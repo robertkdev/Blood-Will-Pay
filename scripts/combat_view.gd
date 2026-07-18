@@ -129,6 +129,10 @@ func _on_continue_pressed() -> void:
 func _auto_start_battle() -> void:
 	controller._auto_start_battle()
 
+func set_auto_start_battle_enabled(enabled: bool) -> void:
+	if controller != null:
+		controller.set_auto_start_battle_enabled(enabled)
+
 func _refresh_economy_ui() -> void:
 	controller.economy_ui.refresh()
 

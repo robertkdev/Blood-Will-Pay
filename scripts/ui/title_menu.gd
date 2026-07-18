@@ -10,6 +10,7 @@ const TextureUtils: GDScript = preload("res://scripts/util/texture_utils.gd")
 const UnitFactoryScript: GDScript = preload("res://scripts/unit_factory.gd")
 const UnitTargetingText: GDScript = preload("res://scripts/ui/unit_targeting_text.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 const SECTION_HOME: String = "home"
 const SECTION_HOW_TO_PLAY: String = "how_to_play"
@@ -59,8 +60,12 @@ var _role_entries: Array[Dictionary] = []
 var _goal_entries: Array[Dictionary] = []
 var _approach_entries: Array[Dictionary] = []
 var _nav_buttons: Array[Button] = []
+var _binding_buttons: Dictionary[StringName, Button] = {}
+var _binding_status: Label = null
+var _listening_action: StringName = StringName()
 
 func _ready() -> void:
+	UserSettingsScript.initialize(get_window())
 	_load_content_data()
 	_apply_gothic_layout()
 	_build_navigation()
@@ -77,6 +82,32 @@ func _ready() -> void:
 	visibility_changed.connect(_on_visibility_changed)
 	_start_bg_loop()
 	_start_logo_float()
+
+func _input(event: InputEvent) -> void:
+	if _listening_action == StringName():
+		return
+	var key_event: InputEventKey = event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.echo:
+		return
+	get_viewport().set_input_as_handled()
+	if key_event.keycode == KEY_ESCAPE or key_event.physical_keycode == KEY_ESCAPE:
+		_cancel_binding_capture("Binding capture canceled.")
+		return
+	if _is_modifier_only(key_event):
+		_set_binding_status("Choose a non-modifier key.", COLOR_BLOOD_HOT)
+		return
+	var result: Dictionary[String, Variant] = UserSettingsScript.set_keyboard_binding(_listening_action, key_event)
+	if not bool(result.get("ok", false)):
+		if String(result.get("error", "")) == "conflict":
+			var conflict_label: String = _action_label(StringName(result.get("conflict_action", "")))
+			_set_binding_status("That key is already assigned to %s. Choose another key or reset defaults." % conflict_label, COLOR_BLOOD_HOT)
+		else:
+			_set_binding_status("The binding could not be saved. Try another key.", COLOR_BLOOD_HOT)
+		return
+	var completed_action: StringName = _listening_action
+	_listening_action = StringName()
+	_refresh_binding_buttons()
+	_set_binding_status("%s is now bound to %s." % [_action_label(completed_action), UserSettingsScript.binding_text(completed_action)], COLOR_GREEN)
 
 func _load_content_data() -> void:
 	_unit_catalog = UnitCatalogScript.new() as UnitCatalog
@@ -549,7 +580,7 @@ func _add_home_route_grid() -> void:
 	_add_card_to_parent(grid, "Run Flow", "Pick a starter, survive the forced first fight, then build through shop offers, bench deployment, combines, items, traits, and betting decisions.", "Start Here", "run flow start starter shop bench combines items traits betting", COLOR_GOLD, false, "HomeRunFlow")
 	_add_card_to_parent(grid, "Roster Library", "Live unit cards include ability text, traits, cost, role, goal, and approaches, so roster study stays tied to current resources.", "Units", "units roster ability traits cost role goal approaches", COLOR_BLOOD_HOT, false, "HomeRoster")
 	_add_card_to_parent(grid, "Combat Terms", "Role, Goal, and Approach explain what a unit is trying to do and why it belongs on a board.", "Glossary", "combat terms role goal approach trait board", COLOR_BLUE, false, "HomeRGA")
-	_add_card_to_parent(grid, "Settings", "Runtime controls for master volume and fullscreen behavior in the current menu session.", "Local", "settings volume fullscreen", COLOR_GREEN, false, "HomeSettings")
+	_add_card_to_parent(grid, "Settings", "Runtime controls for volume, fullscreen behavior, readable UI scaling, and keyboard bindings.", "Local", "settings volume fullscreen ui scale keyboard bindings accessibility", COLOR_GREEN, false, "HomeSettings")
 
 func _render_global_search_results() -> void:
 	var count: int = 0
@@ -585,28 +616,36 @@ func _render_rga() -> void:
 	_set_content_header("Combat Terms", "Player-facing language for reading units, boards, and fights.")
 	if _search_field != null:
 		_search_field.placeholder_text = "Search terms: backline, peel, sustained, role..."
-	_add_card("Role", "The broad job a unit is built to perform: tank, brawler, assassin, marksman, mage, or support.", "role tank brawler assassin marksman mage support")
-	_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition")
-	_add_card("Approach", "The toolkit a unit uses to reach its goal: peel, ramp, sustain, lockdown, dive, zone control, and similar combat patterns.", "approach toolkit peel ramp sustain lockdown dive zone")
-	_add_card("Active Trait", "A trait turns on when enough matching units are on your board. Active thresholds are highlighted on trait hover cards.", "trait active threshold board")
-	_add_card("Win Odds", "A quick read of current board strength. Use it as a warning light, not a promise.", "win odds board strength warning")
-	_add_card("Bench", "Bought units wait on the bench until you drag them to the board. Dropping a bench unit onto a board unit swaps their positions.", "bench drag swap positions")
+	var count: int = 0
+	count += _count_card(_add_card("Role", "The broad job a unit is built to perform: tank, brawler, assassin, marksman, mage, or support.", "role tank brawler assassin marksman mage support"))
+	count += _count_card(_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition"))
+	count += _count_card(_add_card("Approach", "The toolkit a unit uses to reach its goal: peel, ramp, sustain, lockdown, dive, zone control, and similar combat patterns.", "approach toolkit peel ramp sustain lockdown dive zone"))
+	count += _count_card(_add_card("Active Trait", "A trait turns on when enough matching units are on your board. Active thresholds are highlighted on trait hover cards.", "trait active threshold board"))
+	count += _count_card(_add_card("Win Odds", "A quick read of current board strength. Use it as a warning light, not a promise.", "win odds board strength warning"))
+	count += _count_card(_add_card("Bench", "Bought units wait on the bench until you drag them to the board. Dropping a bench unit onto a board unit swaps their positions.", "bench drag swap positions"))
 	_add_heading("Roles")
-	_render_role_cards(false)
+	count += _render_role_cards(false)
 	_add_heading("Goals")
-	_render_goal_cards(false, 0)
+	count += _render_goal_cards(false, 0)
 	_add_heading("Approaches")
-	_render_approach_cards(false, 0)
+	count += _render_approach_cards(false, 0)
+	if count == 0:
+		_add_empty_state("No combat terms match this search. Try role, goal, approach, trait, odds, or bench, or clear the search to browse every term.", true)
 
 func _render_settings() -> void:
-	_set_content_header("Settings", "Local runtime controls for the title menu and current game window.")
+	_listening_action = StringName()
+	_binding_buttons.clear()
+	_binding_status = null
+	_set_content_header("Settings", "Local runtime controls, readable UI scaling, and keyboard bindings.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search settings: volume, fullscreen..."
+		_search_field.placeholder_text = "Search settings: volume, fullscreen, UI scale, keys..."
 	var added: int = 0
 	added += _add_volume_setting()
 	added += _add_fullscreen_setting()
+	added += _add_ui_scale_setting()
+	added += _add_input_settings()
 	if added == 0:
-		_add_empty_state("No settings match the search.")
+		_add_empty_state("No settings match this search. Clear the search to see every available setting.", true)
 
 func _render_unit_cards(compact: bool, limit: int) -> int:
 	var count: int = 0
@@ -732,6 +771,9 @@ func _add_card(title: String, body: String, search_blob: String, kicker: String 
 		return null
 	return _add_card_to_parent(_content_body, title, body, kicker, search_blob, accent, compact, "InfoCard")
 
+func _count_card(card: PanelContainer) -> int:
+	return 1 if card != null else 0
+
 func _add_card_to_parent(parent: Control, title: String, body: String, kicker: String, search_blob: String, accent: Color, compact: bool, node_name: String) -> PanelContainer:
 	if not _matches_query(search_blob + " " + title + " " + body + " " + kicker):
 		return null
@@ -766,7 +808,7 @@ func _add_heading(text: String) -> void:
 	label.custom_minimum_size = Vector2(0.0, 36.0)
 	_content_body.add_child(label)
 
-func _add_empty_state(text: String) -> void:
+func _add_empty_state(text: String, show_clear_search: bool = false) -> void:
 	var card: PanelContainer = _make_card_container("EmptyState", COLOR_PANEL_SOFT, Color(COLOR_MUTED.r, COLOR_MUTED.g, COLOR_MUTED.b, 0.56), 1)
 	_content_body.add_child(card)
 	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
@@ -775,6 +817,15 @@ func _add_empty_state(text: String) -> void:
 	margin.add_child(stack)
 	stack.add_child(_make_label("Nothing Found", 20, COLOR_TEXT, true))
 	stack.add_child(_make_label(text, 14, COLOR_MUTED, true))
+	if show_clear_search:
+		var clear_button: Button = Button.new()
+		clear_button.name = "ClearSearchButton"
+		clear_button.text = "Clear Search"
+		clear_button.focus_mode = Control.FOCUS_ALL
+		clear_button.custom_minimum_size = Vector2(180.0, 40.0)
+		_style_menu_button(clear_button, false)
+		clear_button.pressed.connect(_clear_search)
+		stack.add_child(clear_button)
 
 func _add_volume_setting() -> int:
 	if not _matches_query("master volume audio sound loud quiet"):
@@ -805,6 +856,78 @@ func _add_fullscreen_setting() -> int:
 	var check: CheckBox = _add_checkbox_setting("Fullscreen", "FullscreenCheck", _is_fullscreen(), "Switches between fullscreen and windowed display.", "fullscreen window display screen")
 	check.toggled.connect(_on_fullscreen_toggled)
 	return 1
+
+func _add_ui_scale_setting() -> int:
+	if not _matches_query("ui scale interface size text accessibility readable display"):
+		return 0
+	var card: PanelContainer = _make_card_container("UIScaleSetting", COLOR_PANEL_SOFT, Color(0.42, 0.31, 0.24, 0.88), 1)
+	_content_body.add_child(card)
+	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
+	var stack: VBoxContainer = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	margin.add_child(stack)
+	stack.add_child(_make_label("UI Scale", 18, COLOR_TEXT, false))
+	var option: OptionButton = OptionButton.new()
+	option.name = "UIScaleOption"
+	option.focus_mode = Control.FOCUS_ALL
+	option.custom_minimum_size = Vector2(220.0, 42.0)
+	var scale_values: Array[float] = [1.0, 1.25, 1.5]
+	var current_scale: float = UserSettingsScript.get_ui_scale()
+	for index: int in range(scale_values.size()):
+		var scale_value: float = scale_values[index]
+		option.add_item("%d%%" % int(roundf(scale_value * 100.0)), index)
+		option.set_item_metadata(index, scale_value)
+		if is_equal_approx(scale_value, current_scale):
+			option.select(index)
+	_style_menu_button(option, false)
+	option.item_selected.connect(_on_ui_scale_selected.bind(option))
+	stack.add_child(option)
+	stack.add_child(_make_label("Enlarges the game interface. Layout remains responsive at every supported scale.", 13, COLOR_MUTED, true))
+	return 1
+
+func _add_input_settings() -> int:
+	if not _matches_query("input keys keyboard remap bindings controls confirm accept cancel menu back accessibility"):
+		return 0
+	var card: PanelContainer = _make_card_container("InputBindingsSetting", COLOR_PANEL_SOFT, Color(0.42, 0.31, 0.24, 0.88), 1)
+	_content_body.add_child(card)
+	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
+	var stack: VBoxContainer = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	margin.add_child(stack)
+	stack.add_child(_make_label("Keyboard Bindings", 18, COLOR_TEXT, false))
+	_add_binding_row(stack, &"ui_accept", "Confirm")
+	_add_binding_row(stack, &"ui_cancel", "Menu / Back")
+	_binding_status = _make_label("Choose a binding, then press a key. Escape cancels capture.", 13, COLOR_MUTED, true)
+	_binding_status.name = "BindingStatus"
+	stack.add_child(_binding_status)
+	var reset_button: Button = Button.new()
+	reset_button.name = "ResetBindingsButton"
+	reset_button.text = "Reset Defaults"
+	reset_button.focus_mode = Control.FOCUS_ALL
+	reset_button.custom_minimum_size = Vector2(180.0, 40.0)
+	_style_menu_button(reset_button, false)
+	reset_button.pressed.connect(_on_reset_bindings_pressed)
+	stack.add_child(reset_button)
+	return 1
+
+func _add_binding_row(parent: VBoxContainer, action: StringName, label_text: String) -> void:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var label: Label = _make_label(label_text, 15, COLOR_TEXT, false)
+	label.custom_minimum_size = Vector2(170.0, 40.0)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(label)
+	var button: Button = Button.new()
+	button.name = "Binding_%s" % String(action)
+	button.text = UserSettingsScript.binding_text(action)
+	button.focus_mode = Control.FOCUS_ALL
+	button.custom_minimum_size = Vector2(220.0, 40.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_menu_button(button, false)
+	button.pressed.connect(_begin_binding_capture.bind(action))
+	row.add_child(button)
+	_binding_buttons[action] = button
 
 func _add_motion_setting() -> int:
 	return 0
@@ -1003,6 +1126,66 @@ func _clear_content_body() -> void:
 
 func _on_search_changed(_text: String) -> void:
 	_render_active_section()
+
+func _clear_search() -> void:
+	if _search_field == null:
+		return
+	_search_field.text = ""
+	_render_active_section()
+	_search_field.grab_focus()
+
+func _on_ui_scale_selected(index: int, option: OptionButton) -> void:
+	if option == null or index < 0 or index >= option.item_count:
+		return
+	var scale_value: float = float(option.get_item_metadata(index))
+	var save_error: Error = UserSettingsScript.set_ui_scale(scale_value, get_window())
+	if save_error != OK:
+		push_warning("TitleMenu: failed to save UI scale error=%d" % int(save_error))
+
+func _begin_binding_capture(action: StringName) -> void:
+	_listening_action = action
+	_set_binding_status("Press a key for %s. Escape cancels." % _action_label(action), COLOR_GOLD)
+	var button: Button = _binding_buttons.get(action) as Button
+	if button != null:
+		button.text = "Press a key..."
+
+func _cancel_binding_capture(message: String) -> void:
+	_listening_action = StringName()
+	_refresh_binding_buttons()
+	_set_binding_status(message, COLOR_MUTED)
+
+func _on_reset_bindings_pressed() -> void:
+	_listening_action = StringName()
+	var save_error: Error = UserSettingsScript.reset_input_defaults()
+	_refresh_binding_buttons()
+	if save_error == OK:
+		_set_binding_status("Keyboard bindings restored to defaults.", COLOR_GREEN)
+	else:
+		_set_binding_status("Default bindings were restored for this session but could not be saved.", COLOR_BLOOD_HOT)
+
+func _refresh_binding_buttons() -> void:
+	for action: StringName in _binding_buttons:
+		var button: Button = _binding_buttons.get(action) as Button
+		if button != null:
+			button.text = UserSettingsScript.binding_text(action)
+
+func _set_binding_status(message: String, color: Color) -> void:
+	if _binding_status != null:
+		_binding_status.text = message
+		_binding_status.add_theme_color_override("font_color", color)
+
+func _action_label(action: StringName) -> String:
+	match action:
+		&"ui_accept":
+			return "Confirm"
+		&"ui_cancel":
+			return "Menu / Back"
+		_:
+			return String(action)
+
+func _is_modifier_only(key_event: InputEventKey) -> bool:
+	var code: Key = key_event.physical_keycode if key_event.physical_keycode != KEY_NONE else key_event.keycode
+	return code == KEY_SHIFT or code == KEY_CTRL or code == KEY_ALT or code == KEY_META
 
 func _on_master_volume_changed(value: float) -> void:
 	var bus_index: int = AudioServer.get_bus_index("Master")

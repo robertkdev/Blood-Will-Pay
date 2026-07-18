@@ -284,7 +284,27 @@ func _select_starter(unit_id: String) -> void:
 		_expect(false, "unit select start button missing")
 		return
 	_expect(not start.disabled, "unit select start button did not enable for %s" % unit_id)
+	if _uses_manual_opening_continue():
+		var combat: Control = await _wait_for_combat_view_ready(20.0)
+		_expect(combat != null, "combat view did not prewarm before manual opening for %s" % unit_id)
+		if combat == null:
+			return
+		_set_opening_auto_start_enabled(false)
 	await _click_button(start, "unit select start button")
+
+func _uses_manual_opening_continue() -> bool:
+	return false
+
+func _set_opening_auto_start_enabled(enabled: bool) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	if combat == null:
+		return
+	if combat.has_method("set_auto_start_battle_enabled"):
+		combat.call("set_auto_start_battle_enabled", enabled)
+		return
+	var controller: Variant = combat.get("controller")
+	if controller != null and controller.has_method("set_auto_start_battle_enabled"):
+		controller.call("set_auto_start_battle_enabled", enabled)
 
 func _press_continue(expect_forced: bool, label: String) -> void:
 	var button: Button = _main.find_child("ContinueButton", true, false) as Button
@@ -806,6 +826,15 @@ func _wait_for_combat_view_visible(timeout_seconds: float) -> bool:
 			return true
 		await get_tree().process_frame
 	return false
+
+func _wait_for_combat_view_ready(timeout_seconds: float) -> Control:
+	var deadline_ms: int = Time.get_ticks_msec() + int(max(0.0, timeout_seconds) * 1000.0)
+	while Time.get_ticks_msec() < deadline_ms:
+		var combat: Control = _main.get_node_or_null("CombatView") as Control
+		if combat != null and combat.get("controller") != null:
+			return combat
+		await get_tree().process_frame
+	return null
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

@@ -74,6 +74,18 @@ func _run() -> void:
 			_expect(_find_label_containing_text(title_menu, "Active Trait") != null, "Combat terms search did not expose player-facing trait terminology", failures)
 			_expect(_find_label_containing_text(title_menu, "PASS / LEAN / FAIL") == null, "Combat terms should not expose backend verdict terminology", failures)
 			_expect_content_panels_generated(title_menu, "RGA cards should use generated texture styling", failures)
+			search_field.text = "definitely-no-such-combat-term"
+			search_field.emit_signal("text_changed", "definitely-no-such-combat-term")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "Nothing Found") != null, "Combat terms unmatched search should explain the empty state", failures)
+			_expect(_find_label_containing_text(title_menu, "clear the search") != null, "Combat terms empty state should provide recovery guidance", failures)
+			var clear_search_button: Button = title_menu.find_child("ClearSearchButton", true, false) as Button
+			_expect(clear_search_button != null, "Combat terms empty state should expose Clear Search", failures)
+			if clear_search_button != null:
+				clear_search_button.emit_signal("pressed")
+				await get_tree().process_frame
+				_expect(search_field.text == "", "Clear Search should reset the query", failures)
+				_expect(_find_label_containing_text(title_menu, "Role") != null, "Clear Search should restore combat terms", failures)
 		if how_to_play_button != null and search_field != null:
 			how_to_play_button.emit_signal("pressed")
 			await get_tree().process_frame
@@ -98,8 +110,16 @@ func _run() -> void:
 				_expect_stylebox_texture(volume_slider, "grabber_area", "MasterVolumeSlider filled area should use generated texture styling", failures)
 			var fullscreen_check: CheckBox = title_menu.find_child("FullscreenCheck", true, false) as CheckBox
 			var motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
+			var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton
+			var accept_binding: Button = title_menu.find_child("Binding_ui_accept", true, false) as Button
+			var cancel_binding: Button = title_menu.find_child("Binding_ui_cancel", true, false) as Button
+			var reset_bindings: Button = title_menu.find_child("ResetBindingsButton", true, false) as Button
 			_expect(fullscreen_check != null, "FullscreenCheck missing", failures)
 			_expect(motion_check == null, "ReducedMotionCheck should be removed from settings", failures)
+			_expect(ui_scale_option != null and ui_scale_option.item_count == 3, "Settings should expose three supported UI scales", failures)
+			_expect(accept_binding != null, "Settings should expose Confirm remapping", failures)
+			_expect(cancel_binding != null, "Settings should expose Menu / Back remapping", failures)
+			_expect(reset_bindings != null, "Settings should expose binding reset", failures)
 			_expect_button_states(fullscreen_check, "FullscreenCheck", failures)
 		var start_button: Button = title_menu.get_node_or_null("Center/VBox/StartButton") as Button
 		_expect(start_button != null, "StartButton missing", failures)

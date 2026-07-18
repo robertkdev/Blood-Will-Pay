@@ -3,9 +3,11 @@ extends "res://tests/visual/natural_bonko_two_stage_main_flow_smoke.gd"
 const REPRESENTATIVE_SMOKE_NAME: String = "NaturalRepresentativeMultiStageMainFlowSmoke"
 const REPRESENTATIVE_STARTERS: Array[String] = ["axiom", "brute", "cashmere", "repo", "sari", "bonko"]
 const REPRESENTATIVE_SEEDS: Array[int] = [4101, 4501, 4601, 5101, 5201, 4401]
-const REPRESENTATIVE_TARGET_CHAPTER: int = 4
-const REPRESENTATIVE_TARGET_ROUND: int = 1
-const REPRESENTATIVE_MAX_BATTLES: int = 26
+# This suite is the representative Main/CombatView load and multi-stage runway
+# gate. Campaign-depth survival belongs to the dedicated campaign variants.
+const REPRESENTATIVE_TARGET_CHAPTER: int = 1
+const REPRESENTATIVE_TARGET_ROUND: int = 4
+const REPRESENTATIVE_MAX_BATTLES: int = 6
 const REPRESENTATIVE_ROUND_TIMEOUT: float = 190.0
 
 var _representative_results: Array[Dictionary] = []

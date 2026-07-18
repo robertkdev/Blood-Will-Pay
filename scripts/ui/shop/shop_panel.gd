@@ -5,7 +5,7 @@ signal first_fight_placeholder_pressed()
 
 const UI := preload("res://scripts/constants/ui_constants.gd")
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
-const ShopCardScene := preload("res://scenes/ui/shop/ShopCard.tscn")
+const SHOP_CARD_SCENE_PATH: String = "res://scenes/ui/shop/ShopCard.tscn"
 const ShopOffer := preload("res://scripts/game/shop/shop_offer.gd")
 const EmptySigilTexture: Texture2D = preload("res://assets/ui/gold icon.png")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
@@ -21,6 +21,7 @@ var _cards: Array = []
 var _empty_label_text: String = "LEDGER"
 var _empty_hint_text: String = "Reroll to reveal"
 var _single_empty_state: bool = false
+var _shop_card_scene: PackedScene = null
 
 func configure(grid: GridContainer, slot_count: int = ShopConfig.SLOT_COUNT) -> void:
     _grid = grid
@@ -138,10 +139,11 @@ func _is_compact_viewport() -> bool:
     return viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
 
 func _make_card(offer, index: int) -> Control:
-    if ShopCardScene:
+    var shop_card_scene: PackedScene = _get_shop_card_scene()
+    if shop_card_scene != null:
         if offer is ShopOffer and String(offer.id) == "":
             return _make_sold()
-        var card: Control = ShopCardScene.instantiate() as Control
+        var card: Control = shop_card_scene.instantiate() as Control
         if card and card.has_method("set_slot_index"):
             card.set_slot_index(index)
         return card
@@ -149,6 +151,11 @@ func _make_card(offer, index: int) -> Control:
     placeholder.custom_minimum_size = Vector2(UI.TILE_SIZE * 2, UI.TILE_SIZE + 24)
     placeholder.color = Color(0.1, 0.1, 0.12, 0.4)
     return placeholder
+
+func _get_shop_card_scene() -> PackedScene:
+    if _shop_card_scene == null:
+        _shop_card_scene = ResourceLoader.load(SHOP_CARD_SCENE_PATH, "PackedScene") as PackedScene
+    return _shop_card_scene
 
 func _make_empty() -> Control:
     return _make_placeholder(false)

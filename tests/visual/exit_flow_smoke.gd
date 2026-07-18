@@ -109,12 +109,24 @@ func _run() -> void:
 	_expect(_unit_select_reset(), "new run from overlay state should clear unit select choice")
 
 	UnitFactory.suppress_validation_warnings = _previous_suppress_validation_warnings
+	var exit_code: int = 0
 	if _failures.is_empty():
 		print("ExitFlowSmoke: OK")
 	else:
 		for failure: String in _failures:
 			push_error("ExitFlowSmoke: " + failure)
-	get_tree().quit()
+		exit_code = 1
+	if _main != null and is_instance_valid(_main):
+		var combat_view: Node = _main.get_node_or_null("CombatView")
+		if combat_view != null and combat_view.has_method("_teardown"):
+			combat_view.call("_teardown")
+		var main_parent: Node = _main.get_parent()
+		if main_parent != null:
+			main_parent.remove_child(_main)
+		_main.free()
+		_main = null
+	await _settle_frames(4)
+	get_tree().quit(exit_code)
 
 func _press_title_enter() -> void:
 	var button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button

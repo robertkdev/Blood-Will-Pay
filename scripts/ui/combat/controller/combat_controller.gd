@@ -1401,6 +1401,9 @@ func _auto_start_battle() -> void:
 		print("[CombatView] Auto-starting battle")
 	_on_continue_pressed()
 
+func set_auto_start_battle_enabled(enabled: bool) -> void:
+	auto_combat = enabled
+
 func _sync_contract_market_overlay() -> void:
 	var shop_node: Node = _autoload_node("Shop")
 	var should_show: bool = false

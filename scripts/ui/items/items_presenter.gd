@@ -4,7 +4,7 @@ class_name ItemsPresenter
 const ItemCatalog := preload("res://scripts/game/items/item_catalog.gd")
 const ItemDef := preload("res://scripts/game/items/item_def.gd")
 
-const ITEM_CARD_SCENE := preload("res://scenes/ui/items/ItemCard.tscn")
+const ITEM_CARD_SCENE_PATH: String = "res://scenes/ui/items/ItemCard.tscn"
 const DEFAULT_MIN_ROWS := 3
 
 var view: Control
@@ -15,6 +15,7 @@ var _item_grid_helper
 var _rebuild_queued: bool = false
 var _rebuilding: bool = false
 var _tearing_down: bool = false
+var _item_card_scene: PackedScene = null
 
 func configure(_view: Control) -> void:
 	_tearing_down = false
@@ -77,9 +78,14 @@ func rebuild() -> void:
 	var min_slots: int = cols * DEFAULT_MIN_ROWS
 	while layout.size() < min_slots:
 		layout.append("")
+	var item_card_scene: PackedScene = _get_item_card_scene()
+	if item_card_scene == null:
+		_rebuilding = false
+		push_error("ItemsPresenter: failed to load %s" % ITEM_CARD_SCENE_PATH)
+		return
 	for idx in range(layout.size()):
-		var id := String(layout[idx])
-		var card := ITEM_CARD_SCENE.instantiate()
+		var id: String = String(layout[idx])
+		var card: Control = item_card_scene.instantiate() as Control
 		if card == null:
 			continue
 		if card.has_method("set_item_id"):
@@ -103,6 +109,11 @@ func rebuild() -> void:
 			if router.has_method("attach_card"):
 				router.attach_card(c)
 	_rebuilding = false
+
+func _get_item_card_scene() -> PackedScene:
+	if _item_card_scene == null:
+		_item_card_scene = ResourceLoader.load(ITEM_CARD_SCENE_PATH, "PackedScene") as PackedScene
+	return _item_card_scene
 
 func _clear_grid() -> void:
 	if grid == null:

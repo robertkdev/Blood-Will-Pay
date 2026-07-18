@@ -91,12 +91,15 @@ func _ready() -> void:
 	_expect(int(Roster.first_empty_slot()) == 0, "New Game did not clear Roster bench", failures)
 	_expect(not is_instance_valid(layer), "New Game did not clear the overlay CanvasLayer", failures)
 
+	var exit_code: int = 0
 	if failures.is_empty():
 		print("LossScreenSmoke: OK")
 	else:
 		for failure: String in failures:
 			push_error("LossScreenSmoke: " + failure)
-	get_tree().quit()
+		exit_code = 1
+	await _settle_frames(4)
+	get_tree().quit(exit_code)
 
 func _prepare_dirty_run_state() -> void:
 	if GameState.has_method("set_stage"):

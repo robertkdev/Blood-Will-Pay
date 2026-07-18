@@ -4,10 +4,12 @@ const SMOKE_NAME: String = "CombatArenaBoundsSmoke"
 const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const PLAYER_TEAM: Array[String] = ["mortem", "berebell", "bonko"]
+const VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
 
 var _main: Control = null
 var _view: Control = null
 var _manager: CombatManager = null
+var _viewport: SubViewport = null
 var _failures: Array[String] = []
 
 func _ready() -> void:
@@ -15,10 +17,24 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	DisplayServer.window_set_size(VIEWPORT_SIZE)
+	var window: Window = get_window()
+	if window != null:
+		window.size = VIEWPORT_SIZE
+		window.content_scale_size = VIEWPORT_SIZE
+	_viewport = SubViewport.new()
+	_viewport.size = VIEWPORT_SIZE
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(_viewport)
 	_main = MAIN_SCENE.instantiate() as Control
-	add_child(_main)
+	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_viewport.add_child(_main)
 	await _settle_frames(8)
+	var authoritative_viewport_rect: Rect2 = _main.get_viewport().get_visible_rect()
+	_expect(Vector2i(authoritative_viewport_rect.size) == VIEWPORT_SIZE, "authoritative combat viewport must be 1920x1080, got=%s" % str(authoritative_viewport_rect.size))
+	if Vector2i(authoritative_viewport_rect.size) != VIEWPORT_SIZE:
+		await _finish()
+		return
 	if _main.has_method("_on_start"):
 		_main.call("_on_start")
 	await _settle_frames(8)
@@ -65,7 +81,7 @@ func _run() -> void:
 	var combat_board_rect: Rect2 = planning_area.get_global_rect()
 	var combat_stats_rect: Rect2 = stats_area.get_global_rect()
 	var engine_bounds: Rect2 = _manager.get_arena_bounds()
-	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	var viewport_rect: Rect2 = _view.get_viewport().get_visible_rect()
 	_expect(_rect_close(arena_rect, combat_board_rect, 3.0), "arena container should match the live combat board rect arena=%s board=%s" % [str(arena_rect), str(combat_board_rect)])
 	_expect(absf(arena_rect.position.x - planning_rect_before.position.x) <= 3.0, "combat reflow should preserve board x alignment")
 	_expect(arena_rect.size.distance_to(planning_rect_before.size) <= 3.0, "combat reflow should preserve board size")
@@ -104,9 +120,15 @@ func _finish() -> void:
 	if _view != null and is_instance_valid(_view) and _view.has_method("_teardown"):
 		_view.call("_teardown")
 	if _main != null and is_instance_valid(_main):
-		remove_child(_main)
+		var main_parent: Node = _main.get_parent()
+		if main_parent != null:
+			main_parent.remove_child(_main)
 		_main.free()
 		_main = null
+	if _viewport != null and is_instance_valid(_viewport):
+		remove_child(_viewport)
+		_viewport.free()
+		_viewport = null
 	_view = null
 	_manager = null
 	await _settle_frames(2)

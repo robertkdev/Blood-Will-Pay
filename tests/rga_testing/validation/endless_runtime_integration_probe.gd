@@ -95,18 +95,48 @@ func _validate_board_capacity_and_odds(failures: Array[String]) -> void:
 	_expect(game_state_node != null, "GameState autoload missing for board capacity probe", failures)
 	_expect(roster_node != null, "Roster autoload missing for board capacity probe", failures)
 	_expect(shop_node != null, "Shop autoload missing for board capacity probe", failures)
-	if game_state_node != null and game_state_node.has_method("set_chapter_and_stage"):
+	if game_state_node == null or roster_node == null or shop_node == null:
+		return
+	var original_stage: int = int(game_state_node.get("stage"))
+	var original_chapter: int = int(game_state_node.get("chapter"))
+	var original_stage_in_chapter: int = int(game_state_node.get("stage_in_chapter"))
+	var original_shop_level: int = int(shop_node.call("get_level")) if shop_node.has_method("get_level") else int(ShopConfig.STARTING_LEVEL)
+	var original_shop_snapshot: Dictionary = {}
+	var has_shop_snapshot: bool = shop_node.has_method("snapshot_run_state") and shop_node.has_method("restore_run_state")
+	if has_shop_snapshot:
+		var snapshot_value: Variant = shop_node.call("snapshot_run_state")
+		if snapshot_value is Dictionary:
+			original_shop_snapshot.assign(snapshot_value as Dictionary)
+	var original_max_team_size: int = int(roster_node.get("max_team_size"))
+	var original_bench_slots: Array[Unit] = []
+	var bench_slots_value: Variant = roster_node.get("bench_slots")
+	if bench_slots_value is Array:
+		for unit_value: Variant in bench_slots_value:
+			original_bench_slots.append(unit_value as Unit)
+	if game_state_node.has_method("set_chapter_and_stage"):
 		game_state_node.call("set_chapter_and_stage", 1, 1)
-	if roster_node != null and roster_node.has_method("reset"):
+	if roster_node.has_method("reset"):
 		roster_node.call("reset")
-	if shop_node != null and shop_node.has_method("reset_run"):
+	if shop_node.has_method("reset_run"):
 		shop_node.call("reset_run")
-	if roster_node != null:
-		_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY), "new run board cap should start at %d, got %d" % [int(ShopConfig.DEFAULT_BOARD_CAPACITY), int(roster_node.get("max_team_size"))], failures)
-	if shop_node != null and shop_node.has_method("set_level"):
+	_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY), "new run board cap should start at %d, got %d" % [int(ShopConfig.DEFAULT_BOARD_CAPACITY), int(roster_node.get("max_team_size"))], failures)
+	if shop_node.has_method("set_level"):
 		shop_node.call("set_level", int(ShopConfig.STARTING_LEVEL) + 1)
-	if roster_node != null:
-		_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY) + 1, "leveling should add one board slot, got cap %d" % int(roster_node.get("max_team_size")), failures)
+	_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY) + 1, "leveling should add one board slot, got cap %d" % int(roster_node.get("max_team_size")), failures)
+	if shop_node.has_method("set_level"):
+		shop_node.call("set_level", int(ShopConfig.STARTING_LEVEL))
+	var capacity_floor_cases: Array[Dictionary] = [
+		{"stage": int(ShopConfig.CHAPTER_TWO_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_TWO_CAP_FLOOR_TEAM_SIZE)},
+		{"stage": int(ShopConfig.CHAPTER_THREE_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_THREE_CAP_FLOOR_TEAM_SIZE)},
+		{"stage": int(ShopConfig.CHAPTER_FOUR_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_FOUR_CAP_FLOOR_TEAM_SIZE)},
+		{"stage": int(ShopConfig.CHAPTER_FIVE_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_FIVE_CAP_FLOOR_TEAM_SIZE)},
+	]
+	for capacity_case: Dictionary in capacity_floor_cases:
+		var floor_stage: int = int(capacity_case.get("stage", 0))
+		var expected_capacity: int = int(capacity_case.get("expected", 0))
+		game_state_node.call("set_stage", floor_stage)
+		var observed_capacity: int = int(roster_node.get("max_team_size"))
+		_expect(observed_capacity == expected_capacity, "global stage %d should apply exact automatic board capacity %d, got %d" % [floor_stage, expected_capacity, observed_capacity], failures)
 	var player: Unit = UnitFactory.spawn("bonko")
 	var enemy: Unit = UnitFactory.spawn("beegle")
 	_expect(player != null and enemy != null, "odds probe should spawn bonko and beegle", failures)
@@ -118,10 +148,19 @@ func _validate_board_capacity_and_odds(failures: Array[String]) -> void:
 		player.level = 4
 		var stronger_odds: int = TeamOddsEstimator.estimate_win_percent(player_team, enemy_team)
 		_expect(stronger_odds > evenish_odds, "unit level should improve displayed odds, before=%d after=%d" % [evenish_odds, stronger_odds], failures)
-	if shop_node != null and shop_node.has_method("reset_run"):
-		shop_node.call("reset_run")
-	if roster_node != null and roster_node.has_method("reset"):
-		roster_node.call("reset")
+	if game_state_node.has_method("set_chapter_and_stage"):
+		game_state_node.call("set_chapter_and_stage", original_chapter, original_stage_in_chapter)
+	elif game_state_node.has_method("set_stage"):
+		game_state_node.call("set_stage", original_stage)
+	if has_shop_snapshot:
+		shop_node.call("restore_run_state", original_shop_snapshot)
+	elif shop_node.has_method("set_level"):
+		shop_node.call("set_level", original_shop_level)
+	roster_node.set("bench_slots", original_bench_slots)
+	if roster_node.has_method("set_max_team_size"):
+		roster_node.call("set_max_team_size", original_max_team_size)
+	else:
+		roster_node.set("max_team_size", original_max_team_size)
 
 func _autoload_node(autoload_name: String) -> Node:
 	var root: Window = get_tree().root

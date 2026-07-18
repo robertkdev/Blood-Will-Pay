@@ -34,17 +34,15 @@ func _run() -> void:
 	await _select_starter("bonko")
 	if _finish_if_failed():
 		return
-	await _settle_frames(4)
-	_expect(_node_visible("CombatView"), "CombatView did not open after selecting Bonko")
-
+	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
+	_expect(combat_opened, "CombatView did not open after selecting Bonko")
 	_set_planning_timer_safe()
-	if _first_fight_placeholder_visible():
-		await _press_continue(true, "betting smoke forced opener")
-	else:
-		_expect(
-			int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active),
-			"betting smoke opener was neither available nor already running"
-		)
+	var repositioned: bool = await _reposition_first_board_unit("betting smoke board reposition") if combat_opened else false
+	_expect(repositioned, "starter board unit did not reposition before betting smoke opener")
+	if _finish_if_failed():
+		return
+	_expect(_first_fight_placeholder_visible(), "forced opener placeholder missing before betting smoke")
+	await _press_continue(true, "betting smoke forced opener")
 	Engine.time_scale = 8.0
 	var shop_ready: bool = await _wait_for_shop_after_win(30.0)
 	_expect(shop_ready, "betting smoke did not reach post-opener shop")
@@ -59,6 +57,9 @@ func _run() -> void:
 
 	await _start_and_verify_locked_max_bet()
 	_finish()
+
+func _uses_manual_opening_continue() -> bool:
+	return true
 
 func _verify_direct_economy_contract() -> void:
 	if get_tree().root.get_node_or_null("/root/Economy") == null:

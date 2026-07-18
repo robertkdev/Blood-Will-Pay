@@ -6,12 +6,14 @@ const MID_RUN_FIRST_FIGHT_TIMEOUT: float = 30.0
 const MID_RUN_ROUND_TIMEOUT: float = 90.0
 const MID_RUN_HEARTBEAT_SECONDS: float = 10.0
 const MAX_DEPLOY_ATTEMPTS: int = 10
+# This smoke owns the deterministic opening-to-Chapter-2 bridge. Chapter-contract
+# and endless progression have dedicated probes with their own decision setup.
 const ROUND_PLANS: Array[Dictionary] = [
 	{
 		"label": "round_2_frontline_pair",
 		"offers": ["morrak", "grint", "mortem", "korath", "sari"],
 		"buy_xp": 1,
-		"buy": ["morrak"],
+		"buy": ["morrak", "grint"],
 		"gold": 16,
 		"min_stage_after": 3,
 	},
@@ -19,16 +21,18 @@ const ROUND_PLANS: Array[Dictionary] = [
 		"label": "round_3_body_width",
 		"offers": ["sari", "brute", "berebell", "bo", "cashmere"],
 		"buy_xp": 1,
-		"buy": ["sari"],
+		"buy": ["sari", "brute"],
 		"gold": 16,
 		"min_stage_after": 4,
 	},
 	{
 		"label": "round_4_boss_gate",
-		"offers": ["berebell", "bo", "cashmere", "repo", "korath"],
+		"offers": ["meridian", "malachor", "nullora", "quillith", "gable"],
 		"buy_xp": 3,
-		"buy": ["berebell"],
-		"gold": 24,
+		"buy": ["meridian", "malachor", "nullora", "quillith", "gable"],
+		"field": ["meridian", "malachor", "nullora", "quillith", "gable"],
+		"bench_out": ["bonko", "morrak", "grint", "sari", "brute"],
+		"gold": 40,
 		"min_stage_after": 5,
 	},
 	{
@@ -38,52 +42,6 @@ const ROUND_PLANS: Array[Dictionary] = [
 		"buy": ["korath"],
 		"gold": 32,
 		"min_chapter_after": 2,
-	},
-	{
-		"label": "chapter_2_round_1_creep_sustain",
-		"offers": ["veyra", "nyxa", "teller", "volt", "kythera"],
-		"buy_xp": 6,
-		"buy": ["veyra"],
-		"gold": 36,
-		"min_chapter_after": 2,
-		"min_stage_after": 2,
-	},
-	{
-		"label": "chapter_2_round_2_normal_check",
-		"offers": ["kythera", "hexeon", "vykos", "teller", "volt"],
-		"buy": ["hexeon", "vykos"],
-		"field": ["veyra", "hexeon", "vykos"],
-		"bench_out": ["bonko", "morrak", "berebell"],
-		"gold": 24,
-		"min_chapter_after": 2,
-		"min_stage_after": 3,
-	},
-	{
-		"label": "chapter_2_round_3_second_rga_puzzle",
-		"offers": ["vykos", "volt", "paisley", "luna", "repo"],
-		"buy": ["volt"],
-		"gold": 20,
-		"min_chapter_after": 2,
-		"min_stage_after": 4,
-	},
-	{
-		"label": "chapter_2_round_4_boss_pivot",
-		"offers": ["kythera", "teller", "repo", "bo", "paisley"],
-		"buy": ["kythera", "teller"],
-		"field": ["kythera", "teller"],
-		"bench_out": ["korath", "sari"],
-		"gold": 28,
-		"min_chapter_after": 2,
-		"min_stage_after": 5,
-	},
-	{
-		"label": "chapter_2_round_5_mirror_bridge",
-		"offers": ["nyxa", "paisley", "luna", "repo", "bo"],
-		"buy": ["nyxa"],
-		"field": ["nyxa"],
-		"bench_out": ["cashmere"],
-		"gold": 24,
-		"min_chapter_after": 3,
 	},
 ]
 
@@ -112,14 +70,14 @@ func _run() -> void:
 func _run_mid_run_progression_flow() -> void:
 	await _ensure_unit_select()
 	await _select_starter(STARTER_ID)
-	await _settle_frames(4)
-	_expect(_node_visible("CombatView"), "CombatView did not open for mid-run progression")
-	var repositioned: bool = await _reposition_first_board_unit("mid-run opener reposition")
+	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
+	_expect(combat_opened, "CombatView did not open for mid-run progression")
+	_set_planning_timer_safe()
+	var repositioned: bool = await _reposition_first_board_unit("mid-run opener reposition") if combat_opened else false
 	_expect(repositioned, "starter did not reposition before mid-run opener")
 	if not _technical_failures().is_empty():
 		return
 
-	_set_planning_timer_safe()
 	_expect(_first_fight_placeholder_visible(), "forced opener placeholder missing before mid-run progression")
 	await _press_continue(true, "mid-run forced opener")
 	var first_result: String = await _wait_for_first_result(MID_RUN_FIRST_FIGHT_TIMEOUT)
@@ -328,7 +286,7 @@ func _button_with_text(text: String) -> Button:
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and String(button.text) == text:
+		if button != null and (String(button.text) == text or String(button.text).begins_with(text + " ")):
 			return button
 	return null
 

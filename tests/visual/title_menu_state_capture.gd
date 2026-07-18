@@ -42,6 +42,7 @@ func _run() -> void:
 			enter_button.emit_signal("pressed")
 		await _settle_seconds(0.85)
 
+	await _open_section("HomeButton")
 	await _capture("01_overview", ["GAMBLE BATTLE", "COMMAND MENU", "OPENING LOOP"])
 	await _open_section("HowToPlayButton")
 	await _set_search("combine")
@@ -52,9 +53,11 @@ func _run() -> void:
 	await _open_section("RGAGlossaryButton")
 	await _set_search("threshold")
 	await _capture("04_combat_terms_search_threshold", ["COMBAT TERMS", "ACTIVE TRAIT", "THRESHOLD"])
+	await _set_search("definitely-no-such-combat-term")
+	await _capture("05_combat_terms_no_results", ["COMBAT TERMS", "NOTHING FOUND", "CLEAR SEARCH"])
 	await _open_section("SettingsButton")
 	await _set_search("")
-	await _capture("05_settings", ["SETTINGS", "MASTER VOLUME", "FULLSCREEN"])
+	await _capture("06_settings", ["SETTINGS", "MASTER VOLUME", "FULLSCREEN", "UI SCALE", "KEYBOARD BINDINGS"])
 	_finish()
 
 func _open_section(button_name: String) -> void:
@@ -111,7 +114,9 @@ func _expect_generated_title_styles(context: String) -> void:
 		var panel_count: int = 0
 		for node: Node in body.find_children("*", "PanelContainer", true, false):
 			var panel: PanelContainer = node as PanelContainer
-			if panel != null:
+			# OptionButton creates private popup/focus PanelContainers that inherit
+			# engine styles; app-authored cards all own a named Margin child.
+			if panel != null and panel.get_node_or_null("Margin") != null:
 				panel_count += 1
 				_expect(panel.get_theme_stylebox("panel") is StyleBoxTexture, "%s %s should use generated texture style" % [context, str(panel.name)])
 		_expect(panel_count > 0, "%s should expose at least one generated card or chip" % context)
