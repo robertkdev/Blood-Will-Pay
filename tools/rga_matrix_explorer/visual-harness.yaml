@@ -1,0 +1,50 @@
+version: 1
+project: Gamble Battle RGA Matrix Explorer
+scenarios:
+- id: rga-explorer
+  title: RGA Matrix Explorer Runtime Review
+  adapter: generic
+  objective: Verify that the counter matrix, trait plan, numbered bridge roster,
+    and double-vertical proofs are legible, coherent, and responsive in the real
+    browser runtime.
+  required_groups:
+  - overview
+  - interaction
+  - responsive
+  captures:
+  - path: visual-evidence\desktop-overview.jpg
+    label: Desktop overview
+    group: overview
+    role: actual
+  - path: visual-evidence\desktop-matrix.jpg
+    label: Desktop counter matrix
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-traits.jpg
+    label: Desktop trait atlas
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-bridges.jpg
+    label: Desktop numbered bridge roster
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-team-lab.jpg
+    label: Desktop double-vertical proof lab
+    group: interaction
+    role: actual
+  - path: visual-evidence\mobile-overview.jpg
+    label: Mobile overview at 390 by 844
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-matrix-clip.jpg
+    label: Mobile matrix viewport
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-traits-filtered.jpg
+    label: Mobile trait atlas filtered to Arcanist
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-team-lab.jpg
+    label: Mobile double-vertical proof lab
+    group: responsive
+    role: actual

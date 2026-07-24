@@ -1,0 +1,20 @@
+[
+  {
+    "id": "F001",
+    "panel_id": "P007",
+    "title": "Mobile matrix lacks a horizontal-scroll affordance",
+    "description": "Only the first matrix columns are visible and the baseline capture does not explain that the matrix continues horizontally.",
+    "verdict": "fail",
+    "severity": "hard",
+    "category": "responsive",
+    "region": [
+      0.44,
+      0.32,
+      0.51,
+      0.68
+    ],
+    "expected": "The narrow layout visibly communicates how to reach all nine opponent columns.",
+    "observed": "The remaining columns are cropped without a visible scroll instruction.",
+    "confidence": 0.98
+  }
+]
