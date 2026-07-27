@@ -179,7 +179,7 @@ func _execute_action(action_id: String, params: Dictionary) -> void:
 				var eco: Node = _get_autoload("Economy")
 				if eco != null and eco.has_method("add_gold"):
 					eco.add_gold(amt)
-					_log("Creep reward: +%d gold" % amt)
+					_log("Creep reward: +%d blood" % amt)
 					_debug_log("action grant_gold: +%d" % amt)
 				else:
 					_debug_log("action grant_gold skipped: Economy missing")

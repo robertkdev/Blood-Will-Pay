@@ -4,6 +4,7 @@ class_name ItemCard
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const ItemCatalog := preload("res://scripts/game/items/item_catalog.gd")
 const ItemDef := preload("res://scripts/game/items/item_def.gd")
+const CombineRules := preload("res://scripts/game/items/combine_rules.gd")
 const ItemTooltipScene := preload("res://scenes/ui/items/ItemTooltip.tscn")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
@@ -15,6 +16,7 @@ var count_label: Label
 var background: Panel
 var frame: Panel
 var patina: ColorRect
+var combine_preview_label: Label
 
 var slot_index: int = -1
 var item_id: String = ""
@@ -23,6 +25,8 @@ var _hovered: bool = false
 var _hover_token: int = 0
 var _tooltip: Control = null
 var _hover_tween: Tween = null
+
+static var active_drag_item_id: String = ""
 
 func _ready() -> void:
 	super._ready()
@@ -130,6 +134,23 @@ func _ensure_children() -> void:
 		count_label.modulate = Color(0.96, 0.74, 0.38, 0.98)
 		count_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		count_label.add_theme_constant_override("outline_size", 1)
+	if combine_preview_label == null:
+		combine_preview_label = Label.new()
+		combine_preview_label.name = "CombinePreview"
+		combine_preview_label.visible = false
+		combine_preview_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		combine_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		combine_preview_label.add_theme_font_size_override("font_size", 11)
+		combine_preview_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.42, 1.0))
+		combine_preview_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+		combine_preview_label.add_theme_constant_override("outline_size", 2)
+		combine_preview_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		combine_preview_label.offset_left = -34.0
+		combine_preview_label.offset_right = 34.0
+		combine_preview_label.offset_top = -24.0
+		combine_preview_label.offset_bottom = -6.0
+		combine_preview_label.z_index = 80
+		add_child(combine_preview_label)
 
 func set_item_id(id: String) -> void:
 	item_id = String(id)
@@ -224,6 +245,7 @@ func _on_mouse_entered() -> void:
 	_hover_token += 1
 	_apply_card_style(item_id.strip_edges() != "")
 	_apply_hover_motion(true, item_id.strip_edges() != "")
+	_update_combine_preview()
 	var token: int = _hover_token
 	await get_tree().create_timer(HOVER_DELAY).timeout
 	if not _hovered or token != _hover_token:
@@ -236,6 +258,7 @@ func _on_mouse_exited() -> void:
 	_clear_tooltip()
 	_apply_card_style(item_id.strip_edges() != "")
 	_apply_hover_motion(false, item_id.strip_edges() != "")
+	_clear_combine_preview()
 
 func _on_focus_entered() -> void:
 	if item_id.strip_edges() == "":
@@ -260,6 +283,7 @@ func _on_hover_gui_input(event: InputEvent) -> void:
 			_tooltip.call("move_to", viewport.get_mouse_position())
 
 func _on_began_drag() -> void:
+	active_drag_item_id = item_id
 	_hovered = false
 	_hover_token += 1
 	_clear_tooltip()
@@ -267,8 +291,26 @@ func _on_began_drag() -> void:
 	_apply_hover_motion(false, item_id.strip_edges() != "")
 
 func _on_ended_drag() -> void:
+	active_drag_item_id = ""
+	_clear_combine_preview()
 	_apply_card_style(item_id.strip_edges() != "")
 	_apply_hover_motion(_hovered, item_id.strip_edges() != "")
+
+func _update_combine_preview() -> void:
+	if combine_preview_label == null:
+		return
+	var result_id: String = CombineRules.completed_for(active_drag_item_id, item_id)
+	if result_id == "":
+		combine_preview_label.visible = false
+		return
+	var result_def: ItemDef = ItemCatalog.get_def(result_id)
+	var result_name: String = String(result_def.name) if result_def != null else result_id.replace("_", " ").capitalize()
+	combine_preview_label.text = "Craft → %s" % result_name
+	combine_preview_label.visible = true
+
+func _clear_combine_preview() -> void:
+	if combine_preview_label != null:
+		combine_preview_label.visible = false
 
 func _show_tooltip() -> void:
 	var viewport: Viewport = get_viewport()

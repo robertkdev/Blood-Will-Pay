@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b2531"/>
+      <stop offset="0.45" stop-color="#100d15"/>
+      <stop offset="1" stop-color="#050408"/>
+    </linearGradient>
+    <linearGradient id="blood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8f2432"/>
+      <stop offset="0.55" stop-color="#5b101c"/>
+      <stop offset="1" stop-color="#24060d"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <circle cx="128" cy="132" r="94" fill="#040307" opacity="0.72" filter="url(#shadow)"/>
+  <path d="M92 31h72v22l-8 10v18h-56V63l-8-10z" fill="#17121c" stroke="#e1c7a0" stroke-width="6"/>
+  <path d="M102 75h52c17 0 28 14 28 31v86c0 18-14 32-32 32h-44c-18 0-32-14-32-32v-86c0-17 11-31 28-31z" fill="url(#glass)" stroke="#e1c7a0" stroke-width="7"/>
+  <path d="M82 145h92v47c0 13-10 24-24 24h-44c-14 0-24-11-24-24z" fill="url(#blood)"/>
+  <path d="M89 145c15-8 28 6 43-1 14-7 25-2 36 1" fill="none" stroke="#dc5868" stroke-width="5" opacity="0.88"/>
+  <path d="M108 86v116" stroke="#f2deba" stroke-width="3" opacity="0.88"/>
+  <path d="M108 104h19M108 123h12M108 142h19M108 161h12M108 180h19" stroke="#f2deba" stroke-width="3" opacity="0.95"/>
+  <path d="M157 97c27 4 38 18 38 42v49c0 10 7 17 17 17h9" fill="none" stroke="#a68573" stroke-width="8" stroke-linecap="round"/>
+  <path d="M157 97c27 4 38 18 38 42v49c0 10 7 17 17 17h9" fill="none" stroke="#3e0b13" stroke-width="4" stroke-linecap="round"/>
+  <rect x="211" y="191" width="22" height="28" rx="4" fill="#17121c" stroke="#e1c7a0" stroke-width="4"/>
+  <path d="M89 53h78M102 34h54" stroke="#f2deba" stroke-width="4" opacity="0.82"/>
+</svg>

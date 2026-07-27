@@ -66,7 +66,7 @@ func set_data(props: Dictionary) -> void:
 		set_meta("shop_disabled_reason", "")
 	offer_id = String(props.get("id", ""))
 	var title := String(props.get("name", "?"))
-	var price_i := int(props.get("price", props.get("cost", 0)))
+	var price_i: int = int(props.get("price", props.get("cost", 0)))
 	var img_path := String(props.get("image_path", props.get("sprite_path", "")))
 	var roles: Array = _coerce_array(props.get("roles", []))
 	var traits: Array = _coerce_array(props.get("traits", []))
@@ -84,7 +84,7 @@ func set_data(props: Dictionary) -> void:
 	if _name_label:
 		_name_label.text = title
 	if _price_label:
-		_price_label.text = str(price_i) + "g"
+		_price_label.text = "%d blood" % price_i
 	if _icon:
 		var tex: Texture2D = null
 		if img_path != "":
@@ -120,7 +120,7 @@ func set_data(props: Dictionary) -> void:
 	else:
 		tooltip_text = title
 	_tooltip_title = title
-	_tooltip_subtitle = "%dg" % price_i
+	_tooltip_subtitle = "%d blood" % price_i
 	_tooltip_lines = _build_tooltip_lines(display_role, display_goal, approaches, alt_goals, traits)
 	tooltip_text = ""
 	if _hovered:
@@ -153,7 +153,7 @@ func set_affordable(affordable: bool) -> void:
 		disabled = not ok
 	if _price_label:
 		_price_label.modulate = Color(1, 1, 0.8, 0.95) if ok else Color(1, 0.5, 0.5, 0.85)
-	set_status_tip("" if ok else "Not enough gold")
+	set_status_tip("" if ok else "Not enough blood in reserve")
 	_refresh_cursor()
 
 func set_shop_disabled(reason) -> void:

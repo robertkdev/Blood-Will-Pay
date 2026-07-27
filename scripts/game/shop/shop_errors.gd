@@ -20,7 +20,7 @@ const MESSAGES := {
 	COMBAT_PHASE: "Not available during combat",
 	INVALID_SLOT: "Invalid shop slot",
 	NO_OFFERS: "No available offers",
-	INSUFFICIENT_GOLD: "Not enough gold",
+	INSUFFICIENT_GOLD: "Not enough blood in reserve",
 	BENCH_FULL: "Bench is full",
 	SHOP_LOCKED: "Shop is locked",
 	INVALID_UNIT: "Invalid unit",
