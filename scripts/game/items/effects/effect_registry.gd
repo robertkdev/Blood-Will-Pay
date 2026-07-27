@@ -18,7 +18,37 @@ func configure(manager: CombatManager, engine: CombatEngine, buff_system: BuffSy
     _register("mindstone", preload("res://scripts/game/items/effects/mindstone.gd").new())
     _register("bandana", preload("res://scripts/game/items/effects/bandana.gd").new())
     _register("turbine", preload("res://scripts/game/items/effects/turbine.gd").new())
-    # Optional additional effects can be added similarly when implemented.
+    var completed_effect: GDScript = preload("res://scripts/game/items/effects/completed_runtime_effect.gd")
+    for effect_id: String in [
+        "anchor",
+        "arc_dice",
+        "armageddon",
+        "chestplate",
+        "clockwork",
+        "codex",
+        "conductor",
+        "dagger",
+        "gamblers_eye",
+        "guard",
+        "heavyheart",
+        "hemothorn",
+        "largewand",
+        "lifetaker",
+        "mageheart",
+        "orb_on_a_stick",
+        "piercing_gear",
+        "relay",
+        "rendsaw",
+        "sanctum",
+        "serenity",
+        "stone",
+        "thunderplate",
+        "vengeance",
+        "vital_battery",
+        "wardheart",
+        "windwall",
+    ]:
+        _register(effect_id, completed_effect.new(effect_id))
 
     # Configure each handler with combat context
     for h in _handlers.values():
@@ -52,7 +82,7 @@ func registered_effect_ids() -> PackedStringArray:
     return ids
 
 func dispatch(effect_id: String, unit: Unit, event: String, data: Dictionary) -> void:
-    var h = _handlers.get(String(effect_id), null)
+    var h: Variant = _handlers.get(String(effect_id), null)
     if h == null:
         return
     if h.has_method("on_event"):

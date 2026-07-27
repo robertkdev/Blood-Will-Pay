@@ -23,9 +23,20 @@ var _unit_scroll: ScrollContainer = null
 var _unit_team: String = "player"
 var _unit_index: int = -1
 
+const UNIT_PANEL_COMPACT_WIDTH: float = 252.0
+const UNIT_PANEL_NORMAL_WIDTH: float = 294.0
+const STATS_PANEL_COMPACT_WIDTH: float = 268.0
+const STATS_PANEL_NORMAL_WIDTH: float = 316.0
+const METRIC_TABS_COMPACT_WIDTH: float = 252.0
+const METRIC_TABS_NORMAL_WIDTH: float = 294.0
+const SCOREBOARD_COMPACT_WIDTH: float = 252.0
+const SCOREBOARD_NORMAL_WIDTH: float = 294.0
+
 func _ready() -> void:
     _configure_input_routing()
     _ensure_unit_scroll_frame()
+    if not resized.is_connected(Callable(self, "_on_resized")):
+        resized.connect(_on_resized)
     _apply_gothic_window_button_styles()
     set_process(false)
     # Wire header window buttons
@@ -63,6 +74,8 @@ func _exit_tree() -> void:
 func teardown() -> void:
     set_process(false)
     set_process_unhandled_input(false)
+    if resized.is_connected(Callable(self, "_on_resized")):
+        resized.disconnect(_on_resized)
     if manager != null and is_instance_valid(manager):
         if manager.is_connected("stats_updated", Callable(self, "_on_stats_updated")):
             manager.stats_updated.disconnect(_on_stats_updated)
@@ -122,6 +135,7 @@ func set_ability_system(_abilities) -> void:
     pass
 
 func show_team_metrics() -> void:
+    _update_unit_panel_layout()
     mode = Mode.TEAM
     if title_label:
         title_label.text = "Team Metrics"
@@ -142,6 +156,7 @@ func show_unit_metrics_ctx(team: String, index: int, u: Unit) -> void:
     show_unit_metrics(u)
 
 func show_unit_metrics(u: Unit) -> void:
+    _update_unit_panel_layout()
     mode = Mode.UNIT
     if title_label:
         title_label.text = "Enemy Unit" if _unit_team == "enemy" else "Player Unit"
@@ -193,10 +208,66 @@ func _ensure_unit_scroll_frame() -> void:
             previous_parent.remove_child(unit_panel)
         _unit_scroll.add_child(unit_panel)
     unit_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    unit_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    unit_panel.custom_minimum_size = Vector2(294.0, 620.0)
+    unit_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+    _update_unit_panel_layout()
 
-func _make_unit_frame_style() -> StyleBox:
+func _on_resized() -> void:
+    _update_unit_panel_layout()
+
+func apply_responsive_layout() -> void:
+    _update_unit_panel_layout()
+
+func _update_unit_panel_layout() -> void:
+    var compact: bool = _is_compact_unit_panel()
+    custom_minimum_size = Vector2(STATS_PANEL_COMPACT_WIDTH if compact else STATS_PANEL_NORMAL_WIDTH, 388.0 if compact else 560.0)
+    update_minimum_size()
+    if metric_tabs != null and is_instance_valid(metric_tabs):
+        metric_tabs.custom_minimum_size = Vector2(METRIC_TABS_COMPACT_WIDTH if compact else METRIC_TABS_NORMAL_WIDTH, 42.0 if compact else 52.0)
+        metric_tabs.update_minimum_size()
+    if scoreboard != null and is_instance_valid(scoreboard):
+        scoreboard.custom_minimum_size = Vector2(SCOREBOARD_COMPACT_WIDTH if compact else SCOREBOARD_NORMAL_WIDTH, 304.0 if compact else 430.0)
+        scoreboard.update_minimum_size()
+    var margin_size: int = 6 if compact else 10
+    var margin: MarginContainer = null
+    if _unit_panel_frame != null and is_instance_valid(_unit_panel_frame):
+        _unit_panel_frame.custom_minimum_size = Vector2(0.0, 0.0)
+        _unit_panel_frame.add_theme_stylebox_override("panel", _make_unit_frame_style(compact))
+        _unit_panel_frame.update_minimum_size()
+        margin = _unit_panel_frame.get_node_or_null("Margin") as MarginContainer
+    if margin != null:
+        margin.custom_minimum_size = Vector2(0.0, 0.0)
+        margin.update_minimum_size()
+        margin.add_theme_constant_override("margin_left", margin_size)
+        margin.add_theme_constant_override("margin_top", margin_size)
+        margin.add_theme_constant_override("margin_right", margin_size)
+        margin.add_theme_constant_override("margin_bottom", margin_size)
+    if _unit_scroll != null and is_instance_valid(_unit_scroll):
+        _unit_scroll.custom_minimum_size = Vector2(0.0, 0.0)
+        _unit_scroll.update_minimum_size()
+        _unit_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        _unit_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+    if unit_panel != null and is_instance_valid(unit_panel):
+        var width: float = UNIT_PANEL_COMPACT_WIDTH if compact else UNIT_PANEL_NORMAL_WIDTH
+        unit_panel.custom_minimum_size = Vector2(width, 430.0)
+        if unit_panel.has_method("set_compact_layout"):
+            unit_panel.call("set_compact_layout", compact)
+        unit_panel.update_minimum_size()
+    var owner_container: Container = get_parent() as Container
+    if owner_container != null:
+        owner_container.queue_sort()
+
+func _is_compact_unit_panel() -> bool:
+    var viewport_size: Vector2 = get_viewport_rect().size
+    if viewport_size.x > 1.0 and (viewport_size.x <= 1400.0 or viewport_size.y <= 760.0):
+        return true
+    var panel_width: float = get_global_rect().size.x
+    if panel_width <= 1.0:
+        panel_width = size.x
+    if panel_width <= 1.0:
+        return false
+    return panel_width <= 340.0
+
+func _make_unit_frame_style(compact: bool = false) -> StyleBox:
     var fallback: StyleBoxFlat = StyleBoxFlat.new()
     fallback.bg_color = Color(0.024, 0.020, 0.028, 0.96)
     fallback.border_color = Color(0.45, 0.33, 0.23, 0.88)
@@ -208,6 +279,12 @@ func _make_unit_frame_style() -> StyleBox:
     fallback.corner_radius_top_right = 5
     fallback.corner_radius_bottom_right = 5
     fallback.corner_radius_bottom_left = 5
+    fallback.content_margin_left = 4.0 if compact else 10.0
+    fallback.content_margin_top = 4.0 if compact else 8.0
+    fallback.content_margin_right = 4.0 if compact else 10.0
+    fallback.content_margin_bottom = 4.0 if compact else 8.0
+    if compact:
+        return fallback
     return GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), fallback)
 
 func _on_window_all() -> void:

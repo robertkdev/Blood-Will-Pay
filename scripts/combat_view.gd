@@ -4,8 +4,6 @@ const GothicUITheme := preload("res://scripts/ui/combat/gothic_ui_theme.gd")
 const UIBars := preload("res://scripts/ui/combat/ui_bars.gd")
 const StageProgressTopBarScene: GDScript = preload("res://scripts/ui/combat/stage_progress_top_bar.gd")
 
-var _controller_script: Script = null
-
 @onready var log_label: RichTextLabel = get_node_or_null("MarginContainer/VBoxContainer/Log") as RichTextLabel
 @onready var player_stats_label: Label = $"MarginContainer/VBoxContainer/HBoxContainer/PlayerStatsLabel"
 @onready var enemy_stats_label: Label = $"MarginContainer/VBoxContainer/HBoxContainer/EnemyStatsLabel"
@@ -31,7 +29,7 @@ var _controller_script: Script = null
 ## Title screen removed
 
 var manager: CombatManager
-var controller
+var controller: CombatController
 var _teardown_done: bool = false
 var stage_progress_top_bar: Control
 
@@ -58,14 +56,10 @@ func _update_grid_metrics() -> void:
 
 func _ready() -> void:
 	if manager == null:
-		manager = load("res://scripts/combat_manager.gd").new()
+		manager = CombatManager.new()
+	if manager != null and manager.get_parent() == null:
 		add_child(manager)
-	if _controller_script == null:
-		_controller_script = load("res://scripts/ui/combat/controller/combat_controller.gd")
-	if _controller_script != null:
-		controller = _controller_script.new()
-	else:
-		controller = null
+	controller = CombatController.new()
 	if not resized.is_connected(Callable(self, "_apply_responsive_layout")):
 		resized.connect(_apply_responsive_layout)
 	_ensure_stage_progress_top_bar()
@@ -94,18 +88,71 @@ func _teardown() -> void:
 		return
 	_teardown_done = true
 	set_process(false)
+	var resized_callback: Callable = Callable(self, "_apply_responsive_layout")
+	if resized.is_connected(resized_callback):
+		resized.disconnect(resized_callback)
 	var gs: Node = _get_gs()
 	if gs != null and is_instance_valid(gs) and gs.is_connected("phase_changed", Callable(self, "_on_phase_changed")):
 		gs.phase_changed.disconnect(_on_phase_changed)
+	_disconnect_external_backplates()
+	if manager != null and is_instance_valid(manager) and manager.has_method("clear_active_battle_runtime"):
+		manager.clear_active_battle_runtime()
 	if controller != null and controller.has_method("teardown"):
 		controller.teardown()
 	controller = null
 	if manager != null and is_instance_valid(manager) and manager.has_method("teardown"):
 		manager.teardown()
 	manager = null
+	_release_runtime_resource_refs(self)
 	theme = null
 	GothicUITheme.clear_runtime()
 	UIBars.clear_runtime()
+
+func _disconnect_external_backplates() -> void:
+	for plate_name: String in ["GothicShopPlate", "GothicItemsPlate", "GothicStatsAreaPlate", "GothicBenchPlate"]:
+		var plate: Panel = get_node_or_null(plate_name) as Panel
+		if plate == null or not is_instance_valid(plate):
+			continue
+		if plate.has_meta("target_path"):
+			var target: Control = get_node_or_null(plate.get_meta("target_path")) as Control
+			var resize_callback: Callable = Callable(GothicUITheme, "_position_external_backplate").bind(self, plate)
+			if target != null and target.is_connected("resized", resize_callback):
+				target.resized.disconnect(resize_callback)
+			if resized.is_connected(resize_callback):
+				resized.disconnect(resize_callback)
+		var plate_parent: Node = plate.get_parent()
+		if plate_parent != null:
+			plate_parent.remove_child(plate)
+		plate.free()
+
+func _release_runtime_resource_refs(root: Node) -> void:
+	if root == null:
+		return
+	for child: Node in root.get_children():
+		_release_runtime_resource_refs(child)
+	var texture_rect: TextureRect = root as TextureRect
+	if texture_rect != null:
+		texture_rect.texture = null
+	var control: Control = root as Control
+	if control != null:
+		for style_name: String in _theme_style_names():
+			control.remove_theme_stylebox_override(style_name)
+		control.theme = null
+
+func _theme_style_names() -> Array[String]:
+	return [
+		"panel",
+		"normal",
+		"hover",
+		"pressed",
+		"focus",
+		"disabled",
+		"background",
+		"fill",
+		"slider",
+		"grabber_area",
+		"grabber_area_highlight",
+	]
 
 func _init_game() -> void:
 	controller._init_game()
@@ -122,6 +169,10 @@ func _on_continue_pressed() -> void:
 
 func _auto_start_battle() -> void:
 	controller._auto_start_battle()
+
+func set_auto_start_battle_enabled(enabled: bool) -> void:
+	if controller != null and controller.has_method("set_auto_start_battle_enabled"):
+		controller.set_auto_start_battle_enabled(enabled)
 
 func _refresh_economy_ui() -> void:
 	controller.economy_ui.refresh()
@@ -196,12 +247,13 @@ func _set_sprite_texture(rect: TextureRect, path: String, fallback_color: Color)
 func _process(_delta: float) -> void:
 	controller.process(_delta)
 	_update_planning_timer(_delta)
+	_update_combat_timer()
 
 
 func _get_gs() -> Node:
 	# Resolve GameState autoload safely in editor/headless contexts.
 	# Prefer autoload by name; fall back to root node lookup.
-	var root: Node = (get_tree().root if get_tree() else null)
+	var root: Node = (get_tree().root if is_inside_tree() and get_tree() else null)
 	var node: Node = (root.get_node_or_null("/root/GameState") if root else null)
 	# Accessing GameState by name works when autoloaded; guard for tests/tools.
 	if typeof(GameState) != TYPE_NIL:
@@ -210,7 +262,7 @@ func _get_gs() -> Node:
 
 func _get_sound() -> Node:
 	# Resolve Sound autoload safely.
-	var root: Node = (get_tree().root if get_tree() else null)
+	var root: Node = (get_tree().root if is_inside_tree() and get_tree() else null)
 	var node: Node = (root.get_node_or_null("/root/Sound") if root else null)
 	if typeof(Sound) != TYPE_NIL:
 		return Sound
@@ -270,11 +322,35 @@ func _update_planning_timer(delta: float) -> void:
 		if controller and controller.has_method("_auto_start_battle"):
 			controller._auto_start_battle()
 
+func _update_combat_timer() -> void:
+	var gp: Variant = _get_gs()
+	if gp == null:
+		return
+	if int(gp.phase) != int(gp.GamePhase.COMBAT):
+		return
+	var total_seconds: float = 300.0
+	var elapsed_seconds: float = 0.0
+	if manager != null and manager.has_method("get_engine"):
+		var engine: Variant = manager.get_engine()
+		if engine != null:
+			total_seconds = max(1.0, float(engine.get("combat_timeout_s")))
+			var battle_state: Variant = engine.get("state")
+			if battle_state != null:
+				elapsed_seconds = max(0.0, float(battle_state.elapsed_time))
+	var remaining_seconds: float = max(0.0, total_seconds - elapsed_seconds)
+	_set_planning_timer_status(_format_combat_time(remaining_seconds), true)
+
 func _format_time(seconds_left: float) -> String:
 	var s: int = int(ceil(max(0.0, seconds_left)))
 	var m: int = int(float(s) / 60.0)
 	var ss: int = int(s % 60)
 	return "Plan %d:%02d" % [m, ss]
+
+func _format_combat_time(seconds_left: float) -> String:
+	var s: int = int(ceil(max(0.0, seconds_left)))
+	var m: int = int(float(s) / 60.0)
+	var ss: int = int(s % 60)
+	return "Combat %d:%02d" % [m, ss]
 
 func _set_planning_timer_status(text: String, active: bool) -> void:
 	if controller != null and controller.has_method("set_board_timer_text"):
@@ -360,6 +436,7 @@ func _apply_responsive_layout() -> void:
 	_set_minimum_size("MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea", Vector2(0.0, 408.0 if compact else 604.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(288.0 if compact else 340.0, 408.0 if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel", Vector2(268.0 if compact else 316.0, 388.0 if compact else 560.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(170.0 if compact else 296.0, 408.0 if compact else 596.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(150.0 if compact else 296.0, 118.0 if compact else 164.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(150.0 if compact else 296.0, 254.0 if compact else 398.0))
@@ -378,6 +455,15 @@ func _apply_responsive_layout() -> void:
 	_set_box_separation("MarginContainer/VBoxContainer/BottomStorageArea", 6 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/ActionsRow", 10 if compact else 18)
 	_apply_shop_compact_layout(compact)
+	if stats_panel != null and stats_panel.has_method("apply_responsive_layout"):
+		stats_panel.call("apply_responsive_layout")
+	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
+	if stats_area != null:
+		stats_area.size_flags_horizontal = Control.SIZE_SHRINK_END
+		stats_area.update_minimum_size()
+	var content_row: Container = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow") as Container
+	if content_row != null:
+		content_row.queue_sort()
 	_update_external_backplates()
 	call_deferred("_update_external_backplates")
 

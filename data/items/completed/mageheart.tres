@@ -9,7 +9,8 @@ name = "Mageheart"
 type = "completed"
 icon_path = "res://assets/items/mage_heart_icon.png"
 stat_mods = {"flat_sp": 60.0, "flat_hp": 300}
-effects = []
+effects = ["mageheart"]
 components = ["wand", "core"]
 tags = PackedStringArray("mage")
+build_axes = PackedStringArray("spell_power", "health", "frontline")
 

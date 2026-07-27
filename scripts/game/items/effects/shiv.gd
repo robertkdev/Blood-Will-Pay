@@ -10,10 +10,10 @@ func on_event(u: Unit, ev: String, data: Dictionary) -> void:
     var crit: bool = bool(data.get("crit", false))
     if not crit:
         return
-    var st := _state()
+    var st: BattleState = _state()
     if st == null:
         return
-    var ctx := _team_index_of(u)
+    var ctx: Dictionary = _team_index_of(u)
     var team: String = String(ctx.team)
     var index: int = int(ctx.index)
     if team == "" or index < 0:
@@ -23,7 +23,7 @@ func on_event(u: Unit, ev: String, data: Dictionary) -> void:
         return
     var tgt_team: String = _other_team(team)
     # Sunder 5% Armor for 3s. Use labeled buff to refresh rather than stack duplicates.
-    var target: Unit = (manager.enemy_team[ti] if team == "player" else manager.player_team[ti])
+    var target: Unit = _unit_at(tgt_team, ti)
     if target == null:
         return
     var eff: float = float(target.armor) * 0.05

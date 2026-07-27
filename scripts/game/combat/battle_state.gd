@@ -16,6 +16,9 @@ var enemy_targets: Array[int] = []
 var battle_active: bool = false
 var regen_tick_accum: float = 0.0
 var elapsed_time: float = 0.0
+# Arena Pressure preserves full sustain early, then lowers healing and newly
+# generated shields so high-sustain mirrors still reach a decisive result.
+var sustain_effectiveness: float = 1.0
 
 # Mentor–Pupil pairing (planning-time; frozen for the battle)
 # Arrays map mentor index -> pupil index (or -1 if none)
@@ -36,6 +39,7 @@ func reset() -> void:
 	battle_active = false
 	regen_tick_accum = 0.0
 	elapsed_time = 0.0
+	sustain_effectiveness = 1.0
 	player_pupil_map.clear()
 	enemy_pupil_map.clear()
 	player_damage_this_round.clear()

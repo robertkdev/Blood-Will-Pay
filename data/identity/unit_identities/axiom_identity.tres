@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "support"
 primary_goal = "support.team_amplification"
 approaches = ["amp", "peel", "sustain"]
-alt_goals = []
+alt_goals = ["support.peel_carry", "mage.pick_burst"]

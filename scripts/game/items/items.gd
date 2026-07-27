@@ -94,6 +94,10 @@ func equip(unit, id: String) -> Dictionary:
 	if key == "":
 		result.reason = "invalid_id"
 		return result
+	if not PhaseRules.can_equip():
+		result.reason = "cannot_equip_in_phase"
+		action_log.emit("Cannot equip items right now")
+		return result
 	var def = ItemCatalog.get_def(key)
 	if def == null:
 		result.reason = "unknown_item"
@@ -122,7 +126,7 @@ func equip(unit, id: String) -> Dictionary:
 	var eq: Array = _ensure_unit_array(unit)
 
 	# Attempt auto-combine first when equipping a component (orderless, does not require temp slot)
-	if String(def.type) == "component":
+	if String(def.type) == "component" and PhaseRules.can_combine():
 		var combined_id: String = Combiner.try_combine_on_equip(unit, key)
 		if combined_id != "":
 			# Place the completed item; consumes components via consumer
@@ -243,6 +247,9 @@ func get_inventory_snapshot() -> Dictionary:
 # Combine two components directly in inventory (no unit involved)
 func try_combine_in_inventory(a: String, b: String, a_slot: int = -1, b_slot: int = -1, result_slot: int = -1) -> Dictionary:
 	var res := {"ok": false, "reason": ""}
+	if not PhaseRules.can_combine():
+		res.reason = "cannot_combine_in_phase"
+		return res
 	var ia := String(a).strip_edges()
 	var ib := String(b).strip_edges()
 	if ia == "" or ib == "":

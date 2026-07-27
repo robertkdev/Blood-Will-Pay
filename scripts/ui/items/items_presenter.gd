@@ -12,18 +12,28 @@ var left_area: Control
 var grid: GridContainer
 var router
 var _item_grid_helper
+var _rebuild_queued: bool = false
+var _rebuilding: bool = false
+var _tearing_down: bool = false
 
 func configure(_view: Control) -> void:
+	_tearing_down = false
+	_rebuild_queued = false
+	_rebuilding = false
 	view = _view
 	if view:
 		left_area = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
 		grid = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid")
 
 func initialize() -> void:
+	_ensure_storage_title()
 	_bind_items_signal()
 	rebuild()
 
 func teardown() -> void:
+	_tearing_down = true
+	_rebuild_queued = false
+	_rebuilding = false
 	var items = _items_singleton()
 	if items != null and items.is_connected("inventory_changed", Callable(self, "_on_inventory_changed")):
 		items.inventory_changed.disconnect(_on_inventory_changed)
@@ -40,11 +50,28 @@ func _bind_items_signal() -> void:
 		items.inventory_changed.connect(_on_inventory_changed)
 
 func _on_inventory_changed() -> void:
+	_queue_rebuild()
+
+func _queue_rebuild() -> void:
+	if _tearing_down or _rebuild_queued:
+		return
+	_rebuild_queued = true
+	call_deferred("_flush_queued_rebuild")
+
+func _flush_queued_rebuild() -> void:
+	_rebuild_queued = false
+	if _tearing_down:
+		return
 	rebuild()
 
 func rebuild() -> void:
-	if grid == null or left_area == null:
+	if _tearing_down or grid == null or left_area == null:
 		return
+	if _rebuilding:
+		_queue_rebuild()
+		return
+	_rebuilding = true
+	_ensure_storage_title()
 	_clear_grid()
 	var layout: Array[String] = _inventory_layout()
 	var cols: int = int(grid.columns) if grid and grid.has_method("get") else 1
@@ -77,12 +104,15 @@ func rebuild() -> void:
 		for c in grid.get_children():
 			if router.has_method("attach_card"):
 				router.attach_card(c)
+	_rebuilding = false
 
 func _clear_grid() -> void:
 	if grid == null:
 		return
 	for c in grid.get_children():
 		grid.remove_child(c)
+		if router != null and router.has_method("detach_card"):
+			router.detach_card(c)
 		c.queue_free()
 
 func _items_singleton():
@@ -90,6 +120,23 @@ func _items_singleton():
 		return Items
 	var node := (view.get_tree().root.get_node_or_null("/root/Items") if view else null)
 	return node
+
+func _ensure_storage_title() -> void:
+	if left_area == null:
+		return
+	var existing: Label = left_area.get_node_or_null("ItemStorageTitle") as Label
+	if existing == null:
+		existing = Label.new()
+		existing.name = "ItemStorageTitle"
+		existing.text = "Items"
+		existing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		existing.add_theme_font_size_override("font_size", 17)
+		existing.add_theme_color_override("font_color", Color(0.94, 0.70, 0.36, 1.0))
+		existing.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
+		existing.add_theme_constant_override("outline_size", 1)
+		left_area.add_child(existing)
+	if existing.get_index() != 0:
+		left_area.move_child(existing, 0)
 
 func _inventory_snapshot() -> Dictionary:
 	var result: Dictionary = {}

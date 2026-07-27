@@ -161,9 +161,12 @@ func _apply_rows(col: VBoxContainer, rows: Array, team_total: float) -> void:
 	# Enforce order with a small tween hint
 	for i in range(desired.size()):
 		var node: Node = desired[i]
-		if node.get_index() != i:
+		if node.get_parent() != col:
+			continue
+		var target_index: int = mini(i, max(0, col.get_child_count() - 1))
+		if node.get_index() != target_index:
 			node.owner = get_tree().edited_scene_root
-			col.move_child(node, i)
+			col.move_child(node, target_index)
 			if node is ScoreboardRow:
 				node.tween_reorder_hint()
 

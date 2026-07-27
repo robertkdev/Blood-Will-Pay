@@ -9,4 +9,4 @@ name = "Exit Wound"
 description = "Strikes the lowest-health enemy, executes near threshold, vanishes, and resets on a kill."
 targeting_summary = "Lowest-health enemy from the enemy backline half; falls back to lowest-health enemy."
 base_cost = 30
-tags = ["damage", "execute", "reset_mechanic", "untargetable"]
+tags = ["damage", "access_backline", "execute", "reset_mechanic", "untargetable"]

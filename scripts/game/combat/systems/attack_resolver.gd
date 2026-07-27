@@ -93,6 +93,25 @@ func apply_projectile_hit(source_team: String, source_index: int, target_index: 
 	var tgt: Unit = TeamUtils.unit_at(state, tgt_team, target_index)
 	if not src or not tgt:
 		return response
+	if not tgt.is_alive():
+		response["reason"] = "target_dead"
+		return response
+	if buff_system != null and not buff_system.is_targetable(state, tgt_team, target_index):
+		response["reason"] = "target_untargetable"
+		var targetability_emitter: Callable = emitters.get("targetability_threat_interaction", Callable())
+		if targetability_emitter.is_valid():
+			var role: String = String(src.get_primary_role()).strip_edges().to_lower()
+			var key_threat: bool = int(src.cost) >= 3 or role == "assassin" or role == "marksman" or role == "mage"
+			targetability_emitter.call(
+				source_team,
+				source_index,
+				tgt_team,
+				target_index,
+				"projectile_target_drop",
+				1.0 / max(0.01, float(src.attack_speed)),
+				key_threat,
+				true)
+		return response
 	# Impact pipeline
 	var impact_res: AttackResult = _impact.apply_hit(source_team, source_index, src, tgt_team, target_index, tgt, damage, crit, respect_block)
 	var before_hp: int = impact_res.before_hp
@@ -119,6 +138,7 @@ func apply_projectile_hit(source_team: String, source_index: int, target_index: 
 			frame_player_team_defeated = true
 		if bool(flags.get("enemy_team_defeated", false)):
 			frame_enemy_team_defeated = true
+	_record_redirected_damage(source_team, source_index, tgt_team, target_index, response)
 	# Analytics events using CombatEvents
 	if _events != null:
 		var absorbed: int = int(response.get("absorbed", 0))
@@ -134,8 +154,11 @@ func apply_projectile_hit(source_team: String, source_index: int, target_index: 
 			_events.hit_overkill(source_team, source_index, tgt_team, target_index, overkill)
 		var redirected: int = int(response.get("redirected", 0))
 		if redirected > 0:
-			_events.damage_redirected(source_team, source_index, tgt_team, target_index, tgt_team, target_index, redirected, "absorb_redirect")
-			_events.redirect_semantic_applied(tgt_team, target_index, source_team, source_index, "body_block_absorb_redirect", 0.0, float(redirected), _redirect_risk_window_s(tgt_team, target_index))
+			var redirect_team: String = String(response.get("redirect_team", tgt_team))
+			var redirect_index: int = int(response.get("redirect_index", target_index))
+			var redirect_kind: String = String(response.get("redirect_kind", "absorb_redirect"))
+			_events.damage_redirected(source_team, source_index, tgt_team, target_index, redirect_team, redirect_index, redirected, redirect_kind)
+			_events.redirect_semantic_applied(redirect_team, redirect_index, source_team, source_index, redirect_kind, 0.0, float(redirected), _redirect_risk_window_s(redirect_team, redirect_index))
 		var cphys: int = int(response.get("comp_phys", 0))
 		var cmag: int = int(response.get("comp_mag", 0))
 		var ctrue: int = int(response.get("comp_true", 0))
@@ -182,6 +205,7 @@ func apply_ability_damage(source_team: String, source_index: int, target_index: 
 			frame_player_team_defeated = true
 		if bool(flags.get("enemy_team_defeated", false)):
 			frame_enemy_team_defeated = true
+	_record_redirected_damage(source_team, source_index, tgt_team, target_index, response)
 	if _events != null:
 		var absorbed: int = int(response.get("absorbed", 0))
 		if absorbed > 0:
@@ -196,8 +220,11 @@ func apply_ability_damage(source_team: String, source_index: int, target_index: 
 			_events.hit_overkill(source_team, source_index, tgt_team, target_index, overkill)
 		var redirected: int = int(response.get("redirected", 0))
 		if redirected > 0:
-			_events.damage_redirected(source_team, source_index, tgt_team, target_index, tgt_team, target_index, redirected, "absorb_redirect")
-			_events.redirect_semantic_applied(tgt_team, target_index, source_team, source_index, "body_block_absorb_redirect", 0.0, float(redirected), _redirect_risk_window_s(tgt_team, target_index))
+			var redirect_team: String = String(response.get("redirect_team", tgt_team))
+			var redirect_index: int = int(response.get("redirect_index", target_index))
+			var redirect_kind: String = String(response.get("redirect_kind", "absorb_redirect"))
+			_events.damage_redirected(source_team, source_index, tgt_team, target_index, redirect_team, redirect_index, redirected, redirect_kind)
+			_events.redirect_semantic_applied(redirect_team, redirect_index, source_team, source_index, redirect_kind, 0.0, float(redirected), _redirect_risk_window_s(redirect_team, redirect_index))
 		var cphys: int = int(response.get("comp_phys", 0))
 		var cmag: int = int(response.get("comp_mag", 0))
 		var ctrue: int = int(response.get("comp_true", 0))
@@ -213,6 +240,43 @@ func apply_ability_damage(source_team: String, source_index: int, target_index: 
 			var amp_source_index: int = int(response.get("amp_source_index", source_index))
 			_events.amp_output_applied(amp_source_team, amp_source_index, source_team, source_index, tgt_team, target_index, amp_delta, float(response.get("amp_output_pct", 0.0)), String(response.get("amp_output_kind", "damage_amp")))
 	return response
+
+func _record_redirected_damage(source_team: String, source_index: int, original_target_team: String, original_target_index: int, response: Dictionary) -> void:
+	var redirected_dealt: int = int(response.get("redirected_dealt", 0))
+	if redirected_dealt <= 0 or state == null:
+		return
+	if _services != null and _services.stats != null:
+		_services.stats.add_dealt(source_team, redirected_dealt)
+	if source_team == "player":
+		while state.player_damage_this_round.size() < state.player_team.size():
+			state.player_damage_this_round.append(0)
+		if source_index >= 0 and source_index < state.player_damage_this_round.size():
+			state.player_damage_this_round[source_index] = int(state.player_damage_this_round[source_index]) + redirected_dealt
+	else:
+		while state.enemy_damage_this_round.size() < state.enemy_team.size():
+			state.enemy_damage_this_round.append(0)
+		if source_index >= 0 and source_index < state.enemy_damage_this_round.size():
+			state.enemy_damage_this_round[source_index] = int(state.enemy_damage_this_round[source_index]) + redirected_dealt
+	if _events == null:
+		return
+	var redirect_team: String = String(response.get("redirect_team", original_target_team))
+	var redirect_index: int = int(response.get("redirect_index", original_target_index))
+	var before_hp: int = int(response.get("redirect_before_hp", 0))
+	var after_hp: int = int(response.get("redirect_after_hp", 0))
+	var kind: String = String(response.get("redirect_kind", "ally_redirect"))
+	_events.redirected_damage_applied(
+		source_team,
+		source_index,
+		original_target_team,
+		original_target_index,
+		redirect_team,
+		redirect_index,
+		redirected_dealt,
+		before_hp,
+		after_hp,
+		kind
+	)
+	_events.unit_stat_changed(redirect_team, redirect_index, {"hp": after_hp})
 
 func totals() -> Dictionary:
 	if _services != null and _services.stats != null:

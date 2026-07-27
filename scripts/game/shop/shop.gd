@@ -51,6 +51,26 @@ func _ready() -> void:
 		GameState.stage_changed.connect(_on_stage_changed)
 	reset_run()
 
+func _exit_tree() -> void:
+	clear_runtime()
+
+func clear_runtime() -> void:
+	state = ShopState.new()
+	_opening_starter_id = ""
+	_opening_helper_shops_consumed = 0
+	_opening_retry_team_bonus_active = false
+	if _tx != null and _tx.has_method("clear_runtime"):
+		_tx.clear_runtime()
+	if _roller != null and _roller.has_method("clear_runtime"):
+		_roller.clear_runtime()
+	if _catalog != null and _catalog.has_method("clear_runtime"):
+		_catalog.clear_runtime()
+	_rng = null
+	_catalog = null
+	_roller = null
+	_tx = null
+	_progress = null
+
 func _has_autoload(autoload_name: String) -> bool:
 	var n: String = String(autoload_name)
 	var path: String = "/root/%s" % n
@@ -194,21 +214,9 @@ func _sync_roster_max_team_size() -> void:
 	if not _has_autoload("Roster"):
 		return
 	var level_delta: int = max(0, get_level() - int(ShopConfig.STARTING_LEVEL))
-	var target_size: int = int(ShopConfig.DEFAULT_BOARD_CAPACITY) + level_delta
+	var target_size: int = min(int(ShopConfig.MAX_BOARD_CAPACITY), int(ShopConfig.DEFAULT_BOARD_CAPACITY) + level_delta)
 	if _is_opening_retry_team_bonus_active():
 		target_size = max(target_size, int(ShopConfig.POST_OPENING_MIN_TEAM_SIZE))
-	if _is_past_early_run_cap_floor_stage():
-		target_size = max(target_size, int(ShopConfig.EARLY_RUN_CAP_FLOOR_TEAM_SIZE))
-	if _is_past_early_level_two_cap_floor_stage():
-		target_size = max(target_size, int(ShopConfig.EARLY_LEVEL_TWO_CAP_FLOOR_TEAM_SIZE))
-	if _is_past_chapter_two_cap_floor_stage():
-		target_size = max(target_size, int(ShopConfig.CHAPTER_TWO_CAP_FLOOR_TEAM_SIZE))
-	if _is_past_chapter_three_cap_floor_stage():
-		target_size = max(target_size, int(ShopConfig.CHAPTER_THREE_CAP_FLOOR_TEAM_SIZE))
-	if _is_past_chapter_four_cap_floor_stage():
-		target_size = max(target_size, int(ShopConfig.CHAPTER_FOUR_CAP_FLOOR_TEAM_SIZE))
-	if _is_past_chapter_five_cap_floor_stage():
-		target_size = max(target_size, int(ShopConfig.CHAPTER_FIVE_CAP_FLOOR_TEAM_SIZE))
 	if Roster.has_method("set_max_team_size"):
 		Roster.set_max_team_size(target_size)
 	else:

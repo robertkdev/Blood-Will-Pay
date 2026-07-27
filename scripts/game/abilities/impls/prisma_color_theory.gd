@@ -62,7 +62,7 @@ func _zone_target(ctx: AbilityContext) -> int:
 	var best_score: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var enemy_position: Vector2 = ctx.position_of(target_team, index)
 		var score: float = _zone_target_score(ctx, enemy, enemy_position)

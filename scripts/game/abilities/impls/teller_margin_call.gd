@@ -41,7 +41,6 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 	# Primary hit
 	var primary_idx: int = int(scored[0].i)
 	var res: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, primary_idx, float(raw_dmg), "physical")
-	var dealt: int = int(res.get("dealt", 0))
 	var after_hp: int = int(res.get("after_hp", 1))
 	var killed: bool = (after_hp <= 0)
 	if killed:
@@ -49,8 +48,9 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 		if roll < DROP_CHANCE:
 			_award_gold(1)
 			ctx.log("Margin Call: +1 gold")
-	# Overflow to next in line: use remaining raw damage not applied to primary (post-mitigation remainder)
-	var leftover: int = max(0, raw_dmg - dealt)
+	# Overflow exists only when the primary died and damage reaching HP exceeded
+	# its pre-hit health. Mitigation loss and shield absorption are not overflow.
+	var leftover: int = _overflow_damage(res, killed)
 	if leftover > 0 and scored.size() > 1:
 		var secondary_idx: int = int(scored[1].i)
 		var res2: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, secondary_idx, float(leftover), "physical")
@@ -61,6 +61,14 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 			if roll2 < DROP_CHANCE:
 				_award_gold(1)
 				ctx.log("Margin Call: +1 gold")
+
+func _overflow_damage(result: Dictionary, killed: bool) -> int:
+	if not killed or result == null:
+		return 0
+	var dealt: int = int(result.get("dealt", 0))
+	var before_hp: int = max(0, int(result.get("before_hp", 0)))
+	var uncapped_hp_damage: int = max(0, int(result.get("before_cap", dealt)))
+	return max(0, uncapped_hp_damage - before_hp)
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:

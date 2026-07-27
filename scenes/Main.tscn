@@ -1,12 +1,10 @@
-[gd_scene load_steps=22 format=3 uid="uid://cs1wvmj4qc8xt"]
+[gd_scene load_steps=18 format=3 uid="uid://cs1wvmj4qc8xt"]
 
-[ext_resource type="PackedScene" uid="uid://bq7rbbhqrjhrt" path="res://scenes/CombatView.tscn" id="1"]
 [ext_resource type="Script" uid="uid://dgmadxqjln56b" path="res://scripts/main.gd" id="2"]
 [ext_resource type="PackedScene" uid="uid://dmyvfgesh7dsg" path="res://scenes/UnitSelect.tscn" id="3"]
 [ext_resource type="Shader" uid="uid://cgfcra2jd0xaq" path="res://scenes/dark_bg.gdshader" id="3_c01mt"]
 [ext_resource type="Shader" uid="uid://cnksqny6s3mip" path="res://shaders/dark_fantasy_bg.gdshader" id="4"]
 [ext_resource type="Script" uid="uid://bw62vrppbd5oq" path="res://scripts/ui/title_menu.gd" id="5"]
-[ext_resource type="Texture2D" uid="uid://bacmh3tnq3r2c" path="res://assets/ui/gold icon.png" id="6_nxtc6"]
 
 [sub_resource type="ShaderMaterial" id="1"]
 shader = ExtResource("4")
@@ -29,15 +27,6 @@ shader_parameter/line_width = 0.5
 shader_parameter/line_soft = 0.0
 shader_parameter/mix_amount = 1.25
 shader_parameter/vignette_strength = 0.75
-
-[sub_resource type="Gradient" id="Gradient_q8u5g"]
-colors = PackedColorArray(0, 0, 0, 1, 0.113725, 0.121569, 0.0980392, 1)
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_lhr70"]
-gradient = SubResource("Gradient_q8u5g")
-fill_to = Vector2(0.5, 0)
-repeat = 2
-metadata/_snap_enabled = true
 
 [sub_resource type="Gradient" id="Gradient_wp0k4"]
 colors = PackedColorArray(0.1, 0.14, 0.13, 1, 0.06, 0.14, 0.13, 1)
@@ -116,7 +105,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = SubResource("GradientTexture2D_lhr70")
 
 [node name="Center" type="CenterContainer" parent="TitleMenu"]
 layout_mode = 1
@@ -164,10 +152,6 @@ theme_override_styles/hover = SubResource("StyleBoxTexture_btn_hover")
 theme_override_styles/focus = SubResource("StyleBoxTexture_btn_hover")
 text = "Quit"
 
-[node name="CombatView" parent="." instance=ExtResource("1")]
-visible = false
-layout_mode = 1
-
 [node name="UnitSelect" parent="." instance=ExtResource("3")]
 visible = false
 layout_mode = 1
@@ -187,7 +171,6 @@ offset_right = 152.0
 offset_bottom = -157.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("6_nxtc6")
 expand_mode = 1
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]

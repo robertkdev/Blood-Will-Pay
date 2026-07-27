@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "brawler"
 primary_goal = "brawler.attrition_dps"
 approaches = ["reposition", "burst", "disrupt"]
-alt_goals = []
+alt_goals = ["brawler.skirmish_dive", "support.enemy_lockdown"]

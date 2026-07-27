@@ -9,7 +9,8 @@ name = "Vital Battery"
 type = "completed"
 icon_path = "res://assets/items/vital_battery_icon.png"
 stat_mods = {"flat_hp": 400, "flat_start_mana": 20}
-effects = []
+effects = ["vital_battery"]
 components = ["core", "orb"]
 tags = PackedStringArray("support", "tank")
+build_axes = PackedStringArray("health", "frontline", "mana", "tempo")
 

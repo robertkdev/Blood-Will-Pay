@@ -27,7 +27,7 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var target: Unit = ctx.unit_at(target_team, target_index)
-	if target == null or not target.is_alive():
+	if target == null or not ctx.is_targetable(target_team, target_index):
 		return false
 	_enter_execution_lane(ctx, target_team, target_index)
 	if ctx.engine.has_signal("target_start"):
@@ -57,10 +57,7 @@ func cast(ctx: AbilityContext) -> bool:
 				var execute_result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, execute_damage, "true")
 				if bool(execute_result.get("processed", false)):
 					result = execute_result
-	if ctx.engine.has_method("_resolver_emit_targetability_window"):
-		ctx.engine._resolver_emit_targetability_window(ctx.caster_team, ctx.caster_index, false, VANISH_DURATION, "egress_exit_wound")
-	if ctx.engine.has_method("_resolver_emit_targetability_threat_interaction"):
-		ctx.engine._resolver_emit_targetability_threat_interaction(target_team, target_index, ctx.caster_team, ctx.caster_index, "exit_wound_vanish", 4.5, true, true)
+	ctx.apply_untargetable(VANISH_DURATION, "egress_exit_wound")
 	if bool(result.get("processed", false)) and not ctx.is_alive(target_team, target_index) and ctx.engine.has_method("_resolver_emit_reset_triggered"):
 		ctx.engine._resolver_emit_reset_triggered(ctx.caster_team, ctx.caster_index, target_team, target_index, "egress_exit_wound_reset", 1, 0.0, 0.75)
 		_reappear_at_edge(ctx)
@@ -68,11 +65,14 @@ func cast(ctx: AbilityContext) -> bool:
 	return bool(result.get("processed", false))
 
 func _reappear_at_edge(ctx: AbilityContext) -> void:
-	var sign_x: float = -1.0 if ctx.caster_team == "player" else 1.0
 	var current: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
-	var destination: Vector2 = Vector2(sign_x * 4.5 * ctx.tile_size(), current.y)
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - current, 0.16)
+	var edge_x: float = current.x + (-4.5 if ctx.caster_team == "player" else 4.5) * ctx.tile_size()
+	if ctx.engine != null and ctx.engine.arena_state != null and ctx.engine.arena_state.data != null:
+		var bounds: Rect2 = ctx.engine.arena_state.data.arena_bounds
+		if bounds != Rect2():
+			var inset: float = min(ctx.tile_size() * 0.5, bounds.size.x * 0.5)
+			edge_x = bounds.position.x + inset if ctx.caster_team == "player" else bounds.position.x + bounds.size.x - inset
+	var destination: Vector2 = Vector2(edge_x, current.y)
 	_set_caster_position(ctx, destination)
 
 func _execution_target(ctx: AbilityContext) -> int:
@@ -83,7 +83,7 @@ func _execution_target(ctx: AbilityContext) -> int:
 	var max_depth: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var enemy_position: Vector2 = ctx.position_of(target_team, index)
 		var depth: float = enemy_position.x * sign_x
@@ -96,7 +96,7 @@ func _execution_target(ctx: AbilityContext) -> int:
 	var best_hp_pct: float = INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var enemy_position: Vector2 = ctx.position_of(target_team, index)
 		var depth: float = enemy_position.x * sign_x
@@ -111,11 +111,8 @@ func _execution_target(ctx: AbilityContext) -> int:
 	return ctx.lowest_hp_enemy(ctx.caster_team)
 
 func _enter_execution_lane(ctx: AbilityContext, target_team: String, target_index: int) -> void:
-	var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
 	var target_position: Vector2 = ctx.position_of(target_team, target_index)
 	var destination: Vector2 = target_position
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
 	_set_caster_position(ctx, destination)
 
 func _set_caster_position(ctx: AbilityContext, destination: Vector2) -> void:

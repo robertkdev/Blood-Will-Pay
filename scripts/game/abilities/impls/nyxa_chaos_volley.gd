@@ -93,9 +93,10 @@ func _initial_volley(ctx: AbilityContext, caster: Unit, lvl_idx: int) -> void:
 func _alive_enemy_indices(ctx: AbilityContext, team: String) -> Array[int]:
 	var out: Array[int] = []
 	var enemies: Array[Unit] = ctx.enemy_team_array(team)
+	var target_team: String = "enemy" if team == "player" else "player"
 	for i in range(enemies.size()):
 		var enemy: Unit = enemies[i]
-		if enemy != null and enemy.is_alive():
+		if enemy != null and ctx.is_targetable(target_team, i):
 			out.append(i)
 	return out
 
