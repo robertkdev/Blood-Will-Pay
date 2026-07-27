@@ -4,24 +4,25 @@ scenarios:
   - id: phase2-graphics-portal
     title: Phase II portal
     adapter: generic
-    objective: Verify that the real browser gallery presents twelve current repository-backed Gamble Battle directions in a readable side-by-side wall, clearly distinguishes repaired, reinspection, and later user-locked redesign status, preserves each full concept without card cropping, provides a large inspection view, and remains legible and operable on desktop and mobile.
+    objective: Verify that the real browser gallery presents twelve current repository-backed Gamble Battle directions in a readable side-by-side wall, opens each concept in a true centered full-screen inspection viewer without nested image scrolling, provides a readable per-unit decision and comment rail, and remains legible and operable on desktop and mobile.
     capture_command: ["node", "scripts/prepare-vdh-captures.mjs"]
     capture_manifest: "visual-evidence/captures.json"
     required_groups: [overview]
     runtime_provenance:
       runtime: "Vinext local web runtime in Codex in-app browser"
       source: "http://localhost:3000/"
-      source_sha256: "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9"
+      source_sha256: "2d99465a225f22f1008d24493f299316514dae716d356117b42509f3a1747ad3"
       build: "npm test / vinext build"
     evidence:
       required_cameras: [browser]
       required_layers: [final]
       required_states: []
       required_viewports: []
-      required_events: [gallery_loaded, inspect_knoll, filter_locked]
+      required_events: [gallery_loaded, inspect_knoll, inspect_korath_review, filter_locked]
       required_combinations:
         - {state: desktop, viewport: desktop-1440x1000}
         - {state: desktop_inspection, viewport: desktop-1440x1000}
+        - {state: desktop_review, viewport: desktop-1920x1080}
         - {state: mobile, viewport: mobile-390x844}
         - {state: mobile_locked, viewport: mobile-390x844}
       required_pairs:

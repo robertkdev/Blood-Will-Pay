@@ -5,7 +5,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const rawRoot = new URL("../visual-evidence/raw/", import.meta.url);
 const stagedRoot = new URL("../visual-evidence/staged/", import.meta.url);
 const sourceSha =
-  "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9";
+  "2d99465a225f22f1008d24493f299316514dae716d356117b42509f3a1747ad3";
 
 await mkdir(stagedRoot, { recursive: true });
 
@@ -40,6 +40,15 @@ const captures = [
     group: "overview",
     viewport: "desktop-1440x1000",
     timestamp_ms: 200,
+  },
+  {
+    file: "desktop-korath-review-viewer.png",
+    event: "inspect_korath_review",
+    state: "desktop_review",
+    label: "Korath centered full-screen viewer with review rail",
+    group: "overview",
+    viewport: "desktop-1920x1080",
+    timestamp_ms: 250,
   },
   {
     file: "mobile-top-before.png",
