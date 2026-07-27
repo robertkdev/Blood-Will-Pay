@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "title": "Gamble Battle Phase II concept portal source manifest",
+  "sourceBranch": "codex/019f91db-ff4-phase2-character-concepts",
+  "sourceHead": "a7bacddf1b221015901409ba66870ee6f66b0682",
+  "ledger": "docs/art/phase2_character_concepts.md",
+  "phase2Evidence": "docs/art/phase2_calibration/phase2_review_evidence_manifest.json",
+  "boardStatus": "STOPPED / NO BOARD VERDICT / CANDIDATES ONLY",
+  "selectionRule": "Use the current Phase II repaired-cut master unless the committed concept ledger contains a later user-locked redesign direction. Exclude thumbnails, face crops, 96px derivatives, silhouettes, comparison boards, rejected evidence, caches, and generated run output.",
+  "units": [
+    {
+      "id": "korath",
+      "sourcePath": "assets/concepts/phase2_calibration/korath/korath_master.png",
+      "sha256": "797fe7361cb6864372eaac3e270cf178b7d15b963725c25259f3c54d88b774a3",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "veyra",
+      "sourcePath": "assets/concepts/phase2_calibration/veyra/veyra_master.png",
+      "sha256": "aabad99083a89af926bcd6ad2ef1a6a6d8b8d7873fa5b4716eb8dee3d827da60",
+      "width": 1122,
+      "height": 1402
+    },
+    {
+      "id": "cashmere",
+      "sourcePath": "assets/concepts/phase2_calibration/cashmere/cashmere_master.png",
+      "sha256": "f80ba21bebe17067f880b2e44dc203efc7a6751ba5876ba6477a9b105abcd02a",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "pilfer",
+      "sourcePath": "assets/concepts/phase2_calibration/pilfer/pilfer_master.png",
+      "sha256": "7c2d18304b26f8503d1843b2eead432b9fd162ee46ef0f19490da5c99a4d4b1e",
+      "width": 1023,
+      "height": 1537
+    },
+    {
+      "id": "nyxa",
+      "sourcePath": "assets/concepts/phase2_calibration/nyxa/nyxa_master.png",
+      "sha256": "49041b874855da4855450660db68598f149a424a8fab44d40a0fec08d2e676d1",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "creep",
+      "sourcePath": "assets/concepts/phase2_calibration/creep/creep_master.png",
+      "sha256": "74914b21f3ce70bf65f323ae4b5315c4f206bb5f0a2386263bb8a1dbfffa3020",
+      "width": 1536,
+      "height": 1024
+    },
+    {
+      "id": "knoll",
+      "sourcePath": "assets/concepts/phase3_redesign/knoll/knoll_foreclosure_press_selected_direction.png",
+      "sha256": "25d344c8478f732f4053e8aff13f70aaba3d9060b4b88522d917267effbe1c6e",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "quillith",
+      "sourcePath": "assets/concepts/phase2_calibration/quillith/quillith_master.png",
+      "sha256": "c0ade3bd7b1e1d61363b629123958f0821308eb4d47eeab1167d8d7a1b9abaa7",
+      "width": 1023,
+      "height": 1537
+    },
+    {
+      "id": "kett",
+      "sourcePath": "assets/concepts/phase2_calibration/kett/kett_master.png",
+      "sha256": "53e16f7f4ccec0c642264c3ce45f2ca5ac9c4aa64dc16f1d447504001495a426",
+      "width": 1023,
+      "height": 1537
+    },
+    {
+      "id": "luna",
+      "sourcePath": "assets/concepts/phase2_calibration/luna/luna_master.png",
+      "sha256": "9436100617222f3f5500715c156793f11b0282cdc95b6b3f767aed2e38b7f836",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "malachor",
+      "sourcePath": "assets/concepts/phase3_redesign/malachor/malachor_living_siege_cage_selected_direction.png",
+      "sha256": "9f33a99ca5ba7c2047338409244d7e2048e92ae9da8313efa9f5fac21a6e2d32",
+      "width": 1024,
+      "height": 1536
+    },
+    {
+      "id": "sable",
+      "sourcePath": "assets/concepts/phase2_calibration/sable/sable_master.png",
+      "sha256": "d079556a5ec2050ff23cab8d8414d1fb3705e231f4c55cedbecde448d53bfd47",
+      "width": 1024,
+      "height": 1536
+    }
+  ]
+}
