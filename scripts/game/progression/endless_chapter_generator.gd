@@ -127,7 +127,10 @@ static func target_rating_for(chapter: int, stage_index: int) -> int:
 		ProgressionConfig.BOSS_STAGE:
 			multiplier = 2.65
 			if procedural_index == 1:
-				multiplier = 2.15
+				# Chapter 1 has only the starter runway behind it. A full boss
+				# board at the normal target creates unwinnable fortress stacks
+				# before players can assemble a team or completed item.
+				multiplier = 0.50
 		ProgressionConfig.MIRROR_STAGE:
 			multiplier = 2.65
 		_:
@@ -256,7 +259,7 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 	if catalog.is_empty():
 		return StageTypes.make_spec(["bonko"], kind, {"target_rating": target, "difficulty_rating": 0, "procedural": true, "endless": true})
 	var theme: Dictionary = _pick_theme(chapter, stage_index, seed, kind)
-	var desired_size: int = _desired_size_for_target(target, kind)
+	var desired_size: int = _desired_size_for_target(target, kind, chapter)
 	var ids: Array[String] = _select_unit_ids(catalog, theme, desired_size, chapter, stage_index, seed, kind, state)
 	var level_cap: int = _level_cap_for(chapter, kind)
 	var levels: Dictionary = _tune_levels(ids, target, level_cap)
@@ -586,7 +589,9 @@ static func _level_for_index_and_id(levels: Dictionary, index: int, id: String) 
 		return max(1, int(levels[id]))
 	return 1
 
-static func _desired_size_for_target(target: int, kind: String) -> int:
+static func _desired_size_for_target(target: int, kind: String, chapter: int = 1) -> int:
+	if int(chapter) == int(ProgressionConfig.PROCEDURAL_START_CHAPTER) and kind == StageTypes.KIND_BOSS:
+		return 2
 	var minimum: int = 4 if kind == StageTypes.KIND_BOSS else 3
 	var size: int = minimum + int(floor(float(max(0, int(target) - 260)) / 260.0))
 	return clampi(size, minimum, MAX_BOARD_UNITS)
@@ -594,7 +599,7 @@ static func _desired_size_for_target(target: int, kind: String) -> int:
 static func _level_cap_for(chapter: int, kind: String) -> int:
 	var procedural_index: int = _procedural_index_for(chapter)
 	if procedural_index == 1 and kind == StageTypes.KIND_BOSS:
-		return 2
+		return 1
 	var cap: int = 5 + int(floor(float(procedural_index - 1) / 5.0))
 	if kind == StageTypes.KIND_BOSS:
 		cap += 1
