@@ -104,27 +104,9 @@ func _refresh_dynamic() -> void:
     # Live DPS (3s) and casts
     var dps3: float = 0.0
     var casts: float = 0.0
-    var hps3: float = 0.0
-    var absorbed_total: float = 0.0
-    var cc_inf: float = 0.0
-    var cc_rec: float = 0.0
-    var overheal: float = 0.0
-    var kills: float = 0.0
-    var deaths: float = 0.0
-    var time_alive: float = 0.0
-    var focus_pct: float = 0.0
     if tracker != null and index >= 0:
         dps3 = tracker.get_value(team, index, "dps", "3S")
         casts = tracker.get_value(team, index, "casts", "ALL")
-        hps3 = tracker.get_value(team, index, "hps", "3S")
-        absorbed_total = tracker.get_value(team, index, "absorbed", "ALL")
-        cc_inf = tracker.get_value(team, index, "cc_inflicted", "ALL")
-        cc_rec = tracker.get_value(team, index, "cc_received", "ALL")
-        overheal = tracker.get_value(team, index, "overheal", "ALL")
-        kills = tracker.get_value(team, index, "kills", "ALL")
-        deaths = tracker.get_value(team, index, "deaths", "ALL")
-        time_alive = tracker.get_value(team, index, "time", "ALL")
-        focus_pct = tracker.get_value(team, index, "focus", "ALL")
     dps_label.text = "DPS (3s): " + _fmt(dps3)
     casts_label.text = "Casts: " + str(int(round(casts)))
     _style_footer_labels()
