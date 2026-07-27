@@ -1,20 +1,38 @@
 [
   {
     "id": "F001",
+    "panel_id": "P002",
+    "title": "Matrix directions and strategy codes are opaque",
+    "description": "The baseline desktop chart says ROW VS and compresses all nine team styles into unexplained two-letter codes.",
+    "verdict": "fail",
+    "severity": "hard",
+    "category": "readability",
+    "region": [
+      0.03,
+      0.39,
+      0.62,
+      0.55
+    ],
+    "expected": "A non-technical player can identify their row, the enemy column, and every team style without decoding shorthand.",
+    "observed": "ROW VS and codes such as BS, DR, and ZC require prior design knowledge.",
+    "confidence": 0.98
+  },
+  {
+    "id": "F002",
     "panel_id": "P007",
-    "title": "Mobile matrix lacks a horizontal-scroll affordance",
-    "description": "Only the first matrix columns are visible and the baseline capture does not explain that the matrix continues horizontally.",
+    "title": "Mobile matrix lacks reading and scroll guidance",
+    "description": "The baseline phone view shows cropped columns without explaining row-versus-column direction, score meaning, or how to reach the remaining opponents.",
     "verdict": "fail",
     "severity": "hard",
     "category": "responsive",
     "region": [
-      0.44,
-      0.32,
-      0.51,
-      0.68
+      0.12,
+      0.2,
+      0.78,
+      0.7
     ],
-    "expected": "The narrow layout visibly communicates how to reach all nine opponent columns.",
-    "observed": "The remaining columns are cropped without a visible scroll instruction.",
+    "expected": "The phone layout visibly teaches the chart and tells the player to swipe sideways.",
+    "observed": "The remaining columns and the meaning of the numbers are unexplained.",
     "confidence": 0.98
   }
 ]

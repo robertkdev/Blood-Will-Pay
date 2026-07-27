@@ -4,9 +4,10 @@ scenarios:
 - id: rga-explorer
   title: RGA Matrix Explorer Runtime Review
   adapter: generic
-  objective: Verify that the counter matrix, trait plan, numbered bridge roster,
-    and double-vertical proofs are legible, coherent, and responsive in the real
-    browser runtime.
+  objective: Verify that a non-technical player can immediately understand how
+    rows and columns map to their team and the enemy team, can read every
+    strategy name without unexplained shorthand, can interpret each score, and
+    can use the glossary at desktop and mobile sizes in the real browser runtime.
   required_groups:
   - overview
   - interaction
@@ -17,7 +18,11 @@ scenarios:
     group: overview
     role: actual
   - path: visual-evidence\desktop-matrix.jpg
-    label: Desktop counter matrix
+    label: Desktop matchup chart with reading guide
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-glossary.jpg
+    label: Desktop score legend and plain-language strategy glossary
     group: interaction
     role: actual
   - path: visual-evidence\desktop-traits.jpg
@@ -37,7 +42,11 @@ scenarios:
     group: responsive
     role: actual
   - path: visual-evidence\mobile-matrix-clip.jpg
-    label: Mobile matrix viewport
+    label: Mobile matchup reading guide
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-legend.jpg
+    label: Mobile score legend and selected matchup explanation
     group: responsive
     role: actual
   - path: visual-evidence\mobile-traits-filtered.jpg

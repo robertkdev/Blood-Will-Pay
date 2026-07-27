@@ -30,7 +30,7 @@ test("server-renders the complete RGA explorer shell", async () => {
   const html = await response.text();
   assert.match(html, /<title>Gamble Battle — RGA Matrix Explorer<\/title>/i);
   assert.match(html, /Every strategy has prey/);
-  assert.match(html, /Counter matrix/);
+  assert.match(html, /Matchup chart/);
   assert.match(html, /Trait atlas/);
   assert.match(html, /Bridge roster/);
   assert.match(html, /Team lab/);
@@ -43,9 +43,16 @@ test("server-renders the complete RGA explorer shell", async () => {
 test("renders the nine-by-nine matchup surface with accessible controls", async () => {
   const response = await render();
   const html = await response.text();
-  assert.match(html, /RGA counter matrix/);
-  assert.match(html, /Bastion Siege versus Dive Reset: Favored · Hard/);
+  assert.match(html, /Who wins against whom\?/);
+  assert.match(html, /Choose your team on the left/);
+  assert.match(html, /Choose the enemy across the top/);
+  assert.match(html, /Enemy team/);
+  assert.match(html, /Your team/);
+  assert.match(html, /Bastion Siege versus Dive Reset: Strong advantage/);
+  assert.match(html, /Big advantage for your team/);
+  assert.doesNotMatch(html, /ROW VS/);
   assert.match(html, /Anti-Meta Flex/);
-  assert.match(html, /Selected matchup/);
-  assert.match(html, /planning-model win expectation/);
+  assert.match(html, /Highlighted square/);
+  assert.match(html, /estimated win chance for your team/);
+  assert.match(html, /Plain-language strategy glossary/);
 });

@@ -8,7 +8,7 @@ type TabId = "matrix" | "traits" | "bridges" | "teams";
 type CounterStrength = "hard" | "soft";
 
 const tabs: Array<{ id: TabId; label: string; hint: string }> = [
-  { id: "matrix", label: "Counter matrix", hint: "Who beats whom, and why" },
+  { id: "matrix", label: "Matchup chart", hint: "See which team style has the advantage" },
   { id: "traits", label: "Trait atlas", hint: "Capstones, supply, and answers" },
   { id: "bridges", label: "Bridge roster", hint: "23 numbered unit concepts" },
   { id: "teams", label: "Team lab", hint: "Proven 10-slot double verticals" },
@@ -33,9 +33,9 @@ function matchup(rowId: string, columnId: string) {
   if (rowId === columnId) {
     return {
       score: 0,
-      label: "Mirror",
+      label: "Even matchup",
       tone: "mirror",
-      reason: "Same archetype. Positioning, unit quality, and execution decide the fight.",
+      reason: "Same team style. Positioning, unit quality, and execution decide the fight.",
       expected: 50,
     };
   }
@@ -46,9 +46,16 @@ function matchup(rowId: string, columnId: string) {
   const rowWins = Boolean(direct);
   const strength = edge?.strength as CounterStrength;
   const magnitude = strength === "hard" ? 2 : 1;
+  const label = rowWins
+    ? strength === "hard"
+      ? "Strong advantage"
+      : "Slight advantage"
+    : strength === "hard"
+      ? "Strong disadvantage"
+      : "Slight disadvantage";
   return {
     score: rowWins ? magnitude : -magnitude,
-    label: `${rowWins ? "Favored" : "Unfavored"} · ${titleCase(strength)}`,
+    label,
     tone: rowWins ? `win-${strength}` : `loss-${strength}`,
     reason: edge?.reason ?? "",
     expected: rowWins ? (strength === "hard" ? 72 : 61) : strength === "hard" ? 28 : 39,
@@ -93,23 +100,23 @@ export function Explorer() {
       <header className="hero">
         <div className="hero-grid">
           <div>
-            <p className="eyebrow">Gamble Battle · planning laboratory</p>
+            <p className="eyebrow">Gamble Battle planning laboratory</p>
             <h1>Every strategy has prey. Every answer has a predator.</h1>
             <p className="lede">
-              A mathematically balanced RGA counter web, a complete trait supply plan, and 23 numbered
-              bridge units that turn verticals into real team-composition choices.
+              A balanced web of team strategies where every plan has favorable and unfavorable
+              opponents, plus a complete trait supply plan and 23 numbered bridge units.
             </p>
           </div>
           <div className="proof-seal" aria-label="Model validation summary">
             <span className="proof-seal-label">Model proof</span>
             <strong>{proofReport.summary.checks}</strong>
             <span>deterministic checks passed</span>
-            <small>Source snapshot · 49 live units · 21 active traits</small>
+            <small>Source snapshot: 49 live units, 21 active traits</small>
           </div>
         </div>
         <div className="summary-strip">
-          <div><strong>9</strong><span>balanced archetypes</span></div>
-          <div><strong>36</strong><span>authored matchups</span></div>
+          <div><strong>9</strong><span>balanced team styles</span></div>
+          <div><strong>36</strong><span>strategy matchups</span></div>
           <div><strong>23</strong><span>numbered bridges</span></div>
           <div><strong>72</strong><span>planned roster</span></div>
           <div><strong>4</strong><span>proven double verticals</span></div>
@@ -134,30 +141,58 @@ export function Explorer() {
         <section className="section-shell" aria-labelledby="matrix-heading">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Zero-sum tournament</p>
-              <h2 id="matrix-heading">RGA counter matrix</h2>
+              <p className="eyebrow">Strategy matchup chart</p>
+              <h2 id="matrix-heading">Who wins against whom?</h2>
             </div>
             <p>
-              Read across a row. Every archetype has exactly two hard wins, two soft wins, two soft
-              losses, and two hard losses. Every row sums to zero.
+              This is a rock-paper-scissors counter system: every team style is strong against some
+              opponents and weak against others. No strategy is best against everything.
             </p>
           </div>
 
+          <div className="matrix-guide" aria-label="How to read the matchup chart">
+            <div>
+              <span>1</span>
+              <strong>Choose your team on the left</strong>
+              <p>Find the row named after the strategy you plan to play.</p>
+            </div>
+            <div>
+              <span>2</span>
+              <strong>Choose the enemy across the top</strong>
+              <p>Follow your row until it meets the opponent&apos;s column.</p>
+            </div>
+            <div>
+              <span>3</span>
+              <strong>Read the square where they meet</strong>
+              <p>Green favors your team. Red favors the enemy. Dark gray is even.</p>
+            </div>
+          </div>
+
           <div className="matrix-layout">
-            <div className="matrix-scroll" role="region" aria-label="Archetype counter matrix" tabIndex={0}>
+            <div className="matrix-scroll" role="region" aria-label="Team style matchup chart" tabIndex={0}>
+              <p className="matrix-scroll-hint">Scroll or swipe sideways to see every enemy team &rarr;</p>
               <table className="matrix-table">
                 <thead>
                   <tr>
-                    <th className="corner">ROW VS</th>
+                    <th className="corner" scope="col">
+                      <span>Enemy team &rarr;</span>
+                      <strong>&darr; Your team</strong>
+                    </th>
                     {model.archetypes.map((column) => (
-                      <th key={column.id} title={column.name}>{column.code}</th>
+                      <th key={column.id} scope="col">
+                        <span className="axis-kicker">Enemy</span>
+                        <strong className="matrix-name">{column.name}</strong>
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {model.archetypes.map((row) => (
                     <tr key={row.id}>
-                      <th title={row.name}>{row.code}</th>
+                      <th scope="row">
+                        <span className="axis-kicker">Your team</span>
+                        <strong className="matrix-name">{row.name}</strong>
+                      </th>
                       {model.archetypes.map((column) => {
                         const result = matchup(row.id, column.id);
                         const selected = row.id === rowId && column.id === columnId;
@@ -182,46 +217,64 @@ export function Explorer() {
                   ))}
                 </tbody>
               </table>
+              <p className="matrix-reading" aria-live="polite">
+                Highlighted square: your <strong>{selectedRow.name}</strong> team is shown as{" "}
+                <strong>{selectedMatchup.label.toLowerCase()}</strong> against enemy{" "}
+                <strong>{selectedColumn.name}</strong>.
+              </p>
               <div className="legend" aria-label="Matrix legend">
-                <span><i className="swatch hard-win" />+2 hard edge</span>
-                <span><i className="swatch soft-win" />+1 soft edge</span>
-                <span><i className="swatch neutral" />0 mirror</span>
-                <span><i className="swatch soft-loss" />−1 soft loss</span>
-                <span><i className="swatch hard-loss" />−2 hard loss</span>
+                <span><i className="swatch hard-win" /><strong>+2</strong> Big advantage for your team</span>
+                <span><i className="swatch soft-win" /><strong>+1</strong> Small advantage for your team</span>
+                <span><i className="swatch neutral" /><strong>0</strong> Even matchup</span>
+                <span><i className="swatch soft-loss" /><strong>-1</strong> Small disadvantage</span>
+                <span><i className="swatch hard-loss" /><strong>-2</strong> Big disadvantage</span>
               </div>
             </div>
 
             <aside className="matchup-card">
-              <p className="eyebrow">Selected matchup</p>
+              <p className="eyebrow">Highlighted square</p>
               <div className="versus-line">
-                <strong>{selectedRow.name}</strong>
-                <span>vs</span>
-                <strong>{selectedColumn.name}</strong>
+                <div>
+                  <span>Your team (row)</span>
+                  <strong>{selectedRow.name}</strong>
+                </div>
+                <b>against</b>
+                <div>
+                  <span>Enemy team (column)</span>
+                  <strong>{selectedColumn.name}</strong>
+                </div>
               </div>
               <div className={`verdict ${selectedMatchup.tone}`}>
                 <span>{selectedMatchup.label}</span>
                 <strong>{selectedMatchup.expected}%</strong>
-                <small>planning-model win expectation</small>
+                <small>estimated win chance for your team in the planning model</small>
               </div>
               <p>{selectedMatchup.reason}</p>
               <div className="matchup-split">
                 <div>
-                  <span>{selectedRow.code} plan</span>
+                  <span>{selectedRow.name} game plan</span>
                   <p>{selectedRow.plan}</p>
                 </div>
                 <div>
-                  <span>{selectedColumn.code} failure mode</span>
+                  <span>Where {selectedColumn.name} can fail</span>
                   <p>{selectedColumn.failureMode}</p>
                 </div>
               </div>
             </aside>
           </div>
 
+          <div className="glossary-heading">
+            <p className="eyebrow">Plain-language strategy glossary</p>
+            <h3>What each team style is trying to do</h3>
+            <p>
+              A team style, sometimes called an archetype in the design plan, is a broad way to win.
+              It is not one locked roster.
+            </p>
+          </div>
           <div className="archetype-grid">
             {model.archetypes.map((archetype) => (
               <article className="archetype-card" key={archetype.id}>
                 <div className="card-title-line">
-                  <span className="code-badge">{archetype.code}</span>
                   <h3>{archetype.name}</h3>
                 </div>
                 <p>{archetype.plan}</p>
@@ -341,7 +394,7 @@ export function Explorer() {
           <div className="filters single-filter">
             <label>
               <span>Find a bridge</span>
-              <input value={bridgeSearch} onChange={(event) => setBridgeSearch(event.target.value)} placeholder="Trait, role, approach, archetype…" />
+              <input value={bridgeSearch} onChange={(event) => setBridgeSearch(event.target.value)} placeholder="Trait, role, approach, team style…" />
             </label>
           </div>
           <div className="bridge-table-wrap">
@@ -351,7 +404,7 @@ export function Explorer() {
                   <th>Unit</th>
                   <th>Cost / role</th>
                   <th>Trait bridge</th>
-                  <th>RGA identity</th>
+                  <th>Team style fit</th>
                   <th>Kit hypothesis</th>
                 </tr>
               </thead>
