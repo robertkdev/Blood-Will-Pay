@@ -26,8 +26,20 @@ async function authorize() {
 }
 
 function conceptFromRequest(request: Request) {
-  const unitId = new URL(request.url).searchParams.get("unit");
-  return unitConcepts.find((concept) => concept.id === unitId) ?? null;
+  const searchParams = new URL(request.url).searchParams;
+  const unitId = searchParams.get("unit");
+  const versionId = searchParams.get("version");
+  const concept = unitConcepts.find((candidate) => candidate.id === unitId);
+  if (!concept) return null;
+
+  const version = versionId
+    ? concept.versions.find((candidate) => candidate.id === versionId)
+    : concept.versions.find(
+        (candidate) => candidate.id === concept.currentVersionId,
+      );
+  if (!version) return null;
+
+  return { concept, version };
 }
 
 function acceptsSameOriginJson(request: Request): boolean {
@@ -43,10 +55,12 @@ export async function GET(request: Request): Promise<Response> {
   const user = await authorize();
   if (!user) return json({ error: "Sign in required." }, 401);
 
-  const concept = conceptFromRequest(request);
-  if (!concept) return json({ error: "Unknown unit." }, 400);
+  const resolved = conceptFromRequest(request);
+  if (!resolved) return json({ error: "Unknown unit or version." }, 400);
 
-  return json(await readUnitReview(concept.id, concept.sha256));
+  return json(
+    await readUnitReview(resolved.concept.id, resolved.version.sha256),
+  );
 }
 
 export async function PUT(request: Request): Promise<Response> {
@@ -56,8 +70,8 @@ export async function PUT(request: Request): Promise<Response> {
     return json({ error: "Same-origin JSON request required." }, 403);
   }
 
-  const concept = conceptFromRequest(request);
-  if (!concept) return json({ error: "Unknown unit." }, 400);
+  const resolved = conceptFromRequest(request);
+  if (!resolved) return json({ error: "Unknown unit or version." }, 400);
 
   const payload = (await request.json().catch(() => null)) as {
     decision?: unknown;
@@ -67,12 +81,14 @@ export async function PUT(request: Request): Promise<Response> {
   }
 
   await saveUnitDecision(
-    concept.id,
-    concept.sha256,
+    resolved.concept.id,
+    resolved.version.sha256,
     payload.decision,
     user,
   );
-  return json(await readUnitReview(concept.id, concept.sha256));
+  return json(
+    await readUnitReview(resolved.concept.id, resolved.version.sha256),
+  );
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -82,8 +98,8 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: "Same-origin JSON request required." }, 403);
   }
 
-  const concept = conceptFromRequest(request);
-  if (!concept) return json({ error: "Unknown unit." }, 400);
+  const resolved = conceptFromRequest(request);
+  if (!resolved) return json({ error: "Unknown unit or version." }, 400);
 
   const payload = (await request.json().catch(() => null)) as {
     body?: unknown;
@@ -97,10 +113,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   await addUnitComment(
-    concept.id,
-    concept.sha256,
+    resolved.concept.id,
+    resolved.version.sha256,
     body,
     user,
   );
-  return json(await readUnitReview(concept.id, concept.sha256), 201);
+  return json(
+    await readUnitReview(resolved.concept.id, resolved.version.sha256),
+    201,
+  );
 }

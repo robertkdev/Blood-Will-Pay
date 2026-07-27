@@ -5,90 +5,38 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const rawRoot = new URL("../visual-evidence/raw/", import.meta.url);
 const stagedRoot = new URL("../visual-evidence/staged/", import.meta.url);
 const sourceSha =
-  "2d99465a225f22f1008d24493f299316514dae716d356117b42509f3a1747ad3";
+  "6bd90847f345beea49337beeb7be79f52cf105a4";
 
 await mkdir(stagedRoot, { recursive: true });
 
 const captures = [
   {
-    file: "desktop-top-before.png",
-    event: "gallery_loaded",
-    state: "desktop",
-    label: "Before: desktop identities below the fold",
-    group: "overview",
-    viewport: "desktop-1440x1000",
+    file: "desktop-version-current.png",
+    event: "inspect_veyra_current",
+    state: "version_review",
+    label: "Veyra P2-03 current candidate with version rail",
+    group: "version-review",
+    viewport: "desktop-1904x708",
     timestamp_ms: 0,
-    role: "before",
-    pair: "desktop_identity",
+    role: "reference",
+    pair: "version_switch",
   },
   {
-    file: "desktop-top.png",
-    event: "gallery_loaded",
-    state: "desktop",
-    label: "After: desktop identities visible",
-    group: "overview",
-    viewport: "desktop-1440x1000",
+    file: "desktop-version-closed-egg.png",
+    event: "inspect_veyra_closed_egg",
+    state: "version_review",
+    label: "Veyra P2-01 closed egg historical candidate",
+    group: "version-review",
+    viewport: "desktop-1904x708",
     timestamp_ms: 100,
-    role: "after",
-    pair: "desktop_identity",
-  },
-  {
-    file: "desktop-knoll-modal.png",
-    event: "inspect_knoll",
-    state: "desktop_inspection",
-    label: "Knoll full-size inspection",
-    group: "overview",
-    viewport: "desktop-1440x1000",
-    timestamp_ms: 200,
-  },
-  {
-    file: "desktop-korath-review-viewer.png",
-    event: "inspect_korath_review",
-    state: "desktop_review",
-    label: "Korath centered full-screen viewer with review rail",
-    group: "overview",
-    viewport: "desktop-1920x1080",
-    timestamp_ms: 250,
-  },
-  {
-    file: "mobile-top-before.png",
-    event: "gallery_loaded",
-    state: "mobile",
-    label: "Before: mobile identity below the fold",
-    group: "overview",
-    viewport: "mobile-390x844",
-    timestamp_ms: 300,
-    role: "before",
-    pair: "mobile_identity",
-  },
-  {
-    file: "mobile-top.png",
-    event: "gallery_loaded",
-    state: "mobile",
-    label: "After: mobile identity visible",
-    group: "overview",
-    viewport: "mobile-390x844",
-    timestamp_ms: 400,
-    role: "after",
-    pair: "mobile_identity",
-  },
-  {
-    file: "mobile-locked-filter.png",
-    event: "filter_locked",
-    state: "mobile_locked",
-    label: "Locked filter: two directions",
-    group: "overview",
-    viewport: "mobile-390x844",
-    timestamp_ms: 500,
+    role: "actual",
+    pair: "version_switch",
   },
 ];
 
 for (const capture of captures) {
   const stagedFile = new URL(capture.file, stagedRoot);
-  await copyFile(
-    new URL(capture.file, rawRoot),
-    stagedFile,
-  );
+  await copyFile(new URL(capture.file, rawRoot), stagedFile);
   const now = new Date();
   await utimes(stagedFile, now, now);
 }
@@ -105,13 +53,13 @@ const manifest = {
     },
     state: capture.state,
     label: capture.label,
-    role: capture.role ?? "actual",
+    role: capture.role,
     camera: "browser",
     group: capture.group,
     viewport: capture.viewport,
     timestamp_ms: capture.timestamp_ms,
     layer: "final",
-    ...(capture.pair ? { pair: capture.pair } : {}),
+    pair: capture.pair,
   })),
 };
 
@@ -122,5 +70,5 @@ await writeFile(
 );
 
 console.log(
-  `Prepared ${manifest.captures.length} browser captures at ${root}\\visual-evidence`,
+  `Prepared ${manifest.captures.length} version-review captures at ${root}\\visual-evidence`,
 );

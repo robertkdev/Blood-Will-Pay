@@ -37,13 +37,16 @@ function commentDate(timestamp: number): string {
 export function ConceptGallery() {
   const [filter, setFilter] = useState<Filter>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   const [review, setReview] = useState<UnitReview | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const [savingComment, setSavingComment] = useState(false);
   const [savingDecision, setSavingDecision] = useState(false);
+  const [referenceCopied, setReferenceCopied] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const openedFromUrl = useRef(false);
 
   const visibleConcepts = useMemo(
     () =>
@@ -58,14 +61,78 @@ export function ConceptGallery() {
     : -1;
   const activeConcept =
     activeIndex >= 0 ? visibleConcepts[activeIndex] : undefined;
+  const activeVersion = activeConcept
+    ? activeConcept.versions.find(
+        (version) =>
+          version.id === (activeVersionId ?? activeConcept.currentVersionId),
+      )
+    : undefined;
+  const activeVersionIndex =
+    activeConcept && activeVersion
+      ? activeConcept.versions.findIndex(
+          (version) => version.id === activeVersion.id,
+        )
+      : -1;
 
-  const activateConcept = useCallback((unitId: string) => {
+  const activateConcept = useCallback(
+    (unitId: string, versionId?: string) => {
+      const concept = unitConcepts.find((candidate) => candidate.id === unitId);
+      if (!concept) return;
+      const selectedVersion = concept.versions.some(
+        (version) => version.id === versionId,
+      )
+        ? versionId
+        : concept.currentVersionId;
+      setReview(null);
+      setReviewError(null);
+      setReviewLoading(true);
+      setCommentDraft("");
+      setReferenceCopied(false);
+      setActiveVersionId(selectedVersion);
+      setActiveId(unitId);
+    },
+    [],
+  );
+
+  const activateVersion = useCallback((versionId: string) => {
     setReview(null);
     setReviewError(null);
     setReviewLoading(true);
     setCommentDraft("");
-    setActiveId(unitId);
+    setReferenceCopied(false);
+    setActiveVersionId(versionId);
   }, []);
+
+  const closeViewer = useCallback(() => {
+    setActiveId(null);
+    setActiveVersionId(null);
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
+  useEffect(() => {
+    if (openedFromUrl.current) return;
+    openedFromUrl.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const unitId = params.get("unit");
+    const versionId = params.get("version") ?? undefined;
+    if (!unitId) return;
+    const frame = window.requestAnimationFrame(() => {
+      activateConcept(unitId, versionId);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activateConcept]);
+
+  useEffect(() => {
+    if (!activeConcept || !activeVersion) return;
+    const params = new URLSearchParams();
+    params.set("unit", activeConcept.id);
+    params.set("version", activeVersion.id);
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
+  }, [activeConcept, activeVersion]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -79,14 +146,17 @@ export function ConceptGallery() {
   }, [activeConcept]);
 
   useEffect(() => {
-    if (!activeConcept) return;
+    if (!activeConcept || !activeVersion) return;
 
     const controller = new AbortController();
 
-    fetch(`/api/reviews?unit=${encodeURIComponent(activeConcept.id)}`, {
+    fetch(
+      `/api/reviews?unit=${encodeURIComponent(activeConcept.id)}&version=${encodeURIComponent(activeVersion.id)}`,
+      {
       cache: "no-store",
       signal: controller.signal,
-    })
+      },
+    )
       .then(async (response) => {
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as {
@@ -108,14 +178,14 @@ export function ConceptGallery() {
       });
 
     return () => controller.abort();
-  }, [activeConcept]);
+  }, [activeConcept, activeVersion]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!activeConcept) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        setActiveId(null);
+        closeViewer();
         return;
       }
 
@@ -144,7 +214,13 @@ export function ConceptGallery() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeConcept, activeIndex, activateConcept, visibleConcepts]);
+  }, [
+    activeConcept,
+    activeIndex,
+    activateConcept,
+    closeViewer,
+    visibleConcepts,
+  ]);
 
   const move = (direction: -1 | 1) => {
     if (!activeConcept) return;
@@ -154,13 +230,30 @@ export function ConceptGallery() {
     activateConcept(visibleConcepts[nextIndex].id);
   };
 
+  const moveVersion = (direction: -1 | 1) => {
+    if (!activeConcept || activeVersionIndex < 0) return;
+    const nextIndex = Math.min(
+      activeConcept.versions.length - 1,
+      Math.max(0, activeVersionIndex + direction),
+    );
+    activateVersion(activeConcept.versions[nextIndex].id);
+  };
+
+  const copyReference = async () => {
+    if (!activeVersion) return;
+    await navigator.clipboard.writeText(
+      `${activeVersion.referenceName} — ${window.location.href}`,
+    );
+    setReferenceCopied(true);
+  };
+
   const saveDecision = async (decision: ReviewDecision) => {
-    if (!activeConcept) return;
+    if (!activeConcept || !activeVersion) return;
     setSavingDecision(true);
     setReviewError(null);
     try {
       const response = await fetch(
-        `/api/reviews?unit=${encodeURIComponent(activeConcept.id)}`,
+        `/api/reviews?unit=${encodeURIComponent(activeConcept.id)}&version=${encodeURIComponent(activeVersion.id)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -181,12 +274,12 @@ export function ConceptGallery() {
 
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!activeConcept || !commentDraft.trim()) return;
+    if (!activeConcept || !activeVersion || !commentDraft.trim()) return;
     setSavingComment(true);
     setReviewError(null);
     try {
       const response = await fetch(
-        `/api/reviews?unit=${encodeURIComponent(activeConcept.id)}`,
+        `/api/reviews?unit=${encodeURIComponent(activeConcept.id)}&version=${encodeURIComponent(activeVersion.id)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -249,7 +342,7 @@ export function ConceptGallery() {
               aria-pressed={filter === item.value}
               onClick={() => {
                 setFilter(item.value);
-                setActiveId(null);
+                closeViewer();
               }}
             >
               {item.label}
@@ -322,31 +415,33 @@ export function ConceptGallery() {
         }
         onCancel={(event) => {
           event.preventDefault();
-          setActiveId(null);
+          closeViewer();
         }}
-        onClose={() => setActiveId(null)}
+        onClose={closeViewer}
       >
-        {activeConcept && (
+        {activeConcept && activeVersion && (
           <div className="viewer-shell">
             <section className="viewer-stage" aria-label="Full-size concept image">
               <div className="viewer-heading">
                 <p>{activeConcept.role}</p>
                 <h2>{activeConcept.name}</h2>
-                <span>{activeConcept.statusLabel}</span>
+                <span>
+                  Unit {activeIndex + 1} of {visibleConcepts.length}
+                </span>
               </div>
 
               <a
                 className="viewer-image"
-                href={activeConcept.image}
+                href={activeVersion.image}
                 target="_blank"
                 rel="noreferrer"
                 title="Open original image"
               >
                 <img
-                  src={activeConcept.image}
-                  alt={`${activeConcept.name} — ${activeConcept.sourceLabel}`}
-                  width={activeConcept.width}
-                  height={activeConcept.height}
+                  src={activeVersion.image}
+                  alt={activeVersion.referenceName}
+                  width={activeVersion.width}
+                  height={activeVersion.height}
                 />
               </a>
 
@@ -367,25 +462,97 @@ export function ConceptGallery() {
                 →
               </button>
 
+              <section className="version-dock" aria-label="Art version history">
+                <div className="version-summary">
+                  <div>
+                    <span
+                      className={`version-status version-status-${activeVersion.status}`}
+                    >
+                      {activeVersion.status === "historical_candidate"
+                        ? "Historical candidate"
+                        : activeVersion.status === "locked_direction"
+                          ? "Direction locked · not final production art"
+                          : "Current candidate"}
+                    </span>
+                    <strong>{activeVersion.referenceName}</strong>
+                    <small>
+                      Version {activeVersionIndex + 1} of{" "}
+                      {activeConcept.versions.length}
+                    </small>
+                  </div>
+                  <button
+                    className="copy-reference"
+                    type="button"
+                    onClick={() => void copyReference()}
+                  >
+                    {referenceCopied ? "Copied" : "Copy reference"}
+                  </button>
+                </div>
+
+                <div className="version-controls">
+                  <button
+                    type="button"
+                    disabled={activeVersionIndex <= 0}
+                    onClick={() => moveVersion(-1)}
+                  >
+                    ← Older
+                  </button>
+                  <div className="version-strip">
+                    {activeConcept.versions.map((version) => (
+                      <button
+                        key={version.id}
+                        className={
+                          version.id === activeVersion.id
+                            ? "version-thumb active"
+                            : "version-thumb"
+                        }
+                        type="button"
+                        aria-label={`View ${version.referenceName}`}
+                        aria-pressed={version.id === activeVersion.id}
+                        onClick={() => activateVersion(version.id)}
+                      >
+                        <img
+                          src={version.image}
+                          alt=""
+                          width={version.width}
+                          height={version.height}
+                        />
+                        <span>{version.id.toUpperCase()}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={
+                      activeVersionIndex >= activeConcept.versions.length - 1
+                    }
+                    onClick={() => moveVersion(1)}
+                  >
+                    Newer →
+                  </button>
+                </div>
+              </section>
+
               <div className="viewer-foot">
-                <span>
-                  {activeIndex + 1} / {visibleConcepts.length}
-                </span>
-                <span>Click image for original · Arrow keys navigate</span>
+                <span>Unit arrows change character</span>
+                <span>Click image for original full resolution</span>
               </div>
             </section>
 
             <aside className="review-panel">
               <div className="review-panel-head">
                 <div>
-                  <p className="role">Unit review</p>
-                  <h3>{activeConcept.name}</h3>
+                  <p className="role">Version review</p>
+                  <h3>{activeVersion.id.toUpperCase()}</h3>
+                  <p className="review-reference">
+                    {activeVersion.referenceName}
+                  </p>
                 </div>
                 <button
                   className="close-button"
                   type="button"
                   aria-label="Close full-screen review"
-                  onClick={() => setActiveId(null)}
+                  onClick={closeViewer}
                 >
                   <span aria-hidden="true">×</span>
                 </button>
@@ -423,12 +590,14 @@ export function ConceptGallery() {
 
               <section className="comment-section" aria-label="Review comments">
                 <div className="comment-title">
-                  <h4>Comments</h4>
+                  <h4>Comments for this version</h4>
                   <span>{review?.comments.length ?? 0}</span>
                 </div>
 
                 <form className="comment-form" onSubmit={submitComment}>
-                  <label htmlFor="review-comment">Add a note for this unit</label>
+                  <label htmlFor="review-comment">
+                    Add a note for {activeVersion.id.toUpperCase()}
+                  </label>
                   <textarea
                     id="review-comment"
                     value={commentDraft}
@@ -483,22 +652,22 @@ export function ConceptGallery() {
                 <summary>Source details</summary>
                 <dl>
                   <div>
-                    <dt>Direction</dt>
-                    <dd>{activeConcept.sourceLabel}</dd>
+                    <dt>Reference name</dt>
+                    <dd>{activeVersion.referenceName}</dd>
                   </div>
                   <div>
                     <dt>Working stage</dt>
-                    <dd>{activeConcept.stage}</dd>
+                    <dd>{activeVersion.stage}</dd>
                   </div>
                   <div>
                     <dt>Native size</dt>
                     <dd>
-                      {activeConcept.width} × {activeConcept.height}
+                      {activeVersion.width} × {activeVersion.height}
                     </dd>
                   </div>
                   <div>
                     <dt>Repository date</dt>
-                    <dd>{activeConcept.sourceDate}</dd>
+                    <dd>{activeVersion.sourceDate}</dd>
                   </div>
                 </dl>
               </details>

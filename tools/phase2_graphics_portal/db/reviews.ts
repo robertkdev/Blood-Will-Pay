@@ -14,6 +14,23 @@ type CommentRow = {
   created_at: number;
 };
 
+export type ReviewDecisionExportRow = {
+  unit_id: string;
+  concept_sha256: string;
+  decision: ReviewDecision;
+  reviewer_name: string;
+  updated_at: number;
+};
+
+export type ReviewCommentExportRow = {
+  id: string;
+  unit_id: string;
+  concept_sha256: string;
+  body: string;
+  author_name: string;
+  created_at: number;
+};
+
 let schemaReady: Promise<void> | null = null;
 
 async function getReviewDatabase(): Promise<D1Database> {
@@ -113,6 +130,30 @@ export async function readUnitReview(
       authorName: row.author_name,
       createdAt: row.created_at,
     })),
+  };
+}
+
+export async function readAllReviewRevisions(): Promise<{
+  decisions: ReviewDecisionExportRow[];
+  comments: ReviewCommentExportRow[];
+}> {
+  const db = await getReviewDatabase();
+  const [decisionResult, commentResult] = await db.batch([
+    db.prepare(
+      `SELECT unit_id, concept_sha256, decision, reviewer_name, updated_at
+       FROM concept_decisions
+       ORDER BY unit_id, concept_sha256, updated_at, decision`,
+    ),
+    db.prepare(
+      `SELECT id, unit_id, concept_sha256, body, author_name, created_at
+       FROM concept_comments
+       ORDER BY unit_id, concept_sha256, created_at, id`,
+    ),
+  ]);
+
+  return {
+    decisions: decisionResult.results as unknown as ReviewDecisionExportRow[],
+    comments: commentResult.results as unknown as ReviewCommentExportRow[],
   };
 }
 
