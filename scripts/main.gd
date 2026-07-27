@@ -10,7 +10,7 @@ const Debug := preload("res://scripts/util/debug.gd")
 const AuditPanelScene: GDScript = preload("res://scripts/ui/audit/audit_panel.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
-const TITLE_SIGIL: Texture2D = preload("res://assets/ui/gold icon.png")
+const TITLE_SIGIL: Texture2D = preload("res://assets/ui/blood_reserve.svg")
 
 const DEBUG_AUTO_START := false
 const DEBUG_TRACE := true
@@ -304,7 +304,7 @@ func _build_title_page() -> void:
 	stack.add_child(title)
 	var subtitle: Label = Label.new()
 	subtitle.name = "Subtitle"
-	subtitle.text = "Blood. Gold. Consequence."
+	subtitle.text = "Blood. Wager. Consequence."
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 20)
 	subtitle.add_theme_color_override("font_color", Color(0.72, 0.66, 0.58, 1.0))

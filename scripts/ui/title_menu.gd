@@ -365,7 +365,7 @@ func _ensure_subtitle() -> void:
 		_subtitle.name = "Subtitle"
 		center_vbox.add_child(_subtitle)
 		center_vbox.move_child(_subtitle, min(1, center_vbox.get_child_count() - 1))
-	_subtitle.text = "Blood. Gold. Consequence."
+	_subtitle.text = "Blood. Wager. Consequence."
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_subtitle.add_theme_font_size_override("font_size", 17)

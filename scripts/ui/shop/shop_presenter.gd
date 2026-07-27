@@ -228,8 +228,8 @@ func _refresh_cards_state() -> void:
 			sc.set_affordable(affordable)
 			if not affordable:
 				var need: int = int(aff.get("need_more", 0))
-				var msg := "Not enough gold"
-				var reason := String(aff.get("reason", ""))
+				var msg: String = "Not enough blood in reserve"
+				var reason: String = String(aff.get("reason", ""))
 				if reason == ShopAffordability.REASON_RESERVE_FLOOR:
 					msg = "Must keep at least 1 health (need +%d)" % max(1, need)
 				elif reason == ShopAffordability.REASON_CREDIT_LIMIT:
@@ -257,7 +257,7 @@ func _refresh_cards_state() -> void:
 	if _buttons:
 		var r_cost: int = int(ShopConfig.REROLL_COST)
 		var aff_r := ShopAffordability.can_afford(gold, bet, r_cost, in_combat, spent)
-		var msg_r := ""
+		var msg_r: String = ""
 		if not bool(aff_r.get("ok", false)):
 			var need_r: int = int(aff_r.get("need_more", 0))
 			var reason_r := String(aff_r.get("reason", ""))
@@ -266,12 +266,12 @@ func _refresh_cards_state() -> void:
 			elif reason_r == ShopAffordability.REASON_CREDIT_LIMIT:
 				msg_r = "Exceeds combat credit (need +%d)" % max(1, need_r)
 			else:
-				msg_r = "Not enough gold"
+				msg_r = "Not enough blood in reserve"
 		_buttons.set_reroll_tooltip(msg_r)
 
 		var x_cost: int = int(ShopConfig.BUY_XP_COST)
 		var aff_x := ShopAffordability.can_afford(gold, bet, x_cost, in_combat, spent)
-		var msg_x := ""
+		var msg_x: String = ""
 		if not bool(aff_x.get("ok", false)):
 			var need_x: int = int(aff_x.get("need_more", 0))
 			var reason_x := String(aff_x.get("reason", ""))
@@ -280,7 +280,7 @@ func _refresh_cards_state() -> void:
 			elif reason_x == ShopAffordability.REASON_CREDIT_LIMIT:
 				msg_x = "Exceeds combat credit (need +%d)" % max(1, need_x)
 			else:
-				msg_x = "Not enough gold"
+				msg_x = "Not enough blood in reserve"
 		_buttons.set_buy_xp_tooltip(msg_x)
 
 func _on_card_clicked(slot_index: int) -> void:
@@ -434,10 +434,10 @@ func _shop_error_message(code: String, context: Dictionary) -> String:
 	if code == ShopErrors.WOULD_KILL_YOU and need_more > 0:
 		var op: String = String(context.get("op", ""))
 		if op == "buy_xp":
-			return "Need +%d gold to buy XP and keep 1 health." % max(1, need_more)
+			return "Need +%d blood to buy XP and keep 1 in reserve." % max(1, need_more)
 		if op == "reroll":
-			return "Need +%d gold to reroll and keep 1 health." % max(1, need_more)
+			return "Need +%d blood to reroll and keep 1 in reserve." % max(1, need_more)
 		if op == "buy_unit":
-			return "Need +%d gold to buy safely." % max(1, need_more)
-		return "Need +%d gold to keep 1 health." % max(1, need_more)
+			return "Need +%d blood in reserve to buy safely." % max(1, need_more)
+		return "Need +%d blood to keep 1 in reserve." % max(1, need_more)
 	return ShopErrors.message(code)
