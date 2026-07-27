@@ -166,6 +166,10 @@ func _on_debuff_applied(source_team: String, source_index: int, target_team: Str
 	if source_side == "":
 		return
 	var is_dot: bool = _is_dot_kind(kind, fields)
+	var attack_speed_slow: float = 0.0
+	if fields.has("attack_speed"):
+		attack_speed_slow = max(0.0, -float(fields.get("attack_speed", 0.0)))
+	var is_enemy_attack_speed_slow: bool = source_side != target_side and attack_speed_slow > 0.0
 	_bump_side(source_side, "debuff_applied", 1)
 	if source_side != "" and target_side != "" and source_side != target_side:
 		_bump_side(source_side, "enemy_debuff_targets", 1)
@@ -173,6 +177,9 @@ func _on_debuff_applied(source_team: String, source_index: int, target_team: Str
 		"debuff_applied": 1,
 		"enemy_debuffs": (1 if source_side != target_side else 0),
 		"debuff_magnitude": float(magnitude),
+		"enemy_attack_speed_slow_events": (1 if is_enemy_attack_speed_slow else 0),
+		"enemy_attack_speed_slow_magnitude": (attack_speed_slow if is_enemy_attack_speed_slow else 0.0),
+		"enemy_attack_speed_slow_duration_s": (max(0.0, float(duration)) if is_enemy_attack_speed_slow else 0.0),
 		"dot_application_events": (1 if is_dot and source_side != target_side else 0),
 		"dot_duration_applied_s": (max(0.0, float(duration)) if is_dot and source_side != target_side else 0.0)
 	})
@@ -328,6 +335,9 @@ func _empty_unit_counts() -> Dictionary:
 		"ally_buffs_to_others": 0,
 		"ally_buff_magnitude_to_others": 0.0,
 		"enemy_debuffs": 0,
+		"enemy_attack_speed_slow_events": 0,
+		"enemy_attack_speed_slow_magnitude": 0.0,
+		"enemy_attack_speed_slow_duration_s": 0.0,
 		"cc_immunity": 0,
 		"on_hit_effects": 0,
 		"on_hit_magnitude": 0.0,

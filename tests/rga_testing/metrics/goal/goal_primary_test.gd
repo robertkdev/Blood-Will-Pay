@@ -104,9 +104,14 @@ func _eval_frontline_absorb(summary: Dictionary, spans: Array) -> bool:
 	var body_block_damage: float = float(summary.get("body_block_damage_prevented", 0.0))
 	var body_block_events: int = int(summary.get("body_block_events", 0))
 	var body_block_direct: bool = body_block_events >= 1 and body_block_damage >= 25.0
+	var redirect_events: int = int(summary.get("redirect_events", 0))
+	var redirected_damage: float = float(summary.get("redirected_damage_prevented", 0.0))
+	var redirect_direct: bool = redirect_events >= 1 and redirected_damage >= 25.0
+	var direct_absorb_semantic: bool = body_block_direct or redirect_direct
 	var frontline_value: float = float(summary.get("frontline_zone_share", 0.0))
 	var frontline_ok: bool = frontline_value >= 0.50
-	var pass_flag: bool = prevented_ok and body_block_direct if body_block_events > 0 else _k_of_n([share_ok, prevented_ok, frontline_ok], 2)
+	var has_direct_absorb_semantic: bool = body_block_events > 0 or redirect_events > 0
+	var pass_flag: bool = prevented_ok and direct_absorb_semantic if has_direct_absorb_semantic else _k_of_n([share_ok, prevented_ok, frontline_ok], 2)
 	var alternate_evidence_reason: String = "alternate_frontline_evidence_satisfied"
 	var share_span_ok: Variant = share_ok
 	var body_block_events_span_ok: Variant = body_block_events >= 1
@@ -114,8 +119,8 @@ func _eval_frontline_absorb(summary: Dictionary, spans: Array) -> bool:
 	var share_reason: String = ""
 	var body_block_reason: String = "direct_redirect_semantic"
 	if pass_flag and body_block_events <= 0:
-		share_reason = alternate_evidence_reason
-		body_block_reason = alternate_evidence_reason
+		share_reason = "direct_redirect_semantic" if redirect_direct else alternate_evidence_reason
+		body_block_reason = share_reason
 		if not share_ok:
 			share_span_ok = null
 		if body_block_events < 1:
@@ -127,8 +132,8 @@ func _eval_frontline_absorb(summary: Dictionary, spans: Array) -> bool:
 	_append_span(spans, summary, "goal_frontline_absorb_body_block_events", float(body_block_events), 1.0, body_block_events_span_ok, body_block_reason)
 	_append_span(spans, summary, "goal_frontline_absorb_body_block_damage_prevented", body_block_damage, 25.0, body_block_damage_span_ok, body_block_reason)
 	_append_span(spans, summary, "goal_frontline_absorb_frontline_zone_share", frontline_value, 0.50, frontline_ok, "frontline_zone_proxy")
-	if body_block_events > 0:
-		return prevented_ok and body_block_direct
+	if has_direct_absorb_semantic:
+		return prevented_ok and direct_absorb_semantic
 	return pass_flag
 
 func _eval_team_fortification(summary: Dictionary, spans: Array) -> bool:
@@ -216,7 +221,29 @@ func _eval_cleanup_execution(summary: Dictionary, spans: Array) -> bool:
 	return _k_of_n([kills_ok, share_ok, overkill_ok], 2)
 
 func _eval_disrupt_and_escape(summary: Dictionary, spans: Array) -> bool:
-	var disrupt_ok: bool = _append_span(spans, summary, "goal_disrupt_escape_disruption_time", float(summary.get("cc_seconds", 0.0)), 1.0, float(summary.get("cc_seconds", 0.0)) >= 1.0)
+	var cc_seconds: float = float(summary.get("cc_seconds", 0.0))
+	var cc_disrupt_ok: bool = cc_seconds >= 1.0
+	var slow_events: int = int(summary.get("enemy_attack_speed_slow_events", 0))
+	var slow_magnitude_total: float = float(summary.get("enemy_attack_speed_slow_magnitude", 0.0))
+	var slow_duration_total_s: float = float(summary.get("enemy_attack_speed_slow_duration_s", 0.0))
+	var slow_magnitude_avg: float = slow_magnitude_total / max(1.0, float(slow_events))
+	var slow_duration_avg_s: float = slow_duration_total_s / max(1.0, float(slow_events))
+	var slow_disrupt_ok: bool = slow_events >= 1 and slow_magnitude_avg >= 0.20 and slow_duration_avg_s >= 1.0
+	var disrupt_ok: bool = cc_disrupt_ok or slow_disrupt_ok
+	var cc_span_ok: Variant = cc_disrupt_ok
+	var cc_reason: String = ""
+	if slow_disrupt_ok and not cc_disrupt_ok:
+		cc_span_ok = null
+		cc_reason = "alternate_direct_attack_speed_slow_evidence"
+	_append_span(spans, summary, "goal_disrupt_escape_disruption_time", cc_seconds, 1.0, cc_span_ok, cc_reason)
+	var slow_span_ok: Variant = slow_disrupt_ok
+	var slow_reason: String = "direct_attack_speed_slow_evidence"
+	if cc_disrupt_ok and not slow_disrupt_ok:
+		slow_span_ok = null
+		slow_reason = "alternate_direct_cc_evidence"
+	_append_span(spans, summary, "goal_disrupt_escape_attack_speed_slow_events", float(slow_events), 1.0, slow_span_ok, slow_reason)
+	_append_span(spans, summary, "goal_disrupt_escape_attack_speed_slow_avg_magnitude", slow_magnitude_avg, 0.20, slow_span_ok, slow_reason)
+	_append_span(spans, summary, "goal_disrupt_escape_attack_speed_slow_avg_duration_s", slow_duration_avg_s, 1.0, slow_span_ok, slow_reason)
 	var escape_ok: bool = _append_span(spans, summary, "goal_disrupt_escape_survival_s", float(summary.get("time_alive_s", 0.0)), 8.0, float(summary.get("time_alive_s", 0.0)) >= 8.0)
 	if _has_direct_targetability(summary):
 		var frames_ok: bool = _append_span(spans, summary, "goal_disrupt_escape_untargetable_frames_pct", float(summary.get("untargetable_frames_pct", 0.0)), 0.05, float(summary.get("untargetable_frames_pct", 0.0)) >= 0.05)
@@ -255,11 +282,13 @@ func _eval_marksman_sustained_dps(summary: Dictionary, spans: Array) -> bool:
 	return _k_of_n([damage_share_ok or sustained_window_ok, uptime_ok, range_ok, survival_ok, ramp_ok], 2)
 
 func _eval_backline_siege(summary: Dictionary, spans: Array) -> bool:
-	var range_ok: bool = _append_span(spans, summary, "goal_backline_siege_long_range_damage_share", float(summary.get("attacks_over_2_tiles_pct", 0.0)), 0.60, float(summary.get("attacks_over_2_tiles_pct", 0.0)) >= 0.60)
+	var long_range_damage_share: float = float(summary.get("damage_over_2_tiles_pct", summary.get("attacks_over_2_tiles_pct", 0.0)))
+	var range_ok: bool = _append_span(spans, summary, "goal_backline_siege_long_range_damage_share", long_range_damage_share, 0.60, long_range_damage_share >= 0.60)
 	var exposure_ok: bool = _append_span(spans, summary, "goal_backline_siege_pressure_without_exposure", _incoming_share(summary), 0.25, _incoming_share(summary) <= 0.25)
 	var damage_ok: bool = _append_span(spans, summary, "goal_backline_siege_team_damage_share", _damage_share(summary), 0.20, _damage_share(summary) >= 0.20)
-	var ramp_ok: bool = _goal_ramp_ok(summary, spans, "goal_backline_siege")
-	return _k_of_n([range_ok, exposure_ok, damage_ok, ramp_ok], 2)
+	var backline_damage_share: float = float(summary.get("backline_damage_share", 0.0))
+	var backline_ok: bool = _append_span(spans, summary, "goal_backline_siege_backline_damage_share", backline_damage_share, 0.55, backline_damage_share >= 0.55)
+	return _k_of_n([range_ok, exposure_ok, damage_ok, backline_ok], 2)
 
 func _eval_tank_shredding(summary: Dictionary, spans: Array) -> bool:
 	var frontline_ok: bool = _append_span(spans, summary, "goal_tank_shredding_damage_to_frontline", float(summary.get("damage_to_frontline_pct", 0.0)), 0.50, float(summary.get("damage_to_frontline_pct", 0.0)) >= 0.50)
@@ -322,13 +351,25 @@ func _eval_pick_burst(summary: Dictionary, spans: Array) -> bool:
 	return _k_of_n([burst_ok, kill_ok, counterplay_ok], 2)
 
 func _eval_mage_sustained_dps(summary: Dictionary, spans: Array) -> bool:
-	var damage_ok: bool = _append_span(spans, summary, "goal_mage_sustained_dps_team_damage_share", _damage_share(summary), 0.20, _damage_share(summary) >= 0.20)
+	var damage_share: float = _damage_share(summary)
+	var sustained_team_share: float = float(summary.get("sustained_3_10s_team_share", 0.0))
+	var sustained_rate: float = float(summary.get("sustained_3_10s_rate", 0.0))
+	var sustained_team_share_ok: bool = _append_span(spans, summary, "goal_mage_sustained_dps_sustained_3_10s_team_share", sustained_team_share, 0.20, sustained_team_share >= 0.20, "direct_sustained_window")
+	var sustained_rate_ok: bool = _append_span(spans, summary, "goal_mage_sustained_dps_sustained_3_10s_rate", sustained_rate, 8.0, sustained_rate >= 8.0, "direct_sustained_window")
+	var sustained_window_ok: bool = sustained_team_share_ok and sustained_rate_ok
+	var damage_share_ok: bool = damage_share >= 0.20
+	var damage_share_span_ok: Variant = damage_share_ok
+	var damage_share_reason: String = ""
+	if not damage_share_ok and sustained_window_ok:
+		damage_share_span_ok = null
+		damage_share_reason = "alternate_sustained_window_evidence_satisfied"
+	_append_span(spans, summary, "goal_mage_sustained_dps_team_damage_share", damage_share, 0.20, damage_share_span_ok, damage_share_reason)
 	var dot_ok: bool = _goal_dot_ok(summary, spans, "goal_mage_sustained_dps")
 	var zone_ok: bool = _goal_zone_ok(summary, spans, "goal_mage_sustained_dps")
 	var ramp_ok: bool = _goal_ramp_ok(summary, spans, "goal_mage_sustained_dps")
 	var on_hit_ok: bool = _goal_on_hit_ok(summary, spans, "goal_mage_sustained_dps")
 	_append_span(spans, summary, "goal_mage_sustained_dps_aoe_dps_diagnostic", float(summary.get("aoe_dps", 0.0)), 5.0, float(summary.get("aoe_dps", 0.0)) >= 5.0, "diagnostic_not_pass_condition")
-	return damage_ok and (dot_ok or zone_ok or ramp_ok or on_hit_ok)
+	return (damage_share_ok or sustained_window_ok) and (dot_ok or zone_ok or ramp_ok or on_hit_ok)
 
 func _eval_peel_carry(summary: Dictionary, spans: Array) -> bool:
 	var saves_ok: bool = _append_span(spans, summary, "goal_peel_carry_peel_saves", float(summary.get("team_peel_saves", 0)), 1.0, int(summary.get("team_peel_saves", 0)) >= 1)
@@ -472,7 +513,7 @@ func _merge_control(summary: Dictionary, rec: Dictionary, first_action_values: A
 		first_action_values.append(first_action)
 
 func _merge_per_unit_kpis(summary: Dictionary, rec: Dictionary) -> void:
-	for key in ["time_on_target_pct", "attack_distance_median_tiles", "attacks_over_2_tiles_pct", "damage_to_frontline_pct", "kiting_tax"]:
+	for key in ["time_on_target_pct", "attack_distance_median_tiles", "attacks_over_2_tiles_pct", "damage_over_2_tiles_pct", "damage_to_frontline_pct", "kiting_tax"]:
 		if rec.has(key):
 			summary[key] = max(float(summary.get(key, 0.0)), float(rec.get(key, 0.0)))
 	if rec.has("damage_to_frontline_pct"):
@@ -480,7 +521,7 @@ func _merge_per_unit_kpis(summary: Dictionary, rec: Dictionary) -> void:
 		summary["backline_damage_share"] = max(float(summary.get("backline_damage_share", 0.0)), backline_damage_share)
 
 func _merge_buffs(summary: Dictionary, rec: Dictionary) -> void:
-	for key in ["ally_buffs", "ally_buffs_to_others", "ally_buff_magnitude_to_others", "amp_output_events", "amp_output_delta", "amp_output_pct_total", "amp_output_beneficiaries", "enemy_debuffs", "enemy_debuff_magnitude", "cc_immunity_applied", "cc_prevented", "cleanse_applied"]:
+	for key in ["ally_buffs", "ally_buffs_to_others", "ally_buff_magnitude_to_others", "amp_output_events", "amp_output_delta", "amp_output_pct_total", "amp_output_beneficiaries", "enemy_debuffs", "enemy_debuff_magnitude", "enemy_attack_speed_slow_events", "enemy_attack_speed_slow_magnitude", "enemy_attack_speed_slow_duration_s", "cc_immunity_applied", "cc_prevented", "cleanse_applied"]:
 		if rec.has(key):
 			summary[key] = float(summary.get(key, 0.0)) + float(rec.get(key, 0.0))
 	for key in ["on_hit_effects", "dot_tick_events", "dot_tick_targets", "dot_application_events"]:

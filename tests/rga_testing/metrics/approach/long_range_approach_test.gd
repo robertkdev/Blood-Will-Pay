@@ -40,6 +40,7 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 	var share_req: float = float(RoleCommon.resolve_min_threshold(share_cfg, cost_band, scenario_label))
 
 	var samples: Array[float] = []
+	var damage_samples: Array[float] = []
 	for key in sims.keys():
 		var entry: Dictionary = sims.get(key, {})
 		var side: String = _subject_side(entry, subject_id)
@@ -58,16 +59,33 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 		var value: float = float(rec.get("attacks_over_2_tiles_pct", -1.0))
 		if value >= 0.0:
 			samples.append(value)
+		var damage_value: float = float(rec.get("damage_over_2_tiles_pct", -1.0))
+		if damage_value >= 0.0:
+			damage_samples.append(damage_value)
 
 	var median_value: float = _median(samples)
-	var pass_flag: bool = median_value >= share_req and samples.size() > 0
+	var median_damage_value: float = _median(damage_samples)
+	var count_share_ok: bool = median_value >= share_req and samples.size() > 0
+	var damage_share_ok: bool = median_damage_value >= share_req and damage_samples.size() > 0
+	var pass_flag: bool = count_share_ok or damage_share_ok
 	var spans: Array = []
 	var extras: Dictionary = RoleCommon.subject_extras(_any_side_for_subject(sims, subject_id), subject_id, ("no_samples" if samples.is_empty() else ""))
-	RoleCommon.append_span(spans, "subject_attacks_over_2_tiles_med", median_value, share_req, pass_flag, extras)
+	var count_span_ok: Variant = count_share_ok
+	var count_extras: Dictionary = extras.duplicate(true)
+	if not count_share_ok and damage_share_ok:
+		count_span_ok = null
+		count_extras["reason"] = "alternate_long_range_damage_share_satisfied"
+	RoleCommon.append_span(spans, "subject_attacks_over_2_tiles_med", median_value, share_req, count_span_ok, count_extras)
+	var damage_span_ok: Variant = damage_share_ok
+	var damage_extras: Dictionary = extras.duplicate(true)
+	if not damage_share_ok and count_share_ok:
+		damage_span_ok = null
+		damage_extras["reason"] = "alternate_long_range_hit_share_satisfied"
+	RoleCommon.append_span(spans, "subject_damage_over_2_tiles_med", median_damage_value, share_req, damage_span_ok, damage_extras)
 
 	var messages: Array[String] = []
 	messages.append("scenario=%s" % scenario_label)
-	messages.append("samples=%d" % samples.size())
+	messages.append("hit_samples=%d; damage_samples=%d" % [samples.size(), damage_samples.size()])
 
 	return {
 		"id": METRIC_ID,

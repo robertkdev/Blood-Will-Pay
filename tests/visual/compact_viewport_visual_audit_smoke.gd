@@ -80,6 +80,10 @@ func _run() -> void:
 	_expect_control_inside(_combat_node("MarginContainer/VBoxContainer/BottomStorageArea"), "bottom shop area")
 	_expect_no_button_text_overflow(combat, "post-shop combat")
 	_save_capture("05_post_shop_planning_1280x720.png", _main)
+	_show_first_unit_details()
+	await _settle_frames(8)
+	_expect_unit_detail_layout()
+	_save_capture("06_unit_detail_1280x720.png", _main)
 	_finish()
 
 func _build_post_shop_state() -> void:
@@ -93,6 +97,10 @@ func _build_post_shop_state() -> void:
 	if unit_select != null:
 		unit_select.visible = false
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	if combat == null and _main.has_method("_ensure_combat_view"):
+		_main.call("_ensure_combat_view")
+		await _settle_frames(4)
+		combat = _main.get_node_or_null("CombatView") as Control
 	_expect(combat != null, "CombatView missing")
 	if combat == null:
 		return
@@ -142,6 +150,66 @@ func _combat_node(path: String) -> Control:
 		return null
 	return combat.get_node_or_null(path) as Control
 
+func _show_first_unit_details() -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	if combat == null:
+		_expect(false, "CombatView missing for unit detail")
+		return
+	var stats_panel: Control = combat.find_child("StatsPanel", true, false) as Control
+	if stats_panel == null:
+		_expect(false, "StatsPanel missing for unit detail")
+		return
+	var manager: CombatManager = combat.get("manager") as CombatManager
+	if manager == null or manager.player_team.is_empty():
+		_expect(false, "Player team missing for unit detail")
+		return
+	var unit: Unit = manager.player_team[0] as Unit
+	if unit == null:
+		_expect(false, "First player unit missing for unit detail")
+		return
+	if stats_panel.has_method("show_unit_metrics_ctx"):
+		stats_panel.call("show_unit_metrics_ctx", "player", 0, unit)
+
+func _expect_unit_detail_layout() -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	if combat == null:
+		return
+	var stats_panel: Control = combat.find_child("StatsPanel", true, false) as Control
+	_expect(stats_panel != null, "StatsPanel missing after unit detail")
+	if stats_panel == null:
+		return
+	var unit_frame: Control = stats_panel.find_child("UnitPanelFrame", true, false) as Control
+	var unit_scroll: ScrollContainer = stats_panel.find_child("UnitScroll", true, false) as ScrollContainer
+	var unit_panel: Control = stats_panel.find_child("UnitPanel", true, false) as Control
+	_expect(unit_frame != null and unit_frame.visible, "unit detail frame should be visible")
+	_expect(unit_scroll != null and unit_scroll.visible, "unit detail scroll should be visible")
+	_expect(unit_panel != null and unit_panel.visible, "unit detail panel should be visible")
+	if unit_frame != null:
+		_expect_control_inside(unit_frame, "unit detail frame")
+	if unit_scroll != null and unit_panel != null:
+		_expect_horizontally_inside(unit_panel, unit_scroll.get_global_rect(), "unit detail panel")
+		_expect_visible_descendants_horizontally_inside(unit_panel, unit_scroll.get_global_rect(), "unit detail")
+	var stats_grid: GridContainer = unit_panel.find_child("StatsGrid", true, false) as GridContainer if unit_panel != null else null
+	_expect(stats_grid != null, "unit detail stats grid missing")
+	if stats_grid != null:
+		_expect(int(stats_grid.columns) <= 3, "compact unit detail should use at most 3 stat columns, got %d" % int(stats_grid.columns))
+
+func _expect_horizontally_inside(control: Control, clip_rect: Rect2, label: String) -> void:
+	if control == null:
+		return
+	var rect: Rect2 = control.get_global_rect()
+	_expect(rect.position.x >= clip_rect.position.x - 1.0, "%s left edge clips horizontally: %s clip=%s" % [label, str(rect), str(clip_rect)])
+	_expect(rect.end.x <= clip_rect.end.x + 1.0, "%s right edge clips horizontally: %s clip=%s" % [label, str(rect), str(clip_rect)])
+
+func _expect_visible_descendants_horizontally_inside(root: Node, clip_rect: Rect2, context: String) -> void:
+	if root == null:
+		return
+	for child: Node in root.get_children():
+		var control: Control = child as Control
+		if control != null and control.visible:
+			_expect_horizontally_inside(control, clip_rect, "%s %s" % [context, str(control.name)])
+		_expect_visible_descendants_horizontally_inside(child, clip_rect, context)
+
 func _first_unit_button() -> Button:
 	if _unit_select == null:
 		return null
@@ -153,10 +221,42 @@ func _expect_control_inside(control: Control, label: String) -> void:
 		return
 	var rect: Rect2 = control.get_global_rect()
 	var viewport_rect: Rect2 = _viewport_rect()
+	var layout_context: String = _layout_context_for(label)
 	_expect(rect.position.x >= viewport_rect.position.x - 1.0, "%s left edge is outside viewport: %s" % [label, str(rect)])
 	_expect(rect.position.y >= viewport_rect.position.y - 1.0, "%s top edge is outside viewport: %s" % [label, str(rect)])
-	_expect(rect.end.x <= viewport_rect.end.x + 1.0, "%s right edge is outside viewport: %s viewport=%s" % [label, str(rect), str(viewport_rect)])
-	_expect(rect.end.y <= viewport_rect.end.y + 1.0, "%s bottom edge is outside viewport: %s viewport=%s" % [label, str(rect), str(viewport_rect)])
+	_expect(rect.end.x <= viewport_rect.end.x + 1.0, "%s right edge is outside viewport: %s viewport=%s%s" % [label, str(rect), str(viewport_rect), layout_context])
+	_expect(rect.end.y <= viewport_rect.end.y + 1.0, "%s bottom edge is outside viewport: %s viewport=%s%s" % [label, str(rect), str(viewport_rect), layout_context])
+
+func _layout_context_for(label: String) -> String:
+	if not label.begins_with("unit detail"):
+		return ""
+	var combat: Control = null
+	if _main != null:
+		combat = _main.get_node_or_null("CombatView") as Control
+	if combat == null:
+		return " context=CombatView missing"
+	var parts: PackedStringArray = PackedStringArray()
+	_append_layout_part(parts, "CombatView", combat)
+	_append_layout_part(parts, "ContentRow", combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow") as Control)
+	_append_layout_part(parts, "LeftItemArea", combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control)
+	_append_layout_part(parts, "BoardColumn", combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn") as Control)
+	_append_layout_part(parts, "StatsArea", combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control)
+	_append_layout_part(parts, "StatsPanel", combat.find_child("StatsPanel", true, false) as Control)
+	var unit_frame: Control = combat.find_child("UnitPanelFrame", true, false) as Control
+	_append_layout_part(parts, "UnitPanelFrame", unit_frame)
+	return " context=%s" % " | ".join(parts)
+
+func _append_layout_part(parts: PackedStringArray, label: String, control: Control) -> void:
+	if control == null:
+		parts.append("%s=<missing>" % label)
+		return
+	parts.append("%s rect=%s min=%s combined=%s flags=%d" % [
+		label,
+		str(control.get_global_rect()),
+		str(control.custom_minimum_size),
+		str(control.get_combined_minimum_size()),
+		int(control.size_flags_horizontal),
+	])
 
 func _expect_no_button_text_overflow(root: Node, context: String) -> void:
 	if root == null:

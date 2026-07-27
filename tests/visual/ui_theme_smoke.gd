@@ -46,6 +46,17 @@ func _run() -> void:
 		var unselected_icon: TextureRect = progress_bar.find_child("StageIcon1", true, false) as TextureRect
 		_expect(selected_icon != null and selected_icon.texture != null and String(selected_icon.texture.resource_path).ends_with("stage_4_boss_selected.png"), "Current stage icon did not use selected asset", failures)
 		_expect(unselected_icon != null and unselected_icon.texture != null and String(unselected_icon.texture.resource_path).ends_with("stage_1_creep_unselected.png"), "Inactive stage icon did not use unselected asset", failures)
+		if selected_icon != null:
+			_expect(String(selected_icon.tooltip_text) == "", "Stage summary icons should suppress native tooltip text", failures)
+			selected_icon.emit_signal("mouse_entered")
+			await get_tree().process_frame
+			var stage_tooltip: PanelContainer = get_tree().root.find_child("StageProgressTooltip", true, false) as PanelContainer
+			_expect(stage_tooltip != null, "Stage summary hover should create a custom tooltip", failures)
+			if stage_tooltip != null:
+				_expect(stage_tooltip.get_theme_stylebox("panel") is StyleBoxTexture, "Stage summary tooltip should use the generated gothic panel asset", failures)
+			selected_icon.emit_signal("mouse_exited")
+			await get_tree().process_frame
+			_expect(get_tree().root.find_child("StageProgressTooltip", true, false) == null, "Stage summary hover exit should clear the custom tooltip", failures)
 		progress_bar.call("update_progress", 1, 1, 5)
 	var continue_button: Button = view.find_child("ContinueButton", true, false) as Button
 	_expect(continue_button != null, "ContinueButton missing", failures)

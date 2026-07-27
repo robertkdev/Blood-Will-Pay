@@ -5,6 +5,7 @@ const BoardGridScript: Script = preload("res://scripts/board_grid.gd")
 const MoveRouterScript: Script = preload("res://scripts/ui/combat/move_router.gd")
 const UnitScript: Script = preload("res://scripts/unit.gd")
 const UnitViewScript: Script = preload("res://scripts/ui/combat/unit_view.gd")
+const TextureUtils: Script = preload("res://scripts/util/texture_utils.gd")
 
 class FakeManager:
 	var player_team: Array[Unit] = []
@@ -33,6 +34,7 @@ class FakeBenchPlacement:
 var _failures: Array[String] = []
 var _board_host: GridContainer = null
 var _bench_host: GridContainer = null
+var _finish_queued: bool = false
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -61,6 +63,24 @@ func _run() -> void:
 	var board_view: UnitView = UnitViewScript.new() as UnitView
 	board_view.set_unit(board_unit)
 	board_helper.attach(board_view, 0)
+	await get_tree().process_frame
+	var sprite_before_reparent: TextureRect = board_view.sprite as TextureRect
+	var sentinel_image: Image = Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	sentinel_image.fill(Color(0.9, 0.6, 0.2, 1.0))
+	var sentinel_texture: ImageTexture = ImageTexture.create_from_image(sentinel_image)
+	if sprite_before_reparent != null:
+		sprite_before_reparent.texture = sentinel_texture
+	var texture_before_reparent: Texture2D = sprite_before_reparent.texture if sprite_before_reparent != null else null
+	var effect_player_before: UnitEffectPlayer = board_view.get("_effect_player") as UnitEffectPlayer
+	board_helper.attach(board_view, 0)
+	await get_tree().process_frame
+	var sprite_after_reparent: TextureRect = board_view.sprite as TextureRect
+	var effect_player_after: UnitEffectPlayer = board_view.get("_effect_player") as UnitEffectPlayer
+	_expect(board_view.unit == board_unit, "reparenting a board view should preserve its unit reference")
+	_expect(texture_before_reparent != null, "board view should have visible unit art before reparenting")
+	_expect(sprite_after_reparent != null and sprite_after_reparent.texture == texture_before_reparent, "reparenting a board view should preserve its visible unit art")
+	_expect(effect_player_before != null and effect_player_after == effect_player_before, "reparenting a board view should preserve its effect player")
+	_expect(effect_player_after != null and effect_player_after.host == board_view, "reparenting a board view should preserve effect-player bindings")
 	var bench_view: UnitView = UnitViewScript.new() as UnitView
 	bench_view.set_unit(bench_unit)
 	bench_view.set_bench_mode(true)
@@ -121,6 +141,9 @@ func _fail(message: String) -> void:
 	_failures.append(message)
 
 func _finish() -> void:
+	if _finish_queued:
+		return
+	_finish_queued = true
 	if _board_host != null and is_instance_valid(_board_host):
 		remove_child(_board_host)
 		_board_host.free()
@@ -131,6 +154,14 @@ func _finish() -> void:
 		_bench_host = null
 	if get_tree().root.get_node_or_null("/root/Roster") != null:
 		Roster.reset()
+	call_deferred("_complete_finish")
+
+func _complete_finish() -> void:
+	# Let _run() unwind so its helpers, units, and views release before the
+	# engine performs leak accounting.
+	await get_tree().process_frame
+	TextureUtils.clear_cache()
+	await get_tree().process_frame
 	if not _failures.is_empty():
 		for failure: String in _failures:
 			push_error(SMOKE_NAME + ": " + failure)
