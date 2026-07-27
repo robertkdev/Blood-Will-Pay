@@ -39,7 +39,10 @@ static func ability_targeting_summary(unit: Unit) -> String:
 static func attack_targeting_summary(unit: Unit) -> String:
 	if unit == null:
 		return ""
-	var override_mode: String = String(unit.targeting_mode_override).strip_edges().to_lower()
+	# Not every roster Unit exposes an explicit targeting override. Preserve
+	# authored overrides where present, otherwise use the normal role/approach
+	# targeting explanation below.
+	var override_mode: String = _optional_string_property(unit, "targeting_mode_override")
 	var override_summary: String = _override_summary(override_mode)
 	if override_summary != "":
 		return override_summary
@@ -76,6 +79,14 @@ static func _override_summary(mode_id: String) -> String:
 			return "Diver threatening priority allies."
 		_:
 			return ""
+
+static func _optional_string_property(source: Object, property_name: String) -> String:
+	if source == null:
+		return ""
+	for property_info: Dictionary in source.get_property_list():
+		if String(property_info.get("name", "")) == property_name:
+			return String(source.get(property_name)).strip_edges().to_lower()
+	return ""
 
 static func _has_approach(approaches: Array[String], approach_id: String) -> bool:
 	var needle: String = String(approach_id).strip_edges().to_lower()
