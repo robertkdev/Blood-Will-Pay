@@ -39,7 +39,7 @@ func _ready() -> void:
 		_expect_texture_style(new_game_button, "pressed", "NewGameButton pressed should use the generated primary button asset", failures)
 		_expect_focus_outline(new_game_button, "NewGameButton focus should preserve the underlying primary button state", failures)
 	if stage_label != null:
-		_expect(stage_label.text == "Stage Reached: 3", "StageLabel did not use live GameState", failures)
+		_expect(stage_label.text == "Total Earned: 8g  •  Chapter 1  •  Stage 3", "StageLabel did not use live run score and GameState", failures)
 	var scoreboard: Node = screen.get_node_or_null("Panel/Center/Frame/VBox/ScoreboardHolder/Scoreboard")
 	_expect(scoreboard != null, "Loss scoreboard missing", failures)
 	if scoreboard != null:

@@ -7,6 +7,7 @@ class_name HighScore
 const FILE_PATH := "user://scores.cfg"
 const SECTION := "run"
 const KEY_BEST_STAGE := "best_stage"
+const CareerRecords := preload("res://scripts/game/run/career_records.gd")
 
 static func get_best_stage() -> int:
 	var cf := ConfigFile.new()
@@ -31,3 +32,9 @@ static func submit_stage(stage: int) -> int:
 	cf.set_value(SECTION, KEY_BEST_STAGE, s)
 	cf.save(FILE_PATH)
 	return s
+
+static func get_records(path: String = FILE_PATH) -> Dictionary:
+	return CareerRecords.load_records(path)
+
+static func submit_run(record: Dictionary, path: String = FILE_PATH) -> Dictionary:
+	return CareerRecords.submit_run(record, path)

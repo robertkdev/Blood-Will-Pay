@@ -18,8 +18,7 @@ func _level_index(u: Unit) -> int:
 func _award_gold(n: int) -> void:
 	if n <= 0:
 		return
-	# Economy is an AutoLoad singleton; call directly
-	Economy.add_gold(n)
+	Economy.add_stake_units(n, true, "teller_margin_call")
 
 func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> void:
 	var hits: Array[int] = ctx.enemies_in_line(ctx.caster_team, ctx.caster_index, target_idx, LINE_LEN_TILES, LINE_WIDTH_TILES)
@@ -48,7 +47,7 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 		var roll: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 		if roll < DROP_CHANCE:
 			_award_gold(1)
-			ctx.log("Margin Call: +1 gold")
+			ctx.log("Margin Call: +1U")
 	# Overflow to next in line: use remaining raw damage not applied to primary (post-mitigation remainder)
 	var leftover: int = max(0, raw_dmg - dealt)
 	if leftover > 0 and scored.size() > 1:
@@ -60,7 +59,7 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 			var roll2: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 			if roll2 < DROP_CHANCE:
 				_award_gold(1)
-				ctx.log("Margin Call: +1 gold")
+				ctx.log("Margin Call: +1U")
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:

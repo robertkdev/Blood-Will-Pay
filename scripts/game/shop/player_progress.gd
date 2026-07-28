@@ -2,18 +2,25 @@ extends RefCounted
 class_name PlayerProgress
 
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
+const CommandResearch := preload("res://scripts/game/progression/command_research.gd")
 
 signal level_changed(old_level: int, new_level: int)
 signal xp_changed(old_xp: int, new_xp: int)
+signal command_changed(points: int, rank: int)
 signal progress_reset(level: int, xp: int)
 
 var level: int = ShopConfig.STARTING_LEVEL
 var xp: int = 0
+var command_points: int = 0
+var command_rank: int = 0
 
 func reset() -> void:
 	level = int(ShopConfig.STARTING_LEVEL)
 	xp = 0
+	command_points = 0
+	command_rank = 0
 	progress_reset.emit(level, xp)
+	command_changed.emit(command_points, command_rank)
 
 func set_level(new_level: int) -> void:
 	var clamped: int = clamp(int(new_level), int(ShopConfig.MIN_LEVEL), int(ShopConfig.MAX_LEVEL))
@@ -43,6 +50,58 @@ func buy_xp() -> int:
 	var amt: int = int(ShopConfig.XP_PER_BUY)
 	add_xp(amt)
 	return amt
+
+func purchase_progression() -> Dictionary:
+	if is_at_max_level():
+		if command_rank >= CommandResearch.DOCTRINES.size():
+			return {
+				"ok": false,
+				"error": "COMMAND_RESEARCH_COMPLETE",
+				"command_points": command_points,
+				"command_rank": command_rank,
+			}
+		var points_added: int = max(1, int(ShopConfig.COMMAND_POINTS_PER_BUY))
+		command_points += points_added
+		command_rank = command_points
+		command_changed.emit(command_points, command_rank)
+		return {
+			"ok": true,
+			"purchase_kind": "command",
+			"points_added": points_added,
+			"command_points": command_points,
+			"command_rank": command_rank,
+		}
+	var xp_added: int = buy_xp()
+	return {
+		"ok": true,
+		"purchase_kind": "xp",
+		"xp_added": xp_added,
+		"level": level,
+		"xp": xp,
+		"xp_to_next": xp_to_next(),
+	}
+
+func purchase_mode() -> String:
+	return "command" if is_at_max_level() else "xp"
+
+func can_purchase_progression() -> bool:
+	return not is_at_max_level() or command_rank < CommandResearch.DOCTRINES.size()
+
+func snapshot() -> Dictionary:
+	return {
+		"level": level,
+		"xp": xp,
+		"command_points": command_points,
+		"command_rank": command_rank,
+	}
+
+func restore(snapshot_data: Dictionary) -> void:
+	level = clamp(int(snapshot_data.get("level", ShopConfig.STARTING_LEVEL)), int(ShopConfig.MIN_LEVEL), int(ShopConfig.MAX_LEVEL))
+	xp = max(0, int(snapshot_data.get("xp", 0)))
+	command_points = max(0, int(snapshot_data.get("command_points", 0)))
+	command_rank = max(0, int(snapshot_data.get("command_rank", command_points)))
+	progress_reset.emit(level, xp)
+	command_changed.emit(command_points, command_rank)
 
 func is_at_max_level() -> bool:
 	return int(level) >= int(ShopConfig.MAX_LEVEL)

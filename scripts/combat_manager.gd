@@ -41,6 +41,9 @@ signal position_updated(team: String, index: int, x: float, y: float)
 signal target_start(source_team: String, source_index: int, target_team: String, target_index: int)
 signal target_end(source_team: String, source_index: int, target_team: String, target_index: int)
 signal ability_cast(source_team: String, source_index: int, ability_id: String, target_team: String, target_index: int, target_point: Vector2)
+signal encounter_escalated(phase_id: String, label: String, champion_index: int, revived_indices: Array[int], affected_player_indices: Array[int], pulse_damage: int, intensity: int)
+signal contract_battle_event(event_type: String, label: String, affected_player_indices: Array[int], affected_enemy_indices: Array[int], value: int, intensity: int)
+signal unit_upgrade_event(event_type: String, label: String, affected_player_indices: Array[int], value: int, intensity: int)
 
 var enemy: Unit
 
@@ -255,6 +258,12 @@ func _wire_engine_signals() -> void:
 		_engine.target_start.connect(_on_engine_target_start)
 	if _engine.has_signal("target_end") and not _engine.is_connected("target_end", Callable(self, "_on_engine_target_end")):
 		_engine.target_end.connect(_on_engine_target_end)
+	if _engine.has_signal("encounter_escalated") and not _engine.is_connected("encounter_escalated", Callable(self, "_on_engine_encounter_escalated")):
+		_engine.encounter_escalated.connect(_on_engine_encounter_escalated)
+	if _engine.has_signal("contract_battle_event") and not _engine.is_connected("contract_battle_event", Callable(self, "_on_engine_contract_battle_event")):
+		_engine.contract_battle_event.connect(_on_engine_contract_battle_event)
+	if _engine.has_signal("unit_upgrade_event") and not _engine.is_connected("unit_upgrade_event", Callable(self, "_on_engine_unit_upgrade_event")):
+		_engine.unit_upgrade_event.connect(_on_engine_unit_upgrade_event)
 	if _engine.ability_system != null and _engine.ability_system.has_signal("ability_cast"):
 		if not _engine.ability_system.is_connected("ability_cast", Callable(self, "_on_ability_system_cast")):
 			_engine.ability_system.ability_cast.connect(_on_ability_system_cast)
@@ -302,6 +311,12 @@ func _unwire_engine_signals() -> void:
 		_engine.target_start.disconnect(_on_engine_target_start)
 	if _engine.has_signal("target_end") and _engine.is_connected("target_end", Callable(self, "_on_engine_target_end")):
 		_engine.target_end.disconnect(_on_engine_target_end)
+	if _engine.has_signal("encounter_escalated") and _engine.is_connected("encounter_escalated", Callable(self, "_on_engine_encounter_escalated")):
+		_engine.encounter_escalated.disconnect(_on_engine_encounter_escalated)
+	if _engine.has_signal("contract_battle_event") and _engine.is_connected("contract_battle_event", Callable(self, "_on_engine_contract_battle_event")):
+		_engine.contract_battle_event.disconnect(_on_engine_contract_battle_event)
+	if _engine.has_signal("unit_upgrade_event") and _engine.is_connected("unit_upgrade_event", Callable(self, "_on_engine_unit_upgrade_event")):
+		_engine.unit_upgrade_event.disconnect(_on_engine_unit_upgrade_event)
 	if _engine.ability_system != null and _engine.ability_system.has_signal("ability_cast"):
 		if _engine.ability_system.is_connected("ability_cast", Callable(self, "_on_ability_system_cast")):
 			_engine.ability_system.ability_cast.disconnect(_on_ability_system_cast)
@@ -357,6 +372,15 @@ func _on_engine_target_end(source_team: String, source_index: int, target_team: 
 
 func _on_ability_system_cast(source_team: String, source_index: int, ability_id: String, target_team: String, target_index: int, target_point: Vector2) -> void:
 	emit_signal("ability_cast", source_team, source_index, ability_id, target_team, target_index, target_point)
+
+func _on_engine_encounter_escalated(phase_id: String, label: String, champion_index: int, revived_indices: Array[int], affected_player_indices: Array[int], pulse_damage: int, intensity: int) -> void:
+	emit_signal("encounter_escalated", phase_id, label, champion_index, revived_indices, affected_player_indices, pulse_damage, intensity)
+
+func _on_engine_contract_battle_event(event_type: String, label: String, affected_player_indices: Array[int], affected_enemy_indices: Array[int], value: int, intensity: int) -> void:
+	emit_signal("contract_battle_event", event_type, label, affected_player_indices, affected_enemy_indices, value, intensity)
+
+func _on_engine_unit_upgrade_event(event_type: String, label: String, affected_player_indices: Array[int], value: int, intensity: int) -> void:
+	emit_signal("unit_upgrade_event", event_type, label, affected_player_indices, value, intensity)
 
 func _ensure_default_player_team_into(arr: Array) -> void:
 	# Append default units into the provided array

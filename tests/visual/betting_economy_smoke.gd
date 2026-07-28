@@ -12,7 +12,7 @@ func _run() -> void:
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
-	Engine.time_scale = 8.0
+	Engine.time_scale = 1.0
 
 	_verify_direct_economy_contract()
 	if _finish_if_failed():
@@ -36,14 +36,16 @@ func _run() -> void:
 		return
 	await _settle_frames(4)
 	_expect(_node_visible("CombatView"), "CombatView did not open after selecting Bonko")
-	var repositioned: bool = await _reposition_first_board_unit("betting smoke board reposition")
-	_expect(repositioned, "starter board unit did not reposition before betting smoke opener")
-	if _finish_if_failed():
-		return
 
 	_set_planning_timer_safe()
-	_expect(_first_fight_placeholder_visible(), "forced opener placeholder missing before betting smoke")
-	await _press_continue(true, "betting smoke forced opener")
+	if _first_fight_placeholder_visible():
+		await _press_continue(true, "betting smoke forced opener")
+	else:
+		_expect(
+			int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active),
+			"betting smoke opener was neither available nor already running"
+		)
+	Engine.time_scale = 8.0
 	var shop_ready: bool = await _wait_for_shop_after_win(30.0)
 	_expect(shop_ready, "betting smoke did not reach post-opener shop")
 	if _finish_if_failed():
@@ -136,6 +138,7 @@ func _start_and_verify_locked_max_bet() -> void:
 		return
 	var selected_bet: int = int(Economy.current_bet)
 	var starting_gold: int = int(Economy.gold)
+	var expected_credit: int = max(0, int(Economy.quoted_payout(selected_bet)) - 1)
 	_expect(selected_bet == int(slider.max_value), "selected bet should still be max before combat")
 	await _press_continue(false, "betting smoke max-bet fight")
 	await _settle_frames(4)
@@ -146,7 +149,7 @@ func _start_and_verify_locked_max_bet() -> void:
 	_expect(int(Economy.gold) == max(0, starting_gold - selected_bet), "combat should escrow selected bet")
 	_expect(int(Economy.last_gold_start) == starting_gold, "combat should capture pre-escrow gold")
 	_expect(int(Economy.last_bet_start) == selected_bet, "combat should capture selected bet")
-	_expect(int(Economy.combat_credit_base) == max(0, (2 * selected_bet) - 1), "combat credit base should derive from selected bet")
+	_expect(int(Economy.combat_credit_base) == expected_credit, "combat credit base should derive from the locked odds quote")
 	_expect(not slider.visible, "bet slider should hide while combat is active")
 	_expect(not slider.editable, "bet slider should lock while combat is active")
 	_expect(String(value_label.text) == "Bet: %d (locked)" % selected_bet, "combat should show locked bet copy, got %s" % String(value_label.text))

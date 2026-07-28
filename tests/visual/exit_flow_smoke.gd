@@ -1,6 +1,7 @@
 extends Node
 
 const MainScene: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/exit_menu_pass"
 const SYSTEM_BACKDROP_MAX_ALPHA: float = 0.62
@@ -24,9 +25,13 @@ func _run() -> void:
 	add_child(_main)
 	await _settle_frames(2)
 
-	_expect(_node_visible("TitleMenu"), "title menu should be visible on boot")
+	_expect(_node_visible("TitlePage"), "title page should be visible on boot")
+	_expect(not _node_visible("TitleMenu"), "title menu should wait behind the title page on boot")
 	_expect(not _button_visible("SystemMenuButton"), "system menu button should be hidden on title")
 
+	_press_title_enter()
+	await _settle_frames(2)
+	_expect(_node_visible("TitleMenu"), "title menu should be visible after entering title page")
 	_press_title_start()
 	await _settle_frames(2)
 	_expect(_node_visible("UnitSelect"), "unit select should be visible after start")
@@ -61,8 +66,8 @@ func _run() -> void:
 
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle_frames(6)
-	_expect(_node_visible("CombatView"), "combat view should be visible after selecting a unit")
+	var combat: Control = await MainTransitionWait.for_combat_view(self, _main)
+	_expect(combat != null and _node_visible("CombatView"), "combat view should be visible after selecting a unit")
 	_expect(_button_visible("SystemMenuButton"), "system menu button should be visible during combat")
 	_expect(not _embedded_combat_menu_visible(), "embedded combat menu button should be hidden")
 
@@ -75,7 +80,8 @@ func _run() -> void:
 	_press_button("ReturnTitleButton")
 	await _settle_frames(3)
 	_expect(not get_tree().paused, "return to title should unpause")
-	_expect(_node_visible("TitleMenu"), "return to title should show title menu")
+	_expect(_node_visible("TitlePage"), "return to title should show title page")
+	_expect(not _node_visible("TitleMenu"), "return to title should hide title menu until entered")
 	_expect(not _node_visible("CombatView"), "return to title should hide combat")
 	_expect(not _button_visible("SystemMenuButton"), "system menu button should hide on title")
 	_expect(GameState.phase == GameState.GamePhase.MENU, "return to title should set menu phase")
@@ -84,6 +90,8 @@ func _run() -> void:
 	fake_loss_layer.name = "LossOverlayLayer"
 	fake_loss_layer.layer = 100
 	get_tree().root.add_child(fake_loss_layer)
+	_press_title_enter()
+	await _settle_frames(2)
 	_press_title_start()
 	await _settle_frames(2)
 	_refresh_system_menu_state()
@@ -107,6 +115,13 @@ func _run() -> void:
 		for failure: String in _failures:
 			push_error("ExitFlowSmoke: " + failure)
 	get_tree().quit()
+
+func _press_title_enter() -> void:
+	var button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
+	if button == null:
+		_expect(false, "title page enter button missing")
+		return
+	button.pressed.emit()
 
 func _press_title_start() -> void:
 	var button: Button = _main.get_node_or_null("TitleMenu/Center/VBox/StartButton") as Button

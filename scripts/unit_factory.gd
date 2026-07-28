@@ -208,6 +208,17 @@ static func spawn(id: String) -> Unit:
 	Trace.step("UnitFactory.spawn: built unit " + id)
 	return u
 
+static func spawn_at_level(id: String, target_level: int) -> Unit:
+	Trace.step("UnitFactory.spawn_at_level: %s level %d" % [id, int(target_level)])
+	var profile: UnitProfile = _load_profile(id)
+	if profile == null:
+		return null
+	var package_profile: UnitProfile = profile.duplicate(true) as UnitProfile
+	if package_profile == null:
+		return null
+	package_profile.level = max(1, int(target_level))
+	return _from_profile(package_profile)
+
 static func _from_profile(profile: UnitProfile) -> Unit:
 	var u := Unit.new()
 	u.id = profile.id

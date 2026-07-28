@@ -35,17 +35,22 @@ const FIRST_SHOP_BLOCKED_HELPERS_BY_STARTER: Dictionary = {
     "sari": ["axiom"],
 }
 
-# Reroll and XP costs
-const REROLL_COST := 2                            # Gold per reroll
-const BUY_XP_COST := 4                            # Gold per XP purchase
+# Reroll and XP/Command costs are expressed in current Stakes units.
+const REROLL_STAKE_UNITS: int = 2
+const PROGRESSION_STAKE_UNITS: int = 4
+# Compatibility aliases for early-game tests where U = 1.
+const REROLL_COST: int = REROLL_STAKE_UNITS
+const BUY_XP_COST: int = PROGRESSION_STAKE_UNITS
 const XP_PER_BUY := 4                             # XP granted per purchase
-const OPENING_HELPER_GUARDED_SHOPS := 2           # Starter support should get viable helpers through the first follow-up shop
+const COMMAND_POINTS_PER_BUY: int = 1
+const OPENING_HELPER_GUARDED_SHOPS := 1           # Guarantee the first post-opener helper, then return to normal variety
 
 # Player level band
 const STARTING_LEVEL := 1
 const MIN_LEVEL := 1
-const MAX_LEVEL := 6                              # Minimal range for initial content
+const MAX_LEVEL := 14                             # 3 starting slots + 13 level-ups = 16 max board slots
 const DEFAULT_BOARD_CAPACITY := 3                 # New runs start with three usable board slots
+const MAX_BOARD_CAPACITY: int = 16                # Physical/readability ceiling; contracts cannot exceed it
 const POST_OPENING_MIN_TEAM_SIZE := DEFAULT_BOARD_CAPACITY
 const POST_OPENING_TEAM_SIZE_BONUS := 0           # Board slots now come from DEFAULT_BOARD_CAPACITY + player levels
 const EARLY_RUN_CAP_FLOOR_STAGE := 3              # By the second shop, bought bench units should be deployable
@@ -69,6 +74,14 @@ const XP_TO_REACH_LEVEL := {
     4: 10,
     5: 16,
     6: 24,
+    7: 40,
+    8: 64,
+    9: 100,
+    10: 154,
+    11: 232,
+    12: 344,
+    13: 504,
+    14: 728,
 }
 
 # Lock rules
@@ -86,6 +99,14 @@ const ODDS_BY_LEVEL := {
     4: {1: 0.50, 2: 0.35, 3: 0.13, 4: 0.02},
     5: {1: 0.36, 2: 0.38, 3: 0.20, 4: 0.05, 5: 0.01},
     6: {1: 0.25, 2: 0.32, 3: 0.27, 4: 0.13, 5: 0.03},
+    7: {1: 0.20, 2: 0.28, 3: 0.30, 4: 0.17, 5: 0.05},
+    8: {1: 0.16, 2: 0.24, 3: 0.31, 4: 0.21, 5: 0.08},
+    9: {1: 0.12, 2: 0.20, 3: 0.31, 4: 0.25, 5: 0.12},
+    10: {1: 0.09, 2: 0.17, 3: 0.30, 4: 0.28, 5: 0.16},
+    11: {1: 0.07, 2: 0.14, 3: 0.28, 4: 0.31, 5: 0.20},
+    12: {1: 0.05, 2: 0.11, 3: 0.25, 4: 0.34, 5: 0.25},
+    13: {1: 0.04, 2: 0.08, 3: 0.22, 4: 0.36, 5: 0.30},
+    14: {1: 0.03, 2: 0.06, 3: 0.18, 4: 0.38, 5: 0.35},
 }
 
 # Fallback behavior for undefined levels (e.g., clamp to last defined)

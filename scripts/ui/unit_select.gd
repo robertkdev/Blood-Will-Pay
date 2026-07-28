@@ -21,6 +21,9 @@ const COLOR_BLOOD: Color = Color(0.52, 0.040, 0.080, 1.0)
 const COLOR_BLOOD_HOT: Color = Color(0.82, 0.070, 0.120, 1.0)
 const FULL_LAYOUT_SIZE: Vector2 = Vector2(1320.0, 900.0)
 const COMPACT_VIEWPORT_HEIGHT: float = 780.0
+const IDENTITY_PANEL_MIN_HEIGHT: float = 96.0
+const START_BUTTON_READY_TEXT: String = "Start Game"
+const START_BUTTON_PENDING_TEXT: String = "Preparing Battle..."
 
 @onready var background: ColorRect = $Background
 @onready var hbox: HBoxContainer = $Center/HBox
@@ -53,6 +56,7 @@ var _start_button_hover_tween: Tween = null
 var _left_plate: Panel = null
 var _right_plate: Panel = null
 var _preview_art_plate: Panel = null
+var _plate_reposition_queued: bool = false
 var _last_scroll_bar_value: float = 0.0
 
 func _ready() -> void:
@@ -61,6 +65,7 @@ func _ready() -> void:
 	_apply_gothic_layout()
 	_wire_start_button_hover()
 	start_button.disabled = true
+	start_button.text = START_BUTTON_READY_TEXT
 	if help_label:
 		help_label.visible = true
 	if not start_button.is_connected("pressed", Callable(self, "_on_StartButton_pressed")):
@@ -230,7 +235,11 @@ func _apply_gothic_layout() -> void:
 	if art_wrap:
 		art_wrap.custom_minimum_size = Vector2(430.0, 360.0)
 		_preview_art_plate = _ensure_float_plate(art_wrap, "GothicArtPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.grid_panel_style(), _make_panel_style(Color(0.014, 0.012, 0.018, 0.86), Color(0.32, 0.24, 0.23, 0.84), 1, 6)), -1, 8.0)
-	call_deferred("_position_gothic_plates")
+		if not art_wrap.resized.is_connected(Callable(self, "_queue_gothic_plate_reposition")):
+			art_wrap.resized.connect(_queue_gothic_plate_reposition)
+	if right_column != null and not right_column.sort_children.is_connected(Callable(self, "_queue_gothic_plate_reposition")):
+		right_column.sort_children.connect(_queue_gothic_plate_reposition)
+	_queue_gothic_plate_reposition()
 	_style_start_button()
 
 func _ensure_grid_wrapper() -> void:
@@ -254,8 +263,12 @@ func _ensure_identity_panel(preview: VBoxContainer) -> void:
 		identity_panel = VBoxContainer.new()
 		identity_panel.name = "IdentityPanel"
 		identity_panel.add_theme_constant_override("separation", 4)
-		identity_panel.visible = false
 		preview.add_child(identity_panel)
+	# Keep this slot in the VBox layout even when its labels are empty. Hiding the
+	# container made ArtWrap jump vertically whenever a card gained/lost hover.
+	identity_panel.visible = true
+	identity_panel.custom_minimum_size = Vector2(0.0, IDENTITY_PANEL_MIN_HEIGHT)
+	identity_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if selected_label:
 		var index: int = selected_label.get_index() + 1
 		preview.move_child(identity_panel, min(index, preview.get_child_count() - 1))
@@ -454,6 +467,16 @@ func _on_StartButton_pressed() -> void:
 		return
 	emit_signal("unit_selected", selected_id)
 
+func set_transition_pending(pending: bool) -> void:
+	if start_button == null:
+		return
+	start_button.text = START_BUTTON_PENDING_TEXT if pending else START_BUTTON_READY_TEXT
+	start_button.disabled = pending or selected_id == ""
+	if pending:
+		start_button.release_focus()
+	if is_inside_tree():
+		_style_start_button()
+
 func _on_unit_hovered(id: String) -> void:
 	if id != "":
 		if _hovered_id != id and _hovered_id != "":
@@ -482,6 +505,7 @@ func _update_preview(id: String, is_selected: bool = false) -> void:
 	if details_label:
 		var lines: Array[String] = _build_detail_lines(id, it)
 		details_label.text = "\n".join(lines)
+	_queue_gothic_plate_reposition()
 
 func _build_detail_lines(id: String, it: Dictionary) -> Array[String]:
 	var lines: Array[String] = []
@@ -589,6 +613,7 @@ func _clear_preview() -> void:
 	_clear_identity_panel()
 	if details_label:
 		details_label.text = "Hover a unit to preview"
+	_queue_gothic_plate_reposition()
 
 func _set_identity_summary(role_text: String, goal_text: String, approaches: Array) -> void:
 	var show_role: bool = role_text.strip_edges() != ""
@@ -599,9 +624,9 @@ func _set_identity_summary(role_text: String, goal_text: String, approaches: Arr
 	if identity_goal_label:
 		identity_goal_label.text = goal_text
 		identity_goal_label.visible = show_goal
-	var show_tags: bool = _set_identity_approach_tags(approaches)
+	_set_identity_approach_tags(approaches)
 	if identity_panel:
-		identity_panel.visible = show_role or show_goal or show_tags
+		identity_panel.visible = true
 
 func _set_identity_approach_tags(approaches: Array) -> bool:
 	if identity_approach_tags == null:
@@ -641,7 +666,7 @@ func _clear_identity_panel() -> void:
 			child.queue_free()
 		identity_approach_tags.visible = false
 	if identity_panel:
-		identity_panel.visible = false
+		identity_panel.visible = true
 
 func _on_resized() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
@@ -953,6 +978,17 @@ func _position_gothic_plates() -> void:
 	_position_float_plate(_left_plate)
 	_position_float_plate(_right_plate)
 	_position_float_plate(_preview_art_plate)
+
+func _queue_gothic_plate_reposition() -> void:
+	if _plate_reposition_queued or not is_inside_tree():
+		return
+	_plate_reposition_queued = true
+	get_tree().process_frame.connect(_position_gothic_plates_after_layout, CONNECT_ONE_SHOT)
+
+func _position_gothic_plates_after_layout() -> void:
+	_plate_reposition_queued = false
+	if is_inside_tree():
+		_position_gothic_plates()
 
 func _position_float_plate(plate: Panel) -> void:
 	if plate == null or not plate.has_meta("target_path"):

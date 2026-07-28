@@ -1,0 +1,74 @@
+version: 1
+project: Gamble Battle
+scenarios:
+  - id: encounter-escalation
+    title: Boss escalation runtime sequence
+    adapter: godot
+    objective: Verify boss-phase banners, revived enemy visibility, combat-board readability, and temporal continuity in the real player-facing Godot runtime.
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "Tools/Capture-EncounterEscalationEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/encounter_escalation/captures.json"
+    required_groups: [overview, temporal]
+    runtime_provenance:
+      entrypoint: "Godot editor game framebuffer"
+      scene: "res://tests/visual/EncounterEscalationVisualCapture.tscn"
+      build: "codex/019f7080-1d6-endless-economy-integration"
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [baseline, phase_one, phase_two]
+      required_viewports: [desktop-1600x900]
+      required_events: [00_battle_start, 01_threshold_65, 02_threshold_30]
+      min_temporal_frames: 1
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 300
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 3
+    telegram_context: "Gamble Battle boss escalation"
+  - id: contract-system
+    title: Run-shaping contracts and arena obligations
+    adapter: godot
+    objective: Verify contract price/reward/risk/impact readability, explicit Champion targeting, Stable ward presentation, and the timed Cinder Clock arena hazard in the real player-facing Godot runtime.
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Capture-ContractSystemEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/contract_system/captures.json"
+    required_groups: [overview, temporal]
+    runtime_provenance:
+      entrypoint: "Godot editor game framebuffer"
+      scene: "res://tests/visual/ContractSystemVisualCapture.tscn"
+      build: "codex/019f7080-1d6-endless-economy-integration"
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [market, targeting, stable_ward, pit_hazard]
+      required_viewports: [desktop-1600x900]
+      required_events: [00_stable_ward, 01_pit_hazard]
+      min_temporal_frames: 1
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 300
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 3
+    telegram_context: "Gamble Battle contracts"
+  - id: unit-upgrades
+    title: Capital recruits and level-four ascension
+    adapter: godot
+    objective: Verify premium recruits expose a named benefit and drawback before purchase, and level-four units receive a readable permanent trigger choice with explicit payoff and failure case.
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Capture-UnitUpgradeEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/unit_upgrades/captures.json"
+    required_groups: [premium_identity, ascension]
+    runtime_provenance:
+      entrypoint: "Godot editor game framebuffer"
+      scene: "res://tests/visual/UnitUpgradeShowcase.tscn"
+      build: "codex/019f7080-1d6-endless-economy-integration"
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [blood_engine, iron_retinue, level_four_choice]
+      required_viewports: [desktop-1920x1080]
+      required_events: [capital_offer, ascension]
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 300
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 3
+    telegram_context: "Gamble Battle unit upgrades"

@@ -168,6 +168,13 @@ func _refresh_progress() -> void:
 		if Shop and Shop.has_method("get_xp_to_next"):
 			need = int(Shop.get_xp_to_next())
 	_buttons.set_progress(lvl, xp, need)
+	var reroll_price: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
+	var progression_price: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
+	var progression_mode: String = String(Shop.get_progression_mode()) if _has_shop() and Shop.has_method("get_progression_mode") else "xp"
+	var command_rank: int = int(Shop.get_command_rank()) if _has_shop() and Shop.has_method("get_command_rank") else 0
+	_buttons.set_action_prices(reroll_price, progression_price, progression_mode, command_rank)
+	var progression_available: bool = bool(Shop.can_purchase_progression()) if _has_shop() and Shop.has_method("can_purchase_progression") else true
+	_buttons.set_progression_available(progression_available, progression_mode)
 
 func _on_economy_changed(_v := 0) -> void:
 	_refresh_cards_state()
@@ -219,10 +226,11 @@ func _refresh_cards_state() -> void:
 		if c is ShopCard:
 			var sc: ShopCard = c
 			# affordability tint only
-			var price := 0
+			var price: int = 0
 			if Shop and Shop.state and idx < Shop.state.offers.size():
-				var off = Shop.state.offers[idx]
-				price = int(off.cost) if off != null else 0
+				var off: Variant = Shop.state.offers[idx]
+				if off != null:
+					price = int(off.price) if int(off.price) > 0 else int(off.cost)
 			var aff := ShopAffordability.can_afford(gold, bet, price, in_combat, spent)
 			var affordable: bool = bool(aff.get("ok", false))
 			sc.set_affordable(affordable)
@@ -255,7 +263,7 @@ func _refresh_cards_state() -> void:
 	if forced_first_fight or in_combat:
 		return
 	if _buttons:
-		var r_cost: int = int(ShopConfig.REROLL_COST)
+		var r_cost: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
 		var aff_r := ShopAffordability.can_afford(gold, bet, r_cost, in_combat, spent)
 		var msg_r := ""
 		if not bool(aff_r.get("ok", false)):
@@ -269,7 +277,7 @@ func _refresh_cards_state() -> void:
 				msg_r = "Not enough gold"
 		_buttons.set_reroll_tooltip(msg_r)
 
-		var x_cost: int = int(ShopConfig.BUY_XP_COST)
+		var x_cost: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
 		var aff_x := ShopAffordability.can_afford(gold, bet, x_cost, in_combat, spent)
 		var msg_x := ""
 		if not bool(aff_x.get("ok", false)):

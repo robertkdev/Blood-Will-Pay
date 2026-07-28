@@ -90,6 +90,18 @@ static func pick_by_priority(attacker: Unit, source_position: Vector2, ally_team
 				current_target,
 				safe_tile_size,
 				inv_tile_size)
+		score += _doctrine_score(
+			String(attacker.targeting_mode_override),
+			source_position,
+			ally_team,
+			ally_positions,
+			enemy,
+			i,
+			enemy_team,
+			enemy_positions,
+			enemy_position,
+			safe_tile_size,
+			inv_tile_size)
 		if i == current_target:
 			current_score = score
 		if score > best_score:
@@ -101,6 +113,45 @@ static func pick_by_priority(attacker: Unit, source_position: Vector2, ally_team
 			if best_idx != current_target and best_score - current_score < SWITCH_MARGIN:
 				return current_target
 	return best_idx
+
+static func _doctrine_score(doctrine_id: String, source_position: Vector2, ally_team: Array[Unit], ally_positions: Array[Vector2], enemy: Unit, enemy_index: int, enemy_team: Array[Unit], enemy_positions: Array[Vector2], enemy_position: Vector2, tile_size: float, inv_tile_size: float) -> float:
+	var doctrine: String = String(doctrine_id).strip_edges().to_lower()
+	if doctrine == "" or enemy == null:
+		return 0.0
+	var distance_tiles: float = source_position.distance_to(enemy_position) * inv_tile_size
+	var hp_ratio: float = float(enemy.hp) / max(1.0, float(enemy.max_hp))
+	var missing_hp: float = clampf(1.0 - hp_ratio, 0.0, 1.0)
+	var enemy_role: String = _role(enemy)
+	match doctrine:
+		"front_to_back":
+			return max(0.0, 10.0 - distance_tiles) * 1.5
+		"backline":
+			var carry_bonus: float = 7.0 if enemy_role == "marksman" or enemy_role == "mage" or enemy_role == "support" else 0.0
+			return carry_bonus + distance_tiles * 0.8 + float(enemy.attack_range) * 0.6
+		"lowest_hp":
+			return missing_hp * 12.0
+		"highest_threat":
+			return clampf(_threat_score(enemy) / 25.0, 0.0, 14.0)
+		"clump":
+			return float(_nearby_alive_count(enemy_index, enemy_team, enemy_positions, enemy_position, tile_size * 2.25)) * 5.0
+		"peel":
+			var role_bonus: float = 7.0 if enemy_role == "assassin" or enemy_role == "brawler" else 0.0
+			return role_bonus + _ally_peel_pressure_simple(ally_team, ally_positions, enemy_position, inv_tile_size)
+	return 0.0
+
+static func _ally_peel_pressure_simple(ally_team: Array[Unit], ally_positions: Array[Vector2], enemy_position: Vector2, inv_tile_size: float) -> float:
+	var best: float = 0.0
+	for index: int in range(ally_team.size()):
+		var ally: Unit = ally_team[index]
+		if ally == null or not ally.is_alive():
+			continue
+		var role_id: String = _role(ally)
+		if role_id != "marksman" and role_id != "mage" and role_id != "support":
+			continue
+		var ally_position: Vector2 = _position_at(ally_positions, index, enemy_position)
+		var distance_tiles: float = ally_position.distance_to(enemy_position) * inv_tile_size
+		best = max(best, max(0.0, 5.0 - distance_tiles) * 1.5)
+	return best
 
 static func _score_candidate(attacker: Unit, attacker_role: String, attacker_goal: String, attacker_mask: int, source_position: Vector2, ally_team: Array[Unit], ally_positions: Array[Vector2], ally_peel_priorities: PackedFloat32Array, ally_peel_wounded_bonuses: PackedFloat32Array, ally_peel_indices: PackedInt32Array, enemy: Unit, enemy_index: int, enemy_team: Array[Unit], enemy_positions: Array[Vector2], enemy_position: Vector2, current_target: int, tile_size: float, inv_tile_size: float) -> float:
 	var enemy_role: String = _role(enemy)

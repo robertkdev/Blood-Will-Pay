@@ -17,8 +17,7 @@ func _level_index(u: Unit) -> int:
 func _award_gold(n: int) -> void:
 	if n <= 0:
 		return
-	# Economy is an AutoLoad singleton; call directly
-	Economy.add_gold(n)
+	Economy.add_stake_units(n, true, "cashmere_arcane_ledger")
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:
@@ -48,5 +47,5 @@ func cast(ctx: AbilityContext) -> bool:
 		var roll: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 		if roll < DROP_CHANCE:
 			_award_gold(1)
-			ctx.log("Arcane Ledger: +1 gold")
+			ctx.log("Arcane Ledger: +1U")
 	return true

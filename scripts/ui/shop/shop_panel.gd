@@ -86,7 +86,9 @@ func set_offers(offers: Array) -> void:
                 props = {
                     "id": String(off.id),
                     "name": String(off.name),
-                    "price": int(off.cost),
+                    "price": int(off.price) if int(off.price) > 0 else int(off.cost),
+                    "package_level": int(off.package_level),
+                    "package_kind": String(off.package_kind),
                     "image_path": String(off.sprite_path),
                     "role": _role_text(roles, primary_role),
                     "roles": roles,

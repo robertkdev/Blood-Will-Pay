@@ -1,0 +1,9 @@
+simulations,shops_per_run,stake_rank,package_level,policy,mean_offer_buy_rate,mean_full_shop_rate,median_remaining_bankroll_share
+20000,5,0,1,buy_all,0.6909595000000001,0.40019,0.0
+20000,5,0,1,selective,0.2,0.0,0.34
+20000,5,3,2,buy_all,0.6556836666666667,0.21995,0.0
+20000,5,3,2,selective,0.2,0.0,0.36
+20000,5,6,3,buy_all,0.314649,0.0008700000000000001,0.0
+20000,5,6,3,selective,0.142758,0.0,0.24
+20000,5,9,4,buy_all,0.090882,0.0,0.12
+20000,5,9,4,selective,0.02326,0.0,0.84

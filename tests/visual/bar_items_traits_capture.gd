@@ -1,6 +1,7 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/bar_items_traits_pass"
 
 var _main: Control = null
@@ -26,8 +27,7 @@ func _run() -> void:
 	await _settle(0.20)
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle(0.30)
-	_view = _main.get_node_or_null("CombatView") as Control
+	_view = await MainTransitionWait.for_combat_view(self, _main)
 	if _view == null:
 		push_error("BarItemsTraitsCapture: CombatView missing")
 		get_tree().quit(1)

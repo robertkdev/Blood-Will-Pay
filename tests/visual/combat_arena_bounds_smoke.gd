@@ -1,6 +1,7 @@
 extends Node
 
 const SMOKE_NAME: String = "CombatArenaBoundsSmoke"
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const PLAYER_TEAM: Array[String] = ["mortem", "berebell", "bonko"]
 
@@ -23,9 +24,7 @@ func _run() -> void:
 	await _settle_frames(8)
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle_frames(12)
-
-	_view = _main.get_node_or_null("CombatView") as Control
+	_view = await MainTransitionWait.for_combat_view(self, _main)
 	if _view == null:
 		_fail("CombatView missing")
 		await _finish()

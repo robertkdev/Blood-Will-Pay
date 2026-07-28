@@ -81,6 +81,12 @@ func _run() -> void:
 			search_field.emit_signal("text_changed", "combine")
 			await get_tree().process_frame
 			_expect(_find_label_containing_text(title_menu, "combine into a stronger copy") != null, "Tutorial search did not expose combine guidance", failures)
+			_expect(_find_label_containing_text(title_menu, "up to level 4") != null, "Tutorial should explain the current level-4 cap", failures)
+			_expect(_find_label_containing_text(title_menu, "up to level 3") == null, "Tutorial should not teach the retired level-3 cap", failures)
+			search_field.text = "contract"
+			search_field.emit_signal("text_changed", "contract")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "PRICE, REWARD, RISK, and NEXT FIGHT") != null, "Tutorial should explain chapter-contract decision fields", failures)
 			_expect_content_panels_generated(title_menu, "How To Play cards should use generated texture styling", failures)
 		if settings_button != null:
 			settings_button.emit_signal("pressed")

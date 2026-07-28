@@ -99,8 +99,7 @@ func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Diction
 	var unit_select_started_reset: bool = _unit_select_reset()
 	await _ensure_unit_select()
 	await _select_starter(starter_id)
-	await _settle_frames(4)
-	var combat_opened: bool = _node_visible("CombatView")
+	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	var board_repositioned: bool = false
 	var first_result: String = await _wait_for_first_result(_first_fight_timeout_seconds())
 	var result: Dictionary = {
