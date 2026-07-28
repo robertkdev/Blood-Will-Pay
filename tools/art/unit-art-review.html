@@ -397,6 +397,11 @@
 			background: rgba(13, 12, 10, 0.82);
 		}
 
+		.comparison-card[data-active="true"] {
+			border-color: var(--accent);
+			box-shadow: inset 0 0 0 2px rgba(215, 170, 72, 0.32);
+		}
+
 		.comparison-art {
 			position: relative;
 			display: grid;
@@ -428,6 +433,26 @@
 			background: rgba(22, 19, 16, 0.95);
 		}
 
+		.comparison-caption-head {
+			display: flex;
+			gap: 8px;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.active-review-badge {
+			border: 1px solid rgba(215, 170, 72, 0.58);
+			border-radius: 999px;
+			padding: 2px 7px;
+			background: rgba(215, 170, 72, 0.16);
+			color: #f3d997;
+			font-family: system-ui, sans-serif;
+			font-size: 9px;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
 		.comparison-caption strong {
 			font-family: Georgia, "Times New Roman", serif;
 			font-size: clamp(14px, 1.2vw, 18px);
@@ -441,10 +466,6 @@
 			white-space: nowrap;
 		}
 
-		dialog[data-mode="comparison"] .preview-workspace {
-			grid-template-columns: minmax(0, 1fr);
-		}
-
 		dialog[data-mode="comparison"] .preview-body {
 			overflow: auto;
 			cursor: default;
@@ -455,9 +476,7 @@
 		}
 
 		dialog[data-mode="comparison"] #preview-image,
-		dialog[data-mode="comparison"] .preview-side-hint,
-		dialog[data-mode="comparison"] .review-sidebar,
-		dialog[data-mode="comparison"] .preview-foot {
+		dialog[data-mode="comparison"] .preview-side-hint {
 			display: none;
 		}
 
@@ -730,6 +749,7 @@
 
 			dialog[data-mode="comparison"] .preview-body {
 				padding: 10px;
+				padding-bottom: 250px;
 			}
 
 			.comparison-grid {
@@ -821,7 +841,7 @@
 			<div class="pill">Maybe <strong id="count-maybe">0</strong></div>
 			<div class="pill">Cut <strong id="count-cut">0</strong></div>
 			<div class="pill">Open <strong id="count-open">0</strong></div>
-			<button id="show-pins" class="pill" type="button" title="Open pinned comparison">Pinned <strong id="count-pinned">0 / 6</strong></button>
+			<button id="show-pins" class="pill" type="button" title="Open pinned comparison">Pinned <strong id="count-pinned">0 / 5</strong></button>
 		</section>
 
 		<main id="grid" class="grid" aria-live="polite"></main>
@@ -894,7 +914,7 @@
 		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
 		const COMMENTS_KEY = "blood-will-pay-unit-art-comments-v1";
 		const PINS_KEY = "blood-will-pay-unit-art-pins-v1";
-		const MAX_PINS = 6;
+		const MAX_PINS = 5;
 		const LIVE_ART = [
 			"axiom.png",
 			"bastionne.png",
@@ -1299,7 +1319,7 @@
 
 		document.getElementById("show-pins").addEventListener("click", () => {
 			if (!pinnedItems().length) {
-				showToast("Right-click art cards to pin up to six.");
+				showToast("Right-click art cards to pin up to five.");
 				return;
 			}
 			openComparisonPreview();
@@ -1349,9 +1369,6 @@
 
 		els.preview.addEventListener("keydown", (event) => {
 			if (event.target.matches("input, textarea, select") || event.target.isContentEditable) {
-				return;
-			}
-			if (state.previewMode === "comparison") {
 				return;
 			}
 			if (event.key === "ArrowLeft") {
@@ -1613,13 +1630,17 @@
 		}
 
 		function openPreview(items, index) {
-			if (pinnedItems().length) {
-				openComparisonPreview();
-				return;
-			}
 			const selectedItem = items[index];
-			state.previewMode = "single";
-			els.preview.dataset.mode = "single";
+			configurePreviewContext(items, selectedItem);
+			state.previewMode = pinnedItems().length ? "comparison" : "single";
+			els.preview.dataset.mode = state.previewMode;
+			updatePreview();
+			els.reviewSidebar.scrollTop = 0;
+			els.preview.scrollTop = 0;
+			els.preview.showModal();
+		}
+
+		function configurePreviewContext(items, selectedItem) {
 			state.previewUnits = uniqueUnits(items);
 			state.previewPreferredKeys = items.reduce((preferred, item) => {
 				const unit = normalizeUnitId(item.unit);
@@ -1630,16 +1651,22 @@
 			}, {});
 			state.previewUnitIndex = clampPreviewIndex(state.previewUnits.indexOf(normalizeUnitId(selectedItem.unit)));
 			loadPreviewVersions(selectedItem.key);
-			updatePreview();
-			els.reviewSidebar.scrollTop = 0;
-			els.preview.scrollTop = 0;
-			els.preview.showModal();
 		}
 
-		function openComparisonPreview() {
+		function openComparisonPreview(selectedItem = null, items = filteredItems()) {
+			const pins = pinnedItems();
+			if (!pins.length) {
+				return;
+			}
+			const activeItem = selectedItem || pins[0];
+			const contextItems = items.some((item) => item.key === activeItem.key)
+				? items
+				: [activeItem, ...items];
+			configurePreviewContext(contextItems, activeItem);
 			state.previewMode = "comparison";
 			els.preview.dataset.mode = "comparison";
-			updateComparisonPreview();
+			updatePreview();
+			els.reviewSidebar.scrollTop = 0;
 			els.preview.scrollTop = 0;
 			if (!els.preview.open) {
 				els.preview.showModal();
@@ -1658,7 +1685,7 @@
 				showToast(displayUnitName(item.unit) + " unpinned.");
 			} else {
 				if (state.pins.length >= MAX_PINS) {
-					showToast("Six pins maximum. Unpin one before adding another.");
+					showToast("Five pins maximum. Unpin one before adding another.");
 					return;
 				}
 				state.pins.push(item.key);
@@ -1667,27 +1694,36 @@
 			savePins();
 			render();
 			if (state.previewMode === "comparison" && els.preview.open && !pinnedItems().length) {
-				els.preview.close();
+				state.previewMode = "single";
+				els.preview.dataset.mode = "single";
+				updatePreview();
 			}
 		}
 
 		function updateComparisonPreview() {
-			const items = pinnedItems();
-			if (!items.length) {
-				if (els.preview.open) {
-					els.preview.close();
-				}
+			const activeItem = currentPreviewItem();
+			if (!activeItem) {
 				return;
 			}
-			state.pins = items.map((item) => item.key);
+			const pins = pinnedItems();
+			const references = pins.filter((item) => item.key !== activeItem.key);
+			const items = [activeItem, ...references].slice(0, MAX_PINS + 1);
+			state.pins = pins.map((item) => item.key);
 			savePins();
-			els.previewName.textContent = "Pinned Comparison · " + items.length + " / " + MAX_PINS;
-			els.previewPath.textContent = "Right-click any comparison slot to unpin";
+			els.previewName.textContent =
+				"Reviewing " + displayUnitName(activeItem.unit) +
+				" · " + references.length + " pinned reference" + (references.length === 1 ? "" : "s");
+			els.previewPath.textContent =
+				"Active review + pinned references · right-click any slot to pin or unpin";
 			els.comparisonGrid.replaceChildren(...items.map((item, index) => {
 				const card = document.createElement("article");
 				card.className = "comparison-card";
 				card.style.gridColumn = comparisonColumn(items.length, index);
-				card.title = "Right-click to unpin " + displayUnitName(item.unit);
+				const isActive = index === 0;
+				card.dataset.active = String(isActive);
+				card.title = isActive
+					? "Active review · right-click to " + (state.pins.includes(item.key) ? "unpin" : "pin")
+					: "Pinned reference · right-click to unpin";
 				card.addEventListener("contextmenu", (event) => {
 					event.preventDefault();
 					togglePin(item);
@@ -1702,11 +1738,20 @@
 
 				const caption = document.createElement("div");
 				caption.className = "comparison-caption";
+				const captionHead = document.createElement("div");
+				captionHead.className = "comparison-caption-head";
 				const name = document.createElement("strong");
 				name.textContent = displayUnitName(item.unit);
+				captionHead.append(name);
+				if (isActive) {
+					const activeBadge = document.createElement("span");
+					activeBadge.className = "active-review-badge";
+					activeBadge.textContent = "Reviewing";
+					captionHead.append(activeBadge);
+				}
 				const version = document.createElement("span");
 				version.textContent = item.version || item.note || item.kind;
-				caption.append(name, version);
+				caption.append(captionHead, version);
 				card.append(art, caption);
 				return card;
 			}));
@@ -1795,6 +1840,9 @@
 			const comment = commentForItem(item);
 			els.comment.value = comment;
 			els.commentStatus.textContent = comment ? "Saved locally" : "No comment yet";
+			if (state.previewMode === "comparison") {
+				updateComparisonPreview();
+			}
 			updatePreviewChoice();
 		}
 
