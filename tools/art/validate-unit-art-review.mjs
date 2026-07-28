@@ -20,12 +20,20 @@ const requireText = (value) => {
 const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 
 if ("mara" in manifest.aliases || manifest.aliases.cashmere) fail("Mara must be the canonical unit name, not an alias.");
-if (manifest.items.length !== 5) fail(`Expected curated history with 5 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 13) fail(`Expected curated history with 13 entries, got ${manifest.items.length}.`);
 if (manifest.items.filter((item) => item.unit === "creep").length !== 3) fail("Creep must have exactly V3, V4, and V5 provenance entries.");
 if (!manifest.items.some((item) => item.unit === "luna" && item.version === "Refit V1")) fail("Luna refit is missing.");
 if (!manifest.items.some((item) => item.unit === "mara" && item.source_unit === "mara")) fail("Mara history is missing.");
 if (manifest.items.some((item) => item.unit === "creep" && !item.path.includes("creep_builtin_revision_candidate"))) fail("Non-Creep art leaked into Creep history.");
 if (manifest.items.some((item) => item.unit === "cashmere" || item.source_unit === "cashmere")) fail("Legacy Cashmere identifiers must remain provenance paths only, not visible unit metadata.");
+
+const sableReviews = manifest.items.filter((item) => item.unit === "sable");
+if (sableReviews.length !== 8) fail(`Expected 8 Sable review versions, got ${sableReviews.length}.`);
+const expectedSableVersions = Array.from({ length: 8 }, (_, index) => `Review V${index + 1}`);
+if (sableReviews.map((item) => item.version).join("|") !== expectedSableVersions.join("|")) fail("Sable review versions are not in chronological order.");
+if (sableReviews.some((item) => item.current)) fail("Sable review history must not replace the default.");
+if (!sableReviews[7].status.includes("Latest review candidate") || !sableReviews[7].label.includes("corrected sleeves")) fail("Sable corrected-sleeves pass must remain the newest review candidate.");
+if (!/\{ unit: "sable"[^}]*current: true[^}]*path: "units\/sable\.png" \}/.test(html)) fail("Sable's existing P2 default is missing or was changed.");
 
 for (const item of manifest.items) {
 	if (!item.local_path) fail(`Curated history entry is not bundled locally: ${item.path}`);
@@ -61,7 +69,9 @@ if (archiveImageCount !== 30) fail(`Expected 30 official P2/S3 archive images, g
 	"HISTORY_SEARCH_ALIASES",
 	"contentKey",
 	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
+	"history: [...PHASE2_ART, ...HISTORICAL_ART]",
+	"function versionsForUnit(unit)",
 	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()"
 ].forEach(requireText);
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=5 p2=30 canonical=mara creep_v5=deduped");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=13 sable_reviews=8 p2=30 canonical=mara creep_v5=deduped");
