@@ -46,11 +46,16 @@ if (sha256(liveCreep) !== sha256(historicalCreep)) fail("Creep live asset and V5
 
 const archiveImageCount = fs.readdirSync(path.join(toolRoot, "phase2-concepts"), { recursive: true })
 	.filter((relativePath) => relativePath.endsWith(".png")).length;
-if (archiveImageCount !== 30) fail(`Expected 30 official archive images, got ${archiveImageCount}.`);
+if (archiveImageCount !== 33) fail(`Expected 33 official archive images, got ${archiveImageCount}.`);
 const phase2Source = html.match(/const PHASE2_ART = \[([\s\S]*?)\]\.map\(\(item\)/)?.[1] || "";
 const phase2Units = new Set([...phase2Source.matchAll(/\{ unit: "([^"]+)"/g)].map((match) => match[1]));
 if (phase2Units.size !== 12) fail(`Expected one latest-card candidate for 12 Phase 2 units, got ${phase2Units.size}.`);
 if (!phase2Units.has("mara")) fail("Mara must remain in the Phase 2 unit filter.");
+for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
+	if (!phase2Source.includes(`unit: "luna"`) || !phase2Source.includes(`version: "${lunaVersion}"`)) {
+		fail(`Luna ${lunaVersion} candidate is missing.`);
+	}
+}
 
 [
 	"Gamble Battle Unit Art Comparison Tool",
@@ -103,4 +108,4 @@ if (html.includes("padding: clamp(10px, 2vw, 30px)")) fail("Comparison artwork s
 if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use the full available review workspace.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=21 mara=17 archive=30 phase2-units=12 canonical=mara pins=5 active-review=1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=21 mara=17 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
