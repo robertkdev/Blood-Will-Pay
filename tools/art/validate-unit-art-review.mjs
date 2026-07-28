@@ -55,14 +55,21 @@ if (archiveImageCount !== 30) fail(`Expected 30 official archive images, got ${a
 	"const CANONICAL_CURRENT",
 	"ALL_UNIT_ART.push(CANONICAL_CURRENT.get(unit) || PHASE2_CURRENT.get(unit) || item)",
 	"const PINS_KEY",
-	"const MAX_PINS = 6",
+	"const MAX_PINS = 5",
 	"addEventListener(\"contextmenu\"",
-	"function openComparisonPreview()",
+	"function configurePreviewContext(items, selectedItem)",
+	"function openComparisonPreview(selectedItem = null, items = filteredItems())",
+	"const items = [activeItem, ...references].slice(0, MAX_PINS + 1)",
+	"card.dataset.active = String(isActive)",
+	"activeBadge.textContent = \"Reviewing\"",
 	"function comparisonColumn(count, index)",
 	"comparison-grid",
-	"Right-click any comparison slot to unpin",
+	"Active review + pinned references",
 	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
 	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()"
 ].forEach(requireText);
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=21 mara=17 archive=30 canonical=mara pins=6");
+if (html.includes("Six pins maximum") || html.includes("0 / 6")) fail("The comparison tool still exposes the old six-pin limit.");
+if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
+
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=21 mara=17 archive=30 canonical=mara pins=5 active-review=1");
