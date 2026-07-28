@@ -1,8 +1,8 @@
 # Gamble Battle Unit-Art Board Reference Criteria
 
-Status: **LOCKED CANONICAL STANDARD — USER CONFIRMED 2026-07-21**
+Status: **LOCKED CANONICAL STANDARD — USER CONFIRMED 2026-07-21; MARA ANCHOR UPDATED BY EXPLICIT USER DECISION 2026-07-26**
 
-Criteria version: `2026-07-21-v1`
+Criteria version: `2026-07-26-v2`
 
 This is the governing design and review standard for every Gamble Battle unit master concept. It applies to calibration, redesign, refinement, convergence repair, and concept lock. If an older prompt, packet, approval, roster note, generated image, baseline record, or older version of the live Google design document conflicts with these user-confirmed unit-art rules, this document wins for unit-art design and review. The live Google document remains authoritative for gameplay, terminology, roster facts, roles, kits, and later user-approved changes. A later explicit user decision may replace this criteria version; silent drift or an older source may not.
 
@@ -170,7 +170,7 @@ Use these as specificity references, not templates to copy:
 
 - **Morwen — starving pride:** wants blood and belonging but treats both as traps. Her exhausted predatory eyes and controlled posture make her seductive because she is wounded, dangerous, and impossible to keep, not because she is passively posing.
 - **Nerissa — controlled hunger:** wants intimacy but fears converting closeness into appetite. Half-open mouth and restrained posture hold shame, desire, and discipline in tension.
-- **Mara — forced self-respect:** lonely and angry without begging. Tired, defiant eyes and controlled posture combine wounded confidence with refusal.
+- **Mara — weaponized self-sabotage:** the human woman has been overtaken by a tormenting counter-self that rejects care, structure, and anything healthy. Her alluring social presence remains as bait while milky scarred eyes, a force-controlled pose, and corrosive black sludge show that another intelligence is wearing her body. Avoid a passive fashion model, generic seductress, or sympathetic ghost.
 - **Vellum — manipulative exhausted control:** still directs the encounter while the cost of maintaining control is visible.
 - **Creep — dissociation from self:** separation and alienation are embodied through face, anatomy, and movement rather than pasted-on gore.
 

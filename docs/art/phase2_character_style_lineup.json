@@ -1,0 +1,31 @@
+{
+  "title": "GAMBLE BATTLE — GOTHIC HORROR CHARACTER LINEUP",
+  "subtitle": "Locked redesign anchors beside Mara's selected working direction",
+  "review_question": "Does Mara's possession tableau now carry the same adult threat, cruel body logic, operatic intensity, and premium finish as the two locked anchors?",
+  "characters": [
+    {
+      "id": "malachor",
+      "display_name": "Malachor",
+      "status": "Locked direction",
+      "lineage": "STAGE THREE • LIVING SIEGE CAGE",
+      "source": "assets/concepts/phase3_redesign/malachor/malachor_living_siege_cage_selected_direction.png",
+      "note": "Oppressive tank mass; aware human trapped inside a coherent physical mechanism."
+    },
+    {
+      "id": "knoll",
+      "display_name": "Knoll",
+      "status": "Locked direction",
+      "lineage": "STAGE THREE • FORECLOSURE PRESS",
+      "source": "assets/concepts/phase3_redesign/knoll/knoll_foreclosure_press_selected_direction.png",
+      "note": "Solemn adult threat; body, movement, and attack all serve the same press mechanism."
+    },
+    {
+      "id": "mara",
+      "display_name": "Mara",
+      "status": "Working direction",
+      "lineage": "PHASE TWO • COST 1 MAGE • ARCANIST / VINDICATOR",
+      "source": "assets/concepts/phase3_redesign/mara/mara_possession_tableau_working_direction.png",
+      "note": "Tormenting deity wears an alluring adult host; one palm drives a single-target corrosive-sludge attack. The trailing hip drape is not a tail."
+    }
+  ]
+}

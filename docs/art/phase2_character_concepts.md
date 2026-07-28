@@ -118,6 +118,61 @@ This expresses Trader/Harmony as physical repossession and redistribution, not s
 
 Final model construction, animation timing, numerical ability tuning, exact displacement rules, status duration, defense-share values, portrait crop, and replacement of the live unit asset remain later production work. They must inherit this locked direction and pass the Phase Six formal approval gate.
 
+## Concept 004 — Mara: Possession Tableau
+
+**User decision:** selected as Mara's current working character and image direction.
+
+**Approval boundary:** this preserves the complete working identity for future art and gameplay integration. It is not a unanimous Board approval, a Phase Six production-art lock, or authorization to replace the live unit sprite. Later Mara iterations must begin from this record rather than the superseded Cashmere, Laith, ledger, ink, or economy concepts.
+
+**Preserved working image:** [`../../assets/concepts/phase3_redesign/mara/mara_possession_tableau_working_direction.png`](../../assets/concepts/phase3_redesign/mara/mara_possession_tableau_working_direction.png)
+
+The preserved PNG is 916 × 1717 with SHA-256 `8122C29115E3A0E6570FFCAFDB8164EED781D1541B939149AF7B7B44F69C7970`. It is a non-destructive working reference and does not replace `assets/units/cashmere.png`.
+
+### Identity supersession
+
+- **Current name:** Mara.
+- **Retired names and identities:** Cashmere and Laith are no longer the forward-looking character. Cashmere's money pun, Mogul identity, Arcane Ledger, and kill reward are rejected. Laith's spine ledger, tattoo ink, and memory-erasure mechanism are also rejected.
+- **Human identity:** Mara is the name of the original woman, not the entity controlling her.
+- **Possession:** a tormenting deity has displaced her agency and wears her body as a social weapon. The entity embodies compulsive self-sabotage: it rejects care, stability, restraint, and anything healthy, then uses manipulation and false intimacy to draw others closer.
+- **Age and body:** unmistakably adult, visually 25–30, tall and full-figured with a round mature face and long nearly straight dark hair.
+
+### Locked gameplay direction
+
+- **Cost:** 1.
+- **Primary role:** `mage`.
+- **Primary goal:** `mage.sustained_dps`.
+- **Approaches:** `dot`, `debuff`, `ramp`.
+- **Traits:** `Arcanist`, `Vindicator`.
+- **Ability name:** `Give In`.
+- **Targeting:** strictly one current enemy target. No bounce, chaining, area spread, or secondary target.
+- **Ability topology:** Mara drives a concentrated blast of corrosive black sludge from one palm into the target. It deals an initial magic hit, then remains on the target as sustained magic damage over time. The pressure grows over the effect window and is intended to become more punishing as Vindicator strips defenses. Arcanist scales the magical output; Vindicator supplies the resistance-breaking bridge.
+- **Economy veto:** the ability never creates blood, gold, currency, loot, or a kill reward.
+
+Exact mana cost, initial damage, tick damage, duration, ramp curve, and whether the ability itself adds any armor or magic-resistance reduction remain numerical implementation decisions. Those values must not change the single-target sustained-DPS topology.
+
+### Working visual direction
+
+Mara wears one deliberate night-out garment: a fitted deep-red wet-look liquid-satin romper with an asymmetrical wrapped neckline, fitted shorts, black hip drape, and black ankle boots. The garment preserves adult allure and separates her from the Victorian coat-and-corset lane. Her whole body is drained of healthy color. Both eyes are milky, scarred, and pupil-less.
+
+The deity's control must consume the composition. Mara's torso forms an off-center curve, her shoulders and head are pulled into a forceful asymmetry, and her hair cuts across her face. A single enormous humanoid shadow behind her does not match her pose, making the controlling intelligence visible without adding a second literal creature.
+
+One forward palm releases one heavy, directional, single-target surge of nearly matte black corrosive sludge. The other hand carries only residue. The sludge must originate unmistakably from her palm; it is not ink, smoke, a magical ribbon, twin columns, or an object she holds.
+
+### Non-negotiable reads and vetoes
+
+- Preserve Mara as an alluring adult woman whose body is being used by something ferocious; do not turn her into a passive model, generic succubus, sympathetic ghost, or ordinary witch.
+- Keep the round mature face, long straight dark hair, desaturated body, two milky scarred eyes, red liquid-satin romper, and one-palm attack.
+- Preserve the misaligned deity-shadow and the emotionally forceful possession tableau.
+- No book, ledger, spine apparatus, handwriting, tattoo ink, memory extraction, Mogul symbols, or economy imagery.
+- No Victorian dress, mourning gown, bridal language, leather default, horns, wings, fangs, or generic demon anatomy.
+- No bounce, chain, area-of-effect spray, or two-handed symmetrical casting.
+- The long black form trailing from her hip in the current working image is a cloth drape, not a tail or appendage. Future art must remove the tail-like read.
+- The working image may be refined later for sludge direction, matte texture, exact face intensity, cloth clarity, and 96-pixel readability without reopening the identity above.
+
+### Implementation boundary
+
+This art branch does not integrate the separate blood-economy/Laith gameplay branch. Runtime data may therefore still expose Cashmere on the default baseline or Laith on the isolated conversion branch. Future integration must rename the active profile to Mara, assign Arcanist and Vindicator, replace the provisional burst/ink kit with `Give In`, and apply the RGA record above without resurrecting Mogul or either ledger concept.
+
 ## Future entries
 
 Add future user-approved concepts as a new numbered section with:

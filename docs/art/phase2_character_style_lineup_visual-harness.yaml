@@ -1,0 +1,39 @@
+version: 1
+project: Gamble Battle selected Gothic horror character lineup
+scenarios:
+  - id: phase2-selected-style-lineup
+    title: Mara working direction against locked Gothic horror anchors
+    adapter: generic
+    objective: Compare Mara with Malachor and Knoll for adult threat, body logic, material weight, framing, and finish.
+    required_groups:
+      - overview
+      - references
+    evidence:
+      required_pairs:
+        mara_vs_malachor: [reference, actual]
+        mara_vs_knoll: [reference, actual]
+    captures:
+      - path: docs/art/phase2_character_style_lineup.png
+        label: Equal-scale selected lineup
+        group: overview
+        role: actual
+      - path: assets/concepts/phase3_redesign/malachor/malachor_living_siege_cage_selected_direction.png
+        label: Malachor locked direction
+        group: references
+        pair: mara_vs_malachor
+        role: reference
+      - path: assets/concepts/phase3_redesign/mara/mara_possession_tableau_working_direction.png
+        label: Mara working direction against Malachor
+        group: references
+        pair: mara_vs_malachor
+        role: actual
+      - path: assets/concepts/phase3_redesign/knoll/knoll_foreclosure_press_selected_direction.png
+        label: Knoll locked direction
+        group: references
+        pair: mara_vs_knoll
+        role: reference
+      - path: assets/concepts/phase3_redesign/mara/mara_possession_tableau_working_direction.png
+        label: Mara working direction against Knoll
+        group: references
+        pair: mara_vs_knoll
+        role: actual

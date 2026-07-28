@@ -5,9 +5,12 @@ Outputs:
   * comparisons/phase2_96px_lineup.png
   * comparisons/phase2_master_comparison.png
   * comparisons/phase2_vellum_first_comparison.png
+  * an optional selected-character style lineup from a small JSON manifest
 
 The 96px board shows both the exact derivative and a nearest-neighbor 3x view.
 The master board contains existing definitive concepts without redrawing.
+The selected lineup keeps locked anchors and active candidates at equal panel
+scale without requiring them to be part of the original calibration manifest.
 """
 
 from __future__ import annotations
@@ -46,6 +49,8 @@ MUTED = (177, 165, 155)
 ACCENT = (157, 96, 78)
 FIELD = (207, 181, 162)
 IMAGE_BG = (24, 22, 25)
+LOCKED = (86, 151, 113)
+CANDIDATE = (188, 126, 70)
 
 ROLE_LAYOUT = [
     ("Tank", "Mage"),
@@ -78,6 +83,11 @@ def contain_alpha(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     canvas = Image.new("RGB", size, IMAGE_BG)
     canvas.paste(fitted, ((size[0] - fitted.width) // 2, (size[1] - fitted.height) // 2))
     return canvas
+
+
+def project_path(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
 
 
 def fit_text(
@@ -348,6 +358,100 @@ def render_vellum_first_board(units: list[dict], records: dict[str, dict], outpu
     board.save(output, optimize=True)
 
 
+def render_selected_lineup(manifest_path: Path, output: Path) -> None:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    characters = manifest["characters"]
+    if not characters:
+        raise ValueError("Selected lineup manifest must contain at least one character")
+
+    width = 2880
+    outer = 28
+    gap = 22
+    header_h = 154
+    footer_h = 62
+    panel_h = 1660
+    panel_w = (width - outer * 2 - gap * (len(characters) - 1)) // len(characters)
+    image_h = 1360
+    height = header_h + panel_h + footer_h
+    board = Image.new("RGB", (width, height), BACKGROUND)
+    draw = ImageDraw.Draw(board)
+
+    draw.text((outer, 24), manifest["title"], fill=INK, font=font(38, True))
+    draw.text((outer, 75), manifest["subtitle"], fill=MUTED, font=font(19))
+    draw.text(
+        (outer, 112),
+        "Equal panel scale • raw source framing preserved • status is direction authority, not production-art approval",
+        fill=FIELD,
+        font=font(15, True),
+    )
+
+    for index, character in enumerate(characters):
+        x = outer + index * (panel_w + gap)
+        y = header_h
+        draw.rounded_rectangle(
+            (x, y, x + panel_w, y + panel_h),
+            18,
+            fill=GROUP,
+            outline=PANEL_EDGE,
+            width=2,
+        )
+        name = character["display_name"].upper()
+        status = character["status"].upper()
+        status_color = LOCKED if status.startswith("LOCKED") else CANDIDATE
+        draw.text((x + 22, y + 18), name, fill=INK, font=font(28, True))
+        badge_font = font(14, True)
+        badge_w = draw.textbbox((0, 0), status, font=badge_font)[2] + 30
+        draw.rounded_rectangle(
+            (x + panel_w - badge_w - 18, y + 18, x + panel_w - 18, y + 49),
+            9,
+            fill=status_color,
+        )
+        draw.text(
+            (x + panel_w - badge_w - 3, y + 25),
+            status,
+            fill=(20, 18, 21),
+            font=badge_font,
+        )
+
+        source_path = project_path(character["source"])
+        if not source_path.is_file():
+            raise FileNotFoundError(f"Selected lineup source is missing: {source_path}")
+        source = Image.open(source_path)
+        image = contain_alpha(source, (panel_w - 36, image_h))
+        image_x = x + 18
+        image_y = y + 72
+        board.paste(image, (image_x, image_y))
+        draw.rectangle(
+            (image_x, image_y, image_x + image.width - 1, image_y + image.height - 1),
+            outline=(64, 58, 62),
+            width=1,
+        )
+
+        text_y = image_y + image_h + 18
+        draw.text((x + 22, text_y), character["lineage"], fill=FIELD, font=font(14, True))
+        text_y += 26
+        note_font = font(17)
+        for line in wrap_lines(draw, character["note"], note_font, panel_w - 44, 3):
+            draw.text((x + 22, text_y), line, fill=INK, font=note_font)
+            text_y += 22
+        draw.text(
+            (x + 22, y + panel_h - 26),
+            fit_text(draw, source_path.name, font(12), panel_w - 44),
+            fill=MUTED,
+            font=font(12),
+        )
+
+    footer_y = header_h + panel_h + 20
+    draw.text(
+        (outer, footer_y),
+        manifest["review_question"],
+        fill=INK,
+        font=font(18, True),
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    board.save(output, optimize=True)
+
+
 def render(output_dir: Path) -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     records = json.loads(PSYCHOLOGY.read_text(encoding="utf-8"))["units"]
@@ -360,6 +464,24 @@ def render(output_dir: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
+    parser.add_argument(
+        "--selected-manifest",
+        type=Path,
+        help="Render only the selected-character lineup described by this JSON manifest.",
+    )
+    parser.add_argument(
+        "--selected-output",
+        type=Path,
+        default=PACKET.parent / "phase2_character_style_lineup.png",
+        help="Output path for --selected-manifest mode.",
+    )
     args = parser.parse_args()
-    target = args.output_dir if args.output_dir.is_absolute() else ROOT / args.output_dir
-    render(target.resolve())
+    if args.selected_manifest:
+        selected_manifest = (
+            args.selected_manifest if args.selected_manifest.is_absolute() else ROOT / args.selected_manifest
+        )
+        selected_output = args.selected_output if args.selected_output.is_absolute() else ROOT / args.selected_output
+        render_selected_lineup(selected_manifest.resolve(), selected_output.resolve())
+    else:
+        target = args.output_dir if args.output_dir.is_absolute() else ROOT / args.output_dir
+        render(target.resolve())
