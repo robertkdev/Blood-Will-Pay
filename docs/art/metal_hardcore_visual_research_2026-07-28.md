@@ -7,6 +7,15 @@ Status: research synthesis; no reskin selected or implemented
 
 This packet identifies what a metal, hardcore, and mosh-pit-inspired reskin should draw from before production decisions are made. It treats the game as an information-dense tactical product, not as a poster with buttons placed on top.
 
+### Translation rule
+
+Metal is the emotional and formal reference, not the literal setting. Gamble
+Battle should depict a brutal war-horror world that metal artists might write
+about, not a concert, venue, audience, band, tour, or merch culture. Translate
+the inspiration into weight, rhythm, compression, rupture, hostility,
+dissonance, and release. The mosh-pit comparison is fulfilled by making the
+world an actual war zone, not by staging combat inside a pit.
+
 The research is grounded in:
 
 - Fresh 1920x1080 player-facing captures of the title menu, How to Play, unit selection, post-shop deployment, opening combat, and planning state.
@@ -25,18 +34,18 @@ The current visual system is coherent but reads as ornate Gothic dungeon fantasy
 
 | Layer | Current treatment | Reskin question |
 | --- | --- | --- |
-| Title identity | Neutral sans-serif title, faint sigil, black field, blood-red primary button | Should the title act like a band logo, a show bill, or a touring equipment mark? |
-| Large panels | Engraved, symmetrical, nine-sliced frames with wood/stone interiors | Which panels become paper, road cases, amp faces, venue signage, or restrained flat utility surfaces? |
-| Buttons | Beveled dark plates with gold trim; red primary action | Which controls can borrow stage hardware without becoming ambiguous? |
+| Title identity | Neutral sans-serif title, faint sigil, black field, blood-red primary button | How can the title feel struck, cut, or forced into a war-horror image while remaining readable? |
+| Large panels | Engraved, symmetrical, nine-sliced frames with wood/stone interiors | Which panels become severe flat fields, field orders, damaged records, or restrained world-material surfaces? |
+| Buttons | Beveled dark plates with gold trim; red primary action | How can controls feel abrupt and forceful without becoming decorative props? |
 | Typography | Mostly clean sans-serif with gold/bone hierarchy | Where can expressive lettering appear without reducing combat-speed readability? |
 | Palette | Near-black, bone, blood red, tarnished gold, muted teal | Which accent family best distinguishes player/enemy, economy, danger, rarity, and focus? |
-| Unit select | Framed portrait grid with role labels and a large detail pane | Should this read as a lineup poster, band roster, merch catalog, or backstage call sheet? |
-| Combat arena | Cracked ornamental stone field with red/teal team halves | Should combat become a stage, floor-level pit, barricaded venue, or abstract tactical floor? |
-| Shop | Framed portrait cards inside a broad ornamental lower plate | Should recruits read as lineup additions, ticketed acts, merch items, or equipment cards? |
+| Unit select | Framed portrait grid with role labels and a large detail pane | Should this read as a warband muster, threat dossier, conscription record, or execution ledger? |
+| Combat arena | Cracked ornamental stone field with red/teal team halves | Which actual battlefield, ruin, killing ground, or besieged structure belongs to this world? |
+| Shop | Framed portrait cards inside a broad ornamental lower plate | How should recruitment feel transactional, coercive, or predatory inside the world's economy? |
 | Items and traits | Slot grid and stacked framed rows | Which ephemera best separates portable items, persistent traits, and unlock thresholds? |
-| Metrics | Side panel with tabs and scoreboard rows | Should this borrow festival timetables, mixing meters, stage-manager cue sheets, or sports scoreboards? |
-| Stage progression | Ornamental chapter strip with encounter emblems | Should progression become a setlist, tour routing strip, festival running order, or access-pass sequence? |
-| Feedback and VFX | Dark fantasy impacts, health/mana bars, colored targeting feedback | Which concert effects add energy without hiding the tactical state? |
+| Metrics | Side panel with tabs and scoreboard rows | Should this borrow casualty boards, tactical summaries, control diagrams, or severe neutral data tables? |
+| Stage progression | Ornamental chapter strip with encounter emblems | Should progression read as a campaign march, spreading ruin, accumulating scars, or a tightening sentence? |
+| Feedback and VFX | Dark fantasy impacts, health/mana bars, colored targeting feedback | How can tension, impact, and recovery borrow metal's rhythm without literal concert effects? |
 
 The highest-risk surfaces are the shop cards, trait rows, scoreboard, stage strip, health bars, and compact buttons. They carry dense or time-sensitive information and cannot use the same expressive intensity as the logo or chapter splash.
 
@@ -80,14 +89,18 @@ References:
 - [Letterform Archive: Bay Area punk flyers](https://letterformarchive.org/news/punk-flyers-of-san-francisco/)
 - [People's Graphic Design Archive: punk collection](https://peoplesgdarchive.org/tag/865/punk)
 
-### 3. Concert posters and festival bills
+### 3. Dense hierarchy under aggression
 
-Concert posters solve a problem close to Gamble Battle’s: express a strong identity while ordering many names, dates, places, prices, and tiers. Festival running orders are especially relevant to chapter progression and encounter sequencing because they prioritize time, stage, and hierarchy over illustration.
+Concert posters and festival bills remain useful source material because they
+express a strong identity while ordering many names, dates, places, prices, and
+tiers. The lesson is formal: large hierarchy, compressed information, and
+controlled ornament. Their event vocabulary must not migrate into the game
+world.
 
 Research targets:
 
 - Headliner/support scale systems.
-- Day/stage columns and repeated timing rows.
+- Fixed columns and repeated timing rows.
 - Controlled ornament around a rigid information grid.
 - Poster families that can change per chapter without changing navigation.
 
@@ -115,16 +128,20 @@ References:
 - [Sound and Vision: The Art of Music](https://bellefontemuseum.org/events/2025/sound-and-vision-the-art-of-music)
 - [Liverpool Museums: early album covers](https://www.liverpoolmuseums.org.uk/early-album-covers)
 
-### 5. Tickets, passes, wristbands, setlists, and stamps
+### 5. Validation marks, records, and states
 
-Event ephemera provides compact, modular visual grammar: perforations, serial numbers, access levels, handwritten marks, stamps, dates, and validation states. These are useful because they naturally encode ownership, cost, progress, eligibility, and access.
+Event ephemera is only one source for compact visual grammar: serial numbers,
+access levels, handwritten marks, stamps, dates, and validation states. The
+game should translate those lessons into documents that belong to its own
+world—field orders, execution records, debt ledgers, warrants, seals, and
+campaign marks.
 
 Best mappings:
 
-- Betting and purchases: ticket or stamped admission logic.
-- Chapter/encounter progress: wristband punches or access-pass sequence.
-- Traits and unlock thresholds: laminates, credentials, or setlist checkmarks.
-- Run history: used ticket stubs or tour routing ledger.
+- Betting and purchases: debt marks, seals, countersigns, or recorded stakes.
+- Chapter/encounter progress: campaign scars, breached positions, or condemned locations.
+- Traits and unlock thresholds: warrants, brands, insignia, or ritual obligations.
+- Run history: a war ledger, casualty record, or map of consequences.
 
 References:
 
@@ -159,9 +176,13 @@ Three evidence-backed palette families deserve comparison:
 
 - **Photocopy + spot ink:** black, dirty bone, paper gray, one blood-red or fluorescent accent.
 - **Extreme-metal print:** near-black, bone, dried oxblood, oxidized metal, restrained warm highlight.
-- **Horror basement ritual:** deep matte black, dirty bone, dried blood, bruised sickly green, and a tightly controlled emergency-red accent.
+- **War-horror night:** deep matte black, ash, dirty bone, old blood, bruised sickly green, and one motivated threat accent.
 
-Stage-light research shows a useful role split: floods establish readable atmosphere, gobos project theme, and strobes intensify selected moments. Gamble Battle should apply the same hierarchy—ambient team separation first, thematic projections second, high-energy flash only for rare peaks.
+Lighting research still supplies a useful hierarchy, but not a literal stage
+look: readable ambient separation first, world-specific motivated light second,
+and high-energy flash only for rare impacts. Horror cinematography, battlefield
+visibility, fire, weather, magic, and damaged architecture should determine the
+actual sources.
 
 References:
 
@@ -170,13 +191,13 @@ References:
 
 ### 8. Materials and UI containers
 
-The current frames are visually expensive: carved corners and repeated gold trim make most surfaces feel equally important. Underground-show ephemera and practical horror production suggest a more modular replacement vocabulary:
+The current frames are visually expensive: carved corners and repeated gold trim make most surfaces feel equally important. War records, damaged civic systems, and practical horror production suggest a more modular replacement vocabulary:
 
-- Layered photocopied flyers, evidence tags, and stained paper for major windows.
-- Scratched acetate, torn tape, and handwritten venue markings for titles and annotations.
+- Field orders, execution ledgers, evidence tags, damaged maps, and stained records for major windows.
+- Scratched acetate, butchered cloth, wax, crude repairs, and handwritten tactical markings for titles and annotations.
 - Restrained hard rectangles for command bars, metrics, slots, and readable card interiors.
-- Speaker cloth, damp concrete, painted plywood, peeling posters, and black negative space for low-priority backgrounds.
-- Ritual chalk, handprints, mold-like stains, and analog-film damage as sparse atmosphere rather than constant decoration.
+- Ash, damp stone, splintered timber, worn iron, smoke, and black negative space for low-priority backgrounds.
+- Scars, handprints, ritual residue, corrosion, and damaged-film texture as sparse atmosphere rather than constant decoration.
 
 The strongest opportunity is not photorealism; it is **functional construction**. Every edge, label, fastener, or tape strip should imply why the container exists.
 
@@ -190,42 +211,56 @@ References:
 The research should build three related but distinct symbol families:
 
 - Functional icons: damage, DPS, casts, gold, bet, XP, lock, reroll, targeting.
-- Scene icons: stage, pit, barricade, amp, mic, cable, pass, wristband, setlist.
+- World icons: breach, siege, execution, ruin, hazard, oath, debt, corruption.
 - Identity emblems: traits, chapters, factions, and unit affiliations.
 
-Functional icons should use stencil, equipment-label, or venue-wayfinding simplicity. Detailed patch/pin illustration belongs to identity emblems. Mixing those levels would repeat the current problem of giving every element equal ornament.
+Functional icons should use stencil, field-sign, or severe wayfinding
+simplicity. Detailed heraldic or ritual illustration belongs to identity
+emblems. Mixing those levels would repeat the current problem of giving every
+element equal ornament.
 
-### 10. Arena and mosh-pit environment
+### 10. Battlefield and pressure environment
 
-The combat field should research real spatial arrangements rather than generic concert wallpaper:
+The mosh-pit reference describes pressure, collision, instability, and loss of
+personal space. The arena should make that comparison literal at the level of
+danger: it is an actual war zone. Research locations native to the fiction:
 
-- Low stage with crowd floor.
-- Barricaded festival pit.
-- Basement or warehouse room.
-- Rehearsal space with floor monitors and cable runs.
-- Arena stage with lighting truss and speaker stacks.
+- Churned killing fields with compressed lanes and broken cover.
+- Breached fortress rooms where escape routes have collapsed.
+- Besieged settlements shaped by organized cruelty.
+- Execution grounds, tribunals, and ritualized military spaces.
+- Ruined civic architecture repurposed for violence and extraction.
 
-The board still needs unambiguous cells, team halves, bench locations, actor silhouettes, and target indicators. The most promising metaphor is **a venue floor organized by production hardware**, not a literal crowd filling every tile.
+The board still needs unambiguous cells, team halves, bench locations, actor
+silhouettes, and target indicators. World materials should organize those
+functions without turning the board into a decorative diorama.
 
 Research questions:
 
-- Can enemy and player halves read as stage-side and floor-side without implying unequal power?
-- Can barricades, cable channels, light pools, or floor tape define cells?
-- Can chapter escalation move from basement show to club to festival headliner without changing board geometry?
+- Can terrain pressure both teams toward collision while leaving tactical choices legible?
+- Can trenches, scars, paving, corpses, stakes, masonry seams, or ritual boundaries define cells?
+- Can chapter escalation move across increasingly brutal locations without changing board geometry?
 
 ### 11. Units and character presentation
 
-Unit presentation should research lineup photography, tour posters, merch illustrations, and underground comics. The roster remains villain-first; the reskin should not convert characters into friendly band mascots.
+Unit presentation should research war photography, criminal dossiers, horror
+cinematography, historical propaganda, underground comics, and practical
+creature effects. The roster remains villain-first; characters are inhabitants
+and perpetrators of this world, not musicians or scene archetypes.
 
 Useful distinctions:
 
-- Portrait crop as band-photo identity.
+- Portrait crop as threat, witness, or perpetrator identity.
 - Full-body combat sprite as readable tactical silhouette.
-- Role as a concise billing tag.
-- Traits as patches or credentials.
-- Level/rank as repeated tour, access, or edition markings.
+- Role as a concise tactical classification.
+- Traits as brands, obligations, mutations, insignia, or reputation marks.
+- Level/rank as scars, authority, transformation, or accumulated consequence.
 
-The clothing and prop research should span hardcore, metalcore, crust, thrash, doom, extreme-metal, grindhouse horror, analog horror, and practical creature-effects traditions without turning every unit into a subculture or horror-trope checklist.
+Music subcultures may still inform attitude, silhouette, abrasion, and material
+honesty, but clothing and props must belong to the world's factions,
+professions, climates, violence, and social systems. Grindhouse horror, war
+horror, analog horror, and practical creature effects are useful adjacent
+sources without becoming trope checklists.
 
 Reference:
 
@@ -233,11 +268,11 @@ Reference:
 
 ### 12. Motion, feedback, and VFX
 
-Concert motion should be divided into:
+Translate tension and release into three levels:
 
-- Persistent: haze, slow light movement, subtle projector/noise loops.
-- Interaction: tape snap, stamp impact, amp-meter kick, registration shift, camera-flash accent.
-- Climactic: white strobe, crowd surge silhouette, pyrotechnic burst, feedback distortion.
+- Persistent: smoke, weather, breath, drifting ash, distant movement, and long visual stillness.
+- Interaction: abrupt cut, snap, strike, displacement, short camera impulse, and fast recovery.
+- Climactic: rupture, mass movement, structural failure, supernatural flare, or violent environmental response.
 
 Photosensitivity guidance must constrain the climactic layer. Xbox guidance flags flashes occurring more than roughly three times per second or occupying about 20 percent or more of the screen as failure risks. Red flashes also need particular restraint.
 
@@ -245,17 +280,21 @@ Reference:
 
 - [Xbox Accessibility Guideline 118: Photosensitivity](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/118)
 
-### 13. Scoreboards and live-event information
+### 13. Scoreboards and tactical information
 
-The scoreboard and chapter strip should study festival schedules, cue sheets, mixing meters, and rack equipment rather than poster art. These references already assume scanning under time pressure.
+The scoreboard and chapter strip can study any information system built for
+scanning under pressure: military maps, casualty boards, industrial control
+diagrams, emergency signage, tactical overlays, and dense schedules. The
+resulting interface should belong to Gamble Battle rather than reproducing the
+source artifact.
 
 Research targets:
 
 - Fixed columns and aligned numbers.
 - Strong selected-state highlight independent of color alone.
-- Time-window tabs that resemble cue or monitor controls.
+- Time-window tabs with unmistakable current and historical states.
 - Meters and bars with readable baselines rather than decorative glow.
-- Setlist/running-order progression for chapters and encounters.
+- Campaign progression that shows advance, loss, escalation, and consequence.
 
 ### 14. Merchandise and promotional art
 
@@ -266,7 +305,9 @@ Merch is a useful stress test for whether the identity is genuinely memorable. R
 - Limited-color screenprint separations.
 - Designs that still work without the game UI around them.
 
-This should inform the logo, chapter emblems, trait patches, achievement marks, and store-page key art, but it should not dictate dense HUD typography.
+This should inform the logo, chapter emblems, achievement marks, and store-page
+key art, but external promotional identity must not become literal in-world
+music culture or dictate dense HUD typography.
 
 ### 15. Comparable games
 
@@ -289,15 +330,18 @@ The generated characters, symbols, labels, and names in these specimens are
 non-canonical visual placeholders; they do not propose roster or gameplay
 changes.
 
-### Direction A: DIY Hardcore Flyer
+### Direction A: DIY Print Grammar
 
 ![DIY Hardcore Flyer direction](research/metal_hardcore_direction_diy_hardcore.png)
+
+This is a graphic-design source study, not a proposal that the game world is
+made of concert flyers.
 
 Core language:
 
 - Black-and-bone photocopy base.
 - One blood-red or fluorescent spot color.
-- Cut-and-paste hierarchy, condensed type, stamps, tape, setlists, ticket fragments.
+- Cut-and-paste hierarchy, condensed type, stamps, hard cropping, and visible assembly.
 - Hard rectangular containers with visible assembly rather than ornate bevels.
 
 Best fit:
@@ -310,20 +354,23 @@ Risks:
 - Deliberate misalignment can damage scanning and perceived polish.
 - Needs a very disciplined clean layer for cards, metrics, and numbers.
 
-### Direction B: Extreme Metal Concert
+### Direction B: Extreme Metal Formal Language
 
 ![Extreme Metal Concert direction](research/metal_hardcore_direction_extreme_metal.png)
+
+This is a study of weight, silhouette, contrast, and identity scale. Its concert
+setting is not part of the proposed fiction.
 
 Core language:
 
 - Original hostile wordmark and emblem family.
 - Black, bone, dried blood, and dark metal.
-- Album-cover drama paired with festival-bill information hierarchy.
-- Stage-light atmosphere and severe silhouette language.
+- Album-cover drama paired with severe information hierarchy.
+- Compressed atmosphere, hostile scale, and severe silhouette language.
 
 Best fit:
 
-- Title identity, chapter/faction emblems, unit portraits, arena atmosphere, bosses, victory/defeat, and merch.
+- Title identity, chapter/faction emblems, unit portraits, arena atmosphere, bosses, and victory/defeat.
 
 Risks:
 
@@ -331,27 +378,30 @@ Risks:
 - Dense logos and distressed type cannot migrate into functional UI.
 - Needs explicit separation between “identity art” and “tactical information.”
 
-### Direction C: Horror Basement Ritual
+### Direction C: War-Horror World
 
-![Horror Basement Ritual direction](research/metal_hardcore_direction_horror_basement.png)
+The previous Horror Basement Ritual specimen is rejected because it depicted a
+literal basement show, crowd, and venue. A new world-image study is required
+before this lane has an approved visual target.
 
 Core language:
 
-- A basement hardcore show curdling into a survival-horror ritual space.
-- Damp concrete, peeling photocopied flyers, stained tape, scratched acetate, ritual chalk, and damaged analog film.
-- Deep matte black, dirty bone, dried blood, bruised sickly green, and emergency red.
-- Suggestive body-horror and uncanny crowd pressure around a calm, rectangular tactical information layer.
+- An actual battlefield, besieged settlement, ruined fortress, execution ground, or other location native to Gamble Battle's fiction.
+- Ash, wet earth, scorched stone, splintered timber, worn iron, old blood, smoke, bone, and damaged masonry.
+- Visual rhythm built from compression, repeated hard masses, one rupture, and one area of silence.
+- Horror grounded in consequence, hostile scale, inhuman threat, and a world whose systems normalize brutality.
 
 Best fit:
 
-- Arena environments, enemy and boss framing, crowd-pressure states, chapter transitions, combat feedback, defeat screens, and horror-inflected shop presentation.
+- Main-menu world image, arena environments, enemy and boss framing, chapter transitions, combat feedback, defeat screens, and the fiction surrounding recruitment and economy.
 
 Risks:
 
-- Can collapse into generic Halloween, ornate Gothic fantasy, or empty gore.
+- Can collapse into generic grimdark fantasy, Halloween imagery, or empty gore.
 - Heavy distress and darkness can bury small values, silhouettes, and status changes.
 - Horror atmosphere must never make routine interactions feel audiovisually exhausting.
 - The clean tactical layer must remain visibly separate from the threatening world around it.
+- Literal music, concert, band, tour, venue, and mosh-pit props are disallowed.
 
 ## Shared Readability Standard
 
@@ -362,7 +412,7 @@ Any direction that advances should pass the following gates:
 - Do not encode player/enemy, selected/unselected, affordable/unaffordable, or enabled/disabled states by color alone.
 - Test title, unit-select, post-shop planning, active combat, compact viewport, tooltip, hover/focus/pressed, and defeat states.
 - Keep persistent animation quiet. Reserve flash, registration shift, shake, and distortion for bounded feedback.
-- Provide a reduced-motion/flash-safe interpretation of any concert-light effect.
+- Provide a reduced-motion/flash-safe interpretation of every high-impact effect.
 - Preserve the current information hierarchy: chapter, plan/combat state, board, bench, actions, economy, shop, traits/items, and metrics must remain scannable in that order.
 - Treat textures as surface seasoning. Text backgrounds, card interiors, and metric rows remain calm enough to read at a glance.
 
@@ -372,9 +422,14 @@ The strongest hypothesis to test is a hybrid, not a uniform skin:
 
 - **Direction B** supplies the game-level identity, villainous character framing, chapter art, and climactic spectacle.
 - **Direction A** supplies menus, tutorials, narrative ephemera, run history, and promotional character.
-- **Direction C** supplies environmental dread, uncanny enemy framing, crowd pressure, analog decay, and the horror vocabulary for combat peaks and failure states.
+- **Direction C** supplies the actual world: war-horror environments, oppressive scale, inhuman threat, and the consequences surrounding combat.
 
-The functional UI should use Direction A's hard rectangular structure with substantially quieter card interiors; Direction C adds horror at the edges, in transitions, and in high-intensity states rather than coating every number in distress. This combination is only a research hypothesis. The next decision should compare the three direction images at full size and choose which lane owns each visual layer before any production assets are replaced.
+The functional UI should borrow Direction A's hard rectangular structure with
+substantially quieter card interiors. Direction B contributes formal intensity,
+not a concert fiction. Direction C is the world and must work even if every
+explicit music reference is removed. The next visual study should therefore
+depict one authentic war-horror location from Gamble Battle rather than another
+music-culture metaphor.
 
 ## Reference Catalog and Tags
 

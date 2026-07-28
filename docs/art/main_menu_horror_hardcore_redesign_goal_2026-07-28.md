@@ -1,113 +1,151 @@
-# Main Menu Redesign Goal: Basement Threshold
+# Main Menu Redesign Goal: The World Is the Breakdown
 
 Date: 2026-07-28
-Status: selected direction for implementation planning
-Concept image: [Horror-hardcore main menu redesign](research/main_menu_horror_hardcore_redesign.png)
+Status: revised direction; prior Basement Threshold concept rejected
 
-## Goal
+## Core Intent
 
-Redesign Gamble Battle's title gateway so the first screen feels like the
-player is descending into a basement hardcore show that has become a hostile
-ritual. The screen should establish horror, crowd pressure, and villain-first
-stakes in one glance while keeping the three existing pieces of title-screen
-copy immediately readable:
+Gamble Battle should not depict metal culture literally. Metal and hardcore are
+the emotional and formal references: aggression, compression, rupture,
+relentless rhythm, ugliness with conviction, sudden silence before impact, and
+the feeling that violence is about to become uncontrollable.
+
+The world itself is the subject. It is a brutal war-horror reality that metal
+artists might write songs about and where a horror film could take place. The
+mosh pit is not represented as a crowd at a show; the comparison is fulfilled
+by making the battlefield itself feel like the war zone people compare a pit
+to.
+
+## Rejected Literal Translation
+
+The generated `Basement Threshold` concept is rejected. It translated the
+inspiration into a staircase, venue, crowd, performer-like villain, pasted
+flyer, and admission ticket. Those elements explain "metal concert" rather than
+making the player feel what metal feels like. The image is retained only in Git
+history as evidence of the rejected interpretation and is not an active visual
+target.
+
+The same prohibition applies across the game:
+
+- No stages, audiences, performers, microphones, amplifiers, speakers, set
+  lists, tickets, backstage passes, venue barricades, or concert lighting as
+  worldbuilding.
+- No UI metaphors that turn units into bands, battles into shows, chapters into
+  tours, or the shop into a merch table.
+- No industrial-science-fiction substitute of road cases, hazard stripes,
+  factory machinery, or cyberpunk panels.
+- No generic "metal" shortcut made from skull piles, pentagrams, unreadable
+  logos, and black-red texture without a coherent world.
+
+## Redesign Goal
+
+The title screen should be one terrible moment inside Gamble Battle's actual
+world: a place already damaged by war, cruelty, monstrous power, and
+consequence. It should feel like the held breath before a breakdown lands.
+
+The player is not entering a concert. The player is crossing into a conflict
+that has the pressure and inevitability of one.
+
+Preserve the existing title-screen copy:
 
 - `GAMBLE BATTLE`
 - `Blood. Gold. Consequence.`
 - `ENTER`
 
-Success means the menu feels specific to this game before the player presses a
-button. It must not read as ornate Gothic fantasy, industrial science fiction,
-generic Halloween art, or a distressed texture pasted over conventional UI.
+## Emotional Construction
 
-## Runtime Baseline
+Translate music into visual form rather than objects:
 
-The current 1920x1080 runtime title screen uses a centered title, subtitle, one
-wide red button, a nearly invisible circular sigil, and large areas of
-featureless black. Its hierarchy is readable, but the background does not
-communicate a place, a threat, the hardcore influence, or the social pressure
-of a mosh pit. The serif-like gold-and-red treatment also keeps the screen in
-the existing Gothic-fantasy lane.
+| Metal feeling | Visual translation |
+| --- | --- |
+| Low-tuned weight | Massive dark shapes, low horizon, compressed vertical space, heavy foreground obstruction |
+| Breakdown anticipation | A held composition with one unresolved point of impact and deliberate empty silence around it |
+| Rhythmic chug | Repeated hard silhouettes, scars, stakes, bodies, or architecture with controlled spacing |
+| Sudden impact | One violent diagonal, rupture, flare, or displaced mass that breaks the repeated structure |
+| Dissonance | Slightly wrong scale, asymmetry, damaged anatomy, impossible shadow, or architecture under stress |
+| Vocal aggression | A title mark that feels cut, struck, or forced into the frame while remaining readable |
+| Pit pressure | Units and environment closing space from several directions; no safe heroic center |
+| Brutal honesty | Dry materials, visible damage, grime, mud, ash, blood, worn iron, and no glamorous polish |
 
-## Direction Iteration
+## Main-Menu World Direction
 
-Three compositions were considered before spending the single image
-generation:
+The next concept should show a real location from the game's war-horror world,
+not an allegory for a show. Candidate situations include:
 
-1. **Occult altar:** a centered logo above a ritual object. Rejected because it
-   preserved the existing centered Gothic composition and lacked hardcore
-   specificity.
-2. **Flyer wall:** a dense collage of posters, stickers, set lists, and menu
-   scraps. Rejected because it made the first interaction noisy and risked
-   turning every surface into distressed decoration.
-3. **Basement threshold:** a calm pasted menu flyer beside a stairwell leading
-   into a threatening crowd and backlit villain. Selected because it creates a
-   clear narrative, strong depth, and one readable interaction without losing
-   the underground-show influence.
+- A churned killing field beneath a colossal ruined structure whose scale makes
+  the combatants feel trapped rather than heroic.
+- A breached fortress interior moments after something inhuman forced its way
+  through.
+- A dead settlement under siege by an unseen force, with evidence of organized
+  cruelty rather than random decay.
+- A battlefield at the instant before two masses collide, framed from inside
+  the crush instead of from a spectator's viewpoint.
+- A ritualized execution ground or military tribunal where the architecture
+  reveals how this world turns violence into law.
 
-## Selected Visual System
+The best situation will imply a larger world, an immediate threat, and a
+specific consequence without requiring lore text.
 
-- **Scene:** player viewpoint at the bottom of a damp concrete stairwell,
-  facing an open basement doorway.
-- **Threat:** the crowd forms a wall of bodies around one backlit villain
-  silhouette. Horror is suggestive, not graphic.
-- **Composition:** the calm menu occupies the left third; the doorway and crowd
-  occupy the right two-thirds. Eye path is title, doorway, then `ENTER`.
-- **Palette:** matte black, dirty bone, charcoal concrete, dried oxblood, faint
-  bruised green, and one emergency-red light.
-- **Materials:** torn photocopied paper, screen-print ink, scratched paint,
-  stained concrete, speaker cloth, handprints, cables, and restrained analog
-  film damage.
-- **Typography:** a readable hand-cut hardcore wordmark for the title,
-  condensed sans serif for the tagline, and a heavy utility sans serif for the
-  primary action.
-- **Interaction:** `ENTER` is a large admission-ticket shape with a crisp focus
-  border and chevron. It must remain obviously clickable with keyboard,
-  controller, or mouse.
+## Composition
 
-## Implementation Boundaries
+- Use asymmetry, compression, and blocked escape routes.
+- Avoid a centered hero or villain posing for the viewer.
+- Place the camera within danger: low to the ground, partially occluded, or
+  surrounded by evidence that violence has already crossed the frame.
+- Build one dominant mass, one rupture, and one area of visual silence.
+- Let the title occupy the silence as a hard graphic interruption rather than a
+  diegetic sign or poster.
+- Make `ENTER` a stark command integrated into the game UI, not a ticket,
+  plaque, prop, or location label.
 
-The concept is a visual target, not a single flattened production texture.
-Implementation should separate the environment, crowd/villain silhouette,
-red-light atmosphere, title treatment, tagline, and button into independent
-Godot layers so focus, hover, reduced motion, scaling, and localization remain
-controllable.
+## World Materials and Palette
 
-- Keep all functional text rendered by Godot.
-- Preserve a clean internal field behind the title and action.
-- Limit motion to slow light breathing, slight film weave, and distant crowd
-  movement; reduced-motion mode should retain the composition without motion.
-- Keep the villain silhouette readable at compact viewport sizes.
-- Do not add ornamental frames, medieval sigils, hazard stripes, road cases,
-  neon machinery, excessive gore, or extra readable poster copy.
-- Treat texture as atmosphere around the interaction, never as interference
-  over the interaction.
+- Ash, wet earth, scorched stone, splintered timber, worn iron, old blood,
+  butchered cloth, smoke, bone, and ruined masonry.
+- Matte black and charcoal as mass, dirty bone as information, dried oxblood as
+  consequence, and one sickly or supernatural accent tied to the world's
+  threat.
+- Lighting should behave like horror cinematography: motivated, directional,
+  obscuring, and dangerous. It should not resemble stage lighting.
+- Texture belongs to the world image. Functional UI remains clean enough to
+  scan immediately.
+
+## Interface Character
+
+The UI can inherit metal's force without pretending to be music memorabilia:
+
+- Hard rectangular information fields with severe spacing and abrupt cuts.
+- Condensed utility typography for labels and sturdy numerals for game state.
+- An original aggressive wordmark used only at identity scale.
+- Focus states that snap, strike, split, or briefly displace rather than glow
+  decoratively.
+- Motion built around tension and release: long stillness, short impact, fast
+  recovery.
+- Audio direction should eventually follow the same rule: physical pressure and
+  rhythmic consequence, not a simulated concert mix.
 
 ## Acceptance Gates
 
-- At 1920x1080 and 1280x720, the title, tagline, and focused `ENTER` action are
-  readable within two seconds.
-- The screen is identifiable as both underground hardcore and horror without
-  relying on a logo explanation.
-- The primary action remains obvious in grayscale and is not communicated by
-  red alone.
-- Keyboard/controller focus, hover, pressed, and reduced-motion states remain
-  visibly distinct.
-- The doorway, crowd, and villain create dread without hiding the menu.
-- A fresh runtime capture matches the selected composition closely enough that
-  the generated image is no longer needed to explain the direction.
+- A viewer describes a brutal horror-war world before mentioning music or a
+  concert.
+- The screen feels aggressive even if the logo and all explicit music
+  references are removed.
+- The image suggests a specific conflict, threat, or social order native to
+  Gamble Battle.
+- No stage, crowd-as-audience, performer, venue, ticket, flyer, speaker,
+  amplifier, or tour metaphor is visible.
+- The title, tagline, and focused `ENTER` action remain readable at 1920x1080
+  and 1280x720.
+- The composition feels like pressure before impact rather than a poster
+  advertising impact.
+- Horror comes from place, consequence, scale, and implication—not Halloween
+  props or gore quantity.
+- Metal comes from rhythm, weight, rupture, and attitude—not literal
+  iconography.
 
-## Confidence
+## Working Summary
 
-High. The selected image has a specific location, a clear player decision, a
-strong villain-first focal point, and a restrained UI surface. It carries the
-horror influence in the world rather than sacrificing usability, and it moves
-decisively away from both the rejected industrial lane and the current ornate
-Gothic treatment.
+The creative rule is:
 
-An independent clean-context visual review passed the concept direction. The
-review specifically confirmed the readable title, exact tagline, oversized
-ticket action, basement-show narrative, and restrained red horror lighting.
-Implementation must preserve doorway silhouette separation at 720p, add an
-explicit default-focus treatment to `ENTER`, and localize ambient motion to the
-ticket, lamp, and distant crowd.
+> Do not put metal culture into the world. Build the kind of world that makes
+> metal feel like the natural way to describe it.
