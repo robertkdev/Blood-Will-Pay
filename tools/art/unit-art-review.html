@@ -1100,7 +1100,7 @@
 			{ unit: "veyra", role: "Tank", status: "Reapproval pending", version: "P2-03", title: "Cocoon Core / Repaired Reapproval Cut", current: true, path: "units/veyra.png" },
 			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/cashmere/p2-01.png" },
 			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/cashmere/p2-02.png" },
-			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-03", title: "Repaired Reapproval Cut", current: true, path: "units/cashmere.png" },
+			{ unit: "mara", role: "Mage", status: "Superseded identity archive", version: "P2-03", title: "Legacy Reapproval Cut", path: "units/cashmere.png" },
 			{ unit: "pilfer", role: "Assassin", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/pilfer/p2-01.png" },
 			{ unit: "pilfer", role: "Assassin", status: "Reinspection pending", version: "P2-02", title: "Board-Era Revision", current: true, path: "units/pilfer.png" },
 			{ unit: "nyxa", role: "Marksman", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/nyxa/p2-01.png" },
@@ -1152,12 +1152,18 @@
 			sourceUnit: [item.source_unit, ...(HISTORY_SEARCH_ALIASES[normalizeUnitId(item.unit)] || [])].join(" "),
 			kind: item.kind || "history",
 			note: item.label || "Historical art",
+			role: item.role || "",
 			status: item.status || "",
 			version: item.version || "",
+			title: item.label || "",
+			current: Boolean(item.current),
 			contentKey: item.content_key || "",
 			path: item.path,
 			src: item.local_path ? encodeURI("./" + item.local_path) : encodeURI(LOCAL_PROJECT_ASSET_ROOT + item.path)
 		}));
+		const CANONICAL_CURRENT = new Map(
+			HISTORICAL_ART.filter((item) => item.current).map((item) => [normalizeUnitId(item.unit), item])
+		);
 		const ALL_UNIT_ART = [];
 		const LIVE_UNIT_CURRENT = new Map();
 		LIVE_ART.forEach((item) => {
@@ -1168,7 +1174,7 @@
 			}
 		});
 		LIVE_UNIT_CURRENT.forEach((item, unit) => {
-			ALL_UNIT_ART.push(PHASE2_CURRENT.get(unit) || item);
+			ALL_UNIT_ART.push(CANONICAL_CURRENT.get(unit) || PHASE2_CURRENT.get(unit) || item);
 		});
 
 		const ART_SETS = {

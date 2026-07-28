@@ -199,10 +199,13 @@ window.GAMBLE_BATTLE_UNIT_ART_HISTORY = {
 		{
 			unit: "mara",
 			source_unit: "mara",
-			kind: "phase 3 concept",
-			version: "Possession tableau",
-			label: "Mara possession tableau working direction",
-			status: "Phase 3 working direction",
+			kind: "canonical identity",
+			role: "Mage",
+			version: "Current identity",
+			label: "Mara possession tableau",
+			status: "User-confirmed Mara identity",
+			current: true,
+			content_key: "canonical:mara",
 			local_path: "history/mara-possession-tableau.png",
 			path: "assets/concepts/phase3_redesign/mara/mara_possession_tableau_working_direction.png"
 		},
