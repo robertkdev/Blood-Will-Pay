@@ -1,11 +1,23 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const TEST_SETTINGS_PATH: String = "user://title_menu_smoke_settings.cfg"
+const VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
 
 func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	DisplayServer.window_set_size(VIEWPORT_SIZE)
+	var window: Window = get_window()
+	if window != null:
+		window.size = VIEWPORT_SIZE
+		window.content_scale_size = VIEWPORT_SIZE
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	UserSettingsScript.set_ui_scale(1.0, window)
+	UserSettingsScript.set_reduced_motion(false)
 	var main: Control = MAIN_SCENE.instantiate()
 	add_child(main)
 	await get_tree().process_frame
@@ -99,6 +111,19 @@ func _run() -> void:
 			search_field.emit_signal("text_changed", "contract")
 			await get_tree().process_frame
 			_expect(_find_label_containing_text(title_menu, "PRICE, REWARD, RISK, and NEXT FIGHT") != null, "Tutorial should explain chapter-contract decision fields", failures)
+			search_field.text = "board slots"
+			search_field.emit_signal("text_changed", "board slots")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "add board slots") != null, "Tutorial should explain that Buy XP adds board slots", failures)
+			var content_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer
+			if content_scroll != null and units_button != null:
+				content_scroll.scroll_vertical = 400
+				units_button.emit_signal("pressed")
+				await get_tree().process_frame
+				how_to_play_button.emit_signal("pressed")
+				await get_tree().process_frame
+				await get_tree().process_frame
+				_expect(content_scroll.scroll_vertical == 0, "How to Play should reopen at the beginning", failures)
 			_expect_content_panels_generated(title_menu, "How To Play cards should use generated texture styling", failures)
 		if settings_button != null:
 			settings_button.emit_signal("pressed")
@@ -115,15 +140,21 @@ func _run() -> void:
 			var cancel_binding: Button = title_menu.find_child("Binding_ui_cancel", true, false) as Button
 			var reset_bindings: Button = title_menu.find_child("ResetBindingsButton", true, false) as Button
 			_expect(fullscreen_check != null, "FullscreenCheck missing", failures)
-			_expect(motion_check == null, "ReducedMotionCheck should be removed from settings", failures)
+			_expect(motion_check != null, "Settings should expose Reduced Motion", failures)
 			_expect(ui_scale_option != null and ui_scale_option.item_count == 3, "Settings should expose three supported UI scales", failures)
 			_expect(accept_binding != null, "Settings should expose Confirm remapping", failures)
 			_expect(cancel_binding != null, "Settings should expose Menu / Back remapping", failures)
 			_expect(reset_bindings != null, "Settings should expose binding reset", failures)
 			_expect_button_states(fullscreen_check, "FullscreenCheck", failures)
+			_expect_button_states(motion_check, "ReducedMotionCheck", failures)
 		var start_button: Button = title_menu.get_node_or_null("Center/VBox/StartButton") as Button
 		_expect(start_button != null, "StartButton missing", failures)
 		if start_button != null:
+			var stateful_start_copy: String = String(start_button.text)
+			start_button.text = "New Run"
+			title_menu.call("_build_navigation")
+			_expect(String(start_button.text) == "New Run", "Title menu navigation rebuild should preserve the save-aware New Run label", failures)
+			start_button.text = stateful_start_copy
 			_expect(start_button.custom_minimum_size.x >= 300.0, "StartButton is not visually prioritized", failures)
 			var start_style: StyleBox = start_button.get_theme_stylebox("normal")
 			_expect(start_style is StyleBoxTexture, "Title StartButton should use the generated primary button asset", failures)

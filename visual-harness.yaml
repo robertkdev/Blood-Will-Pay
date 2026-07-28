@@ -24,6 +24,29 @@ scenarios:
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 1
     telegram_context: "Gamble Battle Godot visibility"
+  - id: phase5-player-clarity
+    title: Player-facing clarity and accessibility gate
+    adapter: godot
+    objective: Verify tutorial terminology and readability, 150 percent accessibility layout, visible wager outcomes, and inset combat bounds in the real Godot runtime at both supported review sizes.
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Capture-Phase5ClarityEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/phase5_clarity/captures.json"
+    required_groups: [tutorial, accessibility, wager, combat]
+    runtime_provenance:
+      entrypoint: "Godot editor game framebuffer"
+      scene: "Phase 5 state-specific capture scenes"
+      build: "current task worktree"
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [tutorial, settings, wager, combat]
+      required_viewports: [desktop-1920x1080, compact-1280x720]
+      required_events: [tutorial, settings, wager, combat]
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 300
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 2
+    telegram_context: "Gamble Battle Phase 5 clarity"
   - id: encounter-escalation
     title: Boss escalation runtime sequence
     adapter: godot

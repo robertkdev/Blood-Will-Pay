@@ -116,7 +116,7 @@ func _ensure_preview_panel() -> void:
 	if selected_label == null:
 		selected_label = Label.new()
 		selected_label.name = "SelectedLabel"
-		selected_label.text = "No champion chosen"
+		selected_label.text = "No starter chosen"
 		preview.add_child(selected_label)
 	_ensure_identity_panel(preview)
 	var art_wrap: CenterContainer = preview.get_node_or_null("ArtWrap") as CenterContainer
@@ -607,7 +607,7 @@ func _clear_hover_for_scroll() -> void:
 
 func _clear_preview() -> void:
 	if selected_label:
-		selected_label.text = "No champion chosen"
+		selected_label.text = "No starter chosen"
 	if preview_art:
 		preview_art.texture = null
 	_clear_identity_panel()

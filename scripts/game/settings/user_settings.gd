@@ -5,7 +5,9 @@ const DEFAULT_SETTINGS_PATH: String = "user://settings.cfg"
 const SECTION_ACCESSIBILITY: String = "accessibility"
 const SECTION_INPUT: String = "input"
 const KEY_UI_SCALE: String = "ui_scale"
+const KEY_REDUCED_MOTION: String = "reduced_motion"
 const DEFAULT_UI_SCALE: float = 1.0
+const DEFAULT_REDUCED_MOTION: bool = false
 const MIN_UI_SCALE: float = 1.0
 const MAX_UI_SCALE: float = 1.5
 const REMAPPABLE_ACTIONS: Array[StringName] = [&"ui_accept", &"ui_cancel"]
@@ -13,6 +15,7 @@ const REMAPPABLE_ACTIONS: Array[StringName] = [&"ui_accept", &"ui_cancel"]
 static var _settings_path: String = DEFAULT_SETTINGS_PATH
 static var _loaded: bool = false
 static var _ui_scale: float = DEFAULT_UI_SCALE
+static var _reduced_motion: bool = DEFAULT_REDUCED_MOTION
 
 static func initialize(window: Window, settings_path: String = "") -> void:
 	if not settings_path.is_empty() and settings_path != _settings_path:
@@ -26,6 +29,7 @@ static func configure_storage_path(settings_path: String) -> void:
 	_settings_path = settings_path if not settings_path.is_empty() else DEFAULT_SETTINGS_PATH
 	_loaded = false
 	_ui_scale = DEFAULT_UI_SCALE
+	_reduced_motion = DEFAULT_REDUCED_MOTION
 
 static func get_ui_scale() -> float:
 	_ensure_loaded()
@@ -35,6 +39,15 @@ static func set_ui_scale(value: float, window: Window) -> Error:
 	_ensure_loaded()
 	_ui_scale = clampf(value, MIN_UI_SCALE, MAX_UI_SCALE)
 	_apply_ui_scale(window)
+	return _save()
+
+static func get_reduced_motion() -> bool:
+	_ensure_loaded()
+	return _reduced_motion
+
+static func set_reduced_motion(enabled: bool) -> Error:
+	_ensure_loaded()
+	_reduced_motion = enabled
 	return _save()
 
 static func get_keyboard_binding(action: StringName) -> InputEventKey:
@@ -82,11 +95,13 @@ static func _ensure_loaded() -> void:
 static func _load() -> void:
 	_loaded = true
 	_ui_scale = DEFAULT_UI_SCALE
+	_reduced_motion = DEFAULT_REDUCED_MOTION
 	var config: ConfigFile = ConfigFile.new()
 	var load_error: Error = config.load(_settings_path)
 	if load_error != OK and load_error != ERR_FILE_NOT_FOUND:
 		push_warning("UserSettings: failed to load %s error=%d" % [_settings_path, int(load_error)])
 	_ui_scale = clampf(float(config.get_value(SECTION_ACCESSIBILITY, KEY_UI_SCALE, DEFAULT_UI_SCALE)), MIN_UI_SCALE, MAX_UI_SCALE)
+	_reduced_motion = bool(config.get_value(SECTION_ACCESSIBILITY, KEY_REDUCED_MOTION, DEFAULT_REDUCED_MOTION))
 	for action: StringName in REMAPPABLE_ACTIONS:
 		if not config.has_section_key(SECTION_INPUT, String(action)):
 			continue
@@ -99,6 +114,7 @@ static func _load() -> void:
 static func _save() -> Error:
 	var config: ConfigFile = ConfigFile.new()
 	config.set_value(SECTION_ACCESSIBILITY, KEY_UI_SCALE, _ui_scale)
+	config.set_value(SECTION_ACCESSIBILITY, KEY_REDUCED_MOTION, _reduced_motion)
 	for action: StringName in REMAPPABLE_ACTIONS:
 		var key_event: InputEventKey = get_keyboard_binding(action)
 		if key_event != null:

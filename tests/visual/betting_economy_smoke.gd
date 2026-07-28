@@ -2,17 +2,26 @@ extends "res://tests/visual/actual_run_loop_smoke.gd"
 
 const SMOKE_NAME: String = "BettingEconomySmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/betting_economy_pass"
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const CLARITY_CAPTURE_SETTINGS_PATH: String = "user://phase5_clarity_capture_settings.cfg"
+
+@export var viewport_size: Vector2i = Vector2i(1920, 1080)
+@export_enum("none", "planning", "combat") var capture_hold_state: String = "none"
+@export var capture_output_dir: String = OUTPUT_DIR
+@export var capture_clarity_states: bool = false
 
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	DisplayServer.window_set_size(viewport_size)
 	var window: Window = get_window()
 	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
+		window.size = viewport_size
+		window.content_scale_size = viewport_size
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
 	Engine.time_scale = 1.0
+	if capture_clarity_states:
+		await _capture_clarity_title_states()
 
 	_verify_direct_economy_contract()
 	if _finish_if_failed():
@@ -54,9 +63,60 @@ func _run() -> void:
 	await _verify_post_shop_bet_controls()
 	if _finish_if_failed():
 		return
+	if capture_hold_state == "planning":
+		Engine.time_scale = 1.0
+		print("BettingEconomySmoke: CAPTURE_READY planning %dx%d" % [viewport_size.x, viewport_size.y])
+		await get_tree().create_timer(90.0).timeout
+		_finish()
+		return
 
 	await _start_and_verify_locked_max_bet()
+	if capture_hold_state == "combat":
+		Engine.time_scale = 1.0
+		print("BettingEconomySmoke: CAPTURE_READY combat %dx%d" % [viewport_size.x, viewport_size.y])
+		await get_tree().create_timer(90.0).timeout
 	_finish()
+
+func _capture_clarity_title_states() -> void:
+	var window: Window = get_window()
+	UserSettingsScript.configure_storage_path(CLARITY_CAPTURE_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	UserSettingsScript.set_ui_scale(1.0, window)
+	UserSettingsScript.set_reduced_motion(true)
+
+	var preview_main: Control = MAIN_SCENE.instantiate() as Control
+	preview_main.set_anchors_preset(Control.PRESET_FULL_RECT)
+	get_tree().root.add_child(preview_main)
+	await _settle_frames(8)
+	var enter_button: Button = preview_main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
+	if enter_button != null:
+		enter_button.pressed.emit()
+	await _settle_frames(8)
+	var title_menu: Control = preview_main.get_node_or_null("TitleMenu") as Control
+	if title_menu != null:
+		title_menu.call("_select_section", "how_to_play", true)
+	await _settle_frames(8)
+	_save_capture("00_tutorial.png")
+
+	UserSettingsScript.set_ui_scale(1.5, window)
+	UserSettingsScript.set_reduced_motion(true)
+	if title_menu != null:
+		title_menu.call_deferred("_refresh_scaled_layout")
+	await _settle_frames(12)
+	if title_menu != null:
+		title_menu.call("_select_section", "settings", true)
+	await _settle_frames(8)
+	_save_capture("00_settings_150_percent.png")
+
+	if preview_main.has_method("_reset_run_state"):
+		preview_main.call("_reset_run_state")
+	var preview_parent: Node = preview_main.get_parent()
+	if preview_parent != null:
+		preview_parent.remove_child(preview_main)
+	preview_main.free()
+	await _settle_frames(6)
+	UserSettingsScript.set_ui_scale(1.0, window)
+	UserSettingsScript.set_reduced_motion(false)
 
 func _uses_manual_opening_continue() -> bool:
 	return true
@@ -111,9 +171,13 @@ func _verify_post_shop_bet_controls() -> void:
 	var slider: HSlider = _bet_slider()
 	var value_label: Label = _bet_value_label()
 	var label: Label = _bet_static_label()
+	var all_in_button: Button = _main.find_child("AllInButton", true, false) as Button if _main != null else null
+	var wager_summary: Label = _main.find_child("WagerSummary", true, false) as Label if _main != null else null
 	_expect(slider != null, "post-shop BetSlider missing")
 	_expect(value_label != null, "post-shop BetValue missing")
 	_expect(label != null, "post-shop BetLabel missing")
+	_expect(all_in_button != null, "post-shop All In button missing")
+	_expect(wager_summary != null, "post-shop wager summary missing")
 	if slider == null or value_label == null:
 		return
 	var gold: int = int(Economy.gold)
@@ -123,13 +187,41 @@ func _verify_post_shop_bet_controls() -> void:
 	_expect(label == null or label.visible, "post-shop Bet label should be visible")
 	_expect(int(slider.min_value) == 1, "post-shop bet slider min should be 1")
 	_expect(int(slider.max_value) == gold, "post-shop bet slider max should equal current gold")
+	_expect(is_equal_approx(slider.step, 1.0), "post-shop bet slider should move in whole-gold steps")
 	var max_bet: int = int(slider.max_value)
-	slider.value = max_bet
+	if all_in_button != null:
+		all_in_button.emit_signal("pressed")
 	await _settle_frames(12)
+	_expect(int(slider.value) == max_bet, "All In should select the maximum wager")
 	_expect(int(Economy.current_bet) == max_bet, "max-bet slider should update Economy.current_bet")
 	_expect(int(Economy.preferred_bet) == max_bet, "max-bet slider should update Economy.preferred_bet")
 	_expect(String(value_label.text) == str(max_bet), "max-bet slider should repaint BetValue to %d, got %s" % [max_bet, String(value_label.text)])
+	if wager_summary != null:
+		var summary_copy: String = String(wager_summary.text)
+		_expect(summary_copy.contains("Wager %dg" % max_bet), "wager summary should show selected wager: %s" % summary_copy)
+		_expect(summary_copy.contains("Win ") and summary_copy.contains("Gross "), "wager summary should show odds and gross return: %s" % summary_copy)
+		_expect(summary_copy.contains("After win ") and summary_copy.contains("After loss "), "wager summary should show both bankroll outcomes: %s" % summary_copy)
+	var bottom_storage: Control = _main.find_child("BottomStorageArea", true, false) as Control if _main != null else null
+	var shop_grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer if _main != null else null
+	_expect_control_inside_viewport(bottom_storage, "post-shop footer")
+	_expect_control_inside_viewport(shop_grid, "post-shop grid")
+	if shop_grid != null:
+		for child: Node in shop_grid.get_children():
+			var card: Control = child as Control
+			if card != null and card.visible:
+				_expect_control_inside_viewport(card, "post-shop card %s" % String(card.name))
 	_save_capture("02_post_shop_max_bet_selected.png")
+
+func _expect_control_inside_viewport(control: Control, label: String) -> void:
+	_expect(control != null, "%s missing" % label)
+	if control == null:
+		return
+	var rect: Rect2 = control.get_global_rect()
+	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	_expect(rect.position.x >= viewport_rect.position.x - 1.0, "%s left edge escaped viewport: %s" % [label, str(rect)])
+	_expect(rect.position.y >= viewport_rect.position.y - 1.0, "%s top edge escaped viewport: %s" % [label, str(rect)])
+	_expect(rect.end.x <= viewport_rect.end.x + 1.0, "%s right edge escaped viewport: %s" % [label, str(rect)])
+	_expect(rect.end.y <= viewport_rect.end.y + 1.0, "%s bottom edge escaped viewport: %s viewport=%s" % [label, str(rect), str(viewport_rect)])
 
 func _start_and_verify_locked_max_bet() -> void:
 	var slider: HSlider = _bet_slider()
@@ -154,6 +246,8 @@ func _start_and_verify_locked_max_bet() -> void:
 	_expect(not slider.visible, "bet slider should hide while combat is active")
 	_expect(not slider.editable, "bet slider should lock while combat is active")
 	_expect(String(value_label.text) == "Bet: %d (locked)" % selected_bet, "combat should show locked bet copy, got %s" % String(value_label.text))
+	var wager_summary: Label = _main.find_child("WagerSummary", true, false) as Label if _main != null else null
+	_expect(wager_summary != null and String(wager_summary.text).contains("locked"), "combat should show visibly locked wager summary")
 	var ignored_ok: bool = Economy.set_bet(1)
 	_expect(ignored_ok, "set_bet during Main-scene combat should report existing positive wager")
 	_expect(int(Economy.current_bet) == selected_bet, "set_bet during Main-scene combat should not change wager")
@@ -175,7 +269,7 @@ func _save_capture(filename: String) -> void:
 	if _is_framebuffer_unavailable():
 		print("%s: skipped %s because framebuffer capture is unavailable" % [SMOKE_NAME, filename])
 		return
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(capture_output_dir))
 	var texture: ViewportTexture = get_viewport().get_texture()
 	if texture == null or not texture.get_rid().is_valid():
 		push_error("%s: skipped %s; viewport texture unavailable" % [SMOKE_NAME, filename])
@@ -184,7 +278,7 @@ func _save_capture(filename: String) -> void:
 	if image == null or image.is_empty():
 		push_error("%s: skipped %s; viewport image unavailable" % [SMOKE_NAME, filename])
 		return
-	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
+	var path: String = "%s/%s" % [capture_output_dir, filename]
 	var error: Error = image.save_png(path)
 	if error != OK:
 		push_error("%s: failed to save %s error=%s" % [SMOKE_NAME, ProjectSettings.globalize_path(path), str(int(error))])

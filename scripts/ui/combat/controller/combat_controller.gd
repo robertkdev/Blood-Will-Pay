@@ -89,6 +89,8 @@ var menu_button: Button
 var gold_label: Label
 var bet_slider: HSlider
 var bet_value: Label
+var all_in_button: Button
+var wager_summary: Label
 var stats_panel: Control
 var board_status_row: HBoxContainer
 var board_timer_label: Label
@@ -201,6 +203,8 @@ func configure(_parent: Control, _manager: CombatManager, nodes: Dictionary) -> 
 	gold_label = nodes.get("gold_label")
 	bet_slider = nodes.get("bet_slider")
 	bet_value = nodes.get("bet_value")
+	all_in_button = nodes.get("all_in_button")
+	wager_summary = nodes.get("wager_summary")
 	stats_panel = nodes.get("stats_panel")
 
 func _shop_singleton() -> Node:
@@ -473,7 +477,7 @@ func initialize() -> void:
 
 	# Economy UI
 	economy_ui = EconomyUI.new()
-	economy_ui.configure(gold_label, bet_slider, bet_value, parent)
+	economy_ui.configure(gold_label, bet_slider, bet_value, all_in_button, wager_summary, parent)
 	if bet_slider and not bet_slider.is_connected("value_changed", Callable(self, "_on_bet_changed")):
 		bet_slider.value_changed.connect(_on_bet_changed)
 
@@ -755,6 +759,8 @@ func _update_board_status() -> void:
 					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
 			win_odds_label.text = "Win Odds %d%%" % odds
 			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f. Quote: %dg -> %dg gross (%.2fx)." % [player_rating, enemy_rating, quoted_bet, quoted_payout, gross_multiplier]
+	if economy_ui != null:
+		economy_ui.refresh()
 	_sync_contract_market_overlay()
 	_queue_active_run_save()
 
@@ -875,7 +881,7 @@ func _init_game() -> void:
 	if manager:
 		manager.stage = 1
 		_on_log_line("Gamble Battle")
-		# Build preview after state set so it reflects Chapter 1 — Stage 1
+		# Build preview after state set so it reflects Chapter 1 — Round 1
 		manager.setup_stage_preview()
 		# Update label to reflect preview stage
 		_update_stage_label()
@@ -1118,7 +1124,7 @@ func _on_continue_pressed() -> void:
 				var idx2: int = ev.tile_idx
 				var pos2: Vector2 = enemy_grid_helper.get_center(idx2) if enemy_grid_helper and idx2 >= 0 else Vector2.ZERO
 				epos.append(pos2)
-			var bounds: Rect2 = arena_bridge.get_arena_bounds()
+			var bounds: Rect2 = arena_bridge.get_engine_arena_bounds()
 			if bounds.size.y <= 1.0 or bounds.size.x <= 1.0:
 				var all_pts: Array[Vector2] = []
 				for v in ppos: if typeof(v) == TYPE_VECTOR2: all_pts.append(v)

@@ -5,6 +5,7 @@ const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const PLAYER_TEAM: Array[String] = ["mortem", "berebell", "bonko"]
 const VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
+const COMPACT_VIEWPORT_SIZE: Vector2i = Vector2i(1280, 720)
 
 var _main: Control = null
 var _view: Control = null
@@ -89,13 +90,33 @@ func _run() -> void:
 	_expect(combat_stats_rect.size.distance_to(stats_rect_before.size) <= 3.0, "combat reflow should preserve metrics size")
 	_expect(_rect_inside(arena_rect, viewport_rect.grow(3.0)), "combat arena should remain inside the viewport arena=%s viewport=%s" % [str(arena_rect), str(viewport_rect)])
 	_expect(_rect_inside(engine_bounds, arena_rect.grow(3.0)), "engine arena bounds should stay inside the live arena rect engine=%s board=%s arena=%s" % [str(engine_bounds), str(combat_board_rect), str(arena_rect)])
+	_expect(engine_bounds.position.x >= arena_rect.position.x + 51.0, "engine bounds should reserve the actor footprint on the left")
+	_expect(engine_bounds.position.y >= arena_rect.position.y + 65.0, "engine bounds should reserve health-bar space above actors")
+	_expect(engine_bounds.end.x <= arena_rect.end.x - 51.0, "engine bounds should reserve the actor footprint on the right")
+	_expect(engine_bounds.end.y <= arena_rect.end.y - 51.0, "engine bounds should reserve the actor footprint below")
 	_expect(not arena_rect.intersects(combat_stats_rect), "arena container should not overlap live team metrics area arena=%s stats=%s" % [str(arena_rect), str(combat_stats_rect)])
 	for child: Node in arena_units.get_children():
 		var control: Control = child as Control
 		if control == null or not control.visible:
 			continue
-		var center: Vector2 = control.get_global_rect().get_center()
-		_expect(arena_rect.grow(24.0).has_point(center), "arena actor center outside live arena rect: %s" % str(center))
+		_expect(_rect_inside(control.get_global_rect(), arena_rect.grow(1.0)), "arena actor body should stay inside the live arena rect: %s" % str(control.get_global_rect()))
+		for plate_name: String in ["BarPlate", "FocusPlate"]:
+			var plate: Control = control.find_child(plate_name, true, false) as Control
+			if plate != null and plate.visible:
+				_expect(_rect_inside(plate.get_global_rect(), arena_rect.grow(1.0)), "%s should stay inside the live arena rect: %s" % [plate_name, str(plate.get_global_rect())])
+
+	_viewport.size = COMPACT_VIEWPORT_SIZE
+	await _settle_frames(30)
+	var compact_arena_rect: Rect2 = arena_container.get_global_rect()
+	var compact_engine_bounds: Rect2 = _manager.get_arena_bounds()
+	var compact_viewport_rect: Rect2 = _view.get_viewport().get_visible_rect()
+	_expect(Vector2i(compact_viewport_rect.size) == COMPACT_VIEWPORT_SIZE, "combat viewport should resize to 1280x720, got=%s" % str(compact_viewport_rect.size))
+	_expect(_rect_inside(compact_arena_rect, compact_viewport_rect.grow(3.0)), "compact combat arena should remain inside the viewport")
+	_expect(_rect_inside(compact_engine_bounds, compact_arena_rect.grow(3.0)), "compact engine bounds should stay inside the live arena")
+	_expect(compact_engine_bounds.position.x >= compact_arena_rect.position.x + 51.0, "compact engine bounds should reserve the actor footprint on the left")
+	_expect(compact_engine_bounds.position.y >= compact_arena_rect.position.y + 65.0, "compact engine bounds should reserve health-bar space above actors")
+	_expect(compact_engine_bounds.end.x <= compact_arena_rect.end.x - 51.0, "compact engine bounds should reserve the actor footprint on the right")
+	_expect(compact_engine_bounds.end.y <= compact_arena_rect.end.y - 51.0, "compact engine bounds should reserve the actor footprint below")
 	await _finish()
 
 func _rect_close(a: Rect2, b: Rect2, tolerance: float) -> bool:

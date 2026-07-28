@@ -39,8 +39,16 @@ def _parse_args() -> argparse.Namespace:
         default="game",
     )
     parser.add_argument("--max-resolution", type=int, default=0)
+    parser.add_argument("--expected-width", type=int, default=0)
+    parser.add_argument("--expected-height", type=int, default=0)
+    parser.add_argument(
+        "--force-relaunch",
+        action="store_true",
+        help="Stop an existing game before running the requested entrypoint.",
+    )
     parser.add_argument("--wait-seconds", type=float, default=20.0)
     parser.add_argument("--visual-wait-seconds", type=float, default=15.0)
+    parser.add_argument("--settle-seconds", type=float, default=0.0)
     parser.add_argument("--connection-attempts", type=int, default=3)
     return parser.parse_args()
 
@@ -343,6 +351,8 @@ async def _capture_visible_frame(
     source: str,
     max_resolution: int,
     wait_seconds: float,
+    expected_width: int = 0,
+    expected_height: int = 0,
 ) -> tuple[Any, bytes, dict[str, Any], int]:
     deadline: float = asyncio.get_running_loop().time() + max(wait_seconds, 0.5)
     last_metrics: dict[str, Any] = {}
@@ -371,11 +381,19 @@ async def _capture_visible_frame(
             )
         image_bytes: bytes = base64.b64decode(image_items[0].data)
         last_metrics = _png_visual_metrics(image_bytes)
-        if bool(last_metrics["nonblank"]):
+        dimensions_match: bool = (
+            expected_width <= 0
+            or expected_height <= 0
+            or (
+                int(last_metrics["width"]) == expected_width
+                and int(last_metrics["height"]) == expected_height
+            )
+        )
+        if bool(last_metrics["nonblank"]) and dimensions_match:
             return image_items[0], image_bytes, last_metrics, attempts
         await asyncio.sleep(0.5)
     raise TimeoutError(
-        "Godot framebuffer remained visually blank after "
+        "Godot framebuffer remained blank or at the wrong dimensions after "
         f"{wait_seconds:.1f}s and {attempts} capture attempts: "
         f"{json.dumps(last_metrics)}"
     )
@@ -384,6 +402,12 @@ async def _capture_visible_frame(
 async def _capture(args: argparse.Namespace) -> dict[str, Any]:
     if args.run == "custom" and not args.scene:
         raise ValueError("--scene is required when --run custom is selected")
+    has_width: bool = args.expected_width > 0
+    has_height: bool = args.expected_height > 0
+    if has_width != has_height:
+        raise ValueError(
+            "--expected-width and --expected-height must be provided together"
+        )
 
     output_path: Path = Path(args.output).expanduser().resolve()
     async with streamablehttp_client(args.url) as (read_stream, write_stream, _):
@@ -405,6 +429,22 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 await _call(session, "editor_state", {"session_id": session_id})
             )
             game_active: bool = _game_is_active(initial_state)
+            if args.run != "none" and game_active and args.force_relaunch:
+                await _call(
+                    session,
+                    "project_manage",
+                    {
+                        "op": "stop",
+                        "params": {},
+                        "session_id": session_id,
+                    },
+                )
+                await _wait_for_editor_ready(
+                    session,
+                    session_id,
+                    args.wait_seconds,
+                )
+                game_active = False
             if args.run != "none" and not game_active:
                 await _wait_for_editor_ready(
                     session,
@@ -419,6 +459,10 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 if args.run == "custom":
                     run_arguments["scene"] = args.scene
                 await _call(session, "project_run", run_arguments)
+                # A completed launch consumes the relaunch request. If a later
+                # screenshot call fails, connection retries must not cycle the
+                # task editor through another stop/start sequence.
+                args.force_relaunch = False
             elif args.source == "game" and not game_active:
                 raise RuntimeError(
                     "No live game is available. Pass --run main/current/custom, "
@@ -431,6 +475,8 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 args.source,
                 args.wait_seconds,
             )
+            if args.settle_seconds > 0.0:
+                await asyncio.sleep(args.settle_seconds)
             (
                 image_item,
                 image_bytes,
@@ -442,7 +488,18 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 args.source,
                 args.max_resolution,
                 args.visual_wait_seconds,
+                args.expected_width,
+                args.expected_height,
             )
+            if has_width and (
+                int(visual_metrics["width"]) != args.expected_width
+                or int(visual_metrics["height"]) != args.expected_height
+            ):
+                raise RuntimeError(
+                    "Godot framebuffer dimensions did not match the expected "
+                    f"viewport {args.expected_width}x{args.expected_height}: "
+                    f"{json.dumps(visual_metrics)}"
+                )
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_bytes)
             return {
@@ -454,6 +511,7 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 "session_id": session_id,
                 "project_path": str(selected.get("project_path", "")),
                 "source": args.source,
+                "settle_seconds": args.settle_seconds,
                 "capture_attempts": capture_attempts,
                 "visual_metrics": visual_metrics,
                 "game_status": ready_state.get("game_status", {}),

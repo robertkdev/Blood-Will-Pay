@@ -18,11 +18,22 @@ param(
     [ValidateRange(0, 8192)]
     [int] $MaxResolution = 0,
 
+    [ValidateRange(0, 8192)]
+    [int] $ExpectedWidth = 0,
+
+    [ValidateRange(0, 8192)]
+    [int] $ExpectedHeight = 0,
+
+    [switch] $ForceRelaunch,
+
     [ValidateRange(1, 120)]
     [int] $WaitSeconds = 20,
 
     [ValidateRange(1, 120)]
     [int] $VisualWaitSeconds = 15,
+
+    [ValidateRange(0, 120)]
+    [double] $SettleSeconds = 0,
 
     [ValidateRange(1, 10)]
     [int] $ConnectionAttempts = 3,
@@ -65,8 +76,11 @@ $clientArguments = @(
     "--run", $Run,
     "--source", $Source,
     "--max-resolution", $MaxResolution.ToString(),
+    "--expected-width", $ExpectedWidth.ToString(),
+    "--expected-height", $ExpectedHeight.ToString(),
     "--wait-seconds", $WaitSeconds.ToString(),
     "--visual-wait-seconds", $VisualWaitSeconds.ToString(),
+    "--settle-seconds", $SettleSeconds.ToString([System.Globalization.CultureInfo]::InvariantCulture),
     "--connection-attempts", $ConnectionAttempts.ToString()
 )
 if (-not [string]::IsNullOrWhiteSpace($SessionHint)) {
@@ -74,6 +88,9 @@ if (-not [string]::IsNullOrWhiteSpace($SessionHint)) {
 }
 if (-not [string]::IsNullOrWhiteSpace($Scene)) {
     $clientArguments += @("--scene", $Scene)
+}
+if ($ForceRelaunch) {
+    $clientArguments += "--force-relaunch"
 }
 
 & $pythonPath @clientArguments

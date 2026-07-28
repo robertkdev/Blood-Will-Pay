@@ -5,9 +5,12 @@ const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const TEST_SETTINGS_PATH: String = "user://accessibility_settings_smoke.cfg"
 
+@export var viewport_size: Vector2i = Vector2i(1280, 720)
+
 var _main: Control = null
 var _failures: Array[String] = []
 var _original_scale: float = 1.0
+var _original_window_size: Vector2i = Vector2i.ZERO
 var _original_accept_events: Array[InputEvent] = []
 var _original_cancel_events: Array[InputEvent] = []
 
@@ -17,6 +20,11 @@ func _ready() -> void:
 func _run() -> void:
 	var window: Window = get_window()
 	_original_scale = window.content_scale_factor if window != null else 1.0
+	_original_window_size = window.size if window != null else Vector2i.ZERO
+	DisplayServer.window_set_size(viewport_size)
+	if window != null:
+		window.size = viewport_size
+		window.content_scale_size = viewport_size
 	_original_accept_events = _copy_events(&"ui_accept")
 	_original_cancel_events = _copy_events(&"ui_cancel")
 	_remove_test_settings()
@@ -42,10 +50,12 @@ func _run() -> void:
 	await _settle_frames(3)
 
 	var scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+	var motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	var accept_button: Button = title_menu.find_child("Binding_ui_accept", true, false) as Button if title_menu != null else null
 	var cancel_button: Button = title_menu.find_child("Binding_ui_cancel", true, false) as Button if title_menu != null else null
 	var reset_button: Button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
 	_expect(scale_option != null, "UI scale option missing")
+	_expect(motion_check != null, "Reduced Motion option missing")
 	_expect(accept_button != null, "Confirm binding button missing")
 	_expect(cancel_button != null, "Menu / Back binding button missing")
 	_expect(reset_button != null, "Reset Defaults button missing")
@@ -57,6 +67,44 @@ func _run() -> void:
 	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), 1.25), "UI scale should update to 125 percent")
 	if window != null:
 		_expect(is_equal_approx(window.content_scale_factor, 1.25), "window content scale should update immediately")
+	scale_option = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+	if scale_option != null:
+		scale_option.select(2)
+		scale_option.item_selected.emit(2)
+	await _settle_frames(4)
+	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), 1.5), "UI scale should update to the supported 150 percent maximum")
+	if window != null:
+		_expect(is_equal_approx(window.content_scale_factor, 1.5), "window content scale should apply the 150 percent maximum immediately")
+	var content_panel: Control = title_menu.find_child("ContentPanel", true, false) as Control if title_menu != null else null
+	var viewport_rect: Rect2 = title_menu.get_viewport().get_visible_rect() if title_menu != null else Rect2()
+	_expect(
+		content_panel != null and _rect_inside(content_panel.get_global_rect(), viewport_rect.grow(2.0)),
+		"150 percent settings panel should remain inside the %dx%d viewport panel=%s viewport=%s"
+		% [viewport_size.x, viewport_size.y, str(content_panel.get_global_rect() if content_panel != null else Rect2()), str(viewport_rect)]
+	)
+	for control_name: String in [
+		"GameTitle",
+		"StartButton",
+		"HomeButton",
+		"HowToPlayButton",
+		"UnitsButton",
+		"RGAGlossaryButton",
+		"SettingsButton",
+		"QuitButton",
+	]:
+		var navigation_control: Control = title_menu.find_child(control_name, true, false) as Control if title_menu != null else null
+		_expect(
+			navigation_control != null and _rect_inside(navigation_control.get_global_rect(), viewport_rect.grow(2.0)),
+			"150 percent title control %s should remain inside the %dx%d viewport rect=%s viewport=%s"
+			% [control_name, viewport_size.x, viewport_size.y, str(navigation_control.get_global_rect() if navigation_control != null else Rect2()), str(viewport_rect)]
+		)
+	motion_check = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
+	reset_button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
+	if motion_check != null:
+		motion_check.button_pressed = true
+	await _settle_frames(2)
+	_expect(UserSettingsScript.get_reduced_motion(), "Reduced Motion should update immediately")
+	_expect(not bool(title_menu.get("_motion_enabled")), "Reduced Motion should stop title-menu animation")
 
 	var remap_key: InputEventKey = _make_key(KEY_F6)
 	var remap_result: Dictionary[String, Variant] = UserSettingsScript.set_keyboard_binding(&"ui_accept", remap_key)
@@ -68,7 +116,8 @@ func _run() -> void:
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
 	_expect(UserSettingsScript.binding_text(&"ui_accept").contains("F6"), "Confirm remap should survive reload")
-	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), 1.25), "UI scale should survive reload")
+	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), 1.5), "maximum UI scale should survive reload")
+	_expect(UserSettingsScript.get_reduced_motion(), "Reduced Motion should survive reload")
 
 	if title_menu != null:
 		title_menu.call("_begin_binding_capture", &"ui_cancel")
@@ -115,6 +164,9 @@ func _make_key(keycode: Key) -> InputEventKey:
 	key_event.pressed = true
 	return key_event
 
+func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
+	return outer.has_point(inner.position) and outer.has_point(inner.end)
+
 func _remove_test_settings() -> void:
 	var absolute_path: String = ProjectSettings.globalize_path(TEST_SETTINGS_PATH)
 	if FileAccess.file_exists(TEST_SETTINGS_PATH):
@@ -143,6 +195,9 @@ func _finish() -> void:
 	var window: Window = get_window()
 	if window != null:
 		window.content_scale_factor = _original_scale
+		if _original_window_size != Vector2i.ZERO:
+			window.size = _original_window_size
+			window.content_scale_size = _original_window_size
 	UserSettingsScript.configure_storage_path(UserSettingsScript.DEFAULT_SETTINGS_PATH)
 	_remove_test_settings()
 	if _failures.is_empty():

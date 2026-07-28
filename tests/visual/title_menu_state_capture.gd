@@ -126,7 +126,7 @@ func _expect_generated_title_styles(context: String) -> void:
 		_expect(button != null and button.get_theme_stylebox("normal") is StyleBoxTexture, "%s %s normal style should be generated" % [context, nav_name])
 		_expect(button != null and button.get_theme_stylebox("pressed") is StyleBoxTexture, "%s %s pressed style should be generated" % [context, nav_name])
 	var motion_check: CheckBox = _title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
-	_expect(motion_check == null, "%s ReducedMotionCheck should not be present" % context)
+	_expect(motion_check != null, "%s ReducedMotionCheck should be present" % context)
 
 func _json_contains_needles(path: String, needles: Array[String]) -> bool:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)

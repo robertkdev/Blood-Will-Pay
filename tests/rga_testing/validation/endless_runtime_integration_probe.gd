@@ -69,8 +69,8 @@ func _validate_chapter_top_bar(failures: Array[String]) -> void:
 	_expect(chapter_label != null, "chapter top bar should create chapter label", failures)
 	if chapter_label != null:
 		_expect(String(chapter_label.text) == "Chapter 1", "chapter top bar label should read Chapter 1, got %s" % chapter_label.text, failures)
-		_expect(String(chapter_label.tooltip_text).contains("RGA:"), "chapter summary hover should expose upcoming RGA challenge details", failures)
-		_expect(String(chapter_label.tooltip_text).contains("Stage 4"), "chapter summary hover should expose later boss stage details", failures)
+		_expect(String(chapter_label.tooltip_text).contains("Challenge:"), "chapter summary hover should expose upcoming challenge details", failures)
+		_expect(String(chapter_label.tooltip_text).contains("Round 4"), "chapter summary hover should expose later boss round details", failures)
 	for stage_index: int in range(1, int(ProgressionConfig.STAGES_PER_CHAPTER) + 1):
 		var icon: TextureRect = top_bar.find_child("StageIcon%d" % stage_index, true, false) as TextureRect
 		_expect(icon != null, "chapter top bar missing stage icon %d" % stage_index, failures)
@@ -80,7 +80,7 @@ func _validate_chapter_top_bar(failures: Array[String]) -> void:
 		_expect(String(icon.tooltip_text).begins_with(_expected_tooltip_for(stage_index)), "chapter top bar stage %d tooltip mismatch: %s" % [stage_index, icon.tooltip_text], failures)
 		_expect(String(icon.tooltip_text).contains("Enemy:"), "chapter top bar stage %d tooltip should preview enemies: %s" % [stage_index, icon.tooltip_text], failures)
 		if stage_index == int(ProgressionConfig.FIRST_RGA_STAGE) or stage_index == int(ProgressionConfig.SECOND_RGA_STAGE):
-			_expect(String(icon.tooltip_text).contains("RGA:"), "RGA stage %d tooltip should include RGA challenge label: %s" % [stage_index, icon.tooltip_text], failures)
+			_expect(String(icon.tooltip_text).contains("Challenge:"), "challenge round %d tooltip should include the challenge label: %s" % [stage_index, icon.tooltip_text], failures)
 			_expect(String(icon.tooltip_text).contains("Plan:"), "RGA stage %d tooltip should include planning puzzle text: %s" % [stage_index, icon.tooltip_text], failures)
 		if stage_index == int(ProgressionConfig.SECOND_RGA_STAGE):
 			_expect(icon.texture != null, "chapter top bar selected stage icon should have a texture", failures)
@@ -262,15 +262,15 @@ func _expected_kind_for(stage_index: int) -> String:
 
 func _expected_tooltip_for(stage_index: int) -> String:
 	if stage_index == int(ProgressionConfig.CREEP_STAGE):
-		return "Stage 1: Creeps"
+		return "Round 1: Creeps"
 	if stage_index == int(ProgressionConfig.FIRST_RGA_STAGE):
-		return "Stage 2: Challenge"
+		return "Round 2: Challenge"
 	if stage_index == int(ProgressionConfig.SECOND_RGA_STAGE):
-		return "Stage 3: Challenge"
+		return "Round 3: Challenge"
 	if stage_index == int(ProgressionConfig.BOSS_STAGE):
-		return "Stage 4: Boss"
+		return "Round 4: Boss"
 	if stage_index == int(ProgressionConfig.MIRROR_STAGE):
-		return "Stage 5: Mirror"
+		return "Round 5: Mirror"
 	return ""
 
 func _chapter_signature(chapter: int) -> String:
