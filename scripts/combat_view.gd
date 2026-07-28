@@ -359,6 +359,8 @@ func _apply_visual_theme_deferred() -> void:
 	_apply_responsive_layout()
 
 func _apply_responsive_layout() -> void:
+	if not is_inside_tree():
+		return
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer

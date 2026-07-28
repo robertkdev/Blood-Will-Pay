@@ -403,7 +403,7 @@ func start_stage() -> void:
 	var ch: int = int(mapping.get("chapter", 1))
 	var sic: int = int(mapping.get("stage_in_chapter", 1))
 	if ch == 1 and sic == 1:
-		RosterCatalog.clear_runtime()
+		RosterCatalog.ensure_runtime_started()
 		MirrorBoardStore.clear_runtime()
 	var total: int = int(ChapterCatalog.stages_in(ch))
 	emit_signal("log_line", LogSchema.format_stage(ch, sic, total))

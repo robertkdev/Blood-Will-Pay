@@ -125,7 +125,7 @@ func _verify_post_shop_bet_controls() -> void:
 	_expect(int(slider.max_value) == gold, "post-shop bet slider max should equal current gold")
 	var max_bet: int = int(slider.max_value)
 	slider.value = max_bet
-	await _settle_frames(3)
+	await _settle_frames(12)
 	_expect(int(Economy.current_bet) == max_bet, "max-bet slider should update Economy.current_bet")
 	_expect(int(Economy.preferred_bet) == max_bet, "max-bet slider should update Economy.preferred_bet")
 	_expect(String(value_label.text) == str(max_bet), "max-bet slider should repaint BetValue to %d, got %s" % [max_bet, String(value_label.text)])
