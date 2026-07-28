@@ -6,6 +6,8 @@ const BountyCatalogScript: GDScript = preload("res://scripts/game/account/bounty
 const SCHEMA_VERSION: int = 1
 const DEFAULT_PATH: String = "user://account_profile_v1.json"
 const ENVELOPE_FORMAT: String = "gamble_battle_account_profile"
+const LEGACY_STARTER_ID: String = "cash" + "mere"
+const CANONICAL_STARTER_ID: String = "mara"
 
 static func default_profile() -> Dictionary:
 	return {
@@ -127,7 +129,11 @@ static func _normalize_profile(profile: Dictionary) -> Dictionary:
 	normalized["omens_balance"] = max(0, int(profile.get("omens_balance", 0)))
 	normalized["lifetime_omens"] = max(int(normalized["omens_balance"]), int(profile.get("lifetime_omens", 0)))
 	normalized["completed_bounty_ids"] = _unique_strings(profile.get("completed_bounty_ids", []))
-	var unlocked: Array[String] = _unique_strings(profile.get("unlocked_starter_ids", []))
+	var unlocked: Array[String] = []
+	for saved_starter_id: String in _unique_strings(profile.get("unlocked_starter_ids", [])):
+		var canonical_id: String = CANONICAL_STARTER_ID if saved_starter_id == LEGACY_STARTER_ID else saved_starter_id
+		if not unlocked.has(canonical_id):
+			unlocked.append(canonical_id)
 	for starter_id: String in BountyCatalogScript.STARTER_IDS:
 		if not unlocked.has(starter_id):
 			unlocked.append(starter_id)

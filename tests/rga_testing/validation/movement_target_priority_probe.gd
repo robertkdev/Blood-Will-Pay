@@ -50,7 +50,7 @@ func _check_assassin_backline_priority(failures: Array[String]) -> void:
 func _check_marksman_front_to_back_priority(failures: Array[String]) -> void:
 	var marksman: Unit = _spawn("sari")
 	var tank: Unit = _spawn("brute")
-	var mage: Unit = _spawn("cashmere")
+	var mage: Unit = _spawn("mara")
 	mage.hp = max(1, int(float(mage.max_hp) * 0.45))
 	var allies: Array[Unit] = [marksman]
 	var ally_positions: Array[Vector2] = [Vector2(64.0, 180.0)]

@@ -9,7 +9,7 @@ const UnitFactoryScript: Script = preload("res://scripts/unit_factory.gd")
 @export var blocked_iterations: int = 120000
 
 const UNIT_IDS: Array[String] = [
-	"bonko", "korath", "sari", "pilfer", "cashmere", "axiom",
+	"bonko", "korath", "sari", "pilfer", "mara", "axiom",
 	"brute", "repo", "hexeon", "luna", "nyxa", "morrak"
 ]
 

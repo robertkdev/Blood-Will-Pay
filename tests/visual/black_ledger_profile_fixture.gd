@@ -31,7 +31,7 @@ func _seed(veteran: bool) -> Dictionary:
 	if veteran:
 		seeded["omens_balance"] = 24
 		seeded["lifetime_omens"] = 52
-		seeded["unlocked_starter_ids"] = ["axiom", "bonko", "brute", "cashmere", "pilfer", "sari", "berebell", "grint", "knoll"]
+		seeded["unlocked_starter_ids"] = ["axiom", "bonko", "brute", "mara", "pilfer", "sari", "berebell", "grint", "knoll"]
 		seeded["completed_bounty_ids"] = [
 			"axiom_ascendant", "calculated_desperation", "unbought_crown", "made_not_bought", "last_one_standing", "woven_company",
 			"five_disciplines", "empty_chair", "chosen_champion", "stable_foundation", "new_formation", "shared_spotlight",

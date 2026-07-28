@@ -1,7 +1,7 @@
 extends RefCounted
 class_name BountyCatalog
 
-const STARTER_IDS: Array[String] = ["axiom", "bonko", "brute", "cashmere", "pilfer", "sari"]
+const STARTER_IDS: Array[String] = ["axiom", "bonko", "brute", "mara", "pilfer", "sari"]
 
 const STARTER_REWARDS: Array[Dictionary] = [
 	{"id": "berebell", "name": "Berebell", "circle": 2, "lifetime_required": 6, "cost": 6, "omen": "A bruiser waits behind a bell of bone."},

@@ -87,7 +87,7 @@ static func _apply_unit_override(style: Dictionary[String, Variant], unit_id: St
 			_merge_style(style, _make_style("ember", Color(1.0, 0.78, 0.42, 1.0), Color(1.0, 0.22, 0.10, 0.96), Color(0.84, 0.16, 0.06, 0.46), Color(1.0, 0.92, 0.42, 0.96), 1.18, 4.5, 32.0, 1.00, 0.05, 4.0))
 		"brute":
 			_merge_style(style, _make_style("hammer", Color(0.92, 0.92, 0.88, 1.0), Color(0.72, 0.58, 0.44, 0.98), Color(0.46, 0.34, 0.26, 0.42), Color(1.0, 0.70, 0.34, 0.94), 1.30, 4.8, 35.0, 0.86))
-		"cashmere":
+		"mara":
 			_merge_style(style, _make_style("ribbon", Color(1.0, 0.84, 0.94, 1.0), Color(0.96, 0.36, 0.72, 0.94), Color(0.70, 0.22, 0.54, 0.42), Color(0.78, 1.0, 0.94, 0.90), 1.02, 3.2, 27.0, 1.04, 0.16, 4.8))
 		"grint":
 			_merge_style(style, _make_style("chain", Color(0.86, 0.94, 1.0, 1.0), Color(0.38, 0.62, 0.90, 0.96), Color(0.18, 0.36, 0.64, 0.44), Color(1.0, 0.82, 0.38, 0.94), 1.14, 4.0, 30.0, 1.08))

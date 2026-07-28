@@ -624,8 +624,9 @@
 			"vykos.png"
 		].map((file) => createArtItem({
 			set: "live",
-			unit: file.replace(/\.png$/i, ""),
-			kind: "live",
+			// The retired filename is preserved for provenance only; it is not approved Mara art.
+			unit: file === "cashmere.png" ? "mara" : file.replace(/\.png$/i, ""),
+			kind: file === "cashmere.png" ? "legacy-placeholder" : "live",
 			path: "assets/units/" + file,
 			src: ASSET_ROOT + encodeURIComponent(file)
 		}));
@@ -645,8 +646,9 @@
 			{ unit: "brute", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/brute/brute_creep_vellum_rework_v3_board_preview_final.png" },
 			{ unit: "caldera", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/caldera/caldera_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
 			{ unit: "caldera", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/caldera/caldera_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
-			{ unit: "cashmere", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_cutout_rawfieldclean.png" },
-			{ unit: "cashmere", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_board_preview_final.png" },
+			// Retired pre-Mara image provenance. Never present these as current or approved Mara art.
+			{ unit: "mara", kind: "legacy-candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_cutout_rawfieldclean.png" },
+			{ unit: "mara", kind: "legacy-board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_board_preview_final.png" },
 			{ unit: "cinder", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cinder/cinder_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
 			{ unit: "cinder", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cinder/cinder_creep_vellum_rework_v3_board_preview_final.png" },
 			{ unit: "creep", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/creep/creep_creep_vellum_accepted_v5_cutout_final_cropped1024_rawfieldclean.png" },

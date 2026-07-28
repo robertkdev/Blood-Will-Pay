@@ -4,7 +4,7 @@ The Black Ledger is Gamble Battle's local-profile progression layer. It rewards 
 
 ## Core rules
 
-- A fresh account can choose Axiom, Bonko, Brute, Cashmere, Pilfer, or Sari as its opening starter.
+- A fresh account can choose Axiom, Bonko, Brute, Mara, Pilfer, or Sari as its opening starter.
 - Locked starters still appear normally in shops and enemy teams. Only the opening starter picker is filtered.
 - Omens come only from one-time Bounties. Runs completed, offline time, lifetime gold, and other passive totals never award Omens.
 - Every revealed Bounty is active. There is no Bounty-selection or equipment step.

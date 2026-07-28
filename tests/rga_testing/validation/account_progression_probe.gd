@@ -16,6 +16,7 @@ var _failures: Array[String] = []
 func _ready() -> void:
 	_cleanup()
 	_test_fresh_profile()
+	_test_legacy_starter_id_migrates_to_mara()
 	await _test_fresh_unit_picker()
 	_test_idempotent_bounty_awards()
 	await _test_spend_uses_balance_not_lifetime()
@@ -40,6 +41,17 @@ func _test_fresh_profile() -> void:
 	for starter_id: String in BountyCatalogScript.STARTER_IDS:
 		_expect(starters.has(starter_id), "fresh profile contains %s" % starter_id)
 	_expect(not starters.has("berebell"), "locked starters do not leak into fresh picker")
+
+func _test_legacy_starter_id_migrates_to_mara() -> void:
+	var legacy_id: String = "cash" + "mere"
+	var legacy_profile: Dictionary = AccountProfileStoreScript.default_profile()
+	legacy_profile["unlocked_starter_ids"] = ["axiom", "bonko", "brute", legacy_id, "pilfer", "sari"]
+	var saved: Dictionary = AccountProfileStoreScript.save_profile(legacy_profile, PROFILE_PATH)
+	_expect(bool(saved.get("ok", false)), "legacy starter profile saves")
+	var starters: Array[String] = _strings((saved.get("profile", {}) as Dictionary).get("unlocked_starter_ids", []))
+	_expect(starters.size() == 6, "legacy starter migration keeps exactly six base starters")
+	_expect(starters.has("mara"), "legacy starter migration unlocks Mara")
+	_expect(not starters.has(legacy_id), "retired starter ID is removed during normalization")
 
 func _test_idempotent_bounty_awards() -> void:
 	var snapshot: Dictionary = _base_snapshot("run-a", "run-a:1:1:victory")

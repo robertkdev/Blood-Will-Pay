@@ -1,9 +1,9 @@
 extends AbilityImplBase
 
-# Cashmere — Arcane Ledger
+# Mara — Arcane Ledger
 # Fires an arcane blast at the current target, dealing
 #   170/255/380 + 0.8×SP + 20×ArcanistStacks magic damage.
-# On kill, 25% chance to grant +1 gold (no cap).
+# On kill, 25% chance to grant +1 Stake unit (no cap).
 
 const BASE_BY_LEVEL := [170, 255, 380]
 const TraitKeys := preload("res://scripts/game/traits/runtime/trait_keys.gd")
@@ -14,10 +14,10 @@ func _level_index(u: Unit) -> int:
 	var lvl: int = (int(u.level) if u != null else 1)
 	return clamp(lvl - 1, 0, 2)
 
-func _award_gold(n: int) -> void:
+func _award_stakes(n: int) -> void:
 	if n <= 0:
 		return
-	Economy.add_stake_units(n, true, "cashmere_arcane_ledger")
+	Economy.add_stake_units(n, true, "mara_arcane_ledger")
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:
@@ -46,6 +46,6 @@ func cast(ctx: AbilityContext) -> bool:
 	if killed:
 		var roll: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 		if roll < DROP_CHANCE:
-			_award_gold(1)
+			_award_stakes(1)
 			ctx.log("Arcane Ledger: +1U")
 	return true

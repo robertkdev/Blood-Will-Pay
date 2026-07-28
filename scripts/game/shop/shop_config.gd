@@ -12,7 +12,7 @@ const FIRST_SHOP_HELPERS_BY_STARTER: Dictionary = {
     "axiom": ["sari"],
     "bo": ["berebell", "grint"],
     "bonko": ["morrak", "grint", "mortem"],
-    "cashmere": ["brute", "bonko"],
+    "mara": ["brute", "bonko"],
     "korath": ["bonko", "sari", "morrak", "berebell"],
     "knoll": ["sari", "brute", "grint", "bonko", "morrak"],
     "morrak": ["berebell", "sari", "bonko"],
@@ -22,16 +22,16 @@ const FIRST_SHOP_HELPERS_BY_STARTER: Dictionary = {
     "sari": ["bonko", "grint", "brute", "berebell", "morrak"],
 }
 const FIRST_SHOP_BLOCKED_HELPERS_BY_STARTER: Dictionary = {
-    "axiom": ["axiom", "repo", "grint", "korath", "brute", "bo", "bonko", "morrak", "berebell", "mortem", "cashmere"],
-    "bo": ["cashmere", "brute", "axiom"],
+    "axiom": ["axiom", "repo", "grint", "korath", "brute", "bo", "bonko", "morrak", "berebell", "mortem", "mara"],
+    "bo": ["mara", "brute", "axiom"],
     "bonko": ["axiom", "repo", "korath"],
-    "cashmere": ["korath", "repo", "axiom"],
+    "mara": ["korath", "repo", "axiom"],
     "korath": ["brute", "axiom"],
     "knoll": ["axiom", "knoll", "pilfer"],
     "morrak": ["repo", "brute", "korath", "grint"],
     "mortem": ["brute", "axiom"],
     "pilfer": ["axiom", "knoll", "pilfer"],
-    "repo": ["axiom", "mortem", "korath", "brute", "cashmere", "grint", "repo"],
+    "repo": ["axiom", "mortem", "korath", "brute", "mara", "grint", "repo"],
     "sari": ["axiom"],
 }
 

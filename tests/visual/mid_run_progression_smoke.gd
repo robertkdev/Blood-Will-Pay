@@ -19,7 +19,7 @@ const ROUND_PLANS: Array[Dictionary] = [
 	},
 	{
 		"label": "round_3_body_width",
-		"offers": ["sari", "brute", "berebell", "bo", "cashmere"],
+		"offers": ["sari", "brute", "berebell", "bo", "mara"],
 		"buy_xp": 1,
 		"buy": ["sari", "brute"],
 		"gold": 16,

@@ -98,7 +98,7 @@ func _assert_suffix_side_filter_fallback() -> bool:
 			_span("magic_peak_over_mean_med_b", 2.00, 1.70, true)
 		]
 	}
-	var report: Dictionary[String, Variant] = _typed_dictionary(ProbeReportCompiler.compile("cashmere", {}, {"metrics": [metric]}, {"run_id": "subject_side_suffix"}))
+	var report: Dictionary[String, Variant] = _typed_dictionary(ProbeReportCompiler.compile("mara", {}, {"metrics": [metric]}, {"run_id": "subject_side_suffix"}))
 	var spans: Array[Dictionary] = _diagnostic_spans(report)
 	var labels: Array[String] = _labels(spans)
 	if not labels.has("magic_share_med_a"):

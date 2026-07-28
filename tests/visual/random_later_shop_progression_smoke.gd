@@ -1,7 +1,7 @@
 extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const RANDOM_LATER_SMOKE_NAME: String = "RandomLaterShopProgressionSmoke"
-const SAMPLE_STARTERS: Array[String] = ["axiom", "berebell", "bo", "bonko", "brute", "cashmere", "grint", "knoll", "korath", "morrak", "mortem", "pilfer", "repo", "sari"]
+const SAMPLE_STARTERS: Array[String] = ["axiom", "berebell", "bo", "bonko", "brute", "mara", "grint", "knoll", "korath", "morrak", "mortem", "pilfer", "repo", "sari"]
 const SAMPLE_SEEDS: Array[int] = [4101, 4201, 4301, 4401, 4501, 4601, 4701, 4751, 4801, 4901, 5001, 5051, 5101, 5201]
 # The generic buyer must reach the first boss. Beating the escalated boss now
 # requires item, combine, and encounter adaptation outside this route's scope.
