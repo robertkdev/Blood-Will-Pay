@@ -1428,7 +1428,7 @@
 				contentKey: config.contentKey || "",
 				path: config.path,
 				id,
-				src: config.src || encodeURI("../../" + config.path)
+				src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)
 			};
 		}
 
