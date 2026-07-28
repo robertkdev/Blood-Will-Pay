@@ -159,7 +159,7 @@ Three evidence-backed palette families deserve comparison:
 
 - **Photocopy + spot ink:** black, dirty bone, paper gray, one blood-red or fluorescent accent.
 - **Extreme-metal print:** near-black, bone, dried oxblood, oxidized metal, restrained warm highlight.
-- **Live industrial stage:** black steel, safety amber, cold cyan team light, controlled red alarm/strobe accent.
+- **Horror basement ritual:** deep matte black, dirty bone, dried blood, bruised sickly green, and a tightly controlled emergency-red accent.
 
 Stage-light research shows a useful role split: floods establish readable atmosphere, gobos project theme, and strobes intensify selected moments. Gamble Battle should apply the same hierarchy—ambient team separation first, thematic projections second, high-energy flash only for rare peaks.
 
@@ -170,13 +170,13 @@ References:
 
 ### 8. Materials and UI containers
 
-The current frames are visually expensive: carved corners and repeated gold trim make most surfaces feel equally important. Touring infrastructure suggests a more modular replacement vocabulary:
+The current frames are visually expensive: carved corners and repeated gold trim make most surfaces feel equally important. Underground-show ephemera and practical horror production suggest a more modular replacement vocabulary:
 
-- Road-case aluminum extrusion for major windows.
-- Recessed label dishes for titles and values.
-- Amp-face or rack-unit plates for command bars and metrics.
-- Gaffer tape, stickers, and stamped labels for secondary annotation.
-- Speaker cloth, painted steel, concrete, or pasted paper for low-priority backgrounds.
+- Layered photocopied flyers, evidence tags, and stained paper for major windows.
+- Scratched acetate, torn tape, and handwritten venue markings for titles and annotations.
+- Restrained hard rectangles for command bars, metrics, slots, and readable card interiors.
+- Speaker cloth, damp concrete, painted plywood, peeling posters, and black negative space for low-priority backgrounds.
+- Ritual chalk, handprints, mold-like stains, and analog-film damage as sparse atmosphere rather than constant decoration.
 
 The strongest opportunity is not photorealism; it is **functional construction**. Every edge, label, fastener, or tape strip should imply why the container exists.
 
@@ -225,7 +225,7 @@ Useful distinctions:
 - Traits as patches or credentials.
 - Level/rank as repeated tour, access, or edition markings.
 
-The clothing and prop research should span hardcore, metalcore, crust, thrash, doom, industrial, and extreme-metal scenes without turning every unit into a subculture costume checklist.
+The clothing and prop research should span hardcore, metalcore, crust, thrash, doom, extreme-metal, grindhouse horror, analog horror, and practical creature-effects traditions without turning every unit into a subculture or horror-trope checklist.
 
 Reference:
 
@@ -331,26 +331,27 @@ Risks:
 - Dense logos and distressed type cannot migrate into functional UI.
 - Needs explicit separation between “identity art” and “tactical information.”
 
-### Direction C: Industrial Mosh Arena
+### Direction C: Horror Basement Ritual
 
-![Industrial Mosh Arena direction](research/metal_hardcore_direction_industrial_pit.png)
+![Horror Basement Ritual direction](research/metal_hardcore_direction_horror_basement.png)
 
 Core language:
 
-- Road cases, amp faces, rack units, label dishes, barricades, tape, cables, and floor markings.
-- Black steel, safety amber, cold cyan, and controlled red.
-- Modular rectangular containers and equipment-label typography.
-- Live-event lighting supplies energy instead of carved ornament.
+- A basement hardcore show curdling into a survival-horror ritual space.
+- Damp concrete, peeling photocopied flyers, stained tape, scratched acetate, ritual chalk, and damaged analog film.
+- Deep matte black, dirty bone, dried blood, bruised sickly green, and emergency red.
+- Suggestive body-horror and uncanny crowd pressure around a calm, rectangular tactical information layer.
 
 Best fit:
 
-- Combat HUD, shop, board, bench, metrics, item slots, controls, and progression systems.
+- Arena environments, enemy and boss framing, crowd-pressure states, chapter transitions, combat feedback, defeat screens, and horror-inflected shop presentation.
 
 Risks:
 
-- Can drift into generic industrial sci-fi.
-- Equipment realism can feel utilitarian without the flyer/logo identity layer.
-- Hazard motifs must not overwhelm gameplay warnings.
+- Can collapse into generic Halloween, ornate Gothic fantasy, or empty gore.
+- Heavy distress and darkness can bury small values, silhouettes, and status changes.
+- Horror atmosphere must never make routine interactions feel audiovisually exhausting.
+- The clean tactical layer must remain visibly separate from the threatening world around it.
 
 ## Shared Readability Standard
 
@@ -371,9 +372,9 @@ The strongest hypothesis to test is a hybrid, not a uniform skin:
 
 - **Direction B** supplies the game-level identity, villainous character framing, chapter art, and climactic spectacle.
 - **Direction A** supplies menus, tutorials, narrative ephemera, run history, and promotional character.
-- **Direction C** supplies the combat/shop information architecture and the physical logic of panels, controls, slots, and board boundaries.
+- **Direction C** supplies environmental dread, uncanny enemy framing, crowd pressure, analog decay, and the horror vocabulary for combat peaks and failure states.
 
-This combination is only a research hypothesis. The next decision should compare the three direction images at full size and choose which lane owns each visual layer before any production assets are replaced.
+The functional UI should use Direction A's hard rectangular structure with substantially quieter card interiors; Direction C adds horror at the edges, in transitions, and in high-intensity states rather than coating every number in distress. This combination is only a research hypothesis. The next decision should compare the three direction images at full size and choose which lane owns each visual layer before any production assets are replaced.
 
 ## Reference Catalog and Tags
 
