@@ -1,0 +1,63 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+
+const toolRoot = path.resolve(process.argv[2] || ".");
+const projectRoot = path.resolve(process.argv[3] || process.cwd());
+const htmlPath = path.join(toolRoot, "unit-art-review.html");
+const dataPath = path.join(toolRoot, "unit-art-history-data.js");
+const html = fs.readFileSync(htmlPath, "utf8");
+const dataSource = fs.readFileSync(dataPath, "utf8");
+const context = { window: {} };
+vm.runInNewContext(dataSource, context, { filename: dataPath });
+
+const manifest = context.window.GAMBLE_BATTLE_UNIT_ART_HISTORY;
+const fail = (message) => { throw new Error(message); };
+const requireText = (value) => {
+	if (!html.includes(value)) fail(`Missing tool behavior: ${value}`);
+};
+const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+
+if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
+if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
+if (manifest.items.length !== 21) fail(`Expected curated history with 21 entries, got ${manifest.items.length}.`);
+if (manifest.items.filter((item) => item.unit === "creep").length !== 3) fail("Creep must have exactly V3, V4, and V5 provenance entries.");
+if (!manifest.items.some((item) => item.unit === "luna" && item.version === "Refit V1")) fail("Luna refit is missing.");
+if (!manifest.items.some((item) => item.unit === "mara" && item.source_unit.includes("mara"))) fail("Mara history is missing.");
+if (manifest.items.filter((item) => item.unit === "mara").length !== 17) fail("Expected 17 curated Mara history variants.");
+if (manifest.items.some((item) => item.unit === "cashmere")) fail("Cashmere cannot remain a visible unit id.");
+if (manifest.items.some((item) => item.unit === "creep" && !item.path.includes("creep_builtin_revision_candidate"))) fail("Non-Creep art leaked into Creep history.");
+
+for (const item of manifest.items) {
+	if (!item.local_path) fail(`Curated history entry is not bundled locally: ${item.path}`);
+	const filePath = path.join(toolRoot, item.local_path);
+	if (!fs.existsSync(filePath)) fail(`Missing history image: ${item.path}`);
+	if (fs.statSync(filePath).size < 1024) fail(`History image is not hydrated: ${item.path}`);
+}
+
+const liveCreep = path.join(projectRoot, "assets/units/creep.png");
+const creepV5 = manifest.items.find((item) => item.version === "V5");
+const historicalCreep = path.join(toolRoot, creepV5.local_path);
+if (sha256(liveCreep) !== sha256(historicalCreep)) fail("Creep live asset and V5 provenance no longer match.");
+
+const archiveImageCount = fs.readdirSync(path.join(toolRoot, "phase2-concepts"), { recursive: true })
+	.filter((relativePath) => relativePath.endsWith(".png")).length;
+if (archiveImageCount !== 30) fail(`Expected 30 official archive images, got ${archiveImageCount}.`);
+
+[
+	"Gamble Battle Unit Art Comparison Tool",
+	"unit: file === \"cashmere.png\" ? \"mara\"",
+	"{ unit: \"mara\", role: \"Mage\"",
+	"const PINS_KEY",
+	"const MAX_PINS = 6",
+	"addEventListener(\"contextmenu\"",
+	"function openComparisonPreview()",
+	"function comparisonColumn(count, index)",
+	"comparison-grid",
+	"Right-click any comparison slot to unpin",
+	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
+	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()"
+].forEach(requireText);
+
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=21 mara=17 archive=30 canonical=mara pins=6");
