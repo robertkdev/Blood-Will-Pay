@@ -63,6 +63,17 @@ if (archiveImageCount !== 30) fail(`Expected 30 official archive images, got ${a
 	"card.dataset.active = String(isActive)",
 	"activeBadge.textContent = \"Reviewing\"",
 	"function comparisonColumn(count, index)",
+	"els.comparisonGrid.dataset.count = String(items.length)",
+	".comparison-grid[data-count=\"2\"],",
+	".comparison-grid[data-count=\"4\"]",
+	".comparison-grid[data-count=\"5\"]",
+	"@media (min-width: 1580px)",
+	"@media (min-width: 1770px)",
+	"grid-template-columns: repeat(4, minmax(0, 1fr))",
+	"grid-template-columns: repeat(5, minmax(0, 1fr))",
+	"padding: clamp(3px, 0.5vw, 8px)",
+	"padding: clamp(8px, 1.5vw, 24px)",
+	"return (1 + (index - 3) * 3) + \" / span 3\"",
 	"comparison-grid",
 	"Active review + pinned references",
 	"src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)",
@@ -72,6 +83,8 @@ if (archiveImageCount !== 30) fail(`Expected 30 official archive images, got ${a
 
 if (html.includes("Six pins maximum") || html.includes("0 / 6")) fail("The comparison tool still exposes the old six-pin limit.");
 if (html.includes("src: config.src || encodeURI(\"../../\" + config.path)")) fail("Candidate and remembered art must load from the main project asset server.");
+if (html.includes("padding: clamp(10px, 2vw, 30px)")) fail("Comparison artwork still wastes card area on the old oversized padding.");
+if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use the full available review workspace.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 
 console.log("UNIT_ART_REVIEW_STATIC: PASS curated=21 mara=17 archive=30 canonical=mara pins=5 active-review=1");
