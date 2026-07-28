@@ -569,6 +569,10 @@
 			white-space: pre-wrap;
 		}
 
+		.version-default-actions {
+			margin-top: 10px;
+		}
+
 		.comment-box {
 			display: grid;
 			gap: 8px;
@@ -858,7 +862,7 @@
 				<input id="search" class="search" type="search" placeholder="Search units" autocomplete="off">
 				<div class="segment" aria-label="Review set">
 					<button type="button" data-set="all" class="active">All Units</button>
-					<button type="button" data-set="phase2">Official Archive</button>
+					<button type="button" data-set="phase2">Phase 2</button>
 					<button type="button" data-set="history">History</button>
 					<button type="button" data-set="live">Live</button>
 					<button type="button" data-set="candidates">Candidates</button>
@@ -917,6 +921,10 @@
 							<button id="next-version" type="button" title="Next version">&rsaquo;</button>
 						</div>
 						<div id="version-meta" class="version-meta"></div>
+						<div class="comment-actions version-default-actions">
+							<span id="default-status" class="comment-status">Official default</span>
+							<button id="set-default" class="action primary" type="button">Set as Default</button>
+						</div>
 					</section>
 					<section class="sidebar-section">
 						<h2>Comment on this version</h2>
@@ -959,6 +967,7 @@
 		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
 		const COMMENTS_KEY = "blood-will-pay-unit-art-comments-v1";
 		const PINS_KEY = "blood-will-pay-unit-art-pins-v1";
+		const DEFAULTS_KEY = "blood-will-pay-unit-art-defaults-v1";
 		const MAX_PINS = 5;
 		const LIVE_ART = [
 			"axiom.png",
@@ -1205,9 +1214,14 @@
 			current: Boolean(item.current)
 		}));
 
-		const PHASE2_CURRENT = new Map(
-			PHASE2_ART.filter((item) => item.current).map((item) => [normalizeUnitId(item.unit), item])
-		);
+		const PHASE2_CURRENT = new Map();
+		PHASE2_ART.forEach((item) => {
+			const unit = normalizeUnitId(item.unit);
+			if (!PHASE2_CURRENT.has(unit) || item.current) {
+				PHASE2_CURRENT.set(unit, item);
+			}
+		});
+		const PHASE2_LATEST_ART = [...PHASE2_CURRENT.values()];
 		const HISTORICAL_MANIFEST = window.GAMBLE_BATTLE_UNIT_ART_HISTORY || { aliases: {}, items: [] };
 		const HISTORY_SEARCH_ALIASES = Object.entries(HISTORICAL_MANIFEST.aliases).reduce((byUnit, [alias, unit]) => {
 			const canonicalUnit = normalizeUnitId(unit);
@@ -1247,7 +1261,7 @@
 
 		const ART_SETS = {
 			all: ALL_UNIT_ART,
-			phase2: PHASE2_ART,
+			phase2: PHASE2_LATEST_ART,
 			history: [...PHASE2_ART, ...HISTORICAL_ART],
 			live: LIVE_ART,
 			candidates: CANDIDATE_ART,
@@ -1262,6 +1276,7 @@
 			decisions: loadDecisions(),
 			comments: loadComments(),
 			pins: loadPins(),
+			defaults: loadDefaults(),
 			previewMode: "single",
 			previewUnits: [],
 			previewUnitIndex: -1,
@@ -1289,6 +1304,8 @@
 			previewStatus: document.getElementById("preview-status"),
 			versionSelect: document.getElementById("version-select"),
 			versionMeta: document.getElementById("version-meta"),
+			defaultStatus: document.getElementById("default-status"),
+			setDefault: document.getElementById("set-default"),
 			reviewSidebar: document.querySelector(".review-sidebar"),
 			comment: document.getElementById("preview-comment"),
 			commentStatus: document.getElementById("comment-status"),
@@ -1403,6 +1420,10 @@
 			updatePreview();
 		});
 
+		els.setDefault.addEventListener("click", () => {
+			setCurrentAsDefault();
+		});
+
 		els.comment.addEventListener("input", () => {
 			saveCurrentComment();
 		});
@@ -1478,7 +1499,11 @@
 		}
 
 		function currentItems() {
-			return ART_SETS[state.set] || ALL_UNIT_ART;
+			const items = ART_SETS[state.set] || ALL_UNIT_ART;
+			if (state.set !== "all" && state.set !== "phase2") {
+				return items;
+			}
+			return items.map((item) => defaultItemForUnit(item.unit) || item);
 		}
 
 		function allArtItems() {
@@ -1521,12 +1546,29 @@
 			});
 		}
 
+		function itemIdentity(item) {
+			return item.contentKey || item.path;
+		}
+
+		function defaultItemForUnit(unit) {
+			const normalizedUnit = normalizeUnitId(unit);
+			const savedIdentity = state.defaults[normalizedUnit];
+			const savedItem = savedIdentity
+				? versionsForUnit(normalizedUnit).find((item) => itemIdentity(item) === savedIdentity)
+				: null;
+			return savedItem ||
+				CANONICAL_CURRENT.get(normalizedUnit) ||
+				PHASE2_CURRENT.get(normalizedUnit) ||
+				LIVE_UNIT_CURRENT.get(normalizedUnit) ||
+				null;
+		}
+
 		function setLabel(setName) {
 			if (setName === "all") {
 				return "all units with the newest available official art";
 			}
 			if (setName === "phase2") {
-				return "the official concept archive";
+				return "Phase 2 units, one default artwork each";
 			}
 			if (setName === "history") {
 				return "historical unit variants from the full project archive";
@@ -1853,6 +1895,26 @@
 			updatePreview();
 		}
 
+		function setCurrentAsDefault() {
+			const item = currentPreviewItem();
+			if (!item) {
+				return;
+			}
+			const unit = normalizeUnitId(item.unit);
+			const identity = itemIdentity(item);
+			if (state.defaults[unit] === identity) {
+				delete state.defaults[unit];
+				showToast(displayUnitName(unit) + " restored to the official default.");
+			} else {
+				state.defaults[unit] = identity;
+				showToast(displayUnitName(unit) + " default changed to " + versionLabel(item, state.previewVersionIndex) + ".");
+			}
+			state.previewPreferredKeys[unit] = item.key;
+			saveDefaults();
+			render();
+			updatePreview();
+		}
+
 		function voteCurrentPreview(choice) {
 			const item = currentPreviewItem();
 			if (!item) {
@@ -1889,17 +1951,33 @@
 		}
 
 		function renderVersionControls(item) {
+			const unit = normalizeUnitId(item.unit);
+			const defaultItem = defaultItemForUnit(unit);
+			const savedIdentity = state.defaults[unit] || "";
 			els.versionSelect.replaceChildren(...state.previewVersions.map((version, index) => {
 				const option = document.createElement("option");
 				option.value = String(index);
-				option.textContent = versionLabel(version, index);
+				option.textContent = (defaultItem && itemIdentity(defaultItem) === itemIdentity(version) ? "★ " : "") + versionLabel(version, index);
 				option.selected = version.key === item.key;
 				return option;
 			}));
-			const sourceLabel = item.set === "phase2" ? "official archive" : item.set;
+			const sourceLabel = item.set === "phase2" ? "Phase 2" : item.set;
 			const details = [item.status, sourceLabel, item.kind].filter(Boolean).join(" · ");
 			const sourceDetail = item.version ? item.title : item.path;
 			els.versionMeta.textContent = details + (details ? "\n" : "") + sourceDetail;
+			if (savedIdentity === itemIdentity(item)) {
+				els.defaultStatus.textContent = "Custom default";
+				els.setDefault.textContent = "Use Official Default";
+				els.setDefault.disabled = false;
+			} else if (defaultItem && itemIdentity(defaultItem) === itemIdentity(item)) {
+				els.defaultStatus.textContent = "Official default";
+				els.setDefault.textContent = "Current Default";
+				els.setDefault.disabled = true;
+			} else {
+				els.defaultStatus.textContent = defaultItem ? "Another version is default" : "No default selected";
+				els.setDefault.textContent = "Set as Default";
+				els.setDefault.disabled = false;
+			}
 		}
 
 		function versionLabel(item, index) {
@@ -2019,6 +2097,23 @@
 
 		function savePins() {
 			localStorage.setItem(PINS_KEY, JSON.stringify(state.pins.slice(0, MAX_PINS)));
+		}
+
+		function loadDefaults() {
+			try {
+				const raw = localStorage.getItem(DEFAULTS_KEY);
+				if (!raw) {
+					return {};
+				}
+				const parsed = JSON.parse(raw);
+				return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+			} catch (error) {
+				return {};
+			}
+		}
+
+		function saveDefaults() {
+			localStorage.setItem(DEFAULTS_KEY, JSON.stringify(state.defaults));
 		}
 
 		function applyTileSize() {
