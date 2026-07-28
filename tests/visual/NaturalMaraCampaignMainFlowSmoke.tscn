@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" path="res://tests/visual/natural_single_campaign_main_flow_smoke.gd" id="1"]
 
-[node name="NaturalCashmereCampaignMainFlowSmoke" type="Node"]
+[node name="NaturalMaraCampaignMainFlowSmoke" type="Node"]
 script = ExtResource("1")
-campaign_smoke_name = "NaturalCashmereCampaignMainFlowSmoke"
-campaign_starter_id = "cashmere"
+campaign_smoke_name = "NaturalMaraCampaignMainFlowSmoke"
+campaign_starter_id = "mara"
 campaign_shop_seed = 4601

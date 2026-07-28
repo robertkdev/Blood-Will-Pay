@@ -50,7 +50,7 @@ Original playable unit inventory:
 | Bo | 1 | Brawler | Fortified, Executioner | Writ of Severance |
 | Bonko | 1 | Brawler | Cartel, Chronomancer | Bonk |
 | Brute | 1 | Tank | Titan, Fortified | Slam |
-| Cashmere | 1 | Mage | Arcanist, Mogul | Arcane Ledger |
+| Mara | 1 | Mage | Arcanist, Mogul | Arcane Ledger |
 | Grint | 1 | Tank | Cartel, Harmony | Body Check |
 | Korath | 1 | Tank | Titan, Blessed | Absorb & Release |
 | Morrak | 1 | Brawler | Striker, Executioner | Reaping Line |
@@ -260,7 +260,7 @@ Target rules:
 | Cinder | Live | 2 | mage | `mage.area_denial_zone` | `zone`, `aoe`, `dot` | Fuse Spark creates a delayed burn area. | Zone Control | Long-Range Siege | melee dive and clumps | range, reposition, source kill | Prove the zone changes pathing, hits multiple units, and keeps clock pressure after application. |
 | Prisma | Live | 3 | mage | `mage.area_denial_zone` | `zone`, `amp`, `aoe` | Color Theory makes a wide-team zone that also boosts the plan. | Wide Trait Engine | Dive Reset | clumped and trait-greedy boards | backline access, disrupt, spread | Prove the zone scales with team context and gives measurable allied value. |
 | Orielle | Live | 4 | mage | `mage.area_denial_zone` | `zone`, `disrupt`, `ramp` | Spell Debt grows a denial field as allies spend mana. | Zone Control | Burst Engage | slow setup and clumped casters | burst source kill, immunity, range | Prove stored mana becomes a larger zone, disrupts timing, and can be raced before it peaks. |
-| Cashmere | Current | 1 | mage | `mage.pick_burst` | `burst`, `execute`, `reset_mechanic` | Arcane Ledger punishes a selected debt target. | Anti-Meta Flex | Peel Carry | isolated low-health targets | redirect, peel, immunity | Prove a pick target, burst into threshold, and a reward or repeat only when the pick succeeds. |
+| Mara | Current | 1 | mage | `mage.pick_burst` | `burst`, `execute`, `reset_mechanic` | Arcane Ledger punishes a selected debt target. | Anti-Meta Flex | Peel Carry | isolated low-health targets | redirect, peel, immunity | Prove a pick target, burst into threshold, and a reward or repeat only when the pick succeeds. |
 | Volt | Current | 2 | mage | `mage.pick_burst` | `burst`, `lockdown`, `dot` | Arc Lock traps one target long enough for a delayed kill clock. | Control Prison | CC Immunity Frontline | isolated carries and divers | immunity, cleanse, range | Prove a single target is held, burst lands in-window, and post-lock pressure continues briefly. |
 | Noxley | Live | 3 | mage | `mage.sustained_dps` | `dot`, `sustain`, `ramp` | Red Static spends health to make repeated magic casts matter. | Attrition Engine | Pick Burst | mitigation frontlines and low-pressure boards | burst, lockdown, anti-sustain | Prove repeated magic damage, self-risk sustain, and growing pressure over time. |
 | Axiom | Current | 1 | support | `support.team_amplification` | `amp`, `peel`, `sustain` | Mentor's Reserve is the baseline support engine. | Wide Trait Engine | Backline Access | fragile carry comps | access, disrupt, AoE | Prove a supported ally gets stronger or safer, and Axiom is a visible pressure point. |

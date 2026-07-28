@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource( 1 )
-id = "cashmere_arcane_ledger"
+id = "mara_arcane_ledger"
 name = "Arcane Ledger"
 description = "Fires an arcane blast for magic damage; on kill, has a chance to drop gold."
 targeting_summary = "Current attack target."

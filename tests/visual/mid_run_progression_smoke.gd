@@ -17,7 +17,7 @@ const ROUND_PLANS: Array[Dictionary] = [
 	},
 	{
 		"label": "round_3_body_width",
-		"offers": ["sari", "brute", "berebell", "bo", "cashmere"],
+		"offers": ["sari", "brute", "berebell", "bo", "mara"],
 		"buy_xp": 1,
 		"buy": ["sari"],
 		"gold": 16,
@@ -25,7 +25,7 @@ const ROUND_PLANS: Array[Dictionary] = [
 	},
 	{
 		"label": "round_4_boss_gate",
-		"offers": ["berebell", "bo", "cashmere", "repo", "korath"],
+		"offers": ["berebell", "bo", "mara", "repo", "korath"],
 		"buy_xp": 3,
 		"buy": ["berebell"],
 		"gold": 24,
@@ -81,7 +81,7 @@ const ROUND_PLANS: Array[Dictionary] = [
 		"offers": ["nyxa", "paisley", "luna", "repo", "bo"],
 		"buy": ["nyxa"],
 		"field": ["nyxa"],
-		"bench_out": ["cashmere"],
+		"bench_out": ["mara"],
 		"gold": 24,
 		"min_chapter_after": 3,
 	},

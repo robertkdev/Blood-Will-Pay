@@ -17,6 +17,12 @@ Concise, enforceable rules for working in this Godot 4.5 project. Scope: entire 
 - If the live doc conflicts with repo code or local docs, surface the conflict and treat the Google Doc as the product/design authority unless the user says otherwise.
 - The brain source note for this document is `Sources/Gamble Battle Google Design Doc.md`.
 
+## Current Unit Naming Contract
+- Mara is the only current unit identity. Cashmere is a retired legacy name and must never be presented as a current unit, alias, display label, or approved image.
+- Lowercase `cashmere` may remain only in explicitly labeled legacy input compatibility, historical filenames, generated-output provenance, or preserved dated evidence.
+- Canonical active identifiers are `mara`, `mara_arcane_ledger`, `data/units/mara.tres`, and `data/identity/unit_identities/mara_identity.tres`.
+- The pale ledger-clad artwork stored under the retired filename is an unapproved placeholder/provenance asset, not confirmed Mara art. Do not silently relabel or promote it.
+
 ## Project Overview
 - Engine: Godot 4.5
 - Main scene (gameplay): `scenes/Main.tscn`

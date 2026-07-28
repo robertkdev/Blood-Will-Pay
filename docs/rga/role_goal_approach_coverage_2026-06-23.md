@@ -74,7 +74,7 @@ Approach coverage now has executable tests for:
 | `marksman.tank_shredding` | teller | proxy via `approach_debuff`, `approach_ramp`, and `approach_long_range`; Teller currently proxy-passes through long range while debuff/ramp fail |
 | `mage.wombo_combo_burst` | luna, paisley | proxy/direct goal checks via `approach_burst` and `approach_aoe` when run; latest Paisley proves `aoe` and `peel` but still fails the wombo goal on burst share and CC-sync |
 | `mage.area_denial_zone` | faeling | direct `goal_primary` and `ZoneExposureKernelProbe.tscn` cover the doc goal; latest Faeling 6v6 now passes live area denial through source-owned Eavesdropping spin-zone exposure |
-| `mage.pick_burst` | cashmere, volt | proxy/direct goal checks via `approach_burst`; latest Volt is now tested as pick burst and fails honestly on burst/kill evidence |
+| `mage.pick_burst` | mara, volt | proxy/direct goal checks via `approach_burst`; latest Volt is now tested as pick burst and fails honestly on burst/kill evidence |
 | `mage.sustained_dps` | none currently assigned | direct `goal_primary` covers the catalog goal when assigned and now requires team damage share plus direct DoT, persistent-zone, ramp, or on-hit evidence; `MageSustainedDpsGoalProbe.tscn` rejects the old AoE-only false-positive path |
 | `support.peel_carry` | totem | direct `goal_primary` now passes through Totem's live source-attributed ally protection utility: real debuff removal, shield/CC-immunity/amp application to the allied carry, plus direct `approach_peel`, `approach_cc_immunity`, and `approach_amp` passes |
 | `support.team_amplification` | axiom | direct `goal_primary` now passes through source-attributed Pupil output lift from Axiom's live kit (`120.46` output delta, `17` output events, `1` beneficiary) |
@@ -101,11 +101,11 @@ Doc-defined goals not currently assigned to a unit but covered by `goal_primary`
 | `sustain` | axiom, beegle, berebell, bonko, kythera, morrak, mortem, veyra, vykos | covered by `approach_sustain`; Veyra currently fails neutral 6v6 |
 | `zone` | faeling | covered by `approach_zone`; current rows prefer direct zone exposure over occupancy proxies. Faeling now passes with live direct spin-zone exposure |
 | `amp` | axiom, totem | covered by `approach_amp`, including direct output-delta telemetry when present; latest Axiom and Totem 6v6 runs both pass through source-attributed live ally amp evidence |
-| `aoe` | cashmere, creep, faeling, luna, morrak, nyxa, paisley | covered by `approach_aoe`; current proxy uses hit groups and AoE DPS |
-| `burst` | cashmere, hexeon, luna, mortem, repo, volt, vykos | covered by `approach_burst`; Repo currently fails neutral 6v6 |
+| `aoe` | mara, creep, faeling, luna, morrak, nyxa, paisley | covered by `approach_aoe`; current proxy uses hit groups and AoE DPS |
+| `burst` | mara, hexeon, luna, mortem, repo, volt, vykos | covered by `approach_burst`; Repo currently fails neutral 6v6 |
 | `cc_immunity` | totem | covered by `approach_cc_immunity`; latest Totem 6v6 passes through source-attributed CC-immunity grants |
 | `debuff` | kythera, teller | covered by `approach_debuff`, including forced-cleanse pressure and cleanse-bait rate when present; Kythera passes and Teller fails |
-| `execute` | cashmere, hexeon, vykos | covered by `approach_execute`; Hexeon's neutral 6v6 row can still fail when no execute opportunity appears, but `HexeonExecuteLiveProbe.tscn` now proves the real kit executes low-HP targets and does not execute above-threshold targets |
+| `execute` | mara, hexeon, vykos | covered by `approach_execute`; Hexeon's neutral 6v6 row can still fail when no execute opportunity appears, but `HexeonExecuteLiveProbe.tscn` now proves the real kit executes low-HP targets and does not execute above-threshold targets |
 | `on_hit_effect` | sari | covered by `approach_on_hit_effect`; latest Sari run fails honestly because no subject on-hit proc events are observed |
 | `ramp` | bonko, nyxa, sari, teller, veyra | covered by `approach_ramp`; current rows prefer direct stack/window state telemetry, while older rows fall back to late/early DPS, time-to-peak, and post-peak falloff |
 | `redirect` | korath | covered by `approach_redirect`; Korath passes direct absorb/redirect evidence, enemy-focus and target-swap evidence, and live body-block/end-risk evidence from real diverted damage; taunt-command and explicit threat-swap submodes are not currently claimed by a live kit |

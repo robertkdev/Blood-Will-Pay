@@ -1,7 +1,7 @@
 extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const RANDOM_LATER_SMOKE_NAME: String = "RandomLaterShopProgressionSmoke"
-const SAMPLE_STARTERS: Array[String] = ["axiom", "berebell", "bo", "bonko", "brute", "cashmere", "grint", "korath", "morrak", "mortem", "repo", "sari"]
+const SAMPLE_STARTERS: Array[String] = ["axiom", "berebell", "bo", "bonko", "brute", "mara", "grint", "korath", "morrak", "mortem", "repo", "sari"]
 const SAMPLE_SEEDS: Array[int] = [4101, 4201, 4301, 4401, 4501, 4601, 4701, 4801, 4901, 5001, 5101, 5201]
 const TARGET_STAGE: int = 5
 const MAX_POST_OPENER_BATTLES: int = 5

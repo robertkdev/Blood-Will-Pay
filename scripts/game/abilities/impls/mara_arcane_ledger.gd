@@ -1,6 +1,6 @@
 extends AbilityImplBase
 
-# Cashmere — Arcane Ledger
+# Mara — Arcane Ledger
 # Fires an arcane blast at the current target, dealing
 #   170/255/380 + 0.8×SP + 20×ArcanistStacks magic damage.
 # On kill, 25% chance to grant +1 gold (no cap).

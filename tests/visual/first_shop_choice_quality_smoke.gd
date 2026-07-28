@@ -2,12 +2,12 @@ extends "res://tests/visual/actual_run_loop_smoke.gd"
 
 const UnitCatalogLib: Script = preload("res://scripts/game/shop/unit_catalog.gd")
 const SMOKE_NAME: String = "FirstShopChoiceQualitySmoke"
-const TARGET_STARTERS: Array[String] = ["axiom", "bo", "bonko", "cashmere", "korath", "morrak", "mortem", "repo", "sari"]
+const TARGET_STARTERS: Array[String] = ["axiom", "bo", "bonko", "mara", "korath", "morrak", "mortem", "repo", "sari"]
 const TARGET_HELPERS: Dictionary = {
 	"axiom": ["sari", "sari", "sari", "sari", "sari"],
-	"bo": ["berebell", "cashmere", "cashmere", "grint", "brute"],
+	"bo": ["berebell", "mara", "mara", "grint", "brute"],
 	"bonko": ["morrak", "grint", "mortem", "axiom", "korath"],
-	"cashmere": ["korath", "repo", "brute", "bonko", "brute"],
+	"mara": ["korath", "repo", "brute", "bonko", "brute"],
 	"korath": ["brute", "bonko", "sari", "morrak", "berebell"],
 	"morrak": ["repo", "berebell", "brute", "sari", "bonko"],
 	"mortem": ["morrak", "bonko", "sari", "brute", "berebell"],

@@ -12,7 +12,7 @@ const MIN_GOOD_RATES: Dictionary[String, float] = {
 	"axiom": 1.0,
 	"bo": 1.0,
 	"bonko": 1.0,
-	"cashmere": 1.0,
+	"mara": 1.0,
 	"korath": 1.0,
 	"morrak": 1.0,
 	"mortem": 1.0,
@@ -20,10 +20,10 @@ const MIN_GOOD_RATES: Dictionary[String, float] = {
 	"sari": 1.0,
 }
 const EXPECTED_BLOCKED_HELPERS_BY_STARTER: Dictionary[String, Array] = {
-	"axiom": ["axiom", "berebell", "bo", "bonko", "brute", "cashmere", "grint", "korath", "morrak", "mortem", "repo"],
-	"bo": ["axiom", "brute", "cashmere"],
+	"axiom": ["axiom", "berebell", "bo", "bonko", "brute", "mara", "grint", "korath", "morrak", "mortem", "repo"],
+	"bo": ["axiom", "brute", "mara"],
 	"bonko": ["axiom", "korath", "repo"],
-	"cashmere": ["axiom", "korath", "repo"],
+	"mara": ["axiom", "korath", "repo"],
 	"korath": ["axiom", "brute"],
 	"morrak": ["brute", "grint", "korath", "repo"],
 	"mortem": ["axiom", "brute"],
@@ -196,7 +196,7 @@ func _first_offer_id(offers: Array[ShopOffer]) -> String:
 	return String(offers[0].id)
 
 func _starter_ids() -> Array[String]:
-	var ids: Array[String] = ["axiom", "bo", "bonko", "cashmere", "korath", "morrak", "mortem", "repo", "sari"]
+	var ids: Array[String] = ["axiom", "bo", "bonko", "mara", "korath", "morrak", "mortem", "repo", "sari"]
 	return ids
 
 func _good_helpers_for(starter_id: String) -> Array[String]:
@@ -211,7 +211,7 @@ func _good_helpers_for(starter_id: String) -> Array[String]:
 			helpers.append("morrak")
 			helpers.append("grint")
 			helpers.append("mortem")
-		"cashmere":
+		"mara":
 			helpers.append("brute")
 			helpers.append("bonko")
 		"korath":

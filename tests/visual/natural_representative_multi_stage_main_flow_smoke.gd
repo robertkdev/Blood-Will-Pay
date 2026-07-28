@@ -1,7 +1,7 @@
 extends "res://tests/visual/natural_bonko_two_stage_main_flow_smoke.gd"
 
 const REPRESENTATIVE_SMOKE_NAME: String = "NaturalRepresentativeMultiStageMainFlowSmoke"
-const REPRESENTATIVE_STARTERS: Array[String] = ["axiom", "brute", "cashmere", "repo", "sari", "bonko"]
+const REPRESENTATIVE_STARTERS: Array[String] = ["axiom", "brute", "mara", "repo", "sari", "bonko"]
 const REPRESENTATIVE_SEEDS: Array[int] = [4101, 4501, 4601, 5101, 5201, 4401]
 const REPRESENTATIVE_TARGET_CHAPTER: int = 4
 const REPRESENTATIVE_TARGET_ROUND: int = 1

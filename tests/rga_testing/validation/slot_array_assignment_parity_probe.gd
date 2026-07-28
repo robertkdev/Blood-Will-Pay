@@ -4,7 +4,7 @@ const SlotStrategyScript: Script = preload("res://scripts/game/combat/movement/s
 const UnitFactoryScript: Script = preload("res://scripts/unit_factory.gd")
 
 const UNIT_IDS: Array[String] = [
-	"bonko", "korath", "sari", "pilfer", "cashmere", "axiom",
+	"bonko", "korath", "sari", "pilfer", "mara", "axiom",
 	"brute", "repo", "hexeon", "luna", "nyxa", "morrak"
 ]
 
