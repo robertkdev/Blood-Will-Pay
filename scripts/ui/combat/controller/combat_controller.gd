@@ -37,6 +37,9 @@ const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.g
 const START_BATTLE_TEXT: String = "Start Battle"
 const START_FORCED_FIGHT_TEXT: String = "Start Opening Fight"
 const BATTLE_LOCKED_TEXT: String = "Battle in progress"
+const BATTLE_PREPARING_TEXT: String = "Preparing battle..."
+const BATTLE_START_TIMEOUT_SECONDS: float = 10.0
+const BATTLE_START_RECOVERY_PREFIX: String = "Battle start recovery:"
 const RESOLVING_PROGRESS_DELAY_SECONDS: float = 3.0
 const RESOLVING_STUCK_WARNING_SECONDS: int = 10
 const RESOLVING_FALLBACK_TEXT: String = "Battle resolved by failsafe"
@@ -152,6 +155,9 @@ var _combat_resolving_active: bool = false
 var _combat_resolving_elapsed: float = 0.0
 var _combat_resolving_last_second: int = -1
 var _combat_resolving_watchdog_seen: bool = false
+var _battle_start_pending: bool = false
+var _battle_start_elapsed: float = 0.0
+var _battle_start_generation: int = 0
 var _hud_snapshot_signature: String = ""
 var _result_banner: PanelContainer = null
 var _encounter_banner: PanelContainer = null
@@ -217,6 +223,7 @@ func teardown() -> void:
 		return
 	_teardown_done = true
 	_auto_loop_running = false
+	_cancel_pending_battle_start()
 	_end_combat_resolving_feedback()
 	_disconnect_controller_signals()
 	var shop_node: Node = _shop_singleton()
@@ -828,6 +835,7 @@ func process(_delta: float) -> void:
 	if arena_container and arena_container.visible:
 		_sync_arena_units()
 	_sync_bottom_combat_visibility()
+	_update_pending_battle_start(_delta)
 	_update_combat_resolving_feedback(_delta)
 
 func _init_game() -> void:
@@ -1132,9 +1140,7 @@ func _on_continue_pressed() -> void:
 			# When bounds are valid, keep as-is
 			if manager.has_method("cache_arena_config"):
 				manager.cache_arena_config(ts, ppos, epos, bounds)
-		Trace.step("Calling manager.start_stage()")
-		manager.start_stage()
-		Trace.step("Returned from manager.start_stage()")
+		_queue_battle_start()
 		return
 	if continue_button.text == "Restart":
 		_init_game()
@@ -1156,7 +1162,75 @@ func _on_continue_pressed() -> void:
 	if economy_ui:
 		economy_ui.set_bet_editable(false)
 	# Do not advance stage here; start whatever GameState currently points to
+	_queue_battle_start()
+
+func _queue_battle_start() -> void:
+	if _battle_start_pending:
+		return
+	_battle_start_pending = true
+	_battle_start_elapsed = 0.0
+	_battle_start_generation += 1
+	var generation: int = _battle_start_generation
+	Trace.step("Battle start queued generation=" + str(generation))
+	call_deferred("_execute_pending_battle_start", generation)
+
+func _execute_pending_battle_start(generation: int) -> void:
+	if not _battle_start_pending or generation != _battle_start_generation:
+		return
+	if manager == null or not is_instance_valid(manager):
+		_recover_pending_battle_start("combat manager became unavailable")
+		return
+	Trace.step("Calling manager.start_stage() generation=" + str(generation))
 	manager.start_stage()
+	Trace.step("Returned from manager.start_stage() generation=" + str(generation))
+	if _battle_start_pending and generation == _battle_start_generation:
+		_recover_pending_battle_start("setup returned before engine readiness")
+
+func _update_pending_battle_start(delta: float) -> void:
+	if not _battle_start_pending:
+		return
+	_battle_start_elapsed += max(0.0, float(delta))
+	if _battle_start_elapsed >= BATTLE_START_TIMEOUT_SECONDS:
+		_recover_pending_battle_start("setup exceeded %ds" % int(BATTLE_START_TIMEOUT_SECONDS))
+
+func _complete_pending_battle_start() -> void:
+	if not _battle_start_pending:
+		return
+	_battle_start_pending = false
+	_battle_start_elapsed = 0.0
+	_battle_start_generation += 1
+
+func _cancel_pending_battle_start() -> void:
+	_battle_start_pending = false
+	_battle_start_elapsed = 0.0
+	_battle_start_generation += 1
+
+func _recover_pending_battle_start(reason: String) -> void:
+	if not _battle_start_pending:
+		return
+	_cancel_pending_battle_start()
+	if manager != null and is_instance_valid(manager):
+		manager.clear_active_battle_runtime()
+		manager.setup_stage_preview()
+	if arena_container != null and arena_container.visible:
+		_exit_combat_arena()
+	if Engine.has_singleton("GameState") or (parent != null and parent.has_node("/root/GameState")):
+		GameState.set_phase(GameState.GamePhase.PREVIEW)
+	if grid_placement != null and manager != null and is_instance_valid(manager):
+		grid_placement.rebuild_enemy_views(manager.enemy_team)
+		enemy_views = grid_placement.get_enemy_views()
+		grid_placement.rebuild_player_views(manager.player_team, false)
+		player_views = grid_placement.get_player_views()
+		refresh_all_views()
+	if continue_button != null:
+		continue_button.disabled = false
+		_set_continue_to_start_text()
+	if attack_button != null:
+		attack_button.disabled = true
+	if economy_ui != null:
+		economy_ui.set_bet_editable(true)
+		economy_ui.refresh()
+	_on_log_line("%s %s; returned to planning." % [BATTLE_START_RECOVERY_PREFIX, reason])
 
 func _on_bench_changed() -> void:
 	# Rebuild bench views first so visuals reflect any immediate bench changes
@@ -1768,6 +1842,9 @@ func _on_bet_changed(val: float) -> void:
 
 func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	Trace.step("CombatView._on_battle_started: begin")
+	_complete_pending_battle_start()
+	if continue_button != null:
+		continue_button.text = BATTLE_LOCKED_TEXT
 	_on_log_line("Prepare to fight.")
 	if projectile_bridge and projectile_bridge.has_method("set_visuals_enabled"):
 		projectile_bridge.set_visuals_enabled(true)
@@ -2789,7 +2866,7 @@ func _begin_combat_resolving_feedback() -> void:
 	_combat_resolving_last_second = -1
 	_combat_resolving_watchdog_seen = false
 	if continue_button != null:
-		continue_button.text = BATTLE_LOCKED_TEXT
+		continue_button.text = BATTLE_PREPARING_TEXT
 
 func _end_combat_resolving_feedback() -> void:
 	_combat_resolving_active = false
@@ -2805,13 +2882,19 @@ func _update_combat_resolving_feedback(delta: float) -> void:
 	if continue_button == null:
 		return
 	_combat_resolving_elapsed += max(0.0, float(delta))
+	if not _battle_start_pending:
+		continue_button.text = BATTLE_LOCKED_TEXT
+		return
 	if _combat_resolving_elapsed < RESOLVING_PROGRESS_DELAY_SECONDS:
 		return
 	var elapsed_seconds: int = int(floor(_combat_resolving_elapsed))
 	if elapsed_seconds == _combat_resolving_last_second:
 		return
 	_combat_resolving_last_second = elapsed_seconds
-	continue_button.text = BATTLE_LOCKED_TEXT
+	if elapsed_seconds >= RESOLVING_STUCK_WARNING_SECONDS:
+		continue_button.text = "Startup delayed %ds..." % elapsed_seconds
+	else:
+		continue_button.text = "Preparing battle %ds..." % elapsed_seconds
 
 func _mark_combat_resolving_fallback() -> void:
 	if not _combat_resolving_active:

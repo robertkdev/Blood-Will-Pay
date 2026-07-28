@@ -219,15 +219,18 @@ func _start_main_scene() -> void:
 
 func _wait_for_first_result(timeout_seconds: float) -> String:
 	var deadline: int = Time.get_ticks_msec() + int(timeout_seconds * 1000.0)
+	var saw_combat: bool = false
 	while Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
 		if get_tree().root.get_node_or_null("LossOverlayLayer") != null:
 			return "loss"
+		if GameState.phase == GameState.GamePhase.COMBAT or Economy.combat_active:
+			saw_combat = true
 		if GameState.phase == GameState.GamePhase.PREVIEW and not Economy.combat_active:
 			if int(GameState.stage_in_chapter) >= 2:
 				if Shop.state != null and Shop.state.offers.size() == int(SHOP_CONFIG.SLOT_COUNT):
 					return "shop"
-			else:
+			elif saw_combat:
 				return "retry"
 	return "timeout"
 

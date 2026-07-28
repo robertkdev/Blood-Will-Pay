@@ -163,6 +163,42 @@ async def _wait_for_capture(
     )
 
 
+async def _wait_for_editor_ready(
+    session: ClientSession,
+    session_id: str,
+    wait_seconds: float,
+) -> dict[str, Any]:
+    """Require two stable ready polls before launching a stopped project."""
+    deadline: float = asyncio.get_running_loop().time() + max(wait_seconds, 0.5)
+    last_state: dict[str, Any] = {}
+    consecutive_ready: int = 0
+    while asyncio.get_running_loop().time() < deadline:
+        state_result: Any = await _call(
+            session,
+            "editor_state",
+            {"session_id": session_id},
+        )
+        last_state = _result_json(state_result)
+        status: str = str(last_state.get("game_status", {}).get("status", ""))
+        if status == "break":
+            raise RuntimeError(
+                "Godot entered debugger break before the editor became ready. "
+                "Read editor/game logs and stop the broken run through MCP."
+            )
+        readiness: str = str(last_state.get("readiness", "")).casefold()
+        if readiness == "ready" and not _game_is_active(last_state):
+            consecutive_ready += 1
+            if consecutive_ready >= 2:
+                return last_state
+        else:
+            consecutive_ready = 0
+        await asyncio.sleep(0.25)
+    raise TimeoutError(
+        f"Godot editor was not stably ready after {wait_seconds:.1f}s: "
+        f"{json.dumps(last_state)}"
+    )
+
+
 def _paeth_predictor(left: int, up: int, upper_left: int) -> int:
     estimate: int = left + up - upper_left
     left_distance: int = abs(estimate - left)
@@ -370,6 +406,11 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
             )
             game_active: bool = _game_is_active(initial_state)
             if args.run != "none" and not game_active:
+                await _wait_for_editor_ready(
+                    session,
+                    session_id,
+                    args.wait_seconds,
+                )
                 run_arguments: dict[str, Any] = {
                     "mode": args.run,
                     "autosave": False,

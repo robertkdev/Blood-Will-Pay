@@ -445,8 +445,6 @@ func start_stage() -> void:
 	player_team = _state.player_team
 	enemy_team = _state.enemy_team
 	enemy = BattleState.first_alive(_state.enemy_team)
-	Trace.step("CM.start_stage: emit battle_started")
-	emit_signal("battle_started", stage, enemy)
 	if enemy:
 		var name2: String = (_state.enemy_team[1].name if _state.enemy_team.size() > 1 else "?")
 		emit_signal("log_line", "=== Stage %d: %s and %s appear! ===" % [stage, _state.enemy_team[0].name, name2])
@@ -499,6 +497,8 @@ func start_stage() -> void:
 	var e_traits: Dictionary = tc.compile(_state.enemy_team)
 	_log_trait_summary("Your team", p_traits)
 	_log_trait_summary("Enemy team", e_traits)
+	Trace.step("CM.start_stage: emit battle_started")
+	emit_signal("battle_started", stage, enemy)
 	Trace.step("CM.start_stage: end")
 
 func start_custom_battle(player_ids: Array[String], enemy_ids: Array[String], options: Dictionary[String, Variant] = {}) -> Dictionary[String, Variant]:
@@ -529,7 +529,6 @@ func start_custom_battle(player_ids: Array[String], enemy_ids: Array[String], op
 	var label: String = String(options.get("label", "Agent Battle Lab")).strip_edges()
 	if label == "":
 		label = "Agent Battle Lab"
-	emit_signal("battle_started", stage, enemy)
 	emit_signal("log_line", "=== %s: %d vs %d ===" % [label, _state.player_team.size(), _state.enemy_team.size()])
 	var pref: Unit = BattleState.first_alive(_state.player_team)
 	if pref == null and _state.player_team.size() > 0:
@@ -567,6 +566,7 @@ func start_custom_battle(player_ids: Array[String], enemy_ids: Array[String], op
 	var e_traits: Dictionary = tc.compile(_state.enemy_team)
 	_log_trait_summary("Lab player team", p_traits)
 	_log_trait_summary("Lab enemy team", e_traits)
+	emit_signal("battle_started", stage, enemy)
 	result["ok"] = true
 	result["player_count"] = _state.player_team.size()
 	result["enemy_count"] = _state.enemy_team.size()

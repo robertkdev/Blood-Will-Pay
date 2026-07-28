@@ -101,6 +101,9 @@ func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Diction
 	await _select_starter(starter_id)
 	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	var board_repositioned: bool = false
+	if combat_opened:
+		_prepare_opener_planning(starter_id)
+		await _press_continue(true, "starter %s opening fight" % starter_id)
 	var first_result: String = await _wait_for_first_result(_first_fight_timeout_seconds())
 	var result: Dictionary = {
 		"id": starter_id,

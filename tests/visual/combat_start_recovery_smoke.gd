@@ -20,6 +20,7 @@ func _run() -> void:
 
 	var controller: Variant = _view.get("controller")
 	var button: Button = _view.find_child("ContinueButton", true, false) as Button
+	var log_label: RichTextLabel = _view.find_child("LogLabel", true, false) as RichTextLabel
 	if controller == null:
 		_fail("CombatView controller missing")
 	if button == null:
@@ -28,24 +29,20 @@ func _run() -> void:
 		_finish()
 		return
 
+	button.disabled = true
 	controller.call("_begin_combat_resolving_feedback")
 	controller.set("_battle_start_pending", true)
-	_expect(String(button.text) == "Preparing battle...", "initial startup text should be immediate")
+	controller.set("_battle_start_elapsed", 0.0)
+	controller.call("_update_pending_battle_start", 10.1)
 
-	controller.call("_update_combat_resolving_feedback", 2.0)
-	_expect(String(button.text) == "Preparing battle...", "startup text should not count before delay")
-
-	controller.call("_update_combat_resolving_feedback", 1.2)
-	_expect(String(button.text) == "Preparing battle 3s...", "startup text should show elapsed seconds after delay")
-
-	controller.call("_update_combat_resolving_feedback", 7.0)
-	_expect(String(button.text) == "Startup delayed 10s...", "long startup text should warn after 10 seconds")
-
-	controller.call("_on_log_line", "Combat no-progress timeout: forcing result from current board state.")
-	_expect(String(button.text) == "Battle resolved by failsafe", "watchdog log should switch button to fallback text")
-
-	controller.call("_update_combat_resolving_feedback", 3.0)
-	_expect(String(button.text) == "Battle resolved by failsafe", "fallback text should not be overwritten by timer updates")
+	_expect(not bool(controller.get("_battle_start_pending")), "timed-out startup should clear pending state")
+	_expect(not button.disabled, "timed-out startup should re-enable the start button")
+	_expect(String(button.text) == "Start Opening Fight" or String(button.text) == "Start Battle", "timed-out startup should restore start text")
+	_expect(GameState.phase == GameState.GamePhase.PREVIEW, "timed-out startup should return to planning")
+	var manager: Variant = controller.get("manager")
+	_expect(manager != null and manager.get_engine() == null, "timed-out startup should clear partial combat runtime")
+	if log_label != null:
+		_expect(log_label.get_parsed_text().contains("Battle start recovery:"), "recovery should be visible in the combat log")
 
 	_finish()
 
@@ -58,12 +55,12 @@ func _finish() -> void:
 			view_parent.remove_child(_view)
 		_view.free()
 		_view = null
-	if _failures.size() > 0:
+	if not _failures.is_empty():
 		for failure: String in _failures:
-			push_error("CombatResolvingFeedbackSmoke: " + failure)
+			push_error("CombatStartRecoverySmoke: " + failure)
 		get_tree().quit(1)
 		return
-	print("CombatResolvingFeedbackSmoke: OK")
+	print("CombatStartRecoverySmoke: OK")
 	get_tree().quit(0)
 
 func _expect(condition: bool, message: String) -> void:
