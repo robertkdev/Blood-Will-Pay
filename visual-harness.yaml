@@ -1,6 +1,29 @@
 version: 1
 project: Gamble Battle
 scenarios:
+  - id: godot-visibility
+    title: Godot player-facing visibility gate
+    adapter: godot
+    objective: Prove the current integration worktree can launch Main.tscn and yield a fresh, visually nonblank player-facing framebuffer capture.
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Capture-GodotVisibilityEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/godot_visibility/captures.json"
+    required_groups: [overview]
+    runtime_provenance:
+      entrypoint: "Godot editor game framebuffer"
+      scene: "res://scenes/Main.tscn"
+      build: "current integration worktree"
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [title_ready]
+      required_viewports: [desktop-1920x1080]
+      required_events: [title_ready]
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 300
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 1
+    telegram_context: "Gamble Battle Godot visibility"
   - id: encounter-escalation
     title: Boss escalation runtime sequence
     adapter: godot

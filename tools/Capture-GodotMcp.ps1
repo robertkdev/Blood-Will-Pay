@@ -21,6 +21,12 @@ param(
     [ValidateRange(1, 120)]
     [int] $WaitSeconds = 20,
 
+    [ValidateRange(1, 120)]
+    [int] $VisualWaitSeconds = 15,
+
+    [ValidateRange(1, 10)]
+    [int] $ConnectionAttempts = 3,
+
     [ValidateRange(1, 65535)]
     [int] $Port = 8000
 )
@@ -59,7 +65,9 @@ $clientArguments = @(
     "--run", $Run,
     "--source", $Source,
     "--max-resolution", $MaxResolution.ToString(),
-    "--wait-seconds", $WaitSeconds.ToString()
+    "--wait-seconds", $WaitSeconds.ToString(),
+    "--visual-wait-seconds", $VisualWaitSeconds.ToString(),
+    "--connection-attempts", $ConnectionAttempts.ToString()
 )
 if (-not [string]::IsNullOrWhiteSpace($SessionHint)) {
     $clientArguments += @("--session-hint", $SessionHint)

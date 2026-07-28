@@ -10,7 +10,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import struct
+import time
 from typing import Any
+import zlib
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
@@ -37,6 +40,8 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max-resolution", type=int, default=0)
     parser.add_argument("--wait-seconds", type=float, default=20.0)
+    parser.add_argument("--visual-wait-seconds", type=float, default=15.0)
+    parser.add_argument("--connection-attempts", type=int, default=3)
     return parser.parse_args()
 
 
@@ -66,6 +71,17 @@ def _raise_for_tool_error(tool_name: str, result: Any) -> None:
 
 def _normalize_path(value: str) -> str:
     return os.path.normcase(os.path.abspath(value.rstrip("/\\")))
+
+
+def _game_is_active(state: dict[str, Any]) -> bool:
+    game_status: dict[str, Any] = state.get("game_status", {})
+    status: str = str(game_status.get("status", ""))
+    return bool(
+        game_status.get("active", False)
+        or state.get("session_active", False)
+        or state.get("is_playing", False)
+        or status not in ("", "not_live", "stopped")
+    )
 
 
 def _choose_session(
@@ -147,6 +163,188 @@ async def _wait_for_capture(
     )
 
 
+def _paeth_predictor(left: int, up: int, upper_left: int) -> int:
+    estimate: int = left + up - upper_left
+    left_distance: int = abs(estimate - left)
+    up_distance: int = abs(estimate - up)
+    upper_left_distance: int = abs(estimate - upper_left)
+    if left_distance <= up_distance and left_distance <= upper_left_distance:
+        return left
+    if up_distance <= upper_left_distance:
+        return up
+    return upper_left
+
+
+def _png_visual_metrics(image_bytes: bytes) -> dict[str, Any]:
+    """Measure whether a Godot PNG contains visible pixels without Pillow."""
+    if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("Screenshot payload is not a PNG")
+
+    offset: int = 8
+    width: int = 0
+    height: int = 0
+    bit_depth: int = 0
+    color_type: int = -1
+    interlace: int = -1
+    compressed_parts: list[bytes] = []
+    while offset + 12 <= len(image_bytes):
+        length: int = struct.unpack(">I", image_bytes[offset : offset + 4])[0]
+        chunk_type: bytes = image_bytes[offset + 4 : offset + 8]
+        data_start: int = offset + 8
+        data_end: int = data_start + length
+        if data_end + 4 > len(image_bytes):
+            raise ValueError("Screenshot PNG contains a truncated chunk")
+        chunk_data: bytes = image_bytes[data_start:data_end]
+        if chunk_type == b"IHDR":
+            width, height, bit_depth, color_type, _, _, interlace = struct.unpack(
+                ">IIBBBBB",
+                chunk_data,
+            )
+        elif chunk_type == b"IDAT":
+            compressed_parts.append(chunk_data)
+        elif chunk_type == b"IEND":
+            break
+        offset = data_end + 4
+
+    channels_by_color_type: dict[int, int] = {0: 1, 2: 3, 4: 2, 6: 4}
+    if (
+        width <= 0
+        or height <= 0
+        or bit_depth != 8
+        or color_type not in channels_by_color_type
+        or interlace != 0
+        or not compressed_parts
+    ):
+        raise ValueError(
+            "Unsupported screenshot PNG layout "
+            f"(width={width}, height={height}, bit_depth={bit_depth}, "
+            f"color_type={color_type}, interlace={interlace})"
+        )
+
+    channels: int = channels_by_color_type[color_type]
+    stride: int = width * channels
+    raw: bytes = zlib.decompress(b"".join(compressed_parts))
+    expected_length: int = height * (stride + 1)
+    if len(raw) != expected_length:
+        raise ValueError(
+            "Screenshot PNG scanline size mismatch "
+            f"(expected={expected_length}, actual={len(raw)})"
+        )
+
+    previous: bytearray = bytearray(stride)
+    visible_pixels: int = 0
+    sampled_pixels: int = 0
+    max_channel: int = 0
+    sample_step: int = max(1, (width * height) // 100_000)
+    raw_offset: int = 0
+    pixel_index: int = 0
+    for _row_index in range(height):
+        filter_type: int = raw[raw_offset]
+        raw_offset += 1
+        filtered: bytes = raw[raw_offset : raw_offset + stride]
+        raw_offset += stride
+        reconstructed: bytearray = bytearray(stride)
+        for index, value in enumerate(filtered):
+            left: int = reconstructed[index - channels] if index >= channels else 0
+            up: int = previous[index]
+            upper_left: int = previous[index - channels] if index >= channels else 0
+            if filter_type == 0:
+                reconstructed[index] = value
+            elif filter_type == 1:
+                reconstructed[index] = (value + left) & 0xFF
+            elif filter_type == 2:
+                reconstructed[index] = (value + up) & 0xFF
+            elif filter_type == 3:
+                reconstructed[index] = (value + ((left + up) // 2)) & 0xFF
+            elif filter_type == 4:
+                reconstructed[index] = (
+                    value + _paeth_predictor(left, up, upper_left)
+                ) & 0xFF
+            else:
+                raise ValueError(f"Unsupported screenshot PNG filter {filter_type}")
+
+        for column in range(width):
+            if pixel_index % sample_step != 0:
+                pixel_index += 1
+                continue
+            start: int = column * channels
+            if color_type == 0:
+                red = green = blue = reconstructed[start]
+                alpha: int = 255
+            elif color_type == 2:
+                red, green, blue = reconstructed[start : start + 3]
+                alpha = 255
+            elif color_type == 4:
+                red = green = blue = reconstructed[start]
+                alpha = reconstructed[start + 1]
+            else:
+                red, green, blue, alpha = reconstructed[start : start + 4]
+            brightest: int = max(red, green, blue)
+            max_channel = max(max_channel, brightest)
+            sampled_pixels += 1
+            if alpha > 8 and brightest > 8:
+                visible_pixels += 1
+            pixel_index += 1
+        previous = reconstructed
+
+    visible_ratio: float = (
+        float(visible_pixels) / float(sampled_pixels) if sampled_pixels else 0.0
+    )
+    return {
+        "width": width,
+        "height": height,
+        "sampled_pixels": sampled_pixels,
+        "visible_pixels": visible_pixels,
+        "visible_ratio": visible_ratio,
+        "max_channel": max_channel,
+        "nonblank": max_channel >= 16 and visible_ratio >= 0.0005,
+    }
+
+
+async def _capture_visible_frame(
+    session: ClientSession,
+    session_id: str,
+    source: str,
+    max_resolution: int,
+    wait_seconds: float,
+) -> tuple[Any, bytes, dict[str, Any], int]:
+    deadline: float = asyncio.get_running_loop().time() + max(wait_seconds, 0.5)
+    last_metrics: dict[str, Any] = {}
+    attempts: int = 0
+    while asyncio.get_running_loop().time() < deadline:
+        attempts += 1
+        screenshot_result: Any = await _call(
+            session,
+            "editor_screenshot",
+            {
+                "source": source,
+                "max_resolution": max_resolution,
+                "include_image": True,
+                "session_id": session_id,
+            },
+        )
+        image_items: list[Any] = [
+            item
+            for item in screenshot_result.content
+            if getattr(item, "type", None) == "image"
+        ]
+        if not image_items:
+            raise RuntimeError(
+                "editor_screenshot returned no image: "
+                + " | ".join(_result_texts(screenshot_result))
+            )
+        image_bytes: bytes = base64.b64decode(image_items[0].data)
+        last_metrics = _png_visual_metrics(image_bytes)
+        if bool(last_metrics["nonblank"]):
+            return image_items[0], image_bytes, last_metrics, attempts
+        await asyncio.sleep(0.5)
+    raise TimeoutError(
+        "Godot framebuffer remained visually blank after "
+        f"{wait_seconds:.1f}s and {attempts} capture attempts: "
+        f"{json.dumps(last_metrics)}"
+    )
+
+
 async def _capture(args: argparse.Namespace) -> dict[str, Any]:
     if args.run == "custom" and not args.scene:
         raise ValueError("--scene is required when --run custom is selected")
@@ -170,9 +368,7 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
             initial_state: dict[str, Any] = _result_json(
                 await _call(session, "editor_state", {"session_id": session_id})
             )
-            game_active: bool = bool(
-                initial_state.get("game_status", {}).get("active", False)
-            )
+            game_active: bool = _game_is_active(initial_state)
             if args.run != "none" and not game_active:
                 run_arguments: dict[str, Any] = {
                     "mode": args.run,
@@ -194,54 +390,70 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 args.source,
                 args.wait_seconds,
             )
-            screenshot_result: Any = await _call(
+            (
+                image_item,
+                image_bytes,
+                visual_metrics,
+                capture_attempts,
+            ) = await _capture_visible_frame(
                 session,
-                "editor_screenshot",
-                {
-                    "source": args.source,
-                    "max_resolution": args.max_resolution,
-                    "include_image": True,
-                    "session_id": session_id,
-                },
+                session_id,
+                args.source,
+                args.max_resolution,
+                args.visual_wait_seconds,
             )
-            image_items: list[Any] = [
-                item
-                for item in screenshot_result.content
-                if getattr(item, "type", None) == "image"
-            ]
-            if not image_items:
-                raise RuntimeError(
-                    "editor_screenshot returned no image: "
-                    + " | ".join(_result_texts(screenshot_result))
-                )
-
-            image_bytes: bytes = base64.b64decode(image_items[0].data)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_bytes)
-            metadata: dict[str, Any] = _result_json(screenshot_result)
             return {
                 "ok": True,
                 "output": str(output_path),
                 "bytes": len(image_bytes),
                 "sha256": hashlib.sha256(image_bytes).hexdigest(),
-                "mime_type": str(image_items[0].mimeType),
+                "mime_type": str(image_item.mimeType),
                 "session_id": session_id,
                 "project_path": str(selected.get("project_path", "")),
                 "source": args.source,
-                "capture": metadata,
+                "capture_attempts": capture_attempts,
+                "visual_metrics": visual_metrics,
                 "game_status": ready_state.get("game_status", {}),
             }
 
 
+def _exception_messages(exc: BaseException) -> list[str]:
+    nested: tuple[BaseException, ...] = getattr(exc, "exceptions", ())
+    if nested:
+        messages: list[str] = []
+        for child in nested:
+            messages.extend(_exception_messages(child))
+        return messages
+    message: str = str(exc).strip()
+    return [f"{type(exc).__name__}: {message}" if message else type(exc).__name__]
+
+
 def main() -> int:
     args: argparse.Namespace = _parse_args()
-    try:
-        result: dict[str, Any] = asyncio.run(_capture(args))
-    except Exception as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=True))
-        return 1
-    print(json.dumps(result, ensure_ascii=True))
-    return 0
+    attempts: int = max(1, args.connection_attempts)
+    errors: list[str] = []
+    for attempt in range(1, attempts + 1):
+        try:
+            result: dict[str, Any] = asyncio.run(_capture(args))
+        except Exception as exc:
+            errors.extend(
+                f"attempt {attempt}: {message}" for message in _exception_messages(exc)
+            )
+            if attempt < attempts:
+                time.sleep(0.5)
+                continue
+            print(
+                json.dumps(
+                    {"ok": False, "attempts": attempt, "errors": errors},
+                    ensure_ascii=True,
+                )
+            )
+            return 1
+        print(json.dumps(result, ensure_ascii=True))
+        return 0
+    return 1
 
 
 if __name__ == "__main__":
