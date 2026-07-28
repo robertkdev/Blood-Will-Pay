@@ -65,11 +65,13 @@ if (archiveImageCount !== 30) fail(`Expected 30 official archive images, got ${a
 	"function comparisonColumn(count, index)",
 	"comparison-grid",
 	"Active review + pinned references",
+	"src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)",
 	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
 	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()"
 ].forEach(requireText);
 
 if (html.includes("Six pins maximum") || html.includes("0 / 6")) fail("The comparison tool still exposes the old six-pin limit.");
+if (html.includes("src: config.src || encodeURI(\"../../\" + config.path)")) fail("Candidate and remembered art must load from the main project asset server.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 
 console.log("UNIT_ART_REVIEW_STATIC: PASS curated=21 mara=17 archive=30 canonical=mara pins=5 active-review=1");
