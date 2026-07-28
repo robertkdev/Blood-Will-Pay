@@ -197,6 +197,7 @@
 		}
 
 		.tile {
+			position: relative;
 			display: grid;
 			grid-template-rows: auto auto auto;
 			gap: 11px;
@@ -206,6 +207,27 @@
 			padding: 12px;
 			background: var(--panel);
 			box-shadow: none;
+		}
+
+		.tile[data-pinned="true"] {
+			border-color: var(--gold);
+			box-shadow: 0 0 0 2px rgba(194, 160, 102, 0.2);
+		}
+
+		.pin-badge {
+			position: absolute;
+			z-index: 2;
+			top: 18px;
+			right: 18px;
+			border: 1px solid #d8bb83;
+			border-radius: 999px;
+			padding: 4px 7px;
+			background: rgba(20, 17, 16, 0.92);
+			color: #f5dfb6;
+			font-size: 10px;
+			font-weight: 750;
+			letter-spacing: 0.08em;
+			pointer-events: none;
 		}
 
 		.tile[data-choice="like"] {
@@ -343,10 +365,100 @@
 			user-select: none;
 		}
 
-		.preview-body img {
+		.preview-body > #preview-image {
+			width: 100%;
+			height: 100%;
+			min-width: 0;
+			min-height: 0;
 			max-width: 100%;
 			max-height: 100%;
+			padding: clamp(24px, 4vw, 72px);
 			object-fit: contain;
+		}
+
+		.comparison-grid {
+			display: none;
+			grid-template-columns: repeat(6, minmax(0, 1fr));
+			grid-auto-rows: minmax(0, 1fr);
+			gap: clamp(8px, 1.2vw, 16px);
+			width: min(100%, 1600px);
+			height: 100%;
+			min-height: 0;
+			margin: auto;
+		}
+
+		.comparison-card {
+			display: grid;
+			grid-template-rows: minmax(0, 1fr) auto;
+			min-width: 0;
+			min-height: 0;
+			overflow: hidden;
+			border: 1px solid #6c583c;
+			background: rgba(13, 12, 10, 0.82);
+		}
+
+		.comparison-art {
+			position: relative;
+			display: grid;
+			place-items: center;
+			min-width: 0;
+			min-height: 0;
+			overflow: hidden;
+		}
+
+		.comparison-art img {
+			position: absolute;
+			inset: 0;
+			display: block;
+			width: 100%;
+			height: 100%;
+			min-width: 0;
+			min-height: 0;
+			max-width: 100%;
+			max-height: 100%;
+			padding: clamp(10px, 2vw, 30px);
+			object-fit: contain;
+		}
+
+		.comparison-caption {
+			display: grid;
+			gap: 2px;
+			padding: 8px 10px 10px;
+			border-top: 1px solid rgba(108, 88, 60, 0.65);
+			background: rgba(22, 19, 16, 0.95);
+		}
+
+		.comparison-caption strong {
+			font-family: Georgia, "Times New Roman", serif;
+			font-size: clamp(14px, 1.2vw, 18px);
+		}
+
+		.comparison-caption span {
+			overflow: hidden;
+			color: var(--muted);
+			font-size: 11px;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		dialog[data-mode="comparison"] .preview-workspace {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		dialog[data-mode="comparison"] .preview-body {
+			overflow: auto;
+			cursor: default;
+		}
+
+		dialog[data-mode="comparison"] .comparison-grid {
+			display: grid;
+		}
+
+		dialog[data-mode="comparison"] #preview-image,
+		dialog[data-mode="comparison"] .preview-side-hint,
+		dialog[data-mode="comparison"] .review-sidebar,
+		dialog[data-mode="comparison"] .preview-foot {
+			display: none;
 		}
 
 		.preview-workspace {
@@ -616,6 +728,20 @@
 				padding-bottom: 250px;
 			}
 
+			dialog[data-mode="comparison"] .preview-body {
+				padding: 10px;
+			}
+
+			.comparison-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				grid-auto-rows: minmax(210px, 1fr);
+				height: auto;
+			}
+
+			.comparison-card {
+				grid-column: auto !important;
+			}
+
 			.review-sidebar {
 				position: absolute;
 				z-index: 4;
@@ -695,6 +821,7 @@
 			<div class="pill">Maybe <strong id="count-maybe">0</strong></div>
 			<div class="pill">Cut <strong id="count-cut">0</strong></div>
 			<div class="pill">Open <strong id="count-open">0</strong></div>
+			<button id="show-pins" class="pill" type="button" title="Open pinned comparison">Pinned <strong id="count-pinned">0 / 6</strong></button>
 		</section>
 
 		<main id="grid" class="grid" aria-live="polite"></main>
@@ -713,6 +840,7 @@
 				<div class="preview-body" id="preview-body">
 					<button id="previous-unit-side" class="preview-side-hint prev" type="button" aria-label="Previous unit">&lsaquo;</button>
 					<img id="preview-image" src="" alt="">
+					<div id="comparison-grid" class="comparison-grid" aria-label="Pinned art comparison"></div>
 					<button id="next-unit-side" class="preview-side-hint next" type="button" aria-label="Next unit">&rsaquo;</button>
 				</div>
 				<aside class="review-sidebar" aria-label="Version review tools">
@@ -765,6 +893,8 @@
 		const STORAGE_KEY = "blood-will-pay-unit-art-review-v1";
 		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
 		const COMMENTS_KEY = "blood-will-pay-unit-art-comments-v1";
+		const PINS_KEY = "blood-will-pay-unit-art-pins-v1";
+		const MAX_PINS = 6;
 		const LIVE_ART = [
 			"axiom.png",
 			"bastionne.png",
@@ -824,6 +954,8 @@
 			// The retired filename is preserved for provenance only; it is not approved Mara art.
 			unit: file === "cashmere.png" ? "mara" : file.replace(/\.png$/i, ""),
 			kind: file === "cashmere.png" ? "legacy-placeholder" : "live",
+			version: file === "creep.png" ? "V5 (promoted live)" : "",
+			contentKey: file === "creep.png" ? "assets/units/creep.png" : "",
 			path: "assets/units/" + file,
 			src: ASSET_ROOT + encodeURIComponent(file)
 		}));
@@ -969,9 +1101,9 @@
 			{ unit: "veyra", role: "Tank", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/veyra/p2-01.png" },
 			{ unit: "veyra", role: "Tank", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/veyra/p2-02.png" },
 			{ unit: "veyra", role: "Tank", status: "Reapproval pending", version: "P2-03", title: "Cocoon Core / Repaired Reapproval Cut", current: true, path: "units/veyra.png" },
-			{ unit: "cashmere", role: "Mage", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/cashmere/p2-01.png" },
-			{ unit: "cashmere", role: "Mage", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/cashmere/p2-02.png" },
-			{ unit: "cashmere", role: "Mage", status: "Reapproval pending", version: "P2-03", title: "Repaired Reapproval Cut", current: true, path: "units/cashmere.png" },
+			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/cashmere/p2-01.png" },
+			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/cashmere/p2-02.png" },
+			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-03", title: "Repaired Reapproval Cut", current: true, path: "units/cashmere.png" },
 			{ unit: "pilfer", role: "Assassin", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/pilfer/p2-01.png" },
 			{ unit: "pilfer", role: "Assassin", status: "Reinspection pending", version: "P2-02", title: "Board-Era Revision", current: true, path: "units/pilfer.png" },
 			{ unit: "nyxa", role: "Marksman", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/nyxa/p2-01.png" },
@@ -1023,8 +1155,11 @@
 			sourceUnit: [item.source_unit, ...(HISTORY_SEARCH_ALIASES[normalizeUnitId(item.unit)] || [])].join(" "),
 			kind: item.kind || "history",
 			note: item.label || "Historical art",
+			status: item.status || "",
+			version: item.version || "",
+			contentKey: item.content_key || "",
 			path: item.path,
-			src: encodeURI(LOCAL_PROJECT_ASSET_ROOT + item.path)
+			src: item.local_path ? encodeURI("./" + item.local_path) : encodeURI(LOCAL_PROJECT_ASSET_ROOT + item.path)
 		}));
 		const ALL_UNIT_ART = [];
 		const LIVE_UNIT_CURRENT = new Map();
@@ -1042,7 +1177,7 @@
 		const ART_SETS = {
 			all: ALL_UNIT_ART,
 			phase2: PHASE2_ART,
-			history: HISTORICAL_ART,
+			history: [...PHASE2_ART, ...HISTORICAL_ART],
 			live: LIVE_ART,
 			candidates: CANDIDATE_ART,
 			remembered: REMEMBERED_ART
@@ -1055,6 +1190,8 @@
 			tileSize: 170,
 			decisions: loadDecisions(),
 			comments: loadComments(),
+			pins: loadPins(),
+			previewMode: "single",
 			previewUnits: [],
 			previewUnitIndex: -1,
 			previewVersions: [],
@@ -1071,11 +1208,13 @@
 			maybe: document.getElementById("count-maybe"),
 			cut: document.getElementById("count-cut"),
 			open: document.getElementById("count-open"),
+			pinned: document.getElementById("count-pinned"),
 			preview: document.getElementById("preview"),
 			previewBody: document.getElementById("preview-body"),
 			previewName: document.getElementById("preview-name"),
 			previewPath: document.getElementById("preview-path"),
 			previewImage: document.getElementById("preview-image"),
+			comparisonGrid: document.getElementById("comparison-grid"),
 			previewStatus: document.getElementById("preview-status"),
 			versionSelect: document.getElementById("version-select"),
 			versionMeta: document.getElementById("version-meta"),
@@ -1152,6 +1291,14 @@
 			}
 		});
 
+		document.getElementById("show-pins").addEventListener("click", () => {
+			if (!pinnedItems().length) {
+				showToast("Right-click art cards to pin up to six.");
+				return;
+			}
+			openComparisonPreview();
+		});
+
 		document.getElementById("close-preview").addEventListener("click", () => {
 			els.preview.close();
 		});
@@ -1196,6 +1343,9 @@
 
 		els.preview.addEventListener("keydown", (event) => {
 			if (event.target.matches("input, textarea, select") || event.target.isContentEditable) {
+				return;
+			}
+			if (state.previewMode === "comparison") {
 				return;
 			}
 			if (event.key === "ArrowLeft") {
@@ -1252,6 +1402,7 @@
 				version: config.version || "",
 				title: config.title || note,
 				current: Boolean(config.current),
+				contentKey: config.contentKey || "",
 				path: config.path,
 				id,
 				src: config.src || encodeURI("../../" + config.path)
@@ -1267,10 +1418,11 @@
 			return [PHASE2_ART, LIVE_ART, CANDIDATE_ART, REMEMBERED_ART, HISTORICAL_ART]
 				.flat()
 				.filter((item) => {
-					if (seen.has(item.path)) {
+					const identity = item.contentKey || item.path;
+					if (seen.has(identity)) {
 						return false;
 					}
-					seen.add(item.path);
+					seen.add(identity);
 					return true;
 				});
 		}
@@ -1292,10 +1444,11 @@
 		function versionsForUnit(unit) {
 			const seen = new Set();
 			return allArtItems().filter((item) => {
-				if (normalizeUnitId(item.unit) !== normalizeUnitId(unit) || seen.has(item.path)) {
+				const identity = item.contentKey || item.path;
+				if (normalizeUnitId(item.unit) !== normalizeUnitId(unit) || seen.has(identity)) {
 					return false;
 				}
-				seen.add(item.path);
+				seen.add(identity);
 				return true;
 			});
 		}
@@ -1324,7 +1477,11 @@
 			els.grid.replaceChildren(...visible.map((item, index) => renderTile(item, index, visible)));
 			updateCounts(visible.length);
 			if (els.preview.open) {
-				updatePreviewChoice();
+				if (state.previewMode === "comparison") {
+					updateComparisonPreview();
+				} else {
+					updatePreviewChoice();
+				}
 			}
 		}
 
@@ -1332,14 +1489,21 @@
 			const choice = state.decisions[item.key] || "";
 			const tile = document.createElement("article");
 			tile.className = "tile";
+			const isPinned = state.pins.includes(item.key);
+			tile.dataset.pinned = String(isPinned);
+			tile.title = isPinned ? "Right-click to unpin" : "Right-click to pin for comparison";
 			if (choice) {
 				tile.dataset.choice = choice;
 			}
+			tile.addEventListener("contextmenu", (event) => {
+				event.preventDefault();
+				togglePin(item);
+			});
 
 			const frame = document.createElement("button");
 			frame.type = "button";
 			frame.className = "art-frame";
-			frame.title = item.path;
+			frame.title = item.path + " · right-click card to " + (isPinned ? "unpin" : "pin");
 			frame.addEventListener("click", () => openPreview(visible, index));
 
 			const image = document.createElement("img");
@@ -1384,6 +1548,12 @@
 				setDecision(item.key, "");
 			});
 
+			if (isPinned) {
+				const pinBadge = document.createElement("span");
+				pinBadge.className = "pin-badge";
+				pinBadge.textContent = "PINNED";
+				tile.append(pinBadge);
+			}
 			tile.append(frame, meta, decisions, clear);
 			return tile;
 		}
@@ -1391,7 +1561,7 @@
 		function filteredItems() {
 			return currentItems().filter((item) => {
 				const choice = state.decisions[item.key] || "";
-				const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note, item.path].join(" ").toLowerCase();
+				const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(" ").toLowerCase();
 				const matchesQuery = !state.query || haystack.includes(state.query);
 				const matchesFilter =
 					state.filter === "all" ||
@@ -1419,6 +1589,7 @@
 			els.maybe.textContent = String(counts.maybe);
 			els.cut.textContent = String(counts.cut);
 			els.open.textContent = String(counts.open);
+			els.pinned.textContent = state.pins.length + " / " + MAX_PINS;
 			els.visibleCount.textContent = visibleCount + " shown from " + setLabel(state.set);
 		}
 
@@ -1436,7 +1607,13 @@
 		}
 
 		function openPreview(items, index) {
+			if (pinnedItems().length) {
+				openComparisonPreview();
+				return;
+			}
 			const selectedItem = items[index];
+			state.previewMode = "single";
+			els.preview.dataset.mode = "single";
 			state.previewUnits = uniqueUnits(items);
 			state.previewPreferredKeys = items.reduce((preferred, item) => {
 				const unit = normalizeUnitId(item.unit);
@@ -1451,6 +1628,96 @@
 			els.reviewSidebar.scrollTop = 0;
 			els.preview.scrollTop = 0;
 			els.preview.showModal();
+		}
+
+		function openComparisonPreview() {
+			state.previewMode = "comparison";
+			els.preview.dataset.mode = "comparison";
+			updateComparisonPreview();
+			els.preview.scrollTop = 0;
+			if (!els.preview.open) {
+				els.preview.showModal();
+			}
+		}
+
+		function pinnedItems() {
+			const byKey = new Map(allArtItems().map((item) => [item.key, item]));
+			return state.pins.map((key) => byKey.get(key)).filter(Boolean).slice(0, MAX_PINS);
+		}
+
+		function togglePin(item) {
+			const index = state.pins.indexOf(item.key);
+			if (index >= 0) {
+				state.pins.splice(index, 1);
+				showToast(displayUnitName(item.unit) + " unpinned.");
+			} else {
+				if (state.pins.length >= MAX_PINS) {
+					showToast("Six pins maximum. Unpin one before adding another.");
+					return;
+				}
+				state.pins.push(item.key);
+				showToast(displayUnitName(item.unit) + " pinned · " + state.pins.length + " / " + MAX_PINS);
+			}
+			savePins();
+			render();
+			if (state.previewMode === "comparison" && els.preview.open && !pinnedItems().length) {
+				els.preview.close();
+			}
+		}
+
+		function updateComparisonPreview() {
+			const items = pinnedItems();
+			if (!items.length) {
+				if (els.preview.open) {
+					els.preview.close();
+				}
+				return;
+			}
+			state.pins = items.map((item) => item.key);
+			savePins();
+			els.previewName.textContent = "Pinned Comparison · " + items.length + " / " + MAX_PINS;
+			els.previewPath.textContent = "Right-click any comparison slot to unpin";
+			els.comparisonGrid.replaceChildren(...items.map((item, index) => {
+				const card = document.createElement("article");
+				card.className = "comparison-card";
+				card.style.gridColumn = comparisonColumn(items.length, index);
+				card.title = "Right-click to unpin " + displayUnitName(item.unit);
+				card.addEventListener("contextmenu", (event) => {
+					event.preventDefault();
+					togglePin(item);
+				});
+
+				const art = document.createElement("div");
+				art.className = "comparison-art";
+				const image = document.createElement("img");
+				image.src = item.src;
+				image.alt = item.id;
+				art.append(image);
+
+				const caption = document.createElement("div");
+				caption.className = "comparison-caption";
+				const name = document.createElement("strong");
+				name.textContent = displayUnitName(item.unit);
+				const version = document.createElement("span");
+				version.textContent = item.version || item.note || item.kind;
+				caption.append(name, version);
+				card.append(art, caption);
+				return card;
+			}));
+			const rows = Math.ceil(items.length / 3);
+			els.comparisonGrid.style.gridTemplateRows = "repeat(" + rows + ", minmax(0, 1fr))";
+		}
+
+		function comparisonColumn(count, index) {
+			const rowIndex = index < 3 ? index : index - 3;
+			const rowCount = index < 3 ? Math.min(count, 3) : count - 3;
+			if (rowCount === 1) {
+				return "3 / span 2";
+			}
+			if (rowCount === 2) {
+				return (rowIndex === 0 ? "2" : "4") + " / span 2";
+			}
+			return (1 + rowIndex * 2) + " / span 2";
 		}
 
 		function currentPreviewItem() {
@@ -1637,6 +1904,25 @@
 
 		function saveComments() {
 			localStorage.setItem(COMMENTS_KEY, JSON.stringify(state.comments));
+		}
+
+		function loadPins() {
+			try {
+				const raw = localStorage.getItem(PINS_KEY);
+				if (!raw) {
+					return [];
+				}
+				const parsed = JSON.parse(raw);
+				return Array.isArray(parsed)
+					? [...new Set(parsed.filter((value) => typeof value === "string"))].slice(0, MAX_PINS)
+					: [];
+			} catch (error) {
+				return [];
+			}
+		}
+
+		function savePins() {
+			localStorage.setItem(PINS_KEY, JSON.stringify(state.pins.slice(0, MAX_PINS)));
 		}
 
 		function applyTileSize() {
