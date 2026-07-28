@@ -26,6 +26,9 @@ if (manifest.items.filter((item) => item.unit === "creep").length !== 3) fail("C
 if (!manifest.items.some((item) => item.unit === "luna" && item.version === "Refit V1")) fail("Luna refit is missing.");
 if (!manifest.items.some((item) => item.unit === "mara" && item.source_unit.includes("mara"))) fail("Mara history is missing.");
 if (manifest.items.filter((item) => item.unit === "mara").length !== 17) fail("Expected 17 curated Mara history variants.");
+const canonicalMara = manifest.items.find((item) => item.unit === "mara" && item.current);
+if (!canonicalMara || canonicalMara.local_path !== "history/mara-possession-tableau.png") fail("The user-confirmed possession tableau must be canonical Mara.");
+if (manifest.items.filter((item) => item.unit === "mara" && item.current).length !== 1) fail("Mara must have exactly one canonical current image.");
 if (manifest.items.some((item) => item.unit === "cashmere")) fail("Cashmere cannot remain a visible unit id.");
 if (manifest.items.some((item) => item.unit === "creep" && !item.path.includes("creep_builtin_revision_candidate"))) fail("Non-Creep art leaked into Creep history.");
 
@@ -49,6 +52,8 @@ if (archiveImageCount !== 30) fail(`Expected 30 official archive images, got ${a
 	"Gamble Battle Unit Art Comparison Tool",
 	"unit: file === \"cashmere.png\" ? \"mara\"",
 	"{ unit: \"mara\", role: \"Mage\"",
+	"const CANONICAL_CURRENT",
+	"ALL_UNIT_ART.push(CANONICAL_CURRENT.get(unit) || PHASE2_CURRENT.get(unit) || item)",
 	"const PINS_KEY",
 	"const MAX_PINS = 6",
 	"addEventListener(\"contextmenu\"",
