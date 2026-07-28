@@ -218,6 +218,86 @@ window.GAMBLE_BATTLE_UNIT_ART_HISTORY = {
 			status: "Phase 3 candidate",
 			local_path: "history/mara-spectral-sludge-v2.png",
 			path: "assets/concepts/phase3_redesign/mara/mara_spectral_sludge_candidate_v2.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "candidate",
+			version: "Review V1",
+			label: "Human-made horror gunfighter",
+			status: "Historical review candidate",
+			local_path: "history/sable/sable-review-v1.png",
+			path: "tools/art/history/sable/sable-review-v1.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "candidate",
+			version: "Review V2",
+			label: "Grounded double-barrel horror",
+			status: "Historical review candidate",
+			local_path: "history/sable/sable-review-v2.png",
+			path: "tools/art/history/sable/sable-review-v2.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "weapon reference",
+			version: "Review V3",
+			label: "Black Nail weapon concept",
+			status: "Approved weapon reference; not a unit default",
+			local_path: "history/sable/sable-review-v3.png",
+			path: "tools/art/history/sable/sable-review-v3.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "candidate",
+			version: "Review V4",
+			label: "Monolithic industrial executioner",
+			status: "Historical review candidate",
+			local_path: "history/sable/sable-review-v4.png",
+			path: "tools/art/history/sable/sable-review-v4.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "candidate",
+			version: "Review V5",
+			label: "Red bob, piercings, and blackwork",
+			status: "Historical review candidate",
+			local_path: "history/sable/sable-review-v5.png",
+			path: "tools/art/history/sable/sable-review-v5.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "candidate",
+			version: "Review V6",
+			label: "Industrial-goth makeup and tattoo pass",
+			status: "Historical review candidate",
+			local_path: "history/sable/sable-review-v6.png",
+			path: "tools/art/history/sable/sable-review-v6.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "candidate",
+			version: "Review V7",
+			label: "Dense tattoo pass (sleeve artifact retained)",
+			status: "Historical review candidate; sleeve artifact retained",
+			local_path: "history/sable/sable-review-v7.png",
+			path: "tools/art/history/sable/sable-review-v7.png"
+		},
+		{
+			unit: "sable",
+			source_unit: "sable",
+			kind: "candidate",
+			version: "Review V8",
+			label: "Heavy-metal pass (corrected sleeves)",
+			status: "Latest review candidate; no default change",
+			local_path: "history/sable/sable-review-v8.png",
+			path: "tools/art/history/sable/sable-review-v8.png"
 		}
 	],
 	excluded_source_categories: [
