@@ -35,6 +35,10 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	engine.alternate_order = bool(job.alternate_order)
 	engine.emit_auto_attack_logs = false
 	engine.emit_ability_logs = false
+	if meta_root.has("combat_timeout_s"):
+		engine.combat_timeout_s = max(0.0, float(meta_root.get("combat_timeout_s", engine.combat_timeout_s)))
+	if meta_root.has("no_progress_timeout_s"):
+		engine.no_progress_timeout_s = max(0.0, float(meta_root.get("no_progress_timeout_s", engine.no_progress_timeout_s)))
 	var requested_caps: PackedStringArray = TelemetryCapabilities.normalize(job.capabilities)
 	if requested_caps.size() > 0:
 		engine.emit_position_telemetry = requested_caps.has(TelemetryCapabilities.CAP_MOBILITY) or requested_caps.has(TelemetryCapabilities.CAP_ZONES)
@@ -108,8 +112,16 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 
 	# Outcome capture
 	var outcome_ref: Dictionary = {"value": ""}
+	var outcome_reason_ref: Dictionary = {"value": ""}
 	engine.victory.connect(func(_stage: int): if String(outcome_ref.get("value", "")) == "": outcome_ref["value"] = "team_a")
 	engine.defeat.connect(func(_stage: int): if String(outcome_ref.get("value", "")) == "": outcome_ref["value"] = "team_b")
+	engine.tie.connect(func(_stage: int): if String(outcome_ref.get("value", "")) == "": outcome_ref["value"] = "draw")
+	engine.log_line.connect(func(text: String):
+		if text.begins_with("Combat no-progress timeout:"):
+			outcome_reason_ref["value"] = "engine_no_progress_timeout"
+		elif text.begins_with("Combat timeout:"):
+			outcome_reason_ref["value"] = "engine_combat_timeout"
+	)
 
 	# Optional event capture
 	var events: Array = []
@@ -263,11 +275,10 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 			_record_target_group_diagnostics(target_group_diagnostics, state.player_team, state.enemy_team, state.player_targets, state.enemy_targets)
 		var a_alive: int = _alive_count(state.player_team)
 		var b_alive: int = _alive_count(state.enemy_team)
-		if a_alive <= 0:
-			outcome_ref["value"] = "team_b"
-			break
-		if b_alive <= 0:
-			outcome_ref["value"] = "team_a"
+		var board_outcome: String = board_outcome_from_alive_counts(a_alive, b_alive)
+		if board_outcome != "":
+			outcome_ref["value"] = board_outcome
+			outcome_reason_ref["value"] = "board_elimination"
 			break
 
 	# Outcome and survivors
@@ -275,12 +286,18 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	var outcome_str: String = String(outcome_ref.get("value", ""))
 	if outcome_str == "":
 		outcome.result = "timeout"
+		outcome.reason = "simulation_timeout"
 	else:
 		outcome.result = outcome_str
+		outcome.reason = String(outcome_reason_ref.get("value", ""))
+		if outcome.reason == "":
+			outcome.reason = "engine_outcome"
 	outcome.time_s = sim_time
 	outcome.frames = int(round(sim_time / delta_s))
 	outcome.team_a_alive = _alive_count(state.player_team)
 	outcome.team_b_alive = _alive_count(state.enemy_team)
+	if bool(meta_root.get("collect_reliability_diagnostics", false)) or outcome.result == "timeout":
+		result["reliability"] = _reliability_snapshot(engine, state, pending_hits.size(), outcome)
 	if bool(jmeta_root.get("perf_movement_diagnostics", false)) and engine.arena_state != null and engine.arena_state.has_method("diagnostics_snapshot"):
 		result["movement_diagnostics"] = engine.arena_state.diagnostics_snapshot()
 	if collect_target_group_diagnostics:
@@ -339,6 +356,51 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	return result
 
 # --- capability derivation -----------------------------------------------
+
+static func board_outcome_from_alive_counts(team_a_alive: int, team_b_alive: int) -> String:
+	if team_a_alive <= 0 and team_b_alive <= 0:
+		return "draw"
+	if team_a_alive <= 0:
+		return "team_b"
+	if team_b_alive <= 0:
+		return "team_a"
+	return ""
+
+func _reliability_snapshot(engine: CombatEngine, state: BattleState, pending_projectiles: int, outcome: DataModels.EngineOutcome) -> Dictionary:
+	if engine == null or state == null or outcome == null:
+		return {}
+	return {
+		"result": String(outcome.result),
+		"reason": String(outcome.reason),
+		"sim_time_s": float(outcome.time_s),
+		"engine_elapsed_s": float(state.elapsed_time),
+		"engine_combat_timeout_s": float(engine.combat_timeout_s),
+		"engine_no_progress_timeout_s": float(engine.no_progress_timeout_s),
+		"last_progress_time_s": float(engine._last_progress_time),
+		"last_progress_age_s": max(0.0, float(state.elapsed_time) - float(engine._last_progress_time)),
+		"total_damage_team_a": int(engine.total_damage_player),
+		"total_damage_team_b": int(engine.total_damage_enemy),
+		"pending_projectiles": max(0, pending_projectiles),
+		"team_a": _team_reliability_rows(state.player_team, engine, true),
+		"team_b": _team_reliability_rows(state.enemy_team, engine, false),
+	}
+
+func _team_reliability_rows(team: Array[Unit], engine: CombatEngine, player_side: bool) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for index: int in range(team.size()):
+		var unit: Unit = team[index]
+		if unit == null:
+			continue
+		var position: Vector2 = engine.get_player_position(index) if player_side else engine.get_enemy_position(index)
+		rows.append({
+			"index": index,
+			"id": String(unit.id),
+			"alive": bool(unit.is_alive()),
+			"hp": int(unit.hp),
+			"max_hp": int(unit.max_hp),
+			"position": [position.x, position.y],
+		})
+	return rows
 
 func _disconnect_engine_connections(engine: Object) -> void:
 	if engine == null:
