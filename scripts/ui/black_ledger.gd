@@ -20,6 +20,8 @@ var _starter_list: VBoxContainer = null
 var _bounty_list: VBoxContainer = null
 var _status_label: Label = null
 var _close_button: Button = null
+var _panel: PanelContainer = null
+var _unlock_column: VBoxContainer = null
 var profile_path: String = "user://account_profile_v1.json"
 
 func configure(account_profile_path: String) -> void:
@@ -39,7 +41,15 @@ func _ready() -> void:
 
 func _sync_to_viewport() -> void:
 	position = Vector2.ZERO
-	size = get_viewport_rect().size
+	var viewport_size: Vector2 = get_viewport_rect().size
+	size = viewport_size
+	if _panel != null:
+		_panel.custom_minimum_size = Vector2(
+			minf(1080.0, maxf(640.0, viewport_size.x - 24.0)),
+			minf(610.0, maxf(400.0, viewport_size.y - 16.0))
+		)
+	if _unlock_column != null:
+		_unlock_column.custom_minimum_size.x = minf(455.0, maxf(360.0, viewport_size.x * 0.48))
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key_event: InputEventKey = event as InputEventKey
@@ -68,16 +78,16 @@ func _build_ui() -> void:
 	var center: CenterContainer = CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var panel: PanelContainer = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(1080.0, 610.0)
-	panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _panel_style()))
-	center.add_child(panel)
+	_panel = PanelContainer.new()
+	_panel.name = "LedgerPanel"
+	_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _panel_style()))
+	center.add_child(_panel)
 	var margin: MarginContainer = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 34)
 	margin.add_theme_constant_override("margin_top", 26)
 	margin.add_theme_constant_override("margin_right", 34)
 	margin.add_theme_constant_override("margin_bottom", 26)
-	panel.add_child(margin)
+	_panel.add_child(margin)
 	var root: VBoxContainer = VBoxContainer.new()
 	root.add_theme_constant_override("separation", 12)
 	margin.add_child(root)
@@ -113,13 +123,12 @@ func _build_ui() -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_theme_constant_override("separation", 22)
 	root.add_child(columns)
-	var unlock_column: VBoxContainer = _make_column("STARTER DEBTS", "Spend Omens on any revealed starter. Shop and enemy appearances are never sealed.")
-	unlock_column.custom_minimum_size = Vector2(455.0, 0.0)
-	columns.add_child(unlock_column)
+	_unlock_column = _make_column("STARTER DEBTS", "Spend Omens on any revealed starter. Shop and enemy appearances are never sealed.")
+	columns.add_child(_unlock_column)
 	var starter_scroll: ScrollContainer = ScrollContainer.new()
 	starter_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	starter_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	unlock_column.add_child(starter_scroll)
+	_unlock_column.add_child(starter_scroll)
 	_starter_list = VBoxContainer.new()
 	_starter_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_starter_list.add_theme_constant_override("separation", 5)
@@ -140,6 +149,7 @@ func _build_ui() -> void:
 	_status_label.add_theme_font_size_override("font_size", 14)
 	_status_label.add_theme_color_override("font_color", COLOR_GOLD)
 	root.add_child(_status_label)
+	_sync_to_viewport()
 
 func _make_column(title_text: String, detail_text: String) -> VBoxContainer:
 	var column: VBoxContainer = VBoxContainer.new()

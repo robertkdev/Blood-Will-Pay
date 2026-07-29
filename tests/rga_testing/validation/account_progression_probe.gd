@@ -182,7 +182,12 @@ func _test_corrupt_primary_recovers_from_backup() -> void:
 	var corrupt: FileAccess = FileAccess.open(RECOVERY_PROFILE_PATH, FileAccess.WRITE)
 	_expect(corrupt != null, "corrupt-primary fixture opens")
 	if corrupt != null:
-		corrupt.store_string("{corrupt")
+		corrupt.store_string(JSON.stringify({
+			"format": AccountProfileStoreScript.ENVELOPE_FORMAT,
+			"schema_version": AccountProfileStoreScript.SCHEMA_VERSION,
+			"checksum_sha256": "intentionally-invalid",
+			"payload_json": "{}",
+		}))
 		corrupt.close()
 	var recovered: Dictionary = AccountProfileStoreScript.load_profile(RECOVERY_PROFILE_PATH)
 	_expect(bool(recovered.get("ok", false)), "corrupt primary recovers from valid backup")

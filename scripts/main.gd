@@ -13,7 +13,6 @@ const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 const BlackLedgerScript: GDScript = preload("res://scripts/ui/black_ledger.gd")
 const TITLE_SIGIL: Texture2D = preload("res://assets/ui/gold icon.png")
-const BLACK_LEDGER_CAPTURE_REQUEST_PATH: String = "user://black_ledger_capture_request.json"
 
 const DEBUG_AUTO_START := false
 const DEBUG_TRACE := true
@@ -69,8 +68,6 @@ func _ready() -> void:
 		if Debug.enabled:
 			print("[Main] Debug auto-start enabled; starting game")
 		call_deferred("_on_start")
-	if OS.is_debug_build() and FileAccess.file_exists(BLACK_LEDGER_CAPTURE_REQUEST_PATH):
-		call_deferred("_run_black_ledger_capture_request")
 
 func _set_menu_visible(show_menu: bool) -> void:
 	if show_menu:
@@ -667,38 +664,6 @@ func _close_black_ledger() -> void:
 	_black_ledger_layer = null
 	get_tree().paused = _ledger_previous_paused
 	_sync_system_menu_button()
-
-func _run_black_ledger_capture_request() -> void:
-	var file: FileAccess = FileAccess.open(BLACK_LEDGER_CAPTURE_REQUEST_PATH, FileAccess.READ)
-	if file == null:
-		return
-	var request_value: Variant = JSON.parse_string(file.get_as_text())
-	file.close()
-	if not request_value is Dictionary:
-		return
-	var request: Dictionary = request_value as Dictionary
-	var output_path: String = String(request.get("output_path", "")).strip_edges()
-	if output_path == "":
-		return
-	var account_profile_path: String = String(request.get("profile_path", "user://account_profile_v1.json"))
-	open_black_ledger(account_profile_path)
-	for _frame_index: int in range(45):
-		await get_tree().process_frame
-	RenderingServer.force_draw(false)
-	var texture: ViewportTexture = get_viewport().get_texture()
-	if texture != null and texture.get_rid().is_valid():
-		var image: Image = texture.get_image()
-		if image != null and not image.is_empty():
-			var output_dir: String = output_path.get_base_dir()
-			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output_dir))
-			var error: Error = image.save_png(output_path)
-			if error == OK:
-				print("BLACK_LEDGER_MAIN_CAPTURE:PASS %s" % ProjectSettings.globalize_path(output_path))
-			else:
-				push_error("BLACK_LEDGER_MAIN_CAPTURE:SAVE_FAILED %d" % int(error))
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(BLACK_LEDGER_CAPTURE_REQUEST_PATH))
-	if bool(request.get("quit_after_capture", true)):
-		get_tree().quit()
 
 func _refresh_continue_run_button() -> void:
 	if _continue_run_button == null:

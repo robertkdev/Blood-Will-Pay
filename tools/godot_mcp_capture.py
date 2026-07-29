@@ -46,6 +46,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Stop an existing game before running the requested entrypoint.",
     )
+    parser.add_argument(
+        "--stop-after-capture",
+        action="store_true",
+        help="Stop the running game after the framebuffer is written.",
+    )
     parser.add_argument("--wait-seconds", type=float, default=20.0)
     parser.add_argument("--visual-wait-seconds", type=float, default=15.0)
     parser.add_argument("--settle-seconds", type=float, default=0.0)
@@ -502,6 +507,21 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 )
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_bytes)
+            if args.stop_after_capture and args.source == "game":
+                await _call(
+                    session,
+                    "project_manage",
+                    {
+                        "op": "stop",
+                        "params": {},
+                        "session_id": session_id,
+                    },
+                )
+                await _wait_for_editor_ready(
+                    session,
+                    session_id,
+                    args.wait_seconds,
+                )
             return {
                 "ok": True,
                 "output": str(output_path),
@@ -513,6 +533,7 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 "source": args.source,
                 "settle_seconds": args.settle_seconds,
                 "capture_attempts": capture_attempts,
+                "stopped_after_capture": bool(args.stop_after_capture),
                 "visual_metrics": visual_metrics,
                 "game_status": ready_state.get("game_status", {}),
             }

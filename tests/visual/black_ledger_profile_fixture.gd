@@ -1,33 +1,47 @@
 extends Node
 
 const AccountProfileStoreScript: GDScript = preload("res://scripts/game/account/account_profile_store.gd")
+const MainScene: PackedScene = preload("res://scenes/Main.tscn")
 
 const CAPTURE_PROFILE_PATH: String = "user://black_ledger_capture_profile.json"
-const REQUEST_PATH: String = "user://black_ledger_capture_request.json"
+const CAPTURE_VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
 
 @export_enum("fresh", "veteran", "restore") var mode: String = "fresh"
 
+var _main: Control = null
+
 func _ready() -> void:
-	var result: Dictionary = {}
-	match mode:
-		"fresh":
-			result = _seed(false)
-		"veteran":
-			result = _seed(true)
-		"restore":
-			result = _restore()
-		_:
-			result = {"ok": false, "error": "UNKNOWN_MODE"}
-	if bool(result.get("ok", false)):
-		print("BLACK_LEDGER_PROFILE_FIXTURE:PASS mode=%s" % mode)
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	call_deferred("_run")
+
+func _run() -> void:
+	if mode == "restore":
+		_cleanup()
+		print("BLACK_LEDGER_PROFILE_FIXTURE:PASS mode=restore")
 		get_tree().quit(0)
-	else:
-		push_error("BLACK_LEDGER_PROFILE_FIXTURE:FAIL mode=%s error=%s" % [mode, String(result.get("error", "UNKNOWN"))])
+		return
+	var seeded: Dictionary = _seed(mode == "veteran")
+	if not bool(seeded.get("ok", false)):
+		push_error("BLACK_LEDGER_PROFILE_FIXTURE:FAIL mode=%s error=%s" % [mode, String(seeded.get("error", "UNKNOWN"))])
 		get_tree().quit(1)
+		return
+	var window: Window = get_window()
+	if window != null:
+		DisplayServer.window_set_size(CAPTURE_VIEWPORT_SIZE)
+		window.size = CAPTURE_VIEWPORT_SIZE
+		window.content_scale_size = CAPTURE_VIEWPORT_SIZE
+	_main = MainScene.instantiate() as Control
+	get_tree().root.add_child(_main)
+	for _frame_index: int in range(8):
+		await get_tree().process_frame
+	_main.call("open_black_ledger", CAPTURE_PROFILE_PATH)
+	for _frame_index: int in range(8):
+		await get_tree().process_frame
+	print("BLACK_LEDGER_CAPTURE_HOST:READY mode=%s" % mode)
 
 func _seed(veteran: bool) -> Dictionary:
+	_cleanup()
 	var seeded: Dictionary = AccountProfileStoreScript.default_profile()
-	var output_name: String = "01_main_fresh.png"
 	if veteran:
 		seeded["omens_balance"] = 24
 		seeded["lifetime_omens"] = 52
@@ -36,29 +50,10 @@ func _seed(veteran: bool) -> Dictionary:
 			"axiom_ascendant", "calculated_desperation", "unbought_crown", "made_not_bought", "last_one_standing", "woven_company",
 			"five_disciplines", "empty_chair", "chosen_champion", "stable_foundation", "new_formation", "shared_spotlight",
 		]
-		output_name = "02_main_veteran.png"
-	var saved: Dictionary = AccountProfileStoreScript.save_profile(seeded, CAPTURE_PROFILE_PATH)
-	if not bool(saved.get("ok", false)):
-		return saved
-	return _write_text(REQUEST_PATH, JSON.stringify({
-		"output_path": "res://outputs/visual_debug/black_ledger/main_source/%s" % output_name,
-		"profile_path": CAPTURE_PROFILE_PATH,
-		"quit_after_capture": true,
-	}, "\t"))
+	return AccountProfileStoreScript.save_profile(seeded, CAPTURE_PROFILE_PATH)
 
-func _restore() -> Dictionary:
+func _exit_tree() -> void:
+	_cleanup()
+
+func _cleanup() -> void:
 	AccountProfileStoreScript.clear(CAPTURE_PROFILE_PATH)
-	var cleanup_paths: Array[String] = [REQUEST_PATH]
-	for cleanup_path: String in cleanup_paths:
-		if FileAccess.file_exists(cleanup_path):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(cleanup_path))
-	return {"ok": true}
-
-func _write_text(path: String, text: String) -> Dictionary:
-	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		return {"ok": false, "error": "WRITE_FAILED", "path": path}
-	file.store_string(text)
-	file.flush()
-	file.close()
-	return {"ok": true, "path": path}

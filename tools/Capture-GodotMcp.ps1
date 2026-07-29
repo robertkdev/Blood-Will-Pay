@@ -26,6 +26,8 @@ param(
 
     [switch] $ForceRelaunch,
 
+    [switch] $StopAfterCapture,
+
     [ValidateRange(1, 120)]
     [int] $WaitSeconds = 20,
 
@@ -91,6 +93,9 @@ if (-not [string]::IsNullOrWhiteSpace($Scene)) {
 }
 if ($ForceRelaunch) {
     $clientArguments += "--force-relaunch"
+}
+if ($StopAfterCapture) {
+    $clientArguments += "--stop-after-capture"
 }
 
 & $pythonPath @clientArguments

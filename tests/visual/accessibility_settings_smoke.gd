@@ -104,13 +104,7 @@ func _run() -> void:
 		_main.call("open_black_ledger", TEST_ACCOUNT_PROFILE_PATH)
 	await _settle_frames(3)
 	var ledger: Control = _main.find_child("BlackLedger", true, false) as Control if _main != null else null
-	var ledger_panel: PanelContainer = ledger.find_child("*", true, false) as PanelContainer if ledger != null else null
-	if ledger != null:
-		for candidate: Node in ledger.find_children("*", "PanelContainer", true, false):
-			var panel_candidate: PanelContainer = candidate as PanelContainer
-			if panel_candidate != null and panel_candidate.custom_minimum_size.x >= 1000.0:
-				ledger_panel = panel_candidate
-				break
+	var ledger_panel: PanelContainer = ledger.find_child("LedgerPanel", true, false) as PanelContainer if ledger != null else null
 	var ledger_viewport: Rect2 = ledger.get_viewport().get_visible_rect() if ledger != null else Rect2()
 	_expect(
 		ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), ledger_viewport.grow(2.0)),

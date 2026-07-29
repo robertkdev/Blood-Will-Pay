@@ -9,14 +9,14 @@ scenarios:
     capture_manifest: "outputs/visual_debug/black_ledger/captures.json"
     required_groups: [ledger]
     runtime_provenance:
-      entrypoint: "Godot 4.5 Main scene game framebuffer"
-      scene: "res://scenes/Main.tscn"
+      entrypoint: "Godot 4.5 editor game framebuffer"
+      scene: "Black Ledger capture hosts instantiating res://scenes/Main.tscn"
       build: "current Black Ledger integration worktree"
     evidence:
-      required_cameras: [p]
-      required_layers: [f]
+      required_cameras: [player]
+      required_layers: [final]
       required_states: [fresh, veteran]
-      required_viewports: [1920x1080]
+      required_viewports: [desktop-1920x1080]
       required_events: [f, v]
       require_runtime_provenance: true
       required_runtime_fields: [entrypoint, scene, build]
