@@ -65,6 +65,23 @@ func _run() -> void:
 		return
 	controller.call("_on_contract_choice_pressed", champion_index)
 	await _settle(0.20)
+	var accepted_overlay: Control = view.find_child("ChapterContractOverlay", true, false) as Control
+	var accepted_status: Label = view.find_child("ContractStatus", true, false) as Label
+	var accepted_style: StyleBoxTexture = accepted_status.get_theme_stylebox("normal") as StyleBoxTexture if accepted_status != null else null
+	if accepted_overlay == null or not accepted_overlay.visible or accepted_status == null or not String(accepted_status.text).begins_with("CHAMPION WRIT PURCHASED"):
+		push_error("ContractSystemVisualCapture: accepted champion targeting state missing overlay=%s visible=%s status=%s text=%s index=%d" % [
+			str(accepted_overlay != null),
+			str(accepted_overlay.visible if accepted_overlay != null else false),
+			str(accepted_status != null),
+			String(accepted_status.text) if accepted_status != null else "<missing>",
+			champion_index,
+		])
+		get_tree().quit(1)
+		return
+	if accepted_style == null or accepted_style.texture == null or not String(accepted_style.texture.resource_path).ends_with("button_choice_success.png"):
+		push_error("ContractSystemVisualCapture: accepted contract should use authored success state")
+		get_tree().quit(1)
+		return
 	_save_capture("02_contract_accepted_champion_targeting.png")
 	if Engine.has_singleton("Shop") or has_node("/root/Shop"):
 		Shop.restore_contract_snapshot({})

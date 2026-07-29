@@ -6,6 +6,28 @@ Supporting pre-generation inventory: `docs/art/blood_will_pay_hardcore_ui_asset_
 
 Total paths: 394
 
+Resumed repair delta against `3c8418ed65f29becf54a35d3e055932a1716318e`
+modifies these existing manifest paths only:
+
+```text
+scripts/ui/combat/controller/combat_controller.gd
+scripts/ui/combat/economy_ui.gd
+scripts/ui/hardcore_ui_assets.gd
+scripts/ui/shop/shop_card.gd
+scripts/ui/title_menu.gd
+scripts/ui/unit_select.gd
+tests/visual/arena_pressure_visual_smoke.gd
+tests/visual/betting_economy_smoke.gd
+tests/visual/contract_system_visual_capture.gd
+tests/visual/hardcore_ui_asset_audit.gd
+tests/visual/hardcore_ui_state_gallery.gd
+tests/visual/post_combat_planning_beat_smoke.gd
+tests/visual/shop_card_hover_smoke.gd
+tests/visual/ui_resolution_matrix_smoke.gd
+tests/visual/unit_select_preview_visual_smoke.gd
+tests/visual/unit_select_smoke.gd
+```
+
 ```text
 A	assets/ui/gothic_v3/button_utility_disabled.png
 A	assets/ui/gothic_v3/button_utility_disabled.png.import

@@ -37,7 +37,9 @@ static func modal_style() -> StyleBoxTexture:
 	return texture_style(HARDCORE_ROOT + "panel_modal.png", Vector4(48.0, 48.0, 48.0, 48.0), Vector4(40.0, 36.0, 40.0, 36.0))
 
 static func choice_style(state: String = "normal") -> StyleBoxTexture:
-	var normalized: String = _button_state(state)
+	var normalized: String = state.strip_edges().to_lower()
+	if normalized != "error" and normalized != "success":
+		normalized = _button_state(normalized)
 	return texture_style(HARDCORE_ROOT + "button_choice_%s.png" % normalized, Vector4(36.0, 28.0, 36.0, 28.0), Vector4(24.0, 18.0, 24.0, 18.0))
 
 static func info_card_style() -> StyleBoxTexture:
@@ -91,11 +93,15 @@ static func ledger_row_style(state: String) -> StyleBoxTexture:
 		normalized = "sealed"
 	return texture_style(GOTHIC_V3_ROOT + "ledger_row_%s.png" % normalized, Vector4(20.0, 16.0, 20.0, 16.0), Vector4(12.0, 5.0, 12.0, 5.0))
 
-static func unit_roster_style() -> StyleBoxTexture:
-	return texture_style(HARDCORE_ROOT + "unit_roster_panel.png", Vector4(48.0, 48.0, 48.0, 48.0), Vector4(32.0, 28.0, 32.0, 28.0))
+static func unit_roster_style(compact: bool = false) -> StyleBoxTexture:
+	var border: float = 32.0 if compact else 48.0
+	var content: float = 20.0 if compact else 32.0
+	return texture_style(HARDCORE_ROOT + "unit_roster_panel.png", Vector4(border, border, border, border), Vector4(content, content, content, content))
 
-static func unit_preview_style() -> StyleBoxTexture:
-	return texture_style(HARDCORE_ROOT + "unit_preview_panel.png", Vector4(48.0, 48.0, 48.0, 48.0), Vector4(32.0, 28.0, 32.0, 28.0))
+static func unit_preview_style(compact: bool = false) -> StyleBoxTexture:
+	var border: float = 32.0 if compact else 48.0
+	var content: float = 20.0 if compact else 32.0
+	return texture_style(HARDCORE_ROOT + "unit_preview_panel.png", Vector4(border, border, border, border), Vector4(content, content, content, content))
 
 static func portrait_large_style() -> StyleBoxTexture:
 	return texture_style(GOTHIC_V3_ROOT + "portrait_frame_large.png", Vector4(42.0, 42.0, 42.0, 42.0), Vector4(18.0, 18.0, 18.0, 18.0), Color.WHITE, false)
@@ -161,7 +167,9 @@ static func poster_button_style(state: String) -> StyleBoxTexture:
 	return texture_style(HARDCORE_ROOT + "button_poster_row_%s.png" % normalized, Vector4(40.0, 16.0, 40.0, 16.0), Vector4(28.0, 10.0, 28.0, 10.0))
 
 static func primary_button_style(state: String) -> StyleBoxTexture:
-	var normalized: String = _button_state(state)
+	var normalized: String = state.strip_edges().to_lower()
+	if normalized != "loading":
+		normalized = _button_state(normalized)
 	return texture_style(HARDCORE_ROOT + "button_primary_%s.png" % normalized, Vector4(28.0, 16.0, 28.0, 16.0), Vector4(24.0, 10.0, 24.0, 10.0))
 
 static func compact_button_style(state: String) -> StyleBoxTexture:
@@ -230,6 +238,23 @@ static func apply_shop_card_states(button: Button) -> void:
 	button.add_theme_stylebox_override("hover_pressed", shop_card_style("hover_selected"))
 	button.add_theme_stylebox_override("focus", shop_card_style("focus"))
 	button.add_theme_stylebox_override("disabled", shop_card_style("disabled"))
+
+static func apply_semantic_button_state(button: Button, family: String, semantic_state: String) -> void:
+	if button == null:
+		return
+	var style: StyleBoxTexture = null
+	if family == "choice" and (semantic_state == "error" or semantic_state == "success"):
+		style = choice_style(semantic_state)
+	elif family == "primary" and semantic_state == "loading":
+		style = primary_button_style("loading")
+	if style == null:
+		apply_button_family(button, family)
+		return
+	button.add_theme_stylebox_override("normal", style)
+	button.add_theme_stylebox_override("hover", style)
+	button.add_theme_stylebox_override("pressed", style)
+	button.add_theme_stylebox_override("hover_pressed", style)
+	button.add_theme_stylebox_override("focus", style)
 
 static func texture(path: String) -> Texture2D:
 	return TextureUtils.try_load_texture(path)

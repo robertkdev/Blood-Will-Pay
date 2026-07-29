@@ -39,6 +39,7 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		window.size = viewport_size
 		window.content_scale_size = viewport_size
 	UserSettingsScript.set_ui_scale(ui_scale, window)
+	UserSettingsScript.set_reduced_motion(true)
 	_main = MAIN_SCENE.instantiate() as Control
 	get_tree().root.add_child(_main)
 	await _settle_frames(5)
@@ -68,6 +69,9 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	]:
 		var control: Control = title_menu.find_child(control_name, true, false) as Control if title_menu != null else null
 		_expect(control != null and _rect_inside(control.get_global_rect(), viewport_rect.grow(2.0)), "%s %s escaped viewport rect=%s viewport=%s" % [label, control_name, str(control.get_global_rect() if control != null else Rect2()), str(viewport_rect)])
+		_expect(control != null and control.is_visible_in_tree() and control.modulate.a >= 0.90, "%s %s was contained but not visibly reviewable" % [label, control_name])
+	if _should_capture(viewport_size, ui_scale):
+		_save_capture("%dx%d_%d_percent_title_menu.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
 	if _main != null:
 		_main.call("open_black_ledger", TEST_ACCOUNT_PROFILE_PATH)
 	await _settle_frames(3)
@@ -75,7 +79,7 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	var ledger_panel: PanelContainer = ledger.find_child("LedgerPanel", true, false) as PanelContainer if ledger != null else null
 	_expect(ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), viewport_rect.grow(2.0)), "%s Black Ledger escaped viewport panel=%s viewport=%s" % [label, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(viewport_rect)])
 	if _should_capture(viewport_size, ui_scale):
-		_save_capture("%dx%d_%d_percent.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+		_save_capture("%dx%d_%d_percent_ledger.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
 	if _main != null:
 		_main.call("_close_black_ledger")
 	await _settle_frames(1)
@@ -83,7 +87,8 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 
 func _should_capture(viewport_size: Vector2i, ui_scale: float) -> bool:
 	return (
-		(viewport_size == Vector2i(1280, 720) and is_equal_approx(ui_scale, 1.5))
+		(viewport_size == Vector2i(1280, 720) and (is_equal_approx(ui_scale, 1.0) or is_equal_approx(ui_scale, 1.5)))
+		or (viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.0))
 		or (viewport_size == Vector2i(2560, 1080) and is_equal_approx(ui_scale, 1.25))
 		or (viewport_size == Vector2i(3840, 2160) and is_equal_approx(ui_scale, 1.0))
 	)

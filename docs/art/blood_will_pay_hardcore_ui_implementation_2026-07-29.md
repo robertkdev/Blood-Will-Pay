@@ -195,3 +195,42 @@ Fresh targeted runtime results in this iteration:
 Telegram repair evidence: 3766-3773. The user requested that the goal stop
 after this iteration, so a new zero-history final reviewer has deliberately
 not been spawned yet. Objective-level PASS remains pending that future review.
+
+## Resumed Board repair iteration
+
+The user resumed the same goal and explicitly removed unit artwork and actor
+presentation from this pass because those assets will be rebuilt separately.
+The starter-selection shell, shop framing, and interaction states remain in
+scope; blank or temporary unit art is not an acceptance defect for this cut.
+
+The resumed repair addressed the remaining non-unit evidence and interaction
+gaps:
+
+- The title command menu now recomputes its compact layout on live resize.
+  `UIResolutionMatrixSmoke` proves visible actions and content at 1280x720,
+  1920x1080, 2560x1080, and 3840x2160 across 100%, 125%, and 150% UI scale.
+- The compact starter shell centers its headings, top-aligns the available
+  choices, limits compact rows to four columns, and keeps Start Game visible.
+- Shop tooltips prefer space outside the complete shop strip, not merely
+  outside the hovered card.
+- Loading, error, and success assets are wired through the runtime loader and
+  state gallery. The contract market now uses the authored error/success
+  artwork in the actual purchase flow and keeps Champion targeting open after
+  purchase.
+- `ALL IN` now becomes an unmistakable selected `ALL IN!` state and prefixes
+  the outcome quote with `ALL IN ARMED`.
+- The battle-result interruption is a 760x260 responsive nine-slice card with
+  a stronger scrim, larger type, and reduced-motion-safe reveal.
+- Arena Pressure evidence now renders against the shipping gothic battlefield
+  and arena frame rather than an empty black fixture.
+
+Fresh MCP-only results: `HardcoreUIAssetAudit` PASS (178/9/7),
+`TitleMenuSmoke` PASS, `UnitSelectSmoke` PASS,
+`UnitSelectPreviewVisualSmoke` PASS, `ShopCardHoverSmoke` PASS,
+`SystemMenuHoverStabilitySmoke` PASS, `LossScreenSmoke` PASS,
+`BettingEconomySmoke` PASS, `PostCombatPlanningBeatSmoke` PASS,
+`ArenaPressureVisualSmoke` PASS, `ContractSystemVisualCapture` 8/8,
+`UIResolutionMatrixSmoke` PASS (4x3), and full `RGATesting` 48 rows with
+`RolesMetrics` failed 0, skipped 0, errors 0.
+
+Telegram progress evidence: 3776-3783.

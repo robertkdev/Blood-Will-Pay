@@ -1538,8 +1538,7 @@ func _show_contract_market() -> void:
 	HardcoreUIAssets.apply_button_family(pass_button, "poster")
 	pass_button.pressed.connect(_on_contract_pass_pressed)
 	_contract_choices.add_child(pass_button)
-	if _contract_status != null:
-		_contract_status.text = "Choose one chapter contract. Compare price, reward, risk, and the visible next-fight consequence. The other offers expire."
+	_set_contract_status("Choose one chapter contract. Compare price, reward, risk, and the visible next-fight consequence. The other offers expire.", "normal")
 	_contract_overlay.visible = true
 	if continue_button != null:
 		continue_button.disabled = true
@@ -1584,9 +1583,12 @@ func _ensure_contract_market_ui() -> void:
 	title.add_theme_font_size_override("font_size", 32)
 	stack.add_child(title)
 	_contract_status = Label.new()
+	_contract_status.name = "ContractStatus"
+	_contract_status.custom_minimum_size = Vector2(0.0, 52.0)
 	_contract_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_contract_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_contract_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_contract_status.add_theme_font_size_override("font_size", 16)
+	_contract_status.add_theme_font_size_override("font_size", 18)
 	stack.add_child(_contract_status)
 	_contract_choices = VBoxContainer.new()
 	_contract_choices.add_theme_constant_override("separation", 10)
@@ -1602,8 +1604,7 @@ func _on_contract_choice_pressed(index: int) -> void:
 		chosen_offer = offers[index] as Dictionary
 	var result: Dictionary = shop_node.call("buy_contract", index)
 	if not bool(result.get("ok", false)):
-		if _contract_status != null:
-			_contract_status.text = "Cannot buy: %s" % String(result.get("error", "unknown"))
+		_set_contract_status("Cannot buy: %s" % String(result.get("error", "unknown")), "error")
 		return
 	if String(chosen_offer.get("family", "")) == "champion":
 		_show_champion_contract_targets(chosen_offer)
@@ -1622,8 +1623,7 @@ func _show_champion_contract_targets(offer: Dictionary) -> void:
 	for child: Node in _contract_choices.get_children():
 		child.queue_free()
 	var doctrine: String = String(offer.get("doctrine", "")).strip_edges().to_lower()
-	if _contract_status != null:
-		_contract_status.text = "CHAMPION WRIT PURCHASED — choose its bearer. %s" % _doctrine_explanation(doctrine)
+	_set_contract_status("CHAMPION WRIT PURCHASED — choose its bearer. %s" % _doctrine_explanation(doctrine), "success")
 	var candidates: Array[Unit] = _champion_contract_units()
 	for unit: Unit in candidates:
 		var target_button: Button = Button.new()
@@ -1639,8 +1639,12 @@ func _show_champion_contract_targets(offer: Dictionary) -> void:
 		HardcoreUIAssets.apply_button_family(target_button, "choice")
 		target_button.pressed.connect(Callable(self, "_on_champion_contract_target_pressed").bind(unit, doctrine))
 		_contract_choices.add_child(target_button)
-	if candidates.is_empty() and _contract_status != null:
-		_contract_status.text = "Contract bought, but no owned unit is currently available. Assignment remains pending."
+	if candidates.is_empty():
+		_set_contract_status("Contract bought, but no owned unit is currently available. Assignment remains pending.", "error")
+	if _contract_overlay != null:
+		_contract_overlay.visible = true
+	if continue_button != null:
+		continue_button.disabled = true
 
 func _champion_contract_units() -> Array[Unit]:
 	var candidates: Array[Unit] = []
@@ -1664,10 +1668,25 @@ func _on_champion_contract_target_pressed(unit: Unit, doctrine: String) -> void:
 		return
 	var applied: Dictionary = shop_node.call("apply_pending_champion_contract", unit, doctrine)
 	if not bool(applied.get("ok", false)):
-		if _contract_status != null:
-			_contract_status.text = "Cannot assign writ: %s" % String(applied.get("error", "unknown"))
+		_set_contract_status("Cannot assign writ: %s" % String(applied.get("error", "unknown")), "error")
 		return
 	_close_contract_market()
+
+func _set_contract_status(text: String, semantic_state: String) -> void:
+	if _contract_status == null:
+		return
+	_contract_status.text = text
+	var normalized_state: String = semantic_state.strip_edges().to_lower()
+	var style_state: String = normalized_state if normalized_state == "error" or normalized_state == "success" else "normal"
+	var status_style: StyleBoxTexture = HardcoreUIAssets.choice_style(style_state)
+	if status_style != null:
+		_contract_status.add_theme_stylebox_override("normal", status_style)
+	if normalized_state == "error":
+		_contract_status.add_theme_color_override("font_color", Color(1.0, 0.80, 0.75, 1.0))
+	elif normalized_state == "success":
+		_contract_status.add_theme_color_override("font_color", Color(0.92, 0.94, 0.76, 1.0))
+	else:
+		_contract_status.add_theme_color_override("font_color", Color(0.90, 0.87, 0.82, 1.0))
 
 func _doctrine_explanation(doctrine: String) -> String:
 	match doctrine:
@@ -2918,6 +2937,17 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 		card.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.result_style(title, is_bounty), _make_result_card_style(accent_color)))
 	banner.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.result_scrim_style(), _make_result_scrim_style()))
 	banner.visible = true
+	banner.modulate = Color.WHITE
+	if card != null:
+		card.scale = Vector2.ONE
+		card.pivot_offset = card.custom_minimum_size * 0.5
+	if not _reduced_motion_enabled() and card != null and parent.get_tree() != null:
+		banner.modulate.a = 0.0
+		card.scale = Vector2(0.90, 0.90)
+		var reveal_tween: Tween = parent.get_tree().create_tween()
+		reveal_tween.set_parallel(true)
+		reveal_tween.tween_property(banner, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		reveal_tween.tween_property(card, "scale", Vector2.ONE, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _hide_result_banner() -> void:
 	if _result_banner != null and is_instance_valid(_result_banner):
@@ -2955,7 +2985,7 @@ func _ensure_result_banner() -> PanelContainer:
 	_result_banner.add_child(center)
 	var card: PanelContainer = PanelContainer.new()
 	card.name = "BattleResultCard"
-	card.custom_minimum_size = Vector2(560.0, 176.0)
+	card.custom_minimum_size = Vector2(760.0, 260.0)
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(card)
 	var margin: MarginContainer = MarginContainer.new()
@@ -2967,35 +2997,35 @@ func _ensure_result_banner() -> PanelContainer:
 	card.add_child(margin)
 	var content: VBoxContainer = VBoxContainer.new()
 	content.name = "Content"
-	content.add_theme_constant_override("separation", 8)
+	content.add_theme_constant_override("separation", 12)
 	margin.add_child(content)
 	var kicker: Label = Label.new()
 	kicker.name = "KickerLabel"
 	kicker.text = "BATTLE OUTCOME"
 	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	kicker.add_theme_font_size_override("font_size", 13)
+	kicker.add_theme_font_size_override("font_size", 15)
 	kicker.add_theme_color_override("font_color", Color(0.72, 0.61, 0.45, 1.0))
 	content.add_child(kicker)
 	var title_label: Label = Label.new()
 	title_label.name = "OutcomeLabel"
-	title_label.custom_minimum_size = Vector2(0.0, 46.0)
+	title_label.custom_minimum_size = Vector2(0.0, 68.0)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 36)
+	title_label.add_theme_font_size_override("font_size", 52)
 	title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 	title_label.add_theme_constant_override("outline_size", 2)
 	content.add_child(title_label)
 	var accent_rule: ColorRect = ColorRect.new()
 	accent_rule.name = "AccentRule"
-	accent_rule.custom_minimum_size = Vector2(0.0, 1.0)
+	accent_rule.custom_minimum_size = Vector2(0.0, 2.0)
 	accent_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(accent_rule)
 	var detail_label: Label = Label.new()
 	detail_label.name = "DetailLabel"
-	detail_label.custom_minimum_size = Vector2(0.0, 24.0)
+	detail_label.custom_minimum_size = Vector2(0.0, 32.0)
 	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	detail_label.add_theme_font_size_override("font_size", 16)
+	detail_label.add_theme_font_size_override("font_size", 18)
 	detail_label.add_theme_color_override("font_color", Color(0.82, 0.79, 0.75, 1.0))
 	content.add_child(detail_label)
 	parent.add_child(_result_banner)
@@ -3003,7 +3033,7 @@ func _ensure_result_banner() -> PanelContainer:
 
 func _make_result_scrim_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.006, 0.005, 0.008, 0.46)
+	style.bg_color = Color(0.006, 0.005, 0.008, 0.66)
 	return style
 
 func _make_result_card_style(accent_color: Color) -> StyleBox:

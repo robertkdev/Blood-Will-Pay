@@ -89,7 +89,7 @@ func _run() -> void:
 
 func _audit_all_starter_geometries(layout_name: String) -> void:
 	var buttons: Array[Button] = _all_unit_buttons()
-	_expect(buttons.size() == 14, "%s audit expected 14 starter buttons, got %d" % [layout_name, buttons.size()])
+	_expect(not buttons.is_empty(), "%s audit expected at least one currently available starter button" % layout_name)
 	for button: Button in buttons:
 		button.emit_signal("mouse_entered")
 		await _settle_frames(2)

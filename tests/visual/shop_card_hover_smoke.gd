@@ -47,6 +47,9 @@ func _run() -> void:
 		var tooltip_layer: CanvasLayer = tooltip.get_parent() as CanvasLayer
 		_expect(tooltip_layer != null and tooltip_layer.layer >= 400, "shop tooltip should live above shop/footer CanvasLayers")
 		_expect(tooltip.get_theme_stylebox("panel") is StyleBoxTexture, "shop tooltip should use the generated panel asset")
+		_expect(not tooltip.get_global_rect().intersects(card.get_global_rect()), "shop tooltip should not cover its source card")
+		var card_grid: Control = card.get_parent() as Control
+		_expect(card_grid == null or not tooltip.get_global_rect().intersects(card_grid.get_global_rect()), "shop tooltip should not cover the shop-card strip")
 		_expect(_tooltip_contains(tooltip, "Attack Targeting:"), "shop tooltip should show attack targeting")
 		_expect(_tooltip_contains(tooltip, "Ability Targeting:"), "shop tooltip should show ability targeting")
 		_expect(not _tooltip_contains(tooltip, "Positioning:"), "shop tooltip should not prescribe positioning")

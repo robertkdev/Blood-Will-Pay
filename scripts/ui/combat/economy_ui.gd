@@ -178,6 +178,7 @@ func refresh() -> void:
 	if all_in_button != null:
 		all_in_button.disabled = in_combat or forced_first_fight or Economy.gold <= 0
 		all_in_button.visible = not in_combat and not forced_first_fight
+		_refresh_all_in_visual(in_combat, forced_first_fight)
 
 	# Hide static "Bet:" labels whenever the slider is hidden; bet_value carries the state copy.
 	if _bet_row:
@@ -211,6 +212,7 @@ func on_bet_changed(val: float) -> void:
 	Economy.set_bet(int(val))
 	if bet_value:
 		bet_value.text = str(int(val))
+	_refresh_all_in_visual(false, false)
 	_refresh_wager_summary(false, false)
 
 func _on_all_in_pressed() -> void:
@@ -218,6 +220,35 @@ func _on_all_in_pressed() -> void:
 		return
 	bet_slider.value = bet_slider.max_value
 	on_bet_changed(bet_slider.value)
+
+func _refresh_all_in_visual(in_combat: bool, forced_first_fight: bool) -> void:
+	if all_in_button == null:
+		return
+	HardcoreUIAssets.apply_button_family(all_in_button, "wager")
+	var armed: bool = (
+		not in_combat
+		and not forced_first_fight
+		and bet_slider != null
+		and Economy.gold > 0
+		and int(bet_slider.value) >= int(bet_slider.max_value)
+	)
+	all_in_button.text = "ALL IN!" if armed else "All In"
+	all_in_button.tooltip_text = "Maximum wager armed. Starting battle risks the full bankroll." if armed else "Set the wager to your full available bankroll."
+	if not armed:
+		all_in_button.remove_theme_color_override("font_color")
+		all_in_button.remove_theme_color_override("font_hover_color")
+		return
+	var selected_style: StyleBoxTexture = HardcoreUIAssets.wager_button_style("selected")
+	var hover_selected_style: StyleBoxTexture = HardcoreUIAssets.wager_button_style("hover_selected")
+	if selected_style != null:
+		all_in_button.add_theme_stylebox_override("normal", selected_style)
+		all_in_button.add_theme_stylebox_override("pressed", selected_style)
+		all_in_button.add_theme_stylebox_override("focus", selected_style)
+	if hover_selected_style != null:
+		all_in_button.add_theme_stylebox_override("hover", hover_selected_style)
+		all_in_button.add_theme_stylebox_override("hover_pressed", hover_selected_style)
+	all_in_button.add_theme_color_override("font_color", Color(1.0, 0.88, 0.60, 1.0))
+	all_in_button.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.82, 1.0))
 
 func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	if wager_summary == null or not _has_economy():
@@ -236,7 +267,11 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	if not in_combat:
 		after_loss = max(0, int(Economy.gold) - wager)
 	var after_win: int = after_loss + gross
-	wager_summary.text = "Wager %dg%s | Win %d%% | Gross %dg | After win %dg | After loss %dg" % [
+	var risk_prefix: String = ""
+	if not in_combat and wager > 0 and wager >= int(Economy.gold):
+		risk_prefix = "ALL IN ARMED | "
+	wager_summary.text = "%sWager %dg%s | Win %d%% | Gross %dg | After win %dg | After loss %dg" % [
+		risk_prefix,
 		wager,
 		" locked" if in_combat else "",
 		odds_percent,

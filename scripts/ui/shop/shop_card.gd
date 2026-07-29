@@ -546,9 +546,33 @@ func _clamped_tooltip_position(raw_position: Vector2) -> Vector2:
 	if viewport == null:
 		return raw_position
 	var viewport_size: Vector2 = viewport.get_visible_rect().size
-	var next_position: Vector2 = raw_position
+	var card_rect: Rect2 = get_global_rect()
+	var context_rect: Rect2 = card_rect
+	var context_control: Control = get_parent() as Control
+	if context_control != null:
+		context_rect = context_control.get_global_rect()
+	var above_position: Vector2 = Vector2(
+		card_rect.get_center().x - _tooltip.size.x * 0.5,
+		context_rect.position.y - _tooltip.size.y - TOOLTIP_EDGE_PADDING
+	)
+	var next_position: Vector2 = above_position if above_position.y >= TOOLTIP_EDGE_PADDING else raw_position
+	if above_position.y < TOOLTIP_EDGE_PADDING:
+		var below_position: Vector2 = Vector2(
+			card_rect.get_center().x - _tooltip.size.x * 0.5,
+			context_rect.end.y + TOOLTIP_EDGE_PADDING
+		)
+		var right_position: Vector2 = Vector2(context_rect.end.x + TOOLTIP_EDGE_PADDING, card_rect.position.y)
+		var left_position: Vector2 = Vector2(context_rect.position.x - _tooltip.size.x - TOOLTIP_EDGE_PADDING, card_rect.position.y)
+		if below_position.y + _tooltip.size.y + TOOLTIP_EDGE_PADDING <= viewport_size.y:
+			next_position = below_position
+		elif right_position.x + _tooltip.size.x + TOOLTIP_EDGE_PADDING <= viewport_size.x:
+			next_position = right_position
+		elif left_position.x >= TOOLTIP_EDGE_PADDING:
+			next_position = left_position
+		else:
+			next_position = raw_position
 	if next_position.x + _tooltip.size.x + TOOLTIP_EDGE_PADDING > viewport_size.x:
-		next_position.x = raw_position.x - _tooltip.size.x - TOOLTIP_CURSOR_OFFSET.x * 1.5
+		next_position.x = viewport_size.x - _tooltip.size.x - TOOLTIP_EDGE_PADDING
 	if next_position.y + _tooltip.size.y + TOOLTIP_EDGE_PADDING > viewport_size.y:
 		next_position.y = viewport_size.y - _tooltip.size.y - TOOLTIP_EDGE_PADDING
 	if next_position.x < TOOLTIP_EDGE_PADDING:

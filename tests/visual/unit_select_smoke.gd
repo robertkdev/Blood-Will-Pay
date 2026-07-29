@@ -140,6 +140,26 @@ func _run() -> void:
 					_expect(view.selected_id == "", "Scroll should not select a unit", failures)
 					_expect(selected_label != null and selected_label.text == "No starter chosen", "Scroll did not clear stale hover preview", failures)
 
+	if window != null:
+		window.size = Vector2i(1280, 720)
+		window.content_scale_size = Vector2i(1280, 720)
+	DisplayServer.window_set_size(Vector2i(1280, 720))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	view.call("_on_resized")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var compact_viewport: Rect2 = view.get_viewport().get_visible_rect()
+	var compact_layout: HBoxContainer = view.get_node_or_null("Center/HBox") as HBoxContainer
+	_expect(compact_layout != null and _rect_inside(compact_layout.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter layout escaped the viewport", failures)
+	_expect(heading != null and _rect_inside(heading.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter heading escaped the viewport", failures)
+	_expect(start_button != null and _rect_inside(start_button.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 Start Game escaped the viewport", failures)
+	if start_button != null:
+		view.set_transition_pending(true)
+		var loading_style: StyleBoxTexture = start_button.get_theme_stylebox("normal") as StyleBoxTexture
+		_expect(loading_style != null and loading_style.texture != null and String(loading_style.texture.resource_path).ends_with("button_primary_loading.png"), "Preparing Battle must render the authored loading state", failures)
+		view.set_transition_pending(false)
+
 	if failures.size() > 0:
 		for failure: String in failures:
 			push_error("UnitSelectSmoke: " + failure)
@@ -224,3 +244,6 @@ func _expect_lists_equal(label: String, expected: Array[String], actual: Array[S
 	var actual_text: String = ",".join(PackedStringArray(actual))
 	if expected_text != actual_text:
 		failures.append("%s expected [%s] got [%s]" % [label, expected_text, actual_text])
+
+func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
+	return outer.has_point(inner.position) and outer.has_point(inner.end)

@@ -69,6 +69,7 @@ var _intro_tween: Tween = null
 var _background_tween: Tween = null
 var _logo_tween: Tween = null
 var _poster_border: TextureRect = null
+var _resize_refresh_queued: bool = false
 
 func _ready() -> void:
 	UserSettingsScript.initialize(get_window())
@@ -87,6 +88,10 @@ func _ready() -> void:
 	if visible:
 		_play_intro()
 	visibility_changed.connect(_on_visibility_changed)
+	resized.connect(_on_layout_resized)
+	var viewport: Viewport = get_viewport()
+	if viewport != null and not viewport.size_changed.is_connected(_on_layout_resized):
+		viewport.size_changed.connect(_on_layout_resized)
 	_start_bg_loop()
 	_start_logo_float()
 
@@ -434,6 +439,7 @@ func _ensure_subtitle() -> void:
 
 func _ensure_content_panel() -> void:
 	var compact: bool = _is_compact_layout()
+	var short_compact: bool = _is_short_compact_layout()
 	_content_panel = get_node_or_null("ContentPanel") as PanelContainer
 	if _content_panel == null:
 		_content_panel = PanelContainer.new()
@@ -441,9 +447,9 @@ func _ensure_content_panel() -> void:
 		add_child(_content_panel)
 	_content_panel.z_index = 6
 	_content_panel.anchor_left = 0.38
-	_content_panel.anchor_top = 0.075
+	_content_panel.anchor_top = 0.025 if short_compact else 0.075
 	_content_panel.anchor_right = 0.965
-	_content_panel.anchor_bottom = 0.92
+	_content_panel.anchor_bottom = 0.975 if short_compact else 0.92
 	_content_panel.offset_left = 0.0
 	_content_panel.offset_top = 0.0
 	_content_panel.offset_right = 0.0
@@ -465,7 +471,7 @@ func _ensure_content_panel() -> void:
 		_content_stack = VBoxContainer.new()
 		_content_stack.name = "Stack"
 		margin.add_child(_content_stack)
-	_content_stack.add_theme_constant_override("separation", 14)
+	_content_stack.add_theme_constant_override("separation", 8 if short_compact else (10 if compact else 14))
 
 	var header: VBoxContainer = _content_stack.get_node_or_null("Header") as VBoxContainer
 	if header == null:
@@ -473,14 +479,14 @@ func _ensure_content_panel() -> void:
 		header.name = "Header"
 		_content_stack.add_child(header)
 		_content_stack.move_child(header, 0)
-	header.add_theme_constant_override("separation", 8)
+	header.add_theme_constant_override("separation", 4 if short_compact else (6 if compact else 8))
 
 	_section_title = header.get_node_or_null("SectionTitle") as Label
 	if _section_title == null:
 		_section_title = Label.new()
 		_section_title.name = "SectionTitle"
 		header.add_child(_section_title)
-	_section_title.add_theme_font_size_override("font_size", 30)
+	_section_title.add_theme_font_size_override("font_size", 22 if short_compact else (26 if compact else 30))
 	_section_title.add_theme_color_override("font_color", Color(0.96, 0.84, 0.62, 1.0))
 	_section_title.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
 	_section_title.add_theme_constant_override("outline_size", 2)
@@ -491,7 +497,7 @@ func _ensure_content_panel() -> void:
 		_section_hint.name = "SectionHint"
 		header.add_child(_section_hint)
 	_section_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_section_hint.add_theme_font_size_override("font_size", 14)
+	_section_hint.add_theme_font_size_override("font_size", 13 if compact else 14)
 	_section_hint.add_theme_color_override("font_color", COLOR_MUTED)
 
 	_search_field = header.get_node_or_null("SearchField") as LineEdit
@@ -499,9 +505,9 @@ func _ensure_content_panel() -> void:
 		_search_field = LineEdit.new()
 		_search_field.name = "SearchField"
 		header.add_child(_search_field)
-	_search_field.custom_minimum_size = Vector2(0.0, 40.0)
+	_search_field.custom_minimum_size = Vector2(0.0, 34.0 if short_compact else (38.0 if compact else 40.0))
 	_search_field.clear_button_enabled = true
-	_search_field.add_theme_font_size_override("font_size", 17)
+	_search_field.add_theme_font_size_override("font_size", 15 if compact else 17)
 	_search_field.add_theme_color_override("font_color", COLOR_TEXT)
 	_search_field.add_theme_color_override("font_placeholder_color", Color(0.62, 0.57, 0.50, 0.82))
 	_style_search_field(_search_field)
@@ -1216,11 +1222,18 @@ func _on_ui_scale_selected(index: int, option: OptionButton) -> void:
 	call_deferred("_refresh_scaled_layout")
 
 func _refresh_scaled_layout() -> void:
+	_resize_refresh_queued = false
 	_apply_gothic_layout()
 	_build_navigation()
 	_ensure_content_panel()
 	_render_active_section()
 	_update_nav_state()
+
+func _on_layout_resized() -> void:
+	if _resize_refresh_queued or not is_inside_tree():
+		return
+	_resize_refresh_queued = true
+	call_deferred("_refresh_scaled_layout")
 
 func _begin_binding_capture(action: StringName) -> void:
 	_listening_action = action

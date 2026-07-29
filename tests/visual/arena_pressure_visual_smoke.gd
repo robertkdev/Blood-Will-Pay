@@ -81,12 +81,30 @@ func _build_surface() -> void:
 	_arena.name = "ArenaContainer"
 	_arena.position = Vector2(360.0, 170.0)
 	_arena.size = Vector2(1200.0, 650.0)
+	_arena.clip_contents = true
 	var arena_style: StyleBoxFlat = StyleBoxFlat.new()
 	arena_style.bg_color = Color(0.035, 0.028, 0.034, 1.0)
 	arena_style.border_color = Color(0.30, 0.20, 0.13, 1.0)
 	arena_style.set_border_width_all(2)
 	_arena.add_theme_stylebox_override("panel", arena_style)
 	_host.add_child(_arena)
+	var battlefield: TextureRect = TextureRect.new()
+	battlefield.name = "BattlefieldSurface"
+	battlefield.texture = load("res://assets/ui/gothic/battlefield_surface.png") as Texture2D
+	battlefield.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	battlefield.stretch_mode = TextureRect.STRETCH_SCALE
+	battlefield.set_anchors_preset(Control.PRESET_FULL_RECT)
+	battlefield.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_arena.add_child(battlefield)
+	var arena_frame: TextureRect = TextureRect.new()
+	arena_frame.name = "ArenaFrame"
+	arena_frame.texture = load("res://assets/ui/gothic/arena_frame.png") as Texture2D
+	arena_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	arena_frame.stretch_mode = TextureRect.STRETCH_SCALE
+	arena_frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	arena_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arena_frame.z_index = 2
+	_arena.add_child(arena_frame)
 	_bridge = CombatVfxBridgeScript.new() as CombatVfxBridge
 	_bridge.configure(_arena, null, null)
 

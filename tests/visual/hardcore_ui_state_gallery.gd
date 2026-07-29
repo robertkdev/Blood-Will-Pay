@@ -48,6 +48,28 @@ func _ready() -> void:
 		_add_header_cell(header, state.to_upper())
 	for family: String in FAMILIES:
 		_add_family_row(stack, family)
+	_add_semantic_row(stack)
+
+func _add_semantic_row(parent: VBoxContainer) -> void:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+	_add_header_cell(row, "SEMANTIC")
+	_add_semantic_preview(row, "LOADING", HardcoreUIAssets.primary_button_style("loading"))
+	_add_semantic_preview(row, "ERROR", HardcoreUIAssets.choice_style("error"))
+	_add_semantic_preview(row, "SUCCESS", HardcoreUIAssets.choice_style("success"))
+	_add_semantic_preview(row, "INPUT ERROR", HardcoreUIAssets.input_style("error"))
+	_add_semantic_preview(row, "INPUT OK", HardcoreUIAssets.input_style("success"))
+
+func _add_semantic_preview(parent: HBoxContainer, text: String, style: StyleBoxTexture) -> void:
+	var preview: Button = Button.new()
+	preview.text = text
+	preview.custom_minimum_size = Vector2(178.0, 64.0)
+	preview.focus_mode = Control.FOCUS_NONE
+	preview.add_theme_font_size_override("font_size", 11)
+	preview.add_theme_color_override("font_color", Color(0.93, 0.88, 0.78, 1.0))
+	preview.add_theme_stylebox_override("normal", style)
+	parent.add_child(preview)
 
 func _add_family_row(parent: VBoxContainer, family: String) -> void:
 	var row: HBoxContainer = HBoxContainer.new()

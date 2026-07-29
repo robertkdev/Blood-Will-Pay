@@ -18,6 +18,10 @@ Concept source: `codex/019fabb0-baa-hybrid-ui-art-direction-plan` at
   Ledger's world-authored content, shop unit art, wager math, and stat tables
   gothic or neutral. Their frames and controls still receive the complete
   replacement/state pass below.
+- Per the resumed user direction, unit artwork and combat-actor presentation
+  are excluded from final acceptance for this cut because they will be rebuilt
+  separately. Unit-select and shop layout, framing, readability, and control
+  states remain in scope.
 - Keep all functional copy live in Godot. No price, percentage, binding,
   outcome, timer, unit name, or menu action may be baked into raster art.
 - `scripts/ui/audit/audit_panel.gd` is debug-only and excluded. Combat VFX,
@@ -204,6 +208,12 @@ idle, listening, saved-success, conflict-error, canceled, and reset states.
 All result and announcement text remains live. `F10-F12` are the persistent
 572x40 Arena Pressure status. `F13-F15` are brief 80-112 px authored impacts;
 they must not become permanent battlefield decoration.
+
+The F01-F04 source canvases remain 560x176, but the shipping battle-result
+control intentionally renders them as a 760x260 nine-slice interruption at
+1920x1080. This preserves the source border while giving victory, defeat, and
+stalemate enough authority over the arena. Reduced Motion skips the reveal
+tween without changing the final readable state.
 
 ## State contract
 

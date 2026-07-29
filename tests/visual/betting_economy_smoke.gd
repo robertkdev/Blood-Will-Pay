@@ -203,8 +203,13 @@ func _verify_post_shop_bet_controls() -> void:
 	_expect(int(Economy.current_bet) == max_bet, "max-bet slider should update Economy.current_bet")
 	_expect(int(Economy.preferred_bet) == max_bet, "max-bet slider should update Economy.preferred_bet")
 	_expect(String(value_label.text) == str(max_bet), "max-bet slider should repaint BetValue to %d, got %s" % [max_bet, String(value_label.text)])
+	if all_in_button != null:
+		var armed_style: StyleBoxTexture = all_in_button.get_theme_stylebox("normal") as StyleBoxTexture
+		_expect(String(all_in_button.text) == "ALL IN!", "armed all-in control should switch to emphatic action copy")
+		_expect(armed_style != null and armed_style.texture != null and String(armed_style.texture.resource_path).ends_with("button_wager_selected.png"), "armed all-in control should use the authored selected wager state")
 	if wager_summary != null:
 		var summary_copy: String = String(wager_summary.text)
+		_expect(summary_copy.begins_with("ALL IN ARMED"), "all-in summary should expose the armed risk state: %s" % summary_copy)
 		_expect(summary_copy.contains("Wager %dg" % max_bet), "wager summary should show selected wager: %s" % summary_copy)
 		_expect(summary_copy.contains("Win ") and summary_copy.contains("Gross "), "wager summary should show odds and gross return: %s" % summary_copy)
 		_expect(summary_copy.contains("After win ") and summary_copy.contains("After loss "), "wager summary should show both bankroll outcomes: %s" % summary_copy)
