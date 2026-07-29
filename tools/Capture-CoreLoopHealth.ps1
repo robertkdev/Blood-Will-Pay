@@ -35,7 +35,11 @@ $httpClient.Timeout = [TimeSpan]::FromMilliseconds(
     [Math]::Max(100, [Math]::Min(750, $IntervalMilliseconds))
 )
 
-$serverPidFile = Join-Path $env:APPDATA 'Godot\app_userdata\Gamble Battle\godot_ai_server.pid'
+$serverPidFile = Join-Path $env:APPDATA 'Godot\app_userdata\Blood Will Pay\godot_ai_server.pid'
+$legacyServerPidFile = Join-Path $env:APPDATA 'Godot\app_userdata\Gamble Battle\godot_ai_server.pid'
+if (-not (Test-Path -LiteralPath $serverPidFile) -and (Test-Path -LiteralPath $legacyServerPidFile)) {
+	$serverPidFile = $legacyServerPidFile
+}
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 $sequence = 0
 

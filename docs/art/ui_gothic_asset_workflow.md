@@ -1,6 +1,6 @@
 # Gothic UI Asset Workflow
 
-This is the future-agent recipe for making Gamble Battle UI assets in the current generated gothic style. Use this before creating or replacing bottom bars, buttons, cards, panels, tooltips, and other exact-size GUI surfaces.
+This is the future-agent recipe for making Blood Will Pay UI assets in the current generated gothic style. Use this before creating or replacing bottom bars, buttons, cards, panels, tooltips, and other exact-size GUI surfaces.
 
 ## Current Production Assets
 

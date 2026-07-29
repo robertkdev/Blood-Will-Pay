@@ -5,17 +5,17 @@ Concise, enforceable rules for working in this Godot 4.5 project. Scope: entire 
 ## Canonical Obsidian Brain
 - The canonical Codex/Obsidian brain vault is `C:\Users\Flipm\Documents\Codex\2026-06-22\hi\outputs\karpathy-obsidian-brain`.
 - Do not use `C:\Users\Flipm\Documents\Obsidian Vault` as project memory unless the user explicitly asks for that older/minimal vault.
-- For meaningful Gamble Battle work, update `Projects/Gamble Battle.md` in the canonical brain before the final response.
+- For meaningful Blood Will Pay work, update `Projects/Blood Will Pay.md` in the canonical brain before the final response.
 - For active sessions, add or update a concise work log when useful: current status, decisions, changed areas, important files, tests/runs, screenshots/evidence paths, blockers, and next steps.
 - When editing the brain, update `Wiki/log.md` and run `Tools\Test-Vault.cmd -CreateProbeCapture` from the canonical brain when feasible.
 - Never copy secrets, credentials, private keys, large generated files, dependency folders, or noisy logs into the brain; summarize and link paths instead.
 
 ## Game Design Source Of Truth
-- The canonical gameplay/design reference is the private Google Doc `gamble battle`: https://docs.google.com/document/d/1OCS4jfjMIiw-2-VQbLPaeDxsmzZMKEAFKb6BHvkMa7I/edit?tab=t.0
+- The canonical gameplay/design reference is the private Google Doc `Blood Will Pay`: https://docs.google.com/document/d/1OCS4jfjMIiw-2-VQbLPaeDxsmzZMKEAFKb6BHvkMa7I/edit?tab=t.0
 - For game terminology, units, roles, stats, traits, items, tests, goals, and design-framework decisions, consult the live Google Doc before inventing new behavior or changing game content.
 - The doc requires the user's signed-in Chrome/Google session; anonymous fetch/export may fail with `401 Unauthorized`.
 - If the live doc conflicts with repo code or local docs, surface the conflict and treat the Google Doc as the product/design authority unless the user says otherwise.
-- The brain source note for this document is `Sources/Gamble Battle Google Design Doc.md`.
+- The brain source note for this document is `Sources/Blood Will Pay Google Design Doc.md`.
 
 ## Current Unit Naming Contract
 - Mara is the only current unit identity. Cashmere is a retired legacy name and must never be presented as a current unit, alias, display label, or approved image.
@@ -41,7 +41,7 @@ Top-level layout
 ## Running (MCP Only)
 - Agents MUST run the project exclusively via MCP `run_project(projectPath="<abs_project_dir>", scene="<scene>.tscn")`.
 - Do not pass `.` for `projectPath`; it resolves relative to the MCP host process and may not be the repo root.
-- Example (this repo): `projectPath="C:\Users\Flipm\Documents\gamble-battle"`.
+- Example (this repo): `projectPath="C:\Users\Flipm\Documents\blood-will-pay"`.
 - Choose the scene appropriate for the task; do not assume `scenes/Main.tscn`.
 - Never invoke the `godot` executable or pass `-s`; if the editor is needed, use MCP `launch_editor(projectPath)`.
 
@@ -77,9 +77,9 @@ Output locations
   - Provide correctly typed values in `properties` (e.g., `position: Vector2(64, 64)`, `rotation: 0.0`, `texture: Resource`), or `null` to clear.
 
 - Run scenes examples
-  - RGA regression suite: `run_project(projectPath="C:\Users\Flipm\Documents\gamble-battle", scene="tests/rga_testing/RGATesting.tscn")`
-  - Role matrix (1v1): `run_project(projectPath="C:\Users\Flipm\Documents\gamble-battle", scene="tests/rga_testing/validation/RoleMatrixProbe.tscn")`
-  - Role matrix (6v6): `run_project(projectPath="C:\Users\Flipm\Documents\gamble-battle", scene="tests/rga_testing/validation/RoleMatrixProbe6v6.tscn")`
+  - RGA regression suite: `run_project(projectPath="C:\Users\Flipm\Documents\blood-will-pay", scene="tests/rga_testing/RGATesting.tscn")`
+  - Role matrix (1v1): `run_project(projectPath="C:\Users\Flipm\Documents\blood-will-pay", scene="tests/rga_testing/validation/RoleMatrixProbe.tscn")`
+  - Role matrix (6v6): `run_project(projectPath="C:\Users\Flipm\Documents\blood-will-pay", scene="tests/rga_testing/validation/RoleMatrixProbe6v6.tscn")`
 
 - Safety
   - Do not hand-edit `.uid`/`.import` files. Use MCP `update_project_uids` or the editor via MCP.
@@ -195,5 +195,5 @@ Output locations
   - Targeted systems: add/extend a purpose-built scene under `tests/rga_testing/...`
 
 ### Troubleshooting
-- Not a valid Godot project: . � Use an absolute `projectPath` (e.g., `C:\Users\Flipm\Documents\gamble-battle`) or discover via `list_projects`.
+- Not a valid Godot project: . � Use an absolute `projectPath` (e.g., `C:\Users\Flipm\Documents\blood-will-pay`) or discover via `list_projects`.
 - Scene parse errors � Ensure required scripts/resources parse under Godot 4.5; update dependencies or run the appropriate RGA probe scene to confirm.

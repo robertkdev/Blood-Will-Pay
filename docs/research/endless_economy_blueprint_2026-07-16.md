@@ -1,4 +1,4 @@
-# Gamble Battle Endless Economy Blueprint
+# Blood Will Pay Endless Economy Blueprint
 
 Date: 2026-07-16
 Status: locked design direction with a first implementation branch in progress
@@ -72,13 +72,13 @@ The first tuning target is:
 
 The TFT mode was **Tocker's Trials**, released for patch 14.17 on August 27, 2024 and scheduled to rotate out with patch 14.19 on September 24. It was not technically endless: Riot described 30 rounds, six bosses, three lives, solo play without timers, a high score, and a separate Chaos mode. The important lesson is not literal infinity. It is the escalating boss cadence, player-controlled planning time, and permission to create enemy boards outside normal PvP constraints.
 
-The Last Flame exposes an endless continuation after its acts and builds escalation from hero, item, and synergy combinations. Hadean Tactics' Eternal Rift adds a persistent-in-run structure, custom hero skills for sale, save/load support, survivor recruitment, and rotating challenge variants. These reinforce a shared direction for Gamble Battle: when the ordinary roster loop matures, unlock new upgrade vocabularies instead of extending the same purchase forever.
+The Last Flame exposes an endless continuation after its acts and builds escalation from hero, item, and synergy combinations. Hadean Tactics' Eternal Rift adds a persistent-in-run structure, custom hero skills for sale, save/load support, survivor recruitment, and rotating challenge variants. These reinforce a shared direction for Blood Will Pay: when the ordinary roster loop matures, unlock new upgrade vocabularies instead of extending the same purchase forever.
 
-Incremental games commonly pair exponentially increasing production with exponentially increasing costs, then introduce qualitative breakpoints, automation, or prestige layers when the old scale becomes routine. Gamble Battle should use the exponential curve and breakpoints, but not the conventional permanent-power prestige loop. Defeat should preserve identity and history while restoring the next run's combat baseline.
+Incremental games commonly pair exponentially increasing production with exponentially increasing costs, then introduce qualitative breakpoints, automation, or prestige layers when the old scale becomes routine. Blood Will Pay should use the exponential curve and breakpoints, but not the conventional permanent-power prestige loop. Defeat should preserve identity and history while restoring the next run's combat baseline.
 
 ## Why Literal 1–5 Gold Fails
 
-Riot has described this exact failure in TFT: when gold inflation lets players buy every shop, the interesting decision-making disappears. Gamble Battle's problem is more severe because its bankroll can grow without a fixed ceiling and currently has no interest system.
+Riot has described this exact failure in TFT: when gold inflation lets players buy every shop, the interesting decision-making disappears. Blood Will Pay's problem is more severe because its bankroll can grow without a fixed ceiling and currently has no interest system.
 
 For any unit price based only on chapter:
 
@@ -215,7 +215,7 @@ Critical economic rule: units, rerolls, XP, contracts, and the next wager must c
 
 The current modeled bet fraction and payout subsidy imply approximately 1.131x expected bankroll growth per fight, or 1.853x over five fights before spending. Spending 10% before those fights creates approximately an 18.5% difference in end-of-chapter capital. That is already a meaningful TFT-like opportunity cost.
 
-Do not add literal TFT interest in the first prototype. Betting is already Gamble Battle's compounding engine; adding interest may double-reward hoarding. Test interest later only if scaled prices and post-shop wagering still fail to produce enough buy/pass tension.
+Do not add literal TFT interest in the first prototype. Betting is already Blood Will Pay's compounding engine; adding interest may double-reward hoarding. Test interest later only if scaled prices and post-shop wagering still fail to produce enough buy/pass tension.
 
 ## The Five-Fight Chapter Market
 

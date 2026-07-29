@@ -12,7 +12,7 @@ One selection expires the other offers. Passing is always valid. Contract prices
 
 Stakes promotion is committed only at chapter boundaries, after the chapter-closing combat payout has updated the run's peak bankroll. It never reprices the shop during a fight or shopping decision.
 
-Gamble Battle uses procedural chapters as the default campaign path from Chapter 1 onward. Every chapter keeps the same 5-stage cadence:
+Blood Will Pay uses procedural chapters as the default campaign path from Chapter 1 onward. Every chapter keeps the same 5-stage cadence:
 
 1. Creep reward round
 2. Normal RGA challenge/puzzle

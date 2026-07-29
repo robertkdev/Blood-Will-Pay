@@ -43,7 +43,7 @@ func _run() -> void:
 		await _settle_seconds(0.85)
 
 	await _open_section("HomeButton")
-	await _capture("01_overview", ["GAMBLE BATTLE", "COMMAND MENU", "OPENING LOOP"])
+	await _capture("01_overview", ["BLOOD WILL PAY", "COMMAND MENU", "OPENING LOOP"])
 	await _open_section("HowToPlayButton")
 	await _set_search("combine")
 	await _capture("02_how_to_play_search_combine", ["HOW TO PLAY", "STRONGER COPY"])
@@ -90,6 +90,14 @@ func _capture(label: String, required_needles: Array[String]) -> void:
 	_expect(_json_contains_needles(json_path, required_needles), "%s JSON missing expected text: %s" % [label, JSON.stringify(required_needles)])
 
 func _capture_title_page(title_page: Control) -> void:
+	var artwork: TextureRect = title_page.get_node_or_null("Artwork") as TextureRect
+	_expect(artwork != null, "00_title_page artwork missing")
+	if artwork != null:
+		_expect(artwork.texture != null, "00_title_page artwork texture missing")
+		_expect(artwork.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED, "00_title_page artwork should preserve aspect")
+		_expect(String(artwork.texture.resource_path).ends_with("blood_will_pay_title_screen_4k.png"), "00_title_page artwork should use the approved Blood Will Pay asset")
+	var enter_button: Button = title_page.get_node_or_null("Center/Stack/EnterButton") as Button
+	_expect(enter_button != null and enter_button.text == "", "00_title_page should not show a visible Enter prompt")
 	var result: Dictionary[String, Variant] = VisionSnapshot.capture(title_page, "00_title_page", OUTPUT_DIR)
 	_captures.append(result)
 	_expect(bool(result.get("ok", false)), "00_title_page capture should succeed")
@@ -100,7 +108,7 @@ func _capture_title_page(title_page: Control) -> void:
 	_expect(path != "" and FileAccess.file_exists(path), "00_title_page final capture missing: %s" % path)
 	_expect(software_path != "" and FileAccess.file_exists(software_path), "00_title_page software capture missing: %s" % software_path)
 	_expect(json_path != "" and FileAccess.file_exists(json_path), "00_title_page JSON capture missing: %s" % json_path)
-	_expect(_json_contains_needles(json_path, ["GAMBLE BATTLE", "ENTER"]), "00_title_page JSON missing expected title-page text")
+	_expect(not _json_contains_any(json_path, ["GAMBLE BATTLE", "\"TEXT\":\"ENTER\""]), "00_title_page JSON should not expose legacy title or a visible Enter prompt")
 
 func _expect_generated_title_styles(context: String) -> void:
 	var content_panel: PanelContainer = _title_menu.get_node_or_null("ContentPanel") as PanelContainer
@@ -125,8 +133,9 @@ func _expect_generated_title_styles(context: String) -> void:
 		var button: Button = _title_menu.get_node_or_null("Center/VBox/%s" % nav_name) as Button
 		_expect(button != null and button.get_theme_stylebox("normal") is StyleBoxTexture, "%s %s normal style should be generated" % [context, nav_name])
 		_expect(button != null and button.get_theme_stylebox("pressed") is StyleBoxTexture, "%s %s pressed style should be generated" % [context, nav_name])
-	var motion_check: CheckBox = _title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
-	_expect(motion_check != null, "%s ReducedMotionCheck should be present" % context)
+	if context == "06_settings":
+		var motion_check: CheckBox = _title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
+		_expect(motion_check != null, "%s ReducedMotionCheck should be present" % context)
 
 func _json_contains_needles(path: String, needles: Array[String]) -> bool:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
@@ -138,6 +147,17 @@ func _json_contains_needles(path: String, needles: Array[String]) -> bool:
 		if not text.contains(needle.to_upper()):
 			return false
 	return true
+
+func _json_contains_any(path: String, needles: Array[String]) -> bool:
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return false
+	var text: String = file.get_as_text().to_upper()
+	file.close()
+	for needle: String in needles:
+		if text.contains(needle.to_upper()):
+			return true
+	return false
 
 func _settle_frames(count: int) -> void:
 	for _frame_index: int in range(count):

@@ -32,7 +32,7 @@ def build_notebook() -> None:
     notebook["cells"] = [
         markdown(
             """
-# Gamble Battle Endless Economy Model
+# Blood Will Pay Endless Economy Model
 
 ## tl;dr
 

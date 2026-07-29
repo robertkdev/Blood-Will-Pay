@@ -12,7 +12,7 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 const BlackLedgerScript: GDScript = preload("res://scripts/ui/black_ledger.gd")
-const TITLE_SIGIL: Texture2D = preload("res://assets/ui/gold icon.png")
+const TITLE_SCREEN_PATH: String = "res://assets/ui/title/blood_will_pay_title_screen_4k.png"
 
 const DEBUG_AUTO_START := false
 const DEBUG_TRACE := true
@@ -317,53 +317,65 @@ func _build_title_page() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_title_page.add_child(background)
-	var sigil: TextureRect = TextureRect.new()
-	sigil.name = "Sigil"
-	sigil.texture = TITLE_SIGIL
-	sigil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sigil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	sigil.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	sigil.modulate = Color(0.72, 0.48, 0.26, 0.24)
-	sigil.anchor_left = 0.22
-	sigil.anchor_top = 0.02
-	sigil.anchor_right = 0.78
-	sigil.anchor_bottom = 0.88
-	_title_page.add_child(sigil)
-	var center: CenterContainer = CenterContainer.new()
+	var artwork: TextureRect = TextureRect.new()
+	artwork.name = "Artwork"
+	artwork.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	artwork.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	artwork.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_title_page.add_child(artwork)
+	if ResourceLoader.exists(TITLE_SCREEN_PATH):
+		artwork.texture = ResourceLoader.load(TITLE_SCREEN_PATH, "Texture2D") as Texture2D
+	if artwork.texture == null:
+		_build_title_page_fallback(_title_page)
+	var center: Control = Control.new()
 	center.name = "Center"
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_title_page.add_child(center)
-	var stack: VBoxContainer = VBoxContainer.new()
+	var stack: Control = Control.new()
 	stack.name = "Stack"
-	stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack.custom_minimum_size = Vector2(720.0, 0.0)
-	stack.add_theme_constant_override("separation", 16)
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.add_child(stack)
-	var title: Label = Label.new()
-	title.name = "GameTitle"
-	title.text = "Gamble Battle"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 76)
-	title.add_theme_color_override("font_color", Color(0.93, 0.88, 0.78, 1.0))
-	title.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
-	title.add_theme_constant_override("outline_size", 5)
-	stack.add_child(title)
-	var subtitle: Label = Label.new()
-	subtitle.name = "Subtitle"
-	subtitle.text = "Blood. Gold. Consequence."
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 20)
-	subtitle.add_theme_color_override("font_color", Color(0.72, 0.66, 0.58, 1.0))
-	stack.add_child(subtitle)
 	var enter_button: Button = Button.new()
 	enter_button.name = "EnterButton"
-	enter_button.text = "Enter"
-	enter_button.custom_minimum_size = Vector2(260.0, 58.0)
+	enter_button.text = ""
+	enter_button.flat = true
 	enter_button.focus_mode = Control.FOCUS_ALL
-	_apply_button_style(enter_button, false)
+	enter_button.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	enter_button.accessibility_name = "Continue to Blood Will Pay main menu"
+	enter_button.accessibility_description = "Press any key or controller button, or click anywhere, to continue."
+	enter_button.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var empty_style: StyleBoxEmpty = StyleBoxEmpty.new()
+	for state_name: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+		enter_button.add_theme_stylebox_override(state_name, empty_style)
 	enter_button.pressed.connect(_dismiss_title_page)
 	stack.add_child(enter_button)
 	_title_page.gui_input.connect(_on_title_page_gui_input)
+
+func _build_title_page_fallback(title_page: Control) -> void:
+	var fallback_center: CenterContainer = CenterContainer.new()
+	fallback_center.name = "FallbackCenter"
+	fallback_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fallback_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title_page.add_child(fallback_center)
+	var fallback_stack: VBoxContainer = VBoxContainer.new()
+	fallback_stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	fallback_stack.add_theme_constant_override("separation", 16)
+	fallback_center.add_child(fallback_stack)
+	var fallback_title: Label = Label.new()
+	fallback_title.text = "BLOOD WILL PAY"
+	fallback_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fallback_title.add_theme_font_size_override("font_size", 76)
+	fallback_title.add_theme_color_override("font_color", Color(0.93, 0.88, 0.78, 1.0))
+	fallback_stack.add_child(fallback_title)
+	var fallback_subtitle: Label = Label.new()
+	fallback_subtitle.text = "THEIR LIVES. YOUR ODDS."
+	fallback_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fallback_subtitle.add_theme_font_size_override("font_size", 20)
+	fallback_subtitle.add_theme_color_override("font_color", Color(0.72, 0.66, 0.58, 1.0))
+	fallback_stack.add_child(fallback_subtitle)
 
 func _show_title_page() -> void:
 	_close_system_menu()
@@ -389,6 +401,14 @@ func _dismiss_title_page() -> void:
 	if _title_page != null:
 		_title_page.visible = false
 	_set_menu_visible(true)
+	_refresh_continue_run_button()
+	call_deferred("_focus_title_menu_entry")
+
+func _focus_title_menu_entry() -> void:
+	if _continue_run_button != null and _continue_run_button.visible and not _continue_run_button.disabled:
+		_continue_run_button.grab_focus()
+	elif start_button != null and start_button.visible and not start_button.disabled:
+		start_button.grab_focus()
 
 func _on_title_page_gui_input(event: InputEvent) -> void:
 	if _is_title_page_event(event):

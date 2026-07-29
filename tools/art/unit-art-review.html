@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Gamble Battle Unit Art Review</title>
+	<title>Blood Will Pay Unit Art Review</title>
 	<style>
 		:root {
 			color-scheme: dark;
@@ -499,7 +499,7 @@
 	<div class="shell">
 		<header class="topbar">
 			<div>
-				<h1>Gamble Battle Unit Art Review</h1>
+				<h1>Blood Will Pay Unit Art Review</h1>
 				<div class="subtle" id="visible-count">Loading assets/units</div>
 			</div>
 			<div class="controls" aria-label="Review controls">
@@ -567,7 +567,8 @@
 
 	<script>
 		const ASSET_ROOT = "../../assets/units/";
-		const STORAGE_KEY = "gamble-battle-unit-art-review-v1";
+		const STORAGE_KEY = "blood-will-pay-unit-art-review-v1";
+		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
 		const LIVE_ART = [
 			"axiom.png",
 			"bastionne.png",
@@ -836,11 +837,11 @@
 		});
 
 		document.getElementById("export-json").addEventListener("click", () => {
-			download("gamble-battle-unit-art-review.json", "application/json", JSON.stringify(exportPayload(), null, "\t"));
+			download("blood-will-pay-unit-art-review.json", "application/json", JSON.stringify(exportPayload(), null, "\t"));
 		});
 
 		document.getElementById("export-csv").addEventListener("click", () => {
-			download("gamble-battle-unit-art-review.csv", "text/csv", exportCsv());
+			download("blood-will-pay-unit-art-review.csv", "text/csv", exportCsv());
 		});
 
 		document.getElementById("copy-summary").addEventListener("click", async () => {
@@ -1107,11 +1108,16 @@
 
 		function loadDecisions() {
 			try {
-				const raw = localStorage.getItem(STORAGE_KEY);
+				const current = localStorage.getItem(STORAGE_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_STORAGE_KEY);
+				const raw = current || legacy;
 				if (!raw) {
 					return {};
 				}
 				const parsed = JSON.parse(raw);
+				if (!current && legacy) {
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+				}
 				return parsed && typeof parsed === "object" ? parsed : {};
 			} catch (error) {
 				return {};
@@ -1129,7 +1135,7 @@
 		function exportPayload() {
 			const counts = getCounts();
 			return {
-				project: "gamble-battle",
+				project: "blood-will-pay",
 				review_set: state.set,
 				review_set_label: setLabel(state.set),
 				exported_at: new Date().toISOString(),
@@ -1164,7 +1170,7 @@
 		function summaryText() {
 			const payload = exportPayload();
 			const lines = [
-				"Gamble Battle unit art review - " + payload.review_set_label,
+				"Blood Will Pay unit art review - " + payload.review_set_label,
 				"Like: " + payload.counts.like,
 				"Maybe: " + payload.counts.maybe,
 				"Cut: " + payload.counts.cut,

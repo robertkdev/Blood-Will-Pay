@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate unit-shop pricing against an unbounded Gamble Battle bankroll."""
+"""Evaluate unit-shop pricing against an unbounded Blood Will Pay bankroll."""
 
 from __future__ import annotations
 

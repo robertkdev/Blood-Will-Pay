@@ -5,7 +5,7 @@ Status: title-screen direction approved; 4K production master created but not wi
 
 ## Core Intent
 
-Gamble Battle should not depict metal culture literally. Metal and hardcore are
+Blood Will Pay should not depict metal culture literally. Metal and hardcore are
 the emotional and formal references: aggression, compression, rupture,
 relentless rhythm, ugliness with conviction, sudden silence before impact, and
 the feeling that violence is about to become uncontrollable.
@@ -39,7 +39,7 @@ The same prohibition applies across the game:
 
 ## Redesign Goal
 
-The title screen should be one terrible moment inside Gamble Battle's actual
+The title screen should be one terrible moment inside Blood Will Pay's actual
 world: a place already damaged by war, cruelty, monstrous power, and
 consequence. It should feel like the held breath before a breakdown lands.
 
@@ -134,7 +134,7 @@ The UI can inherit metal's force without pretending to be music memorabilia:
 - The screen feels aggressive even if the logo and all explicit music
   references are removed.
 - The image suggests a specific conflict, threat, or social order native to
-  Gamble Battle.
+  Blood Will Pay.
 - No stage, crowd-as-audience, performer, venue, ticket, flyer, speaker,
   amplifier, or tour metaphor is visible.
 - The title and tagline remain readable at 3840x2160, 1920x1080, and 1280x720.

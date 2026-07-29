@@ -1,6 +1,6 @@
 # The Ashen Covenant
 
-Status: story-first universe draft for Gamble Battle. This replaces the rejected `docs/lore.md`.
+Status: story-first universe draft for Blood Will Pay. This replaces the rejected `docs/lore.md`.
 
 This document treats the world as primary. The battles, characters, factions, and visual direction come from this universe; the universe is not an explanation of a rules surface.
 

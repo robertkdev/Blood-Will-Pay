@@ -1,6 +1,6 @@
 # Black Ledger account progression
 
-The Black Ledger is Gamble Battle's local-profile progression layer. It rewards demonstrated mastery with permanent starter options while leaving combat power, odds, shop power, and starting bankroll unchanged. The current implementation persists on this installation; it does not yet synchronize through Steam, a server account, or cloud storage.
+The Black Ledger is Blood Will Pay's local-profile progression layer. It rewards demonstrated mastery with permanent starter options while leaving combat power, odds, shop power, and starting bankroll unchanged. The current implementation persists on this installation; it does not yet synchronize through Steam, a server account, or cloud storage.
 
 ## Core rules
 

@@ -30,17 +30,50 @@ func _run() -> void:
 	_expect(title_menu != null, "TitleMenu missing", failures)
 	if title_menu != null:
 		_expect(not title_menu.visible, "TitleMenu should wait behind the title page on main start", failures)
+		var artwork: TextureRect = main.get_node_or_null("TitlePage/Artwork") as TextureRect
+		_expect(artwork != null, "TitlePage Artwork missing", failures)
+		if artwork != null:
+			_expect(artwork.texture != null, "TitlePage Artwork texture missing", failures)
+			_expect(artwork.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED, "TitlePage Artwork should preserve the full composition", failures)
+			_expect(artwork.anchor_left == 0.0 and artwork.anchor_top == 0.0 and artwork.anchor_right == 1.0 and artwork.anchor_bottom == 1.0, "TitlePage Artwork should fill the viewport", failures)
 		var enter_button: Button = main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
 		_expect(enter_button != null, "TitlePage EnterButton missing", failures)
 		if enter_button != null:
+			_expect(enter_button.text == "", "TitlePage should not show a visible continue prompt", failures)
+			_expect(enter_button.flat, "TitlePage interaction surface should remain visually transparent", failures)
+			_expect(enter_button.accessibility_name.contains("Blood Will Pay"), "TitlePage should expose the renamed title to assistive technology", failures)
+			_expect(enter_button.has_focus(), "TitlePage interaction surface should receive initial focus", failures)
 			enter_button.emit_signal("pressed")
 			await get_tree().process_frame
 			await get_tree().process_frame
 		_expect(title_menu.visible, "TitleMenu is not visible after entering from title page", failures)
+		var expected_focus: Control = main.get_node_or_null("TitleMenu/Center/VBox/ContinueRunButton") as Control
+		if expected_focus == null or not expected_focus.visible:
+			expected_focus = main.get_node_or_null("TitleMenu/Center/VBox/StartButton") as Control
+		_expect(expected_focus != null and expected_focus.has_focus(), "TitlePage dismissal should hand focus to the main menu", failures)
+		main.call("_show_title_page")
+		await get_tree().process_frame
+		var key_event: InputEventKey = InputEventKey.new()
+		key_event.pressed = true
+		key_event.keycode = KEY_ENTER
+		main.call("_unhandled_input", key_event)
+		await get_tree().process_frame
+		_expect(title_menu.visible, "Keyboard input should dismiss the title page", failures)
+		main.call("_show_title_page")
+		await get_tree().process_frame
+		var joy_event: InputEventJoypadButton = InputEventJoypadButton.new()
+		joy_event.pressed = true
+		joy_event.button_index = JOY_BUTTON_A
+		main.call("_unhandled_input", joy_event)
+		await get_tree().process_frame
+		_expect(title_menu.visible, "Controller input should dismiss the title page", failures)
 		var title_label: Label = title_menu.get_node_or_null("Center/VBox/GameTitle") as Label
 		_expect(title_label != null, "GameTitle missing", failures)
 		if title_label != null:
+			_expect(title_label.text == "Blood Will Pay", "GameTitle should use the new game name", failures)
 			_expect(title_label.get_theme_font_size("font_size") >= 54, "GameTitle is not visually prioritized", failures)
+		var subtitle: Label = title_menu.get_node_or_null("Center/VBox/Subtitle") as Label
+		_expect(subtitle != null and subtitle.text == "Their lives. Your odds.", "Title menu should use the new tagline", failures)
 		var hero: TextureRect = title_menu.get_node_or_null("TitleHero") as TextureRect
 		_expect(hero == null, "TitleHero should not render a background unit over the menu", failures)
 		var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer

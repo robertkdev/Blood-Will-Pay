@@ -304,7 +304,7 @@ def build() -> dict[str, Any]:
 		"manifest": {
 			"version": 1,
 			"surface": "report",
-			"title": "Gamble Battle Endless Economy — Decision Blueprint",
+			"title": "Blood Will Pay Endless Economy — Decision Blueprint",
 			"description": "A research-backed, simulation-checked economy and escalation blueprint.",
 			"generatedAt": now,
 			"sources": sources,
@@ -522,7 +522,7 @@ def build() -> dict[str, Any]:
 				},
 			],
 			"blocks": [
-				{"id": "title", "type": "markdown", "body": "# Gamble Battle Endless Economy — Decision Blueprint"},
+				{"id": "title", "type": "markdown", "body": "# Blood Will Pay Endless Economy — Decision Blueprint"},
 				{"id": "exec-heading", "type": "markdown", "body": "## Executive Summary"},
 				{
 					"id": "exec-body",
@@ -530,7 +530,7 @@ def build() -> dict[str, Any]:
 					"body": (
 						"The earlier recommendation to keep units at literal **1–5 gold forever is rejected**. Riot has "
 						"described the same failure in TFT: when players can buy every shop, the economic decision disappears. "
-						"Gamble Battle should preserve TFT's **ratios**, not its nominal numbers.\n\n"
+						"Blood Will Pay should preserve TFT's **ratios**, not its nominal numbers.\n\n"
 						"Use a visible, irreversible **Stakes denomination U**. Units cost `1U–5U`, rerolls `2U`, and "
 						"XP/command purchases `4U`. U advances through a sticky 1-2-5 high-water ladder only at chapter "
 						"boundaries, while the entire bankroll remains liquid. At one million gold, the proposed market is "
@@ -548,7 +548,7 @@ def build() -> dict[str, Any]:
 						"clear boss cadence and permission to show boards outside normal TFT constraints. The Last Flame's "
 						"endless act and Hadean Tactics' Eternal Rift reinforce the value of run-specific build mutation, "
 						"save/resume support, and new upgrade vocabularies after the ordinary roster loop is mature.\n\n"
-						"Gamble Battle should combine those structures with incremental-game arithmetic: a visible "
+						"Blood Will Pay should combine those structures with incremental-game arithmetic: a visible "
 						"exponential reference curve, periodic qualitative breakpoints, and reset boundaries that preserve "
 						"identity without adding permanent exponential combat power."
 					),

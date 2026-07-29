@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "usage": "Machine-readable proof ledger for the Gamble Battle matte gothic unit-art workflow. Use this before generation to see which archetypes are proven, which examples were rejected, and which coverage gaps still need a deliberate stress test. Do not treat a proof here as permission to replace live assets; live swaps still require explicit user approval.",
+  "usage": "Machine-readable proof ledger for the Blood Will Pay matte gothic unit-art workflow. Use this before generation to see which archetypes are proven, which examples were rejected, and which coverage gaps still need a deliberate stress test. Do not treat a proof here as permission to replace live assets; live swaps still require explicit user approval.",
   "style_contract": {
     "target": "western dark gothic board-game unit art, about 10 percent grounded realism, high-detail matte gothic illustration, Vellum-level dry detail richness, Paisley as secondary contrast context only, powder-matte dry material language, layered fabric/parchment/dry edge wear, hand-painted surface breakup, low-specular ambient light, broad heavy shadow, readable at 96 px",
     "reference_hierarchy": [

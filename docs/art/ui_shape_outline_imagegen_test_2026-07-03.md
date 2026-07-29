@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Test whether calculated, exact-size UI outlines can be used as image-generation start sources for Gamble Battle UI assets such as the bottom bar, shop cards, action buttons, and the primary battle button.
+Test whether calculated, exact-size UI outlines can be used as image-generation start sources for Blood Will Pay UI assets such as the bottom bar, shop cards, action buttons, and the primary battle button.
 
 ## Source Geometry
 
@@ -28,7 +28,7 @@ Comparator screenshot:
 
 Mode: built-in `image_gen` tool using the clean outline sheet as the visible edit/source image.
 
-Prompt intent: preserve exact geometry and green matte while painting only inside the existing shapes in the current severe gothic Gamble Battle UI direction: blackened iron, deep charcoal stone, blood-red enamel, ember-gold trim, subtle vellum/stone grain, crisp bevels.
+Prompt intent: preserve exact geometry and green matte while painting only inside the existing shapes in the current severe gothic Blood Will Pay UI direction: blackened iron, deep charcoal stone, blood-red enamel, ember-gold trim, subtle vellum/stone grain, crisp bevels.
 
 Raw output:
 

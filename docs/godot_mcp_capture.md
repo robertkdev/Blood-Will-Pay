@@ -31,7 +31,7 @@ If the game is already running:
 ```powershell
 .\tools\Capture-GodotMcp.ps1 `
     -OutputPath C:\path\to\evidence\game.png `
-    -ProjectPath C:\Users\Flipm\Documents\gamble-battle
+    -ProjectPath C:\Users\Flipm\Documents\blood-will-pay
 ```
 
 To run the main scene through MCP and capture it once the game helper is ready:
@@ -39,7 +39,7 @@ To run the main scene through MCP and capture it once the game helper is ready:
 ```powershell
 .\tools\Capture-GodotMcp.ps1 `
     -OutputPath C:\path\to\evidence\title.png `
-    -ProjectPath C:\Users\Flipm\Documents\gamble-battle `
+    -ProjectPath C:\Users\Flipm\Documents\blood-will-pay `
     -Run main
 ```
 

@@ -883,7 +883,7 @@ func _init_game() -> void:
 	# For compatibility with existing flows
 	if manager:
 		manager.stage = 1
-		_on_log_line("Gamble Battle")
+		_on_log_line("Blood Will Pay")
 		# Build preview after state set so it reflects Chapter 1 — Round 1
 		manager.setup_stage_preview()
 		# Update label to reflect preview stage

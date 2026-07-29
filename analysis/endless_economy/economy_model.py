@@ -637,7 +637,7 @@ def run_model(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Model Gamble Battle endless-economy pricing and betting policies."
+        description="Model Blood Will Pay endless-economy pricing and betting policies."
     )
     parser.add_argument("--simulations", type=int, default=5_000)
     parser.add_argument("--chapters", type=int, default=40)

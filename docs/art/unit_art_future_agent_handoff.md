@@ -1,8 +1,8 @@
-# Gamble Battle Unit Art Future Agent Handoff
+# Blood Will Pay Unit Art Future Agent Handoff
 
 > Mara naming note (2026-07-28): Mara is the only current unit name. Any lower-case `cashmere` path is legacy provenance, and the formal ledger-clad image from those paths must not be relabeled or promoted as current Mara art.
 
-Use this when a new Codex agent has no conversation history and needs to continue the Gamble Battle unit-art workflow without drifting away from the approved direction.
+Use this when a new Codex agent has no conversation history and needs to continue the Blood Will Pay unit-art workflow without drifting away from the approved direction.
 
 ## Current State
 
@@ -114,7 +114,7 @@ That command validates the proof policy, completion audit, workflow docs, all 23
 Godot validation is separate because this repo requires MCP-only Godot execution. Run:
 
 ```text
-mcp godot run_project projectPath="C:\Users\Flipm\Documents\gamble-battle" scene="tests/rga_testing/validation/RoleMatrixProbe.tscn"
+mcp godot run_project projectPath="C:\Users\Flipm\Documents\blood-will-pay" scene="tests/rga_testing/validation/RoleMatrixProbe.tscn"
 mcp godot get_debug_output
 ```
 

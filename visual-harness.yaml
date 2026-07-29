@@ -1,5 +1,5 @@
 version: 1
-project: Gamble Battle
+project: Blood Will Pay
 scenarios:
   - id: black-ledger
     title: Ledger
@@ -23,7 +23,7 @@ scenarios:
       max_source_age_seconds: 300
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 3
-    telegram_context: "Gamble Battle Black Ledger"
+    telegram_context: "Blood Will Pay Black Ledger"
   - id: godot-visibility
     title: Godot player-facing visibility gate
     adapter: godot
@@ -46,7 +46,7 @@ scenarios:
       max_source_age_seconds: 300
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 1
-    telegram_context: "Gamble Battle Godot visibility"
+    telegram_context: "Blood Will Pay Godot visibility"
   - id: phase5-player-clarity
     title: Player-facing clarity and accessibility gate
     adapter: godot
@@ -69,7 +69,7 @@ scenarios:
       max_source_age_seconds: 300
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 2
-    telegram_context: "Gamble Battle Phase 5 clarity"
+    telegram_context: "Blood Will Pay Phase 5 clarity"
   - id: encounter-escalation
     title: Boss escalation runtime sequence
     adapter: godot
@@ -93,7 +93,7 @@ scenarios:
       max_source_age_seconds: 300
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 3
-    telegram_context: "Gamble Battle boss escalation"
+    telegram_context: "Blood Will Pay boss escalation"
   - id: contract-system
     title: Run-shaping contracts and arena obligations
     adapter: godot
@@ -117,7 +117,7 @@ scenarios:
       max_source_age_seconds: 300
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 3
-    telegram_context: "Gamble Battle contracts"
+    telegram_context: "Blood Will Pay contracts"
   - id: unit-upgrades
     title: Capital recruits and level-four ascension
     adapter: godot
@@ -140,4 +140,4 @@ scenarios:
       max_source_age_seconds: 300
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 3
-    telegram_context: "Gamble Battle unit upgrades"
+    telegram_context: "Blood Will Pay unit upgrades"
