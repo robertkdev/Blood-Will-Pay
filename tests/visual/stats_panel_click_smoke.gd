@@ -1,6 +1,7 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const UNIT_FACTORY := preload("res://scripts/unit_factory.gd")
 const PLAYER_TEAM: Array[String] = ["mortem", "berebell", "bonko"]
 
@@ -40,9 +41,7 @@ func _run() -> void:
 	await _settle_frames(8)
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle_frames(12)
-
-	_view = _main.get_node_or_null("CombatView") as Control
+	_view = await MainTransitionWait.for_combat_view(self, _main)
 	if _view == null:
 		_fail("CombatView missing")
 		_finish()
@@ -197,9 +196,17 @@ func _expect_unit_info_labels(context: String) -> void:
 	var attack_label: Label = _unit_panel.find_child("AttackInfo", true, false) as Label
 	if attack_label == null or not String(attack_label.text).begins_with("Attack:"):
 		_fail("%s: attack info label missing or empty" % context)
+	var attack_targeting_label: Label = _unit_panel.find_child("AttackTargetingInfo", true, false) as Label
+	if attack_targeting_label == null or not String(attack_targeting_label.text).begins_with("Attack Targeting:"):
+		_fail("%s: attack targeting info label missing or empty" % context)
 	var ability_label: Label = _unit_panel.find_child("AbilityInfo", true, false) as Label
 	if ability_label == null or not String(ability_label.text).begins_with("Ability:"):
 		_fail("%s: ability info label missing or empty" % context)
+	var ability_targeting_label: Label = _unit_panel.find_child("AbilityTargetingInfo", true, false) as Label
+	if ability_targeting_label == null or not String(ability_targeting_label.text).begins_with("Ability Targeting:"):
+		_fail("%s: ability targeting info label missing or empty" % context)
+	if ability_targeting_label != null and String(ability_targeting_label.text).find("Positioning:") >= 0:
+		_fail("%s: unit info should not prescribe positioning" % context)
 	var stats_grid: GridContainer = _unit_panel.find_child("StatsGrid", true, false) as GridContainer
 	if stats_grid == null or stats_grid.get_child_count() == 0:
 		_fail("%s: unit stat cards missing" % context)

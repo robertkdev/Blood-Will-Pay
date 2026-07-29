@@ -13,6 +13,7 @@ var player_grid_helper: BoardGrid
 var enemy_grid_helper: BoardGrid
 var manager: CombatManager
 var rng: RandomNumberGenerator
+var _visuals_enabled: bool = true
 
 func configure(_parent: Node, _arena_bridge, _player_grid_helper: BoardGrid, _enemy_grid_helper: BoardGrid, _manager: CombatManager, _rng: RandomNumberGenerator) -> void:
     parent = _parent
@@ -44,6 +45,11 @@ func has_active() -> bool:
 func has_active_visual_for(source_team: String, source_index: int, target_index: int) -> bool:
     return projectile_manager != null and projectile_manager.has_active_visual_for(source_team, source_index, target_index)
 
+func set_visuals_enabled(enabled: bool) -> void:
+    _visuals_enabled = bool(enabled)
+    if not _visuals_enabled:
+        clear()
+
 func clear() -> void:
     if projectile_manager:
         projectile_manager.clear()
@@ -71,6 +77,8 @@ func teardown() -> void:
     rng = null
 
 func on_projectile_fired(source_team: String, source_index: int, target_index: int, damage: int, crit: bool) -> void:
+    if not _visuals_enabled:
+        return
     if not projectile_manager:
         return
     var start_pos: Vector2

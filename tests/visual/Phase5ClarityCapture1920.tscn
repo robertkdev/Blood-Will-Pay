@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/visual/betting_economy_smoke.gd" id="1"]
+
+[node name="Phase5ClarityCapture1920" type="Node"]
+script = ExtResource("1")
+viewport_size = Vector2i(1920, 1080)
+capture_hold_state = "combat"
+capture_output_dir = "res://outputs/visual_debug/phase5_clarity/self_capture/1920x1080"
+capture_clarity_states = true

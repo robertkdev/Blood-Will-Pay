@@ -671,7 +671,7 @@ func _button_with_text(text: String) -> Button:
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and String(button.text) == text:
+		if button != null and (String(button.text) == text or String(button.text).begins_with(text + " ")):
 			return button
 	return null
 

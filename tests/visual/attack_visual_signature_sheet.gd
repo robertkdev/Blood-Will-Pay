@@ -6,7 +6,7 @@ const UnitFactory := preload("res://scripts/unit_factory.gd")
 
 const OUTPUT_PATH: String = "res://outputs/visual_iter/attack_visuals_pass/unit_attack_signature_sheet.png"
 const PLAYABLE_IDS: Array[String] = [
-	"axiom", "berebell", "bo", "bonko", "brute", "cashmere",
+	"axiom", "berebell", "bo", "bonko", "brute", "mara",
 	"grint", "hexeon", "korath", "kythera", "luna", "morrak",
 	"mortem", "nyxa", "paisley", "repo", "sari", "teller",
 	"totem", "veyra", "volt", "vykos",

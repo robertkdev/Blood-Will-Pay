@@ -18,3 +18,8 @@ func is_blocked(state: BattleState, team: String, idx: int) -> bool:
     if buff_system == null or state == null:
         return false
     return buff_system.is_movement_blocked(state, team, idx)
+
+func is_unit_blocked(unit: Unit) -> bool:
+    if buff_system == null:
+        return false
+    return buff_system.is_unit_movement_blocked(unit)

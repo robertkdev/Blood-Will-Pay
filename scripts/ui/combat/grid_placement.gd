@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GridPlacement
 
+signal player_placements_changed()
+
 const UnitViewClass := preload("res://scripts/ui/combat/unit_view.gd")
 const UnitSlotView := preload("res://scripts/ui/combat/unit_slot_view.gd")
 const UnitItemsView := preload("res://scripts/ui/items/unit_items_view.gd")
@@ -56,6 +58,21 @@ func get_player_views() -> Array:
 
 func get_enemy_views() -> Array:
 	return enemy_views
+
+func get_player_placements() -> Array[int]:
+	var placements: Array[int] = []
+	for slot: UnitSlotView in player_views:
+		placements.append(int(slot.tile_idx) if slot != null else -1)
+	return placements
+
+func set_player_placements(player_team: Array[Unit], placements: Array[int]) -> void:
+	_player_index_by_unit.clear()
+	var count: int = min(player_team.size(), placements.size())
+	for index: int in range(count):
+		var unit: Unit = player_team[index]
+		var tile_index: int = int(placements[index])
+		if unit != null and tile_index >= 0 and tile_index < player_tiles.size():
+			_player_index_by_unit[unit] = tile_index
 
 func teardown() -> void:
 	if player_grid_helper != null:
@@ -116,6 +133,7 @@ func rebuild_enemy_views(enemy_team: Array) -> void:
 		var u: Unit = enemy_team[i]
 		var uv: UnitView = UnitViewClass.new()
 		uv.set_unit(u)
+		uv.drag_size = Vector2(float(tile_size), float(tile_size))
 		# Items overlay
 		var _items_view_e: UnitItemsView = UnitItemsView.new()
 		_items_view_e.set_unit(u)
@@ -185,17 +203,16 @@ func rebuild_player_views(player_team: Array, allow_drag: bool) -> void:
 		used_tiles[tile_idx] = true
 		var uv: UnitView = UnitViewClass.new()
 		uv.set_unit(pu)
+		uv.drag_size = Vector2(float(tile_size), float(tile_size))
 		# Items overlay
 		var _items_view_p: UnitItemsView = UnitItemsView.new()
 		_items_view_p.set_unit(pu)
 		uv.add_child(_items_view_p)
-		if allow_drag:
-			uv.enable_drag(player_grid_helper)
-			# Capture loop index by value to avoid late-binding issues
-			var _i: int = i
-			uv.dropped_on_tile.connect(func(idx): _on_player_unit_dropped(_i, idx))
 		if player_grid_helper:
 			player_grid_helper.attach(uv, tile_idx)
+		if allow_drag:
+			uv.enable_drag(player_grid_helper)
+			uv.dropped_on_tile.connect(_on_player_unit_view_dropped.bind(uv))
 		var slot: UnitSlotView = UnitSlotView.new()
 		slot.unit = pu
 		slot.view = uv
@@ -205,6 +222,15 @@ func rebuild_player_views(player_team: Array, allow_drag: bool) -> void:
 		summary.append(placement)
 	if not summary.is_empty():
 		Debug.log("Plan", "Player positions %s" % [Strings.join(summary, ", ")])
+
+func _on_player_unit_view_dropped(idx: int, view: UnitView) -> void:
+	if view == null:
+		return
+	for i: int in range(player_views.size()):
+		var slot: UnitSlotView = player_views[i]
+		if slot != null and slot.view == view:
+			_on_player_unit_dropped(i, idx)
+			return
 
 func _on_player_unit_dropped(i: int, idx: int) -> void:
 	if idx < 0 or idx >= player_tiles.size():
@@ -242,3 +268,4 @@ func _on_player_unit_dropped(i: int, idx: int) -> void:
 		if player_grid_helper and ctrl:
 			player_grid_helper.attach(ctrl, idx)
 		player_views[i].tile_idx = idx
+	player_placements_changed.emit()

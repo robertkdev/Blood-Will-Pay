@@ -6,6 +6,7 @@
 script = ExtResource( 1 )
 id = "korath_absorb_release"
 name = "Absorb & Release"
-description = "Absorbs a portion of damage taken, then heals the lowest-HP ally after a delay. Gains Titan stacks on cast."
+description = "Bodyguards nearby allies by diverting some damage and charging release from that pressure, dashes into the current target, briefly stuns them, absorbs extra damage during the window, then heals the lowest-HP ally and releases stored pressure into priority threats after a delay. Gains Titan stacks on cast."
+targeting_summary = "Current target for engage; ally damage can divert to Korath; delayed release heals lowest-health ally and punishes backline-access pressure sources."
 base_cost = 40
-tags = ["heal", "mitigation"]
+tags = ["heal", "mitigation", "engage", "control", "redirect"]

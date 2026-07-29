@@ -2,7 +2,7 @@
 
 [node name="TraitsPanel" type="Control"]
 z_index = 40
-custom_minimum_size = Vector2(56, 64)
+custom_minimum_size = Vector2(296, 280)
 layout_mode = 3
 anchors_preset = 0
 mouse_filter = 2
@@ -17,11 +17,26 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.593552, 0.169596, 0.223749, 1)
 
+[node name="TraitsTitle" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 14.0
+offset_top = 8.0
+offset_right = -14.0
+offset_bottom = 32.0
+grow_horizontal = 2
+text = "Traits"
+
 [node name="TraitsScroll" type="ScrollContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 36.0
+offset_right = -10.0
+offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -29,3 +44,4 @@ horizontal_scroll_mode = 0
 
 [node name="TraitsVBox" type="VBoxContainer" parent="TraitsScroll"]
 layout_mode = 2
+size_flags_horizontal = 3

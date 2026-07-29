@@ -32,7 +32,7 @@ func _run() -> void:
 			"b": [
 				{
 					"unit_index": 0,
-					"unit_id": "cashmere"
+					"unit_id": "mara"
 				}
 			]
 		}
@@ -124,7 +124,7 @@ func _make_state() -> BattleState:
 	brute.max_hp = 1000
 	brute.hp = 1000
 	var enemy: Unit = Unit.new()
-	enemy.id = "cashmere"
+	enemy.id = "mara"
 	enemy.max_hp = 1000
 	enemy.hp = 1000
 	var player_team: Array[Unit] = [korath, brute]
@@ -142,7 +142,7 @@ func _run_metric_result(kernel_result: Dictionary) -> Dictionary:
 				"probe": {
 					"context": {
 						"team_a_ids": ["korath", "brute"],
-						"team_b_ids": ["cashmere"]
+						"team_b_ids": ["mara"]
 					},
 					"kernels": kernel_result,
 					"units": {
@@ -160,7 +160,7 @@ func _run_metric_result(kernel_result: Dictionary) -> Dictionary:
 						],
 						"b": [
 							{
-								"unit_id": "cashmere",
+								"unit_id": "mara",
 								"incoming": 0.0,
 								"pre_mit_incoming": 0.0
 							}

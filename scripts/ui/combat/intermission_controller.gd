@@ -26,11 +26,11 @@ func _ensure_bar() -> void:
     _bar.anchor_top = 0.0
     _bar.anchor_right = 0.5
     _bar.anchor_bottom = 0.0
-    _bar.offset_left = -280.0
-    _bar.offset_right = 280.0
-    _bar.offset_top = 92.0
-    _bar.offset_bottom = 102.0
-    _bar.z_index = 2000
+    _bar.offset_left = -240.0
+    _bar.offset_right = 240.0
+    _bar.offset_top = 142.0
+    _bar.offset_bottom = 148.0
+    _bar.z_index = 150
     _bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _bar.min_value = 0.0
     _bar.max_value = 1.0
@@ -58,9 +58,8 @@ func _make_bar_background_style() -> StyleBoxFlat:
 
 func _make_bar_fill_style() -> StyleBoxFlat:
     var style: StyleBoxFlat = StyleBoxFlat.new()
-    style.bg_color = COLOR_BLOOD
-    style.border_color = COLOR_GOLD
-    style.border_width_top = 1
+    style.bg_color = Color(0.88, 0.56, 0.22, 0.84)
+    style.border_color = Color(1.0, 0.78, 0.36, 0.65)
     style.corner_radius_top_left = 3
     style.corner_radius_top_right = 3
     style.corner_radius_bottom_right = 3

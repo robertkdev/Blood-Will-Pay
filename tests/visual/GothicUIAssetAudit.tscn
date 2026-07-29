@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/visual/gothic_ui_asset_audit.gd" id="1"]
+
+[node name="GothicUIAssetAudit" type="Node"]
+script = ExtResource("1")

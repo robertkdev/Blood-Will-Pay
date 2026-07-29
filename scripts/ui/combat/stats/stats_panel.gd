@@ -10,6 +10,8 @@ enum Mode { TEAM, UNIT }
 var mode: int = Mode.TEAM
 var manager: CombatManager = null
 var _tracker: StatsTracker = null
+var _unit_panel_frame: PanelContainer = null
+var _unit_scroll: ScrollContainer = null
 
 @onready var title_label: Label = $"VBox/Header/Title"
 @onready var btn_all: Button = $"VBox/Header/WindowAll"
@@ -23,6 +25,7 @@ var _unit_index: int = -1
 
 func _ready() -> void:
     _configure_input_routing()
+    _ensure_unit_scroll_frame()
     _apply_gothic_window_button_styles()
     set_process(false)
     # Wire header window buttons
@@ -125,6 +128,8 @@ func show_team_metrics() -> void:
         title_label.add_theme_color_override("font_color", Color(0.92, 0.68, 0.34, 1.0))
     if scoreboard:
         scoreboard.visible = true
+    if _unit_panel_frame:
+        _unit_panel_frame.visible = false
     if unit_panel:
         unit_panel.visible = false
         unit_panel.set_process(false)
@@ -145,8 +150,65 @@ func show_unit_metrics(u: Unit) -> void:
         unit_panel.set_unit(u)
         unit_panel.visible = true
         unit_panel.set_process(true)
+    if _unit_panel_frame:
+        _unit_panel_frame.visible = true
     if scoreboard:
         scoreboard.visible = false
+
+func _ensure_unit_scroll_frame() -> void:
+    var body: Control = $"VBox/Body" as Control
+    if body == null or unit_panel == null:
+        return
+    _unit_panel_frame = body.get_node_or_null("UnitPanelFrame") as PanelContainer
+    if _unit_panel_frame == null:
+        _unit_panel_frame = PanelContainer.new()
+        _unit_panel_frame.name = "UnitPanelFrame"
+        _unit_panel_frame.visible = false
+        _unit_panel_frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+        _unit_panel_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _unit_panel_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        _unit_panel_frame.add_theme_stylebox_override("panel", _make_unit_frame_style())
+        body.add_child(_unit_panel_frame)
+    var margin: MarginContainer = _unit_panel_frame.get_node_or_null("Margin") as MarginContainer
+    if margin == null:
+        margin = MarginContainer.new()
+        margin.name = "Margin"
+        margin.add_theme_constant_override("margin_left", 10)
+        margin.add_theme_constant_override("margin_top", 10)
+        margin.add_theme_constant_override("margin_right", 10)
+        margin.add_theme_constant_override("margin_bottom", 10)
+        _unit_panel_frame.add_child(margin)
+    _unit_scroll = margin.get_node_or_null("UnitScroll") as ScrollContainer
+    if _unit_scroll == null:
+        _unit_scroll = ScrollContainer.new()
+        _unit_scroll.name = "UnitScroll"
+        _unit_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        _unit_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        _unit_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _unit_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+        margin.add_child(_unit_scroll)
+    if unit_panel.get_parent() != _unit_scroll:
+        var previous_parent: Node = unit_panel.get_parent()
+        if previous_parent != null:
+            previous_parent.remove_child(unit_panel)
+        _unit_scroll.add_child(unit_panel)
+    unit_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    unit_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    unit_panel.custom_minimum_size = Vector2(294.0, 620.0)
+
+func _make_unit_frame_style() -> StyleBox:
+    var fallback: StyleBoxFlat = StyleBoxFlat.new()
+    fallback.bg_color = Color(0.024, 0.020, 0.028, 0.96)
+    fallback.border_color = Color(0.45, 0.33, 0.23, 0.88)
+    fallback.border_width_left = 1
+    fallback.border_width_top = 1
+    fallback.border_width_right = 1
+    fallback.border_width_bottom = 1
+    fallback.corner_radius_top_left = 5
+    fallback.corner_radius_top_right = 5
+    fallback.corner_radius_bottom_right = 5
+    fallback.corner_radius_bottom_left = 5
+    return GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), fallback)
 
 func _on_window_all() -> void:
     if mode == Mode.UNIT:

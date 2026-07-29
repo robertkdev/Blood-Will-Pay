@@ -3,6 +3,7 @@ class_name BenchPlacement
 
 const UI := preload("res://scripts/constants/ui_constants.gd")
 const UnitViewClass := preload("res://scripts/ui/combat/unit_view.gd")
+const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const DEBUG_BENCH_PLACEMENT_LOGS: bool = false
 
 var bench_grid: GridContainer
@@ -43,30 +44,43 @@ func _ensure_tiles() -> void:
     for c in bench_grid.get_children():
         if c is Button:
             var b: Button = c as Button
-            b.text = ""
-            b.toggle_mode = false
-            b.focus_mode = Control.FOCUS_NONE
-            b.disabled = false
-            b.mouse_filter = Control.MOUSE_FILTER_PASS
-            b.mouse_default_cursor_shape = Control.CURSOR_ARROW
+            b.name = "BenchSlot_%02d" % tiles.size()
+            _configure_tile_button(b)
             # Always enforce tile size from constants to allow runtime scaling
             b.custom_minimum_size = Vector2(tile_size, tile_size)
             tiles.append(b)
     # Create more tiles if needed to reach capacity
     while tiles.size() < capacity:
         var nb: Button = Button.new()
-        nb.text = ""
-        nb.toggle_mode = false
-        nb.focus_mode = Control.FOCUS_NONE
-        nb.disabled = false
-        nb.mouse_filter = Control.MOUSE_FILTER_PASS
-        nb.mouse_default_cursor_shape = Control.CURSOR_ARROW
+        nb.name = "BenchSlot_%02d" % tiles.size()
+        _configure_tile_button(nb)
         nb.custom_minimum_size = Vector2(tile_size, tile_size)
         bench_grid.add_child(nb)
         tiles.append(nb)
     # Trim extra tiles if any
     if tiles.size() > capacity:
         tiles.resize(capacity)
+
+func _configure_tile_button(button: Button) -> void:
+    button.text = ""
+    button.toggle_mode = false
+    button.focus_mode = Control.FOCUS_NONE
+    button.disabled = false
+    button.mouse_filter = Control.MOUSE_FILTER_PASS
+    button.mouse_default_cursor_shape = Control.CURSOR_ARROW
+    var fallback: StyleBoxFlat = StyleBoxFlat.new()
+    fallback.bg_color = Color(0.024, 0.021, 0.027, 0.82)
+    fallback.border_color = Color(0.34, 0.28, 0.20, 0.60)
+    fallback.border_width_left = 1
+    fallback.border_width_top = 1
+    fallback.border_width_right = 1
+    fallback.border_width_bottom = 1
+    fallback.corner_radius_top_left = 5
+    fallback.corner_radius_top_right = 5
+    fallback.corner_radius_bottom_right = 5
+    fallback.corner_radius_bottom_left = 5
+    button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.bench_slot_style(Color(0.88, 0.82, 0.70, 0.86)), fallback))
+    button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.bench_slot_style(Color(0.46, 0.44, 0.40, 0.58)), fallback))
 
 func _build_helper() -> void:
     var cols: int = 1
@@ -97,6 +111,7 @@ func rebuild_bench_views(units: Array, allow_drag: bool) -> void:
             continue
         var uv: UnitView = UnitViewClass.new()
         uv.set_unit(u)
+        uv.drag_size = Vector2(float(tile_size), float(tile_size))
         if uv.has_method("set_bench_mode"):
             uv.set_bench_mode(true)
         if allow_drag:

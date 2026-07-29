@@ -168,6 +168,13 @@ func _refresh_progress() -> void:
 		if Shop and Shop.has_method("get_xp_to_next"):
 			need = int(Shop.get_xp_to_next())
 	_buttons.set_progress(lvl, xp, need)
+	var reroll_price: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
+	var progression_price: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
+	var progression_mode: String = String(Shop.get_progression_mode()) if _has_shop() and Shop.has_method("get_progression_mode") else "xp"
+	var command_rank: int = int(Shop.get_command_rank()) if _has_shop() and Shop.has_method("get_command_rank") else 0
+	_buttons.set_action_prices(reroll_price, progression_price, progression_mode, command_rank)
+	var progression_available: bool = bool(Shop.can_purchase_progression()) if _has_shop() and Shop.has_method("can_purchase_progression") else true
+	_buttons.set_progression_available(progression_available, progression_mode)
 
 func _on_economy_changed(_v := 0) -> void:
 	_refresh_cards_state()
@@ -219,18 +226,20 @@ func _refresh_cards_state() -> void:
 		if c is ShopCard:
 			var sc: ShopCard = c
 			# affordability tint only
-			var price := 0
+			var price: int = 0
 			if Shop and Shop.state and idx < Shop.state.offers.size():
-				var off = Shop.state.offers[idx]
-				price = int(off.cost) if off != null else 0
+				var off: Variant = Shop.state.offers[idx]
+				if off != null:
+					price = int(off.price) if int(off.price) > 0 else int(off.cost)
 			var aff := ShopAffordability.can_afford(gold, bet, price, in_combat, spent)
-			sc.set_affordable(bool(aff.get("ok", false)))
-			if not bool(aff.get("ok", false)):
+			var affordable: bool = bool(aff.get("ok", false))
+			sc.set_affordable(affordable)
+			if not affordable:
 				var need: int = int(aff.get("need_more", 0))
 				var msg := "Not enough gold"
 				var reason := String(aff.get("reason", ""))
 				if reason == ShopAffordability.REASON_RESERVE_FLOOR:
-					msg = "Must keep at least 2 health (need +%d)" % max(1, need)
+					msg = "Must keep at least 1 health (need +%d)" % max(1, need)
 				elif reason == ShopAffordability.REASON_CREDIT_LIMIT:
 					msg = "Exceeds combat credit (need +%d)" % max(1, need)
 				if sc.has_method("set_status_tip"):
@@ -243,7 +252,7 @@ func _refresh_cards_state() -> void:
 				sc.set_shop_disabled("Bench full")
 			else:
 				# Re-enable if previously disabled for bench full (lightweight approach)
-				sc.disabled = false
+				sc.disabled = not affordable
 				sc.modulate = Color(1,1,1,1)
 			# Connect click -> buy
 			if not sc.is_connected("clicked", Callable(self, "_on_card_clicked")):
@@ -254,28 +263,28 @@ func _refresh_cards_state() -> void:
 	if forced_first_fight or in_combat:
 		return
 	if _buttons:
-		var r_cost: int = int(ShopConfig.REROLL_COST)
+		var r_cost: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
 		var aff_r := ShopAffordability.can_afford(gold, bet, r_cost, in_combat, spent)
 		var msg_r := ""
 		if not bool(aff_r.get("ok", false)):
 			var need_r: int = int(aff_r.get("need_more", 0))
 			var reason_r := String(aff_r.get("reason", ""))
 			if reason_r == ShopAffordability.REASON_RESERVE_FLOOR:
-				msg_r = "Must keep at least 2 health (need +%d)" % max(1, need_r)
+				msg_r = "Must keep at least 1 health (need +%d)" % max(1, need_r)
 			elif reason_r == ShopAffordability.REASON_CREDIT_LIMIT:
 				msg_r = "Exceeds combat credit (need +%d)" % max(1, need_r)
 			else:
 				msg_r = "Not enough gold"
 		_buttons.set_reroll_tooltip(msg_r)
 
-		var x_cost: int = int(ShopConfig.BUY_XP_COST)
+		var x_cost: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
 		var aff_x := ShopAffordability.can_afford(gold, bet, x_cost, in_combat, spent)
 		var msg_x := ""
 		if not bool(aff_x.get("ok", false)):
 			var need_x: int = int(aff_x.get("need_more", 0))
 			var reason_x := String(aff_x.get("reason", ""))
 			if reason_x == ShopAffordability.REASON_RESERVE_FLOOR:
-				msg_x = "Must keep at least 2 health (need +%d)" % max(1, need_x)
+				msg_x = "Must keep at least 1 health (need +%d)" % max(1, need_x)
 			elif reason_x == ShopAffordability.REASON_CREDIT_LIMIT:
 				msg_x = "Exceeds combat credit (need +%d)" % max(1, need_x)
 			else:
@@ -433,10 +442,10 @@ func _shop_error_message(code: String, context: Dictionary) -> String:
 	if code == ShopErrors.WOULD_KILL_YOU and need_more > 0:
 		var op: String = String(context.get("op", ""))
 		if op == "buy_xp":
-			return "Need +%d gold to buy XP and keep 2 health." % max(1, need_more)
+			return "Need +%d gold to buy XP and keep 1 health." % max(1, need_more)
 		if op == "reroll":
-			return "Need +%d gold to reroll and keep 2 health." % max(1, need_more)
+			return "Need +%d gold to reroll and keep 1 health." % max(1, need_more)
 		if op == "buy_unit":
 			return "Need +%d gold to buy safely." % max(1, need_more)
-		return "Need +%d gold to keep 2 health." % max(1, need_more)
+		return "Need +%d gold to keep 1 health." % max(1, need_more)
 	return ShopErrors.message(code)

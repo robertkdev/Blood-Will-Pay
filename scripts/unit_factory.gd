@@ -18,6 +18,8 @@ const UnitScaler := preload("res://scripts/game/units/unit_scaler.gd")
 const Trace := preload("res://scripts/util/trace.gd")
 
 const MAX_ATTACK_SPEED := 4.0
+# Retired legacy input only. Runtime identity always canonicalizes to Mara.
+const LEGACY_UNIT_ID_ALIASES: Dictionary[String, String] = {"cashmere": "mara"}
 
 # Validation toggles for headless harnesses
 static var role_invariant_fail_fast: bool = false
@@ -34,6 +36,10 @@ static var _roots_other: Array[String] = [
 	"res://data/other_units/creeps",
 	"res://data/other_units/other",
 ]
+
+static func _canonical_unit_id(id: String) -> String:
+	var cleaned_id: String = String(id).strip_edges()
+	return String(LEGACY_UNIT_ID_ALIASES.get(cleaned_id, cleaned_id))
 
 static func is_creep_id(id: String) -> bool:
 	# Returns true if the unit id resolves to a resource under the creeps root.
@@ -121,7 +127,7 @@ static func _def_path(id: String) -> String:
 	return "res://data/units/%s.tres" % id
 
 static func _resolve_path_for(id: String) -> String:
-	var sid: String = String(id).strip_edges()
+	var sid: String = _canonical_unit_id(id)
 	if sid == "":
 		return ""
 	# Fast path: canonical location exists
@@ -199,14 +205,26 @@ static func _load_profile(id: String) -> UnitProfile:
 	return null
 
 static func spawn(id: String) -> Unit:
-	Trace.step("UnitFactory.spawn: " + id)
-	var profile: UnitProfile = _load_profile(id)
+	var canonical_id: String = _canonical_unit_id(id)
+	Trace.step("UnitFactory.spawn: " + canonical_id)
+	var profile: UnitProfile = _load_profile(canonical_id)
 	if profile == null:
-		Trace.step("UnitFactory.spawn: def missing for " + id)
+		Trace.step("UnitFactory.spawn: def missing for " + canonical_id)
 		return null
 	var u: Unit = _from_profile(profile)
-	Trace.step("UnitFactory.spawn: built unit " + id)
+	Trace.step("UnitFactory.spawn: built unit " + canonical_id)
 	return u
+
+static func spawn_at_level(id: String, target_level: int) -> Unit:
+	Trace.step("UnitFactory.spawn_at_level: %s level %d" % [id, int(target_level)])
+	var profile: UnitProfile = _load_profile(id)
+	if profile == null:
+		return null
+	var package_profile: UnitProfile = profile.duplicate(true) as UnitProfile
+	if package_profile == null:
+		return null
+	package_profile.level = max(1, int(target_level))
+	return _from_profile(package_profile)
 
 static func _from_profile(profile: UnitProfile) -> Unit:
 	var u := Unit.new()

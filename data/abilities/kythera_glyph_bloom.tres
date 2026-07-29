@@ -7,6 +7,6 @@ script = ExtResource( 1 )
 id = "kythera_glyph_bloom"
 name = "Glyph Bloom"
 description = "First cast: greatly increases Max HP and deals persistent AoE damage. Subsequent casts: heals self and increases the AoE damage per second."
+targeting_summary = "Self-centered glyph bloom."
 base_cost = 80
 tags = ["scaling", "aoe", "heal"]
-

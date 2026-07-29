@@ -62,7 +62,7 @@ func _validate_default_preview() -> void:
 	_expect(chapter_label != null, "procedural default chapter label missing")
 	if chapter_label != null:
 		_expect(String(chapter_label.text) == "Chapter 1", "procedural default chapter label expected Chapter 1 got %s" % chapter_label.text)
-		_expect(String(chapter_label.tooltip_text).contains("RGA:"), "procedural default chapter hover should preview RGA challenges")
+		_expect(String(chapter_label.tooltip_text).contains("Challenge:"), "procedural default chapter hover should preview challenges")
 	var board_capacity_label: Label = _main.find_child("BoardCapacityLabel", true, false) as Label
 	_expect(board_capacity_label != null, "procedural default board capacity label missing")
 	if board_capacity_label != null:

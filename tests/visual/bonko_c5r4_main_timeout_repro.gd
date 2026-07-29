@@ -2,7 +2,7 @@ extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const REPRO_NAME: String = "BonkoC5R4MainTimeoutRepro"
 const PLAYER_IDS: Array[String] = ["bonko", "kythera", "volt", "nyxa", "luna", "teller", "hexeon", "veyra", "paisley"]
-const BENCH_IDS: Array[String] = ["berebell", "mortem", "cashmere", "sari", "morrak", "korath", "vykos"]
+const BENCH_IDS: Array[String] = ["berebell", "mortem", "mara", "sari", "morrak", "korath", "vykos"]
 const CHAPTER: int = 5
 const ROUND_IN_CHAPTER: int = 4
 const SHOP_SETUP_GOLD: int = 8

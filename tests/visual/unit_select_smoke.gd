@@ -8,6 +8,11 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	var window: Window = get_window()
+	if window != null:
+		window.size = Vector2i(1920, 1080)
+		window.content_scale_size = Vector2i(1920, 1080)
 	var view: UnitSelect = UNIT_SELECT_SCENE.instantiate() as UnitSelect
 	add_child(view)
 	await get_tree().process_frame
@@ -40,8 +45,10 @@ func _run() -> void:
 	if art_plate != null:
 		_expect_texture_style(art_plate, "panel", "Preview art plate should use a generated texture frame", failures)
 	var selected_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/SelectedLabel") as Label
-	_expect(selected_label != null and selected_label.text == "No champion chosen", "Unit Select should begin with no inspected champion", failures)
-	var details_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/Details") as Label
+	_expect(selected_label != null and selected_label.text == "No starter chosen", "Unit Select should begin with no inspected starter", failures)
+	var details_scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll") as ScrollContainer
+	_expect(details_scroll != null, "Unit Select preview details should use a scrollable container", failures)
+	var details_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll/Details") as Label
 	_expect(details_label != null and details_label.text == "Hover a unit to preview", "Unit Select should begin with neutral preview help", failures)
 	var initial_art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
 	_expect(initial_art != null and initial_art.texture == null, "Unit Select should begin without default preview art", failures)
@@ -66,7 +73,10 @@ func _run() -> void:
 		_expect(details_label != null and String(details_label.text).find("Identity summary above") < 0, "Sari preview should not show identity placeholder copy", failures)
 		_expect(details_label != null and String(details_label.text).find("Traits:") >= 0, "Sari preview should show readable traits/identity tags", failures)
 		_expect(details_label != null and String(details_label.text).find("Attack:") >= 0, "Starter preview should show attack details", failures)
+		_expect(details_label != null and String(details_label.text).find("Attack Targeting:") >= 0, "Starter preview should show attack targeting", failures)
 		_expect(details_label != null and String(details_label.text).find("Ability:") >= 0, "Starter preview should show ability details", failures)
+		_expect(details_label != null and String(details_label.text).find("Ability Targeting:") >= 0, "Starter preview should show ability targeting", failures)
+		_expect(details_label != null and String(details_label.text).find("Positioning:") < 0, "Starter preview should not prescribe positioning", failures)
 		sari_button.emit_signal("mouse_exited")
 		await get_tree().process_frame
 	var first_button: Button = view.find_child("UnitButton_*", true, false) as Button
@@ -76,18 +86,18 @@ func _run() -> void:
 		_expect_texture_style(first_button, "normal", "Starter card normal state should use the generated 150x138 frame asset", failures)
 		_expect_texture_style(first_button, "hover", "Starter card hover state should use the generated 150x138 frame asset", failures)
 		_expect_texture_style(first_button, "pressed", "Starter card pressed state should use the generated 150x138 frame asset", failures)
-		_expect_texture_style(first_button, "focus", "Starter card focus state should use the generated 150x138 frame asset", failures)
+		_expect_focus_outline(first_button, "Starter card focus should preserve the underlying card state", failures)
 		first_button.emit_signal("pressed")
 		await get_tree().process_frame
 		_expect(not start_button.disabled, "StartButton did not enable after unit selection", failures)
-		_expect(selected_label != null and selected_label.text != "No champion chosen", "Selection label did not update", failures)
+		_expect(selected_label != null and selected_label.text != "No starter chosen", "Selection label did not update", failures)
 		var art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
 		_expect(art != null and art.texture != null, "Preview art did not load", failures)
 		view.reset_selection()
 		await get_tree().process_frame
 		_expect(start_button.disabled, "StartButton did not disable after reset_selection", failures)
 		_expect(view.selected_id == "", "selected_id did not clear after reset_selection", failures)
-		_expect(selected_label != null and selected_label.text == "No champion chosen", "Selection label did not reset", failures)
+		_expect(selected_label != null and selected_label.text == "No starter chosen", "Selection label did not reset", failures)
 		_expect(art != null and art.texture == null, "Preview art did not clear after reset_selection", failures)
 		var unit_id: String = String(first_button.get_meta("unit_id")) if first_button.has_meta("unit_id") else ""
 		if unit_id != "":
@@ -108,7 +118,7 @@ func _run() -> void:
 					await get_tree().process_frame
 					await get_tree().process_frame
 					_expect(view.selected_id == "", "Scroll should not select a unit", failures)
-					_expect(selected_label != null and selected_label.text == "No champion chosen", "Scroll did not clear stale hover preview", failures)
+					_expect(selected_label != null and selected_label.text == "No starter chosen", "Scroll did not clear stale hover preview", failures)
 
 	if failures.size() > 0:
 		for failure: String in failures:
@@ -129,6 +139,13 @@ func _expect_texture_style(control: Control, style_name: String, message: String
 		return
 	var style: StyleBox = control.get_theme_stylebox(style_name)
 	_expect(style is StyleBoxTexture, message, failures)
+
+func _expect_focus_outline(control: Control, message: String, failures: Array[String]) -> void:
+	if control == null:
+		failures.append(message)
+		return
+	var style: StyleBoxFlat = control.get_theme_stylebox("focus") as StyleBoxFlat
+	_expect(style != null and not style.draw_center, message, failures)
 
 func _first_label_child(parent: Control) -> Label:
 	if parent == null:

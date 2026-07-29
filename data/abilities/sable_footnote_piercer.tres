@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "sable_footnote_piercer"
 name = "Footnote Piercer"
 description = "Fires a line shot that repeatedly shreds defenses as an on-hit scholar mark."
+targeting_summary = "Highest-health enemy in a line; can also catch nearby enemies."
 base_cost = 50
 tags = ["damage", "long_range", "debuff", "on_hit_effect"]

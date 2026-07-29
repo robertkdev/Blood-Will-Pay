@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "kythera_siphon"
 name = "Siphon"
 description = "For 3s, siphons (1 + floor(Aegis stacks/3), capped at 3) Magic Resist per second from the target and deals 15 + 35% SP magic damage per second. At the end, Kythera permanently gains the total MR siphoned for the rest of combat."
+targeting_summary = "Current attack target."
 base_cost = 80
 tags = ["mitigation", "drain", "damage", "stacking"]

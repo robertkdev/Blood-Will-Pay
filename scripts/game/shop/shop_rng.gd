@@ -15,6 +15,12 @@ func set_seed(seed: int) -> void:
 func get_seed() -> int:
     return int(_rng.seed)
 
+func get_state() -> int:
+    return int(_rng.state)
+
+func set_state(value: int) -> void:
+    _rng.state = int(value)
+
 func randf() -> float:
     return _rng.randf()
 
@@ -43,4 +49,3 @@ func pick_weighted(weights: Dictionary):
         if target < acc:
             return k
     return weights.keys().back()
-

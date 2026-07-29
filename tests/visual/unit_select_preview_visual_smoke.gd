@@ -8,6 +8,7 @@ const OUTPUT_DIR: String = "res://outputs/visual_iter/unit_select_preview_pass"
 var _view: UnitSelect = null
 var _failures: Array[String] = []
 var _saved_captures: int = 0
+var _neutral_art_rect: Rect2 = Rect2()
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -29,6 +30,8 @@ func _run() -> void:
 	await _settle_frames(4)
 
 	_expect_neutral_preview("initial")
+	var neutral_art_wrap: Control = _preview_art_wrap()
+	_neutral_art_rect = neutral_art_wrap.get_global_rect() if neutral_art_wrap != null else Rect2()
 	_save_capture("01_neutral_preview.png")
 
 	var first_button: Button = _first_unit_button()
@@ -37,17 +40,28 @@ func _run() -> void:
 		first_button.emit_signal("mouse_entered")
 		await _settle_frames(4)
 		_expect_hover_preview()
+		_expect_preview_art_geometry_stable("hover preview")
 		_save_capture("02_hover_preview.png")
 
 		first_button.button_pressed = true
 		first_button.emit_signal("pressed")
 		await _settle_frames(4)
 		_expect_selected_preview()
+		_expect_preview_art_geometry_stable("selected preview")
 		_save_capture("03_selected_enabled.png")
+		_view.set_transition_pending(true)
+		await _settle_frames(2)
+		_expect(_start_button() != null and _start_button().disabled, "pending transition should disable Start Game")
+		_expect(_start_button() != null and _start_button().text == "Preparing Battle...", "pending transition should explain the wait")
+		_expect_preview_art_geometry_stable("pending transition")
+		_view.set_transition_pending(false)
+		await _settle_frames(2)
+		_expect(_start_button() != null and not _start_button().disabled, "completed transition should restore the selected Start Game button")
 
 		_view.reset_selection()
 		await _settle_frames(4)
 		_expect_neutral_preview("post-selection reset")
+		_expect_preview_art_geometry_stable("post-selection reset")
 		first_button.button_pressed = false
 		first_button.emit_signal("mouse_entered")
 		await _settle_frames(4)
@@ -58,9 +72,48 @@ func _run() -> void:
 			_view.call("_clear_hover_for_scroll")
 			await _settle_frames(3)
 		_expect_neutral_preview("scroll-clear")
+		_expect_preview_art_geometry_stable("scroll-clear")
 		_save_capture("04_after_scroll_clear.png")
 
+	await _audit_all_starter_geometries("wide")
+	_configure_compact_viewport()
+	await _settle_frames(6)
+	_view.reset_selection()
+	await _settle_frames(4)
+	var compact_art_wrap: Control = _preview_art_wrap()
+	_neutral_art_rect = compact_art_wrap.get_global_rect() if compact_art_wrap != null else Rect2()
+	await _audit_all_starter_geometries("compact")
+	_save_capture("05_compact_all_starter_preview.png")
+
 	_finish()
+
+func _audit_all_starter_geometries(layout_name: String) -> void:
+	var buttons: Array[Button] = _all_unit_buttons()
+	_expect(buttons.size() == 14, "%s audit expected 14 starter buttons, got %d" % [layout_name, buttons.size()])
+	for button: Button in buttons:
+		button.emit_signal("mouse_entered")
+		await _settle_frames(2)
+		_expect_preview_art_geometry_stable("%s hover %s" % [layout_name, button.name])
+		button.emit_signal("mouse_exited")
+		await _settle_frames(1)
+
+func _all_unit_buttons() -> Array[Button]:
+	var buttons: Array[Button] = []
+	if _view == null:
+		return buttons
+	for node: Node in _view.find_children("UnitButton_*", "Button", true, false):
+		var button: Button = node as Button
+		if button != null:
+			buttons.append(button)
+	return buttons
+
+func _configure_compact_viewport() -> void:
+	var compact_size: Vector2i = Vector2i(1280, 720)
+	DisplayServer.window_set_size(compact_size)
+	var window: Window = get_window()
+	if window != null:
+		window.size = compact_size
+		window.content_scale_size = compact_size
 
 func _expect_neutral_preview(context: String) -> void:
 	var selected_label: Label = _selected_label()
@@ -69,10 +122,13 @@ func _expect_neutral_preview(context: String) -> void:
 	var identity_panel: Control = _identity_panel()
 	var start_button: Button = _start_button()
 	_expect(_view != null and _view.selected_id == "", "%s Unit Select should not have a selected unit" % context)
-	_expect(selected_label != null and String(selected_label.text) == "No champion chosen", "%s preview title should be neutral" % context)
+	_expect(selected_label != null and String(selected_label.text) == "No starter chosen", "%s preview title should be neutral" % context)
 	_expect(details_label != null and String(details_label.text) == "Hover a unit to preview", "%s preview help should be neutral" % context)
 	_expect(preview_art != null and preview_art.texture == null, "%s preview art should be empty" % context)
-	_expect(identity_panel == null or not identity_panel.visible, "%s identity summary should be hidden" % context)
+	_expect(identity_panel != null and identity_panel.visible, "%s identity summary slot should remain reserved" % context)
+	_expect(_role_badge() == null or not _role_badge().visible, "%s role badge should be hidden" % context)
+	_expect(_goal_label() == null or not _goal_label().visible, "%s goal label should be hidden" % context)
+	_expect(_approach_tags() == null or not _approach_tags().visible, "%s approach tags should be hidden" % context)
 	_expect(start_button != null and start_button.disabled, "%s Start Game should remain disabled" % context)
 
 func _expect_hover_preview() -> void:
@@ -96,7 +152,7 @@ func _expect_selected_preview() -> void:
 	var identity_panel: Control = _identity_panel()
 	var start_button: Button = _start_button()
 	_expect(_view != null and _view.selected_id != "", "selected preview should set selected_id")
-	_expect(selected_label != null and String(selected_label.text) != "No champion chosen", "selected preview should show chosen unit title")
+	_expect(selected_label != null and String(selected_label.text) != "No starter chosen", "selected preview should show chosen unit title")
 	_expect(selected_label != null and not String(selected_label.text).begins_with("Inspecting "), "selected preview should not use inspecting copy")
 	_expect(details_label != null and String(details_label.text).find("Attack:") >= 0, "selected preview should show attack details")
 	_expect(details_label != null and String(details_label.text).find("Ability:") >= 0, "selected preview should show ability details")
@@ -120,7 +176,9 @@ func _expect_generated_preview_surfaces() -> void:
 		_expect_texture_style(role_badge, "normal", "role badge should use generated texture")
 	var approach_tags: FlowContainer = _approach_tags()
 	_expect(approach_tags != null and approach_tags.visible, "approach tags should be visible during populated preview")
-	var first_tag: Label = _first_label_child(approach_tags) if approach_tags != null else null
+	var first_tag: Label = null
+	if approach_tags != null:
+		first_tag = _first_label_child(approach_tags)
 	_expect(first_tag != null, "approach tags should contain a label")
 	if first_tag != null:
 		_expect_texture_style(first_tag, "normal", "approach tag should use generated texture")
@@ -150,16 +208,22 @@ func _selected_label() -> Label:
 	return _view.get_node_or_null("Center/HBox/Right/Preview/SelectedLabel") as Label
 
 func _details_label() -> Label:
-	return _view.get_node_or_null("Center/HBox/Right/Preview/Details") as Label
+	return _view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll/Details") as Label
 
 func _preview_art() -> TextureRect:
 	return _view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
+
+func _preview_art_wrap() -> Control:
+	return _view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap") as Control
 
 func _identity_panel() -> Control:
 	return _view.get_node_or_null("Center/HBox/Right/Preview/IdentityPanel") as Control
 
 func _role_badge() -> Label:
 	return _view.get_node_or_null("Center/HBox/Right/Preview/IdentityPanel/RoleBadge") as Label
+
+func _goal_label() -> Label:
+	return _view.get_node_or_null("Center/HBox/Right/Preview/IdentityPanel/GoalLabel") as Label
 
 func _approach_tags() -> FlowContainer:
 	return _view.get_node_or_null("Center/HBox/Right/Preview/IdentityPanel/ApproachTags") as FlowContainer
@@ -169,6 +233,15 @@ func _art_plate() -> Panel:
 
 func _start_button() -> Button:
 	return _view.get_node_or_null("Center/HBox/Right/StartButton") as Button
+
+func _expect_preview_art_geometry_stable(context: String) -> void:
+	var art_wrap: Control = _preview_art_wrap()
+	_expect(art_wrap != null, "%s art wrap should exist" % context)
+	if art_wrap == null:
+		return
+	var current_rect: Rect2 = art_wrap.get_global_rect()
+	_expect(current_rect.position.distance_to(_neutral_art_rect.position) <= 0.5, "%s moved the preview art from %s to %s" % [context, str(_neutral_art_rect.position), str(current_rect.position)])
+	_expect(current_rect.size.distance_to(_neutral_art_rect.size) <= 0.5, "%s resized the preview art from %s to %s" % [context, str(_neutral_art_rect.size), str(current_rect.size)])
 
 func _first_label_child(parent: Control) -> Label:
 	if parent == null:
@@ -212,7 +285,9 @@ func _save_capture(filename: String) -> void:
 	print("%s: saved %s" % [SMOKE_NAME, ProjectSettings.globalize_path(path)])
 
 func _save_vision_capture(filename: String) -> void:
-	var root_node: Node = _view if _view != null else self
+	var root_node: Node = self
+	if _view != null:
+		root_node = _view
 	var result: Dictionary[String, Variant] = VisionSnapshot.capture(root_node, filename.get_basename(), OUTPUT_DIR)
 	if not bool(result.get("ok", false)):
 		push_error("%s: vision fallback failed for %s reason=%s" % [SMOKE_NAME, filename, str(result.get("reason", ""))])

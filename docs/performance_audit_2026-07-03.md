@@ -207,6 +207,60 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
 - Rejected follow-up experiments after `c9fb9ec`: tightening the Hungarian bound for every cheaper exact rotation preserved signatures but regressed real 12v12 slot assignment to `2815076us`; reducing `HUNGARIAN_PRUNE_EPS` to `0.000001` preserved signatures but regressed focused `single_12` to `882ms`; returning Hungarian cost from `-v[0]` preserved signatures but regressed real 12v12 slot assignment to `2764723us`; precomputing the mage AOE radius square preserved `PerfTargeting.tscn` signature but regressed focused targeting median to `675ms`. All were reverted.
 - Current audit breadth check confirms slot assignment is the only high-impact measured hotspot left on the current tree, not the only subsystem that should stay monitored. `PerfMovementPhases.tscn` stayed clean with 6v6 movement `477948us` / slot assignment `187023us` (`39.1%`) and 12v12 movement `3205009us` / slot assignment `2889190us` (`90.1%`). `PerfSlotTeamAssignment.tscn` preserved aggregate signature `2813605715628331077`, with same-target `single_12` median `763ms` versus split-target `split_12` median `42ms`. Secondary checks stayed smaller and clean: `PerfTargeting.tscn` median `604ms`, signature `9036604269279486158`; `PerfCollisionResolver.tscn` median total `134ms`, aggregate `1955603822268948610`; `PerfCombatUiSignals.tscn` reported `position_updated=169`, `UnitActor.position_apply_calls=169`, hidden `UnitPanel` dynamic refreshes `0`, and errors `[]`.
 - `PerfTextureUtils.tscn` now hashes texture/circle dimensions plus cache diagnostics instead of run-specific object instance IDs, making its benchmark signature deterministic. Repeated validation stayed clean with one real texture load, one circle generation, `599` cache hits for each repeated path, and stable signature `3546666616613787855`.
+- Current continuation accepted a small target-resolution cleanup: `MovementService2._update_impl()` now trusts the alive scratch arrays in the target resolver loops immediately after resizing them to the exact team sizes, removing redundant bounds checks before dead-unit skips. `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures and errors `[]`; accepted repeats showed 12v12 movement `2967009us` then `3073323us`, with target slices `34518us` then `34969us`, versus the fresh control target slice `36208us`. Broad gates stayed clean: `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, `Perf1v1.tscn` signature `-6199507685307107293:55`, and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Rejected in the same continuation: changing internal slot-assignment result objects from dictionaries to arrays preserved `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077` and produced one faster focused run (`single_12` `691ms`), but the repeat was noisy (`783ms`) and real `PerfMovementPhases.tscn` regressed 12v12 slot assignment to `3095590us` / movement `3412905us`, so it was reverted.
+- `TargetController.current_target()` now uses per-team boolean recursion-guard arrays instead of allocating a formatted `"team:index"` string and probing a dictionary on every current-target lookup. `_sync_arrays()` also skips target/guard resize helpers when sizes already match. Validation stayed behavior-stable and clean: `Perf1v1.tscn` signature `-6199507685307107293:55`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, total `12592ms`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, total `13758ms`; `MovementTargetPriorityProbe.tscn` PASS; `RoleMatrixProbe6v6.tscn` PASS; and `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures with target slices `33006us` and `31914us`.
+- Post-`74d9b38` breadth check answers that optimization is not exhausted, but the remaining high-value surface is concentrated. `PerfMovementPhases.tscn` stayed clean with 6v6 movement `516974us` / slot assignment `205070us` (`39.7%`) and 12v12 movement `3086026us` / slot assignment `2777816us` (`90.0%`). `PerfSlotTeamAssignment.tscn` preserved aggregate signature `2813605715628331077`, with same-target `single_12` median `833ms` versus split-target `split_12` median `43ms`. `PerfSlotStrategy.tscn` stayed much cheaper overall at median total `289ms`, so the expensive case is specifically the grid-like, same-target 12-unit exact assignment path. Secondary checks stayed smaller and clean: `PerfTargeting.tscn` median `606ms`, signature `9036604269279486158`; `PerfCollisionResolver.tscn` median total `135ms`, aggregate `1955603822268948610`; and `PerfCombatUiSignals.tscn` reported `position_updated=171`, `UnitActor.position_apply_calls=171`, hidden `UnitPanel` dynamic refreshes `0`, and errors `[]`.
+- `MovementService2` now refreshes cached inner movement bounds once per movement update and reuses those min/max values inside `_bounded_band_step()` instead of rebuilding them for every `_inside_bounds()` / `_clamp_to_inner_bounds()` fallback check. Fresh control before the change was `PerfMovementPhases.tscn` 6v6 movement `561968us`, 12v12 movement `3296447us`, signatures preserved. Patched repeats preserved 6v6/12v12 signatures and errors `[]`: 6v6 movement `501909us` then `423323us`, and 12v12 movement `2822593us` then `2907464us`; player/enemy step slices improved in both repeats. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, and `RoleMatrixProbe6v6.tscn` PASS. `CombatArenaBoundsSmoke.tscn` still prints `CombatArenaBoundsSmoke: OK`; its known dummy-renderer cleanup diagnostics remain functional-only noise, not an empty-error gate. Rejected/no-change in the same pass: a conflict-aware row-min lower-bound probe for same-target 12-slot assignment would pre-prune zero Hungarian passes on the focused benchmark data, so it was not implemented.
+- `CollisionResolver.resolve()` now computes clamp bounds once per resolve call before writeback instead of rebuilding `bounds.position + bounds.size` for every moved unit. Focused `PerfCollisionResolver.tscn` improved from fresh control median total `136ms` to `120ms` while preserving aggregate signature `1955603822268948610`; dense 6v6 improved `34ms` to `30ms`, dense 12v12 stayed effectively neutral (`49ms` to `51ms`), and late 12v12 improved `53ms` to `39ms`. Real movement profiling preserved 6v6/12v12 signatures and errors `[]`; 6v6 collision moved from control `37679us` to `28408us`, and 12v12 stayed in range at `33850us` while slot assignment remained dominant. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `MovementService2._update_impl()` now caches player/enemy team sizes once per update and reuses those counts through scratch sizing, alive snapshots, target loops, previous-slot sync, cap buffers, and player/enemy step loops. Fresh control before the change was `PerfMovementPhases.tscn` 6v6 movement `439376us`, 12v12 movement `2843489us`, with signatures preserved. Patched repeats preserved 6v6/12v12 signatures and errors `[]`: 6v6 movement `388935us` then `388496us`; 12v12 movement `2806223us` then `2723839us`, with 12v12 slot assignment still dominating at `89.0-89.1%`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=464`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=11202`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=12153`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `MovementService2._sync_prev_slots()` now reads the movement state's slot-id and slot-timer arrays directly instead of string-dispatching through `MovementState.get_slot_id()` and `get_slot_timer()` for every unit. Fresh same-turn control was `PerfMovementPhases.tscn` 6v6 movement `441932us` with `prev_slots=15829us`, and 12v12 movement `2624348us` with `prev_slots=14021us`. Patched repeats preserved signatures and errors `[]`; 12v12 `prev_slots` stayed near half the control at `7353us`, `7471us`, and `7155us`, with movement samples `2551929us`, `2611506us`, and `2566572us`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=379`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=10202`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=12122`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Rejected in the same continuation: reusing cached team counts for all movement target grouping and step-loop size checks preserved 6v6/12v12 signatures, but produced mixed profiler evidence with 6v6/12v12 movement `465470us`/`2581026us` then `424121us`/`2710291us` versus same-turn control `441932us`/`2624348us`, so it was reverted.
+- Temporary slot-internal timing instrumentation, not retained, split the 12v12 slot hotspot further: with signatures preserved, `slot_assign=2307053us`, `target_assignment=2281647us` (`98.9%` of slot assignment), `assignment_eval=2233819us` (`96.8%`), `dp_search=1749041us` (`80.2%`), `hungarian_bound=130146us` (`6.0%`), `cost_matrix_build=103874us` (`4.8%`), and `dp_setup=49854us` (`2.3%`). This confirms the next serious slot optimization must reduce exact DP search work, not range lookup, pair sorting, output construction, previous-slot sync, or Hungarian bound overhead. The instrumentation code was reverted because diagnostics-off `PerfSlotTeamAssignment.tscn` focused `single_12` samples regressed from the same-turn control `638ms` to `698-783ms`.
+- `tests/perf/PerfSlotDpSearch.tscn` now gives a retained focused benchmark for exact DP search, separate from full slot-map construction and movement. Initial clean run: `dp_10_initial` median `152ms`, signature `6303755885759420833`; `dp_12_initial` median `136ms`, signature `2611917746955582709`; `dp_12_pruned` median `142ms`, signature `4518023324749157470`; aggregate signature `6007460045863670620`. Existing gates stayed behavior-stable afterward: `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, and `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures with 12v12 movement `2431263us` and slot assignment `2153027us`.
+- `SlotStrategy._best_assignment_dp()` now uses Hungarian dual potentials to skip DP edges that cannot appear in any assignment under the incumbent while still letting the existing DP choose the final assignment and tie order. Fresh `PerfSlotDpSearch.tscn` control was aggregate `6007460045863670620`, median total `471ms`; patched run preserved the aggregate and errors `[]`, lowering median total to `264ms`. `PerfSlotTeamAssignment.tscn` preserved aggregate `2813605715628331077`, with `single_12` median `217ms`. Real movement profiling repeated cleanly with preserved 6v6/12v12 signatures: 12v12 slot assignment `782933us` / movement `1090110us`, then `814269us` / movement `1117797us`. Broad gates stayed clean: `PerfSlotStrategy.tscn` aggregate `5330865502362346199`, `Perf1v1.tscn` signature `-6199507685307107293:55`, `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, and `RoleMatrixProbe6v6.tscn` PASS.
+- `MovementService2` now caches arena clamp min/max values once per movement update and uses those for per-unit post-step clamping instead of calling the generic `MovementMath.clamp_to_rect()` helper for every moved unit. Fresh `PerfMovementPhases.tscn` control preserved signatures with 6v6 movement `426804us`, player/enemy steps `97127us`/`56564us`, and 12v12 movement `1045563us`, player/enemy steps `146356us`/`56734us`. Patched repeats preserved 6v6/12v12 signatures and errors `[]`: 6v6 movement `430275us` then `424821us`, and 12v12 movement `950849us` then `1037877us`, with player/enemy steps lowered to `128792us`/`41924us` then `138604us`/`45161us`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, and `RoleMatrixProbe6v6.tscn` PASS.
+- `Targeting.pick_by_priority()` now reads the attacker's primary goal only for marksman scoring, because no other role path uses it. Fresh `PerfTargeting.tscn` control preserved signature `9036604269279486158` with median `671ms`; patched repeats preserved the same signature and errors `[]` with medians `614ms` and `574ms`. Real movement profiling preserved 6v6/12v12 signatures and errors `[]`, with the 12v12 target slice at `31996us`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, and `RoleMatrixProbe6v6.tscn` PASS.
+- `Targeting._score_candidate()` now checks carry roles directly after computing the enemy role string instead of calling a single-use helper. Focused `PerfTargeting.tscn` preserved signature `9036604269279486158`, with patched medians `561ms` and `629ms` versus fresh same-turn control `671ms`. Real movement profiling preserved 6v6/12v12 signatures, with the 12v12 target slice at `31732us`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, and `RoleMatrixProbe6v6.tscn` PASS.
+- `Targeting._ally_peel_priority()` now checks long-range/ramp ally approaches through a single `_approach_mask()` pass by adding `APPROACH_RAMP`, avoiding two separate string-normalizing scans for support peel priority. Fresh `PerfTargeting.tscn` control preserved signature `9036604269279486158`, median `440ms`; patched repeats preserved the same signature and errors `[]` with medians `438ms` and `432ms`. `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures and errors `[]`, with the 12v12 target slice `23811us`; `Perf6v6.tscn` preserved aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=9513`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `SlotStrategy` now uses compact array rows for per-attacker slot angle pairs, avoiding temporary dictionaries in the assignment scoring hot path while preserving double-precision angle behavior. A `Vector2` pair attempt was rejected because it changed 12-unit slot signatures, likely through float precision loss. `SlotStrategy._best_assignment_dp()` also reuses per-size DP scratch arrays for best costs and predecessor state, with full refills each solve to preserve behavior. Fresh controls on this continuation were `PerfSlotDpSearch.tscn` median total `245ms`, `PerfSlotTeamAssignment.tscn` median total `372ms`, and `PerfSlotStrategy.tscn` median total `283ms`. Final focused runs preserved signatures and errors `[]`: `PerfSlotDpSearch.tscn` median total `215ms`, aggregate `6007460045863670620`; `PerfSlotTeamAssignment.tscn` median total `359ms`, aggregate `2813605715628331077`; `PerfSlotStrategy.tscn` median total `152ms`, aggregate `5330865502362346199`.
+- Real movement profiling after the slot-row and DP-scratch changes preserved 6v6/12v12 signatures and errors `[]`. Fresh control was 6v6 movement `416054us` with slot assignment `166949us`, and 12v12 movement `1007395us` with slot assignment `716685us`. Accepted final samples were 12v12 movement `915871us` / slot assignment `636610us`, then `820277us` / `580475us`; one whole-scene noisy repeat regressed every phase and was not counted as the win. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=463`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=10577`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=9462`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `MovementService2._update_impl()` now reads the already-sized `_profiles_player` / `_profiles_enemy` arrays directly inside player/enemy movement step loops, avoiding the `_profile_for("team", idx)` function call and string branch for every moving unit. Fresh control before the edit preserved signatures with 6v6 movement `410052us`, player/enemy steps `92165us`/`48497us`, and 12v12 movement `1013115us`, player/enemy steps `150928us`/`55792us`. Patched repeats preserved signatures and errors `[]`: accepted movement samples were 6v6 `378958us` with player/enemy steps `84779us`/`45915us`, and 12v12 `693935us` then `818263us` with player/enemy steps `99642us`/`34160us` then `115157us`/`41177us`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=394`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=9740`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=7978`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `BuffSystem` and `MovementBuffAdapter` now expose a direct unit-based movement-blocker query, and `MovementService2` uses it in player/enemy step loops when movement blockers are active. This keeps the existing state/team/index API but avoids re-resolving the unit from `BattleState` in the hot active-blocker path. Updated `PerfMovementBlockers.tscn` preserved hit counts and errors `[]`: legacy blocked path `484ms`, current gated state lookup `318ms`, direct unit path `170ms`, signature `1737463064138009568`. Broad gates stayed clean: `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures, `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=364`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=9716`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=7857`; `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`; and `PerfCombatUiSignals.tscn` loaded cleanly with errors `[]` after the dirty-tree UI parse repair.
+- `SlotStrategy._best_assignment_dp()` now hoists the reduced-cost pruning flag and current row dual out of the inner column loop, reads each column cost once, and delays `next_mask` construction until a candidate can beat the incumbent. Fresh controls after the blocker pass were `PerfSlotDpSearch.tscn` median total `241ms`, `PerfSlotTeamAssignment.tscn` median total `311ms`, and `PerfMovementPhases.tscn` 12v12 slot assignment `529000us`. Patched focused gates preserved signatures and errors `[]`: `PerfSlotDpSearch.tscn` median total `164ms`, aggregate `6007460045863670620`; `PerfSlotTeamAssignment.tscn` median total `281ms`, aggregate `2813605715628331077`; and `PerfSlotStrategy.tscn` median total `221ms`, aggregate `5330865502362346199`. The first movement repeat was mixed, but the accepted repeat preserved signatures and lowered slot assignment to 6v6 `134930us` and 12v12 `490435us`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=401`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=10726`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=8548`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `MovementService2` now uses an inline squared-distance attack-band gate in the player/enemy step loops instead of calling `MovementMath.within_range()`, preserving the same nonnegative range and epsilon math while avoiding per-unit helper dispatch, assertions, type checks, and square-root distance. Fresh control after the slot DP inner-loop pass preserved signatures with 6v6 player/enemy steps `98572us`/`51298us` and 12v12 player/enemy steps `128958us`/`37932us`. Patched repeats preserved signatures and errors `[]`: 6v6 player/enemy steps `86820us`/`49227us`, then `69778us`/`38522us`; 12v12 player/enemy steps `106427us`/`32311us`, then `107337us`/`34729us`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=402`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=10581`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=8806`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `SlotStrategy._assign_for_target_into()` now precomputes each attacker's previous-slot hysteresis data once while building sorted attacker/angle rows, and `_evaluate_assignment()` reuses those row values for every base rotation. This avoids repeated `prev_slot_assignments` dictionary lookups and frame-factor recalculation inside the base-rotation cost-matrix loop while preserving the fallback path for simple two-field rows. Fresh noisy controls preserved signatures with `PerfSlotTeamAssignment.tscn` median total `970ms` (`single_12=457ms`) and `PerfMovementPhases.tscn` 12v12 slot assignment `1727659us`. Patched focused repeats preserved aggregate `2813605715628331077` and errors `[]`, with median totals `487ms` and `476ms`. Real movement preserved 6v6/12v12 signatures and errors `[]`, with 12v12 slot assignment `789091us`. Broad gates stayed clean: `PerfSlotStrategy.tscn` aggregate `5330865502362346199`, `Perf1v1.tscn` signature `-6199507685307107293:55`, `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Rejected follow-up: a branch-free specialized `_evaluate_assignment_precomputed()` improved `PerfSlotTeamAssignment.tscn` focused totals from the fresh `351ms` control to `286ms` and `278ms` while preserving aggregate `2813605715628331077`, but two real `PerfMovementPhases.tscn` repeats did not beat the current-head 12v12 slot slice (`569592us` and `567645us` versus `527795us` control), so it was reverted.
+- Rejected follow-up: skipping `best_assignment` duplication improved focused `PerfSlotTeamAssignment.tscn` totals from fresh `300ms` control to `267ms` and `277ms`, with aggregate `2813605715628331077`, but real `PerfMovementPhases.tscn` repeats did not beat the 12v12 slot-assignment control (`685766us` and `548509us` versus `531198us`), so it was reverted.
+- `CollisionResolver.resolve()` now resizes and fills its combined position/alive/cap/tag scratch arrays directly instead of clearing and appending each element. Focused `PerfCollisionResolver.tscn` preserved aggregate `1955603822268948610` and errors `[]`, with median total `94ms` then `105ms` versus fresh `106ms`, and dense 12v12 improved from `46ms` to `34ms`/`33ms`. `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures and errors `[]`, with collision slices `19898us` and `29142us` versus fresh `24341us` and `30954us`; broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `Perf6v6.tscn` aggregate `4480953857527108889:18`, `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Current breadth refresh answers that optimization is not exhausted, but the remaining high-value work is concentrated. `PerfCombatUiSignals.tscn` stayed clean with `position_updated=153`, `UnitActor.position_apply_calls=153`, hidden `UnitPanel` dynamic refreshes `0`, and errors `[]`; `PerfTargeting.tscn` preserved signature `9036604269279486158` with median `479ms`; and `PerfTextureUtils.tscn` preserved stable cache signature `3546666616613787855` with one real texture load and one circle generation across 600 repeat requests each.
+- `CollisionResolver.resolve()` now builds a reusable active-index list once per resolve call and iterates only live units during pair separation, preserving pair order while skipping repeated dead-unit checks. Same-turn focused control was `PerfCollisionResolver.tscn` aggregate `1955603822268948610` with median total `298ms`; patched repeats preserved the same aggregate signature and errors `[]` with median totals `141ms` and `103ms`. Real movement profiling preserved 6v6/12v12 signatures and errors `[]`, with collision slices `27765us` in 6v6 and `36025us` in 12v12. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Rejected follow-ups from the target-telemetry pass: reusable slot-map dictionaries preserved movement signatures but regressed 12v12 movement profiling; a single-lookup `ForcedMovement.consume_step()` path preserved signature but regressed direct active consumption from fresh `372ms` to `591ms`; skipping unique-min bookkeeping for 10-12 unit slot groups preserved the focused aggregate signature but regressed `PerfSlotTeamAssignment.tscn` median total from fresh `276ms` to `356ms`; fixed-size active collision-index filling improved focused `PerfCollisionResolver.tscn` from `146ms` to `120ms`/`128ms`, but regressed real movement collision slices, so it was reverted.
+- `CombatEngine._emit_target_events_for_team()` now updates the previous-target tracking arrays in place instead of allocating a replacement array on every position/target telemetry pass. `PerfCombatUiSignals.tscn` stayed clean with target signals `{target_start=7, target_end=0}`, `position_updated=160`, hidden `UnitPanel` dynamic refreshes `0`, and errors `[]`. Broad gates stayed clean: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=359`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=9708`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=8094`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `MovementState.positions_changed_from()` now compares squared distance against a squared threshold for progress-watchdog checks, avoiding square-root distance work while preserving threshold semantics. Validation stayed behavior-stable: `Perf1v1.tscn` kept signature `-6199507685307107293:55`, `time_ms=391`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=9417`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, accepted repeat `total_ms=8176` after one noisy `11525ms` sample; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `Targeting._score_candidate()` now omits unused source index/team arguments from the hot per-candidate scoring call. Fresh `PerfTargeting.tscn` control preserved signature `9036604269279486158`, median `592ms`; patched repeats preserved the same signature and errors `[]` with medians `450ms`, noisy `581ms`, and `477ms`. Real-combat gates stayed behavior-stable and clean: `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures; `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=432`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=10739`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=8886`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Rejected in the same continuation: reusing `_evaluate_assignment()` cost-matrix/unique-min scratch arrays preserved slot signatures but regressed `PerfSlotTeamAssignment.tscn` from fresh aggregate `359ms` to `369ms` then `438ms`; direct slot-memory array writes in `MovementService2` preserved movement signatures but failed to improve player/enemy step slices; and squared in-band/bounded range comparisons preserved signatures but regressed movement phase timings. All three were reverted.
+- `Targeting.pick_by_priority()` now also omits unused source index/team parameters from its public selector signature, with in-repo call sites updated. Focused repeats preserved signature `9036604269279486158` with medians `707ms` noisy, then `468ms` and `456ms`. Target validation stayed behavior-stable: `MovementTargetPriorityProbe.tscn` PASS. Broad gates stayed clean: `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures; `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=391`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=10111`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=8925`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`. `MovementQualityProbe.tscn` was not counted as a clean gate because it still reports a team-movement peel-bubble assertion.
+- `CollisionResolver.resolve()` now omits the unused `_all_alive` scratch buffer and uses local alive booleans only while building the active-index list. Fresh `PerfCollisionResolver.tscn` control preserved aggregate `1955603822268948610`, median total `146ms`; patched repeats preserved the same aggregate and errors `[]`, with median totals `93ms` and `107ms`. Real-combat gates stayed behavior-stable and clean: `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures, with collision slices `21862us` and `26521us`; `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=380`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=10386`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=10120`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- `CollisionResolver.resolve()` now also omits the redundant `_tag_indices` scratch array and writes player/enemy positions back by their known combined-array ranges. Focused `PerfCollisionResolver.tscn` preserved aggregate `1955603822268948610`; the same-load reverted control was median total `107ms`, while patched repeats were `100ms`, noisy `137ms`, and `99ms`. A broader tag-array removal that also removed `_tag_is_player` was rejected after mixed focused repeats (`97ms`, `151ms`) versus the same-load control. Real-combat gates stayed behavior-stable and clean: `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures, with collision slices `20981us` and `28787us`; `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=356`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, `total_ms=11277`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, `total_ms=10608`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Rejected follow-ups after the collision tag-index cleanup: precomputing per-row reduced-cost-allowed columns in `SlotStrategy._best_assignment_dp()` improved focused `PerfSlotDpSearch.tscn` median totals from fresh `391ms` control to `272ms` and `280ms`, and kept `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077` with totals `537ms` and `466ms`, but real `PerfMovementPhases.tscn` did not beat the 12v12 control (`1195684us` and noisy `1459798us` slot assignment versus control `1178473us`), so it was reverted. Trimming unused helper-call arguments from `MovementService2` preserved 6v6/12v12 movement signatures, but same-load reverted control was faster in 12v12 (`movement=1236419us`, `player_steps=166385us`) than the best patched repeat (`movement=1326278us`, `player_steps=212233us`), so it was also reverted.
+- `tests/perf/PerfMovementPhases.tscn` now runs repeated samples per case and reports median/p95/min/max elapsed and movement timings, while checking deterministic signatures across samples. The profiler default was corrected to `samples_per_case=3` so its nearest-rank median is the middle sample, not the faster of two samples. Validation stayed clean with errors `[]`: 6v6 signature `-3997862279252171970:232`, median movement `600160us`, p95 `653852us`; 12v12 signature `3567836549670627538:428`, median movement `1375801us`, p95 `1384709us`, representative slot assignment `982970us` (`71.4%`). This does not optimize runtime directly; it hardens the real-movement gate used to accept or reject future optimization candidates.
+- `tests/perf/PerfSlotTeamAssignment.tscn` and `tests/perf/PerfSlotStrategy.tscn` now also default to three samples per case so their nearest-rank medians are middle samples. Validation stayed clean with errors `[]`: `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, median total `350ms`, `single_12` median `183ms`; `PerfSlotStrategy.tscn` aggregate `5330865502362346199`, median total `235ms`.
+- Current answer refresh: optimization is not exhausted, but the remaining high-value work is still concentrated in movement slot assignment. Fresh checks stayed clean with errors `[]`: `PerfTargeting.tscn` median `464ms`, signature `9036604269279486158`; `PerfCollisionResolver.tscn` median total `88ms`, aggregate `1955603822268948610`; `PerfCombatUiSignals.tscn` `position_updated=142`, `UnitActor.position_apply_calls=142`, hidden `UnitPanel` dynamic refreshes `0`; `PerfTextureUtils.tscn` `22ms`, one real texture load, one circle generation, signature `3546666616613787855`; `PerfSlotTeamAssignment.tscn` median total `304ms`, aggregate `2813605715628331077`; and `PerfMovementPhases.tscn` preserved 6v6/12v12 signatures with 12v12 movement `1597954us` and slot assignment `1186170us` (`74.2%`). Rejected same-pass slot scratch experiment: reusing per-size `_evaluate_assignment()` cost rows preserved `PerfSlotTeamAssignment.tscn` signatures but regressed median total from fresh `304ms` to `335ms`, so it was reverted.
+- Current continuation controls remained clean but did not produce a keepable runtime patch. Baselines: `PerfSlotDpSearch.tscn` median total `183ms`, aggregate `6007460045863670620`; `PerfSlotTeamAssignment.tscn` median total `341ms`, aggregate `2813605715628331077`; `PerfSlotStrategy.tscn` median total `444ms`, aggregate `5330865502362346199`; `PerfMovementPhases.tscn` 12v12 movement `761001us` with slot assignment `541421us` (`71.1%`); `PerfForcedMovement.tscn` signature `3092491491923327610`, direct active `424ms`; and `PerfMovementBlockers.tscn` signature `1737463064138009568`, gated empty `9ms`, unit blocked `215ms`. Rejected and reverted: lowering `HUNGARIAN_PRUNE_MIN_SIZE` from `10` to `6` preserved slot signatures but regressed `PerfSlotStrategy.tscn` from `444ms` to `525ms`; precomputing forced-impulse per-second displacement preserved `PerfForcedMovement.tscn` signature but regressed direct active from fresh `424ms` to `494ms` and then `631ms`.
+- `PerfMovementPhases.tscn` now includes an `8v8_large` case matching the long-running `PerfLargeBoard.tscn` stress board so movement phase attribution covers the board that lives longest in broad perf. Validation stayed clean with errors `[]`: 6v6 signature `-3997862279252171970:232`, median movement `380138us`, slot assignment `160578us` (`42.2%`); new 8v8 signature `7184874536639686372:300`, median movement `898663us`, slot assignment `305996us` (`34.1%`), player/enemy steps `235538us`/`121922us`, collision `72528us`; and 12v12 signature `3567836549670627538:428`, median movement `873733us`, slot assignment `602459us` (`69.0%`). This keeps 12v12 slot assignment as the top single hotspot, but shows long 8v8 fights need step-loop and collision attention too.
+- `CollisionResolver.resolve()` now clamps player/enemy step caps once while filling its scratch arrays instead of re-clamping both caps inside every active pair check. Same-turn `PerfCollisionResolver.tscn` control preserved aggregate `1955603822268948610` with median total `266ms`; patched repeats preserved the same aggregate and errors `[]` with median totals `126ms` and `93ms`. Real movement profiling preserved 6v6/8v8/12v12 signatures and errors `[]`, with 8v8 collision reduced from the prior `72528us` slice to `63468us`; the accepted run reported 6v6 collision `27733us`, 8v8 movement `819056us` with slot `274524us` (`33.5%`) and collision `63468us` (`7.7%`), and 12v12 movement `882113us` with slot `607770us` (`68.9%`) and collision `30903us`. Broad gates stayed clean: `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, total `13743ms`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, total `14402ms`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Rejected follow-up: movement helper active-index neighbor scans preserved 6v6/8v8/12v12 signatures and errors `[]`, but regressed the current real movement gate, so the source change was reverted. Versus the cap-clamp accepted control (`6v6` movement `464037us`, `8v8` movement `819056us`, `12v12` movement `882113us`), the active-index candidate measured `509666us`, `968082us`, and `1153339us`; 8v8 collision also rose to `75294us` and 12v12 player steps rose to `187643us`.
+- `SlotStrategy._evaluate_assignment()` now converts the attacker index only in the legacy non-precomputed pair fallback instead of doing that conversion on every row of the current five-field pair hot path. Same-turn controls were `PerfSlotTeamAssignment.tscn` median total `456ms` and `single_12=236ms`, plus `PerfSlotDpSearch.tscn` median total `223ms`. Patched focused repeats preserved signatures and errors `[]`: `PerfSlotTeamAssignment.tscn` median totals `284ms` and `288ms`, with `single_12=122ms` then `142ms`; `PerfSlotDpSearch.tscn` median total `186ms`; and `PerfSlotStrategy.tscn` median total `200ms`, aggregate `5330865502362346199`. Real movement profiling preserved 6v6/8v8/12v12 signatures and errors `[]`, with 6v6 movement `406895us`, 8v8 movement `777647us`, and 12v12 movement `713748us` with slot assignment `504898us` (`70.7%`). Broad gates stayed clean: `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent `0`, total `8797ms`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent `0`, total `10376ms`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Current continuation controls stayed clean and kept the same hotspot shape: `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `339303us`, `822645us`, and `737879us`; 12v12 slot assignment was `495532us` (`67.2%`). Focused controls were `PerfSlotTeamAssignment.tscn` median total `314ms`, aggregate `2813605715628331077`, and `PerfSlotDpSearch.tscn` median total `238ms`, aggregate `6007460045863670620`.
+- Rejected current movement-step candidate: adding a squared-distance early gate to `_avoid_from()` changed 12v12 behavior (`3567836549670627538:428` expected versus `1189363951486668268:430` observed), so it was reverted immediately despite preserving 6v6/8v8 signatures. Rejected current slot API cleanup: removing unused `assign_slots_for_team()` parameters preserved `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, but regressed focused totals from `314ms` control to `355ms` and `415ms`. Rejected current previous-slot array path: passing typed slot-memory arrays instead of rebuilding dictionaries preserved movement signatures but regressed focused slot total to `392ms` and did not hold real movement repeats (`6v6` `378734us` then `362679us`, `8v8` `718165us` then `828283us`, `12v12` `756396us` then `822304us`). All source changes were reverted.
+- Current continuation controls for the next solver pass stayed clean: `PerfSlotDpSearch.tscn` median total `156ms`, aggregate `6007460045863670620`; `PerfSlotTeamAssignment.tscn` median total `310ms`, aggregate `2813605715628331077`; and `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `366369us`, `800830us`, and `814997us`, with 12v12 slot assignment `596939us` (`73.2%`). Rejected and reverted: splitting `_best_assignment_dp()` into reduced-prune/non-prune branch loops preserved signatures and improved one focused slot sample (`279ms`) but regressed `PerfSlotDpSearch.tscn` to `169ms`, had a noisy second slot sample (`319ms`), and worsened real 6v6/8v8 movement to `407387us`/`1100360us`; returning the Hungarian objective as `-v[0]` instead of re-summing assigned rows preserved DP signatures but regressed `PerfSlotDpSearch.tscn` to `263ms`; and a stricter upper-bound-only squared-distance gate in `_avoid_from()` still changed 12v12 behavior (`1189363951486668268:430`) and regressed movement, so it was also reverted.
+- Current step-loop control stayed behavior-stable: `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `421397us`, `783720us`, and `1196443us`; 8v8 player/enemy steps were `185679us`/`110344us`, and 12v12 player/enemy steps were `166918us`/`53739us`. Rejected and reverted a self-loop merge that computed same-team separation and avoidance from one distance pass: it preserved signatures and improved some 6v6/12v12 samples, but the target 8v8 gate did not hold (`885635us` then `803476us` movement versus `783720us` control) and `PerfLargeBoard.tscn` regressed to total `9421ms` despite stable aggregate `7144113503220431359:12`.
+- Added `tests/perf/PerfSlotSolverBreakdown.tscn` to break the remaining slot-assignment hotspot into Hungarian guard cost, initial DP, pruned DP, and full base-rotation `_evaluate_assignment()` loops. First clean run kept errors `[]` and reported aggregate signature `4738803460811644685`: Hungarian 12 median `64ms`, initial DP 12 median `56ms`, pruned DP 12 median `169ms`, rotation 8 median `175ms`, rotation 12 median `31ms`, median total `495ms`.
+- Rejected follow-up after the solver breakdown: tightening the existing-incumbent Hungarian guard from `> incumbent + eps` to `>= incumbent` improved the isolated pruned-DP slice in one breakdown run (`169ms` baseline to `125ms`) but changed `PerfSlotTeamAssignment.tscn` behavior from aggregate `2813605715628331077` to `8350969739402505035`. The source change was reverted; the restored gate preserved aggregate `2813605715628331077` with errors `[]`.
+- Current continuation controls after the responsive visual-fix commit stayed behavior-stable and kept slot assignment as the main remaining hotspot. `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: 6v6 movement `331605us`, slot assignment `142620us` (`43.0%`); 8v8 movement `674126us`, slot assignment `237337us` (`35.2%`); 12v12 movement `747646us`, slot assignment `534736us` (`71.5%`). `PerfSlotSolverBreakdown.tscn` preserved aggregate `4738803460811644685`, errors `[]`, and reported median total `406ms`: Hungarian 12 `39ms`, initial DP 12 `47ms`, pruned DP 12 `146ms`, rotation 8 `141ms`, rotation 12 `33ms`.
+- Rejected current follow-ups and reverted source: carrying desired range in slot-angle rows preserved `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077` but did not beat real movement controls (`357797us`, `679983us`, `757300us` for 6v6/8v8/12v12). Direct slot-memory array writes in `MovementService2` preserved signatures and produced one promising 12v12 sample (`708195us`) but failed to repeat (`772785us` on the second run), so it was also reverted.
+- Rejected additional current follow-ups and reverted source: reusing per-target movement group arrays preserved movement signatures but regressed real movement from the fresh controls to 6v6 `365998us` and 8v8 `705546us` while only nudging 12v12 to `743705us`; the group phase itself worsened in 6v6/8v8, so the built-in dictionary clear remains better. Inlining targeting position lookups improved focused `PerfTargeting.tscn` from median `543ms` to `404ms` with signature `9036604269279486158`, but repeated real movement gates regressed 6v6/8v8 and the second run also regressed 12v12 to `798386us`, so that source change was also reverted.
 
 ## Changes Made
 
@@ -216,19 +270,28 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
 - `scripts/game/combat/systems/target_controller.gd`
   - Changed target-array synchronization from per-call rebuilds to in-place resizing.
   - This removes repeated hot-loop allocation from `current_target()`, which movement calls for every unit.
+  - Uses per-team boolean recursion-guard arrays for `current_target()` instead of per-call formatted string keys and dictionary probes.
 - `scripts/game/combat/systems/cooldown_scheduler.gd`
   - Changed cooldown-array synchronization from per-frame rebuilds to in-place resizing.
   - Avoids per-frame `Array[float]` allocation during `advance()`.
   - Avoids `slice()` allocation in `_order_for()` when order arrays already match team size.
 - `scripts/game/combat/movement/movement_state.gd`
   - Changed integer capacity helpers to resize existing arrays in place instead of rebuilding slot/target memory arrays every frame.
+  - Uses squared-distance threshold checks for progress-watchdog position comparison, avoiding square roots while preserving the same movement threshold.
 - `scripts/game/combat/movement/collision_resolver.gd`
   - Reuses typed scratch buffers for combined positions, alive flags, step caps, and team/index tags.
   - Replaced nested per-unit tag arrays with parallel typed buffers.
   - Collision debug counters are now collected only when debug logging is enabled, avoiding non-behavioral pair-stat bookkeeping during normal combat frames.
+  - Computes arena clamp bounds once per resolve call and reuses them while writing positions back.
+  - Resizes and fills combined scratch arrays directly instead of clearing and appending per unit every resolve call.
+  - Builds a reusable active-index list once per resolve call and iterates live-unit pairs only during separation.
+  - Removes the unused combined alive scratch array; active-index construction now uses local alive booleans and avoids per-resolve alive-buffer writes.
+  - Removes the redundant tag-index scratch array; final writeback uses the known player and enemy ranges in the combined position array.
+  - Clamps player/enemy step caps once while filling scratch arrays, avoiding repeated cap clamping inside the active-pair collision loop.
 - `scripts/game/combat/movement/movement_service2.gd`
   - Reuses per-frame alive, target, step-cap, group, and previous-slot scratch buffers across movement updates.
   - Trusts resized alive scratch arrays in grouping and per-team step loops, avoiding redundant fallback bounds/alive checks.
+  - Trusts resized alive scratch arrays in the target resolver loops too, avoiding redundant bounds checks before dead-unit target skips.
   - Trusts the same resized alive scratch arrays inside slot-step and avoidance helper loops, avoiding remaining per-neighbor alive-array bounds checks while preserving movement signatures.
   - Skips per-unit forced-movement key lookups for a team when the forced impulse map is empty.
   - Uses direct forced-step consumption when forced impulses are active, avoiding a duplicate `has_active()` lookup for the active unit.
@@ -239,6 +302,13 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
   - `_compute_in_band_step()` reuses the measured avoidance-vector length for direction calculation instead of recomputing it through `normalized()`.
   - `_bounded_band_step()` now checks the same four out-of-bounds fallback directions in order without allocating a temporary candidate array, preserving movement signatures while reducing in-band fallback overhead.
   - `_compute_in_band_step()` now skips distance/range/speed/band setup for profiles that have no kite or strafe behavior and already return zero in-band.
+  - Caches the inner movement bounds once per update and reuses the min/max values in in-band bounds checks/clamps.
+  - Caches arena clamp min/max once per update and reuses them for per-unit post-step position clamping.
+  - Caches player/enemy team sizes once per movement update and reuses them through scratch buffers and per-team loops.
+  - Syncs previous-slot scratch dictionaries from direct slot-id/timer arrays instead of per-unit string-dispatched movement-state getters.
+  - Reads already-sized player/enemy movement profile arrays directly inside step loops instead of calling a team-string dispatch helper per moving unit.
+  - Uses direct unit-based movement blocker checks in player/enemy step loops when blockers are active, avoiding state/team/index unit re-resolution per moving unit.
+  - Uses an inline squared-distance attack-band check in player/enemy step loops, preserving the shared range math while avoiding the general `MovementMath.within_range()` helper on every moving unit.
 - `scripts/game/combat/movement/strategies/slot_strategy.gd`
   - Bounded grouped slot assignment: groups up to 12 attackers use exact bitmask DP, oversized groups use deterministic greedy fallback.
   - Prevents factorial spikes as board sizes or same-target piles grow.
@@ -257,12 +327,23 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
   - Caches DP mask rows as `PackedInt32Array` values, avoiding per-mask variant conversion in `_best_assignment_dp()` while preserving exact assignment signatures.
   - Skips non-improving DP assignment backtracking when the final mask cost does not beat the current incumbent.
   - Uses the Hungarian exact cost as an upper bound for the first unbounded 10-12 unit DP solve, preserving DP assignment/tie behavior while reducing full-state exploration.
+  - Uses Hungarian dual potentials to skip DP column edges that cannot fit under the incumbent, preserving exact DP assignment/tie behavior while reducing same-target 12-unit search work.
+  - Uses compact `[attacker_index, angle]` rows for temporary slot-angle pairs, avoiding hot-path dictionary construction/lookups without changing public slot-map dictionaries.
+  - Reuses per-size exact-DP scratch arrays for best costs and predecessor state, refilling them each solve instead of reallocating the same large arrays.
+  - Hoists reduced-cost prune state and row dual values out of the DP column loop, reads each candidate column cost once, and only builds `next_mask` after the candidate can beat the incumbent.
+  - Precomputes previous-slot hysteresis data into attacker angle rows once per target group, avoiding repeated previous-slot dictionary lookups for every base rotation during assignment evaluation.
+  - Converts attacker indices only in the legacy non-precomputed `_evaluate_assignment()` fallback instead of every current hot-path row.
+  - `_best_assignment()` dispatches 2-row and 3-row cost matrices to direct exact fast paths that preserve DP tie order and return typed `Array[int]` assignments.
+  - `_best_assignment()` also dispatches 4-row cost matrices to an unrolled exact DP fast path that mirrors the generic DP mask traversal and partial-state tie handling.
+- `tests/perf/PerfSlotSmallAssignment.gd` / `tests/perf/PerfSlotSmallAssignment.tscn`
+  - Adds a focused 2/3/4-row assignment benchmark comparing fast dispatch with the general DP path and checking deterministic signatures.
 - `scripts/game/combat/movement/forced_movement.gd`
   - Adds `has_any()` so movement can skip per-unit forced-impulse key construction on frames with no active forced movement.
   - Tracks active impulse counts by team through `has_any_for_team()`, so one team's forced impulse does not trigger per-unit forced checks for the other team.
 - `scripts/game/abilities/buff_system.gd` and `scripts/game/combat/movement/adapters/buff_adapter.gd`
   - Add a movement-blocker presence gate so movement can avoid per-unit stun/root checks on frames with no active movement blockers.
   - Use one unit-buff scan for active stun/root/rooted movement blocking instead of separate stun and tag lookups.
+  - Adds `is_unit_movement_blocked(unit)` / `is_unit_blocked(unit)` so callers that already have a `Unit` can skip `BattleState` team/index lookup.
 - `scripts/game/combat/systems/target_controller.gd`
   - `resolver_for_arena()` now returns a live cached target directly when the stored target is still valid, falling back to the full `current_target()` path only for stale, missing, or dead targets.
   - This avoids per-frame movement resolver overhead from repeated target-array sync/recursion-guard work in the common live-target case.
@@ -272,11 +353,23 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
 - `scripts/game/combat/movement/movement_service2.gd`, `tests/rga_testing/core/lockstep_simulator.gd`, and `tests/perf/PerfMovementPhases.gd` / `.tscn`
   - Added opt-in movement phase diagnostics for setup, alive snapshot, target resolution, grouping, previous-slot sync, slot assignment, step caps, player steps, enemy steps, and collision.
   - Lockstep jobs enable diagnostics only when `metadata.perf_movement_diagnostics` is true, and the new profiler scene prints per-case phase percentages plus target call/skip counts.
+  - `PerfMovementPhases.gd` now repeats each case three times by default and reports median/p95/min/max movement timing while checking sample signatures for consistency.
 - `tests/perf/PerfSlotStrategy.gd`
   - Upgraded the benchmark to repeated samples per case with median/p95/min/max reporting so solver changes are not judged from a single noisy timing sample.
+  - Defaults to three samples per case so nearest-rank medians are middle samples.
 - `tests/perf/PerfSlotTeamAssignment.gd` / `tests/perf/PerfSlotTeamAssignment.tscn`
   - Added focused coverage for `SlotStrategy.assign_slots_for_team()` across 6-attacker same-target, 12-attacker same-target, and 12-attacker split-target cases.
   - Reports repeated-sample median/p95/min/max timings plus deterministic slot-map signatures, making it a better focused gate for movement-path slot assignment changes than `PerfSlotStrategy.tscn` alone.
+  - Defaults to three samples per case so nearest-rank medians are middle samples.
+- `tests/perf/PerfSlotDpSearch.gd` / `tests/perf/PerfSlotDpSearch.tscn`
+  - Added focused exact-DP search coverage for 10- and 12-row cost matrices with initial and pruned incumbent modes.
+  - Reports repeated-sample median/p95/min/max timings plus deterministic assignment/cost signatures, giving a faster gate for changes that target `_best_assignment_dp()` directly before running full movement profiling.
+- `tests/perf/PerfSlotSolverBreakdown.gd` / `tests/perf/PerfSlotSolverBreakdown.tscn`
+  - Added focused slot-solver breakdown coverage for Hungarian guard cost, initial DP, pruned DP, and full base-rotation `_evaluate_assignment()` loops over 8- and 12-attacker synthetic rows.
+  - Reports repeated-sample median/p95/min/max timings plus deterministic signatures so future slot algorithm work can distinguish DP, Hungarian guard, and rotation-loop costs before touching movement.
+- `scripts/game/combat/movement/strategies/slot_strategy.gd` and `tests/perf/PerfSlotSolverBreakdown.gd`
+  - Added `_evaluate_precomputed_assignment()` for the production five-field pair rows, keeping the legacy evaluator intact while skipping fallback previous-slot parsing in the hot rotation loop.
+  - Updated the solver breakdown rotation case to measure the same precomputed evaluator used by production slot assignment.
 - `tests/perf/PerfTargeting.gd` / `tests/perf/PerfTargeting.tscn`
   - Added a focused deterministic target-priority benchmark over mixed 12v12 teams.
   - Reports repeated-sample median/p95/min/max timings plus a deterministic target-selection signature.
@@ -288,15 +381,21 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
   - Precomputes support ally peel priorities once per target pick, so support scoring does not rescan ally role/approach metadata for every enemy candidate.
   - Reuses the already-computed target role when scoring mage candidates, avoiding duplicate role lookup/normalization while preserving target-selection signatures.
   - Computes target threat only for attackers whose scoring path uses it: lockdown/debuff approaches, tanks, and supports.
+  - Reads the attacker's primary goal only for marksman scoring, avoiding unused goal normalization for other roles.
+  - Checks carry roles directly after role normalization, avoiding a helper call per candidate.
   - Clamps tile size once per target pick and passes that safe value through candidate and peel scoring, avoiding repeated per-candidate/per-ally `max(1.0, tile_size)` work while preserving target-selection signatures.
   - Computes reciprocal tile size once per target pick and reuses it for candidate and support-peel distance-to-tile conversions, avoiding repeated division while preserving target-selection signatures.
   - Computes enemy carry-role status once per candidate and reuses it across role-specific scoring helpers, avoiding repeated role string comparisons while preserving target-selection signatures.
+  - Adds a ramp approach mask bit so support peel priority can check long-range/ramp allies through one approach-mask pass instead of two separate normalized string scans.
+  - Omits unused source index/team arguments from the hot `_score_candidate()` call, preserving target-selection signatures while reducing per-candidate call overhead.
+  - Removes the same unused source index/team parameters from `pick_by_priority()` and updates the in-repo call sites.
 - `scripts/game/combat/combat_engine.gd` and `tests/rga_testing/core/lockstep_simulator.gd`
   - Added explicit position/target telemetry toggles.
   - Base-only headless jobs disable unused movement/target telemetry; role/UI-capable paths keep telemetry enabled.
 - `scripts/game/combat/combat_engine.gd`
   - Avoids duplicating the fresh progress-watchdog position snapshot when movement or damage already proves progress. The snapshot is already newly allocated by `_all_positions()`, so the extra duplicate was redundant.
   - Smart target selection now reuses the movement service's typed position copy directly instead of duplicating and filtering that copy into a second array.
+  - Updates previous-target telemetry arrays in place during target event emission instead of allocating replacement arrays every pass.
 - `scripts/game/combat/movement/movement_state.gd`, `movement_service2.gd`, `movement_service.gd`, and `combat_engine.gd`
   - Added movement snapshot compare/copy helpers and moved the combat progress watchdog onto them, avoiding per-frame player/enemy position copy arrays and a combined snapshot allocation while preserving the existing `0.5` movement threshold.
 - `tests/perf/PerfCombatUiSignals.gd` / `tests/perf/PerfCombatUiSignals.tscn`
@@ -352,6 +451,7 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
   - Compares the previous global forced-impulse gate against the per-team gate for player-only active impulses.
 - `tests/perf/PerfMovementBlockers.gd` / `tests/perf/PerfMovementBlockers.tscn`
   - Added focused coverage for empty movement-blocker checks and active root blocking through the movement buff adapter, including a legacy active-root comparison.
+  - Now reports `unit_blocked_ms` / `unit_blocked_hits` for the direct unit-based active-blocker path alongside legacy and state-lookup paths.
 - `tests/perf/PerfLargeBoard.gd` / `tests/perf/PerfLargeBoard.tscn`
   - Added deterministic 8v8 and 12v12 stress coverage through the existing headless simulator.
   - Uses base telemetry only, repeated samples, deterministic signatures, and aggregate consistency checks.
@@ -361,24 +461,1190 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
 - `tests/visual/combat_view_theme_playtest.gd`
   - Added explicit `CombatView` teardown/free on exit. The scene still reports renderer/resource cleanup errors under the MCP run, so it is not used as the clean validation source for this pass.
 
+## Continuation - 2026-07-04
+
+Fresh broad audit answer: no, slot assignment is not the only code worth monitoring, but it is still the only major proven hotspot in the current benchmark surface.
+
+- `tests/perf/PerfMovementPhases.tscn` fresh accepted baseline, errors `[]`:
+  - 6v6 neutral: signature `-3997862279252171970:232`, median elapsed `1856ms`, movement `552895us`; top phases slot assignment `237433us` (`42.9%`), player steps `129010us` (`23.3%`), enemy steps `62427us` (`11.3%`), targets `35531us` (`6.4%`), collision `27460us` (`5.0%`), groups `27261us` (`4.9%`).
+  - 8v8 large: signature `7184874536639686372:300`, median elapsed `2865ms`, movement `792485us`; top phases slot assignment `275266us` (`34.7%`), player steps `192263us` (`24.3%`), enemy steps `110791us` (`14.0%`), targets `68777us` (`8.7%`), collision `63878us` (`8.1%`), groups `21399us` (`2.7%`).
+  - 12v12 large: signature `3567836549670627538:428`, median elapsed `1645ms`, movement `906279us`; top phases slot assignment `627059us` (`69.2%`), player steps `135549us` (`15.0%`), enemy steps `47212us` (`5.2%`), targets `34096us` (`3.8%`), collision `31376us` (`3.5%`), previous slots `8284us` (`0.9%`).
+- `tests/perf/PerfLargeBoard.tscn` fresh accepted baseline, errors `[]`: 8v8 median `3185ms`, p95 `3326ms`, signature `7184874536639686372:300`; 12v12 median `1503ms`, p95 `1761ms`, signature `3567836549670627538:428`; aggregate `7144113503220431359:12`, inconsistent cases `0`.
+- `tests/perf/Perf6v6.tscn` fresh accepted baseline, errors `[]`: neutral median `1709ms`, burst median `1696ms`, peel median `2004ms`; aggregate `4480953857527108889:18`, inconsistent cases `0`.
+- `tests/perf/PerfTargeting.tscn` fresh accepted baseline, errors `[]`: median `611ms`, p95 `662ms`, signature `9036604269279486158`.
+- `tests/perf/PerfCombatUiSignals.tscn` fresh accepted check, errors `[]`: short player-facing combat sampled `1.518s`, signals were `position_updated=111`, `team_stats_updated=5`, `stats_updated=7`, `unit_stat_changed=6`, `hit_applied=3`, `target_start=7`, `projectile_fired=3`; unit/actor/trait diagnostics stayed bounded.
+- `tests/perf/PerfCollisionResolver.tscn` fresh accepted check, errors `[]`: dense 6v6 median `26ms`, dense 12v12 median `40ms`, late 12v12 median `38ms`, median total `104ms`, aggregate `1955603822268948610`.
+- `tests/perf/PerfMovementBlockers.tscn` fresh accepted check, errors `[]`: empty direct checks `630ms` versus gated empty `21ms`; active blocked legacy `639ms`, gated blocked `644ms`, unit-blocked fast path `165ms`, signature `1737463064138009568`.
+- Rejected movement-step candidate: changing separation and avoidance guards in `movement_service2.gd` to compare squared distances before `sqrt()` looked like a safe optimization and made 6v6 faster while preserving its signature, but it changed real movement outcomes in larger cases. `PerfMovementPhases.tscn` changed 8v8 from `7184874536639686372:300` to `1860074410702899490:300`, and changed 12v12 from `3567836549670627538:428` / `258` frames to `-400081363281330588:430` / `285` frames. Source was reverted. Treat exact movement floating-point math as behavior-sensitive even when the algebra appears equivalent.
+
+## Continuation - 2026-07-04 Slot Evaluator Hot Path
+
+Accepted change: `SlotStrategy._assign_for_target_into()` now calls `_evaluate_precomputed_assignment()` for the production five-field pair rows, skipping the legacy previous-slot fallback branch inside the row loop. A later 2026-07-04 cleanup removed the now-unused legacy `_evaluate_assignment()` after no code or test callers remained, and `PerfSlotSolverBreakdown.tscn` now measures the same precomputed rotation path.
+
+- `tests/perf/PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, errors `[]`: median total `525ms`, with rotation_8 `161ms` and rotation_12 `32ms`.
+- `tests/perf/PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`: median total `307ms`; `single_6=114ms`, `single_12=155ms`, `split_12=38ms`.
+- `tests/perf/PerfMovementPhases.tscn` kept 6v6/8v8/12v12 signatures and errors `[]`: 6v6 movement `321217us` with slot assignment `133611us` (`41.6%`), 8v8 movement `636720us` with slot assignment `222958us` (`35.0%`), and 12v12 movement `723225us` with slot assignment `506231us` (`70.0%`).
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`: 8v8 median `2402ms`, 12v12 median `1285ms`, total `7941ms`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`: neutral `970ms`, burst `1048ms`, peel `1140ms`, total `9719ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed after the slot evaluator change: `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6777`.
+
+## Continuation - 2026-07-04 Small Assignment Fast Path
+
+Accepted change: `_best_assignment()` now dispatches 2-row and 3-row cost matrices to exact direct fast paths that preserve the existing DP tie order and return typed `Array[int]` assignments. This targets tiny target groups that still enter the exact solver frequently, without changing 4+ row DP behavior.
+
+- `tests/perf/PerfSlotSmallAssignment.tscn` matched fast-path and DP signatures with errors `[]`: `fast_2=213ms` versus `dp_2=328ms`, both signature `9147655718134670509`; `fast_3=217ms` versus `dp_3=353ms`, both signature `5621901183604553248`; aggregate `8471590680142310671`.
+- `tests/perf/PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`: `single_6=151ms`, `single_12=152ms`, `split_12=33ms`, total `336ms`. This gate is noisy and mostly exercises larger groups, so it is a behavior/stability check more than the focused win.
+- `tests/perf/PerfMovementPhases.tscn` kept 6v6/8v8/12v12 signatures and errors `[]`: 6v6 movement `315786us` with slot assignment `126529us` (`40.1%`), 8v8 movement `649983us` with slot assignment `210414us` (`32.4%`), and 12v12 movement `726045us` with slot assignment `513358us` (`70.7%`).
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`: 8v8 median `2355ms`, 12v12 median `1329ms`, total `7774ms`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`: repeat run neutral `1047ms`, burst `970ms`, peel `1098ms`, total `9610ms`; an earlier same-signature run was noisier at `10087ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed after the small-assignment fast path: `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6321`.
+
+## Continuation - 2026-07-04 4-Row Assignment Fast Path
+
+Accepted change: `_best_assignment()` now dispatches 4-row cost matrices to a specialized exact DP fast path. This is not a flat 24-permutation scan; it preserves the generic DP's mask order, partial-state costs, strict `<` update behavior, and final backtracking result.
+
+- Rejected during this pass: reusing a static cost-matrix scratch shape inside assignment evaluation preserved signatures but regressed `PerfSlotSolverBreakdown.tscn` from the same-turn control `406ms` to `459ms`, with `rotation_8=149ms` and `rotation_12=44ms`. Source was reverted.
+- Rejected during this pass: a flat 24-permutation 4-row fast path was fast (`fast_4=165ms` versus `dp_4=387ms`) but failed `PerfSlotSmallAssignment.tscn` signature checks because it did not preserve the generic DP's partial-mask tie handling. Source was replaced with the unrolled DP version.
+- `tests/perf/PerfSlotSmallAssignment.tscn` matched fast-path and DP signatures with errors `[]`: `fast_2=202ms` versus `dp_2=354ms`, signature `9147655718134670509`; `fast_3=199ms` versus `dp_3=339ms`, signature `5621901183604553248`; `fast_4=169ms` versus `dp_4=334ms`, signature `3661903802700781707`; aggregate `7950943139573947519`.
+- `tests/perf/PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`: first run total `315ms` with `split_12=24ms`; repeat total `301ms` with `single_6=125ms`, `single_12=150ms`, `split_12=26ms`.
+- `tests/perf/PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, errors `[]`: total `430ms`; this remained a guard for 8/12-row behavior and was not the direct target of the 4-row fast path.
+- `tests/perf/PerfMovementPhases.tscn` kept 6v6/8v8/12v12 signatures and errors `[]`: 6v6 movement `310289us` with slot assignment `123003us` (`39.6%`), 8v8 movement `623293us` with slot assignment `201979us` (`32.4%`), and 12v12 movement `714859us` with slot assignment `492648us` (`68.9%`).
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`: 8v8 median `2429ms`, 12v12 median `1292ms`, total `7982ms`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`: neutral `1000ms`, burst `926ms`, peel `1080ms`, total `9317ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed after the 4-row fast path: `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5982`.
+
+## Continuation - 2026-07-04 Rejected 4-Row Precomputed Evaluator
+
+Rejected follow-up: a dedicated 4-row `_evaluate_precomputed_assignment()` branch reused four cost rows and avoided the generic unique-min arrays before calling the accepted 4-row exact solver. It preserved signatures and improved the split-target focused sample, but it regressed real movement profiling and was reverted.
+
+- Current control before the candidate, errors `[]`: `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `300621us`, `620858us`, and `704847us`; slot assignment was `118294us`, `201764us`, and `480028us`. `PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, total `277ms`, with `split_12=30ms`. `PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, total `457ms`.
+- Candidate focused runs kept `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, errors `[]`: first total `310ms` with `split_12=27ms`; repeat total `270ms` with `split_12=24ms`.
+- Candidate real movement failed the acceptance bar despite stable signatures: `PerfMovementPhases.tscn` regressed to 6v6 movement `315959us` / slot `128841us`, 8v8 movement `652536us` / slot `211471us`, and 12v12 movement `729543us` / slot `515255us`. Source was reverted.
+
+## Continuation - 2026-07-04 Rejected 8-Row Hungarian Threshold
+
+Rejected follow-up: lowering `HUNGARIAN_PRUNE_MIN_SIZE` from `10` to `8` made the focused 8-row rotation solver faster and preserved all signatures, but it consistently regressed the long 8v8 movement surface. Source was reverted.
+
+- Current control before the candidate, errors `[]`: `PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, total `412ms`, with `rotation_8=146ms`; `PerfSlotDpSearch.tscn` kept aggregate `6007460045863670620`, total `171ms`; `PerfMovementPhases.tscn` kept 6v6/8v8/12v12 signatures with movement `300621us`, `620858us`, and `704847us`.
+- Candidate focused gates kept signatures and errors `[]`: `PerfSlotSolverBreakdown.tscn` total improved to `375ms`, with `rotation_8=93ms`; `PerfSlotDpSearch.tscn` stayed roughly neutral at `169ms`; `PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, total `276ms`.
+- Candidate real movement was a tradeoff: first `PerfMovementPhases.tscn` run preserved signatures with 12v12 movement improved to `663924us`, but 6v6/8v8 moved to `318718us` and `646303us`. Repeat preserved signatures with 12v12 better again at `611381us`, but 6v6/8v8 stayed worse at `316842us` and `653116us`. `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, total `7932ms`, with 8v8 `2581ms` and 12v12 `1164ms`; `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, total `9623ms`. Because the 8v8 regression repeated, the threshold was not accepted.
+
+## Continuation - 2026-07-04 Broad Hotspot Refresh
+
+Fresh answer to "is that all that needs optimizing?": no. The latest clean phase profile still shows multiple meaningful surfaces, but slot assignment remains the largest single 12v12 hotspot and the best-proven optimization target. Step loops matter especially in 8v8, while targeting and collision are secondary monitored surfaces.
+
+- `tests/perf/PerfMovementPhases.tscn` fresh run, errors `[]`:
+  - 6v6 neutral: signature `-3997862279252171970:232`, median elapsed `1021ms`, movement `325961us`; slot assignment `135881us` (`41.7%`), player steps `73142us` (`22.4%`), enemy steps `38684us` (`11.9%`), targets `25847us` (`7.9%`), collision `20386us` (`6.3%`), groups `8023us` (`2.5%`).
+  - 8v8 large: signature `7184874536639686372:300`, median elapsed `2391ms`, movement `627325us`; slot assignment `207300us` (`33.0%`), player steps `154871us` (`24.7%`), enemy steps `92086us` (`14.7%`), targets `56119us` (`8.9%`), collision `53259us` (`8.5%`), groups `17480us` (`2.8%`).
+  - 12v12 large: signature `3567836549670627538:428`, median elapsed `1209ms`, movement `690460us`; slot assignment `480841us` (`69.6%`), player steps `103563us` (`15.0%`), enemy steps `32953us` (`4.8%`), targets `25882us` (`3.7%`), collision `23293us` (`3.4%`), previous slots `6180us` (`0.9%`).
+- Rejected follow-up: removing the `.duplicate()` call when storing a newly best slot assignment preserved signatures but regressed the same-turn focused controls. `PerfSlotSolverBreakdown.tscn` worsened from control total `420ms` to `445ms`, and `PerfSlotTeamAssignment.tscn` worsened from control total `245ms` to `300ms`. Source was reverted.
+
+## Continuation - 2026-07-04 Movement Blocker Count
+
+Accepted change: `BuffSystem.has_movement_blockers()` now uses a cached active movement-blocker count instead of scanning every active buff on each movement update. The count is updated when stun/root/rooted buffs are created, expired, cleansed, or when the buff system is cleared. This preserves the previous blocker definition while making active non-blocking buff states cheap.
+
+- Focused A/B result in `tests/perf/PerfMovementBlockers.tscn`: a temporary old-scan control took `5303ms` for `240000` active non-blocking checks; the retained count-based path took `127ms` on the final run with the same signature `8928121065208191259` and errors `[]`.
+- `tests/rga_testing/validation/BuffMovementBlockerCountSmoke.tscn` passed with errors `[]`: fresh systems report no blockers, shields and cleanseable mark tags do not count, refreshed roots still count once, tick expiry clears the count, and cleanse removes stun/rooted blockers.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`: neutral `958ms`, burst `980ms`, peel `1062ms`, total `9490ms`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`: 8v8 median `2412ms`, 12v12 median `1133ms`, total `7654ms`.
+- `tests/perf/Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `345ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` had already passed after this source change with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6219`.
+- This is a real hot-loop cleanup for buff-heavy fights, not proof that the whole movement surface is done. The latest phase evidence still points to slot assignment first, then movement step loops, target refresh, and collision checks.
+
+## Continuation - 2026-07-04 Forced Movement Integer Keys
+
+Accepted change: `ForcedMovement` now stores impulses in per-team dictionaries keyed by integer unit index instead of building `"team:index"` string keys for every active lookup. The public behavior is unchanged: team counts still gate whole-team checks, expired impulses are removed during consumption, and `has_any()` remains true while any team has a tracked impulse.
+
+- Focused A/B in `tests/perf/PerfForcedMovement.tscn`: same-turn control had `direct_active_ms=404`, `global_enemy_ms=168`, signature `3092491491923327610`; patched repeats preserved the signature and errors `[]` with `direct_active_ms=281` / `298` and `global_enemy_ms=60` / `67`.
+- `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: 6v6 movement `310093us`, 8v8 movement `592194us`, 12v12 movement `675811us`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, total `9835ms`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7631ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6545`.
+- This mainly helps frames with active knockback/forced impulses or global active-impulse misses. It is retained as a focused movement-adapter cleanup, while slot assignment and 8v8 step loops remain higher-value measured surfaces.
+- Rejected follow-up: precomputing the default slow/corridor radii once per movement update preserved 6v6/8v8/12v12 signatures and improved 6v6 movement from the fresh `310093us` control to `297842us`, but 8v8 worsened from `592194us` to `603427us` and 12v12 worsened from `675811us` to `677755us`. Source was reverted.
+
+## Continuation - 2026-07-04 Targeting Approach Mask Cache
+
+Accepted change: `Unit` now carries a lazy targeting approach-mask cache that resets when identity data is assigned. `Targeting._approach_mask()` uses that cache instead of rescanning and normalizing the same static approach strings on every smart target selection. While editing `scripts/unit.gd`, the existing inferred local variables in the touched file were also converted to explicit types.
+
+- Focused A/B in `tests/perf/PerfTargeting.tscn`: same-turn control was median `508ms`, p95 `515ms`, signature `9036604269279486158`; patched repeats preserved the signature and errors `[]` with medians `414ms` and `422ms`.
+- `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: 6v6 movement `306112us`, 8v8 movement `600067us`, 12v12 movement `664898us`; target slices were `26349us`, `57499us`, and `24879us`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, total `9367ms`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `8077ms`.
+- `tests/perf/Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `331ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6182`.
+- This is retained as a focused targeting cleanup. It does not change the ranking rules and does not close the broader optimization goal; slot assignment and 8v8 step loops remain the largest measured open surfaces.
+
+## Continuation - 2026-07-04 3-Row Assignment Allocation Trim
+
+Accepted change: `_best_assignment_3()` now tracks the best 3-row assignment in local integer slots and allocates the returned `Array[int]` only once, after the winning candidate is known. Candidate order, strict `<` updates, incumbent behavior, and signatures are unchanged.
+
+- Focused A/B in `tests/perf/PerfSlotSmallAssignment.tscn`: same-turn control had `fast_3=203ms`, aggregate `7950943139573947519`; patched repeats preserved the aggregate and errors `[]` with `fast_3=168ms` and `173ms`.
+- `tests/perf/PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`, median total `316ms`.
+- `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: 6v6 movement `296216us`, 8v8 movement `606801us`, 12v12 movement `655840us`; 12v12 slot assignment `488861us`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, total `9533ms`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7543ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6320`.
+- Rejected follow-up during this pass: caching normalized target role/goal strings on `Unit` preserved `PerfTargeting.tscn` signature `9036604269279486158`, but regressed the same-turn focused control from `399ms` to `409ms` and `415ms`. Source was reverted.
+
+## Continuation - 2026-07-04 2-Row Assignment Branch Trim
+
+Accepted change: `_best_assignment_2()` now compares the two possible 2-row assignments directly instead of carrying a mutable `best_cost` plus a `use_first` flag through the hot path. Strict `<` tie behavior, incumbent behavior, returned assignments, and signatures are unchanged.
+
+- Focused A/B in `tests/perf/PerfSlotSmallAssignment.tscn`: same-turn control had `fast_2=220ms`, aggregate `7950943139573947519`; patched repeats preserved the aggregate and errors `[]` with `fast_2=183ms` and `193ms`.
+- `tests/perf/PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`, median total `345ms`.
+- `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: `-3997862279252171970:232`, `7184874536639686372:300`, and `3567836549670627538:428`; 12v12 slot assignment was `470008us`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, total `9332ms`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7840ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6085`.
+- This is retained as another tiny exact-assignment cleanup, not as the end of the optimization pass. Latest phase evidence still has slot assignment as the largest 12v12 movement slice, with player/enemy step loops and target/collision phases still worth monitoring.
+
+## Continuation - 2026-07-04 Pair Angle Insertion Sort
+
+Accepted change: `_assign_for_target_into()` now sorts the small per-target `[attacker, angle, previous slot]` pair list with a local insertion sort instead of `Array.sort_custom()` plus an inline comparator. The ordered-by-angle result is unchanged, and the helper preserves equal-angle input order.
+
+- Focused control in `tests/perf/PerfSlotTeamAssignment.tscn`: total `296ms`, aggregate `2813605715628331077`.
+- Patched repeats of `tests/perf/PerfSlotTeamAssignment.tscn` preserved aggregate `2813605715628331077`, errors `[]`, with totals `292ms` and `271ms`.
+- Same-turn control in `tests/perf/PerfMovementPhases.tscn` had movement `327037us`, `594929us`, and `687811us` for 6v6/8v8/12v12.
+- Patched `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`, and movement `298752us`, `579586us`, and `655550us`; 12v12 slot assignment was `482255us`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, total `9239ms`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7877ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5995`.
+- Rejected same-pass follow-ups: iterating `groups` directly instead of `groups.keys()` preserved signatures but stayed in the same focused timing spread (`288ms`, `291ms`) and was reverted; caching range setup sizes and clamped tile size regressed `PerfSlotTeamAssignment.tscn` to `306ms` and was reverted; removing private helper `max(0.0, delta)` clamps preserved movement signatures but slightly worsened the accepted phase control across 6v6/8v8/12v12 (`302155us`, `590481us`, `658685us`) and was reverted.
+- This removes callback sort overhead from a per-target movement hot path. It still does not close the larger performance audit; slot assignment remains the top 12v12 surface, while 8v8 step loops, targeting, and collision remain monitored.
+
+## Continuation - 2026-07-04 Movement Radius Precompute
+
+Accepted change: `MovementService2._update_impl()` now computes separation and avoidance radii once per movement update and passes those values into private step helpers. The previous behavior is preserved because `radius` was already clamped nonnegative before the helper calls.
+
+- Fresh control in `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `347707us`, `591088us`, and `691927us`.
+- Patched `tests/perf/PerfMovementPhases.tscn` repeats preserved the same signatures and errors `[]`. First run movement was `290295us`, `585015us`, and `659099us`; repeat movement was `302246us`, `594192us`, and `667637us`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, total `9196ms`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7554ms`.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6391`.
+- This is a small step-loop cleanup, not a completion point. 8v8 step loops remain a meaningful monitored surface, and 12v12 is still slot-assignment dominated.
+
+## Continuation - 2026-07-04 Movement Speed Scale Precompute
+
+Accepted change: `MovementService2._update_impl()` now computes the clamped speed scale once per movement update and passes it into private movement helpers. The rejected private `delta` clamp removal was not repeated; helper-local `max(0.0, delta)` behavior is unchanged.
+
+- Fresh control in `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `326066us`, `584337us`, and `716417us`.
+- Patched `tests/perf/PerfMovementPhases.tscn` preserved the same signatures and errors `[]` in three repeats. First run movement was `308412us`, `579638us`, and `639902us`; second was mixed at `308812us`, `601010us`, and `699420us`; third was `289517us`, `594688us`, and `645269us`.
+- `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7405ms`.
+- `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`; repeat total `9159ms` after a noisier stable-signature `9452ms` run.
+- `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with final `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6314`.
+- This is retained as a small helper cleanup with favorable 6v6/12v12 phase samples and favorable broad aggregate checks, while the 8v8 phase remains noisy and should continue to be monitored before accepting larger step-loop changes.
+
+## Continuation - 2026-07-04 Rejected Movement Helper Parameter Trim
+
+Rejected follow-up: removing unused private helper parameters from `_compute_arrive_step()` and `_compute_in_band_step()` preserved deterministic signatures, but the aggregate timing signal was too weak to keep.
+
+- Fresh control in `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `321642us`, `594383us`, and `666695us`.
+- Candidate `tests/perf/PerfMovementPhases.tscn` repeats preserved the same signatures and errors `[]`, but were mixed: first run `300063us`, `589906us`, `674972us`; second run `304546us`, `575320us`, `684324us`.
+- Candidate `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7544ms`.
+- Candidate `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, but total `9497ms` was weaker than the last retained 6v6 repeat. Source was reverted.
+
+## Continuation - 2026-07-04 Rejected Collision Cap Deferral
+
+Rejected follow-up: moving collision cap reads inside the capped-pair branch preserved focused collision signatures but regressed the focused collision benchmark, so source was reverted.
+
+- Fresh control in `tests/perf/PerfCollisionResolver.tscn` kept aggregate `1955603822268948610`, errors `[]`, total `73ms`: dense 6v6 `20ms`, dense 12v12 `29ms`, late 12v12 `24ms`.
+- Candidate repeats preserved the same aggregate signature and errors `[]`, but worsened totals to `89ms` and `94ms`; dense 12v12 regressed to `43ms` then `42ms`, and dense 6v6 regressed to `29ms` in the second repeat.
+- Collision remains a monitored secondary surface, not the next primary target, unless a future real movement profile shows it climbing materially above the latest phase share.
+
+## Continuation - 2026-07-04 Movement Steering Weight Precompute
+
+Accepted change: `MovementService2._update_impl()` now computes clamped seek, separation, and avoidance steering weights once per movement update and passes them into `_compute_slot_step()`. This preserves behavior because the same `MovementTuning` values were already being clamped inside every slot-step call.
+
+- Fresh control in `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `301298us`, `644901us`, and `741582us`.
+- Patched `tests/perf/PerfMovementPhases.tscn` repeated cleanly with the same signatures and errors `[]`. First run movement was `304427us`, `625208us`, and `696401us`; repeat movement was `287470us`, `610027us`, and `647416us`.
+- Broad gates stayed clean through Godot MCP: `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, total `7610ms`; `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, total `9115ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `355ms`; `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6140`.
+- This is a retained step-loop cleanup. It improves the latest 8v8 and 12v12 movement phase samples, while slot assignment remains the top 12v12 hotspot and should stay the primary target for larger future wins.
+
+## Continuation - 2026-07-04 Rejected Min Forward Dot Precompute
+
+Rejected follow-up: precomputing the clamped `min_forward_dot` once per movement update preserved deterministic signatures, but failed the same-turn real movement control. Source was reverted.
+
+- Fresh control in `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `294970us`, `612226us`, and `633799us`.
+- Candidate `tests/perf/PerfMovementPhases.tscn` preserved the same signatures and errors `[]`, but regressed 6v6 to `356280us` and 12v12 to `649227us`; 8v8 improved to `597079us`, but that was not enough to keep the change.
+- Keep `min_forward_dot` as a helper-local clamp unless a future broader rewrite proves a stronger net win.
+
+## Continuation - 2026-07-04 Rejected Direct Slot Info Reads
+
+Rejected follow-up: reading known slot-map fields directly and only computing default slot radii when no slot info existed preserved deterministic signatures, but did not beat the same-turn real movement control. Source was reverted.
+
+- Same control as above in `tests/perf/PerfMovementPhases.tscn`: 6v6/8v8/12v12 movement `294970us`, `612226us`, and `633799us`.
+- Candidate preserved signatures and errors `[]`, and improved 8v8 to `580413us`, but regressed 6v6 to `323280us` and 12v12 to `654659us`.
+- Keep the current fallback `Dictionary.get(...)` slot-info reads unless a larger slot-data shape change proves faster across 6v6, 8v8, and 12v12 together.
+
+## Continuation - 2026-07-04 Rejected Ally Peel Priority Fallback Removal
+
+Rejected follow-up: removing the defensive support-peel priority fallback branch preserved `PerfTargeting.tscn` signatures, but the timing signal was mixed and real movement did not hold. Source was reverted.
+
+- Fresh `tests/perf/PerfTargeting.tscn` control preserved signature `9036604269279486158`, errors `[]`, median `416ms`.
+- Candidate `PerfTargeting.tscn` repeats preserved the same signature and errors `[]`, with medians `398ms` then `429ms`.
+- Candidate `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures and errors `[]`; 8v8 improved to `587278us`, but 12v12 regressed to `653206us`, so the focused targeting micro-win was not retained.
+
+## Continuation - 2026-07-04 Support Peel Candidate Index Cache
+
+Accepted change: support targeting now builds a packed list of positive-priority peel ally indices once per support target pick. `_ally_peel_pressure()` loops those candidates instead of rescanning every ally for every enemy candidate. The zero-priority fallback path is retained for direct helper calls without a prebuilt priority array.
+
+- Fresh `tests/perf/PerfTargeting.tscn` control preserved signature `9036604269279486158`, errors `[]`, median `407ms`.
+- Candidate `PerfTargeting.tscn` preserved the same signature and errors `[]`, but focused timing was mixed: medians `385ms`, `423ms`, and `416ms`.
+- Real movement held better than the focused noise: `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures and errors `[]`. 6v6 movement regressed slightly to `287318us` versus the `283409us` control, but 8v8 improved to `567079us` from `586791us`, and 12v12 improved to `625046us` from `662897us`.
+- Broad gates stayed clean through Godot MCP: `tests/perf/Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8826ms`; `tests/perf/PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7108ms`; `tests/perf/Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `327ms`; and `tests/rga_testing/validation/RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5826`.
+- Rejected same-pass candidates: reusing slot evaluator cost/unique-minimum scratch preserved `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077` but regressed the focused total from `264ms` to `295ms`; skipping inactive previous-slot dictionary entries preserved movement signatures and improved one 8v8 sample, but repeated 12v12 movement regressed to `681170us` versus the `662897us` control. Both source changes were reverted.
+
+## Continuation - 2026-07-04 Rejected Slot Assignment Copy And Slot Memory Writes
+
+Rejected follow-up candidates: avoiding the duplicate of each new best slot assignment, and writing slot memory arrays directly instead of calling `MovementState.set_slot_memory(...)`, both preserved deterministic signatures but failed the real movement bar. Source was reverted.
+
+- Fresh same-turn controls after `6a60060`: `tests/perf/PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, total `392ms`; `tests/perf/PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, total `294ms`; `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `290716us`, `553775us`, and `600618us`.
+- Assignment-copy removal preserved focused slot signatures and improved `PerfSlotTeamAssignment.tscn` to `249ms`, but real movement regressed 8v8 to `582295us` and 12v12 to `650928us`. Source was reverted.
+- Direct slot-memory writes preserved movement signatures and improved initial 6v6/8v8 samples (`279468us`, `540354us`) with near-neutral 12v12 (`599674us`), but repeats were mixed: 8v8 regressed to `568327us`, 12v12 to `621767us`, and final 12v12 to `639724us`. `Perf6v6.tscn` stayed stable but slower than the previous accepted broad total (`8942ms` vs `8826ms`), while `PerfLargeBoard.tscn` improved to `7030ms`. The phase-gate 12v12 regression was enough to reject the change.
+- Do not accept focused slot-wrapper wins unless `PerfMovementPhases.tscn` holds 8v8 and 12v12 in repeat runs. These probes reinforce that slot-assignment and movement-loop micro-edits can improve isolated totals while worsening the real large-fight gate.
+
+## Continuation - 2026-07-04 Breadth Refresh
+
+Fresh breadth pass answering whether optimization is exhausted: no, but remaining high-value work is concentrated. Movement remains the primary surface; targeting, collision, UI signal churn, and texture caching are currently healthy enough to monitor instead of churn without a stronger profile.
+
+- `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures and errors `[]`: 6v6 movement `278907us` with slot assignment `118598us` (`42.5%`), 8v8 movement `559528us` with slot assignment `192892us` (`34.5%`), and 12v12 movement `634891us` with slot assignment `465355us` (`73.3%`). 8v8 still has meaningful player/enemy step-loop and collision cost, but 12v12 remains slot-assignment dominated.
+- Focused non-slot checks stayed clean: `tests/perf/PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `433ms`; `tests/perf/PerfCollisionResolver.tscn` preserved aggregate `1955603822268948610`, errors `[]`, median total `73ms`; `tests/perf/PerfCombatUiSignals.tscn` had `position_updated=111`, matching `UnitActor.position_apply_calls=111`, hidden `UnitPanel` dynamic refreshes `0`, and errors `[]`; `tests/perf/PerfTextureUtils.tscn` preserved signature `3546666616613787855`, errors `[]`, with one real texture load and one circle generation across 600 repeat requests each.
+- Focused slot checks stayed clean: `tests/perf/PerfSlotSolverBreakdown.tscn` preserved aggregate `4738803460811644685`, errors `[]`, median total `392ms`; `tests/perf/PerfSlotTeamAssignment.tscn` preserved aggregate `2813605715628331077`, errors `[]`, median total `264ms` (`single_6=111ms`, `single_12=129ms`, `split_12=24ms`).
+- A plausible step-loop idea, merging the same-team separation and avoidance scans, was not repeated because this document already records that self-loop merge as rejected: it preserved signatures but failed the 8v8 movement gate and regressed `PerfLargeBoard.tscn`. Continue using this rejected-history check before retrying movement micro-edits.
+
+## Continuation - 2026-07-04 Rejected Slot Direction Zero Branch Removal
+
+Rejected follow-up: removing the defensive `Vector2.ZERO` branch after `Vector2(cos(slot_angle), sin(slot_angle))` preserved deterministic signatures but did not hold the real 12v12 movement gate. Source was reverted.
+
+- Focused candidate `tests/perf/PerfSlotTeamAssignment.tscn` preserved aggregate `2813605715628331077`, errors `[]`, and was effectively neutral: total `263ms` versus the fresh breadth control `264ms`.
+- Candidate `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures and errors `[]`. First run improved 8v8/12v12 movement to `552303us` and `589056us` but regressed 6v6 to `297395us`; repeat held 8v8 at `544752us` but regressed 12v12 to `671975us` versus the `634891us` breadth control.
+- Keep the defensive branch unless a larger slot-output representation change proves a repeatable real movement win. The result reinforces that slot-output construction is not the main remaining slot bottleneck.
+
+## Continuation - 2026-07-04 Rejected One-Pass Support Peel Setup
+
+Rejected follow-up: building support peel priorities and positive-priority ally indices in one loop preserved targeting signatures and improved the focused targeting benchmark, but regressed the real movement gate. Source was reverted.
+
+- Fresh `tests/perf/PerfTargeting.tscn` control preserved signature `9036604269279486158`, errors `[]`, median `465ms`.
+- Candidate `PerfTargeting.tscn` repeats preserved the same signature and errors `[]`, with medians `423ms` and `432ms`.
+- Candidate `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures and errors `[]`, but regressed 8v8 movement to `583931us` and 12v12 movement to `698482us` versus the `559528us` / `634891us` breadth control. Keep the two-helper setup until a targeting change improves the real phase gate, not only the focused targeting median.
+
+## Continuation - 2026-07-04 Targeting Dead Helper Cleanup
+
+Accepted cleanup: removed unused `Targeting._has_approach()` and `_has_mask()` helpers. Hot targeting paths already use cached approach masks and direct bit checks, so this trims dead code without changing target selection.
+
+- Fresh controls before this cleanup kept `tests/perf/PerfSlotTeamAssignment.tscn` clean with aggregate `2813605715628331077`, total `309ms`; `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `293147us`, `579780us`, and `622839us`.
+- Rejected same-pass movement typed-alive-buffer experiment: tightening helper parameters to `Array[bool]` preserved the same movement signatures and improved 6v6/8v8 movement to `284418us` and `565778us`, but regressed 12v12 movement to `647025us`; source was reverted.
+- Targeting cleanup validation: `tests/perf/PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `383ms`.
+- Real movement and broad gates stayed clean through Godot MCP: `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `272431us`, `562923us`, and `604853us`; `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8638ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7068ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5832`.
+- This is retained as code cleanup and no-regression evidence, not as a primary hotspot fix. Slot assignment remains the main 12v12 target, and 8v8 step loops plus collision remain meaningful secondary surfaces.
+
+## Continuation - 2026-07-04 Collision Sized-Array Trust
+
+Accepted change: `CollisionResolver.resolve()` now trusts the already-sized alive and step-cap arrays passed by `MovementService2` and the focused collision benchmark, removing fallback size checks during collision setup. This avoids per-unit bounds checks before building the active-index list while preserving active pair order and pair math.
+
+- Fresh same-turn movement control in `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `309253us`, `615216us`, and `705206us`; collision slices were `20925us`, `56785us`, and `27075us`.
+- Focused `tests/perf/PerfCollisionResolver.tscn` preserved aggregate `1955603822268948610`, errors `[]`, median total `89ms`: dense 6v6 `21ms`, dense 12v12 `33ms`, late 12v12 `35ms`.
+- Patched `PerfMovementPhases.tscn` repeats preserved the same 6v6/8v8/12v12 signatures and errors `[]`. First run movement was `309031us`, `596259us`, and `644432us`; repeat movement was `300069us`, `612362us`, and `644712us`. The 8v8 and 12v12 gates improved versus the fresh control in both runs.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `9343ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7559ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `356ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6300`.
+- This is a secondary-surface cleanup. The 12v12 movement profile is still dominated by slot assignment, so the broader performance goal remains active.
+
+## Continuation - 2026-07-04 Slot Legacy Cleanup And Rejected Guards
+
+Accepted cleanup: removed the unused `MovementService2` `MovementMath` preload plus unused `SlotStrategy._circ_dist()`, `_slot_angles()`, and legacy `_evaluate_assignment()`. Production slot assignment and the solver breakdown already use `_evaluate_precomputed_assignment()`, so this trims dead hot-file code without changing slot choices.
+
+- Fresh same-turn controls before cleanup kept `tests/perf/PerfMovementPhases.tscn` signatures stable with 6v6/8v8/12v12 movement `309253us`, `615216us`, and `705206us`; `tests/perf/PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`, total `297ms`.
+- Rejected before cleanup: removing the duplicate `ranges_world.has(attacker_index)` guard in `SlotStrategy.assign_slots_for_team()` preserved the focused slot aggregate but regressed `PerfSlotTeamAssignment.tscn` to `317ms`, so source was reverted.
+- Cleanup validation stayed signature-stable and error-free. `PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077` with totals `314ms`, `282ms`, then `325ms` after reverting the wrap experiment. `PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, total `471ms`.
+- Real movement stayed stable: `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures and errors `[]`, with movement `312014us`, `630481us`, and `682823us`. Slot assignment remained dominant in 12v12 at `504896us` (`73.9%`).
+- Broad gates stayed clean through Godot MCP: `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6301`; `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `9493ms`; and `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7779ms`.
+- Rejected after cleanup: replacing `_wrap_angle()` calls in the bounded slot-angle loops with a single subtract branch preserved signatures but regressed focused slot totals to `346ms` and `352ms`, so source was reverted. The remaining high-value work is still not exhausted, but it is concentrated in slot assignment and must continue to pass real movement gates, not only focused microbenchmarks.
+
+## Continuation - 2026-07-04 Inline Avoidance Steering
+
+Accepted change: `MovementService2._compute_avoidance_vector()` now performs the tiny `_avoid_from()` math inline inside the same-team and other-team neighbor loops, then removes the unused helper. The distance checks, weighting formula, accumulation order, and corridor scaling are unchanged; this removes repeated private helper calls from the 8v8/12v12 movement step loops.
+
+- Fresh same-turn controls before the edit: `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `291806us`, `561222us`, and `623996us`; 8v8 player/enemy steps were `115734us`/`85048us`, and 12v12 player/enemy steps were `63039us`/`30492us`. `PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, total `419ms`; `PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, total `292ms`.
+- Rejected same-pass slot micro-candidate: reusing static scratch arrays for the 2/3/4-row assignment helpers preserved `PerfSlotSmallAssignment.tscn` signatures but regressed the focused total from `1469ms` to `1514ms` and introduced less clean mutable return semantics, so source was reverted.
+- Patched `PerfMovementPhases.tscn` repeats preserved 6v6/8v8/12v12 signatures and errors `[]`. First run movement was `259957us`, `518865us`, and `591176us`; repeat movement was `259505us`, `525419us`, and `607909us`. The 8v8 player/enemy step slices held at `99162us`/`70862us` then `100677us`/`71418us`, and the 12v12 step slices held at `46568us`/`21955us` then `52054us`/`24972us`.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8676ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7042ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `327ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5680`.
+- This improves the monitored 8v8 step-loop surface and lowers 12v12 movement, but the latest profile still shows 12v12 slot assignment as the dominant remaining cost (`458926us`, `75.5%` of movement in the accepted repeat). Continue treating slot assignment as the primary surface while watching 8v8 step loops and collision.
+
+## Continuation - 2026-07-04 Rejected Avoidance Microguards
+
+Rejected follow-up candidates after `f020bb3`: precomputing `1.0 / avoid_radius` plus returning early for zero corridor factor, and inlining `_corridor_factor()` into `_compute_slot_step()`. Both preserved deterministic signatures but failed the real movement acceptance bar. Source was reverted.
+
+- Fresh current control after `f020bb3`: `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `274739us`, `525359us`, and `602719us`; 8v8 player/enemy steps were `99674us`/`70583us`, and 12v12 player/enemy steps were `52352us`/`27080us`.
+- Inverse-radius/zero-corridor candidate preserved signatures but was mixed: 6v6 improved to `263397us`, while 8v8 regressed to `527059us` and 12v12 regressed to `605646us`, so source was reverted.
+- Inline corridor-factor candidate preserved signatures and had a favorable first 12v12 sample (`590898us`), but the repeat regressed 8v8 to `548666us` and 12v12 to `610474us`; source was reverted.
+- Restored-source sanity `PerfMovementPhases.tscn` preserved all signatures with errors `[]`; movement was `284934us`, `534210us`, and `670302us` in that noisy check. Keep the accepted `_avoid_from()` inlining, but do not retry these smaller avoidance microguards without a stronger profiler signal.
+
+## Continuation - 2026-07-04 Rejected Slot Pair Pre-Size
+
+Fresh answer to "is that all that needs optimizing?": no. The latest clean controls still show slot assignment as the largest 12v12 movement surface, with 8v8 step loops, targeting, and collision remaining secondary monitored surfaces.
+
+- Fresh focused control in `tests/perf/PerfSlotTeamAssignment.tscn` preserved aggregate `2813605715628331077`, errors `[]`, total `265ms`.
+- Fresh real movement control in `tests/perf/PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `270597us`, `523525us`, and `582785us`; slot assignment was `118283us`, `190215us`, and `445641us`.
+- Rejected follow-up: pre-sizing the per-target `pairs` array in `_assign_for_target_into()` before filling it preserved focused slot signatures and improved `PerfSlotTeamAssignment.tscn` totals to `248ms` and `240ms`.
+- The same candidate failed the real movement gate: first phase run moved to `274993us`, `518056us`, and `586307us`; repeat moved to `265340us`, `512527us`, and `589745us`. The 8v8 improvement was not enough to keep a repeated 12v12 regression, so source was reverted.
+- Keep using real `PerfMovementPhases.tscn` as the acceptance gate for slot-wrapper allocation changes; focused slot wins alone are not sufficient.
+
+## Continuation - 2026-07-04 Movement Position Capacity Trust
+
+Accepted change: `MovementService2._update_impl()` now trusts `MovementState.ensure_capacity()` inside the player and enemy step loops and removes redundant `i >= data.player_positions.size()` / `j >= data.enemy_positions.size()` checks from the dead-unit branch. The update already resizes player/enemy position arrays to the team counts before alive snapshots, target grouping, slot assignment, and step application, so this trims a per-unit branch without changing movement behavior.
+
+- Fresh controls before retained source change: `PerfMovementPhases.tscn` preserved signatures with movement `271933us`, `559227us`, and `622529us` for 6v6/8v8/12v12; `PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, errors `[]`, total `404ms`; `PerfTargeting.tscn` kept signature `9036604269279486158`, errors `[]`, median `435ms`; `PerfCollisionResolver.tscn` kept aggregate `1955603822268948610`, errors `[]`, total `75ms`.
+- Rejected targeting follow-up: pre-sizing `_build_positive_priority_indices()` before shrinking it back to the written count preserved `PerfTargeting.tscn` signature, but regressed the focused median to `450ms` versus the `435ms` control, so source was reverted.
+- Rejected movement cap follow-up: skipping `step.length()` when the final step was exactly `Vector2.ZERO` preserved movement signatures and improved 8v8/12v12, but repeatedly regressed 6v6 movement to `292860us` and `291358us` versus the `271933us` control. Source was reverted.
+- Retained position-capacity trust repeats preserved 6v6/8v8/12v12 signatures and errors `[]`. First run movement was `270086us`, `527992us`, and `598192us`; repeat movement was `276999us`, `535132us`, and `582314us`.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8832ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `6964ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `325ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5842`.
+- This is a small step-loop branch cleanup, not a completion point. Slot assignment remains the largest 12v12 surface, while 8v8 step loops, targeting, and collision remain monitored.
+
+## Continuation - 2026-07-04 Movement Target Scratch Trust
+
+Accepted change: `MovementService2._update_impl()` now trusts the resized target scratch arrays inside the player and enemy step loops. `_p_targets_scratch` and `_e_targets_scratch` are resized to exact team counts before target resolution and grouping, so the later `i < p_targets.size()` / `j < e_targets.size()` fallback branches were redundant.
+
+- Fresh real movement control before the edit preserved 6v6/8v8/12v12 signatures and errors `[]`: movement `278748us`, `512532us`, and `570398us`.
+- Candidate repeats preserved the same signatures and errors `[]`. First run movement was `262480us`, `512241us`, and `579428us`; repeat movement was `268522us`, `519652us`, and `557425us`.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8739ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `6892ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `328ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5758`.
+- This is another narrow branch cleanup in the step loop. It improves the professional polish of the movement hot path but does not close the broader goal; slot assignment remains the largest 12v12 surface.
+
+## Continuation - 2026-07-04 Rejected Slot Index and Collision Cap Trust
+
+Fresh answer to "is that all that needs optimizing?": no. Current clean controls still show slot assignment as the largest 12v12 movement cost, with collision and targeting kept as monitored secondary surfaces.
+
+- Fresh clean controls before the rejected slot index-trust candidate: `PerfSlotTeamAssignment.tscn` preserved aggregate `2813605715628331077`, errors `[]`, total `300ms`; `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures and errors `[]`, with movement `265331us`, `527380us`, and `574532us`, and slot assignment `116993us`, `190638us`, and `443611us`.
+- Rejected slot range setup candidate: directly reading `attackers_units[attacker_index]` and `profiles[attacker_index]` inside `SlotStrategy.assign_slots_for_team()` improved focused slot totals to `267ms` and `273ms`, but did not hold the real movement gate. Patched movement repeats were mixed: `256696us`/`520708us`/`602195us`, `306204us`/`522633us`/`563677us`, and `261945us`/`529669us`/`585439us`. The repeated 12v12 regressions against the clean `574532us` control were not acceptable, so source was reverted.
+- Rejected collision cap-trust candidate: directly copying `player_step_caps[i]` / `enemy_step_caps[j]` in `CollisionResolver.resolve()` improved focused collision totals from clean `106ms` to `82ms` and `71ms`, preserving aggregate `1955603822268948610`, but real movement repeats regressed to `274492us`/`538457us`/`674944us` and `292971us`/`552085us`/`654384us`. Source was reverted despite the focused win.
+- No source optimization was retained from this pass. The takeaway is unchanged: focused microbenchmarks are useful filters, but real `PerfMovementPhases.tscn` remains the acceptance gate for frame-loop work.
+
+## Continuation - 2026-07-04 Direct Movement Target Arrays
+
+Accepted change: `CombatEngine` now asks `TargetController` to copy the current arena targets into reusable player/enemy target arrays and calls `MovementService2.update_movement_with_targets()`. `MovementService2` still keeps the existing Callable resolver path for probes and fallback callers, but real combat movement now avoids a per-live-unit `Callable.call()` when cached targets are already valid. `TargetController.copy_arena_targets()` preserves the previous stale/dead-target fallback by calling `current_target()` only when an alive unit's stored target is no longer valid.
+
+- Fresh real movement control before the edit preserved 6v6/8v8/12v12 signatures and errors `[]`: movement `260929us`, `533730us`, and `593095us`; target phases were `23482us`, `54504us`, and `22575us`.
+- Candidate repeats preserved the same signatures and errors `[]`. First run movement was `242816us`, `484100us`, and `591504us`; repeat movement was `247496us`, `494947us`, and `589712us`. The `targets` phase dropped out of the top phase list in both patched repeats, while 12v12 remained dominated by slot assignment.
+- Target behavior and broad gates stayed clean through Godot MCP: `MovementTargetPriorityProbe.tscn` passed; `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8709ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `6975ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `355ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5906`.
+- This reduces a secondary movement phase and improves 6v6/8v8 frame-loop movement, but it does not complete the broader audit: 12v12 slot assignment is still the dominant remaining cost.
+
+## Continuation - 2026-07-04 Rejected Direct Target Validity Inline
+
+Rejected follow-up after `226bded`: inlining target validity checks inside `TargetController.copy_arena_targets()` preserved deterministic signatures but did not hold the stress gate, so source was reverted.
+
+- Fresh direct-target-array control in `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `267588us`, `481433us`, and `595175us`.
+- Candidate `PerfMovementPhases.tscn` repeats preserved signatures and errors `[]`, but were mixed: first run `245121us`, `498363us`, and `599543us`; second run `259063us`, `485928us`, and `551350us`; third run `232974us`, `476790us`, and `588303us`.
+- `MovementTargetPriorityProbe.tscn` passed and `Perf6v6.tscn` stayed clean with aggregate `4480953857527108889:18`, total `8550ms`, but `PerfLargeBoard.tscn` repeated slightly worse than the retained direct-target-array gate: `7015ms` and `7022ms` versus the `6975ms` retained gate. Source was reverted because this was too small to keep against a repeated stress regression.
+
+## Continuation - 2026-07-04 Rejected Slot Allocation Shortcuts
+
+Fresh answer to "is that all that needs optimizing?": no. A clean control still shows slot assignment dominating the 12v12 movement phase, so the remaining optimization surface is real and not just theoretical.
+
+- Fresh focused control in `PerfSlotTeamAssignment.tscn` preserved aggregate `2813605715628331077`, errors `[]`, total `285ms`.
+- Fresh real movement control in `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `252441us`, `495148us`, and `538207us`; slot assignment was `118368us`, `197926us`, and `423718us`.
+- Rejected scratch-array candidate: reusing the unique-minimum shortcut arrays preserved the focused slot signature and was effectively flat in `PerfSlotTeamAssignment.tscn` (`284ms`), but failed the real gate: 12v12 movement regressed to `588680us` and slot assignment to `466781us`, so source was reverted.
+- Rejected no-duplicate candidate: recording the returned best assignment array without `.duplicate()` improved focused slot total to `256ms`, preserving aggregate `2813605715628331077`, and initially improved 6v6/8v8 movement. It repeatedly regressed 12v12 movement (`571189us`, then `576941us`) and slot assignment (`451034us`, then `454659us`), so source was reverted.
+- Rejected tiny-group unique-minimum guard: skipping the unique-minimum shortcut for 2/3/4-row assignments kept `PerfSlotSmallAssignment.tscn` fast/DP signatures aligned and improved `PerfSlotTeamAssignment.tscn` to `274ms`, but failed the 12v12 movement gate with movement `586305us` and slot assignment `466078us`, so source was reverted.
+- Takeaway: allocation micro-optimizations around `_evaluate_precomputed_assignment()` can make focused team-slot timings look better while still hurting the single-target 12v12 stress case. Future slot work should target the 5+ row exact path itself and keep `PerfMovementPhases.tscn` 12v12 as a hard acceptance gate.
+
+## Continuation - 2026-07-04 Rejected DP Predecessor State Trims
+
+Rejected solver-state follow-up after the allocation shortcut pass. Both candidates preserved exact DP signatures and improved focused solver totals, but neither held the real 12v12 movement gate, so source was reverted.
+
+- Fresh focused controls before the edits: `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, errors `[]`, total `154ms`; `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, errors `[]`, total `409ms`.
+- Rejected predecessor-mask removal: computing the previous mask from the picked column instead of storing `prev_masks` improved focused totals to `152ms` in `PerfSlotDpSearch.tscn` and `385ms` in `PerfSlotSolverBreakdown.tscn`, but repeated real movement regressed 12v12 from the latest `538207us` control to `548626us`, then `596871us`. Source was reverted.
+- Rejected predecessor-array clear skip: keeping the stored predecessor arrays but skipping `prev_cols.fill(-1)` and `prev_masks.fill(-1)` improved focused totals to `144ms` in `PerfSlotDpSearch.tscn` and `381ms` in `PerfSlotSolverBreakdown.tscn`, but real 12v12 movement regressed again to `594957us`, with slot assignment at `466629us`. Source was reverted.
+- Restored-source sanity: `PerfSlotDpSearch.tscn` preserved aggregate `6007460045863670620`, errors `[]`, total `153ms`.
+- Takeaway: direct DP predecessor-state trims are not safe to retain from focused solver wins alone. The acceptance bar remains the real `PerfMovementPhases.tscn` 12v12 case, and future exact-solver work should avoid changing backtrace storage unless it also proves lower real slot-assignment time.
+
+## Continuation - 2026-07-04 Movement Target Count Trust
+
+Accepted change: `MovementService2._update_impl()` now uses the already-known `player_count` / `enemy_count` values for target-index bounds checks in grouping and per-unit target-position lookup. `ensure_capacity()` has already resized movement position arrays to those counts, so this removes repeated position-array size calls in the movement frame loop without changing behavior.
+
+- Fresh real movement control preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `267694us`, `476262us`, and `580565us`; groups were visible at `7684us` for 6v6 and `15477us` for 8v8.
+- Rejected reusable group-array variants: a dictionary-backed group array pool worsened the groups phase and 12v12 movement (`593700us`), while a fixed-index group array pool still worsened 8v8 movement (`499737us`) and made the groups phase heavier despite one better 12v12 sample. Source was reverted before the retained count-trust cleanup.
+- Retained count-trust repeats preserved signatures and errors `[]`. First run movement was `252258us`, `503925us`, and `577756us`; repeat was `248378us`, `482291us`, and `555927us`; third run was `257712us`, `477200us`, and `575635us`. 6v6 and 12v12 held below the control; 8v8 settled near-neutral after one noisy regression.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8517ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `6898ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `381ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5912`.
+- This is a narrow frame-loop cleanup and does not complete the broader goal. Slot assignment remains the dominant 12v12 surface.
+
+## Continuation - 2026-07-04 Previous Slot Size Trust
+
+Accepted change: `_sync_prev_slots()` now trusts that `MovementState.ensure_capacity()` has resized slot-id and slot-timer arrays to the requested team count. This keeps the existing previous-slot dictionary shape but removes redundant per-unit size fallbacks in the movement frame loop.
+
+- Fresh real movement control preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `262727us`, `495400us`, and `629249us`; 12v12 `prev_slots` was `6378us`.
+- Patched repeats preserved the same signatures and errors `[]`. First run movement was `240107us`, `462697us`, and `543109us`, with 12v12 `prev_slots=5023us`; repeat movement was `257918us`, `491352us`, and `577866us`, with 12v12 `prev_slots=5693us`.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8620ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `6919ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `333ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5704`.
+- This is another narrow movement bookkeeping cleanup. It improves repeat movement samples but does not change the remaining conclusion: 12v12 slot assignment is still the largest open surface.
+
+## Continuation - 2026-07-04 Movement Profile Count Trust
+
+Accepted change: `MovementService2.configure()` and `ensure_capacity()` now pass their already-known team counts into profile-array sizing instead of having `_ensure_profiles()` repeatedly read live position-array sizes. `MovementState.configure()` and `ensure_capacity()` resize positions to those same counts first, so this keeps behavior stable while trimming another setup/profile bookkeeping path.
+
+- Fresh real movement control preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `247945us`, `482609us`, and `589499us`.
+- Patched repeats preserved the same signatures and errors `[]`. Movement samples were `255444us` / `464657us` / `570464us`, then `260388us` / `500235us` / `600250us`, then `246553us` / `476117us` / `567461us` for 6v6/8v8/12v12. The 12v12 median improved versus the fresh control despite one noisy repeat, 8v8 stayed slightly below control on median, and 6v6 remained noise-level mixed.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8463ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `6881ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `333ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5846`.
+- This is a small safe cleanup, not a new hotspot conclusion. Slot assignment remains the dominant 12v12 movement surface.
+
+## Continuation - 2026-07-04 Rejected Slot Wrapper and Hungarian Slack Probes
+
+Rejected two source candidates after they preserved deterministic signatures but failed to beat the real movement acceptance bar. Source was reverted; this is a docs-only checkpoint.
+
+- Fresh controls: `PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`, total `300ms`; `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `252181us`, `469941us`, and `548196us`.
+- Rejected slot wrapper cleanup: iterating groups directly, caching target/unit/profile sizes, and hoisting the tile-size clamp preserved `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077` but regressed the focused total to `305ms`. The real movement gate also regressed all cases to `262270us`, `538823us`, and `647484us`, so source was reverted. This reconfirms the earlier wrapper-family rejection.
+- Fresh solver controls before the Hungarian slack candidate: `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, total `160ms`; `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, total `404ms`.
+- Rejected Hungarian slack candidate: using the exact Hungarian minimum directly for reduced-cost slack instead of the summed dual lower-bound helper preserved focused signatures and improved `PerfSlotDpSearch.tscn` to `159ms`, `PerfSlotSolverBreakdown.tscn` to `395ms`, and `PerfSlotTeamAssignment.tscn` to `276ms`. It still failed repeated real movement because 12v12 regressed to `575837us` and `572205us` versus the fresh `548196us` control. Source was reverted; keep the current dual lower-bound calculation unless a future change proves the real 12v12 phase.
+- Takeaway: focused slot wins remain useful filters, but they are still insufficient for retention. The real `PerfMovementPhases.tscn` 12v12 case remains the decisive gate for slot-assignment changes.
+
+## Continuation - 2026-07-04 Support Peel Wounded Bonus Cache
+
+Accepted change: support targeting now caches wounded-bonus values only for positive-priority peel ally indices once per support pick. `_ally_peel_pressure()` reuses those values while scoring each enemy candidate, while the fallback helper path still computes the bonus on demand. This keeps the accepted two-pass priority/index setup and avoids the previously rejected one-pass setup merge.
+
+- Fresh `PerfTargeting.tscn` control preserved signature `9036604269279486158`, errors `[]`, median `434ms`.
+- First candidate version cached wounded bonuses for every ally. Focused targeting improved with medians `418ms` and `406ms`, but real movement stayed mixed and repeated 12v12 movement regressed to `556369us` then `579561us` versus the latest source-clean `548196us` control, so it was narrowed instead of retained.
+- Retained narrower candidate caches wounded bonuses only for the positive-priority peel indices. `PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `408ms`.
+- Real movement signatures stayed stable. The first narrowed `PerfMovementPhases.tscn` sample was still mixed at `238507us`, `472903us`, and `562188us`, but the accepted repeat improved all three cases versus the latest source-clean movement control: `250215us`, `466492us`, and `535974us` for 6v6/8v8/12v12.
+- Target behavior and broad gates stayed clean through Godot MCP: `MovementTargetPriorityProbe.tscn` PASS; `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8454ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7058ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `335ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5867`.
+- This is a scoped targeting cleanup. It does not change the larger conclusion: 12v12 slot assignment remains the main open performance surface.
+
+## Continuation - 2026-07-04 Rejected Support Param And Collision Active Index
+
+Fresh answer to "is that all that needs optimizing?": no. A clean `PerfMovementPhases.tscn` control still shows 12v12 slot assignment as the largest remaining measured surface: 6v6/8v8/12v12 movement was `238166us`, `469410us`, and `563929us`, with slot assignment at `119553us` (`50.2%`), `190436us` (`40.6%`), and `454939us` (`80.7%`). `PerfSlotSolverBreakdown.tscn` kept aggregate `4738803460811644685`, errors `[]`, total `422ms`; `PerfSlotTeamAssignment.tscn` kept aggregate `2813605715628331077`, errors `[]`, total `301ms`.
+
+- Rejected targeting micro-cleanup: removing the unused support `enemy` parameter and null check preserved `PerfTargeting.tscn` signature `9036604269279486158`, but timing did not hold. Fresh control was `412ms`; the candidate first read `406ms`, then repeated at `445ms`. Source was reverted.
+- Rejected collision active-index scratch write: pre-sizing `_active_indices` and writing live indices by explicit `active_count` improved focused `PerfCollisionResolver.tscn` from clean `80ms` to `72ms` and `69ms`, preserving aggregate `1955603822268948610`, but failed the real movement acceptance bar.
+- Candidate `PerfMovementPhases.tscn` first moved to `250459us`, `465351us`, and `589894us`; repeat moved to `237650us`, `487189us`, and `562376us`. The focused collision win was not enough to justify a mixed full-frame result and a repeated 8v8 movement regression, so source was reverted.
+- No source optimization was retained from this pass. Continue treating slot assignment as the primary surface; collision remains monitored, but focused collision wins must still prove out in `PerfMovementPhases.tscn`.
+
+## Continuation - 2026-07-04 Rejected Previous-Slot Array And Mage Nearby Count
+
+No source optimization was retained from this pass. Two candidates preserved deterministic signatures and improved at least one focused or partial gate, but both failed the real movement acceptance bar and were reverted.
+
+- Fresh `PerfMovementPhases.tscn` control before the previous-slot array candidate preserved 6v6/8v8/12v12 signatures with movement `247964us`, `463366us`, and `544679us`; 12v12 slot assignment was `431693us`.
+- Rejected previous-slot array path: letting `SlotStrategy.assign_slots_for_team()` read `MovementState` slot-id/timer arrays directly removed the dictionary sync work but regressed real movement. Candidate runs preserved signatures but moved to `255581us`/`448064us`/`554098us`, then `248075us`/`489454us`/`569247us`; 12v12 slot assignment worsened to `447889us` then `453177us`. Source was reverted.
+- Fresh `PerfTargeting.tscn` control before the mage count candidate preserved signature `9036604269279486158`, errors `[]`, median `444ms`.
+- Rejected mage nearby-count cache: prebuilding nearby-live counts for mage AOE/zone picks improved focused targeting to `413ms` and `439ms` with the same signature, and `MovementTargetPriorityProbe.tscn` passed. The real movement gate did not hold: first run slowed every case to `317456us`, `632887us`, and `610934us`; repeat normalized 6v6 but still regressed 8v8 and 12v12 to `476755us` and `593986us`. Source was reverted.
+- Takeaway: direct previous-slot arrays and mage AOE count precomputation are not safe retained wins under the current gate. Slot assignment remains the primary open surface; targeting work needs focused wins that also avoid repeated `PerfMovementPhases.tscn` regressions.
+
+## Continuation - 2026-07-04 Packed DP Cost Scratch
+
+Accepted change: `_best_assignment_dp()` now stores its reusable DP `best_costs` scratch in a `PackedFloat64Array` instead of `Array[float]`, while keeping predecessor arrays, traversal order, tie behavior, and 64-bit cost precision intact. This targets the hot fill/read/write cost table in the exact slot solver without changing the backtrace storage that previously failed real movement gates.
+
+- Fresh focused controls before the retained change: `PerfSlotDpSearch.tscn` preserved aggregate `6007460045863670620`, errors `[]`, total `164ms`; `PerfSlotSolverBreakdown.tscn` preserved aggregate `4738803460811644685`, errors `[]`, total `404ms`.
+- Rejected same-pass predecessor storage variant: changing `prev_cols` and `prev_masks` to `PackedInt32Array` preserved aggregate `6007460045863670620`, but regressed `PerfSlotDpSearch.tscn` from `164ms` to `176ms`, so it was reverted before broader gates.
+- Packed-cost scratch preserved signatures and improved focused gates: `PerfSlotDpSearch.tscn` total `139ms`, aggregate `6007460045863670620`; `PerfSlotSolverBreakdown.tscn` total `386ms`, aggregate `4738803460811644685`. `PerfSlotTeamAssignment.tscn` was noisy but held signatures, with totals `335ms` then `295ms`, aggregate `2813605715628331077`.
+- Real movement A/B evidence: patched `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `256838us`/`506836us`/`536615us`, then `253943us`/`482146us`/`535105us`, then `234498us`/`483623us`/`537027us`. A source-clean A/B control in the same runtime window was worse in the primary 12v12 case at `586575us` movement and `468475us` slot assignment, while the patched 12v12 slot assignment held around `422849us` to `426505us`.
+- Broad gates stayed clean through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8738ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7176ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `336ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6197`.
+- This is a retained solver-storage optimization, not completion of the broader audit. 12v12 slot assignment remains the primary surface, but the exact DP cost table now has lower focused and real 12v12 cost.
+
+## Continuation - 2026-07-04 Rejected Follow-up Solver And Movement Probes
+
+No source optimization was retained from this pass. The direct answer to "is that all that needs optimizing?" remains no: the restored current-tree `PerfMovementPhases.tscn` baseline still preserved deterministic signatures while showing 12v12 slot assignment at `439249us` of `551949us` movement (`79.6%`). The same baseline measured 6v6 and 8v8 movement at `243086us` and `514354us`, with 8v8 step loops plus collision still material secondary slices.
+
+- Rejected Hungarian packed scratch: changing Hungarian pruning scratch arrays to `PackedFloat64Array` / `PackedInt32Array` preserved solver signatures, but regressed focused gates. Fresh controls were `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, total `1164ms`, and `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, total `232ms`; the candidate moved those totals to `1278ms` and `433ms`, so source was reverted.
+- Rejected DP reduced-branch split: splitting `_best_assignment_dp()` into reduced-prune and non-reduced loops preserved signatures and improved focused solver totals (`PerfSlotSolverBreakdown.tscn` `1164ms` -> `597ms`, `PerfSlotDpSearch.tscn` `232ms` -> `166ms`). It did not survive the real gate: `PerfMovementPhases.tscn` 12v12 movement regressed to `647002us`, with slot assignment `500841us`. Source was reverted.
+- Rejected movement slot-mode boolean cleanup: replacing per-unit slot-mode `String(...)` conversion with a boolean `los_arrive` flag in `MovementService2` immediately failed the 6v6 movement gate, moving from the restored `243086us` baseline to `423454us`. The run was stopped after the first case and source was reverted.
+- Takeaway: remaining optimization is not exhausted, but the current frontier is past easy local rewrites. Future candidates should keep using the focused solver scenes as filters, then require `PerfMovementPhases.tscn` 12v12 and 8v8 proof before retention.
+
+## Continuation - 2026-07-04 Movement Group Count Trust
+
+Accepted change: `MovementService2._update_impl()` now loops target-group construction over the already-known `player_count` / `enemy_count` values instead of re-reading the resized target-array sizes. `ensure_capacity()` and the target scratch resize happen earlier in the same frame, so this preserves behavior while trimming two hot frame-loop size calls.
+
+- Rejected per-unit movement-blocker count cache: adding per-unit blocker counters to `BuffSystem` preserved a targeted blocker smoke and improved `PerfMovementBlockers.tscn` `unit_blocked_ms` from `257` to `152`, but failed the real movement gate. Patched `PerfMovementPhases.tscn` samples regressed to 12v12 movement `843849us` / slot assignment `678401us`, then `594268us` after a repeat, so source was reverted.
+- Rejected zero-step bounds-write skip: skipping the final clamp/write when a zero movement step was already inside arena bounds preserved signatures and improved 6v6 movement from the fresh `256890us` control to `246684us`, but regressed 8v8 to `536220us` and 12v12 to `659924us`. Source was reverted.
+- Fresh movement control before the retained count-trust cleanup preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `256890us`, `491001us`, and `570645us`; 12v12 slot assignment remained the largest slice at `451579us` (`79.1%`).
+- Retained count-trust evidence stayed behavior-stable. Candidate movement samples were `245556us` / `487548us` / `576773us`, then `248107us` / `487750us` / `559465us` for 6v6/8v8/12v12. A restored-source A/B control in the same window was `263341us` / `485685us` / `579864us`, making 6v6 and 12v12 favorable while 8v8 stayed effectively neutral/noisy.
+- Broad gates stayed clean through Godot MCP: `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `348ms`; `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8745ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7503ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=5898`.
+- This is a narrow frame-loop cleanup. It answers the active question the same way as the prior breadth checks: no, optimization is not exhausted, but the remaining high-value work is concentrated in 12v12 slot assignment while 8v8 step loops/collision remain monitored secondary surfaces.
+
+## Continuation - 2026-07-04 Rejected DP Budget And Group Iteration Probes
+
+No source optimization was retained from this follow-up slot-frontier pass. Fresh focused controls after `71c292d`: `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, errors `[]`, total `369ms`; `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, errors `[]`, total `143ms`; `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, errors `[]`, total `249ms`.
+
+- Rejected unconditional DP remaining-budget guard: skipping columns whose cost could not beat the current incumbent preserved `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, and improved `dp_12_pruned` from `63ms` to `57ms`, but regressed the full focused total to `151ms` because initial DP cases slowed.
+- Rejected external-incumbent-only budget guard: limiting the same skip to calls that entered `_best_assignment_dp()` with a finite incumbent still preserved signatures but regressed `PerfSlotDpSearch.tscn` total further to `175ms`, with `dp_12_pruned=91ms`.
+- Rejected isolated direct group iteration: changing `SlotStrategy.assign_slots_for_team()` from `groups.keys()` to direct dictionary iteration preserved `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, but regressed the focused total from `249ms` to `253ms` and the same-target 12 case from `117ms` to `125ms`.
+- Takeaway: the current slot frontier remains sensitive to seemingly reasonable local shortcuts. Keep the current DP incumbent check order and `groups.keys()` iteration unless a future candidate beats the focused gates first, then proves itself in `PerfMovementPhases.tscn`.
+
+## Continuation - 2026-07-04 Rejected Movement Team Local Probes
+
+No source optimization was retained from this frame-loop pass. Fresh real movement control preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `253221us`, `591163us`, and `815592us`. The large-case control was noisy, but still showed 12v12 slot assignment as the dominant slice at `659432us` (`80.9%`).
+
+- Rejected full team-array local cache: caching `state.player_team` / `state.enemy_team` into local typed arrays at movement update start and using them for alive checks, slot assignment, and step loops preserved the 6v6 signature but immediately regressed 6v6 movement to `328444us`, so the run was stopped before larger cases and source was reverted.
+- Rejected alive-loop unit locals: reading each alive-check unit into a local before calling `is_alive()` preserved signatures and initially looked neutral (`252976us`/`487011us`/`597787us`), but the repeat failed 8v8 and 12v12 badly (`627030us` and `881968us`), so source was reverted.
+- Takeaway: local-variable reshaping around `state.player_team` / `state.enemy_team` is not a safe quick win in this GDScript hot loop. Keep the current direct property/index reads unless a future profiler shows a different access pattern and passes repeated `PerfMovementPhases.tscn`.
+
+## Continuation - 2026-07-04 Rejected In-Band Epsilon Handoff
+
+No source optimization was retained. Passing the update-level `eps_safe` value into `_compute_in_band_step()` instead of recomputing `max(0.0, tuning.range_epsilon)` inside the helper preserved deterministic signatures, but failed the real movement gate. `PerfMovementPhases.tscn` regressed 6v6 movement to `296689us` and 8v8 movement to `532008us` before the run was stopped; source was reverted. Keep the helper-local range-epsilon clamp unless a broader in-band rewrite proves a real movement win.
+
+## Continuation - 2026-07-04 Count-5 Assignment Coverage
+
+No source optimization was retained from the direct answer follow-up. The answer remains no: optimization is not exhausted, but 12v12 slot assignment remains the current primary measured surface while 8v8 step loops/collision stay secondary.
+
+- `tests/perf/PerfSlotSmallAssignment.tscn` now includes count-5 `fast_5` and direct `dp_5` cases so future tiny exact-assignment work can check the next size above the retained 2/3/4-row fast paths.
+- Clean expanded-benchmark run after reverting the source candidate preserved errors `[]` and aggregate signature `4367829170111879031`: `fast_5` median `497ms`, `dp_5` median `607ms`, both signature `6095637763049574696`.
+- Rejected 5-row specialized DP dispatcher: it preserved the count-5 signature and won one noisy pass (`fast_5=466ms` versus direct `dp_5=503ms`), but lost on repeat (`fast_5=574ms` versus direct `dp_5=518ms`). Source was reverted because the candidate was not a reliable focused win and is not the main 12v12 slot path.
+
+## Continuation - 2026-07-04 Movement Step Helper Benchmark
+
+No gameplay source optimization was retained from this pass. Fresh controls still show slot assignment as the largest 12v12 surface, but the 8v8 case also has a large combined player/enemy step and collision slice worth filtering with a focused benchmark before future movement-helper edits.
+
+- Fresh controls: `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, errors `[]`, total `179ms`; `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, errors `[]`, total `806ms`; `PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, errors `[]`, total `268ms`; `PerfTargeting.tscn` signature `9036604269279486158`, errors `[]`, median `510ms`.
+- Fresh `PerfMovementPhases.tscn` control preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `254336us`, `690939us`, and `889251us`. Phase slices were 6v6 slot `123122us` (`48.4%`), 8v8 slot `279947us` (`40.5%`) with player/enemy steps `136674us`/`108275us` and collision `73596us`, and 12v12 slot `675267us` (`75.9%`).
+- Added `tests/perf/PerfMovementStepHelpers.tscn` / `.gd` to isolate the non-slot step-helper cost. Clean rerun preserved errors `[]`, aggregate signature `4095235582607810427`: `slot_step_8v8` median `179ms`, signature `8517957193674428854`; `slot_step_12v12` median `189ms`, signature `9171504211272572178`; `in_band_8v8` median `75ms`, signature `2023130859922751419`.
+- Skipped repeating already documented rejected candidates: precomputed slow/corridor defaults, clamped `min_forward_dot` hoisting, squared in-band/bounded range comparisons, support-peel positive-index one-pass construction, and several slot DP/local shortcut families. Future step-helper work should first beat `PerfMovementStepHelpers.tscn`, then prove itself in `PerfMovementPhases.tscn` 8v8 and 12v12.
+
+## Continuation - 2026-07-04 Slot Array Output Path
+
+Accepted change: real combat movement now asks `SlotStrategy` to fill reusable per-team slot arrays instead of allocating a `Dictionary` of nested slot dictionaries and unpacking those dictionaries during each step loop. The legacy `assign_slots_for_team()` dictionary API remains for tests and compatibility; the new `assign_slots_for_team_into_arrays()` path is used only by `MovementService2._update_impl()`.
+
+- Rejected Hungarian cost-return shortcut first: returning `-v[0]` from `_assignment_min_cost_hungarian()` preserved signatures and improved some direct Hungarian samples, but same-window focused totals were effectively tied and mixed (`PerfSlotSolverBreakdown` `543ms` candidate vs `540ms` control; `PerfSlotDpSearch` `150ms` candidate vs `156ms` control). Source was restored before the retained array-output work.
+- Fresh `PerfMovementPhases.tscn` control before the array path preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `357351us`, `601893us`, and `841390us`; slot assignment `171437us`, `246377us`, and `650954us`.
+- Array-path repeats preserved the same signatures and errors `[]`. First run movement was `369790us`, `540210us`, and `535315us`, with slot assignment `174879us`, `219203us`, and `426945us`. Repeat movement was `245848us`, `497269us`, and `751033us`, with slot assignment `118124us`, `202363us`, and `607380us`. 6v6 was mixed on the first sample, but 8v8 and 12v12 slot assignment both stayed below the fresh control.
+- Added `tests/rga_testing/validation/SlotArrayAssignmentParityProbe.tscn` / `slot_array_assignment_parity_probe.gd` to compare the new array output against the legacy dictionary output for single-target, split-target, and single-attacker LOS cases. The probe passed with errors `[]`.
+- Broad gates stayed behavior-stable through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0` on two runs (`12790ms`, `12311ms`, noisy totals); `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0` on two runs (`7932ms`, `8423ms`, 12v12 medians `1184ms` and `1147ms`); `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `363ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=7143`.
+- This removes a real allocation/unpack surface in the movement frame loop and lowers repeated 8v8/12v12 phase-profiler slot-assignment samples, but it does not finish the audit. The exact slot solver remains the dominant 12v12 slice after the output-shape cleanup.
+
+## Continuation - 2026-07-04 Target Role Goal Cache
+
+Accepted change: `Unit` now caches normalized targeting role and goal strings when identity data is set, and `Targeting._role()` / `_goal()` use those caches with the previous normalization path as fallback. This mirrors the existing approach-mask cache and removes repeated `strip_edges().to_lower()` work from target-priority scoring without changing target rules.
+
+- Fresh current-tree controls after the slot-array commit: `PerfMovementPhases.tscn` preserved signatures with 6v6/8v8/12v12 movement `271161us`, `492379us`, and `630013us`; slot assignment was still dominant at `133772us`, `197999us`, and `501795us`. Focused `PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `757ms`.
+- Rejected same-pass solver/frame candidates were reverted before the retained targeting cache: reusable `_evaluate_precomputed_assignment()` cost-row scratch preserved signatures but regressed `PerfSlotSolverBreakdown.tscn` from `423ms` control to `657ms`; removing redundant-looking slot LOS boolean fills preserved signatures but regressed 12v12 movement to `779253us`; and array-path-only no-duplicate best-assignment storage passed parity but regressed 12v12 movement to `1078446us`.
+- Retained targeting cache preserved `PerfTargeting.tscn` signature `9036604269279486158` and improved focused medians to `417ms`, then `430ms` on repeat. `MovementTargetPriorityProbe.tscn` passed with errors `[]`.
+- Real movement signatures stayed stable. `PerfMovementPhases.tscn` with the cache measured 6v6/8v8/12v12 movement `259329us`, `491257us`, and `622534us`, all slightly below the fresh current-tree control despite noisy p95 on 12v12.
+- Broad gates stayed behavior-stable through Godot MCP: `Perf6v6.tscn` kept aggregate `4480953857527108889:18`, inconsistent cases `0`, total `11145ms`; `PerfLargeBoard.tscn` kept aggregate `7144113503220431359:12`, inconsistent cases `0`, total `8202ms`; `Perf1v1.tscn` kept signature `-6199507685307107293:55`, errors `[]`, time `349ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=7150`.
+- This is a retained targeting hot-path cleanup. It does not complete the broader audit: after the cache, the main measured surface is still 12v12 exact slot assignment, while targeting remains covered by `PerfTargeting.tscn`.
+
+## Continuation - 2026-07-04 Post-Cache Frontier Refresh
+
+No source optimization was retained from this follow-up. The direct answer to "is that all that needs optimizing?" remains no, but the easy/safe local rewrites are largely exhausted and must keep proving themselves in full movement gates, not just focused benchmarks.
+
+- Fresh targeting control after the retained role/goal cache preserved `PerfTargeting.tscn` signature `9036604269279486158`, errors `[]`, median `428ms`; restored-source verification after a rejected candidate was `434ms`.
+- Rejected targeting role-kind cache: caching numeric role IDs and switching hot role comparisons from strings to ints preserved the targeting signature, but regressed `PerfTargeting.tscn` to `1127ms`, so source was reverted.
+- Fresh real movement control preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `230574us`, `452992us`, and `667211us`. Slot assignment remained the top slice at `111531us` (`48.4%`), `186273us` (`41.1%`), and `549230us` (`82.3%`); 12v12 previous-slot sync was only `5857us` (`0.9%`).
+- Rejected direct previous-slot array handoff: passing `MovementState` slot-id/timer arrays directly to the real slot-array path passed `SlotArrayAssignmentParityProbe.tscn`, but regressed `PerfMovementPhases.tscn` to 6v6 `242369us` and 8v8 `609863us`, so the run was stopped and source reverted.
+- Rejected ring direction guard cleanup: removing an impossible-looking `Vector2.ZERO` fallback after `Vector2(cos(angle), sin(angle))` improved focused `PerfSlotTeamAssignment.tscn` from fresh total `511ms` to `303ms` and `284ms`, preserving aggregate `2813605715628331077`, and parity still passed. The real movement gate failed: 6v6 regressed to `260821us` and 8v8 to `728435us`, so source was reverted.
+- Current secondary checks stayed behavior-stable and are monitored rather than primary: `PerfCollisionResolver.tscn` aggregate `1955603822268948610`, errors `[]`, median total `131ms`; `PerfCombatUiSignals.tscn` reported `position_updated=111`, matching `UnitActor.position_apply_calls=111`, hidden `UnitPanel` dynamic refreshes `0`, errors `[]`; `PerfTextureUtils.tscn` stayed cache-effective at `25ms`, one real texture load and one circle generation, signature `3546666616613787855`; `PerfForcedMovement.tscn` kept signature `3092491491923327610`; and `PerfMovementBlockers.tscn` kept signature `8928121065208191259` with empty blocker gating at `8ms` versus `787ms` direct.
+- Takeaway: continue treating 12v12 slot assignment as the main frontier, but do not trust focused slot wins unless `PerfMovementPhases.tscn` also improves 6v6/8v8/12v12. Targeting, collision, UI signals, texture caching, forced movement, and movement-blocker gates are currently healthy enough to monitor.
+
+## Continuation - 2026-07-04 Rejected Movement Clamp And Slot Tie Probes
+
+No source optimization was retained from this pass. Fresh `PerfMovementPhases.tscn` control preserved 6v6/8v8/12v12 signatures with movement `296905us`, `575272us`, and `979775us`; a same-window restored-source A/B control measured `264367us`, `509184us`, and `819356us`. Both controls still show 12v12 slot assignment as the main surface (`793431us` then `684731us`).
+
+- Rejected movement arena-clamp inline: replacing `_clamp_to_arena_bounds(cur + step)` with direct cached-min/max clamping preserved signatures and improved the first 12v12 sample to `667250us`, then `739654us` on repeat. It was not retained because same-window restored source was faster on 6v6 and 8v8 (`264367us`/`509184us` restored versus patched `315364us`/`544599us` on repeat).
+- Rejected movement-blocker branch reorder: changing the short-circuit order to check `movement_blockers_active` before `step == Vector2.ZERO` immediately regressed 6v6 movement to `403409us`, so the run was stopped and source reverted.
+- Rejected slot unique-minimum bookkeeping trim: avoiding row-min tie bookkeeping after the unique-minimum shortcut was already impossible preserved focused slot signatures (`PerfSlotTeamAssignment.tscn` aggregate `2813605715628331077`, `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`) and improved 12v12 movement versus restored control (`767273us` versus `819356us`), but it regressed both 6v6 and 8v8 real movement (`289985us` and `560365us` versus restored `264367us` and `509184us`), so source was reverted.
+- Takeaway: GDScript hot-loop branch and helper-call shape remains counterintuitive under real workloads. Continue requiring same-window `PerfMovementPhases.tscn` A/B evidence across 6v6, 8v8, and 12v12 before retaining even tiny movement or slot-evaluator changes.
+
+## Continuation - 2026-07-04 Slot Array Benchmark Expansion
+
+No gameplay source optimization was retained from this pass. The answer to "is that all that needs optimizing?" is still no: the current measured frontier is narrower and harder, but the 8v8 and 12v12 phase data still show meaningful remaining work.
+
+- Fresh `PerfMovementPhases.tscn` control preserved 6v6/8v8/12v12 signatures with errors `[]`: movement `277770us`, `562769us`, and `578471us`. Slot assignment remained the largest single surface at `144680us` (`52.1%`), `228057us` (`40.5%`), and `464182us` (`80.2%`). The 8v8 case still shows combined step loops plus collision as a secondary surface (`255741us`, about `45.4%`).
+- `tests/perf/PerfSlotTeamAssignment.tscn` now measures both the legacy dictionary slot output and the real array-output path used by `MovementService2._update_impl()`. Restored-source expanded control preserved errors `[]`, aggregate signature `7341365920787360302`: dictionary cases `dict_single_6=115ms`, `dict_single_12=157ms`, `dict_split_12=22ms`; real array cases `array_single_6=107ms`, `array_single_12=138ms`, `array_split_12=23ms`.
+- Rejected array-path typed range scratch: replacing the real array-output path's index-keyed range dictionary with a typed float array preserved signatures and improved one split-target sample (`array_split_12=23ms` versus `46ms` in the immediate pre-candidate run), but regressed the single-target array cases that map closest to the 12v12 hotspot (`array_single_6=126ms`, `array_single_12=152ms` versus immediate control `117ms` and `135ms`). Source was reverted; the expanded benchmark coverage was retained.
+- Takeaway: future slot-output changes should now prove both dictionary compatibility and real array-path timing in `PerfSlotTeamAssignment.tscn`, then still pass `PerfMovementPhases.tscn`. The slot frontier is not exhausted, but source changes need same-window wins on single-target 12v12-style cases before broader validation.
+
+## Continuation - 2026-07-04 Rejected Movement Helper Arg Cleanup
+
+No source optimization was retained. Fresh controls stayed behavior-stable with errors `[]`: expanded `PerfSlotTeamAssignment.tscn` aggregate `7341365920787360302`, total `670ms`; `PerfMovementStepHelpers.tscn` aggregate `4095235582607810427`, total `825ms`; and `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `311750us`, `559328us`, and `589449us`.
+
+- Rejected movement helper unused-argument cleanup: removing unused team/target/debug parameters from `_compute_slot_step()`, `_compute_in_band_step()`, and `_compute_arrive_step()` while hoisting the rare slot debug print to callers preserved focused helper signatures and improved `PerfMovementStepHelpers.tscn` from `825ms` to `550ms`.
+- The real movement gate failed despite the focused win. First patched `PerfMovementPhases.tscn` preserved signatures and improved 6v6/8v8 (`245866us`, `538022us`) but regressed 12v12 to `757234us`; repeat preserved signatures and 6v6 stayed favorable (`255880us`) while 8v8 was near-neutral (`552576us`) and 12v12 regressed further to `807325us`. Source was reverted. Post-revert `PerfMovementStepHelpers.tscn` stayed clean and measured total `475ms`, so the focused helper result was not a durable win either.
+- Takeaway: helper-call shape can look strongly favorable in `PerfMovementStepHelpers.tscn` and still disturb the real 12v12 frame profile. Keep the current helper signatures unless a future candidate wins the focused helper gate and repeated `PerfMovementPhases.tscn` 12v12.
+
+## Continuation - 2026-07-04 Rejected Packed DP Predecessor Scratch
+
+No source optimization was retained. Fresh controls after the visual checkpoint stayed clean with errors `[]`: expanded `PerfSlotTeamAssignment.tscn` aggregate `7341365920787360302`, total `560ms`; `PerfMovementPhases.tscn` preserved 6v6/8v8/12v12 signatures with movement `276318us`, `477614us`, and `545591us`, with 12v12 slot assignment still dominant at `439409us` (`80.5%`); `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, total `434ms`; and `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, total `153ms`.
+
+- Rejected packed DP predecessor scratch: changing `_dp_scratch_for_size()` to store `prev_cols` and `prev_masks` as `PackedInt32Array` instead of `Array[int]` preserved `PerfSlotDpSearch.tscn` signatures, but regressed the focused DP total from `153ms` to `164ms` (`dp_10_initial=38ms`, `dp_12_initial=51ms`, `dp_12_pruned=75ms`). Source was reverted before any broader gate.
+- Takeaway: the retained packed `best_costs` table does not generalize to packed predecessor arrays in this GDScript DP loop. Keep predecessor scratch as `Array[int]` unless a future candidate shows a same-window focused win before real movement validation.
+
+## Continuation - 2026-07-04 Slot Group Shape Coverage
+
+No gameplay source optimization was retained. `tests/perf/PerfSlotTeamAssignment.tscn` now covers intermediate 12-unit group shapes in both legacy dictionary and real array output paths, so future slot work can distinguish all-on-one, pair-split, 3-way split, 4-way split, and one-target-each behavior.
+
+- Clean expanded run preserved errors `[]`, aggregate signature `7518035012375708751`, and deterministic per-case signatures. Dictionary medians: `dict_single_6=134ms`, `dict_single_12=145ms`, `dict_pair_12=127ms`, `dict_split_12=27ms`, `dict_quad_12=34ms`, `dict_spread_12=13ms`. Real array medians: `array_single_6=99ms`, `array_single_12=140ms`, `array_pair_12=128ms`, `array_split_12=31ms`, `array_quad_12=46ms`, `array_spread_12=12ms`.
+- Takeaway: the meaningful focused slot frontier is large single-target and pair-split groups; once groups break into 3/4/spread shapes, assignment cost is much lower. Future source candidates should prioritize count-12 and paired count-6 workloads before optimizing broad slot-output mechanics.
+
+## Continuation - 2026-07-04 Count-6 Assignment Coverage
+
+No gameplay source optimization was retained. The answer to "is that all that needs optimizing?" remains no: current controls still show meaningful 8v8/12v12 movement cost, but prior rejected slot candidates make the next source change higher-risk and require sharper same-window evidence.
+
+- Fresh controls preserved errors `[]`: `PerfSlotTeamAssignment.tscn` aggregate `7518035012375708751`, total `815ms`; `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, total `144ms`; `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, total `402ms`; and `PerfMovementPhases.tscn` kept 6v6/8v8/12v12 signatures with movement `233072us`, `495627us`, and `627543us`. Slot assignment remained the dominant 12v12 slice at `513542us` (`81.8%`) and a large 8v8 slice at `200224us` (`40.4%`).
+- Rechecked candidate history before editing source: unique-min preflight, no-duplicate best assignment storage, scratch-row reuse, lower Hungarian prune thresholds, packed predecessor scratch, and several helper/branch rewrites have already been rejected because focused wins did not survive the real movement gate.
+- `tests/perf/PerfSlotSmallAssignment.tscn` now includes count-6 dispatcher and direct-DP cases to match the newly exposed pair-split frontier. Clean expanded run preserved errors `[]`; count-6 dispatcher and direct-DP signatures both measured `1077033215214316036`, with `fast_6=689ms` and `dp_6=934ms` over 8,000 iterations, aggregate `7023677399820711247`.
+- Takeaway: the remaining slot frontier is not exhausted, but the next retained source optimization should now beat count-12 and count-6 gates before any real-movement validation. Benchmark-only expansion was retained because it closes a coverage gap without changing gameplay behavior.
+
+## Continuation - 2026-07-04 Count-6 Solver Breakdown Coverage
+
+No gameplay source optimization was retained. This pass sharpened the count-6 gate that maps to the pair-split 12-unit slot frontier.
+
+- Same-window controls before the benchmark expansion preserved errors `[]`: `PerfSlotDpSearch.tscn` aggregate `6007460045863670620`, total `225ms`; `PerfSlotSolverBreakdown.tscn` aggregate `4738803460811644685`, total `456ms`.
+- `tests/perf/PerfSlotDpSearch.tscn` now includes count-6 initial and pruned DP-search cases. Clean run preserved errors `[]`: `dp_6_initial=214ms`, signature `1168711661898648443`; `dp_6_pruned=175ms`, signature `1791660261227535585`; existing 10/12-row signatures stayed unchanged; new aggregate `5528722778184086582`.
+- `tests/perf/PerfSlotSolverBreakdown.tscn` now includes a count-6 `rotation_eval` case. Clean run preserved errors `[]`: `rotation_6=147ms`, signature `2967004710389803135`; existing 12-row Hungarian/DP and 8/12-row rotation signatures stayed unchanged; new aggregate `4927161410404863131`.
+- Takeaway: future count-6 source work should beat the new direct DP and rotation breakdown gates, not only `PerfSlotSmallAssignment.tscn`, before moving to `PerfSlotTeamAssignment.tscn` pair-split and real `PerfMovementPhases.tscn` validation.
+
+## Continuation - 2026-07-04 Secondary Gate Refresh And Rejected Step Merge
+
+No gameplay source optimization was retained from this pass. The answer to "is that all that needs optimizing?" remains no: the easy wins are mostly gone, but real movement profiles still show enough slot and step-loop cost to keep the audit open.
+
+- Clean post-revert `tests/perf/PerfMovementPhases.tscn` control preserved signatures and errors `[]`: 6v6 movement `281236us` with slot assignment `139773us` (`49.7%`), 8v8 movement `655964us` with slot assignment `260894us` (`39.8%`) plus player/enemy steps and collision at roughly `303883us`, 10v10 movement `354992us` with slot assignment `240711us` (`67.8%`), and 12v12 movement `665384us` with slot assignment `535019us` (`80.4%`).
+- Rejected count-10 DP specialization: routing exactly 10-row assignments to a dedicated copy of the Hungarian-bounded DP preserved `PerfSlotDpSearch.tscn` signatures, but regressed the focused count-10 rows (`dp_10_initial` `43ms -> 60ms`, `dp_10_pruned` `35ms -> 40ms`), so source was reverted before real movement validation.
+- Rejected combined separation/avoidance scan: merging the friendly separation and friendly avoidance loops inside `_compute_slot_step()` preserved focused `PerfMovementStepHelpers.tscn` signatures and improved median total `747ms -> 661ms`, but failed the real movement gate. 6v6 regressed `281236us -> 305634us`, 10v10 regressed `354992us -> 374012us`, and 12v12 regressed `665384us -> 670387us`; only 8v8 improved (`655964us -> 589099us`). Source was reverted.
+- Secondary gate refresh stayed clean: `PerfTargeting.tscn` signature `9036604269279486158`, median `511ms`, errors `[]`; `PerfCollisionResolver.tscn` aggregate `1955603822268948610`, median total `96ms`, errors `[]`; `PerfCombatUiSignals.tscn` kept position events and actor applies aligned at `111`, hidden `UnitPanel` dynamic refreshes `0`, errors `[]`; `PerfTextureUtils.tscn` kept one real texture load and one circle generation across 600 requests each, signature `3546666616613787855`; `PerfMovementBlockers.tscn` kept empty gated lookup at `8ms` versus `757ms` direct, signature `8928121065208191259`; `PerfForcedMovement.tscn` kept signature `3092491491923327610`.
+- Takeaway: continue treating 10v10/12v12 slot assignment as the primary frontier and 8v8 step loops as the main secondary frontier. Focused helper wins are not enough; future source changes still need same-window `PerfMovementPhases.tscn` evidence across 6v6, 8v8, 10v10, and 12v12.
+
+## Continuation - 2026-07-04 Compact Support Peel Targeting
+
+Accepted source optimization: support peel targeting now builds compact positive-priority ally arrays in one pass instead of building a full ally-priority array and then scanning it again for positive indices and wounded bonuses. The scoring semantics are unchanged: each positive ally keeps the same peel priority and wounded bonus, but non-positive allies are not stored in the hot support peel arrays.
+
+- Fresh focused control before the edit: `PerfTargeting.tscn` signature `9036604269279486158`, median `511ms`, errors `[]`.
+- Patched focused validation preserved signature `9036604269279486158` and errors `[]`, improving `PerfTargeting.tscn` to median `453ms`, then `415ms` on repeat.
+- Targeted behavior and broad gates stayed clean through Godot MCP: `MovementTargetPriorityProbe.tscn` PASS; `PerfMovementPhases.tscn` preserved 6v6/8v8/10v10/12v12 signatures with errors `[]`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`; `Perf1v1.tscn` signature `-6199507685307107293:55`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- This improves a monitored secondary path, not the main remaining bottleneck. 10v10/12v12 slot assignment remains the primary frontier for the broader optimization goal.
+
+## Continuation - 2026-07-04 Rejected Post-Targeting Slot And Group Probes
+
+No source optimization was retained from this direct follow-up to "is that all that needs optimizing?" The answer remains no: current evidence still points to large-fight slot assignment as the primary remaining surface, with 8v8 step/collision work as secondary, but the obvious local allocation/hash-check rewrites failed real movement gates.
+
+- Fresh current-tree `PerfMovementPhases.tscn` control after `715513d` preserved 6v6/8v8/10v10/12v12 signatures with errors `[]`: movement `281038us`, `559568us`, `381433us`, and `716588us`; slot assignment was still the largest 12v12 slice at `576298us` (`80.4%`) and the largest 10v10 slice at `254543us` (`66.7%`).
+- Rejected inline support-peel data construction: moving the compact peel arrays directly into `Targeting.pick_by_priority()` preserved `PerfTargeting.tscn` signature `9036604269279486158`, but repeats were not a reliable win (`406ms`, `578ms`, restored control `466ms`, reapplied `560ms`). Source was restored to the retained helper-based compact peel implementation.
+- Rejected reusable movement group arrays: reusing per-target attacker arrays in `MovementService2._update_impl()` preserved movement signatures, but regressed the important real movement cases. Candidate movement was `301662us`, `541082us`, `427132us`, and `812063us`; 8v8 was slightly favorable, but 6v6, 10v10, and 12v12 all lost versus the fresh control.
+- Rejected slot range duplicate-check removal: removing `ranges_world.has(attacker_index)` from the legacy and real array slot output paths preserved `PerfSlotTeamAssignment.tscn` aggregate `8298910219877174874` and looked promising in one focused pass (`2727ms` control to `1950ms`, repeat `2502ms`), but failed the real movement gate badly: `331614us`, `583160us`, `489605us`, and `1035856us` for 6v6/8v8/10v10/12v12. Source was reverted.
+- Takeaway: the slot frontier is not exhausted, but focused slot wrapper improvements must be treated as filters only. Same-window `PerfMovementPhases.tscn` across 6v6, 8v8, 10v10, and 12v12 remains the decisive gate before retaining further slot or movement-loop micro-optimizations.
+
+## Continuation - 2026-07-04 Odd-Count Slot DP Path
+
+Accepted source optimization: `_best_assignment_dp()` now routes 7-row and 9-row assignments through a shared no-reduced-pruning DP helper. Counts 7 and 9 never use the Hungarian reduced-cost pruning path, so this keeps the same mask traversal, predecessor backtrace, and strict tie behavior while avoiding the generic reduced-prune branch shape for odd group sizes that occur as large fights lose units.
+
+- Added odd-count coverage to `PerfSlotDpSearch.tscn` (`dp_7_initial`, `dp_7_pruned`, `dp_9_initial`, `dp_9_pruned`) and `PerfSlotTeamAssignment.tscn` (`single_7`, `single_9`, `single_11` for both dictionary and real array paths). Current-tree expanded controls preserved errors `[]`: `PerfSlotDpSearch` aggregate `4315239695411013037`; odd DP medians were `305ms`, `202ms`, `333ms`, and `151ms`. Expanded `PerfSlotTeamAssignment` aggregate was `6126179979591804452`, with odd single-target medians `dict_7=323ms`, `dict_9=482ms`, `dict_11=233ms`, `array_7=185ms`, `array_9=425ms`, and `array_11=199ms`.
+- Focused source validation preserved the expanded signatures. `PerfSlotDpSearch` was mixed/noisy but improved the latest count-9 rows (`dp_9_initial=285ms`, `dp_9_pruned=113ms`) while count-7 initial remained slower, so real movement was treated as decisive. `PerfSlotTeamAssignment` improved expanded total from `4366ms` control to `4002ms`, aggregate `6126179979591804452`, while still showing a count-7 array regression.
+- Real movement validation supported retention. `PerfMovementPhases.tscn` preserved 6v6/8v8/10v10/12v12 signatures and errors `[]`; patched repeats measured movement `296743us` / `538316us` / `348040us` / `689829us`, then `276574us` / `506464us` / `324735us` / `647929us`. The fresh pre-candidate control was `281038us` / `559568us` / `381433us` / `716588us`, so the repeat improved all four cases and lowered 10v10/12v12 slot assignment to `224127us` / `521140us`.
+- Broad gates stayed behavior-stable through Godot MCP: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`, total `9369ms`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7816ms`; `Perf1v1.tscn` signature `-6199507685307107293:55`, time `343ms`; and `RoleMatrixProbe6v6.tscn` passed with `failed=0`, `skipped=0`, `errors=0`.
+- This is a retained large-fight slot improvement and coverage expansion, not completion of the broader optimization audit. Count 10/12 slot assignment remains the primary frontier, and odd-count coverage should remain in the focused gates for future solver changes.
+
+## Continuation - 2026-07-04 Count-11 Solver Coverage
+
+No gameplay source optimization was retained from this pass. Count-11 focused coverage was added because 11-unit groups occur naturally after one death in 12v12 fights, and the previous odd-count source pass covered 7/9 but not 11.
+
+- `PerfSlotDpSearch.tscn` now includes `dp_11_initial` and `dp_11_pruned`; clean post-revert validation preserved errors `[]`, aggregate `7234308013805264845`, and count-11 signatures `4075200561191643665` / `7850970466478732065` with medians `58ms` / `53ms`.
+- `PerfSlotSolverBreakdown.tscn` now includes `hungarian_11` and `rotation_11`; clean validation preserved errors `[]`, aggregate `6131016972257857795`, `hungarian_11=52ms` signature `2948632919463100959`, and `rotation_11=105ms` signature `2099189642656196703`.
+- Rejected count-11 no-Hungarian path: routing count 11 through the no-reduced DP helper preserved signatures but regressed `dp_11_initial` from the fresh `37ms` focused control to `471ms`. Source was reverted before real movement validation. Count 11 should keep the current Hungarian-pruned generic path unless a future candidate beats the expanded focused gates first.
+
+## Continuation - 2026-07-04 Rejected Fixed-Size 7/9 DP Helpers
+
+No source optimization was retained. Replacing the accepted shared 7/9 no-reduced DP helper with fixed-size `_best_assignment_dp_7()` and `_best_assignment_dp_9()` preserved focused signatures and improved `PerfSlotDpSearch.tscn` (`dp_7_initial=243ms`, `dp_7_pruned=160ms`, `dp_9_initial=246ms`, `dp_9_pruned=109ms`, aggregate `7234308013805264845`) plus `PerfSlotTeamAssignment.tscn` aggregate `6126179979591804452`. It failed the real movement gate: `PerfMovementPhases.tscn` preserved signatures but regressed 6v6/8v8/10v10/12v12 movement to `399197us`, `703222us`, `356293us`, and `967245us`, with 12v12 slot assignment at `781165us`. Source was reverted; keep the shared generic 7/9 helper unless a future candidate passes real movement.
+
+## Continuation - 2026-07-04 Frontier Recheck After "Is That All?"
+
+No source optimization was retained from this pass. The direct answer remains no: the current-tree profiler still shows meaningful large-fight movement cost, but the retained frontier is past easy local rewrites.
+
+- Fresh `PerfMovementPhases.tscn` control preserved 6v6/8v8/10v10/12v12 signatures and errors `[]`: movement `380481us`, `601394us`, `388688us`, and `704631us`. Slot assignment remained the largest single slice at `50.1%`, `40.5%`, `68.4%`, and `78.7%` respectively.
+- Fresh focused controls stayed clean: `PerfSlotSolverBreakdown.tscn` aggregate `6131016972257857795`, total `1148ms`; `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `2010ms`; `PerfSlotTeamAssignment.tscn` aggregate `6126179979591804452`, total `3831ms`.
+- Rejected `_sync_prev_slots()` redundant-write cleanup: updating existing previous-slot dictionaries in place without reassigning them preserved signatures and improved 6v6/8v8 movement to `301593us` and `589080us`, but regressed 10v10/12v12 to `446880us` and `765758us`; 12v12 slot assignment rose to `616205us`. Source was reverted.
+- Rejected raising `HUNGARIAN_PRUNE_MIN_SIZE` from `10` to `11`: the focused DP gate preserved signatures but made count-10 rows much worse (`dp_10_initial=392ms` versus `54ms` control, `dp_10_pruned=89ms` versus `47ms` control), so the run was stopped and source was reverted.
+- Takeaway: optimization is not exhausted, but further retained source work should target tie-preserving 10/12 slot assignment or a focused 8v8 step-loop win, then prove itself in same-window `PerfMovementPhases.tscn` across 6v6, 8v8, 10v10, and 12v12.
+
+## Continuation - 2026-07-04 Movement Helper Gate Expansion
+
+No gameplay source optimization was retained. `PerfMovementStepHelpers.tscn` now separates anchored 8v8 slot-step coverage from no-anchor 8v8 slot-step coverage and adds an `arrive_step_8v8` row for the single-attacker LOS-arrival helper used by one-unit target groups.
+
+- Fresh focused control before editing preserved errors `[]`, aggregate `4814297933245202717`, total `739ms`: `slot_step_8v8=238ms`, `slot_step_10v10=205ms`, `slot_step_12v12=212ms`, and `in_band_8v8=84ms`.
+- Rejected redundant helper delta-clamp removal: replacing `max_speed * max(0.0, delta)` with `max_speed * delta` in private movement helpers preserved focused signatures but regressed the focused total to `760ms`, so source was reverted before real movement validation.
+- Expanded benchmark validation preserved errors `[]`, aggregate `2737480079043224455`, total `1087ms`: `slot_step_8v8=233ms`, `slot_step_8v8_no_anchor=220ms`, `slot_step_10v10=252ms`, `slot_step_12v12=197ms`, `arrive_step_8v8=73ms`, and `in_band_8v8=112ms`.
+- Takeaway: arrive helper cost is currently small; future step-loop source candidates should use the expanded helper gate to distinguish anchor-related cost from the base slot-step path, then still pass real `PerfMovementPhases.tscn`.
+
+## Continuation - 2026-07-04 Odd-Size Movement Phase Coverage
+
+No gameplay source optimization was retained. `PerfMovementPhases.tscn` now includes `9v9_large` and `11v11_large` cases so recent odd-count slot solver work has real movement coverage instead of only focused DP and team-assignment coverage.
+
+- Same-turn focused slot controls before the movement expansion stayed clean: `PerfSlotTeamAssignment.tscn` aggregate `6126179979591804452`, total `2766ms`; `PerfSlotSolverBreakdown.tscn` aggregate `6131016972257857795`, total `776ms`; `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `1197ms`.
+- Expanded `PerfMovementPhases.tscn` preserved errors `[]` and deterministic signatures across six cases. Movement totals were `253526us` for 6v6, `480299us` for 8v8, `594025us` for new 9v9, `325632us` for 10v10, `580647us` for new 11v11, and `624757us` for 12v12.
+- New odd-size findings: 9v9 ran the full `45.05s` shape and was `50.7%` slot assignment (`301339us`), while 11v11 ended at `13.30s` and was `81.0%` slot assignment (`470322us`). 11v11 is therefore now part of the primary large-fight slot frontier alongside 10v10 and 12v12.
+- Takeaway: future slot source candidates should keep validating 6v6/8v8/9v9/10v10/11v11/12v12 in `PerfMovementPhases.tscn`, especially if they touch odd-count DP, Hungarian pruning, or target-group slot output.
+
+## Continuation - 2026-07-04 Pair Split And Rotation Gate Expansion
+
+No gameplay source optimization was retained from this pass. The direct answer to "is that all that needs optimizing?" remains no: the current profiles still show large-fight slot assignment as the primary frontier, but two source cleanup candidates failed the professional real-movement gate.
+
+- Fresh controls before source probing stayed clean with errors `[]`: `PerfSlotTeamAssignment.tscn` aggregate `6126179979591804452`, total `3932ms`; `PerfMovementPhases.tscn` kept 6v6/8v8/9v9/10v10/11v11/12v12 signatures with movement `353092us`, `591007us`, `720038us`, `394314us`, `720501us`, and `857445us`. Slot assignment remained the major 10v10/11v11/12v12 slice at `278706us` (`70.7%`), `590662us` (`82.0%`), and `693327us` (`80.9%`).
+- Rejected dead ring-vector guard removal: removing the impossible `Vector2(cos(slot_angle), sin(slot_angle)) == Vector2.ZERO` fallback preserved `PerfSlotTeamAssignment.tscn` aggregate `6126179979591804452`, but regressed the focused total from `3932ms` to `4527ms`, so source was reverted before broad movement validation.
+- Rejected fixed corridor-epsilon hoist: computing slot `corridor_eps` once per target group preserved focused signatures and improved `PerfSlotTeamAssignment.tscn` from `3932ms` to `3364ms`, but failed the real movement gate. Patched movement stayed signature-stable but measured `251554us`, `579662us`, `713401us`, `492579us`, `733828us`, and `935451us`; the 10v10/11v11/12v12 regressions outweighed the 6v6/8v8/9v9 wins, so source was reverted.
+- `PerfSlotTeamAssignment.tscn` now includes pair-split 10- and 11-attacker cases for both dictionary and real array APIs. Clean expanded validation preserved errors `[]` and produced aggregate `773148128031759898`, total `4186ms`; new rows were `dict_pair_10=78ms`, `dict_pair_11=125ms`, `array_pair_10=68ms`, and `array_pair_11=108ms`.
+- `PerfSlotSolverBreakdown.tscn` now includes `rotation_9` to match the real 9v9 movement case. Clean validation preserved errors `[]`, aggregate `3460608454349089621`, total `1171ms`, and `rotation_9=180ms` with signature `8587046574868356591`.
+- Takeaway: future slot source work should treat focused output-loop wins as filters only. Candidates that touch 9/10/11/12-slot behavior should beat the expanded pair-split and rotation gates, then pass same-window `PerfMovementPhases.tscn` across all six movement sizes before being retained.
+
+## Continuation - 2026-07-04 Expanded No-Anchor Step Helper Gates
+
+No gameplay source optimization was retained. The next step-loop probe focused on avoiding the `_apply_anchor_step()` helper call when a movement profile has no anchor behavior, but the focused benchmark rejected it.
+
+- Fresh `PerfMovementStepHelpers.tscn` control preserved errors `[]`, aggregate `2737480079043224455`, total `1029ms`; row medians were `slot_step_8v8=252ms`, `slot_step_8v8_no_anchor=200ms`, `slot_step_10v10=219ms`, `slot_step_12v12=197ms`, `arrive_step_8v8=73ms`, and `in_band_8v8=88ms`.
+- Rejected no-anchor fast-return source probe: skipping `_apply_anchor_step()` at call sites when `anchor_strength <= 0.0` preserved focused signatures, but regressed the helper total to `1136ms` (`slot_step_8v8=266ms`, `slot_step_8v8_no_anchor=226ms`, `slot_step_10v10=260ms`, `slot_step_12v12=211ms`, `arrive_step_8v8=81ms`, `in_band_8v8=92ms`). Source was reverted before any real movement validation.
+- `PerfMovementStepHelpers.tscn` now includes `slot_step_10v10_no_anchor`, `slot_step_12v12_no_anchor`, and `in_band_8v8_no_anchor` so future step-loop edits can distinguish anchor overhead from base steering cost at larger team sizes. Clean expanded validation preserved errors `[]`, aggregate `4713848927282072330`, total `1790ms`; new rows were `slot_step_10v10_no_anchor=368ms`, `slot_step_12v12_no_anchor=250ms`, and `in_band_8v8_no_anchor=88ms`.
+- Takeaway: no-anchor rows are not automatically cheaper once team size rises, so call-site branch shortcuts should not be assumed to help. Future movement-step source candidates should first beat the expanded helper gate, then pass `PerfMovementPhases.tscn` on 6v6/8v8/9v9/10v10/11v11/12v12.
+
+## Continuation - 2026-07-04 Rejected Movement Radius Reciprocal Probe
+
+No source optimization was retained. The expanded movement-helper gate rejected replacing repeated separation/avoidance `distance / radius` divisions with precomputed reciprocal multiplication.
+
+- Rejected movement radius reciprocal probe: precomputing `1.0 / separation_radius` and `1.0 / avoidance_radius` preserved `PerfMovementStepHelpers.tscn` signatures, but regressed the expanded helper total from the latest clean `1790ms` control to `2355ms`. The largest regressions were `slot_step_8v8_no_anchor=367ms`, `slot_step_12v12=502ms`, and `slot_step_12v12_no_anchor=367ms`. Source was reverted before real movement validation.
+- Takeaway: in GDScript, this hot-loop reciprocal rewrite is slower than direct division in the current helper shapes. Keep the direct `distance / radius` form unless a future same-window focused gate proves otherwise.
+
+## Continuation - 2026-07-04 Remaining Optimization Frontier Check
+
+No gameplay source optimization was retained. The direct answer to "is that all that needs optimizing?" is no: the current real movement profile still has a large slot-assignment frontier, and smaller fights still leave step-loop and collision slices worth monitoring.
+
+- Fresh focused slot controls before source probing stayed clean with errors `[]`: `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `1434ms`; `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1395ms`.
+- Rejected Hungarian lower-bound shortcut: returning the already computed Hungarian assignment cost directly from `_hungarian_dual_lower_bound()` preserved `PerfSlotDpSearch.tscn` signatures, but regressed the focused total to `1582ms`, with `dp_12_pruned` rising from `67ms` to `106ms`. Source was reverted before broader solver validation.
+- Fresh `PerfMovementPhases.tscn` validation after reverting source stayed clean with errors `[]` and preserved deterministic signatures across 6v6, 8v8, 9v9, 10v10, 11v11, and 12v12. Current measured movement totals were `347118us`, `539514us`, `593875us`, `349207us`, `811095us`, and `715144us`.
+- Slot assignment remains the primary large-team optimization frontier: latest slot slices were `47.2%` for 6v6, `40.7%` for 8v8, `50.4%` for 9v9, `70.4%` for 10v10, `82.2%` for 11v11, and `78.7%` for 12v12.
+- Secondary but not finished surfaces remain visible in smaller and longer fights: 8v8 measured `20.3%` player steps, `14.4%` enemy steps, and `10.9%` collision, while 6v6 measured `17.2%` player steps, `11.4%` enemy steps, and `10.2%` collision.
+- Takeaway: the audit is past easy edits, not past optimization. Future retained work should first target the tie-preserving large-team slot path, but step-loop and collision candidates should stay in the queue when a fresh profile shows them above noise.
+
+## Continuation - 2026-07-04 Reuse Empty Targeting Peel Arrays
+
+Accepted secondary-path source cleanup: `Targeting.pick_by_priority()` now reuses static empty packed arrays for non-peel calls instead of constructing three empty peel arrays for every target pick. Real support peel picks still replace those empties with freshly built positive-priority peel data, preserving target scores and signatures.
+
+- Fresh focused controls before the edit stayed clean: `PerfTargeting.tscn` signature `9036604269279486158`, median `450ms`; slot-focused controls also stayed clean with `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, and `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`.
+- Patched `PerfTargeting.tscn` preserved signature `9036604269279486158` and improved repeated medians to `423ms` and `422ms`.
+- Behavior and broader gates stayed clean through Godot MCP: `MovementTargetPriorityProbe.tscn` PASS; `PerfMovementPhases.tscn` preserved 6v6/8v8/9v9/10v10/11v11/12v12 signatures with errors `[]`; `Perf6v6.tscn` aggregate `4480953857527108889:18`; `Perf1v1.tscn` signature `-6199507685307107293:55`; `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`; and `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`.
+- Latest movement phase evidence still points to slot assignment as the main unresolved surface: 10v10/11v11/12v12 slot slices were `69.8%`, `77.7%`, and `81.6%`. This targeting cleanup improves a monitored secondary path; it does not close the competitive optimization goal.
+
+## Continuation - 2026-07-04 Direct Frontier Answer Refresh
+
+No gameplay source optimization was retained from this answer pass. The direct answer to "is that all that needs optimizing?" remains no: the retained targeting cleanup is a real secondary-path win, but current real movement evidence still has a large slot-assignment frontier.
+
+- Fresh `PerfMovementPhases.tscn` control after `38b24c1` preserved deterministic signatures and errors `[]` across 6v6, 8v8, 9v9, 10v10, 11v11, and 12v12. Movement totals were `293775us`, `505928us`, `624483us`, `378961us`, `615269us`, and `647817us`.
+- Slot assignment remains the primary large-fight optimization surface: the latest slices were `51.3%` for 6v6, `40.5%` for 8v8, `51.1%` for 9v9, `70.3%` for 10v10, `78.4%` for 11v11, and `79.9%` for 12v12.
+- Focused slot controls stayed clean: `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3621ms`; `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1097ms`; and `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `1631ms`.
+- Takeaway: optimization is past easy local rewrites, not finished. The next retained source change should still target tie-preserving 10/11/12-unit slot assignment or a measured secondary movement slice, then prove itself in the real `PerfMovementPhases.tscn` gate.
+
+## Continuation - 2026-07-04 Rejected Targeting Array Return And Hungarian Way Reset
+
+No gameplay source optimization was retained from this pass. Both source probes preserved signatures, but neither met the professional keep bar once compared against focused or restored real controls.
+
+- Rejected support-peel array return: replacing the private support-peel `Dictionary` return with a positional `Array[Variant]` preserved `PerfTargeting.tscn` signature `9036604269279486158`, but regressed the focused targeting median from `422ms` control to `507ms`. Source was reverted before broader validation.
+- Rejected Hungarian `way` scratch reset removal: removing `way.fill(0)` from `_assignment_min_cost_hungarian()` preserved focused slot signatures and looked slightly favorable in `PerfSlotDpSearch.tscn` (`1469ms` control to `1458ms`) and `PerfSlotTeamAssignment.tscn` (`3621ms` control to `3419ms`), but it did not hold in the decisive movement comparison.
+- Candidate `PerfMovementPhases.tscn` preserved all six signatures. First candidate run improved 6v6/9v9/10v10/12v12 versus the fresh frontier control, but the repeat regressed 11v11/12v12 to `741989us` / `684751us` movement.
+- Restored-source control after reverting was better on the primary large-fight frontier: 10v10 `329095us`, 11v11 `585770us`, and 12v12 `619848us`, with slot assignment `68.4%`, `80.3%`, and `79.4%`. Keep the `way.fill(0)` reset unless a future same-window candidate beats restored real movement, not only focused solver gates.
+
+## Continuation - 2026-07-04 Collision Team Tag Scratch Removal
+
+Accepted secondary-surface source cleanup: `CollisionResolver.resolve()` now derives same-team status from the combined player/enemy index ranges instead of maintaining a `_tag_is_player` scratch array. Player units are always written before enemy units in the combined collision arrays, so pair order, collision math, caps, friendly-soft behavior, and writeback order are unchanged.
+
+- Fresh focused control before the edit: `PerfCollisionResolver.tscn` aggregate `1955603822268948610`, total `89ms`, errors `[]`.
+- Patched focused validation preserved aggregate `1955603822268948610` and errors `[]`, improving `PerfCollisionResolver.tscn` to total `75ms`; dense 12v12 moved `35ms -> 28ms` and late 12v12 moved `35ms -> 25ms`.
+- Real movement validation preserved all six `PerfMovementPhases.tscn` signatures with errors `[]`. Repeats measured movement `268419us` / `491309us` / `548633us` / `307400us` / `584955us` / `604959us`, then `268828us` / `503786us` / `561717us` / `314966us` / `583869us` / `620028us`.
+- Broad gates stayed behavior-stable through Godot MCP: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`; `Perf1v1.tscn` signature `-6199507685307107293:55`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- This trims a monitored collision slice. It does not close the optimization goal because 10v10/11v11/12v12 movement remains slot-assignment dominated.
+
+## Continuation - 2026-07-04 Rejected Follow-Up Micro-Optimizations
+
+No gameplay source optimization was retained from this pass. Both candidates preserved deterministic signatures, but neither cleared the real-game keep bar.
+
+- Rejected slot private-helper argument trim: removing unused private `_team` / `_target_idx` parameters from `SlotStrategy` assignment helpers preserved `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, but regressed same-window focused total from `3409ms` control to `3471ms`. The public `assign_for_target()` signature was never changed, and the source was reverted.
+- Rejected collision non-debug loop split: splitting `CollisionResolver.resolve()` into separate diagnostics-off and diagnostics-on pair loops preserved `PerfCollisionResolver.tscn` aggregate `1955603822268948610` and improved the same-window focused total from `144ms` control to `95ms`, but broader `PerfMovementPhases.tscn` runs were mixed or worse despite preserving all six movement signatures. Repeats included 12v12 movement `639421us` and `625114us`, compared with the previous accepted collision-cleanup range of roughly `604959-620028us`. The source was reverted.
+- Takeaway: optimization is not exhausted, but the next professional-grade retained change should still come from the large same-target slot-assignment frontier or a secondary slice that wins in `PerfMovementPhases.tscn`, not only a focused microbenchmark.
+
+## Continuation - 2026-07-04 Avoid Slot Assignment Duplicates
+
+Accepted a narrow slot-assignment allocation cleanup: the dictionary and array target-slot loops now keep the assignment array returned by `_evaluate_precomputed_assignment()` directly instead of duplicating it when a new best base rotation is found. The returned assignment is not mutated after selection, so tie order and slot indices are unchanged.
+
+- Fresh focused controls before the edit stayed clean: `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `1429ms`; `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1103ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `5104ms`.
+- Patched `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898` and improved focused totals to `4665ms` and then `3771ms`. The strongest repeated row improvements were in the expensive single-target and pair-target slot assignment cases.
+- Real `PerfMovementPhases.tscn` preserved all six deterministic signatures on every candidate and restored-control run. Evidence was noisy but favored retention on the main large-team frontier: candidate repeats included 10v10/11v11/12v12 movement `305118us` / `563852us` / `603913us`, while restored-source same-window control measured `472763us` / `701583us` / `625617us`. One retained-diff run was load-contaminated at 11v11/12v12, and a later retained-diff run measured `373319us` / `556146us` / `624659us`.
+- Broad gates stayed behavior-stable through Godot MCP: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`; `Perf1v1.tscn` signature `-6199507685307107293:55`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- This is an allocation cleanup in the primary slot frontier, not completion. Future slot work should still target the 9/10/11/12 same-target rotation/DP path and require real movement evidence because focused slot wins can still be misleading.
+
+## Continuation - 2026-07-04 Rejected Slot Row-Cost Micro-Optimizations
+
+No gameplay source optimization was retained from this pass. Two `_evaluate_precomputed_assignment()` probes preserved slot signatures, but failed the real movement keep bar.
+
+- Rejected row-min used-column bitmask: replacing the per-evaluation `Array[bool]` used-column tracker with an integer bitmask preserved `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898` and improved focused total from fresh control `5336ms` to `4764ms` / `4994ms`, but real `PerfMovementPhases.tscn` regressed the six-case movement profile. Candidate movement measured 6v6/8v8/9v9/10v10/11v11/12v12 at `409466us` / `607770us` / `681554us` / `394460us` / `982184us` / `838346us`, while restored-source same-window control measured `269162us` / `546709us` / `602851us` / `375677us` / `956739us` / `654360us`.
+- Rejected row-level previous-slot branch split: hoisting the previous-slot active checks outside the inner column loop preserved `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898` and focused total `4970ms`, but real movement was inconsistent and repeated regressions hit the frontier. Candidate runs included `299524us` / `720757us` / `615259us` / `359664us` / `633063us` / `645262us`, then `286883us` / `555844us` / `724418us` / `472883us` / `1027689us` / `613153us`.
+- Takeaway: GDScript-level branch/bitmask rewrites inside row-cost construction can improve focused slot totals while hurting full movement. Keep requiring same-window `PerfMovementPhases.tscn` evidence before retaining evaluator micro-optimizations.
+
+## Continuation - 2026-07-04 Combined Slot-Step Neighbor Scan
+
+Accepted a movement-helper optimization in `MovementService2._compute_slot_step()`: same-team neighbor distance work is now shared between separation steering and local avoidance instead of scanning the same team once for separation and again inside `_compute_avoidance_vector()`. Enemy avoidance still uses the same second pass, and the final avoidance vector is still multiplied by the same corridor factor, preserving output signatures.
+
+- Fresh control before the edit: `PerfMovementStepHelpers.tscn` aggregate `4713848927282072330`, total `1805ms`; `PerfMovementPhases.tscn` preserved signatures with movement `275697us` / `619101us` / `1036068us` / `393675us` / `705361us` / `737319us` for 6v6/8v8/9v9/10v10/11v11/12v12.
+- Patched focused helper repeats preserved aggregate `4713848927282072330` and improved total to `1711ms` and `1708ms`. 8v8 and 10v10 slot-step helper rows improved clearly; 12v12 helper rows were mixed/worse in focused samples, so the change required real movement proof.
+- Real `PerfMovementPhases.tscn` preserved all six signatures on both retained-diff runs. Accepted repeats measured movement `285329us` / `494057us` / `543069us` / `320007us` / `573931us` / `610527us`, then `260747us` / `498447us` / `556689us` / `310628us` / `560574us` / `684655us`. The change consistently improved 8v8/9v9/10v10/11v11 versus the fresh control, and 12v12 was favorable on the first repeat and still below fresh control on the second.
+- Broad gates stayed behavior-stable through Godot MCP: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`; `Perf1v1.tscn` signature `-6199507685307107293:55`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- This reduces the secondary step-loop surface that remains visible in 8v8/9v9 while preserving the main slot-assignment frontier. The goal remains active because large same-target slot assignment still dominates 10v10/11v11/12v12.
+
+## Continuation - 2026-07-04 Remaining Optimization Frontier Check
+
+No gameplay source optimization was retained from this pass. The answer to whether the audit is finished is still no: the fresh movement profile continues to show a large same-target slot-assignment frontier, while three plausible local rewrites failed the professional keep bar and were reverted.
+
+- Fresh `PerfMovementPhases.tscn` on the restored source preserved errors `[]` and all six deterministic signatures. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `548396us` / `723205us` / `825725us` / `462209us` / `690396us` / `696273us`; slot assignment accounted for `47.5%` / `39.7%` / `53.6%` / `69.9%` / `81.0%` / `83.1%`.
+- Rejected lazy row-cost shortcut: splitting `_evaluate_precomputed_assignment()` into a row-minimum first pass and a fallback full-cost pass preserved `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, but regressed focused total from `1039ms` control to `1181ms`, especially the rotation rows. Source was reverted.
+- Rejected assignment cost scratch: reusing a static temporary row-cost matrix preserved `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, but regressed focused total to `1288ms`. Source was reverted.
+- Rejected slot-step avoidance length cleanup: measuring the unscaled avoidance accumulator and applying `corridor_factor` only to strength preserved `PerfMovementStepHelpers.tscn` aggregate `4713848927282072330` with a mixed focused total (`2050ms` versus `2058ms` control), but real `PerfMovementPhases.tscn` regressed 12v12 to `1099351us` movement with slot assignment `917632us`. Source was reverted.
+- Takeaway: remaining optimization is real but past easy local rewrites. Continue with tie-preserving 10/11/12-slot assignment work or secondary movement changes only when they beat the six-case `PerfMovementPhases.tscn` gate, not just a focused microbenchmark.
+
+## Continuation - 2026-07-04 Rejected Targeting And Collision Micro-Probes
+
+No gameplay source optimization was retained from this pass. Two secondary-surface probes preserved deterministic signatures, but failed focused or real movement gates.
+
+- Rejected support-peel direct dictionary indexing: replacing `Dictionary.get(..., Packed*Array())` with direct key reads in `Targeting.pick_by_priority()` preserved `PerfTargeting.tscn` signature `9036604269279486158`, but regressed the focused targeting median from `496ms` control to `626ms`. Source was reverted before broader validation.
+- Fresh `PerfSlotTeamAssignment.tscn` remained clean while checking the primary frontier, with aggregate `773148128031759898` and total `5611ms`. The expensive rows were still the 9/10/11/12 same-target and pair-target assignment paths, so the primary conclusion did not change.
+- Rejected collision same-team expression simplification: changing the resolved-pair test from `(a < player_count) == (b < player_count)` to the equivalent `b < player_count or a >= player_count` preserved `PerfCollisionResolver.tscn` aggregate `1955603822268948610` and improved focused total from `92ms` to `74ms`, but failed the decisive real movement gate.
+- Candidate `PerfMovementPhases.tscn` preserved all six signatures. The first candidate pass was mixed but plausible against restored control; the repeat regressed 12v12 movement to `1162609us` with collision `47407us`, so source was reverted. Restored-source same-window control was lower at 12v12 movement `819991us` with collision `31837us`.
+- Takeaway: targeting and collision remain monitored secondary surfaces, but the next retained optimization should still prioritize tie-preserving slot assignment or pass `PerfMovementPhases.tscn` without a 12v12 regression.
+
+## Continuation - 2026-07-04 Direct Optimization Frontier Answer
+
+No gameplay source optimization was retained from this pass. The answer to whether that is all that needs optimizing is no: the current tree is past the easy local rewrites, but the real movement profile still has a clear large-team slot-assignment frontier, and 8v8/9v9 still leave measured secondary movement slices.
+
+- Fresh `PerfSlotDpSearch.tscn` control stayed clean with errors `[]`, aggregate `7234308013805264845`, and total `1638ms`. Current medians were `dp_6_initial=301ms`, `dp_6_pruned=244ms`, `dp_7_initial=305ms`, `dp_7_pruned=176ms`, `dp_9_initial=242ms`, `dp_9_pruned=106ms`, `dp_10_initial=41ms`, `dp_10_pruned=40ms`, `dp_11_initial=33ms`, `dp_11_pruned=27ms`, `dp_12_initial=49ms`, and `dp_12_pruned=74ms`.
+- Fresh `PerfSlotSolverBreakdown.tscn` stayed clean with errors `[]`, aggregate `3460608454349089621`, and total `1332ms`. The current expensive focused rows were `dp_12_pruned=191ms`, `rotation_8=168ms`, `rotation_9=182ms`, `rotation_10=127ms`, and `rotation_11=122ms`.
+- Fresh `PerfMovementPhases.tscn` preserved all six deterministic signatures with errors `[]`. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `262781us`, `531310us`, `555987us`, `309412us`, `579730us`, and `614189us`.
+- Slot assignment remains the primary large-fight frontier: latest slot slices were `49.2%`, `40.3%`, `50.3%`, `68.5%`, `80.3%`, and `80.9%` across 6v6/8v8/9v9/10v10/11v11/12v12. The 8v8 and 9v9 cases also keep secondary slices worth monitoring, with player/enemy steps plus collision totaling about `45.3%` in 8v8 and `36.4%` in 9v9.
+- A cost-only finite-incumbent DP precheck was considered but not repeated because the audit already records that candidate as rejected by focused slot validation. The next source candidate should still come from a tie-preserving slot-assignment improvement or a secondary movement slice that beats `PerfMovementPhases.tscn`, not from repeating already rejected DP predecessor or cost-only variants.
+
+## Continuation - 2026-07-04 Follow-Up Frontier Recheck
+
+No gameplay source optimization was retained from this pass. The direct answer is still no: the project is past broad obvious cleanup, but not past optimization. Current evidence narrows the remaining professional-grade work to large-team slot assignment first, with targeting and collision monitored as secondary surfaces.
+
+- Fresh focused slot controls stayed behavior-stable and clean: `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1222ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3330ms`.
+- Fresh targeting control was `PerfTargeting.tscn` median `421ms`, p95 `453ms`, signature `9036604269279486158`. Rejected support-peel scratch-array reuse preserved the signature, but repeats did not hold as a reliable win (`393ms`, `450ms`, `433ms`); restored source then measured `407ms`, so the source was reverted.
+- Fresh collision control stayed stable and small relative to slot assignment: `PerfCollisionResolver.tscn` aggregate `1955603822268948610`, total `343ms`, with `dense_6v6=98ms`, `dense_12v12=126ms`, and `late_12v12=119ms`.
+- Fresh restored-source movement validation preserved all six `PerfMovementPhases.tscn` signatures with errors `[]`. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `256413us`, `548711us`, `579381us`, `326215us`, `795973us`, and `626534us`.
+- Slot assignment remains the decisive large-team frontier in that movement run: `49.8%`, `40.4%`, `50.4%`, `69.5%`, `73.9%`, and `81.1%` of measured movement respectively. The next retained source change should still come from a tie-preserving 10/11/12-slot assignment win or a secondary movement slice that beats the six-case real movement gate.
+
+## Continuation - 2026-07-04 Rejected Hungarian Final-Sum Guard Cleanup
+
+No gameplay source optimization was retained from this pass. The candidate removed the defensive invalid-row branch while re-summing the completed Hungarian assignment cost in `_assignment_min_cost_hungarian()`. That branch should be unreachable after a valid square assignment, and signatures stayed stable, but the focused solver gate rejected the change.
+
+- Fresh focused slot controls before the probe stayed clean with errors `[]`: `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `4059ms`; `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1210ms`.
+- Rejected Hungarian final-sum guard cleanup: `PerfSlotSolverBreakdown.tscn` preserved aggregate `3460608454349089621`, but regressed total to `1415ms`. It improved `hungarian_10` (`122ms -> 64ms`) but worsened the decisive mixed rows, including `dp_12_pruned` (`194ms -> 222ms`), `rotation_8` (`174ms -> 196ms`), `rotation_11` (`95ms -> 203ms`), and `rotation_12` (`31ms -> 49ms`). Source was reverted.
+- Fresh secondary helper control after reverting stayed behavior-stable: `PerfMovementStepHelpers.tscn` aggregate `4713848927282072330`, total `2170ms`. The expensive helper rows were still slot-step rows, especially 8v8/10v10/12v12, while arrive and in-band rows remained much smaller.
+- Fresh restored-source movement validation preserved all six `PerfMovementPhases.tscn` signatures with errors `[]`. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `322169us`, `829693us`, `688504us`, `436590us`, `965854us`, and `773597us`.
+- Current movement slices keep the same frontier: slot assignment was `50.4%`, `39.0%`, `51.2%`, `69.9%`, `79.9%`, and `83.4%` respectively. In 8v8, player/enemy steps plus collision were still material at `47.7%`, so secondary step-loop work remains worth measuring, but the next retained source change should still clear same-window `PerfMovementPhases.tscn`, not just a focused helper or solver row.
+
+## Continuation - 2026-07-04 Rejected 9-Row Hungarian-Bounded DP
+
+No gameplay source optimization was retained from this pass. The candidate lowered `HUNGARIAN_PRUNE_MIN_SIZE` from 10 to 9 and removed the explicit 9-row unreduced-DP dispatch, letting 9-unit exact assignment use the existing Hungarian-bounded DP path. It preserved deterministic signatures and looked promising in focused 9-row rows, but failed the same-window real movement comparison.
+
+- Fresh focused control before the probe: `PerfSlotSolverBreakdown.tscn` preserved aggregate `3460608454349089621`, errors `[]`, total `1494ms`, with `rotation_9=199ms`.
+- Candidate focused gates preserved signatures and errors `[]`: `PerfSlotSolverBreakdown.tscn` stayed at aggregate `3460608454349089621`, improved total to `1061ms`, and cut `rotation_9` to `110ms`; `PerfSlotTeamAssignment.tscn` stayed at aggregate `773148128031759898`, total `3417ms`, with `dict_single_9=132ms` and `array_single_9=119ms`.
+- The candidate did not pass the real movement gate. `PerfMovementPhases.tscn` preserved all six signatures, but movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `275211us`, `549292us`, `593413us`, `407794us`, `655573us`, and `1013008us`; 12v12 slot assignment rose to `835661us` (`82.5%`).
+- Restored-source same-window control after reverting was better on the decisive movement cases while preserving signatures and errors `[]`: 6v6/8v8/9v9/10v10/11v11/12v12 movement was `254112us`, `520240us`, `551827us`, `330044us`, `660501us`, and `635306us`, with 12v12 slot assignment back down to `514037us`.
+- Takeaway: extending Hungarian-bounded pruning to 9-row groups is another focused-solver win that does not survive real movement. Keep the explicit 9-row unreduced DP path unless a future candidate beats same-window `PerfMovementPhases.tscn`, especially 9v9 and 12v12 together.
+
+## Continuation - 2026-07-04 Non-Support Targeting Fast Path
+
+Accepted a secondary target-priority optimization: `Targeting.pick_by_priority()` now routes non-support attackers through a narrower candidate scorer that does not pass support-peel arrays or branch through support scoring. Support attackers still use the existing full scorer, so support peel, engage, threat, stickiness, mage AOE, and role-specific rules keep the same formulas and target signatures.
+
+- Fresh focused control before the edit: `PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `1308ms`.
+- Patched focused repeats preserved signature `9036604269279486158` and errors `[]`, improving medians to `489ms` and `387ms`.
+- Target-specific validation passed: `MovementTargetPriorityProbe.tscn` printed `PASS` with errors `[]`.
+- Broad gates stayed behavior-stable and clean: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`, total `9278ms`; `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=340`; `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6081`; and `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7200ms`.
+- This improves a monitored secondary path. The competitive optimization goal remains active because large-team slot assignment still dominates current 10v10/11v11/12v12 movement profiles.
+
+## Continuation - 2026-07-04 Rejected Hungarian Unique-Optimum Shortcut
+
+No gameplay source optimization was retained from this pass. The direct answer to whether everything is optimized remains no: fresh evidence still puts slot assignment at the top of the real movement profile, but the tested solver shortcut did not pass the actual-fight keep bar.
+
+- Fresh restored-source controls stayed clean with errors `[]`: `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `994ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3417ms`; `PerfMovementPhases.tscn` preserved all six deterministic signatures, with movement `249903us` / `688270us` / `510722us` / `376641us` / `531877us` / `558182us` for 6v6 through 12v12.
+- Rejected candidate: after the existing Hungarian pass, return the Hungarian assignment only when all non-assigned reduced-cost edges are strictly worse, proving a unique optimum and otherwise falling back to the current tie-preserving DP. This preserved focused signatures and improved `PerfSlotTeamAssignment.tscn` total to `2959ms`.
+- The real movement gate rejected it. Patched `PerfMovementPhases.tscn` preserved signatures, but 11v11 regressed to `639043us` movement with `516684us` slot assignment, and 12v12 was not a movement win at `567283us` movement despite a small slot-assignment slice improvement (`443385us`). Source was reverted.
+- Takeaway: even a tie-safe-looking Hungarian shortcut needs same-window 10v10/11v11/12v12 movement proof before retention. The next slot candidate should keep the current DP tie behavior unless it can beat the broad phase gate, not just `PerfSlotTeamAssignment.tscn`.
+
+## Continuation - 2026-07-04 Rejected Targeting Role Split Probes
+
+No gameplay source optimization was retained from this pass. Two narrow `Targeting.pick_by_priority()` branch-shape probes preserved target-selection signatures but did not beat the focused keep bar, so both were reverted before broader movement validation.
+
+- Fresh focused control: `PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `363ms`.
+- Rejected non-mage scorer split: routing mages through the retained non-support scorer and all other non-support roles through a smaller scorer preserved signature `9036604269279486158`, but measured `363ms` and then `389ms`, so it was flat-to-worse against the same-window control.
+- Rejected support/non-support loop branch hoist: moving the support/non-support branch outside the enemy loop preserved signature `9036604269279486158`, but regressed `PerfTargeting.tscn` to `463ms`.
+- Restored source after reverting stayed clean with signature `9036604269279486158`, median `417ms`. Takeaway: the current retained non-support fast path should keep its existing loop shape unless a future targeting change shows a clear repeated focused win before broad combat gates.
+
+## Continuation - 2026-07-04 Rejected 7-Row Hungarian-Bounded DP
+
+No gameplay source optimization was retained from this pass. The direct answer to whether the audit is finished remains no: fresh controls still put large-team slot assignment at the top of the real movement profile, with 8v8/9v9 step and collision slices as secondary monitored surfaces.
+
+- Fresh restored-source controls stayed clean with errors `[]`: `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1110ms`; `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `1905ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3847ms`.
+- Fresh restored-source `PerfMovementPhases.tscn` preserved all six deterministic signatures. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `274593us`, `533114us`, `568086us`, `368117us`, `707523us`, and `704008us`. Slot assignment was `48.3%`, `40.1%`, `50.5%`, `70.6%`, `79.0%`, and `82.7%` respectively.
+- Rejected candidate: lowering `HUNGARIAN_PRUNE_MIN_SIZE` to 7 and letting 7-row groups use the existing Hungarian-bounded DP path preserved focused signatures. It improved `PerfSlotDpSearch.tscn` total from `1905ms` to `1405ms`, with `dp_7_initial` improving `296ms -> 176ms` and `dp_7_pruned` improving `204ms -> 147ms`; `PerfSlotTeamAssignment.tscn` also stayed signature-stable and improved total to `3719ms`.
+- The real movement gate rejected it before the full run finished. The candidate preserved signatures, but 6v6 movement regressed to `360234us` with slot assignment `175751us`, and 8v8 regressed to `634045us` with slot assignment `253073us`; the same-window restored-source control was `274593us` and `533114us` respectively. Source was reverted.
+- Takeaway: do not lower the Hungarian-bounded DP threshold to 7, 8, or 9 just because the focused solver rows improve. Future exact-assignment work should keep the current 7-row and 9-row unreduced DP dispatches unless a candidate beats same-window `PerfMovementPhases.tscn`.
+
+## Continuation - 2026-07-04 Target Group Shape Probe
+
+Added benchmark-only target-group shape diagnostics for the lockstep simulator. This is opt-in through `job.metadata.perf_target_group_diagnostics` and does not change gameplay movement code. New scene: `tests/perf/PerfTargetGroupShapes.tscn`.
+
+- `PerfTargetGroupShapes.tscn` passed through Godot MCP with errors `[]`, aggregate signature `-234389136367210299:36`, and no inconsistent cases. It samples the same 6v6/8v8/9v9/10v10/11v11/12v12 cases used by `PerfMovementPhases.tscn`.
+- Shape evidence: 8v8 large had only group sizes 1/2/3 and zero all-on-one frames, matching why its profile still has meaningful step/collision slices. 9v9 reached 6-attacker max groups for `156` frames but did not show 7/8/9 clumps in this sample.
+- Large-team clumps are real in the decisive rows: 10v10 reached max group sizes 7 and 10 (`23` and `32` frame-events); 11v11 reached 7/8/9/11 (`11`/`1`/`30`/`29`); 12v12 reached 8/9/10/12 (`11`/`4`/`34`/`17`).
+- Compatibility validation: `PerfMovementPhases.tscn` still preserved all six deterministic signatures with errors `[]` after adding the opt-in simulator diagnostics. Latest compatibility slices still put slot assignment at `69.2%`, `80.7%`, and `81.3%` for 10v10/11v11/12v12.
+- Takeaway: future solver work should prioritize exact assignment for high-count same-target clumps in 10v10/11v11/12v12, while 8v8 is better treated as a mixed step/collision/slot case rather than an all-on-one solver case.
+
+## Continuation - 2026-07-04 Rejected Movement Frame-Loop Cleanups
+
+No gameplay source optimization was retained from this pass. The direct answer to whether this is all that needs optimizing remains no: current controls still show slot assignment as the dominant 10v10/11v11/12v12 surface, but two attractive frame-loop cleanups failed the same-window high-count movement gate and were reverted.
+
+- Fresh restored-source `PerfMovementPhases.tscn` control preserved all six deterministic signatures with errors `[]`. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `258827us`, `581567us`, `583798us`, `312177us`, `613270us`, and `577267us`. Slot assignment remained the top large-fight slice at `70.4%`, `80.9%`, and `78.4%` in 10v10/11v11/12v12.
+- Rejected repeated slot-LOS clear removal: skipping `_p_slot_los_scratch.fill(false)` / `_e_slot_los_scratch.fill(false)` preserved signatures and improved some smaller rows, but 10v10 regressed to `460060us` movement with `308964us` slot assignment. 12v12 was flat at `573236us`, so this remains rejected and source was reverted.
+- Rejected duplicate slot-index branch cleanup: combining the slot-output read and slot-memory write under one `slot_idx >= 0` branch preserved signatures and improved 6v6/8v8/9v9 plus 11v11, but 10v10 regressed to `353945us` and 12v12 regressed sharply to `911321us` with `757198us` slot assignment. Source was reverted.
+- Takeaway: do not keep tiny movement frame-loop branch/clear cleanups unless they beat the full six-case `PerfMovementPhases.tscn` gate. The next serious retained change still needs to attack tie-preserving high-count slot assignment or a secondary movement slice with same-window proof across 10v10/11v11/12v12.
+
+## Continuation - 2026-07-04 Breadth Benchmark Recheck
+
+No gameplay source optimization was retained from this pass. The direct answer to whether that is all that needs optimizing is still no: normal-scale combat is in decent shape, but large-team slot assignment and second-tier movement-step costs remain measurable.
+
+- Fresh six-case `PerfMovementPhases.tscn` stayed clean with errors `[]` and preserved all deterministic signatures. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `251063us`, `457632us`, `544767us`, `288892us`, `507895us`, and `684440us`. Slot assignment remained the dominant large-team slice at `69.6%`, `80.2%`, and `81.2%` for 10v10/11v11/12v12; 8v8/9v9 still retained material player/enemy step plus collision slices.
+- Focused slot gates stayed behavior-stable: `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3254ms`; `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `2485ms`; and `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `2362ms`. The remaining expensive rows are shape-specific, especially rotation/evaluator work around 8/9/10 units and high-count same-target cases.
+- Secondary surfaces were measured to avoid overfitting the audit to slot assignment. `PerfMovementStepHelpers.tscn` aggregate `4713848927282072330`, total `2452ms`, with slot-step rows still the clear helper cost; `PerfCollisionResolver.tscn` aggregate `1955603822268948610`, total `130ms`; `PerfTargeting.tscn` signature `9036604269279486158`, median `651ms`; `PerfTextureUtils.tscn` finished in `23ms` after one texture and one circle generation; `PerfMovementBlockers.tscn` confirmed current gating is important (`803ms` direct empty checks versus `10ms` gated empty checks); and `PerfForcedMovement.tscn` confirmed newer direct/team paths are much cheaper than legacy active checks.
+- Broad gameplay gates stayed clean through Godot MCP: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=365`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`, medians `976ms` / `1113ms` / `1168ms`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`, with 8v8 median `2515ms` and 12v12 median `1410ms`.
+- `PerfTargetGroupShapes.tscn` stayed clean with aggregate `-234389136367210299:36`. The shape evidence confirms 8v8 is mostly 1/2/3-attacker groups, while 10v10/11v11/12v12 do produce high-count same-target clumps up to 10/11/12. Future slot work should use this shape probe before assuming a solver change helps every large-board case.
+- Takeaway: the project is past broad obvious cleanup, not past optimization. The next professional-grade source change should be an architecture-level, tie-preserving exact-assignment improvement for the high-count clumps, or a measured movement-step/gating improvement that wins in `PerfMovementPhases.tscn`. Repeating small branch, scratch, threshold, or row-cost rewrites is unlikely to be productive unless they beat same-window real movement gates.
+
+## Continuation - 2026-07-04 Support Peel Positive-Array Fast Path
+
+Accepted targeting optimization: support scoring now uses a direct positive-array peel-pressure helper when `_build_positive_ally_peel_data()` has already produced live, positive-priority ally indices. The fallback `_ally_peel_pressure()` path remains for the empty-array case.
+
+- Focused targeting proof: retained-diff `PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, with medians `537ms`, `432ms`, and `556ms`. Same-window restored-source controls preserved the same signature but measured `1055ms` and `735ms`.
+- Behavioral check: `MovementTargetPriorityProbe.tscn` printed `MovementTargetPriorityProbe: PASS`, errors `[]`.
+- Broad validation through Godot MCP stayed behavior-stable: `Perf1v1.tscn` signature `-6199507685307107293:55`, `time_ms=436`, errors `[]`; `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`, `total_ms=15291`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`, `total_ms=8655`; `RoleMatrixProbe6v6.tscn` final verdict `PASS`, `failed=0`, `skipped=0`, `errors=0`, `wall_ms=6385`.
+- Movement-phase compatibility stayed clean and preserved all six deterministic signatures. Latest measured movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `259083us`, `493014us`, `556775us`, `305264us`, `548440us`, and `607631us`; slot assignment remained the dominant large-team slice at `67.9%`, `79.0%`, and `81.2%` for 10v10/11v11/12v12.
+- Rejected same-pass slot experiment: three 5-row exact-assignment fast path attempts were reverted. Two changed focused assignment signatures, and the tie-preserving DP specialization preserved behavior but measured `fast_5=443ms` versus existing `dp_5=427ms`.
+- Takeaway: support targeting still had one measured secondary win, but the main frontier is unchanged. Large-team slot assignment remains the dominant 10v10/11v11/12v12 movement cost, and future source work should keep using same-window movement gates before retaining solver changes.
+
+## Continuation - 2026-07-04 Rejected In-Band Movement Distance Probe
+
+No gameplay source optimization was retained from this pass. The in-band movement helper candidate improved focused helper rows but changed real combat behavior, so source was reverted.
+
+- Fresh controls before the edit: `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1078ms`; `PerfMovementPhases.tscn` preserved all six deterministic signatures with errors `[]` and movement totals `257421us`, `506593us`, `574390us`, `495358us`, `592654us`, and `730620us` for 6v6/8v8/9v9/10v10/11v11/12v12; `PerfMovementStepHelpers.tscn` aggregate `4713848927282072330`, total `1306ms`.
+- Rejected candidate: replacing several in-band `distance_to()` range checks with squared-distance comparisons and removing the final scalar from `_compute_avoidance_vector()` preserved `PerfMovementStepHelpers.tscn` signatures. The affected in-band rows improved from `120ms` / `88ms` to `76ms` / `75ms` on the first candidate run, and a repeat stayed favorable at `76ms` / `82ms`.
+- Candidate `PerfMovementPhases.tscn` preserved all movement signatures and improved some totals, including 12v12 `686723us` then `583021us`, but broader combat rejected the change. `Perf6v6.tscn` changed peel from expected signature `1121549412794869883:232`, `frames=544`, aggregate `4480953857527108889:18` to peel signature `2017122493037976673:232`, `frames=529`, aggregate `-8708148576181535883:18`.
+- Restored-source confirmation after revert returned `Perf6v6.tscn` to expected signatures with errors `[]`: neutral `-3997862279252171970:232`, burst `5578449822537178089:232`, peel `1121549412794869883:232`, aggregate `4480953857527108889:18`.
+- Takeaway: do not replace in-band range checks with squared-distance comparisons or remove the avoidance-vector scalar without matchup-level acceptance work. The helper benchmark and movement phase profiler were too weak to prove gameplay equivalence here.
+
+## Continuation - 2026-07-04 Rejected Slot Dispatcher Bypass
+
+No gameplay source optimization was retained. A narrow `_evaluate_precomputed_assignment()` dispatcher bypass for 5-12 row groups preserved focused signatures but failed the real movement gate, so source was reverted.
+
+- Fresh focused controls on the restored source were clean: `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3651ms`; `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `2026ms`; `PerfSlotSmallAssignment.tscn` aggregate `7023677399820711247`, total `5328ms`.
+- Candidate change: after row costs were built and the unique-minimum shortcut failed, `_evaluate_precomputed_assignment()` called `_best_assignment_dp()` directly for 5-12 row groups instead of routing through `_best_assignment()`'s size dispatcher. This preserved behavior in focused gates and improved `PerfSlotSolverBreakdown.tscn` from total `1078ms` to `1037ms`; `PerfSlotTeamAssignment.tscn` stayed signature-stable and improved total to `3460ms`.
+- Real `PerfMovementPhases.tscn` rejected the candidate despite preserving all six signatures. The candidate regressed 6v6/8v8 and especially 12v12: movement totals were `417464us`, `657341us`, `564869us`, `335977us`, `675974us`, and `1176865us`, with 12v12 slot assignment `978395us`.
+- Takeaway: even semantically identical dispatcher-shape changes can perturb the real GDScript frame profile. Keep the current `_best_assignment()` dispatch from `_evaluate_precomputed_assignment()` unless a future same-window candidate beats the full six-case movement gate, not only focused slot totals.
+
+## Continuation - 2026-07-04 Direct Frontier Answer After User Question
+
+No gameplay source optimization was retained from this pass. The answer to "is that all that needs optimizing?" is still no, but the remaining work is no longer broad cleanup; the fresh evidence points to a narrow slot-assignment frontier plus monitored movement-step steering.
+
+- Fresh `PerfMovementPhases.tscn` stayed clean with errors `[]` and preserved deterministic signatures. Movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `285649us`, `741853us`, `553116us`, `312294us`, `593055us`, and `721452us`. Slot assignment was still the dominant large-team slice at `67.6%`, `78.9%`, and `78.2%` for 10v10/11v11/12v12.
+- Fresh `PerfMovementStepHelpers.tscn` stayed clean with aggregate `4713848927282072330`, total `2971ms`. The slot-step rows are still the expensive helper rows; arrive and in-band rows remain secondary.
+- Fresh `PerfTargetGroupShapes.tscn` stayed clean with aggregate `-234389136367210299:36`, inconsistent cases `0`. The live shape evidence shows high-count same-target clumps still occur in larger fights: 10v10 produced group sizes up to `10`, 11v11 up to `11`, and 12v12 up to `12`, even though most group events are smaller 1/2/3-attacker groups.
+- Takeaway: optimization is not done, but the easy wins are mostly exhausted. Future retained source work should either change the exact slot-assignment architecture in a tie-preserving way, or beat both the focused helper/slot benchmarks and the full `PerfMovementPhases.tscn` gate. Do not repeat previous branch-shape, previous-slot array, reciprocal-radius, dispatcher-bypass, or threshold-lowering probes without new evidence.
+
+## Continuation - 2026-07-04 Rejected Support Scorer Specialization
+
+No gameplay source optimization was retained. A support-only candidate scorer removed the generic role `match` path for support attackers, but it did not produce a reliable focused targeting win and was reverted before broader combat validation.
+
+- Fresh focused control before the edit: `PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `357ms`.
+- Candidate change: `Targeting.pick_by_priority()` routed support attackers into a support-specific scorer that kept the same distance, low-HP, stickiness, execute, threat, peel, and engage formulas, while removing unused non-support branches and arguments.
+- Candidate `PerfTargeting.tscn` preserved signature `9036604269279486158` and errors `[]`, but measured median `503ms`, failing the focused keep bar against the clean same-window control. Restored-source confirmation after revert preserved the expected signature with a noisy median `518ms`.
+- Takeaway: keep the current retained non-support fast path and generic support scorer. Support-targeting branch-shape edits need repeated focused wins before broader gates; preserving the target-selection signature is not enough.
+
+## Continuation - 2026-07-04 Rejected Ring Lower-Bound Rotation Precheck
+
+No gameplay source optimization was retained. A conservative ring-distance lower-bound precheck before full rotation cost-matrix construction preserved focused signatures and improved isolated slot benchmarks, but it regressed the real movement gate and was reverted.
+
+- Fresh `PerfMovementPhases.tscn` control preserved errors `[]` and showed the current frontier clearly: movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `296614us`, `496459us`, `629030us`, `391167us`, `791151us`, and `819392us`; slot assignment was `69.0%`, `81.6%`, and `79.0%` of 10v10/11v11/12v12 movement.
+- Focused controls: `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1527ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `6143ms`.
+- Candidate change: `_assign_for_target_into()` and `_assign_for_target_into_arrays()` skipped a rotation when a cheap nearest-ring-slot lower bound could not beat the current best cost, avoiding some `_evaluate_precomputed_assignment()` matrix/DP work.
+- Focused candidate results looked favorable: `PerfSlotSolverBreakdown.tscn` kept aggregate `3460608454349089621` and improved total to `1282ms`; `PerfSlotTeamAssignment.tscn` kept aggregate `773148128031759898` and improved total to `3535ms`.
+- Real movement rejected the candidate early. Candidate `PerfMovementPhases.tscn` preserved the first two signatures and errors `[]`, but 6v6 movement regressed to `325601us` with slot assignment `160222us`, and 8v8 regressed sharply to `972688us` with slot assignment `383179us`. The run was stopped after 8v8 and source was reverted.
+- Takeaway: do not add per-rotation lower-bound prechecks that look good in isolated slot benchmarks unless they also beat the real movement frame gate. The extra bound work can perturb the real GDScript frame profile enough to erase focused wins.
+
+## Continuation - 2026-07-04 Reconfirmed Rejected Array Range Scratch Path
+
+No gameplay source optimization was retained. This fresh pass reconfirmed an older rejected shape: changing the real movement array slot API to use a reusable `Array[float]` for per-attacker range lookup instead of the existing scratch `Dictionary`. It preserved slot signatures but failed the focused public slot-assignment gate and was reverted before real movement validation.
+
+- Fresh `PerfMovementPhases.tscn` control stayed clean with errors `[]`; movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `472429us`, `662674us`, `688534us`, `350109us`, `680098us`, and `696116us`, with slot assignment still `69.3%`, `80.7%`, and `82.0%` of 10v10/11v11/12v12 movement.
+- Same-window `PerfSlotTeamAssignment.tscn` control preserved aggregate `773148128031759898`, total `3154ms`; the array single-target rows were still the focused public API hotspot.
+- Candidate `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898`, but total regressed to `3947ms`. Array rows were mixed-to-worse: `array_single_7` moved `139ms -> 201ms`, `array_single_8` `205ms -> 304ms`, `array_single_9` `300ms -> 452ms`, `array_pair_12` `107ms -> 167ms`, and `array_quad_12` `29ms -> 76ms`.
+- Takeaway: keep the current scratch `Dictionary` range lookup in the array slot API. In this GDScript loop, replacing it with a reusable typed float array remains slower across enough public array-path rows to reject before broad movement validation.
+
+## Continuation - 2026-07-04 Reconfirmed Rejected Ring Offset Cache
+
+No gameplay source optimization was retained. A fresh retest reconfirmed the older rejected ring-offset cache shape: precomputing `step * slot_index` offsets for each attacker count inside the real slot assignment helpers preserved deterministic slot output, but slowed the decisive focused public API benchmark and was reverted before broader movement validation.
+
+- Same-window `PerfSlotTeamAssignment.tscn` control preserved aggregate `773148128031759898`, total `3154ms`.
+- Candidate change: `_assign_for_target_into()` and `_assign_for_target_into_arrays()` used a cached `Array[float]` of ring angle offsets per count, then filled `ring_angles` and final slot angles with `base + ring_offsets[index]` instead of `base + step * float(index)`.
+- The valid post-fix candidate run preserved aggregate `773148128031759898` and errors `[]`, but regressed total to `4864ms`. Expensive rows were not improved enough to justify retention: `dict_single_12=259ms`, `array_single_9=613ms`, `array_single_10=273ms`, `array_single_11=256ms`, and `array_single_12=252ms`.
+- Restored-source confirmation after revert preserved aggregate `773148128031759898` and errors `[]`. The noisy total was `6646ms`, so this confirmation is behavior validation rather than a new performance baseline.
+- Takeaway: keep inline `step * float(index)` math in the slot rotation loops. In this GDScript path, the cached array lookup is slower than the repeated multiply and adds another static cache that does not pay for itself.
+
+## Continuation - 2026-07-04 Rejected 7/9-Row DP Specialization
+
+No gameplay source optimization was retained. A source candidate split the generic unreduced 7-row and 9-row exact DP search into count-specialized helpers with the same row, mask, column, and strict-less tie order. It preserved focused signatures and improved isolated slot benchmarks, but it failed the decisive real movement comparison and was reverted.
+
+- Fresh focused controls before the edit stayed clean: `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `1573ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3813ms`.
+- Candidate focused gates preserved signatures and errors `[]`: `PerfSlotSolverBreakdown.tscn` improved total to `1129ms`, `PerfSlotDpSearch.tscn` preserved aggregate `7234308013805264845` with total `1276ms`, and `PerfSlotTeamAssignment.tscn` improved total to `3330ms`.
+- Real `PerfMovementPhases.tscn` rejected the candidate despite preserving all six signatures. Candidate movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `305645us`, `583311us`, `625035us`, `486917us`, `622052us`, and `672533us`; restored source measured `261414us`, `510557us`, `868788us`, `411817us`, `578045us`, and `597774us`. The candidate only won the noisy 9v9 row and regressed 6v6, 8v8, 10v10, 11v11, and 12v12, including the slot-heavy rows.
+- Takeaway: do not retain count-specialized 7/9 DP wrappers without real movement wins. GDScript frame behavior is sensitive enough that focused DP/rotation wins can still lose in the integrated movement path.
+
+## Continuation - 2026-07-04 Rejected Support Peel Positive-Path Inlining
+
+No gameplay source optimization was retained. A targeting candidate inlined `_ally_peel_pressure_for_ally_cached()` inside the retained positive-array support peel path to avoid one helper call and direct-index already-positive ally positions. It preserved target-selection behavior, but regressed the focused targeting benchmark and was reverted before broad combat validation.
+
+- Fresh `PerfTargeting.tscn` control preserved signature `9036604269279486158`, errors `[]`, median `444ms`, p95 `541ms`.
+- Candidate `PerfTargeting.tscn` preserved the same signature and errors `[]`, but regressed to median `560ms`, p95 `650ms`.
+- Takeaway: keep the current helper call inside `_ally_peel_pressure_from_positive_arrays()`. In this GDScript path, manually inlining the distance/proximity calculation is slower than the existing small helper.
+
+## Continuation - 2026-07-04 Rejected Retarget Sync and Slot-Step Lazy Normalize
+
+No gameplay source optimization was retained. Two fresh candidates preserved deterministic signatures but failed the broader keep bar once measured against integrated combat/movement surfaces.
+
+- Rejected target-controller bulk-refresh sync cleanup: `TargetController.refresh_live_targets()` and `_prime_targets()` used an already-synced private helper to avoid calling `_sync_arrays()` once per unit. Same-window `Perf6v6.tscn` looked favorable and preserved aggregate `4480953857527108889:18`, improving total `14483ms -> 10488ms`. The larger-board check rejected retention: candidate `PerfLargeBoard.tscn` preserved aggregate `7144113503220431359:12`, but measured `10980ms` versus a same-window restored-source control at `9579ms`. Source was restored.
+- Rejected movement slot-step lazy normalization: `_compute_slot_step()` delayed normalizing the self-neighbor vector until a neighbor was actually inside the separation or avoidance radius. The focused helper gate preserved aggregate `4713848927282072330` and improved `PerfMovementStepHelpers.tscn` total `1897ms -> 1597ms`, especially the 12v12 slot-step rows.
+- The real movement gate rejected the lazy-normalization candidate despite preserving all six `PerfMovementPhases.tscn` signatures and errors `[]`. Candidate movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `319343us`, `535424us`, `698864us`, `518970us`, `836376us`, and `683401us`, which did not beat the current integrated movement frontier, especially 10v10 through 12v12. Source was restored.
+- Takeaway: focused helper wins still are not enough. Continue to require same-window `PerfMovementPhases.tscn` wins before retaining movement-step cleanups, and require `PerfLargeBoard.tscn` scale proof before keeping controller/targeting control-flow cleanups that look positive only in 6v6.
+
+## Continuation - 2026-07-04 Rejected Arrival Radius Lazy Defaults
+
+No gameplay source optimization was retained. A small movement-loop candidate delayed default arrival/corridor radius calculations until a unit had no assigned slot, but it failed the broader combat gate despite improving some local player/enemy step slices.
+
+- Fresh focused controls before the edit stayed clean with errors `[]`: `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3361ms`; `PerfSlotSolverBreakdown.tscn` aggregate `3460608454349089621`, total `929ms`; and `PerfMovementPhases.tscn` preserved all six deterministic signatures with movement totals `298095us`, `530851us`, `560162us`, `371778us`, `558554us`, and `593558us` for 6v6/8v8/9v9/10v10/11v11/12v12.
+- Candidate `PerfMovementPhases.tscn` preserved all signatures and errors `[]`. Repeats were mixed but showed the intended local step effect: movement totals included `259667us`, `469810us`, `539941us`, `336435us`, `594238us`, and `576916us`, then `242575us`, `490416us`, `522149us`, `330382us`, `511994us`, and `608141us`.
+- Broad candidate gates stayed behavior-stable but did not prove a real win: `Perf6v6.tscn` preserved aggregate `4480953857527108889:18` with total `15201ms`, and `PerfLargeBoard.tscn` preserved aggregate `7144113503220431359:12` with total `10143ms`.
+- Same-window restored-source `Perf6v6.tscn` was clearly faster while preserving expected signatures: neutral/burst/peel medians `937ms`, `1027ms`, and `1075ms`, total `9643ms`, aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`. Source was restored.
+- Takeaway: do not retain lazy default arrival/corridor radius initialization in `MovementService2._update_impl()` unless a future profile shows a clean same-window broad win. Small player/enemy step savings are too easy to lose in the integrated combat loop.
+
+## Continuation - 2026-07-04 Slot Shape Diagnostics
+
+Added benchmark-only movement diagnostics for slot assignment group shapes and side-specific slot time. `MovementService2.diagnostics_snapshot()` now reports `slot_group_sizes` and `slot_side_usec` only when diagnostics are enabled, and `PerfMovementPhases.tscn` prints those fields beside the existing phase timings. Normal gameplay and normal perf scenes leave the counters off.
+
+- Fresh focused slot controls before the diagnostics edit stayed clean: `PerfSlotDpSearch.tscn` aggregate `7234308013805264845`, total `1427ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, total `3652ms`.
+- `PerfMovementPhases.tscn` passed with all six deterministic signatures and errors `[]`. The new fields show that large-team slot time is heavily player-side in the wipe rows: 10v10 `player=203531us` / `enemy=28082us`, 11v11 `player=429426us` / `enemy=26400us`, and 12v12 `player=429411us` / `enemy=28608us`.
+- Shape evidence from the same profiler run: 10v10 included player-side 6/7/10 clumps (`29` / `24` / `33` events), 11v11 included 7/8/9/11 clumps (`11` / `2` / `31` / `30`), and 12v12 included 8/9/10/12 clumps (`12` / `5` / `35` / `18`). However, small 1/2/3 groups still dominate event counts and accumulate real cost, especially in 8v8 and 9v9.
+- Diagnostics-off validation stayed behavior-stable through Godot MCP: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Takeaway: the next serious source optimization should not assume only all-on-one 12-unit clumps matter. The profiler now points to player-side slot assignment across a mix of many small groups plus intermittent high-count 7-12 clumps; candidate algorithms should improve that real distribution, not only a single all-on-one microbenchmark.
+
+## Continuation - 2026-07-04 Rejected 2-Attacker Array Fast Path
+
+No gameplay source optimization was retained. A source candidate added a count-2 fast path inside the preallocated array-output slot assignment path. It preserved focused signatures and improved the isolated slot benchmark total, but it regressed the worst real large-board movement rows and was reverted.
+
+- Candidate `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898` with errors `[]` and improved total time from the earlier focused control `3652ms` to `3555ms`. The targeted rows were mixed-to-positive: `array_pair_10` was effectively flat (`77ms -> 78ms`), `array_pair_11` improved (`203ms -> 113ms`), and `array_pair_12` was nearly flat (`151ms -> 147ms`).
+- Real `PerfMovementPhases.tscn` preserved all six deterministic signatures and errors `[]`, but rejected the candidate on integrated timing. The candidate improved the 10v10 side slice versus the slot-shape diagnostic baseline (`player=203531us -> 193282us`, `enemy=28082us -> 17237us`), but 11v11 regressed (`player=429426us -> 443755us`) and 12v12 regressed badly (`player=429411us -> 543385us`, `slot_assign=593962us`). Source was restored.
+- Takeaway: do not reintroduce a separate count-2 array-output branch without a same-window `PerfMovementPhases.tscn` win in 10v10, 11v11, and 12v12. In this path, reducing generic solver setup for small groups can still lose once the full mixed group distribution and GDScript call overhead are included.
+
+## Continuation - 2026-07-04 Slot Group-Time Diagnostics
+
+Added benchmark-only slot assignment timing by group size. `SlotStrategy` now records `slot_group_usec` only when diagnostics are enabled, `MovementService2.diagnostics_snapshot()` exposes those buckets, and `PerfMovementPhases.tscn` prints them beside the existing group-count and side-time summaries.
+
+- Validation stayed clean through Godot MCP: `PerfMovementPhases.tscn` preserved all six deterministic signatures with errors `[]`; diagnostics-off `Perf6v6.tscn` preserved aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`; diagnostics-off `PerfLargeBoard.tscn` preserved aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`; `RoleMatrixProbe6v6.tscn` PASSed with `failed=0`, `skipped=0`, `errors=0`; and diagnostics-off `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898`.
+- New timing evidence: frequent tiny groups are not the primary slot-assignment cost. In the latest diagnostic run, 10v10 spent `122397us` in player-side 10-attacker groups, 11v11 spent `253827us` in player-side 9-attacker groups plus `142844us` in 11-attacker groups, and 12v12 spent `144391us` in player-side 10-attacker groups plus `148768us` in 12-attacker groups.
+- Takeaway: the next source optimization should focus on high-count exact assignment/rotation work that preserves tie order. Small-group count-1/count-2 branches are still worth monitoring, but the new timing buckets say they are not the main 10v10-12v12 assignment frontier.
+
+## Continuation - 2026-07-04 Rejected Previous-Slot Incumbent Bound
+
+No gameplay source optimization was retained. A high-count solver candidate used the current previous-slot assignment as a padded incumbent bound for 9+ row `_evaluate_precomputed_assignment()` calls. It did not accept the previous assignment directly, so signatures stayed stable, but the extra bound work regressed the integrated movement profiler and was reverted.
+
+- Focused behavior stayed stable: `PerfSlotSolverBreakdown.tscn` preserved aggregate `3460608454349089621`, errors `[]`, with total `1525ms`; `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898`, errors `[]`, with total `4588ms`.
+- Real `PerfMovementPhases.tscn` rejected the candidate despite preserving all six deterministic signatures and errors `[]`. Candidate movement totals for 6v6/8v8/9v9/10v10/11v11/12v12 were `313880us`, `716908us`, `865618us`, `539566us`, `740544us`, and `774995us`, regressing every important row versus the current diagnostic frontier. High-count buckets were also worse: 10v10 `player_10=242328us`, 11v11 `player_11=289423us`, and 12v12 `player_12=302997us`.
+- Takeaway: do not add previous-slot incumbent-bound work inside `_evaluate_precomputed_assignment()` without new evidence. The added per-rotation bookkeeping costs more than it saves in real movement, even though it is behavior-stable.
+
+## Continuation - 2026-07-04 Slot Subphase Diagnostics
+
+Added benchmark-only slot subphase timing. `SlotStrategy` now records `slot_phase_usec` for pair building/sorting, rotation plus exact assignment, and output writeback only when diagnostics are enabled; `MovementService2.diagnostics_snapshot()` exposes those buckets; and `PerfMovementPhases.tscn` prints them beside the group-size timing.
+
+- Validation stayed clean through Godot MCP: diagnostics-on `PerfMovementPhases.tscn` preserved all six deterministic signatures with errors `[]`; diagnostics-off `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898`; diagnostics-off `Perf6v6.tscn` preserved aggregate `4480953857527108889:18`; diagnostics-off `PerfLargeBoard.tscn` preserved aggregate `7144113503220431359:12`; and `RoleMatrixProbe6v6.tscn` PASSed with `failed=0`, `skipped=0`, `errors=0`.
+- New evidence: high-count cost is overwhelmingly rotation/evaluation, not setup or output. Latest 10v10 had `player_10_rotate=156327us` versus `player_10_pairs=2189us` and `player_10_output=1165us`. 11v11 had `player_9_rotate=223640us` and `player_11_rotate=165182us`, while their pair/output work stayed under `1500us` each. 12v12 had `player_10_rotate=150382us` and `player_12_rotate=150164us`, again with pair/output work below `1500us`.
+- Takeaway: future source work should attack the rotation/evaluator architecture itself. Pair construction, sorting, and final slot-output writes are now proven secondary for the worst current large-team rows.
+
+## Continuation - 2026-07-04 Rejected Cost-Only Rotation Selection
+
+No gameplay source optimization was retained. A source candidate changed only the real array-output slot assignment path for groups of 9+ attackers: it evaluated each base rotation by exact cost only, then rebuilt the full assignment once for the winning rotation. The candidate preserved signatures but regressed the focused array assignment gate and was reverted.
+
+- Fresh controls before the edit stayed clean through Godot MCP: `PerfSlotSolverBreakdown.tscn` preserved aggregate `3460608454349089621`, errors `[]`, total `1465ms`; `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898`, errors `[]`, total `4780ms`.
+- Candidate `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898` and errors `[]`, but total rose to `5209ms`. The changed array rows regressed sharply: `array_single_9` `417ms -> 549ms`, `array_single_10` `174ms -> 268ms`, `array_single_11` `199ms -> 298ms`, `array_single_12` `193ms -> 278ms`, `array_pair_10` `75ms -> 140ms`, `array_pair_11` `81ms -> 188ms`, and `array_pair_12` `122ms -> 230ms`.
+- Takeaway: do not retry "cost-only rotation selection plus final assignment rebuild" without a new algorithmic reason. Avoiding assignment retention does not save enough; the extra exact cost pass duplicates the expensive rotation/evaluator work. The next slot candidate must reduce exact DP/search work itself or prove a real cache across repeated combat frames.
+
+## Continuation - 2026-07-04 Current Slot Frontier Refresh
+
+No gameplay source optimization was retained in this checkpoint. Fresh profiling after the rejected cost-only rotation candidate confirms the goal is still active and the remaining professional optimization frontier is still slot assignment, now with clear evidence that mid-size rotation work matters alongside 10-12 attacker clumps.
+
+- `PerfMovementStepHelpers.tscn` stayed clean with aggregate `4713848927282072330`, errors `[]`, total `1771ms`. Slot-step helper rows remain the largest helper rows, but the full movement profiler still puts slot assignment ahead of step loops.
+- `PerfMovementPhases.tscn` preserved all six signatures with errors `[]`. Movement totals and slot shares were: 6v6 `315543us` / slot `179122us` (`56.8%`), 8v8 `703130us` / slot `359649us` (`51.1%`), 9v9 `799816us` / slot `471727us` (`59.0%`), 10v10 `366910us` / slot `265813us` (`72.4%`), 11v11 `680854us` / slot `563853us` (`82.8%`), and 12v12 `670695us` / slot `553208us` (`82.5%`).
+- Slot subphase evidence shows the frontier is rotation/evaluation across several sizes, not pair setup or output. Real profiler examples: 9v9 `combined_6_rotate=93953us` and `combined_2_rotate=74296us`; 10v10 `player_10_rotate=116725us`; 11v11 `player_9_rotate=208401us` plus `player_11_rotate=189592us`; 12v12 `player_10_rotate=169695us` plus `player_12_rotate=158010us`.
+- Focused slot solver gates stayed clean but still expose the same shape. `PerfSlotDpSearch.tscn` preserved aggregate `7234308013805264845`, errors `[]`, total `2239ms`, with `dp_6_initial=399ms`, `dp_6_pruned=341ms`, `dp_9_initial=281ms`, `dp_9_pruned=207ms`, `dp_12_initial=58ms`, and `dp_12_pruned=81ms`. `PerfSlotSolverBreakdown.tscn` preserved aggregate `3460608454349089621`, errors `[]`, total `1490ms`, with rotation rows `rotation_6=85ms`, `rotation_8=209ms`, `rotation_9=425ms`, `rotation_10=214ms`, `rotation_11=164ms`, and `rotation_12=63ms`.
+- Takeaway: the next retained source change should not be another local row-cost, scratch, dispatcher, threshold, or ring-offset micro-edit. It needs a tie-preserving rotation/evaluator architecture win that improves the mid-size and high-count rotation rows, then survives same-window `PerfMovementPhases.tscn` across all six movement sizes.
+
+## Continuation - 2026-07-04 Rejected Count-3 Precomputed Evaluator
+
+No gameplay source optimization was retained. A source candidate added an unrolled `_evaluate_precomputed_assignment()` path for exactly 3 attackers, computing scalar row/slot costs directly and preserving the existing 3-row permutation order and strict tie behavior. It preserved signatures but regressed the focused slot assignment gate, so it was reverted before real movement validation.
+
+- Same-window `PerfSlotTeamAssignment.tscn` control preserved aggregate `773148128031759898`, errors `[]`, total `3383ms`. Candidate preserved the same aggregate and errors `[]`, but total rose to `3462ms`.
+- Important regressions included dictionary pair rows `dict_pair_10` `60ms -> 119ms`, `dict_pair_11` `85ms -> 176ms`, and `dict_pair_12` `97ms -> 201ms`; real array rows also regressed in places, including `array_single_10` `136ms -> 185ms`, `array_single_11` `141ms -> 207ms`, `array_pair_12` `118ms -> 184ms`, and `array_split_12` `26ms -> 32ms`.
+- Takeaway: do not retry an unrolled count-3 precomputed evaluator without new evidence. Avoiding row-array construction for 3-row groups does not pay for the extra GDScript branch/code shape in the public team-assignment gate.
+
+## Continuation - 2026-07-04 Rejected Cached 2/3 Assignment Arrays
+
+No gameplay source optimization was retained. A source candidate cached the two possible `_assignment_2()` result arrays and six possible `_assignment_3()` result arrays, returning shared read-only arrays instead of allocating a fresh small assignment array on each successful fast-path solve. It preserved deterministic signatures, but did not survive the broader slot-team gate and was reverted.
+
+- Focused controls stayed clean through Godot MCP: `PerfSlotSmallAssignment.tscn` aggregate `7023677399820711247`, errors `[]`, total `4262ms`, with `fast_2=297ms` and `fast_3=187ms`; `PerfSlotTeamAssignment.tscn` aggregate `773148128031759898`, errors `[]`, total `3645ms`.
+- Candidate `PerfSlotSmallAssignment.tscn` preserved aggregate `7023677399820711247` and errors `[]`. It improved `fast_2` (`297ms -> 250ms`) but left `fast_3` flat (`187ms -> 188ms`) and the noisy total regressed to `4681ms`.
+- Candidate `PerfSlotTeamAssignment.tscn` preserved aggregate `773148128031759898` and errors `[]`, but total rose from `3645ms` to `4268ms`. It helped small split rows like `dict_split_12` (`33ms -> 27ms`) and `dict_quad_12` (`46ms -> 41ms`), but regressed broader rows including `dict_pair_12` (`118ms -> 145ms`), `array_pair_10` (`62ms -> 125ms`), `array_pair_12` (`114ms -> 161ms`), and `array_single_12` (`126ms -> 181ms`).
+- Takeaway: do not replace `_assignment_2()` / `_assignment_3()` fresh result arrays with shared cached arrays without new evidence. The extra branch shape and shared-array path can win an isolated 2-row microcase but lose in the real mixed slot-team wrapper.
+
+## Continuation - 2026-07-04 Retained Generic Count-2 Precomputed Evaluator
+
+Retained a narrow slot-assignment source optimization in `SlotStrategy._evaluate_precomputed_assignment()`: exactly two attackers and two ring slots now compute the two legal assignment costs directly before allocating row-cost matrices. This is distinct from the rejected array-output count-2 branch because it applies to the shared precomputed evaluator used by both dictionary and array slot paths, and it keeps the existing strict tie preference from `_best_assignment_2()`.
+
+- Current restored-source `PerfMovementPhases.tscn` control preserved all six deterministic signatures with errors `[]`. Movement totals and slot assignment were 6v6 `414291us` / `239165us`, 8v8 `621409us` / `316129us`, 9v9 `670494us` / `397404us`, 10v10 `362379us` / `257438us`, 11v11 `640975us` / `529531us`, and 12v12 `746493us` / `571111us`.
+- Focused source gate passed: same-window `PerfSlotTeamAssignment.tscn` improved total `3807ms -> 3105ms`, preserved aggregate `773148128031759898`, and had errors `[]`.
+- Real movement gate passed: candidate `PerfMovementPhases.tscn` preserved all six signatures and errors `[]`; movement totals improved to 6v6 `301199us`, 8v8 `594310us`, 9v9 `622229us`, 10v10 `328423us`, 11v11 `555240us`, and 12v12 `605005us`. Slot assignment also improved to `168611us`, `295810us`, `351948us`, `230153us`, `446725us`, and `490398us` respectively.
+- Broad validation stayed clean: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`, errors `[]`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`, errors `[]`; and `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`.
+- Takeaway: the goal remains active, but this is a real retained movement win. Count-2 slot groups are common enough in 6v6/8v8/9v9 and still present around larger clumps, so cutting their precomputed evaluator work improves the full movement gate without disturbing high-count signatures.
+
+## Continuation - 2026-07-04 Post Count-2 Frontier Refresh
+
+No additional gameplay source optimization was retained in this checkpoint. Fresh profiling after the retained generic count-2 evaluator confirms the goal remains active and narrows the next work to high-count slot rotation/evaluator architecture rather than another local bookkeeping tweak.
+
+- Current `PerfMovementPhases.tscn` preserved all six deterministic signatures with errors `[]`. Movement totals and slot shares were 6v6 `290070us` / slot `164169us` (`56.6%`), 8v8 `696917us` / slot `345152us` (`49.5%`), 9v9 `649149us` / slot `363126us` (`55.9%`), 10v10 `405105us` / slot `298273us` (`73.6%`), 11v11 `599506us` / slot `481399us` (`80.3%`), and 12v12 `827064us` / slot `653762us` (`79.0%`).
+- Current slot subphase evidence still points to high-count rotation/evaluator cost. The biggest current buckets were 10v10 `player_10_rotate=153022us`, 11v11 `player_9_rotate=187835us` plus `player_11_rotate=137350us`, and 12v12 `player_10_rotate=169813us` plus `player_12_rotate=195337us`. Count-3 and count-6 rows remain visible in 8v8/9v9, but count-3 scalar precomputed evaluation has already been rejected.
+- Focused `PerfSlotSolverBreakdown.tscn` preserved aggregate `3460608454349089621`, errors `[]`, total `1165ms`. The largest rows were `dp_12_pruned=193ms`, `rotation_8=164ms`, `rotation_9=212ms`, `rotation_10=135ms`, and `rotation_11=114ms`.
+- Current `PerfTargeting.tscn` preserved signature `9036604269279486158`, errors `[]`, median `368ms`, p95 `400ms`. Targeting remains monitored but is not the main frontier beside current slot-assignment costs.
+- Candidate families intentionally skipped as already exhausted in this audit: unique-minimum bookkeeping/bitmask/preflight variants, count-3 scalar precomputed evaluation, count-4/5 row precomputed rewrites, group-array reuse, direct dictionary iteration, previous-slot rewrites, Hungarian threshold changes, predecessor-state trims, ring-offset caches, lower-bound rotation prechecks, and targeting branch-shape rewrites.
+- Takeaway: further retained source work likely needs a real tie-preserving exact-assignment architecture change for 9/10/11/12 attacker groups, or a secondary movement-step/collision win that beats the full movement gate. Small GDScript branch/scratch rewrites are now more likely to be noise or regressions unless they beat same-window `PerfMovementPhases.tscn`.
+
+## Continuation - 2026-07-04 Retained Conservative Far-Distance Movement Cull
+
+Retained a secondary movement-step optimization in `MovementService2`: separation and avoidance scans now skip units that are provably outside the relevant influence radius using a conservative squared-distance far cull, then keep the original `length()` calculation and original threshold checks for all near-radius candidates. This avoids the behavior drift from exact squared-threshold rewrites while reducing unnecessary distance work in step helpers.
+
+- Rejected first candidate: replacing the actual radius checks with squared-distance threshold checks improved focused `PerfMovementStepHelpers.tscn` total to `1418ms`, but changed real `PerfMovementPhases.tscn` signatures in 8v8 (`1860074410702899490:300`) and 9v9 (`1871751904924299171:334`), so it was reverted.
+- Retained candidate focused gate: the conservative far-cull version preserved `PerfMovementStepHelpers.tscn` aggregate `4713848927282072330`, errors `[]`; best candidate total was `1232ms` versus the fresh control `1896ms`, and the final re-applied source stayed behavior-stable at `1815ms`.
+- Integrated movement gate preserved all six deterministic signatures. Candidate full movement totals were `318708us`, `639452us`, `690871us`, `326007us`, `634169us`, and `638829us`; repeat totals were `299857us`, `578282us`, `664460us`, `322553us`, `610472us`, and `815406us`. A same-window restored-source control after reverting measured `330460us`, `625648us`, `620465us`, `400777us`, `698124us`, and `693176us`, so timing stayed noisy but the retained source improved the 6v6/8v8/10v10/11v11 repeat rows and the total movement sum while preserving signatures.
+- Broad validation stayed clean: `Perf6v6.tscn` aggregate `4480953857527108889:18`, inconsistent cases `0`, total `8795ms`; `PerfLargeBoard.tscn` aggregate `7144113503220431359:12`, inconsistent cases `0`, total `7132ms`; `RoleMatrixProbe6v6.tscn` PASS with `failed=0`, `skipped=0`, `errors=0`; and `Perf1v1.tscn` signature `-6199507685307107293:55`, time `358ms`.
+- Takeaway: this is a retained secondary step-loop win, not the end of the performance audit. 10v10/11v11/12v12 remain slot-assignment dominated, and the next major optimization still needs to reduce high-count rotation/evaluator cost without changing combat signatures.
+
 ## Current Hotspots
 
 1. Combat movement is the primary optimization surface.
-   - `MovementService2._update_impl()` computes alive flags, target groups, slot maps, steering, avoidance, and collision resolution every simulation step.
-   - The largest obvious per-frame buffer rebuilds are now handled, and the exact slot solver no longer uses factorial permutation search.
-   - `PerfMovementPhases.tscn` now proves `SlotStrategy.assign_for_target()` / slot assignment dominates the 12v12 movement profile at roughly `85-90%` of measured movement time even after the latest lazy range-entry pass and Hungarian pruning guard. The current breadth check measured 12v12 slot assignment at `90.1%` of movement time. Slot allocation, range-dictionary cleanup, inline circular-distance cleanup, single-distance slot stepping, typed row costs, the row-min shortcut, direct slot-map writes, packed DP mask rows, non-improving DP backtrace skips, lazy active-group range entries, strict-worse Hungarian pruning, and Hungarian scratch reuse helped measured samples, but slot assignment remains the next primary optimization surface. Preserve real-combat signatures; direct Hungarian assignment changed behavior, equal-cost Hungarian pruning changed behavior, Hungarian-bounded DP was slower in the real profiler, lower-bound DP pruning was slower, DP open-column caching was slower, positive-angle wrap cleanup was slower, greedy-bounded exact DP regressed real movement profiling, a cached column-bit array was slower in the focused gate, and removing predecessor sentinel fills regressed real movement profiling despite a focused benchmark win.
+  - `MovementService2._update_impl()` computes alive flags, target groups, slot maps, steering, avoidance, and collision resolution every simulation step.
+  - The largest obvious per-frame buffer rebuilds are now handled, and the exact slot solver no longer uses factorial permutation search.
+   - `PerfMovementPhases.tscn` now proves `SlotStrategy.assign_for_target()` / slot assignment remains the largest 12v12 movement slice. The Hungarian-dual DP prune plus DP scratch reuse lowered it from earlier `85-90%` samples, but the latest restored baselines still put 12v12 slot assignment around `83%` of measured movement time. Temporary deeper instrumentation showed the core exact DP search alone consumed about `80%` of 12v12 slot-assignment time before the retained focused DP benchmark was added. Slot allocation, range-dictionary cleanup, inline circular-distance cleanup, single-distance slot stepping, typed row costs, the row-min shortcut, direct slot-map writes, packed DP mask rows, non-improving DP backtrace skips, lazy active-group range entries, strict-worse Hungarian pruning, Hungarian scratch reuse, first-solve Hungarian bounds, Hungarian-dual edge pruning, compact slot-angle rows, DP scratch reuse, the precomputed-row assignment evaluator, 2/3/4-row exact assignment fast paths, generic count-2 precomputed evaluation, and avoiding duplicate assignment arrays helped measured samples, but slot assignment remains the next primary optimization surface. Preserve real-combat signatures; direct Hungarian assignment changed behavior, equal-cost Hungarian pruning changed behavior, Hungarian-bounded DP was slower in the real profiler, lower-bound DP pruning was slower, DP open-column caching was slower, positive-angle wrap cleanup was slower, greedy-bounded exact DP regressed real movement profiling, a cached column-bit array was slower in the focused gate, Vector2-packed slot angle rows changed signatures, removing predecessor sentinel fills regressed real movement profiling despite a focused benchmark win, a flat 4-row permutation scan changed DP tie signatures, a dedicated 4-row precomputed cost-row scratch path regressed real movement despite a split-target focused win, lowering the Hungarian prune threshold to 7, 8, or 9 rows improved focused solver rows but regressed same-window real movement, and lazy row-cost/cost-scratch evaluator rewrites regressed focused solver gates.
+   - The added `8v8_large` and `9v9_large` phase cases show long fights are less slot-dominated than the 12v12 wipe case: latest restored samples put 8v8 around `40%` slot assignment, `34.6%` combined player/enemy step loops, and `10.7%` collision, while 9v9 was `53.6%` slot assignment and `26.3%` combined step loops. Future work should keep 12v12 slot assignment as the top single hotspot but use 8v8/9v9 phase evidence before ignoring step-loop or collision improvements.
+   - `PerfTargetGroupShapes.tscn` distinguishes real target-group shapes from timing slices, and `PerfMovementPhases.tscn` now prints slot group-size histograms, player/enemy slot-assignment time, assignment time by group size, and slot subphase timing. Latest diagnostics show the expensive large-team slot slice is mostly player-side; many small 1/2/3-attacker groups dominate event counts, but high-count 9/10/11/12-attacker clumps dominate assignment time in the worst rows. The subphase split shows high-count cost is almost entirely rotation/evaluator work, not pair building or output writeback. Use these diagnostics before assuming a solver optimization helps every large-board case equally.
 
 2. Targeting does meaningful per-candidate scoring.
    - `Targeting.pick_by_priority()` walks live enemies and may score ally peel pressure and nearby units.
    - The `target_recheck_interval_s=0.35` throttle is important. Do not move this to per-frame retargeting.
-   - `PerfTargeting.tscn` now isolates target-priority scoring and shows attacker approach metadata plus support ally peel metadata were real focused hotspots. The current implementation caches attacker role/goal/approach mask and ally peel priorities once per pick; future targeting work should preserve signature `9036604269279486158` in that focused benchmark.
+   - `PerfTargeting.tscn` now isolates target-priority scoring and shows attacker approach metadata plus support ally peel metadata were real focused hotspots. The current implementation caches attacker role/goal/approach mask and ally peel priorities once per pick, and routes non-support attackers through a narrower scorer that skips support-peel argument traffic; future targeting work should preserve signature `9036604269279486158` in that focused benchmark.
 
 3. Telemetry and UI signals are broad.
    - Combat emits position, target, hit, stat, and team-stat signals.
    - Headless base-only RGA now disables unused position/target telemetry.
    - Player-facing HUD refreshes now skip duplicate broad stat/team-stat repaints, arena actors skip unchanged bar/texture applications, and arena movement is applied from position signals instead of per-frame full-team polling.
    - `position_updated` still fires roughly 155-170 times in the short diagnostics combat, but the UI now applies those events directly instead of issuing roughly 2058 actor position setter calls.
-   - Collision and texture caching are not current large hotspots in focused checks: collision samples are tens of milliseconds and texture/circle requests hit cache after one real load/generation.
+   - Collision and texture caching are not current large hotspots in focused checks: collision now iterates live-unit pairs only, avoids repeated active-pair cap clamping, and stayed at `93-126ms` focused median total in latest repeats, while texture/circle requests hit cache after one real load/generation.
    - UI listeners should keep using diagnostics gates before further repaint or signal-throttling changes.
 
 4. Simulation cadence is sensitive.
@@ -387,12 +1653,13 @@ Scope: Godot 4.5 Gamble Battle runtime, focused on combat simulation and player-
 
 ## Recommended Next Optimizations
 
-1. Clean up remaining dummy-renderer teardown diagnostics in `CombatArenaBoundsSmoke.tscn` if that scene must become a strict empty-error gate; its stale-bounds assertion now passes.
-2. Consider engine-level `position_updated` coalescing only if telemetry consumers or visual profiling prove the remaining 159 events are material; the UI no longer polls every actor every frame.
-3. Use `PerfSlotTeamAssignment.tscn`, `PerfMovementPhases.tscn`, and `PerfLargeBoard.tscn` as the focused/regression/stress gates before future movement changes above 6v6.
-4. Use `PerfTargeting.tscn` before and after target-priority changes, then confirm with `Perf6v6.tscn` or `RoleMatrixProbe6v6.tscn`.
-5. Continue slot assignment work with a tie-preserving exact algorithm or a proven safe cache; direct Hungarian assignment is not acceptable because it changed real combat signatures.
-6. Continue adaptive/coarse stepping only behind acceptance tests; `delta_s=0.25` changed signatures in the sweep.
+1. Continue slot assignment work above the tiny 2/3/4-row fast paths with a tie-preserving exact algorithm or a proven safe cache; direct Hungarian assignment is not acceptable because it changed real combat signatures. Prioritize high-count 9/10/11/12 rotation/evaluator timing, then check both count-12 and the new count-6 assignment coverage before broader movement gates.
+2. Use `PerfTargetGroupShapes.tscn` to confirm which target-group sizes are actually driving a proposed solver change, then use `PerfSlotSolverBreakdown.tscn` and `PerfSlotDpSearch.tscn` for `_best_assignment_dp()` and base-rotation solver changes, including the count-6 gates for pair-split work. Gate retained changes with `PerfSlotTeamAssignment.tscn`, `PerfMovementPhases.tscn`, and `PerfLargeBoard.tscn` before future movement changes above 6v6.
+3. Use `PerfTargeting.tscn` before and after target-priority changes, then confirm with `Perf6v6.tscn` or `RoleMatrixProbe6v6.tscn`.
+4. Consider engine-level `position_updated` coalescing only if telemetry consumers or visual profiling prove the remaining 155-170 events are material; the UI no longer polls every actor every frame.
+5. Continue adaptive/coarse stepping only behind acceptance tests; `delta_s=0.25` changed signatures in the sweep.
+6. Clean up remaining dummy-renderer teardown diagnostics in `CombatArenaBoundsSmoke.tscn` only if that scene must become a strict empty-error gate; its stale-bounds assertion now passes.
+7. Treat collision as monitored rather than primary until a new profile shows it materially above the latest `3.5-7.7%` real movement slice.
 
 ## Guardrails
 

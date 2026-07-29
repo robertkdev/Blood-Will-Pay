@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "ivara_open_bid"
 name = "Open Bid"
 description = "Marks the highest-health enemy with a long-range bid shot that shreds defenses and starts focus."
+targeting_summary = "Highest-health enemy."
 base_cost = 35
 tags = ["damage", "long_range", "debuff", "engage"]

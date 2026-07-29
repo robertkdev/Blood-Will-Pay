@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "grint_body_check"
 name = "Body Check"
 description = "Swipe the target for 100/150/225 + 0.6×AD physical damage, then dash into the target, knocking them back by 1 tile."
+targeting_summary = "Current attack target."
 base_cost = 60
 tags = ["damage", "dash", "knockback", "physical"]

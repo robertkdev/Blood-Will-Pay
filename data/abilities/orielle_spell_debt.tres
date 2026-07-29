@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "orielle_spell_debt"
 name = "Spell Debt"
 description = "Stores nearby mana pressure as debt, then detonates a denial zone that disrupts enemy timing."
+targeting_summary = "Current attack target, or lowest-health enemy if none; detonates a zone around that target."
 base_cost = 65
 tags = ["damage", "zone", "disrupt", "ramp"]

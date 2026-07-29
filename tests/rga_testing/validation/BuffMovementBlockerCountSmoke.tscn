@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/buff_movement_blocker_count_smoke.gd" id="1"]
+
+[node name="BuffMovementBlockerCountSmoke" type="Node"]
+script = ExtResource("1")

@@ -3,10 +3,10 @@ extends Node
 const SlotStrategyScript: Script = preload("res://scripts/game/combat/movement/strategies/slot_strategy.gd")
 const UnitFactoryScript: Script = preload("res://scripts/unit_factory.gd")
 
-@export var samples_per_case: int = 2
+@export var samples_per_case: int = 3
 
 const UNIT_IDS: Array[String] = [
-	"bonko", "korath", "sari", "pilfer", "cashmere", "axiom",
+	"bonko", "korath", "sari", "pilfer", "mara", "axiom",
 	"brute", "repo", "hexeon", "luna", "nyxa", "morrak"
 ]
 
@@ -15,9 +15,32 @@ func _ready() -> void:
 
 func _run() -> void:
 	var cases: Array[Dictionary] = [
-		{"label": "single_6", "count": 6, "target_count": 1, "iterations": 180},
-		{"label": "single_12", "count": 12, "target_count": 1, "iterations": 24},
-		{"label": "split_12", "count": 12, "target_count": 3, "iterations": 72}
+		{"label": "dict_single_6", "mode": "dict", "count": 6, "target_count": 1, "iterations": 180},
+		{"label": "dict_single_7", "mode": "dict", "count": 7, "target_count": 1, "iterations": 120},
+		{"label": "dict_single_8", "mode": "dict", "count": 8, "target_count": 1, "iterations": 72},
+		{"label": "dict_single_9", "mode": "dict", "count": 9, "target_count": 1, "iterations": 48},
+		{"label": "dict_single_10", "mode": "dict", "count": 10, "target_count": 1, "iterations": 36},
+		{"label": "dict_single_11", "mode": "dict", "count": 11, "target_count": 1, "iterations": 30},
+		{"label": "dict_single_12", "mode": "dict", "count": 12, "target_count": 1, "iterations": 24},
+		{"label": "dict_pair_10", "mode": "dict", "count": 10, "target_count": 2, "iterations": 108},
+		{"label": "dict_pair_11", "mode": "dict", "count": 11, "target_count": 2, "iterations": 102},
+		{"label": "dict_pair_12", "mode": "dict", "count": 12, "target_count": 2, "iterations": 96},
+		{"label": "dict_split_12", "mode": "dict", "count": 12, "target_count": 3, "iterations": 72},
+		{"label": "dict_quad_12", "mode": "dict", "count": 12, "target_count": 4, "iterations": 120},
+		{"label": "dict_spread_12", "mode": "dict", "count": 12, "target_count": 12, "iterations": 180},
+		{"label": "array_single_6", "mode": "array", "count": 6, "target_count": 1, "iterations": 180},
+		{"label": "array_single_7", "mode": "array", "count": 7, "target_count": 1, "iterations": 120},
+		{"label": "array_single_8", "mode": "array", "count": 8, "target_count": 1, "iterations": 72},
+		{"label": "array_single_9", "mode": "array", "count": 9, "target_count": 1, "iterations": 48},
+		{"label": "array_single_10", "mode": "array", "count": 10, "target_count": 1, "iterations": 36},
+		{"label": "array_single_11", "mode": "array", "count": 11, "target_count": 1, "iterations": 30},
+		{"label": "array_single_12", "mode": "array", "count": 12, "target_count": 1, "iterations": 24},
+		{"label": "array_pair_10", "mode": "array", "count": 10, "target_count": 2, "iterations": 108},
+		{"label": "array_pair_11", "mode": "array", "count": 11, "target_count": 2, "iterations": 102},
+		{"label": "array_pair_12", "mode": "array", "count": 12, "target_count": 2, "iterations": 96},
+		{"label": "array_split_12", "mode": "array", "count": 12, "target_count": 3, "iterations": 72},
+		{"label": "array_quad_12", "mode": "array", "count": 12, "target_count": 4, "iterations": 120},
+		{"label": "array_spread_12", "mode": "array", "count": 12, "target_count": 12, "iterations": 180}
 	]
 	var aggregate_signature: int = 23
 	var total_ms: int = 0
@@ -27,6 +50,7 @@ func _run() -> void:
 		total_ms += int(result.get("median_ms", 0))
 		aggregate_signature = _mix(aggregate_signature, int(result.get("signature", 0)))
 		print("PerfSlotTeamAssignment case=", String(case_data.get("label", "")),
+			" mode=", String(case_data.get("mode", "")),
 			" count=", int(case_data.get("count", 0)),
 			" target_count=", int(case_data.get("target_count", 0)),
 			" iterations=", int(case_data.get("iterations", 0)),
@@ -48,7 +72,8 @@ func _run_case(case_data: Dictionary, sample_count: int) -> Dictionary:
 		var sample: Dictionary = _run_case_once(
 			int(case_data.get("count", 0)),
 			int(case_data.get("target_count", 1)),
-			int(case_data.get("iterations", 0)))
+			int(case_data.get("iterations", 0)),
+			String(case_data.get("mode", "dict")))
 		ms_values.append(int(sample.get("time_ms", 0)))
 		if sample_index == 0:
 			first_signature = int(sample.get("signature", 0))
@@ -64,7 +89,7 @@ func _run_case(case_data: Dictionary, sample_count: int) -> Dictionary:
 		"signature": first_signature
 	}
 
-func _run_case_once(count: int, target_count: int, iterations: int) -> Dictionary:
+func _run_case_once(count: int, target_count: int, iterations: int, mode: String) -> Dictionary:
 	var strategy: SlotStrategy = SlotStrategyScript.new()
 	var units: Array[Unit] = _spawn_units(count)
 	var positions: Array[Vector2] = _positions_for(count, Vector2(300.0, 384.0), -1.0)
@@ -76,31 +101,65 @@ func _run_case_once(count: int, target_count: int, iterations: int) -> Dictionar
 	var profiles: Array[MovementProfile] = _profiles_for(count)
 	var previous_slots: Dictionary[int, Dictionary] = _previous_slots_for(count)
 	var last_map: Dictionary = {}
+	var slot_positions: Array[Vector2] = _vector2_array(count, Vector2.ZERO)
+	var slot_indices: Array[int] = _int_array(count, -1)
+	var slot_los: Array[bool] = _bool_array(count, false)
+	var slot_slow_radii: Array[float] = _float_array(count, 0.0)
+	var slot_corridor_radii: Array[float] = _float_array(count, 0.0)
+	var slot_corridor_eps: Array[float] = _float_array(count, 0.0)
 	var guard_sum: int = 0
 	var started_usec: int = Time.get_ticks_usec()
 	for iteration in range(max(0, iterations)):
 		_nudge_targets(target_positions, iteration)
-		last_map = strategy.assign_slots_for_team(
-			"player",
-			units,
-			positions,
-			alive,
-			targets,
-			target_positions,
-			target_alive,
-			groups,
-			profiles,
-			96.0,
-			0,
-			[],
-			previous_slots,
-			6)
-		guard_sum += last_map.size()
+		if mode == "array":
+			slot_indices.fill(-1)
+			slot_los.fill(false)
+			strategy.assign_slots_for_team_into_arrays(
+				"player",
+				units,
+				positions,
+				alive,
+				targets,
+				target_positions,
+				target_alive,
+				groups,
+				profiles,
+				96.0,
+				slot_positions,
+				slot_indices,
+				slot_los,
+				slot_slow_radii,
+				slot_corridor_radii,
+				slot_corridor_eps,
+				0,
+				[],
+				previous_slots,
+				6)
+			guard_sum += _assigned_slot_count(slot_indices)
+		else:
+			last_map = strategy.assign_slots_for_team(
+				"player",
+				units,
+				positions,
+				alive,
+				targets,
+				target_positions,
+				target_alive,
+				groups,
+				profiles,
+				96.0,
+				0,
+				[],
+				previous_slots,
+				6)
+			guard_sum += last_map.size()
 	var elapsed_ms: int = int((Time.get_ticks_usec() - started_usec) / 1000)
+	var final_size: int = _assigned_slot_count(slot_indices) if mode == "array" else last_map.size()
+	var signature: int = _array_signature(slot_positions, slot_indices, slot_los, slot_slow_radii, guard_sum) if mode == "array" else _map_signature(last_map, guard_sum)
 	return {
 		"time_ms": elapsed_ms,
-		"map_size": last_map.size(),
-		"signature": _map_signature(last_map, guard_sum)
+		"map_size": final_size,
+		"signature": signature
 	}
 
 func _spawn_units(count: int) -> Array[Unit]:
@@ -168,6 +227,24 @@ func _bool_array(count: int, value: bool) -> Array[bool]:
 		out.append(value)
 	return out
 
+func _int_array(count: int, value: int) -> Array[int]:
+	var out: Array[int] = []
+	for _index in range(max(0, count)):
+		out.append(value)
+	return out
+
+func _float_array(count: int, value: float) -> Array[float]:
+	var out: Array[float] = []
+	for _index in range(max(0, count)):
+		out.append(value)
+	return out
+
+func _vector2_array(count: int, value: Vector2) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for _index in range(max(0, count)):
+		out.append(value)
+	return out
+
 func _nudge_targets(target_positions: Array[Vector2], iteration: int) -> void:
 	for index in range(target_positions.size()):
 		target_positions[index] = target_positions[index] + Vector2(float((iteration + index) % 3) - 1.0, float((iteration * 2 + index) % 5) - 2.0)
@@ -187,6 +264,28 @@ func _map_signature(slot_map: Dictionary, guard_sum: int) -> int:
 		signature = _mix(signature, int(round(float(slot_data.get("angle", 0.0)) * 10000.0)))
 		signature = _mix(signature, int(round(float(slot_data.get("slow_radius", 0.0)) * 100.0)))
 	return signature
+
+func _array_signature(slot_positions: Array[Vector2], slot_indices: Array[int], slot_los: Array[bool], slow_radii: Array[float], guard_sum: int) -> int:
+	var signature: int = _mix(43, guard_sum)
+	for index in range(slot_indices.size()):
+		var slot_index: int = int(slot_indices[index])
+		if slot_index < 0:
+			continue
+		var position: Vector2 = slot_positions[index]
+		signature = _mix(signature, index)
+		signature = _mix(signature, slot_index)
+		signature = _mix(signature, 1 if slot_los[index] else 0)
+		signature = _mix(signature, int(round(position.x * 100.0)))
+		signature = _mix(signature, int(round(position.y * 100.0)))
+		signature = _mix(signature, int(round(float(slow_radii[index]) * 100.0)))
+	return signature
+
+func _assigned_slot_count(slot_indices: Array[int]) -> int:
+	var count: int = 0
+	for slot_index in slot_indices:
+		if int(slot_index) >= 0:
+			count += 1
+	return count
 
 func _percentile_int(values: Array[int], pct: float) -> int:
 	if values.is_empty():

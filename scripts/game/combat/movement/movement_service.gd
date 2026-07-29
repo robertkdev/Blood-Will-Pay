@@ -65,6 +65,12 @@ func player_positions_copy() -> Array:
 func enemy_positions_copy() -> Array:
 	return _impl.enemy_positions_copy()
 
+func player_positions_current() -> Array[Vector2]:
+	return _impl.player_positions_current()
+
+func enemy_positions_current() -> Array[Vector2]:
+	return _impl.enemy_positions_current()
+
 func copy_all_positions_to(out: Array[Vector2]) -> void:
 	_impl.copy_all_positions_to(out)
 
@@ -85,6 +91,9 @@ func tile_size() -> float:
 
 func update_movement(state, delta: float, target_resolver: Callable) -> void:
 	_impl.update_movement(state, delta, target_resolver)
+
+func update_movement_with_targets(state, delta: float, player_targets: Array[int], enemy_targets: Array[int]) -> void:
+	_impl.update_movement_with_targets(state, delta, player_targets, enemy_targets)
 
 func update(delta: float, state, target_resolver: Callable) -> void:
 	_impl.update(delta, state, target_resolver)

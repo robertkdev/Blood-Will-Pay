@@ -83,17 +83,17 @@ func _on_unit_dropped(target_grid, tile_idx: int, uv: UnitView) -> void:
 func _bench_to_board(uv: UnitView, tile_idx: int) -> bool:
 	if manager == null or board_grid == null or bench_grid == null or grid_placement == null or bench_placement == null:
 		return _set_route_status(false, "missing_refs")
-	if board_grid.is_occupied(tile_idx):
-		if Debug.enabled:
-			print("[MoveRouter] Bench→Board failed: tile occupied", tile_idx)
-		_snap_back(uv)
-		return _set_route_status(false, "board_tile_occupied", {"tile": tile_idx})
 
 	# Explicitly type and cast the unit
 	var u: Unit = (uv.unit as Unit)
 	if u == null:
 		_snap_back(uv)
 		return _set_route_status(false, "missing_unit")
+	var source_slot: int = bench_grid.index_of(uv)
+	if source_slot == -1:
+		source_slot = _roster_slot_of(u)
+	if board_grid.is_occupied(tile_idx):
+		return _bench_to_board_swap(uv, tile_idx, u, source_slot)
 	if uv.has_method("set_bench_mode"):
 		uv.set_bench_mode(false)
 
@@ -136,6 +136,39 @@ func _bench_to_board(uv: UnitView, tile_idx: int) -> bool:
 		if uv.is_inside_tree():
 			uv.queue_free()
 	return _set_route_status(true, "bench_to_board", {"tile": tile_idx, "team_size": manager.player_team.size()})
+
+func _bench_to_board_swap(uv: UnitView, tile_idx: int, bench_unit: Unit, source_slot: int) -> bool:
+	if roster == null:
+		_snap_back(uv)
+		return _set_route_status(false, "missing_roster")
+	if source_slot < 0 or source_slot >= bench_grid.size():
+		_snap_back(uv)
+		return _set_route_status(false, "bench_source_missing", {"tile": tile_idx, "bench_slot": source_slot})
+	var board_unit: Unit = _board_unit_at_tile(tile_idx)
+	if board_unit == null:
+		_snap_back(uv)
+		return _set_route_status(false, "board_unit_missing", {"tile": tile_idx, "bench_slot": source_slot})
+	var board_team_index: int = _team_index_of(board_unit)
+	if board_team_index == -1:
+		_snap_back(uv)
+		return _set_route_status(false, "board_unit_not_in_team", {"tile": tile_idx, "bench_slot": source_slot})
+	if uv.has_method("set_bench_mode"):
+		uv.set_bench_mode(false)
+	manager.player_team[board_team_index] = bench_unit
+	roster.set_slot(source_slot, board_unit)
+	if refresh_cb.is_valid():
+		refresh_cb.call()
+	else:
+		bench_placement.rebuild_bench_views(roster.bench_slots if roster else [], true)
+		grid_placement.rebuild_player_views(manager.player_team, true)
+	if grid_placement.has_method("_on_player_unit_dropped"):
+		grid_placement._on_player_unit_dropped(board_team_index, tile_idx)
+	if uv:
+		if uv.has_method("cleanup_drag_artifacts"):
+			uv.cleanup_drag_artifacts()
+		if uv.is_inside_tree():
+			uv.queue_free()
+	return _set_route_status(true, "bench_to_board_swap", {"tile": tile_idx, "bench_slot": source_slot, "team_size": manager.player_team.size()})
 
 func _board_to_bench(uv: UnitView, tile_idx: int) -> bool:
 	if manager == null or board_grid == null or bench_grid == null or grid_placement == null or bench_placement == null or roster == null:
@@ -239,3 +272,36 @@ func _snap_back(uv: UnitView) -> void:
 		if si != -1:
 			bench_grid.attach(uv, si)
 			return
+
+func _board_unit_at_tile(tile_idx: int) -> Unit:
+	if board_grid == null:
+		return null
+	var occupant: Control = null
+	if board_grid.has_method("occupant_at"):
+		occupant = board_grid.occupant_at(tile_idx)
+	var board_view: UnitView = occupant as UnitView
+	if board_view != null:
+		return board_view.unit as Unit
+	if grid_placement != null and grid_placement.has_method("get_player_views"):
+		for slot_value: Variant in grid_placement.get_player_views():
+			if slot_value == null:
+				continue
+			if int(slot_value.tile_idx) == tile_idx:
+				return slot_value.unit as Unit
+	return null
+
+func _team_index_of(unit: Unit) -> int:
+	if unit == null or manager == null:
+		return -1
+	for index: int in range(manager.player_team.size()):
+		if manager.player_team[index] == unit:
+			return index
+	return -1
+
+func _roster_slot_of(unit: Unit) -> int:
+	if unit == null or roster == null:
+		return -1
+	for index: int in range(roster.bench_slots.size()):
+		if roster.bench_slots[index] == unit:
+			return index
+	return -1

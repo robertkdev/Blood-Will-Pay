@@ -7,5 +7,6 @@ script = ExtResource("1")
 id = "nyxa_chaos_volley"
 name = "Chaos Volley"
 description = "Fires random arrows for the next four attacks, gaining +1 arrow per cast."
+targeting_summary = "Initial volley hits random living enemies; empowered attacks keep using attack targeting."
 base_cost = 50
 tags = Array[String](["damage", "multishot"])

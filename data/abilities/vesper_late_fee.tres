@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "vesper_late_fee"
 name = "Late Fee"
 description = "Marks a weakened target, blinks in after a readable delay, executes, and phases out on reset."
+targeting_summary = "Lowest-health enemy from the enemy backline half; falls back to lowest-health enemy."
 base_cost = 30
 tags = ["damage", "execute", "reset_mechanic", "untargetable"]

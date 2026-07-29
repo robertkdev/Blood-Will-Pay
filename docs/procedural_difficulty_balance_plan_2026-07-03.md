@@ -46,7 +46,9 @@ Chapter target:
   - first RGA: `1.90`
   - second RGA: `2.25`
   - boss: `2.65`
+  - chapter 1 boss: `2.15`
   - mirror: `2.65`
+- Chapter 1 boss levels are capped at `2` so the first boss is a runway spike, not a late-run scaling check.
 
 Generated normal/boss board difficulty now includes:
 
@@ -100,7 +102,7 @@ Latest audit after trait-aware scoring and the Chapter 1 runway patch:
 - Chapter 1 Round 1 sample: fixed Beegle runway opener, target `100`, difficulty `100`.
 - Chapter 1 Round 2 sample: starter-safe RGA director runway spec, with `target_rating` set to its measured `difficulty_rating`.
 - Chapter 1 Round 3 sample: starter-safe RGA director runway spec, with `target_rating` set to its measured `difficulty_rating`.
-- Chapter 1 boss sample: raw unit rating `182`, active trait pressure `57`, total difficulty `239` against target `265`.
+- Chapter 1 boss sample: target `215` with authored level cap `2`; refresh `DifficultyRatingAudit.tscn` after the UI pass for exact post-cap sample rows.
 
 The important change is that trait pressure now pulls generated levels downward instead of silently stacking on top of a near-target raw unit board. The Chapter 1 runway also keeps the first two RGA rounds authored around starter readability before the budgeted generator takes over.
 

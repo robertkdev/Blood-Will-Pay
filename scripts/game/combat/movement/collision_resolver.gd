@@ -4,10 +4,8 @@ class_name CollisionResolver
 const Debug = preload("res://scripts/util/debug.gd")
 
 var _all_pos: Array[Vector2] = []
-var _all_alive: Array[bool] = []
 var _caps: Array[float] = []
-var _tag_is_player: Array[bool] = []
-var _tag_indices: Array[int] = []
+var _active_indices: Array[int] = []
 
 # CollisionResolver
 # Simple O(n^2) circle separation working across both teams. Performs a single
@@ -29,23 +27,27 @@ func resolve(
         debug_log: bool = false) -> void:
     if radius <= 0.0:
         return
-    _all_pos.clear()
-    _all_alive.clear()
-    _caps.clear()
-    _tag_is_player.clear()
-    _tag_indices.clear()
-    for i in range(player_positions.size()):
-        _all_pos.append(player_positions[i])
-        _all_alive.append((player_alive[i] if i < player_alive.size() else true))
-        _caps.append((player_step_caps[i] if i < player_step_caps.size() else 0.0))
-        _tag_is_player.append(true)
-        _tag_indices.append(i)
-    for j in range(enemy_positions.size()):
-        _all_pos.append(enemy_positions[j])
-        _all_alive.append((enemy_alive[j] if j < enemy_alive.size() else true))
-        _caps.append((enemy_step_caps[j] if j < enemy_step_caps.size() else 0.0))
-        _tag_is_player.append(false)
-        _tag_indices.append(j)
+    var player_count: int = player_positions.size()
+    var enemy_count: int = enemy_positions.size()
+    var total_count: int = player_count + enemy_count
+    _all_pos.resize(total_count)
+    _caps.resize(total_count)
+    _active_indices.clear()
+    for i in range(player_count):
+        _all_pos[i] = player_positions[i]
+        var player_is_alive: bool = player_alive[i]
+        var player_step_cap: float = player_step_caps[i]
+        _caps[i] = max(0.0, player_step_cap)
+        if player_is_alive:
+            _active_indices.append(i)
+    for j in range(enemy_count):
+        var write_index: int = player_count + j
+        _all_pos[write_index] = enemy_positions[j]
+        var enemy_is_alive: bool = enemy_alive[j]
+        var enemy_step_cap: float = enemy_step_caps[j]
+        _caps[write_index] = max(0.0, enemy_step_cap)
+        if enemy_is_alive:
+            _active_indices.append(write_index)
 
     var min_dist: float = radius * 2.0
     var min_dist2: float = min_dist * min_dist
@@ -58,13 +60,12 @@ func resolve(
     var friend_pairs: int = 0
     var enemy_pairs: int = 0
     var max_overlap_seen: float = 0.0
+    var active_count: int = _active_indices.size()
     for _iter in range(iters):
-        for a in range(_all_pos.size()):
-            if not _all_alive[a]:
-                continue
-            for b in range(a + 1, _all_pos.size()):
-                if not _all_alive[b]:
-                    continue
+        for active_a in range(active_count):
+            var a: int = _active_indices[active_a]
+            for active_b in range(active_a + 1, active_count):
+                var b: int = _active_indices[active_b]
                 var pa: Vector2 = _all_pos[a]
                 var pb: Vector2 = _all_pos[b]
                 var diff: Vector2 = pb - pa
@@ -78,9 +79,9 @@ func resolve(
                 var dir: Vector2 = diff / d if d > 0.0 else Vector2.RIGHT
                 var half: float = overlap * 0.5
 
-                var same_team: bool = (_tag_is_player[a] == _tag_is_player[b])
-                var cap_a: float = max(0.0, _caps[a])
-                var cap_b: float = max(0.0, _caps[b])
+                var same_team: bool = (a < player_count) == (b < player_count)
+                var cap_a: float = _caps[a]
+                var cap_b: float = _caps[b]
 
                 var move_a: float
                 var move_b: float
@@ -109,18 +110,29 @@ func resolve(
                         resolved_pairs += 1
 
     # Write back and clamp
-    for i2 in range(_all_pos.size()):
-        var idx: int = _tag_indices[i2]
+    var clamp_to_bounds: bool = bounds != Rect2()
+    var min_x: float = 0.0
+    var min_y: float = 0.0
+    var max_x: float = 0.0
+    var max_y: float = 0.0
+    if clamp_to_bounds:
+        min_x = bounds.position.x
+        min_y = bounds.position.y
+        max_x = bounds.position.x + bounds.size.x
+        max_y = bounds.position.y + bounds.size.y
+    for i2 in range(player_count):
         var p: Vector2 = _all_pos[i2]
-        if bounds != Rect2():
-            p.x = clampf(p.x, bounds.position.x, bounds.position.x + bounds.size.x)
-            p.y = clampf(p.y, bounds.position.y, bounds.position.y + bounds.size.y)
-        if _tag_is_player[i2]:
-            if idx < player_positions.size():
-                player_positions[idx] = p
-        else:
-            if idx < enemy_positions.size():
-                enemy_positions[idx] = p
+        if clamp_to_bounds:
+            p.x = clampf(p.x, min_x, max_x)
+            p.y = clampf(p.y, min_y, max_y)
+        player_positions[i2] = p
+    for j2 in range(enemy_count):
+        var enemy_write_index: int = player_count + j2
+        var enemy_p: Vector2 = _all_pos[enemy_write_index]
+        if clamp_to_bounds:
+            enemy_p.x = clampf(enemy_p.x, min_x, max_x)
+            enemy_p.y = clampf(enemy_p.y, min_y, max_y)
+        enemy_positions[j2] = enemy_p
 
     if collect_debug_stats:
         print("[Coll] iters=", iters, " pairs=", total_pairs, " resolved=", resolved_pairs,

@@ -24,7 +24,7 @@ func _run() -> void:
 	_presenter.configure(self, grid)
 	await get_tree().process_frame
 
-	var buy_xp: Button = _button_with_text("Buy XP")
+	var buy_xp: Button = _button_with_text_prefix("Buy XP")
 	_expect(buy_xp != null, "Buy XP button missing")
 	if buy_xp == null:
 		_finish()
@@ -38,7 +38,7 @@ func _run() -> void:
 	_expect(int(Economy.gold) == 4, "4g Buy XP denial should leave gold unchanged")
 	_expect(int(Shop.get_level()) == 1, "4g Buy XP denial should leave level unchanged")
 	_expect(int(Shop.get_xp()) == 0, "4g Buy XP denial should leave XP unchanged")
-	_expect(_label_with_text("Need +2 gold to buy XP and keep 2 health.") != null, "4g Buy XP denial should show reserve-floor feedback")
+	_expect(_label_with_text("Need +1 gold to buy XP and keep 1 health.") != null, "4g Buy XP denial should show reserve-floor feedback")
 	_expect(_label_with_text("Lvl 1 (0/2)") != null, "4g Buy XP denial should leave progress label at Lvl 1 (0/2)")
 
 	_set_gold(6)
@@ -84,13 +84,13 @@ func _press_button(button: Button) -> void:
 		return
 	button.emit_signal("pressed")
 
-func _button_with_text(text: String) -> Button:
+func _button_with_text_prefix(text: String) -> Button:
 	if _host == null:
 		return null
 	var buttons: Array[Node] = _host.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and String(button.text) == text:
+		if button != null and String(button.text).begins_with(text):
 			return button
 	return null
 

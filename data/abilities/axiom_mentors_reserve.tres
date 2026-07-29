@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "axiom_mentors_reserve"
 name = "Mentor's Reserve"
 description = "Grants the Pupil mana, empowers their damage, and shields self for a short duration."
+targeting_summary = "Pupil ally; also shields self."
 base_cost = 60
 tags = ["shield", "support", "amp"]

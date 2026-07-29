@@ -14,11 +14,19 @@ var traits: Array[String] = []
 var roles: Array[String] = [] # Legacy multi-role data; prefer primary_role/goal
 var cost: int = 1
 var level: int = 1
+var purchase_value: int = 0
+var market_package_kind: String = "standard"
+var capital_charter_id: String = ""
+var ascension_path_id: String = ""
+var targeting_mode_override: String = ""
 var primary_role: String = ""
 var primary_goal: String = ""
 var approaches: Array[String] = []
 var alt_goals: Array[String] = []
 var identity: UnitIdentity = null
+var targeting_approach_mask_cache: int = -1
+var targeting_role_cache: String = ""
+var targeting_goal_cache: String = ""
 
 # Health
 var max_hp: int = int(UnitDefaults.BASELINE_STATS["max_hp"])
@@ -74,12 +82,12 @@ func heal_to_full() -> void:
 
 func take_damage(amount: int) -> int:
 	# Armor/damage_reduction could reduce damage earlier in pipeline.
-	var res := Health.apply_damage(self, amount)
+	var res: Dictionary = Health.apply_damage(self, amount)
 	return int(res.get("dealt", int(max(0, amount))))
 
 func attack_roll(rng: RandomNumberGenerator) -> Dictionary:
 	# Deprecated: prefer AttackRoller.roll; keep for compatibility
-	var roller := preload("res://scripts/game/combat/attack/roll/attack_roller.gd").new()
+	var roller: Variant = preload("res://scripts/game/combat/attack/roll/attack_roller.gd").new()
 	roller.deterministic = false
 	return roller.roll(self, rng)
 
@@ -99,6 +107,9 @@ func set_identity_data(primary_role_value: String, primary_goal_value: String, a
 	approaches = _to_string_array(approaches_value)
 	alt_goals = _to_string_array(alt_goals_value)
 	identity = identity_resource
+	targeting_approach_mask_cache = -1
+	targeting_role_cache = String(primary_role).strip_edges().to_lower()
+	targeting_goal_cache = String(primary_goal).strip_edges().to_lower()
 
 func get_primary_role() -> String:
 	return primary_role
@@ -109,7 +120,7 @@ func get_primary_goal() -> String:
 func is_primary_role(role_id: String) -> bool:
 	if role_id == null:
 		return false
-	var current := String(primary_role).strip_edges()
+	var current: String = String(primary_role).strip_edges()
 	if current == "":
 		return false
 	return current.to_lower() == String(role_id).strip_edges().to_lower()
@@ -121,7 +132,7 @@ func get_alt_goals() -> Array[String]:
 	return alt_goals.duplicate()
 
 func has_approach(approach_id: String) -> bool:
-	var key := String(approach_id)
+	var key: String = String(approach_id)
 	for a in approaches:
 		if String(a) == key:
 			return true

@@ -1,29 +1,48 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const TEST_SETTINGS_PATH: String = "user://title_menu_smoke_settings.cfg"
+const VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
 
 func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	DisplayServer.window_set_size(VIEWPORT_SIZE)
+	var window: Window = get_window()
+	if window != null:
+		window.size = VIEWPORT_SIZE
+		window.content_scale_size = VIEWPORT_SIZE
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	UserSettingsScript.set_ui_scale(1.0, window)
+	UserSettingsScript.set_reduced_motion(false)
 	var main: Control = MAIN_SCENE.instantiate()
 	add_child(main)
 	await get_tree().process_frame
 	await get_tree().process_frame
 
 	var failures: Array[String] = []
+	var title_page: Control = main.get_node_or_null("TitlePage") as Control
+	_expect(title_page != null and title_page.visible, "TitlePage should be visible before the main menu", failures)
 	var title_menu: Control = main.get_node_or_null("TitleMenu") as Control
 	_expect(title_menu != null, "TitleMenu missing", failures)
 	if title_menu != null:
-		_expect(title_menu.visible, "TitleMenu is not visible on main start", failures)
+		_expect(not title_menu.visible, "TitleMenu should wait behind the title page on main start", failures)
+		var enter_button: Button = main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
+		_expect(enter_button != null, "TitlePage EnterButton missing", failures)
+		if enter_button != null:
+			enter_button.emit_signal("pressed")
+			await get_tree().process_frame
+			await get_tree().process_frame
+		_expect(title_menu.visible, "TitleMenu is not visible after entering from title page", failures)
 		var title_label: Label = title_menu.get_node_or_null("Center/VBox/GameTitle") as Label
 		_expect(title_label != null, "GameTitle missing", failures)
 		if title_label != null:
 			_expect(title_label.get_theme_font_size("font_size") >= 54, "GameTitle is not visually prioritized", failures)
 		var hero: TextureRect = title_menu.get_node_or_null("TitleHero") as TextureRect
-		_expect(hero != null, "TitleHero missing", failures)
-		if hero != null:
-			_expect(hero.texture != null, "TitleHero texture missing", failures)
+		_expect(hero == null, "TitleHero should not render a background unit over the menu", failures)
 		var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer
 		_expect(content_panel != null, "ContentPanel missing", failures)
 		if content_panel != null:
@@ -54,15 +73,31 @@ func _run() -> void:
 			await get_tree().process_frame
 			_expect(_find_label_containing_text(title_menu, "Hexeon") != null, "Unit search did not find Hexeon", failures)
 			_expect(_find_label_containing_text(title_menu, "Prismatic Guillotine") != null, "Unit card did not show ability info", failures)
+			_expect(_find_label_containing_text(title_menu, "Attack Targeting:") != null, "Unit card did not show attack targeting", failures)
+			_expect(_find_label_containing_text(title_menu, "Ability Targeting:") != null, "Unit card did not show ability targeting", failures)
+			_expect(_find_label_containing_text(title_menu, "Positioning:") == null, "Unit card should not prescribe positioning", failures)
 			_expect_content_panels_generated(title_menu, "Units page cards should use generated texture styling", failures)
 		if rga_button != null and search_field != null:
 			rga_button.emit_signal("pressed")
 			await get_tree().process_frame
-			search_field.text = "PASS"
-			search_field.emit_signal("text_changed", "PASS")
+			search_field.text = "threshold"
+			search_field.emit_signal("text_changed", "threshold")
 			await get_tree().process_frame
-			_expect(_find_label_containing_text(title_menu, "PASS / LEAN / FAIL") != null, "RGA search did not expose verdict terminology", failures)
+			_expect(_find_label_containing_text(title_menu, "Active Trait") != null, "Combat terms search did not expose player-facing trait terminology", failures)
+			_expect(_find_label_containing_text(title_menu, "PASS / LEAN / FAIL") == null, "Combat terms should not expose backend verdict terminology", failures)
 			_expect_content_panels_generated(title_menu, "RGA cards should use generated texture styling", failures)
+			search_field.text = "definitely-no-such-combat-term"
+			search_field.emit_signal("text_changed", "definitely-no-such-combat-term")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "Nothing Found") != null, "Combat terms unmatched search should explain the empty state", failures)
+			_expect(_find_label_containing_text(title_menu, "clear the search") != null, "Combat terms empty state should provide recovery guidance", failures)
+			var clear_search_button: Button = title_menu.find_child("ClearSearchButton", true, false) as Button
+			_expect(clear_search_button != null, "Combat terms empty state should expose Clear Search", failures)
+			if clear_search_button != null:
+				clear_search_button.emit_signal("pressed")
+				await get_tree().process_frame
+				_expect(search_field.text == "", "Clear Search should reset the query", failures)
+				_expect(_find_label_containing_text(title_menu, "Role") != null, "Clear Search should restore combat terms", failures)
 		if how_to_play_button != null and search_field != null:
 			how_to_play_button.emit_signal("pressed")
 			await get_tree().process_frame
@@ -70,6 +105,25 @@ func _run() -> void:
 			search_field.emit_signal("text_changed", "combine")
 			await get_tree().process_frame
 			_expect(_find_label_containing_text(title_menu, "combine into a stronger copy") != null, "Tutorial search did not expose combine guidance", failures)
+			_expect(_find_label_containing_text(title_menu, "up to level 4") != null, "Tutorial should explain the current level-4 cap", failures)
+			_expect(_find_label_containing_text(title_menu, "up to level 3") == null, "Tutorial should not teach the retired level-3 cap", failures)
+			search_field.text = "contract"
+			search_field.emit_signal("text_changed", "contract")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "PRICE, REWARD, RISK, and NEXT FIGHT") != null, "Tutorial should explain chapter-contract decision fields", failures)
+			search_field.text = "board slots"
+			search_field.emit_signal("text_changed", "board slots")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "add board slots") != null, "Tutorial should explain that Buy XP adds board slots", failures)
+			var content_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer
+			if content_scroll != null and units_button != null:
+				content_scroll.scroll_vertical = 400
+				units_button.emit_signal("pressed")
+				await get_tree().process_frame
+				how_to_play_button.emit_signal("pressed")
+				await get_tree().process_frame
+				await get_tree().process_frame
+				_expect(content_scroll.scroll_vertical == 0, "How to Play should reopen at the beginning", failures)
 			_expect_content_panels_generated(title_menu, "How To Play cards should use generated texture styling", failures)
 		if settings_button != null:
 			settings_button.emit_signal("pressed")
@@ -81,13 +135,26 @@ func _run() -> void:
 				_expect_stylebox_texture(volume_slider, "grabber_area", "MasterVolumeSlider filled area should use generated texture styling", failures)
 			var fullscreen_check: CheckBox = title_menu.find_child("FullscreenCheck", true, false) as CheckBox
 			var motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
+			var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton
+			var accept_binding: Button = title_menu.find_child("Binding_ui_accept", true, false) as Button
+			var cancel_binding: Button = title_menu.find_child("Binding_ui_cancel", true, false) as Button
+			var reset_bindings: Button = title_menu.find_child("ResetBindingsButton", true, false) as Button
 			_expect(fullscreen_check != null, "FullscreenCheck missing", failures)
-			_expect(motion_check != null, "ReducedMotionCheck missing", failures)
+			_expect(motion_check != null, "Settings should expose Reduced Motion", failures)
+			_expect(ui_scale_option != null and ui_scale_option.item_count == 3, "Settings should expose three supported UI scales", failures)
+			_expect(accept_binding != null, "Settings should expose Confirm remapping", failures)
+			_expect(cancel_binding != null, "Settings should expose Menu / Back remapping", failures)
+			_expect(reset_bindings != null, "Settings should expose binding reset", failures)
 			_expect_button_states(fullscreen_check, "FullscreenCheck", failures)
 			_expect_button_states(motion_check, "ReducedMotionCheck", failures)
 		var start_button: Button = title_menu.get_node_or_null("Center/VBox/StartButton") as Button
 		_expect(start_button != null, "StartButton missing", failures)
 		if start_button != null:
+			var stateful_start_copy: String = String(start_button.text)
+			start_button.text = "New Run"
+			title_menu.call("_build_navigation")
+			_expect(String(start_button.text) == "New Run", "Title menu navigation rebuild should preserve the save-aware New Run label", failures)
+			start_button.text = stateful_start_copy
 			_expect(start_button.custom_minimum_size.x >= 300.0, "StartButton is not visually prioritized", failures)
 			var start_style: StyleBox = start_button.get_theme_stylebox("normal")
 			_expect(start_style is StyleBoxTexture, "Title StartButton should use the generated primary button asset", failures)
@@ -97,14 +164,16 @@ func _run() -> void:
 			_expect(unit_select != null and unit_select.visible, "StartButton did not open UnitSelect", failures)
 
 	if failures.size() > 0:
-		main.queue_free()
+		remove_child(main)
+		main.free()
 		await get_tree().process_frame
 		for failure: String in failures:
 			push_error("TitleMenuSmoke: " + failure)
 		get_tree().quit(1)
 		return
 
-	main.queue_free()
+	remove_child(main)
+	main.free()
 	await get_tree().process_frame
 	print("TitleMenuSmoke: OK")
 	get_tree().quit(0)

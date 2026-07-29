@@ -31,20 +31,33 @@ func _run() -> void:
 	if _title_menu == null:
 		_finish()
 		return
+	if not _title_menu.visible:
+		var title_page: Control = _main.get_node_or_null("TitlePage") as Control
+		_expect(title_page != null, "TitlePage missing")
+		if title_page != null:
+			_capture_title_page(title_page)
+		var enter_button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
+		_expect(enter_button != null, "TitlePage EnterButton missing")
+		if enter_button != null:
+			enter_button.emit_signal("pressed")
+		await _settle_seconds(0.85)
 
+	await _open_section("HomeButton")
 	await _capture("01_overview", ["GAMBLE BATTLE", "COMMAND MENU", "OPENING LOOP"])
 	await _open_section("HowToPlayButton")
 	await _set_search("combine")
-	await _capture("02_how_to_play_search_combine", ["HOW TO PLAY", "COMBINE INTO A STRONGER COPY"])
+	await _capture("02_how_to_play_search_combine", ["HOW TO PLAY", "STRONGER COPY"])
 	await _open_section("UnitsButton")
 	await _set_search("hexeon")
 	await _capture("03_units_search_hexeon", ["UNITS", "HEXEON", "PRISMATIC GUILLOTINE"])
 	await _open_section("RGAGlossaryButton")
-	await _set_search("PASS")
-	await _capture("04_rga_search_pass", ["RGA GLOSSARY", "PASS / LEAN / FAIL"])
+	await _set_search("threshold")
+	await _capture("04_combat_terms_search_threshold", ["COMBAT TERMS", "ACTIVE TRAIT", "THRESHOLD"])
+	await _set_search("definitely-no-such-combat-term")
+	await _capture("05_combat_terms_no_results", ["COMBAT TERMS", "NOTHING FOUND", "CLEAR SEARCH"])
 	await _open_section("SettingsButton")
 	await _set_search("")
-	await _capture("05_settings", ["SETTINGS", "MASTER VOLUME", "FULLSCREEN", "REDUCED MOTION"])
+	await _capture("06_settings", ["SETTINGS", "MASTER VOLUME", "FULLSCREEN", "UI SCALE", "KEYBOARD BINDINGS"])
 	_finish()
 
 func _open_section(button_name: String) -> void:
@@ -76,6 +89,19 @@ func _capture(label: String, required_needles: Array[String]) -> void:
 	_expect(json_path != "" and FileAccess.file_exists(json_path), "%s JSON capture missing: %s" % [label, json_path])
 	_expect(_json_contains_needles(json_path, required_needles), "%s JSON missing expected text: %s" % [label, JSON.stringify(required_needles)])
 
+func _capture_title_page(title_page: Control) -> void:
+	var result: Dictionary[String, Variant] = VisionSnapshot.capture(title_page, "00_title_page", OUTPUT_DIR)
+	_captures.append(result)
+	_expect(bool(result.get("ok", false)), "00_title_page capture should succeed")
+	_expect(bool(result.get("software_ok", false)), "00_title_page software PNG should be saved")
+	var path: String = str(result.get("path", ""))
+	var software_path: String = str(result.get("software_path", ""))
+	var json_path: String = str(result.get("json_path", ""))
+	_expect(path != "" and FileAccess.file_exists(path), "00_title_page final capture missing: %s" % path)
+	_expect(software_path != "" and FileAccess.file_exists(software_path), "00_title_page software capture missing: %s" % software_path)
+	_expect(json_path != "" and FileAccess.file_exists(json_path), "00_title_page JSON capture missing: %s" % json_path)
+	_expect(_json_contains_needles(json_path, ["GAMBLE BATTLE", "ENTER"]), "00_title_page JSON missing expected title-page text")
+
 func _expect_generated_title_styles(context: String) -> void:
 	var content_panel: PanelContainer = _title_menu.get_node_or_null("ContentPanel") as PanelContainer
 	_expect(content_panel != null and content_panel.get_theme_stylebox("panel") is StyleBoxTexture, "%s content panel should use generated texture style" % context)
@@ -88,7 +114,9 @@ func _expect_generated_title_styles(context: String) -> void:
 		var panel_count: int = 0
 		for node: Node in body.find_children("*", "PanelContainer", true, false):
 			var panel: PanelContainer = node as PanelContainer
-			if panel != null:
+			# OptionButton creates private popup/focus PanelContainers that inherit
+			# engine styles; app-authored cards all own a named Margin child.
+			if panel != null and panel.get_node_or_null("Margin") != null:
 				panel_count += 1
 				_expect(panel.get_theme_stylebox("panel") is StyleBoxTexture, "%s %s should use generated texture style" % [context, str(panel.name)])
 		_expect(panel_count > 0, "%s should expose at least one generated card or chip" % context)
@@ -97,6 +125,8 @@ func _expect_generated_title_styles(context: String) -> void:
 		var button: Button = _title_menu.get_node_or_null("Center/VBox/%s" % nav_name) as Button
 		_expect(button != null and button.get_theme_stylebox("normal") is StyleBoxTexture, "%s %s normal style should be generated" % [context, nav_name])
 		_expect(button != null and button.get_theme_stylebox("pressed") is StyleBoxTexture, "%s %s pressed style should be generated" % [context, nav_name])
+	var motion_check: CheckBox = _title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
+	_expect(motion_check != null, "%s ReducedMotionCheck should be present" % context)
 
 func _json_contains_needles(path: String, needles: Array[String]) -> bool:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
@@ -112,6 +142,11 @@ func _json_contains_needles(path: String, needles: Array[String]) -> bool:
 func _settle_frames(count: int) -> void:
 	for _frame_index: int in range(count):
 		await get_tree().process_frame
+
+func _settle_seconds(seconds: float) -> void:
+	await _settle_frames(4)
+	await get_tree().create_timer(seconds).timeout
+	await _settle_frames(4)
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

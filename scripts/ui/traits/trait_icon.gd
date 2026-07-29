@@ -18,6 +18,7 @@ const COLOR_ICON_ACTIVE: Color = Color(1.0, 0.86, 0.58, 1.0)
 const COLOR_ICON_INACTIVE: Color = Color(0.62, 0.56, 0.50, 0.82)
 const COLOR_ICON_HOVER: Color = Color(1.0, 0.91, 0.70, 1.0)
 const HOVER_DELAY: float = 0.08
+const TOOLTIP_GROUP: String = "gothic_hover_tooltip"
 
 @onready var _icon: TextureRect = $Texture
 
@@ -39,6 +40,10 @@ func _ready() -> void:
 		mouse_entered.connect(_on_mouse_entered)
 	if not is_connected("mouse_exited", Callable(self, "_on_mouse_exited")):
 		mouse_exited.connect(_on_mouse_exited)
+	if not is_connected("focus_entered", Callable(self, "_on_focus_entered")):
+		focus_entered.connect(_on_focus_entered)
+	if not is_connected("focus_exited", Callable(self, "_on_focus_exited")):
+		focus_exited.connect(_on_focus_exited)
 	if not is_connected("gui_input", Callable(self, "_on_hover_gui_input")):
 		gui_input.connect(_on_hover_gui_input)
 	_update_visuals()
@@ -67,6 +72,7 @@ func _update_visuals() -> void:
 		_icon.modulate = COLOR_ICON_HOVER if _hovered else COLOR_ICON_ACTIVE if _active else COLOR_ICON_INACTIVE
 	var has_trait: bool = trait_id.strip_edges() != ""
 	visible = has_trait
+	focus_mode = Control.FOCUS_ALL if has_trait else Control.FOCUS_NONE
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if has_trait else Control.CURSOR_ARROW
 	if not has_trait:
 		_clear_tooltip()
@@ -104,10 +110,12 @@ func _on_mouse_entered() -> void:
 
 func _show_tooltip() -> void:
 	_clear_tooltip()
+	_clear_global_tooltips()
 	var tooltip: Control = TraitTooltipScene.instantiate() as Control
 	if tooltip == null:
 		return
 	tooltip.top_level = true
+	tooltip.add_to_group(TOOLTIP_GROUP)
 	var root: Window = get_tree().root
 	if root:
 		root.add_child(tooltip)
@@ -115,9 +123,10 @@ func _show_tooltip() -> void:
 		tooltip.call("set_trait", trait_id)
 	if tooltip.has_method("set_context"):
 		tooltip.call("set_context", _active, _count, _tier)
-	var pos: Vector2 = get_viewport().get_mouse_position()
-	if tooltip.has_method("show_at"):
-		tooltip.call("show_at", pos)
+	if tooltip.has_method("show_near"):
+		tooltip.call("show_near", global_position, size)
+	elif tooltip.has_method("show_at"):
+		tooltip.call("show_at", _tooltip_anchor_position())
 	_tooltip = tooltip
 
 func _on_mouse_exited() -> void:
@@ -130,23 +139,59 @@ func _on_mouse_exited() -> void:
 	_apply_active_bg()
 	_clear_tooltip()
 
+func _on_focus_entered() -> void:
+	if trait_id.strip_edges() == "":
+		return
+	if not TraitTooltipScene:
+		return
+	_hovered = true
+	_hover_token += 1
+	z_index = 80
+	_apply_active_bg()
+	if _icon:
+		_icon.modulate = COLOR_ICON_HOVER
+	_apply_hover_motion(true)
+	_show_tooltip()
+
+func _on_focus_exited() -> void:
+	_hovered = false
+	_hover_token += 1
+	z_index = 0
+	_apply_hover_motion(false)
+	if _icon:
+		_icon.modulate = COLOR_ICON_ACTIVE if _active else COLOR_ICON_INACTIVE
+	_apply_active_bg()
+	_clear_tooltip()
+
 func _on_hover_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and _tooltip != null and is_instance_valid(_tooltip):
-		var viewport: Viewport = get_viewport()
-		if viewport != null and _tooltip.has_method("move_to"):
-			_tooltip.call("move_to", viewport.get_mouse_position())
+		if _tooltip.has_method("move_to_raw"):
+			_tooltip.call("move_to_raw", _tooltip_anchor_position())
+		elif _tooltip.has_method("move_to"):
+			_tooltip.call("move_to", _tooltip_anchor_position())
 
 func _clear_tooltip() -> void:
 	if _tooltip and is_instance_valid(_tooltip):
 		_tooltip.queue_free()
 	_tooltip = null
 
-func _apply_hover_motion(active: bool) -> void:
+func _clear_global_tooltips() -> void:
+	if get_tree() == null:
+		return
+	var nodes: Array[Node] = get_tree().get_nodes_in_group(TOOLTIP_GROUP)
+	for node: Node in nodes:
+		if node != null and node != _tooltip and is_instance_valid(node):
+			node.queue_free()
+
+func _apply_hover_motion(_active: bool) -> void:
 	if _hover_tween != null and is_instance_valid(_hover_tween):
 		_hover_tween.kill()
 	_hover_tween = create_tween()
 	_hover_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_hover_tween.tween_property(self, "scale", Vector2(1.09, 1.09) if active else Vector2.ONE, 0.09)
+	_hover_tween.tween_property(self, "scale", Vector2.ONE, 0.09)
+
+func _tooltip_anchor_position() -> Vector2:
+	return global_position + Vector2(size.x + 14.0, -8.0)
 
 func set_active(v: bool) -> void:
 	_active = bool(v)

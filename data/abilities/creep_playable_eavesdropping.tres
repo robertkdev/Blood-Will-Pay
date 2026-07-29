@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "creep_playable_eavesdropping"
 name = "Eavesdropping"
 description = "Dashes to the lowest-health enemy and spins, dealing physical AoE damage in rapid ticks. Unstoppable and damage-reduced while spinning. Exiled: longer duration, stronger ticks, first takedown chases to the next lowest-health enemy."
+targeting_summary = "Lowest-health enemy from the enemy backline half."
 base_cost = 20
 tags = ["damage", "aoe", "dash", "spin", "access_backline"]

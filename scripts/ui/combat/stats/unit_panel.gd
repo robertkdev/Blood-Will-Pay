@@ -4,6 +4,7 @@ class_name UnitPanel
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const UIBars := preload("res://scripts/ui/combat/ui_bars.gd")
 const AbilityCatalog := preload("res://scripts/game/abilities/ability_catalog.gd")
+const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
 const COLOR_PANEL: Color = Color(0.026, 0.022, 0.030, 0.92)
@@ -34,7 +35,9 @@ var unit_ref: Unit = null
 var hp_bar: ProgressBar
 var mana_bar: ProgressBar
 var attack_info_label: Label = null
+var attack_targeting_label: Label = null
 var ability_info_label: Label = null
+var ability_targeting_label: Label = null
 
 static var diagnostics_enabled: bool = false
 static var diagnostic_dynamic_refresh_calls: int = 0
@@ -214,11 +217,21 @@ func _ensure_combat_info() -> void:
         attack_info_label = _make_info_label("AttackInfo")
         root_box.add_child(attack_info_label)
         root_box.move_child(attack_info_label, min(insert_index, root_box.get_child_count() - 1))
+    if attack_targeting_label == null or not is_instance_valid(attack_targeting_label):
+        attack_targeting_label = _make_info_label("AttackTargetingInfo")
+        root_box.add_child(attack_targeting_label)
+        var attack_targeting_index: int = root_box.get_children().find(attack_info_label) + 1
+        root_box.move_child(attack_targeting_label, min(attack_targeting_index, root_box.get_child_count() - 1))
     if ability_info_label == null or not is_instance_valid(ability_info_label):
         ability_info_label = _make_info_label("AbilityInfo")
         root_box.add_child(ability_info_label)
-        var ability_index: int = root_box.get_children().find(attack_info_label) + 1
+        var ability_index: int = root_box.get_children().find(attack_targeting_label) + 1
         root_box.move_child(ability_info_label, min(ability_index, root_box.get_child_count() - 1))
+    if ability_targeting_label == null or not is_instance_valid(ability_targeting_label):
+        ability_targeting_label = _make_info_label("AbilityTargetingInfo")
+        root_box.add_child(ability_targeting_label)
+        var ability_targeting_index: int = root_box.get_children().find(ability_info_label) + 1
+        root_box.move_child(ability_targeting_label, min(ability_targeting_index, root_box.get_child_count() - 1))
 
 func _make_info_label(label_name: String) -> Label:
     var label: Label = Label.new()
@@ -374,14 +387,18 @@ func _refresh_bars() -> void:
 
 func _refresh_combat_info() -> void:
     _ensure_combat_info()
-    if attack_info_label == null or ability_info_label == null:
+    if attack_info_label == null or attack_targeting_label == null or ability_info_label == null or ability_targeting_label == null:
         return
     if unit_ref == null:
         attack_info_label.visible = false
+        attack_targeting_label.visible = false
         ability_info_label.visible = false
+        ability_targeting_label.visible = false
         return
     attack_info_label.visible = true
+    attack_targeting_label.visible = true
     ability_info_label.visible = true
+    ability_targeting_label.visible = true
     var attack_period: float = 1.0 / max(0.01, float(unit_ref.attack_speed))
     var crit_chance: int = int(round(float(unit_ref.crit_chance) * 100.0))
     var crit_damage: String = String.num(float(unit_ref.crit_damage), 2)
@@ -393,11 +410,15 @@ func _refresh_combat_info() -> void:
         crit_damage
     ]
     attack_info_label.tooltip_text = attack_info_label.text
+    attack_targeting_label.text = UnitTargetingText.attack_targeting_line(unit_ref)
+    attack_targeting_label.tooltip_text = attack_targeting_label.text
 
     var ability_id: String = String(unit_ref.ability_id).strip_edges()
     if ability_id == "":
         ability_info_label.text = "Ability: none"
         ability_info_label.tooltip_text = ability_info_label.text
+        ability_targeting_label.text = ""
+        ability_targeting_label.visible = false
         return
     var ability_def: AbilityDef = AbilityCatalog.get_def(ability_id)
     var ability_name: String = _prettify_token(ability_id)
@@ -412,6 +433,9 @@ func _refresh_combat_info() -> void:
     var cost_text: String = " Cost: %d mana." % cost if cost > 0 else ""
     ability_info_label.text = "Ability: %s.%s %s" % [ability_name, cost_text, description]
     ability_info_label.tooltip_text = ability_info_label.text
+    ability_targeting_label.text = UnitTargetingText.ability_targeting_line(unit_ref)
+    ability_targeting_label.tooltip_text = ability_targeting_label.text
+    ability_targeting_label.visible = ability_targeting_label.text.strip_edges() != ""
 
 func _clear_stats_grid() -> void:
     if stats_grid == null or not is_instance_valid(stats_grid):
@@ -426,6 +450,7 @@ func _build_stats_grid() -> void:
         return
     var entries: Array[Array] = [
         ["LVL", str(unit_ref.level)],
+        ["Cost", "%dg" % int(unit_ref.cost)],
         ["HP", str(unit_ref.max_hp)],
         ["AD", _fmt(unit_ref.attack_damage)],
         ["SP", _fmt(unit_ref.spell_power)],

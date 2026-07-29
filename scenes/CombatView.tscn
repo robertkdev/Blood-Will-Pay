@@ -51,16 +51,18 @@ horizontal_alignment = 2
 [node name="StageLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 61
-text = "Stage 1"
+text = "Round 1"
 horizontal_alignment = 1
 
 [node name="PlanningTimerLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+z_index = 60
+custom_minimum_size = Vector2(0, 28)
 layout_mode = 2
 text = ""
 horizontal_alignment = 1
 
 [node name="BattleArea" type="Control" parent="MarginContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 640)
+custom_minimum_size = Vector2(0, 604)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 6
@@ -79,9 +81,10 @@ custom_minimum_size = Vector2(320, 480)
 layout_mode = 2
 size_flags_horizontal = 0
 size_flags_vertical = 6
+theme_override_constants/separation = 10
 
 [node name="ItemStorageGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
-custom_minimum_size = Vector2(320, 480)
+custom_minimum_size = Vector2(320, 164)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
@@ -91,7 +94,7 @@ columns = 6
 
 [node name="LeftSpacer" type="Control" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
 layout_mode = 2
-size_flags_vertical = 6
+size_flags_vertical = 0
 
 [node name="BoardColumn" type="VBoxContainer" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow"]
 layout_mode = 2
@@ -105,7 +108,7 @@ theme_override_constants/separation = 16
 metadata/_edit_use_anchors_ = true
 
 [node name="TopArea" type="Control" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea"]
-custom_minimum_size = Vector2(0, 288)
+custom_minimum_size = Vector2(0, 264)
 layout_mode = 2
 
 [node name="EnemyGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea"]
@@ -114,8 +117,9 @@ anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
 offset_left = -316.0
+offset_top = 28.0
 offset_right = 316.0
-offset_bottom = 232.0
+offset_bottom = 260.0
 grow_horizontal = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
@@ -280,19 +284,18 @@ layout_mode = 0
 expand_mode = 1
 
 [node name="BottomArea" type="Control" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea"]
-custom_minimum_size = Vector2(0, 288)
+custom_minimum_size = Vector2(0, 264)
 layout_mode = 2
 
 [node name="PlayerGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea"]
 layout_mode = 1
-anchors_preset = 7
+anchors_preset = 5
 anchor_left = 0.5
-anchor_top = 1.0
 anchor_right = 0.5
-anchor_bottom = 1.0
 offset_left = -316.0
-offset_top = -232.0
+offset_top = 36.0
 offset_right = 316.0
+offset_bottom = 268.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_constants/h_separation = 8
@@ -487,14 +490,11 @@ grow_vertical = 2
 mouse_filter = 2
 metadata/_edit_use_anchors_ = true
 
-[node name="TraitsPanel" parent="MarginContainer/VBoxContainer/BattleArea" instance=ExtResource("3")]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.16875
-anchor_top = 0.123438
-anchor_right = 0.197917
-anchor_bottom = 0.99375
-metadata/_edit_use_anchors_ = true
+[node name="TraitsPanel" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea" instance=ExtResource("3")]
+custom_minimum_size = Vector2(320, 308)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
 [node name="BenchArea" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 z_index = 20
@@ -504,7 +504,7 @@ size_flags_vertical = 2
 alignment = 1
 
 [node name="BenchGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/BenchArea"]
-custom_minimum_size = Vector2(0, 72)
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
@@ -544,11 +544,23 @@ size_flags_horizontal = 3
 size_flags_vertical = 4
 min_value = 1.0
 max_value = 2.0
+step = 1.0
 value = 1.0
 
 [node name="BetValue" type="Label" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
 layout_mode = 2
 text = "1"
+
+[node name="AllInButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
+layout_mode = 2
+text = "All In"
+
+[node name="WagerSummary" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Wager 1g | Win 50% | Gross 2g | After win 3g | After loss 1g"
+horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="BottomStorageArea" type="VBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -557,7 +569,7 @@ size_flags_vertical = 2
 theme_override_constants/separation = 10
 
 [node name="ShopGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/BottomStorageArea"]
-custom_minimum_size = Vector2(1000, 72)
+custom_minimum_size = Vector2(1000, 124)
 layout_mode = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8

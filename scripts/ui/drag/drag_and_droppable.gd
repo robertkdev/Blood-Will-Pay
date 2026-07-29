@@ -75,6 +75,11 @@ func on_drop(_success: bool, _index: int) -> void:
 	# Overridable hook for subclasses (e.g., items)
 	pass
 
+func finish_drag_at_global(global_pos: Vector2) -> void:
+	_last_mouse_pos = global_pos
+	if _dragging:
+		_end_drag_internal()
+
 func _on_gui_input_base(event: InputEvent) -> void:
 	if not can_drag_now():
 		return

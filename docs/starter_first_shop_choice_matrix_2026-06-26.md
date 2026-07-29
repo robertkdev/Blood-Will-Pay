@@ -1,5 +1,7 @@
 # Starter First-Shop Choice Matrix - 2026-06-26
 
+> Legacy naming note (2026-07-28): this dated evidence preserves the former display name `Cashmere`, retired technical IDs, exact test output, and filenames. The current unit is Mara. Do not treat any preserved occurrence below as a current identity.
+
 Source: `tests/visual/FirstShopChoiceQualitySmoke.tscn`, rerun through MCP on 2026-06-26 after expanding the starter-aware opening-shop guard to first-slot helper quality and known-bad helper suppression.
 
 The smoke targets current starter lines where a naive first visible/first-clicked shop card can determine whether the run cleanly advances beyond Stage 2. For each starter it forces a deterministic five-offer first shop, buys/deploys each slot through the real Main-scene flow, then starts and resolves the second fight.

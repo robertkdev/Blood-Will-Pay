@@ -7,6 +7,9 @@ const BuffSystemLib := preload("res://scripts/game/abilities/buff_system.gd")
 const MovementServiceLib := preload("res://scripts/game/combat/movement/movement_service2.gd")
 const MovementProfileLib := preload("res://scripts/game/combat/movement/movement_profile.gd")
 const Targeting := preload("res://scripts/game/combat/targeting.gd")
+const EncounterEscalationRuntimeLib := preload("res://scripts/game/combat/encounter_escalation_runtime.gd")
+const ContractBattleRuntimeLib := preload("res://scripts/game/combat/contract_battle_runtime.gd")
+const UnitUpgradeRuntimeLib := preload("res://scripts/game/combat/unit_upgrade_runtime.gd")
 
 signal projectile_fired(source_team: String, source_index: int, target_index: int, damage: int, crit: bool)
 signal stats_updated(player, enemy)
@@ -15,6 +18,7 @@ signal unit_stat_changed(team: String, index: int, fields: Dictionary)
 signal log_line(text: String)
 signal victory(stage: int)
 signal defeat(stage: int)
+signal tie(stage: int)
 signal vfx_knockup(team: String, index: int, duration: float)
 signal vfx_beam_line(start: Vector2, end: Vector2, color: Color, width: float, duration: float)
 signal position_updated(team: String, index: int, x: float, y: float)
@@ -22,6 +26,9 @@ signal target_start(source_team: String, source_index: int, target_team: String,
 signal target_end(source_team: String, source_index: int, target_team: String, target_index: int)
 signal ability_cast(source_team: String, source_index: int, target_team: String, target_index: int, position: Vector2)
 signal ability_committed(source_team: String, source_index: int, ability_id: String, target_team: String, target_index: int, position: Vector2, cooldown_s: float, commitment_kind: String)
+signal encounter_escalated(phase_id: String, label: String, champion_index: int, revived_indices: Array[int], affected_player_indices: Array[int], pulse_damage: int, intensity: int)
+signal contract_battle_event(event_type: String, label: String, affected_player_indices: Array[int], affected_enemy_indices: Array[int], value: int, intensity: int)
+signal unit_upgrade_event(event_type: String, label: String, affected_player_indices: Array[int], value: int, intensity: int)
 
 const POSITION_EMIT_INTERVAL: float = 0.1
 var position_emit_interval_override: float = -1.0
@@ -81,6 +88,8 @@ var _last_player_positions: Array = []
 var _last_enemy_positions: Array = []
 var _last_targets_player: Array = []
 var _last_targets_enemy: Array = []
+var _movement_player_targets_scratch: Array[int] = []
+var _movement_enemy_targets_scratch: Array[int] = []
 
 var arena_state: Variant = MovementServiceLib.new()
 var target_controller: TargetController = TargetController.new()
@@ -91,6 +100,11 @@ var projectile_handler: ProjectileHandler = ProjectileHandler.new()
 var regen_system: RegenSystem = RegenSystem.new()
 var ability_system: AbilitySystem = null
 var buff_system: BuffSystem = null
+var encounter_escalation_runtime: RefCounted = EncounterEscalationRuntimeLib.new()
+var encounter_escalation_config: Dictionary = {}
+var contract_battle_runtime: RefCounted = ContractBattleRuntimeLib.new()
+var contract_battle_config: Dictionary = {}
+var unit_upgrade_runtime: RefCounted = UnitUpgradeRuntimeLib.new()
 var _connected_ability_system: AbilitySystem = null
 var _connected_buff_system: BuffSystem = null
 ## Removed passive damage system (was: tick accumulator + constants)
@@ -121,12 +135,25 @@ func set_seed(seed: int) -> void:
 	_seed_locked = true
 	rng.seed = coerced
 
+func configure_encounter_escalation(config: Dictionary) -> void:
+	encounter_escalation_config = config.duplicate(true)
+	if state != null:
+		encounter_escalation_runtime.configure(state, encounter_escalation_config)
+
+func configure_contract_battle(config: Dictionary) -> void:
+	contract_battle_config = config.duplicate(true)
+	if state != null:
+		contract_battle_runtime.configure(state, contract_battle_config)
+
 func configure(_state: BattleState, _player: Unit, _stage: int, _selector: Callable = Callable()) -> void:
 	Trace.step("CombatEngine.configure: begin")
 	_disconnect_signal_bindings()
 	state = _state
 	player_ref = _player
 	stage = _stage
+	encounter_escalation_runtime.configure(state, encounter_escalation_config)
+	contract_battle_runtime.configure(state, contract_battle_config)
+	unit_upgrade_runtime.configure(state)
 	# Prefer engine-provided closest-target selector if none supplied
 	select_closest_target = (_selector if _selector.is_valid() else Callable(self, "_engine_select_closest_target"))
 	if _seed_locked:
@@ -190,7 +217,8 @@ func teardown() -> void:
 	if target_controller != null:
 		target_controller.state = null
 		target_controller.selector = Callable()
-		target_controller._resolving.clear()
+		target_controller._resolving_player.clear()
+		target_controller._resolving_enemy.clear()
 	if cooldown_scheduler != null:
 		cooldown_scheduler.state = null
 		cooldown_scheduler.target_controller = null
@@ -215,8 +243,15 @@ func teardown() -> void:
 	_last_enemy_positions.clear()
 	_last_targets_player.clear()
 	_last_targets_enemy.clear()
+	_movement_player_targets_scratch.clear()
+	_movement_enemy_targets_scratch.clear()
 	_first_attack_windup_done.clear()
 	_target_recheck_accum = 0.0
+	encounter_escalation_config.clear()
+	encounter_escalation_runtime.configure(null, {})
+	contract_battle_config.clear()
+	contract_battle_runtime.configure(null, {})
+	unit_upgrade_runtime.configure(null)
 
 func set_arena(tile_size: float, player_pos: Array, enemy_pos: Array, bounds: Rect2) -> void:
 	# Cast/convert to typed arrays of Vector2 for movement.configure signature
@@ -256,8 +291,6 @@ func _engine_select_closest_target(my_team: String, my_index: int, enemy_team: S
 	var current_target: int = _current_target_index(my_team, my_index)
 	return Targeting.pick_by_priority(
 		attacker,
-		my_index,
-		my_team,
 		src_pos,
 		ally_arr,
 		ally_positions,
@@ -270,7 +303,11 @@ func _positions_for_team(team: String) -> Array[Vector2]:
 	if arena_state == null:
 		return []
 	if team == "player":
+		if arena_state.has_method("player_positions_current"):
+			return arena_state.player_positions_current()
 		return arena_state.player_positions_copy()
+	if arena_state.has_method("enemy_positions_current"):
+		return arena_state.enemy_positions_current()
 	return arena_state.enemy_positions_copy()
 
 func _position_at(positions: Array[Vector2], index: int, fallback: Vector2) -> Vector2:
@@ -480,8 +517,12 @@ func process(delta: float) -> void:
 		return
 	state.elapsed_time += delta
 	_retarget_if_due(delta)
-	arena_state.update_movement(state, delta, target_controller.resolver_for_arena())
+	target_controller.copy_arena_targets(_movement_player_targets_scratch, _movement_enemy_targets_scratch)
+	arena_state.update_movement_with_targets(state, delta, _movement_player_targets_scratch, _movement_enemy_targets_scratch)
 	_update_combat_progress_watchdog()
+	_process_encounter_escalation()
+	_process_contract_battle(delta)
+	_process_unit_upgrades()
 	var timeout_outcome: String = _combat_timeout_outcome()
 	if timeout_outcome != "":
 		_emit_outcome(timeout_outcome)
@@ -512,6 +553,7 @@ func process(delta: float) -> void:
 		if gated.size() > 0:
 			attack_resolver.resolve_ordered(gated)
 	_emit_target_events()
+	_process_encounter_escalation()
 	if _evaluate_outcome():
 		return
 	_update_totals_cache()
@@ -538,10 +580,149 @@ func on_projectile_hit(source_team: String, source_index: int, target_index: int
 	_update_totals_cache()
 	_mark_combat_progress()
 	_reset_debug_counters()
+	_process_encounter_escalation()
 	_evaluate_outcome()
 
 func _apply_regen(ticks: int) -> void:
 	regen_system.apply_ticks(state, ticks, player_ref, _resolver_emitters)
+
+func _process_encounter_escalation() -> void:
+	if encounter_escalation_runtime == null:
+		return
+	var event: Dictionary = encounter_escalation_runtime.process()
+	if event.is_empty():
+		return
+	var champion_index: int = int(event.get("champion_index", -1))
+	var revived_indices: Array[int] = []
+	for revived_value: Variant in event.get("revived_indices", []):
+		var revived_index: int = int(revived_value)
+		revived_indices.append(revived_index)
+		if revived_index >= 0 and revived_index < state.enemy_cds.size():
+			state.enemy_cds[revived_index] = 0.0
+		emit_signal("unit_stat_changed", "enemy", revived_index, {"hp": true, "mana": true})
+		emit_signal("vfx_knockup", "enemy", revived_index, 0.55)
+	var affected_player_indices: Array[int] = []
+	for player_value: Variant in event.get("affected_player_indices", []):
+		var player_index: int = int(player_value)
+		affected_player_indices.append(player_index)
+		emit_signal("unit_stat_changed", "player", player_index, {"hp": true})
+		emit_signal("vfx_knockup", "player", player_index, 0.18)
+	if champion_index >= 0:
+		emit_signal("unit_stat_changed", "enemy", champion_index, {"hp": true, "max_hp": true, "attack_damage": true, "spell_power": true, "attack_speed": true, "mana": true})
+		emit_signal("vfx_knockup", "enemy", champion_index, 0.85)
+	if target_controller != null:
+		target_controller.refresh_live_targets()
+	_emit_stats_snapshot()
+	var label: String = String(event.get("label", "BOSS PHASE"))
+	var pulse_damage: int = int(event.get("pulse_damage", 0))
+	emit_signal("log_line", "[BOSS PHASE %d] %s — %d reinforcement(s) return; arena pulse deals %d total damage." % [
+		int(event.get("phase_number", 1)),
+		label,
+		revived_indices.size(),
+		pulse_damage,
+	])
+	emit_signal(
+		"encounter_escalated",
+		String(event.get("phase_id", "boss_phase")),
+		label,
+		champion_index,
+		revived_indices,
+		affected_player_indices,
+		pulse_damage,
+		int(event.get("intensity", 1))
+	)
+
+func _process_contract_battle(delta: float) -> void:
+	if contract_battle_runtime == null:
+		return
+	var events: Array[Dictionary] = contract_battle_runtime.process(delta)
+	for event: Dictionary in events:
+		var event_type: String = String(event.get("event_type", "contract_effect"))
+		var label: String = String(event.get("label", "CONTRACT ACTIVATED"))
+		var affected_player_indices: Array[int] = []
+		var affected_enemy_indices: Array[int] = []
+		for player_value: Variant in event.get("player_indices", []):
+			affected_player_indices.append(int(player_value))
+		for enemy_value: Variant in event.get("enemy_indices", []):
+			affected_enemy_indices.append(int(enemy_value))
+		if event_type == "starting_ward" or event_type == "death_inheritance":
+			var shield_values: Array[int] = []
+			for shield_value: Variant in event.get("player_values", []):
+				shield_values.append(int(shield_value))
+			var duration_s: float = max(0.5, float(event.get("duration_s", 8.0)))
+			for value_index: int in range(affected_player_indices.size()):
+				var player_index: int = affected_player_indices[value_index]
+				var shield_amount: int = int(shield_values[value_index]) if value_index < shield_values.size() else 0
+				if shield_amount > 0 and buff_system != null:
+					buff_system.apply_shield(state, "player", player_index, shield_amount, duration_s)
+				emit_signal("unit_stat_changed", "player", player_index, {"hp": true, "shield": true})
+				emit_signal("vfx_knockup", "player", player_index, 0.16)
+		else:
+			for player_index: int in affected_player_indices:
+				emit_signal("unit_stat_changed", "player", player_index, {"hp": true})
+				emit_signal("vfx_knockup", "player", player_index, 0.24)
+			for enemy_index: int in affected_enemy_indices:
+				emit_signal("unit_stat_changed", "enemy", enemy_index, {"hp": true})
+				emit_signal("vfx_knockup", "enemy", enemy_index, 0.24)
+		var value: int = max(0, int(event.get("value", 0)))
+		if value > 0:
+			_mark_combat_progress()
+		_emit_stats_snapshot()
+		emit_signal("log_line", "[CONTRACT] %s - %d total value." % [label, value])
+		emit_signal(
+			"contract_battle_event",
+			event_type,
+			label,
+			affected_player_indices,
+			affected_enemy_indices,
+			value,
+			max(1, int(event.get("intensity", 1)))
+		)
+
+func _process_unit_upgrades() -> void:
+	if unit_upgrade_runtime == null:
+		return
+	var events: Array[Dictionary] = unit_upgrade_runtime.process()
+	for event: Dictionary in events:
+		var event_type: String = String(event.get("event_type", "unit_upgrade"))
+		var label: String = String(event.get("label", "LEGACY AWAKENS"))
+		var affected_player_indices: Array[int] = []
+		for player_value: Variant in event.get("player_indices", []):
+			affected_player_indices.append(int(player_value))
+		var stat_index: int = int(event.get("stat_index", -1))
+		var stat_value: Variant = event.get("stat_fields", {})
+		if stat_index >= 0 and stat_value is Dictionary and not (stat_value as Dictionary).is_empty() and buff_system != null:
+			buff_system.apply_stats_labeled(
+				state,
+				"player",
+				stat_index,
+				"unit_upgrade_%s" % event_type,
+				stat_value as Dictionary,
+				max(0.5, float(event.get("duration_s", 90.0)))
+			)
+		var shield_values: Array[int] = []
+		for shield_value: Variant in event.get("player_values", []):
+			shield_values.append(int(shield_value))
+		var shield_duration_s: float = max(0.5, float(event.get("shield_duration_s", 8.0)))
+		for value_index: int in range(affected_player_indices.size()):
+			var player_index: int = affected_player_indices[value_index]
+			var shield_amount: int = int(shield_values[value_index]) if value_index < shield_values.size() else 0
+			if shield_amount > 0 and buff_system != null:
+				buff_system.apply_shield(state, "player", player_index, shield_amount, shield_duration_s)
+			emit_signal("unit_stat_changed", "player", player_index, {"hp": true, "mana": true, "shield": true, "attack_speed": true, "attack_damage": true, "spell_power": true})
+			emit_signal("vfx_knockup", "player", player_index, 0.25 if int(event.get("intensity", 1)) < 3 else 0.48)
+		var value: int = max(0, int(event.get("value", 0)))
+		_mark_combat_progress()
+		_emit_stats_snapshot()
+		emit_signal("log_line", "[UNIT LEGACY] %s - %d total effect." % [label, value])
+		emit_signal(
+			"unit_upgrade_event",
+			event_type,
+			label,
+			affected_player_indices,
+			value,
+			max(1, int(event.get("intensity", 1)))
+		)
 
 ## Passive damage removed
 
@@ -576,6 +757,8 @@ func _emit_outcome(kind: String) -> void:
 			emit_signal("victory", stage)
 		"defeat":
 			emit_signal("defeat", stage)
+		"tie":
+			emit_signal("tie", stage)
 		_:
 			# Fallback: default to defeat if unknown outcome
 			emit_signal("defeat", stage)
@@ -628,7 +811,9 @@ func _fallback_timeout_outcome() -> String:
 		return "defeat"
 	if total_damage_player > total_damage_enemy:
 		return "victory"
-	return "defeat"
+	if total_damage_enemy > total_damage_player:
+		return "defeat"
+	return "tie"
 
 func _alive_count(units: Array[Unit]) -> int:
 	var count: int = 0
@@ -779,9 +964,10 @@ func _emit_target_events(force: bool = false) -> void:
 	_last_targets_enemy = _emit_target_events_for_team("enemy", "player", enemy_targets, _last_targets_enemy, force)
 
 func _emit_target_events_for_team(team: String, target_team: String, current: Array, previous: Array, force: bool) -> Array:
-	var result: Array = []
 	var curr_count: int = current.size()
 	var prev_count: int = previous.size()
+	if previous.size() < curr_count:
+		previous.resize(curr_count)
 	for i in range(curr_count):
 		var new_target: int = int(current[i])
 		var prev_target: int = (int(previous[i]) if i < prev_count else -1)
@@ -794,13 +980,15 @@ func _emit_target_events_for_team(team: String, target_team: String, current: Ar
 					emit_signal("target_end", team, i, target_team, prev_target)
 				if new_target >= 0:
 					emit_signal("target_start", team, i, target_team, new_target)
-		result.append(new_target)
+		previous[i] = new_target
 	if not force and prev_count > curr_count:
 		for j in range(curr_count, prev_count):
 			var prev_val: int = int(previous[j])
 			if prev_val >= 0:
 				emit_signal("target_end", team, j, target_team, prev_val)
-	return result
+	if previous.size() > curr_count:
+		previous.resize(curr_count)
+	return previous
 
 # Public helper to avoid external scripts depending on internal fields
 func set_movement_debug_frames(frames: int) -> void:

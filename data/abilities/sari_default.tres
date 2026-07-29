@@ -7,6 +7,6 @@ script = ExtResource( 1 )
 id = "sari_default"
 name = "Strike"
 description = "Basic strike ability."
+targeting_summary = "Current attack target."
 base_cost = 60
 tags = ["damage"]
-

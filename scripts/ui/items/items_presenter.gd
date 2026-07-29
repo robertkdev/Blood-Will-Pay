@@ -4,7 +4,7 @@ class_name ItemsPresenter
 const ItemCatalog := preload("res://scripts/game/items/item_catalog.gd")
 const ItemDef := preload("res://scripts/game/items/item_def.gd")
 
-const ITEM_CARD_SCENE := preload("res://scenes/ui/items/ItemCard.tscn")
+const ITEM_CARD_SCENE_PATH: String = "res://scenes/ui/items/ItemCard.tscn"
 const DEFAULT_MIN_ROWS := 3
 
 var view: Control
@@ -12,8 +12,15 @@ var left_area: Control
 var grid: GridContainer
 var router
 var _item_grid_helper
+var _rebuild_queued: bool = false
+var _rebuilding: bool = false
+var _tearing_down: bool = false
+var _item_card_scene: PackedScene = null
 
 func configure(_view: Control) -> void:
+	_tearing_down = false
+	_rebuild_queued = false
+	_rebuilding = false
 	view = _view
 	if view:
 		left_area = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
@@ -24,6 +31,9 @@ func initialize() -> void:
 	rebuild()
 
 func teardown() -> void:
+	_tearing_down = true
+	_rebuild_queued = false
+	_rebuilding = false
 	var items = _items_singleton()
 	if items != null and items.is_connected("inventory_changed", Callable(self, "_on_inventory_changed")):
 		items.inventory_changed.disconnect(_on_inventory_changed)
@@ -40,11 +50,27 @@ func _bind_items_signal() -> void:
 		items.inventory_changed.connect(_on_inventory_changed)
 
 func _on_inventory_changed() -> void:
+	_queue_rebuild()
+
+func _queue_rebuild() -> void:
+	if _tearing_down or _rebuild_queued:
+		return
+	_rebuild_queued = true
+	call_deferred("_flush_queued_rebuild")
+
+func _flush_queued_rebuild() -> void:
+	_rebuild_queued = false
+	if _tearing_down:
+		return
 	rebuild()
 
 func rebuild() -> void:
-	if grid == null or left_area == null:
+	if _tearing_down or grid == null or left_area == null:
 		return
+	if _rebuilding:
+		_queue_rebuild()
+		return
+	_rebuilding = true
 	_clear_grid()
 	var layout: Array[String] = _inventory_layout()
 	var cols: int = int(grid.columns) if grid and grid.has_method("get") else 1
@@ -52,9 +78,14 @@ func rebuild() -> void:
 	var min_slots: int = cols * DEFAULT_MIN_ROWS
 	while layout.size() < min_slots:
 		layout.append("")
+	var item_card_scene: PackedScene = _get_item_card_scene()
+	if item_card_scene == null:
+		_rebuilding = false
+		push_error("ItemsPresenter: failed to load %s" % ITEM_CARD_SCENE_PATH)
+		return
 	for idx in range(layout.size()):
-		var id := String(layout[idx])
-		var card := ITEM_CARD_SCENE.instantiate()
+		var id: String = String(layout[idx])
+		var card: Control = item_card_scene.instantiate() as Control
 		if card == null:
 			continue
 		if card.has_method("set_item_id"):
@@ -77,6 +108,12 @@ func rebuild() -> void:
 		for c in grid.get_children():
 			if router.has_method("attach_card"):
 				router.attach_card(c)
+	_rebuilding = false
+
+func _get_item_card_scene() -> PackedScene:
+	if _item_card_scene == null:
+		_item_card_scene = ResourceLoader.load(ITEM_CARD_SCENE_PATH, "PackedScene") as PackedScene
+	return _item_card_scene
 
 func _clear_grid() -> void:
 	if grid == null:

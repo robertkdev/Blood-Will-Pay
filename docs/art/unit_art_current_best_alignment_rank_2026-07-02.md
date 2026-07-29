@@ -1,5 +1,7 @@
 # Unit Art Current-Best Alignment Rank - 2026-07-02
 
+> Mara naming note (2026-07-28): Mara is the current unit name. Any remaining lower-case `cashmere` filename or path below is retained only as pre-rename artifact provenance; the associated formal ledger-clad image is not approved as current Mara art.
+
 Scope: all 51 playable units, but graded from the best current artwork surface available:
 
 1. Latest `accepted` or `current_candidate` unit row in `docs/art/unit_art_proof_matrix.json`.
@@ -45,7 +47,7 @@ Review artifacts:
 | 21 | Brute | proof/current matte-post | Mixed-good | Newer matte pass helps; still generic fantasy-stone tank. |
 | 22 | Malachor | live fallback | Mixed-good | Strong corrupted tank, but green glow and raid-boss polish drift. |
 | 23 | Quillith | live fallback | Mixed-good | Dark caster silhouette works; blue magic and clean fantasy energy hold it back. |
-| 24 | Cashmere | proof/current v3 | Mixed-good | Newer version is much better than live, but modern suit cleanliness still limits world scarring. |
+| 24 | Mara | proof/current v3 | Mixed-good | Newer version is much better than live, but modern suit cleanliness still limits world scarring. |
 | 25 | Axiom | proof/current | Mixed | Improved dark owl-scholar, but still reads clean fantasy more than tragic occult survivor. |
 | 26 | Sari | proof/current | Mixed | Darker predator direction helps, but still action-game assassin rather than folklore tragedy. |
 | 27 | Morrak | proof/current | Mixed | Better brutal executioner, but composition/cutout artifacts and glossy monster read remain. |
@@ -76,7 +78,7 @@ Review artifacts:
 
 ## Takeaway
 
-The correction moves several formerly low-ranked units much higher: Totem, Repo, Kythera, Paisley, Creep, Cashmere, Veyra, Berebell, Mortem, and Nyxa should be judged from their newer candidates, not the stale live PNGs.
+The correction moves several formerly low-ranked units much higher: Totem, Repo, Kythera, Paisley, Creep, Mara, Veyra, Berebell, Mortem, and Nyxa should be judged from their newer candidates, not the stale live PNGs.
 
 The safest current-best art references are Omenry, Juno Vale, Sable, Saffron, Orielle, Ivara, Totem v26, Repo v3, Ravel, Vesper, Bastionne, and Nullora.
 

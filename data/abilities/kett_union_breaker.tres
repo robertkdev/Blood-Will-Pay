@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "kett_union_breaker"
 name = "Union Breaker"
 description = "Punches three times, stacking on-hit pressure, ramp evidence, and a frontline debuff."
+targeting_summary = "Current attack target, or lowest-health enemy if none."
 base_cost = 50
 tags = ["damage", "on_hit_effect", "ramp", "debuff"]

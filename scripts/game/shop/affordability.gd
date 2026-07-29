@@ -8,7 +8,7 @@ const REASON_OK := "OK"
 const REASON_RESERVE_FLOOR := "RESERVE_FLOOR"   # Out of combat: must keep the planning reserve
 const REASON_CREDIT_LIMIT := "CREDIT_LIMIT"     # In combat: would exceed combat credit and kill you even on win
 const REASON_INSUFFICIENT := "INSUFFICIENT_GOLD"
-const PLANNING_RESERVE_FLOOR := 2
+const PLANNING_RESERVE_FLOOR := 1
 
 static func can_afford(gold: int, bet: int, cost: int, in_combat: bool, spent_so_far: int = 0) -> Dictionary:
 	var c: int = max(0, int(cost))

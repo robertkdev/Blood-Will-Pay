@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "rooket_brace_shot"
 name = "Brace Shot"
 description = "Braces with damage reduction and CC immunity, then fires a piercing bolt that shreds enemies."
+targeting_summary = "Current attack target, or lowest-health enemy if none; fires a piercing line."
 base_cost = 55
 tags = ["damage", "line", "debuff", "defense"]

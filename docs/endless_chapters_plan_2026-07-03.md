@@ -49,6 +49,7 @@ Current formula:
   - first normal: `1.90`
   - second normal: `2.25`
   - boss: `2.65`
+  - Chapter 1 boss: `2.15`, with generated unit levels capped at `2`
   - mirror: player-board driven, but tagged with the boss target for logging
 
 That gives the generator a smooth ramp without needing infinite authored pools. Deep scaling comes from generated levels, board size, and active trait pressure. Generated enemy items are not assigned yet; item pressure is audit-visible but should not affect generated difficulty until item-bearing enemy boards are introduced.

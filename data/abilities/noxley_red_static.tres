@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "noxley_red_static"
 name = "Red Static"
 description = "Pays health to chain blood lightning, healing from damage dealt and leaving ticking red static."
+targeting_summary = "Two nearest enemies, or lowest-health enemy if none are near."
 base_cost = 50
 tags = ["damage", "dot", "sustain", "ramp"]

@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "prisma_color_theory"
 name = "Color Theory"
 description = "Amplifies the team, then creates a prismatic area burst and denial field."
+targeting_summary = "Current attack target, or lowest-health enemy if none; creates an AoE at that target."
 base_cost = 60
 tags = ["damage", "zone", "amp", "aoe"]

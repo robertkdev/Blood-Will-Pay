@@ -37,9 +37,9 @@ func _ready() -> void:
 		_expect_texture_style(new_game_button, "normal", "NewGameButton normal should use the generated primary button asset", failures)
 		_expect_texture_style(new_game_button, "hover", "NewGameButton hover should use the generated primary button asset", failures)
 		_expect_texture_style(new_game_button, "pressed", "NewGameButton pressed should use the generated primary button asset", failures)
-		_expect_texture_style(new_game_button, "focus", "NewGameButton focus should use the generated primary button asset", failures)
+		_expect_focus_outline(new_game_button, "NewGameButton focus should preserve the underlying primary button state", failures)
 	if stage_label != null:
-		_expect(stage_label.text == "Stage Reached: 3", "StageLabel did not use live GameState", failures)
+		_expect(stage_label.text == "Total Earned: 8g  •  Chapter 1  •  Stage 3", "StageLabel did not use live run score and GameState", failures)
 	var scoreboard: Node = screen.get_node_or_null("Panel/Center/Frame/VBox/ScoreboardHolder/Scoreboard")
 	_expect(scoreboard != null, "Loss scoreboard missing", failures)
 	if scoreboard != null:
@@ -91,12 +91,15 @@ func _ready() -> void:
 	_expect(int(Roster.first_empty_slot()) == 0, "New Game did not clear Roster bench", failures)
 	_expect(not is_instance_valid(layer), "New Game did not clear the overlay CanvasLayer", failures)
 
+	var exit_code: int = 0
 	if failures.is_empty():
 		print("LossScreenSmoke: OK")
 	else:
 		for failure: String in failures:
 			push_error("LossScreenSmoke: " + failure)
-	get_tree().quit()
+		exit_code = 1
+	await _settle_frames(4)
+	get_tree().quit(exit_code)
 
 func _prepare_dirty_run_state() -> void:
 	if GameState.has_method("set_stage"):
@@ -157,6 +160,13 @@ func _expect_texture_style(control: Control, style_name: String, message: String
 		return
 	var style: StyleBox = control.get_theme_stylebox(style_name)
 	_expect(style is StyleBoxTexture, message, failures)
+
+func _expect_focus_outline(control: Control, message: String, failures: Array[String]) -> void:
+	if control == null:
+		failures.append(message)
+		return
+	var style: StyleBoxFlat = control.get_theme_stylebox("focus") as StyleBoxFlat
+	_expect(style != null and not style.draw_center, message, failures)
 
 func _settle_frames(count: int) -> void:
 	for _frame_index: int in range(count):

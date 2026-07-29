@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "bastionne_no_pass_writ"
 name = "No-Pass Writ"
 description = "Raises a gate wall that locks one threat, redirects pressure, and briefly blocks crowd control."
+targeting_summary = "Priority threat, favoring carries, burst units, and backline goals."
 base_cost = 60
 tags = ["tank", "lockdown", "redirect", "cc_immunity"]

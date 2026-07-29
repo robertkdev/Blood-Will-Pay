@@ -75,16 +75,17 @@ func _render_ids(ids: Array[String]) -> void:
 		var tex: Texture2D = _icon_for(id)
 		var chip: PanelContainer = PanelContainer.new()
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		chip.custom_minimum_size = Vector2(20, 20)
+		chip.custom_minimum_size = Vector2(22, 22)
+		chip.clip_contents = true
 		chip.add_theme_stylebox_override("panel", _make_chip_style())
 		var icon_rect: TextureRect = TextureRect.new()
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon_rect.custom_minimum_size = Vector2(18, 18)
-		icon_rect.size = Vector2(18, 18)
+		icon_rect.custom_minimum_size = Vector2(14, 14)
+		icon_rect.size = Vector2(14, 14)
 		icon_rect.texture = tex
-		icon_rect.modulate = Color(0.98, 0.91, 0.80, 0.98)
+		icon_rect.modulate = Color(0.74, 0.64, 0.50, 0.88)
 		chip.add_child(icon_rect)
 		_container.add_child(chip)
 
@@ -104,7 +105,7 @@ func _make_chip_style() -> StyleBox:
 	style.content_margin_top = 1
 	style.content_margin_right = 1
 	style.content_margin_bottom = 1
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.item_slot_style(Color(0.82, 0.74, 0.62, 0.90)), style)
+	return GothicUIAssets.style_or_fallback(GothicUIAssets.item_icon_frame_style(Color(0.76, 0.68, 0.54, 0.82)), style)
 
 func _icon_for(id: String) -> Texture2D:
 	var def: ItemDef = ItemCatalog.get_def(id)

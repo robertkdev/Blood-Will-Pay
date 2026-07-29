@@ -4,19 +4,26 @@ class_name EconomyUI
 var gold_label: Label
 var bet_slider: HSlider
 var bet_value: Label
+var all_in_button: Button
+var wager_summary: Label
 var _root: Node = null
 var _bet_row: Control = null
 var _gold_changed_cb: Callable = Callable()
 var _bet_changed_cb: Callable = Callable()
 
-func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, root: Node = null) -> void:
+func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all_in_button: Button, _wager_summary: Label, root: Node = null) -> void:
 	gold_label = _gold_label
 	bet_slider = _bet_slider
 	bet_value = _bet_value
+	all_in_button = _all_in_button
+	wager_summary = _wager_summary
 	_root = root
 	# Cache the row container so we can hide/show parts of it
 	if bet_slider:
 		_bet_row = bet_slider.get_parent()
+		bet_slider.step = 1.0
+	if all_in_button != null and not all_in_button.is_connected("pressed", Callable(self, "_on_all_in_pressed")):
+		all_in_button.pressed.connect(_on_all_in_pressed)
 	refresh()
 	if _has_economy():
 		_gold_changed_cb = Callable(self, "_on_economy_gold_changed")
@@ -42,6 +49,8 @@ func teardown() -> void:
 	gold_label = null
 	bet_slider = null
 	bet_value = null
+	all_in_button = null
+	wager_summary = null
 	_root = null
 	_bet_row = null
 	_gold_changed_cb = Callable()
@@ -132,6 +141,9 @@ func refresh() -> void:
 		bet_slider.value = target
 		bet_slider.editable = not in_combat and not forced_first_fight
 		bet_slider.visible = not in_combat and not forced_first_fight
+	if all_in_button != null:
+		all_in_button.disabled = in_combat or forced_first_fight or Economy.gold <= 0
+		all_in_button.visible = not in_combat and not forced_first_fight
 
 	# Hide static "Bet:" labels whenever the slider is hidden; bet_value carries the state copy.
 	if _bet_row:
@@ -154,6 +166,7 @@ func refresh() -> void:
 			else:
 				bet_value.text = str(max(1, int(Economy.current_bet)))
 			bet_value.visible = true
+	_refresh_wager_summary(in_combat, forced_first_fight)
 
 func on_bet_changed(val: float) -> void:
 	if not _has_economy():
@@ -164,6 +177,40 @@ func on_bet_changed(val: float) -> void:
 	Economy.set_bet(int(val))
 	if bet_value:
 		bet_value.text = str(int(val))
+	_refresh_wager_summary(false, false)
+
+func _on_all_in_pressed() -> void:
+	if bet_slider == null or not bet_slider.editable:
+		return
+	bet_slider.value = bet_slider.max_value
+	on_bet_changed(bet_slider.value)
+
+func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
+	if wager_summary == null or not _has_economy():
+		return
+	if forced_first_fight:
+		wager_summary.text = "Opening wager 1g | Betting unlocks after the first shop"
+		wager_summary.tooltip_text = "Win the forced opener to unlock wager choice and outcome quotes."
+		return
+	var wager: int = max(0, int(Economy.current_bet))
+	if not in_combat and bet_slider != null:
+		wager = max(0, int(bet_slider.value))
+	var probability: float = clampf(float(Economy.projected_win_probability), 0.01, 1.0)
+	var odds_percent: int = int(roundf(probability * 100.0))
+	var gross: int = int(Economy.quoted_payout(wager))
+	var after_loss: int = max(0, int(Economy.gold))
+	if not in_combat:
+		after_loss = max(0, int(Economy.gold) - wager)
+	var after_win: int = after_loss + gross
+	wager_summary.text = "Wager %dg%s | Win %d%% | Gross %dg | After win %dg | After loss %dg" % [
+		wager,
+		" locked" if in_combat else "",
+		odds_percent,
+		gross,
+		after_win,
+		after_loss,
+	]
+	wager_summary.tooltip_text = "Gross return includes the wager. Win odds are an estimate, not a guarantee."
 
 func set_bet_editable(editable: bool) -> void:
 	if bet_slider:

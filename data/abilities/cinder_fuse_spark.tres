@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "cinder_fuse_spark"
 name = "Fuse Spark"
 description = "Drops a burning fuse zone that hits clustered enemies, then ticks as a short DoT."
+targeting_summary = "Current attack target, or lowest-health enemy if none; creates a zone at that target."
 base_cost = 55
 tags = ["damage", "aoe", "zone", "dot"]

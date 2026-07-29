@@ -1,0 +1,1227 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Gamble Battle Unit Art Review</title>
+	<style>
+		:root {
+			color-scheme: dark;
+			--bg: #171613;
+			--panel: #24231f;
+			--panel-2: #302f29;
+			--line: #514c41;
+			--text: #f2eee5;
+			--muted: #b8b0a1;
+			--like: #68c27c;
+			--maybe: #d7aa48;
+			--cut: #d96d64;
+			--focus: #7fb7d8;
+			--shadow: rgba(0, 0, 0, 0.35);
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			margin: 0;
+			background: var(--bg);
+			color: var(--text);
+			font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+		}
+
+		button,
+		input,
+		select {
+			font: inherit;
+		}
+
+		button {
+			border: 1px solid var(--line);
+			background: #2b2924;
+			color: var(--text);
+			border-radius: 6px;
+			cursor: pointer;
+			min-height: 34px;
+		}
+
+		button:hover,
+		button:focus-visible,
+		input:focus-visible {
+			border-color: var(--focus);
+			outline: 2px solid rgba(127, 183, 216, 0.28);
+			outline-offset: 2px;
+		}
+
+		.shell {
+			min-height: 100vh;
+		}
+
+		.topbar {
+			position: sticky;
+			top: 0;
+			z-index: 10;
+			display: grid;
+			grid-template-columns: minmax(180px, 1fr) auto;
+			gap: 16px;
+			align-items: center;
+			padding: 14px 18px;
+			border-bottom: 1px solid var(--line);
+			background: rgba(23, 22, 19, 0.96);
+			box-shadow: 0 12px 32px var(--shadow);
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 20px;
+			font-weight: 650;
+			line-height: 1.2;
+			letter-spacing: 0;
+		}
+
+		.subtle {
+			color: var(--muted);
+			font-size: 13px;
+			margin-top: 4px;
+		}
+
+		.controls {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			justify-content: flex-end;
+			align-items: center;
+		}
+
+		.search {
+			width: min(260px, 42vw);
+			min-height: 34px;
+			border: 1px solid var(--line);
+			border-radius: 6px;
+			padding: 7px 10px;
+			background: #12110f;
+			color: var(--text);
+		}
+
+		.segment {
+			display: inline-grid;
+			grid-auto-flow: column;
+			gap: 0;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			overflow: hidden;
+		}
+
+		.segment button {
+			border: 0;
+			border-radius: 0;
+			min-width: 68px;
+			background: #25231f;
+		}
+
+		.segment button + button {
+			border-left: 1px solid var(--line);
+		}
+
+		.segment button.active[data-filter="like"],
+		.tile[data-choice="like"] .choice[data-choice="like"] {
+			background: rgba(104, 194, 124, 0.22);
+			border-color: rgba(104, 194, 124, 0.7);
+			color: #daf3de;
+		}
+
+		.segment button.active[data-filter="maybe"],
+		.tile[data-choice="maybe"] .choice[data-choice="maybe"] {
+			background: rgba(215, 170, 72, 0.24);
+			border-color: rgba(215, 170, 72, 0.75);
+			color: #f8e7b7;
+		}
+
+		.segment button.active[data-filter="cut"],
+		.tile[data-choice="cut"] .choice[data-choice="cut"] {
+			background: rgba(217, 109, 100, 0.24);
+			border-color: rgba(217, 109, 100, 0.75);
+			color: #f8d3cf;
+		}
+
+		.segment button.active[data-filter="all"],
+		.segment button.active[data-filter="unmarked"],
+		.segment button.active[data-set] {
+			background: #3a382f;
+		}
+
+		.action {
+			padding: 0 11px;
+		}
+
+		.action.primary {
+			border-color: #8b7855;
+			background: #433929;
+		}
+
+		.summary {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			padding: 14px 18px 0;
+		}
+
+		.pill {
+			min-width: 92px;
+			border: 1px solid var(--line);
+			border-radius: 999px;
+			padding: 6px 10px;
+			background: var(--panel);
+			color: var(--muted);
+			text-align: center;
+			font-size: 13px;
+		}
+
+		.pill strong {
+			color: var(--text);
+			font-weight: 650;
+		}
+
+		.grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(var(--tile-size, 170px), 1fr));
+			gap: 14px;
+			padding: 18px;
+		}
+
+		.tile {
+			display: grid;
+			grid-template-rows: auto auto auto;
+			gap: 10px;
+			min-width: 0;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 10px;
+			background: var(--panel);
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+		}
+
+		.tile[data-choice="like"] {
+			border-color: rgba(104, 194, 124, 0.7);
+		}
+
+		.tile[data-choice="maybe"] {
+			border-color: rgba(215, 170, 72, 0.75);
+		}
+
+		.tile[data-choice="cut"] {
+			border-color: rgba(217, 109, 100, 0.75);
+		}
+
+		.art-frame {
+			display: grid;
+			place-items: center;
+			aspect-ratio: 1 / 1;
+			border: 1px solid #3c392f;
+			border-radius: 6px;
+			overflow: hidden;
+			background-color: #1b1a17;
+			background-image:
+				linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%),
+				linear-gradient(-45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%),
+				linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
+				linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.06) 75%);
+			background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+			background-size: 16px 16px;
+			cursor: zoom-in;
+		}
+
+		.art-frame img {
+			display: block;
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+		}
+
+		.meta {
+			min-width: 0;
+		}
+
+		.name {
+			overflow: hidden;
+			color: var(--text);
+			font-size: 14px;
+			font-weight: 650;
+			line-height: 1.25;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.path {
+			overflow: hidden;
+			color: var(--muted);
+			font-size: 12px;
+			line-height: 1.25;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.decisions {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 6px;
+		}
+
+		.choice {
+			min-width: 0;
+			padding: 0 4px;
+		}
+
+		.clear {
+			display: none;
+			width: 100%;
+			color: var(--muted);
+		}
+
+		.tile[data-choice] .clear {
+			display: block;
+		}
+
+		dialog {
+			width: 100vw;
+			max-width: 100vw;
+			height: 100vh;
+			max-height: 100vh;
+			margin: 0;
+			border: 0;
+			border-radius: 0;
+			padding: 0;
+			background: #151411;
+			color: var(--text);
+			box-shadow: none;
+		}
+
+		dialog::backdrop {
+			background: #000;
+		}
+
+		.preview-shell {
+			display: grid;
+			grid-template-rows: auto minmax(0, 1fr) auto;
+			width: 100vw;
+			height: 100vh;
+		}
+
+		.preview-head {
+			display: flex;
+			justify-content: space-between;
+			gap: 12px;
+			align-items: center;
+			padding: 12px 14px;
+			border-bottom: 1px solid var(--line);
+			background: rgba(18, 17, 15, 0.94);
+		}
+
+		.preview-body {
+			display: grid;
+			place-items: center;
+			min-height: 0;
+			padding: 16px;
+			background:
+				linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+				linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+				linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
+				linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
+				#1b1a17;
+			background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+			background-size: 24px 24px;
+			cursor: pointer;
+			position: relative;
+			user-select: none;
+		}
+
+		.preview-body img {
+			max-width: 100%;
+			max-height: 100%;
+			object-fit: contain;
+		}
+
+		.preview-side-hint {
+			position: absolute;
+			top: 50%;
+			width: 48px;
+			height: 48px;
+			display: grid;
+			place-items: center;
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			border-radius: 999px;
+			background: rgba(0, 0, 0, 0.34);
+			color: rgba(255, 255, 255, 0.72);
+			font-size: 28px;
+			transform: translateY(-50%);
+			pointer-events: none;
+		}
+
+		.preview-side-hint.prev {
+			left: 18px;
+		}
+
+		.preview-side-hint.next {
+			right: 18px;
+		}
+
+		.preview-foot {
+			display: grid;
+			grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+			gap: 12px;
+			align-items: center;
+			padding: 12px 14px;
+			border-top: 1px solid var(--line);
+			background: rgba(18, 17, 15, 0.96);
+		}
+
+		.preview-status {
+			color: var(--muted);
+			font-size: 13px;
+		}
+
+		.preview-actions {
+			display: grid;
+			grid-auto-flow: column;
+			gap: 8px;
+			justify-content: center;
+		}
+
+		.preview-choice {
+			min-width: 88px;
+			padding: 0 12px;
+		}
+
+		dialog[data-choice="like"] .preview-choice[data-choice="like"] {
+			background: rgba(104, 194, 124, 0.22);
+			border-color: rgba(104, 194, 124, 0.7);
+			color: #daf3de;
+		}
+
+		dialog[data-choice="maybe"] .preview-choice[data-choice="maybe"] {
+			background: rgba(215, 170, 72, 0.24);
+			border-color: rgba(215, 170, 72, 0.75);
+			color: #f8e7b7;
+		}
+
+		dialog[data-choice="cut"] .preview-choice[data-choice="cut"] {
+			background: rgba(217, 109, 100, 0.24);
+			border-color: rgba(217, 109, 100, 0.75);
+			color: #f8d3cf;
+		}
+
+		dialog:not([data-choice]) .preview-choice[data-choice="open"] {
+			background: rgba(229, 217, 193, 0.14);
+			border-color: rgba(229, 217, 193, 0.42);
+			color: var(--text);
+		}
+
+		.preview-help {
+			color: var(--muted);
+			font-size: 12px;
+			text-align: right;
+		}
+
+		.toast {
+			position: fixed;
+			right: 18px;
+			bottom: 18px;
+			z-index: 20;
+			max-width: min(420px, calc(100vw - 36px));
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 10px 12px;
+			background: #292720;
+			color: var(--text);
+			box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+			opacity: 0;
+			transform: translateY(8px);
+			pointer-events: none;
+			transition: opacity 160ms ease, transform 160ms ease;
+		}
+
+		.toast.show {
+			opacity: 1;
+			transform: translateY(0);
+		}
+
+		@media (max-width: 880px) {
+			.topbar {
+				grid-template-columns: 1fr;
+			}
+
+			.controls {
+				justify-content: flex-start;
+			}
+
+			.search {
+				width: 100%;
+			}
+		}
+
+		@media (max-width: 560px) {
+			.grid {
+				grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+				gap: 10px;
+				padding: 12px;
+			}
+
+			.topbar {
+				padding: 12px;
+			}
+
+			.summary {
+				padding-inline: 12px;
+			}
+
+			.segment button {
+				min-width: 58px;
+			}
+
+			.preview-foot {
+				grid-template-columns: 1fr;
+			}
+
+			.preview-actions {
+				grid-auto-flow: row;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.preview-help,
+			.preview-status {
+				text-align: center;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="shell">
+		<header class="topbar">
+			<div>
+				<h1>Gamble Battle Unit Art Review</h1>
+				<div class="subtle" id="visible-count">Loading assets/units</div>
+			</div>
+			<div class="controls" aria-label="Review controls">
+				<input id="search" class="search" type="search" placeholder="Search units" autocomplete="off">
+				<div class="segment" aria-label="Review set">
+					<button type="button" data-set="live" class="active">Live</button>
+					<button type="button" data-set="candidates">Candidates</button>
+					<button type="button" data-set="remembered">Remembered</button>
+				</div>
+				<div class="segment" aria-label="Filter">
+					<button type="button" data-filter="all" class="active">All</button>
+					<button type="button" data-filter="like">Like</button>
+					<button type="button" data-filter="maybe">Maybe</button>
+					<button type="button" data-filter="cut">Cut</button>
+					<button type="button" data-filter="unmarked">Open</button>
+				</div>
+				<button id="smaller" class="action" type="button" title="Smaller cards">-</button>
+				<button id="larger" class="action" type="button" title="Larger cards">+</button>
+				<button id="export-json" class="action primary" type="button">Export JSON</button>
+				<button id="export-csv" class="action" type="button">Export CSV</button>
+				<button id="copy-summary" class="action" type="button">Copy Summary</button>
+				<button id="clear-all" class="action" type="button">Clear</button>
+			</div>
+		</header>
+
+		<section class="summary" aria-label="Decision summary">
+			<div class="pill">Total <strong id="count-total">0</strong></div>
+			<div class="pill">Like <strong id="count-like">0</strong></div>
+			<div class="pill">Maybe <strong id="count-maybe">0</strong></div>
+			<div class="pill">Cut <strong id="count-cut">0</strong></div>
+			<div class="pill">Open <strong id="count-open">0</strong></div>
+		</section>
+
+		<main id="grid" class="grid" aria-live="polite"></main>
+	</div>
+
+	<dialog id="preview">
+		<div class="preview-shell">
+			<div class="preview-head">
+				<div>
+					<div class="name" id="preview-name"></div>
+					<div class="path" id="preview-path"></div>
+				</div>
+				<button id="close-preview" class="action" type="button">Close</button>
+			</div>
+			<div class="preview-body" id="preview-body">
+				<div class="preview-side-hint prev" aria-hidden="true">&lsaquo;</div>
+				<img id="preview-image" src="" alt="">
+				<div class="preview-side-hint next" aria-hidden="true">&rsaquo;</div>
+			</div>
+			<div class="preview-foot">
+				<div class="preview-status" id="preview-status">1 / 1</div>
+				<div class="preview-actions" aria-label="Preview voting controls">
+					<button class="preview-choice" type="button" data-preview-choice="like" data-choice="like">Like</button>
+					<button class="preview-choice" type="button" data-preview-choice="maybe" data-choice="maybe">Maybe</button>
+					<button class="preview-choice" type="button" data-preview-choice="cut" data-choice="cut">Cut</button>
+					<button class="preview-choice" type="button" data-preview-choice="" data-choice="open">Open</button>
+				</div>
+				<div class="preview-help">Left/right side or arrow keys move between visible cards</div>
+			</div>
+		</div>
+	</dialog>
+
+	<div id="toast" class="toast" role="status"></div>
+
+	<script>
+		const ASSET_ROOT = "../../assets/units/";
+		const STORAGE_KEY = "gamble-battle-unit-art-review-v1";
+		const LIVE_ART = [
+			"axiom.png",
+			"bastionne.png",
+			"berebell.png",
+			"bo.png",
+			"bonko.png",
+			"brute.png",
+			"caldera.png",
+			"cashmere.png",
+			"cinder.png",
+			"creep.png",
+			"draxelle.png",
+			"egress.png",
+			"gable.png",
+			"grint.png",
+			"hexeon.png",
+			"ivara.png",
+			"juno_vale.png",
+			"kett.png",
+			"knoll.png",
+			"korath (1).png",
+			"korath.png",
+			"kythera.png",
+			"luna.png",
+			"malachor.png",
+			"marble.png",
+			"meridian.png",
+			"miri.png",
+			"morrak.png",
+			"mortem.png",
+			"noxley.png",
+			"nullora.png",
+			"nyxa.png",
+			"omenry.png",
+			"orielle.png",
+			"paisley.png",
+			"pilfer.png",
+			"prisma.png",
+			"quillith.png",
+			"quorra.png",
+			"ravel.png",
+			"repo.png",
+			"rooket.png",
+			"sable.png",
+			"saffron.png",
+			"sari (3).png",
+			"sari.png",
+			"teller.png",
+			"totem.png",
+			"velour.png",
+			"vesper.png",
+			"veyra.png",
+			"volt.png",
+			"vykos.png"
+		].map((file) => createArtItem({
+			set: "live",
+			// The retired filename is preserved for provenance only; it is not approved Mara art.
+			unit: file === "cashmere.png" ? "mara" : file.replace(/\.png$/i, ""),
+			kind: file === "cashmere.png" ? "legacy-placeholder" : "live",
+			path: "assets/units/" + file,
+			src: ASSET_ROOT + encodeURIComponent(file)
+		}));
+
+		const CANDIDATE_ART = [
+			{ unit: "axiom", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/axiom/axiom_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "axiom", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/axiom/axiom_creep_vellum_rework_v2_board_preview_final.png" },
+			{ unit: "bastionne", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/bastionne/bastionne_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "bastionne", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/bastionne/bastionne_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "berebell", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/berebell/berebell_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "berebell", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/berebell/berebell_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "bo", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/bo/bo_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "bo", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/bo/bo_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "bonko", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/bonko/bonko_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "bonko", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/bonko/bonko_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "brute", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/brute/brute_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "brute", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/brute/brute_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "caldera", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/caldera/caldera_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "caldera", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/caldera/caldera_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			// Retired pre-Mara image provenance. Never present these as current or approved Mara art.
+			{ unit: "mara", kind: "legacy-candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_cutout_rawfieldclean.png" },
+			{ unit: "mara", kind: "legacy-board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_board_preview_final.png" },
+			{ unit: "cinder", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cinder/cinder_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "cinder", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cinder/cinder_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "creep", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/creep/creep_creep_vellum_accepted_v5_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "creep", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/creep/creep_creep_vellum_accepted_v5_board_preview_final.png" },
+			{ unit: "draxelle", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/draxelle/draxelle_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "draxelle", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/draxelle/draxelle_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "egress", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/egress/egress_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "egress", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/egress/egress_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "gable", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/gable/gable_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "gable", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/gable/gable_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "grint", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/grint/grint_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "grint", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/grint/grint_creep_vellum_rework_v2_board_preview_final.png" },
+			{ unit: "hexeon", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/hexeon/hexeon_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "hexeon", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/hexeon/hexeon_creep_vellum_rework_v2_board_preview_final.png" },
+			{ unit: "ivara", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/ivara/ivara_creep_vellum_rework_v1_cutout_rawfieldclean.png" },
+			{ unit: "ivara", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/ivara/ivara_creep_vellum_rework_v1_board_preview_final_blue_muted.png" },
+			{ unit: "juno_vale", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/juno_vale/juno_vale_creep_vellum_rework_v1_cutout_rawfieldclean.png" },
+			{ unit: "juno_vale", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/juno_vale/juno_vale_creep_vellum_rework_v1_board_preview_final.png" },
+			{ unit: "kett", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/kett/kett_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "kett", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/kett/kett_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "knoll", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/knoll/knoll_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "knoll", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/knoll/knoll_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "korath", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/korath/korath_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "korath", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/korath/korath_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "kythera", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/kythera/kythera_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "kythera", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/kythera/kythera_creep_vellum_rework_v3_board_preview_final_blue_muted_strong.png" },
+			{ unit: "luna", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/luna/luna_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "luna", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/luna/luna_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "malachor", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/malachor/malachor_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "malachor", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/malachor/malachor_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "marble", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/marble/marble_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "marble", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/marble/marble_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "meridian", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/meridian/meridian_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "meridian", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/meridian/meridian_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "miri", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/miri/miri_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "miri", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/miri/miri_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "morrak", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/morrak/morrak_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "morrak", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/morrak/morrak_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "mortem", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/mortem/mortem_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "mortem", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/mortem/mortem_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "noxley", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/noxley/noxley_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "noxley", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/noxley/noxley_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "nullora", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/nullora/nullora_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "nullora", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/nullora/nullora_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "nyxa", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/nyxa/nyxa_creep_vellum_rework_v7_cutout_rawfieldclean.png" },
+			{ unit: "nyxa", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/nyxa/nyxa_creep_vellum_rework_v7_board_preview_final.png" },
+			{ unit: "omenry", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/omenry/omenry_creep_vellum_rework_v1_cutout_rawfieldclean.png" },
+			{ unit: "omenry", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/omenry/omenry_creep_vellum_rework_v1_board_preview_final.png" },
+			{ unit: "orielle", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/orielle/orielle_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "orielle", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/orielle/orielle_creep_vellum_rework_v2_board_preview_final_blue_muted.png" },
+			{ unit: "paisley", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/paisley/paisley_creep_vellum_accepted_refit_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "paisley", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/paisley/paisley_creep_vellum_accepted_refit_board_preview_final.png" },
+			{ unit: "pilfer", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/pilfer/pilfer_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "pilfer", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/pilfer/pilfer_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "prisma", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/prisma/prisma_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "prisma", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/prisma/prisma_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "quillith", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/quillith/quillith_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "quillith", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/quillith/quillith_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "quorra", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/quorra/quorra_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "quorra", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/quorra/quorra_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "ravel", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/ravel/ravel_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean_yellow_muted_strong.png" },
+			{ unit: "ravel", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/ravel/ravel_creep_vellum_rework_v1_board_preview_final_yellow_muted_strong.png" },
+			{ unit: "repo", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/repo/repo_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "repo", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/repo/repo_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "rooket", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/rooket/rooket_creep_vellum_rework_v5_cutout_rawfieldclean.png" },
+			{ unit: "rooket", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/rooket/rooket_creep_vellum_rework_v5_board_preview_final.png" },
+			{ unit: "sable", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/sable/sable_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "sable", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/sable/sable_creep_vellum_rework_v2_board_preview_final.png" },
+			{ unit: "saffron", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/saffron/saffron_creep_vellum_rework_v1_cutout_rawfieldclean.png" },
+			{ unit: "saffron", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/saffron/saffron_creep_vellum_rework_v1_board_preview_final.png" },
+			{ unit: "sari", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/sari/sari_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "sari", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/sari/sari_creep_vellum_rework_v2_board_preview_final.png" },
+			{ unit: "teller", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/teller/teller_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "teller", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/teller/teller_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "totem", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/totem/totem_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "totem", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/totem/totem_creep_vellum_rework_v1_board_preview_final.png" },
+			{ unit: "velour", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/velour/velour_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "velour", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/velour/velour_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "vesper", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/vesper/vesper_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "vesper", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/vesper/vesper_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
+			{ unit: "veyra", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/veyra/veyra_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "veyra", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/veyra/veyra_creep_vellum_rework_v2_board_preview_final.png" },
+			{ unit: "volt", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/volt/volt_creep_vellum_rework_v2_cutout_rawfieldclean.png" },
+			{ unit: "volt", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/volt/volt_creep_vellum_rework_v2_board_preview_final.png" },
+			{ unit: "vykos", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/vykos/vykos_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "vykos", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/vykos/vykos_creep_vellum_rework_v3_board_preview_final.png" }
+		].map((item) => createArtItem({
+			set: "candidates",
+			unit: item.unit,
+			kind: item.kind,
+			path: item.path
+		}));
+
+		const REMEMBERED_ART = [
+			{ unit: "creep", kind: "live", note: "current live asset", path: "assets/units/creep.png" },
+			{ unit: "creep", kind: "candidate", note: "accepted v5 final cutout, black scythe ring", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/creep/creep_creep_vellum_accepted_v5_cutout_final_cropped1024_rawfieldclean.png" },
+			{ unit: "creep", kind: "board", note: "accepted v5 board preview", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/creep/creep_creep_vellum_accepted_v5_board_preview_final.png" },
+			{ unit: "creep", kind: "candidate", note: "v5 raw, broad black scythe ring", path: "outputs/art_pipeline/style_validation/creep_builtin_revision_candidate_v5_2026_07_01/creep_builtin_revision_candidate_v5_raw.png" },
+			{ unit: "creep", kind: "candidate", note: "v5 cutout, broad black scythe ring", path: "outputs/art_pipeline/style_validation/creep_builtin_revision_candidate_v5_2026_07_01/creep_builtin_revision_candidate_v5_cutout_birefnet_foregroundml_despill_edgeclean.png" },
+			{ unit: "creep", kind: "candidate", note: "v4 raw, matte black scythe ribbons", path: "outputs/art_pipeline/style_validation/creep_builtin_revision_candidate_v4_2026_07_01/creep_builtin_revision_candidate_v4_raw.png" },
+			{ unit: "creep", kind: "candidate", note: "v4 cutout, matte black scythe ribbons", path: "outputs/art_pipeline/style_validation/creep_builtin_revision_candidate_v4_2026_07_01/creep_builtin_revision_candidate_v4_cutout_birefnet_foregroundml_despill_edgeclean.png" },
+			{ unit: "creep", kind: "candidate", note: "v3 raw, flat matte black scythe ribbons", path: "outputs/art_pipeline/style_validation/creep_builtin_revision_candidate_v3_2026_07_01/creep_builtin_revision_candidate_v3_raw.png" },
+			{ unit: "creep", kind: "candidate", note: "v3 cutout, flat matte black scythe ribbons", path: "outputs/art_pipeline/style_validation/creep_builtin_revision_candidate_v3_2026_07_01/creep_builtin_revision_candidate_v3_cutout_birefnet_foregroundml_despill_edgeclean.png" },
+			{ unit: "knoll", kind: "live", note: "current live asset", path: "assets/units/knoll.png" },
+			{ unit: "knoll", kind: "candidate", note: "tall goal-rework final cutout", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/knoll/knoll_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
+			{ unit: "knoll", kind: "board", note: "tall goal-rework board preview", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/knoll/knoll_creep_vellum_rework_v3_board_preview_final.png" },
+			{ unit: "knoll", kind: "candidate", note: "tall v3 selected raw", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/knoll/knoll_creep_vellum_rework_v3_raw_selected.png" },
+			{ unit: "knoll", kind: "candidate", note: "v2 raw", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/knoll/knoll_creep_vellum_rework_v2_raw.png" },
+			{ unit: "knoll", kind: "candidate", note: "v1 raw", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/knoll/knoll_creep_vellum_rework_v1_raw.png" }
+		].map((item) => createArtItem({
+			set: "remembered",
+			unit: item.unit,
+			kind: item.kind,
+			note: item.note,
+			path: item.path
+		}));
+
+		const ART_SETS = {
+			live: LIVE_ART,
+			candidates: CANDIDATE_ART,
+			remembered: REMEMBERED_ART
+		};
+
+		const state = {
+			set: "live",
+			filter: "all",
+			query: "",
+			tileSize: 170,
+			decisions: loadDecisions(),
+			previewItems: [],
+			previewIndex: -1
+		};
+
+		const els = {
+			grid: document.getElementById("grid"),
+			search: document.getElementById("search"),
+			visibleCount: document.getElementById("visible-count"),
+			total: document.getElementById("count-total"),
+			like: document.getElementById("count-like"),
+			maybe: document.getElementById("count-maybe"),
+			cut: document.getElementById("count-cut"),
+			open: document.getElementById("count-open"),
+			preview: document.getElementById("preview"),
+			previewBody: document.getElementById("preview-body"),
+			previewName: document.getElementById("preview-name"),
+			previewPath: document.getElementById("preview-path"),
+			previewImage: document.getElementById("preview-image"),
+			previewStatus: document.getElementById("preview-status"),
+			toast: document.getElementById("toast")
+		};
+
+		document.querySelectorAll("[data-set]").forEach((button) => {
+			button.addEventListener("click", () => {
+				state.set = button.dataset.set;
+				document.querySelectorAll("[data-set]").forEach((candidate) => {
+					candidate.classList.toggle("active", candidate === button);
+				});
+				render();
+			});
+		});
+
+		document.querySelectorAll("[data-filter]").forEach((button) => {
+			button.addEventListener("click", () => {
+				state.filter = button.dataset.filter;
+				document.querySelectorAll("[data-filter]").forEach((candidate) => {
+					candidate.classList.toggle("active", candidate === button);
+				});
+				render();
+			});
+		});
+
+		els.search.addEventListener("input", () => {
+			state.query = els.search.value.trim().toLowerCase();
+			render();
+		});
+
+		document.getElementById("smaller").addEventListener("click", () => {
+			state.tileSize = Math.max(128, state.tileSize - 20);
+			applyTileSize();
+		});
+
+		document.getElementById("larger").addEventListener("click", () => {
+			state.tileSize = Math.min(260, state.tileSize + 20);
+			applyTileSize();
+		});
+
+		document.getElementById("export-json").addEventListener("click", () => {
+			download("gamble-battle-unit-art-review.json", "application/json", JSON.stringify(exportPayload(), null, "\t"));
+		});
+
+		document.getElementById("export-csv").addEventListener("click", () => {
+			download("gamble-battle-unit-art-review.csv", "text/csv", exportCsv());
+		});
+
+		document.getElementById("copy-summary").addEventListener("click", async () => {
+			const summary = summaryText();
+			try {
+				await navigator.clipboard.writeText(summary);
+				showToast("Summary copied.");
+			} catch (error) {
+				showToast(summary);
+			}
+		});
+
+		document.getElementById("clear-all").addEventListener("click", () => {
+			if (!confirm("Clear all current unit art decisions?")) {
+				return;
+			}
+			state.decisions = {};
+			saveDecisions();
+			render();
+		});
+
+		document.getElementById("close-preview").addEventListener("click", () => {
+			els.preview.close();
+		});
+
+		els.previewBody.addEventListener("click", (event) => {
+			const rect = els.previewBody.getBoundingClientRect();
+			const midpoint = rect.left + rect.width / 2;
+			movePreview(event.clientX < midpoint ? -1 : 1);
+		});
+
+		els.preview.addEventListener("keydown", (event) => {
+			if (event.key === "ArrowLeft") {
+				event.preventDefault();
+				movePreview(-1);
+			}
+			if (event.key === "ArrowRight") {
+				event.preventDefault();
+				movePreview(1);
+			}
+		});
+
+		document.querySelectorAll("[data-preview-choice]").forEach((button) => {
+			button.addEventListener("click", () => {
+				voteCurrentPreview(button.dataset.previewChoice);
+			});
+		});
+
+		function createArtItem(config) {
+			const pathParts = config.path.split("/");
+			const file = pathParts[pathParts.length - 1];
+			const unit = config.unit || file.replace(/\.png$/i, "");
+			const kind = config.kind || "candidate";
+			const note = config.note || "";
+			const id = config.set === "live"
+				? unit
+				: unit + " | " + kind + (note ? " | " + note : "");
+			return {
+				key: config.set === "live" ? file : config.path,
+				set: config.set,
+				file,
+				unit,
+				kind,
+				note,
+				path: config.path,
+				id,
+				src: config.src || encodeURI("../../" + config.path)
+			};
+		}
+
+		function currentItems() {
+			return ART_SETS[state.set] || LIVE_ART;
+		}
+
+		function setLabel(setName) {
+			if (setName === "candidates") {
+				return "candidate variants";
+			}
+			if (setName === "remembered") {
+				return "remembered Creep and Knoll variants";
+			}
+			return "live assets/units";
+		}
+
+		function render() {
+			const visible = filteredItems();
+			els.grid.replaceChildren(...visible.map((item, index) => renderTile(item, index, visible)));
+			updateCounts(visible.length);
+			if (els.preview.open) {
+				updatePreviewChoice();
+			}
+		}
+
+		function renderTile(item, index, visible) {
+			const choice = state.decisions[item.key] || "";
+			const tile = document.createElement("article");
+			tile.className = "tile";
+			if (choice) {
+				tile.dataset.choice = choice;
+			}
+
+			const frame = document.createElement("button");
+			frame.type = "button";
+			frame.className = "art-frame";
+			frame.title = item.path;
+			frame.addEventListener("click", () => openPreview(visible, index));
+
+			const image = document.createElement("img");
+			image.src = item.src;
+			image.alt = item.id;
+			image.loading = "lazy";
+			frame.append(image);
+
+			const meta = document.createElement("div");
+			meta.className = "meta";
+
+			const name = document.createElement("div");
+			name.className = "name";
+			name.textContent = item.id;
+
+			const path = document.createElement("div");
+			path.className = "path";
+			path.textContent = item.note ? item.note + " | " + item.path : item.path;
+			meta.append(name, path);
+
+			const decisions = document.createElement("div");
+			decisions.className = "decisions";
+			["like", "maybe", "cut"].forEach((value) => {
+				const button = document.createElement("button");
+				button.type = "button";
+				button.className = "choice";
+				button.dataset.choice = value;
+				button.textContent = labelFor(value);
+				button.addEventListener("click", () => {
+					setDecision(item.key, value);
+				});
+				decisions.append(button);
+			});
+
+			const clear = document.createElement("button");
+			clear.type = "button";
+			clear.className = "clear";
+			clear.textContent = "Clear";
+			clear.addEventListener("click", () => {
+				setDecision(item.key, "");
+			});
+
+			tile.append(frame, meta, decisions, clear);
+			return tile;
+		}
+
+		function filteredItems() {
+			return currentItems().filter((item) => {
+				const choice = state.decisions[item.key] || "";
+				const haystack = [item.id, item.unit, item.kind, item.note, item.path].join(" ").toLowerCase();
+				const matchesQuery = !state.query || haystack.includes(state.query);
+				const matchesFilter =
+					state.filter === "all" ||
+					(state.filter === "unmarked" && !choice) ||
+					choice === state.filter;
+				return matchesQuery && matchesFilter;
+			});
+		}
+
+		function setDecision(file, choice) {
+			if (choice) {
+				state.decisions[file] = choice;
+			} else {
+				delete state.decisions[file];
+			}
+			saveDecisions();
+			render();
+		}
+
+		function updateCounts(visibleCount) {
+			const counts = getCounts();
+			const items = currentItems();
+			els.total.textContent = String(items.length);
+			els.like.textContent = String(counts.like);
+			els.maybe.textContent = String(counts.maybe);
+			els.cut.textContent = String(counts.cut);
+			els.open.textContent = String(counts.open);
+			els.visibleCount.textContent = visibleCount + " shown from " + setLabel(state.set);
+		}
+
+		function getCounts() {
+			const counts = { like: 0, maybe: 0, cut: 0, open: 0 };
+			currentItems().forEach((item) => {
+				const choice = state.decisions[item.key];
+				if (choice === "like" || choice === "maybe" || choice === "cut") {
+					counts[choice] += 1;
+				} else {
+					counts.open += 1;
+				}
+			});
+			return counts;
+		}
+
+		function openPreview(items, index) {
+			state.previewItems = items.slice();
+			state.previewIndex = clampPreviewIndex(index);
+			updatePreview();
+			els.preview.showModal();
+		}
+
+		function currentPreviewItem() {
+			return state.previewItems[state.previewIndex] || null;
+		}
+
+		function movePreview(delta) {
+			if (!state.previewItems.length) {
+				return;
+			}
+			state.previewIndex = clampPreviewIndex(state.previewIndex + delta);
+			updatePreview();
+		}
+
+		function clampPreviewIndex(index) {
+			const count = state.previewItems.length;
+			if (!count) {
+				return -1;
+			}
+			return ((index % count) + count) % count;
+		}
+
+		function voteCurrentPreview(choice) {
+			const item = currentPreviewItem();
+			if (!item) {
+				return;
+			}
+			setDecision(item.key, choice);
+			updatePreviewChoice();
+		}
+
+		function updatePreview() {
+			const item = currentPreviewItem();
+			if (!item) {
+				if (els.preview.open) {
+					els.preview.close();
+				}
+				return;
+			}
+			els.previewName.textContent = item.id;
+			els.previewPath.textContent = item.path;
+			els.previewImage.src = item.src;
+			els.previewImage.alt = item.id;
+			updatePreviewChoice();
+		}
+
+		function updatePreviewChoice() {
+			const item = currentPreviewItem();
+			if (!item) {
+				return;
+			}
+			const choice = state.decisions[item.key] || "";
+			if (choice) {
+				els.preview.dataset.choice = choice;
+			} else {
+				delete els.preview.dataset.choice;
+			}
+			const label = choice ? labelFor(choice) : "Open";
+			els.previewStatus.textContent = (state.previewIndex + 1) + " / " + state.previewItems.length + " - " + label;
+		}
+
+		function loadDecisions() {
+			try {
+				const raw = localStorage.getItem(STORAGE_KEY);
+				if (!raw) {
+					return {};
+				}
+				const parsed = JSON.parse(raw);
+				return parsed && typeof parsed === "object" ? parsed : {};
+			} catch (error) {
+				return {};
+			}
+		}
+
+		function saveDecisions() {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(state.decisions));
+		}
+
+		function applyTileSize() {
+			els.grid.style.setProperty("--tile-size", state.tileSize + "px");
+		}
+
+		function exportPayload() {
+			const counts = getCounts();
+			return {
+				project: "gamble-battle",
+				review_set: state.set,
+				review_set_label: setLabel(state.set),
+				exported_at: new Date().toISOString(),
+				counts,
+				decisions: currentItems().map((item) => ({
+					path: item.path,
+					unit_id: item.unit,
+					kind: item.kind,
+					label: item.id,
+					note: item.note || "",
+					decision: state.decisions[item.key] || "open"
+				}))
+			};
+		}
+
+		function exportCsv() {
+			const rows = [["review_set", "path", "unit_id", "kind", "label", "note", "decision"]];
+			currentItems().forEach((item) => {
+				rows.push([
+					state.set,
+					item.path,
+					item.unit,
+					item.kind,
+					item.id,
+					item.note || "",
+					state.decisions[item.key] || "open"
+				]);
+			});
+			return rows.map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
+		}
+
+		function summaryText() {
+			const payload = exportPayload();
+			const lines = [
+				"Gamble Battle unit art review - " + payload.review_set_label,
+				"Like: " + payload.counts.like,
+				"Maybe: " + payload.counts.maybe,
+				"Cut: " + payload.counts.cut,
+				"Open: " + payload.counts.open
+			];
+			["like", "maybe", "cut"].forEach((decision) => {
+				const files = payload.decisions
+					.filter((row) => row.decision === decision)
+					.map((row) => row.path);
+				if (files.length > 0) {
+					lines.push(labelFor(decision) + ": " + files.join(", "));
+				}
+			});
+			return lines.join("\n");
+		}
+
+		function csvCell(value) {
+			return '"' + String(value).replace(/"/g, '""') + '"';
+		}
+
+		function download(filename, type, content) {
+			const blob = new Blob([content], { type });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = filename;
+			document.body.append(link);
+			link.click();
+			link.remove();
+			URL.revokeObjectURL(url);
+		}
+
+		function labelFor(value) {
+			if (value === "like") {
+				return "Like";
+			}
+			if (value === "maybe") {
+				return "Maybe";
+			}
+			if (value === "cut") {
+				return "Cut";
+			}
+			return "Open";
+		}
+
+		let toastTimer = 0;
+		function showToast(message) {
+			window.clearTimeout(toastTimer);
+			els.toast.textContent = message;
+			els.toast.classList.add("show");
+			toastTimer = window.setTimeout(() => {
+				els.toast.classList.remove("show");
+			}, 2400);
+		}
+
+		applyTileSize();
+		render();
+	</script>
+</body>
+</html>

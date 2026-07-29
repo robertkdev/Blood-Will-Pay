@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "quillith_final_exam"
 name = "Final Exam"
 description = "Names a Pupil, protects and amplifies them, then forces a reduced recast with team mana spillover."
+targeting_summary = "Highest-damage ally as Pupil; reduced recast hits current attack target or lowest-health enemy."
 base_cost = 36
 tags = ["utility", "amp", "reset_mechanic", "peel"]

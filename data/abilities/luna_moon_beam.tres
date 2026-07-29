@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "luna_moon_beam"
 name = "Moon Beam"
 description = "Fire a thin ray of refracted moonlight through the current target, piercing all enemies in a line for 260/390/580 + 0.75×SP magic damage."
+targeting_summary = "Current attack target in a line."
 base_cost = 60
 tags = ["damage", "line", "beam", "magic"]

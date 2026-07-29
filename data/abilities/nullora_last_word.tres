@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "nullora_last_word"
 name = "Last Word"
 description = "Vanishes into the enemy backline, marks the carry, executes the threshold, and leaves before retaliation."
+targeting_summary = "Enemy carry in the backline."
 base_cost = 28
 tags = ["damage", "access_backline", "execute", "untargetable"]

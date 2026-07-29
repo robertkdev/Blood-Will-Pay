@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "meridian_full_spectrum_treaty"
 name = "Full Spectrum Treaty"
 description = "Links wide allies, amplifies the treaty board, then detonates a prism beam across clustered enemies."
+targeting_summary = "Current attack target, or lowest-health enemy if none; detonates an AoE around that target."
 base_cost = 38
 tags = ["damage", "aoe", "burst", "amp"]

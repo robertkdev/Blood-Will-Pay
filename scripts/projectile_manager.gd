@@ -66,6 +66,7 @@ func clear() -> void:
 	_projectiles.clear()
 	_impacts.clear()
 	_reset_debug_counters()
+	visible = false
 	queue_redraw()
 
 func fire_basic(
@@ -86,6 +87,7 @@ func fire_basic(
 		emit_hit_on_arrival: bool = true,
 		style: Dictionary[String, Variant] = {}
 ) -> void:
+	visible = true
 	var dir: Vector2 = (end_pos - start_pos)
 	var dist: float = max(1.0, dir.length())
 	dir /= dist

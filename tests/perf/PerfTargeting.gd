@@ -7,12 +7,12 @@ const UnitFactoryScript: Script = preload("res://scripts/unit_factory.gd")
 @export var samples_per_case: int = 3
 
 const TEAM_A_IDS: Array[String] = [
-	"bonko", "korath", "sari", "pilfer", "cashmere", "axiom",
+	"bonko", "korath", "sari", "pilfer", "mara", "axiom",
 	"brute", "repo", "hexeon", "luna", "nyxa", "morrak"
 ]
 
 const TEAM_B_IDS: Array[String] = [
-	"repo", "bo", "sari", "pilfer", "cashmere", "knoll",
+	"repo", "bo", "sari", "pilfer", "mara", "knoll",
 	"korath", "brute", "hexeon", "luna", "nyxa", "morrak"
 ]
 
@@ -53,8 +53,6 @@ func _run_sample() -> Dictionary:
 		for a_index in range(team_a.size()):
 			var selected_a: int = Targeting.pick_by_priority(
 				team_a[a_index],
-				a_index,
-				"player",
 				positions_a[a_index],
 				team_a,
 				positions_a,
@@ -67,8 +65,6 @@ func _run_sample() -> Dictionary:
 		for b_index in range(team_b.size()):
 			var selected_b: int = Targeting.pick_by_priority(
 				team_b[b_index],
-				b_index,
-				"enemy",
 				positions_b[b_index],
 				team_b,
 				positions_b,

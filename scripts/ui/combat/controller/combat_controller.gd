@@ -7,6 +7,7 @@ const G := preload("res://scripts/constants/gameplay_constants.gd")
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const Debug := preload("res://scripts/util/debug.gd")
 const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
+const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
 const ArenaBridge := preload("res://scripts/ui/combat/arena_bridge.gd")
 const GridPlacement := preload("res://scripts/ui/combat/grid_placement.gd")
@@ -29,13 +30,21 @@ const ProgressionService := preload("res://scripts/game/progression/progression_
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
 const RosterUtils := preload("res://scripts/game/progression/roster_utils.gd")
 const TeamOddsEstimator := preload("res://scripts/game/combat/team_odds_estimator.gd")
+const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
+const RunSnapshotCoordinator := preload("res://scripts/game/run/run_snapshot_coordinator.gd")
+const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.gd")
+const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
+const TraitCompilerScript: GDScript = preload("res://scripts/game/traits/trait_compiler.gd")
 
 const START_BATTLE_TEXT: String = "Start Battle"
 const START_FORCED_FIGHT_TEXT: String = "Start Opening Fight"
-const BATTLE_LOCKED_TEXT: String = "Combat Resolving..."
+const BATTLE_LOCKED_TEXT: String = "Battle in progress"
+const BATTLE_PREPARING_TEXT: String = "Preparing battle..."
+const BATTLE_START_TIMEOUT_SECONDS: float = 10.0
+const BATTLE_START_RECOVERY_PREFIX: String = "Battle start recovery:"
 const RESOLVING_PROGRESS_DELAY_SECONDS: float = 3.0
 const RESOLVING_STUCK_WARNING_SECONDS: int = 10
-const RESOLVING_FALLBACK_TEXT: String = "Resolving fallback..."
+const RESOLVING_FALLBACK_TEXT: String = "Battle resolved by failsafe"
 const FIRST_DEPLOY_BENCH_TOOLTIP: String = "Drag this bench unit to a highlighted board cell."
 const OPENING_RETRY_MIN_GOLD: int = 3
 const FIRST_BOSS_PREP_CHAPTER: int = 1
@@ -82,10 +91,22 @@ var menu_button: Button
 var gold_label: Label
 var bet_slider: HSlider
 var bet_value: Label
+var all_in_button: Button
+var wager_summary: Label
 var stats_panel: Control
 var board_status_row: HBoxContainer
+var board_timer_label: Label
 var board_capacity_label: Label
 var win_odds_label: Label
+var _contract_layer: CanvasLayer = null
+var _contract_overlay: Control = null
+var _contract_choices: VBoxContainer = null
+var _contract_status: Label = null
+var _ascension_layer: CanvasLayer = null
+var _ascension_overlay: Control = null
+var _ascension_choices: VBoxContainer = null
+var _ascension_status: Label = null
+var _pending_ascension_units: Array[Unit] = []
 
 # External engine manager
 var manager: CombatManager
@@ -138,7 +159,19 @@ var _combat_resolving_active: bool = false
 var _combat_resolving_elapsed: float = 0.0
 var _combat_resolving_last_second: int = -1
 var _combat_resolving_watchdog_seen: bool = false
+var _battle_start_pending: bool = false
+var _battle_start_elapsed: float = 0.0
+var _battle_start_generation: int = 0
 var _hud_snapshot_signature: String = ""
+var _result_banner: PanelContainer = null
+var _encounter_banner: PanelContainer = null
+var _encounter_banner_label: Label = null
+var _encounter_banner_tween: Tween = null
+var _bottom_combat_visibility_state: int = -1
+var _layout_tile_size: int = UI.TILE_SIZE
+var _active_run_save_pending: bool = false
+var _active_run_restore_in_progress: bool = false
+var _encounter_escalations_seen: int = 0
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -173,25 +206,31 @@ func configure(_parent: Control, _manager: CombatManager, nodes: Dictionary) -> 
 	gold_label = nodes.get("gold_label")
 	bet_slider = nodes.get("bet_slider")
 	bet_value = nodes.get("bet_value")
+	all_in_button = nodes.get("all_in_button")
+	wager_summary = nodes.get("wager_summary")
 	stats_panel = nodes.get("stats_panel")
 
 func _shop_singleton() -> Node:
+	return _autoload_node("Shop")
+
+func _autoload_node(name: String) -> Node:
 	if parent != null and parent.get_tree() != null:
 		var root: Node = parent.get_tree().root
 		if root != null:
-			var shop_node: Node = root.get_node_or_null("/root/Shop")
-			if shop_node != null:
-				return shop_node
+			var autoload_node: Node = root.get_node_or_null("/root/%s" % name)
+			if autoload_node != null:
+				return autoload_node
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null:
 		return null
-	return tree.root.get_node_or_null("/root/Shop") if tree.root != null else null
+	return tree.root.get_node_or_null("/root/%s" % name) if tree.root != null else null
 
 func teardown() -> void:
 	if _teardown_done:
 		return
 	_teardown_done = true
 	_auto_loop_running = false
+	_cancel_pending_battle_start()
 	_end_combat_resolving_feedback()
 	_disconnect_controller_signals()
 	var shop_node: Node = _shop_singleton()
@@ -265,6 +304,17 @@ func teardown() -> void:
 	if _beam_overlay != null and is_instance_valid(_beam_overlay):
 		_beam_overlay.queue_free()
 	_beam_overlay = null
+	if _result_banner != null and is_instance_valid(_result_banner):
+		_result_banner.queue_free()
+	_result_banner = null
+	if _encounter_banner_tween != null and _encounter_banner_tween.is_valid():
+		_encounter_banner_tween.kill()
+	_encounter_banner_tween = null
+	if _encounter_banner != null and is_instance_valid(_encounter_banner):
+		_encounter_banner.queue_free()
+	_encounter_banner = null
+	_encounter_banner_label = null
+	_bottom_combat_visibility_state = -1
 	player_views.clear()
 	enemy_views.clear()
 	player_grid_helper = null
@@ -283,14 +333,29 @@ func _disconnect_controller_signals() -> void:
 		_disconnect_signal(manager, "unit_stat_changed", "_on_unit_stat_changed")
 		_disconnect_signal(manager, "vfx_knockup", "_on_vfx_knockup")
 		_disconnect_signal(manager, "vfx_beam_line", "_on_vfx_beam_line")
+		_disconnect_signal(manager, "encounter_escalated", "_on_encounter_escalated")
+		_disconnect_signal(manager, "contract_battle_event", "_on_contract_battle_event")
+		_disconnect_signal(manager, "unit_upgrade_event", "_on_unit_upgrade_event")
 		_disconnect_signal(manager, "hit_applied", "_on_engine_hit_applied")
 		_disconnect_signal(manager, "projectile_fired", "_on_projectile_fired")
 		_disconnect_signal(manager, "victory", "_on_victory")
 		_disconnect_signal(manager, "defeat", "_on_defeat")
+		_disconnect_signal(manager, "tie", "_on_tie")
 	if Engine.has_singleton("Items") and Items.is_connected("action_log", Callable(self, "_on_items_action_log")):
 		Items.action_log.disconnect(_on_items_action_log)
 	if Engine.has_singleton("Roster") and Roster.is_connected("bench_changed", Callable(self, "_on_bench_changed")):
 		Roster.bench_changed.disconnect(_on_bench_changed)
+	if Engine.has_singleton("Economy") and Economy.is_connected("gold_changed", Callable(self, "_on_economy_gold_changed_for_save")):
+		Economy.gold_changed.disconnect(_on_economy_gold_changed_for_save)
+	if Engine.has_singleton("Shop") and Shop.is_connected("offers_changed", Callable(self, "_on_shop_offers_changed_for_save")):
+		Shop.offers_changed.disconnect(_on_shop_offers_changed_for_save)
+	if Engine.has_singleton("Shop") and Shop.is_connected("locked_changed", Callable(self, "_on_shop_locked_changed_for_save")):
+		Shop.locked_changed.disconnect(_on_shop_locked_changed_for_save)
+	if Engine.has_singleton("Items"):
+		if Items.is_connected("inventory_changed", Callable(self, "_on_inventory_changed_for_save")):
+			Items.inventory_changed.disconnect(_on_inventory_changed_for_save)
+		if Items.is_connected("equipped_changed", Callable(self, "_on_equipped_changed_for_save")):
+			Items.equipped_changed.disconnect(_on_equipped_changed_for_save)
 	if Engine.has_singleton("GameState"):
 		if GameState.is_connected("chapter_changed", Callable(self, "_on_gs_chapter_changed")):
 			GameState.chapter_changed.disconnect(_on_gs_chapter_changed)
@@ -340,6 +405,12 @@ func initialize() -> void:
 			manager.vfx_knockup.connect(_on_vfx_knockup)
 		if not manager.is_connected("vfx_beam_line", Callable(self, "_on_vfx_beam_line")):
 			manager.vfx_beam_line.connect(_on_vfx_beam_line)
+		if manager.has_signal("encounter_escalated") and not manager.is_connected("encounter_escalated", Callable(self, "_on_encounter_escalated")):
+			manager.encounter_escalated.connect(_on_encounter_escalated)
+		if manager.has_signal("contract_battle_event") and not manager.is_connected("contract_battle_event", Callable(self, "_on_contract_battle_event")):
+			manager.contract_battle_event.connect(_on_contract_battle_event)
+		if manager.has_signal("unit_upgrade_event") and not manager.is_connected("unit_upgrade_event", Callable(self, "_on_unit_upgrade_event")):
+			manager.unit_upgrade_event.connect(_on_unit_upgrade_event)
 		# Stable hit signal from manager (re-emitted from engine)
 		if not manager.is_connected("hit_applied", Callable(self, "_on_engine_hit_applied")):
 			manager.hit_applied.connect(_on_engine_hit_applied)
@@ -367,6 +438,8 @@ func initialize() -> void:
 		manager.victory.connect(_on_victory)
 	if manager and not manager.is_connected("defeat", Callable(self, "_on_defeat")):
 		manager.defeat.connect(_on_defeat)
+	if manager and manager.has_signal("tie") and not manager.is_connected("tie", Callable(self, "_on_tie")):
+		manager.tie.connect(_on_tie)
 
 	# UI-side stats tracker
 	if stats_tracker == null:
@@ -407,7 +480,7 @@ func initialize() -> void:
 
 	# Economy UI
 	economy_ui = EconomyUI.new()
-	economy_ui.configure(gold_label, bet_slider, bet_value, parent)
+	economy_ui.configure(gold_label, bet_slider, bet_value, all_in_button, wager_summary, parent)
 	if bet_slider and not bet_slider.is_connected("value_changed", Callable(self, "_on_bet_changed")):
 		bet_slider.value_changed.connect(_on_bet_changed)
 
@@ -418,17 +491,19 @@ func initialize() -> void:
 
 	# Build grids
 	view_rng.randomize()
+	_layout_tile_size = _responsive_tile_size()
 	grid_placement = GridPlacement.new()
-	grid_placement.configure(player_grid, enemy_grid, UI.TILE_SIZE, 8, 3)
+	grid_placement.configure(player_grid, enemy_grid, _layout_tile_size, 8, 3)
+	grid_placement.player_placements_changed.connect(_on_player_placements_changed_for_save)
 	# Ensure grid containers match the configured tile size so the
 	# runtime layout looks the same as the editor preview.
-	_apply_grid_dimensions(UI.TILE_SIZE)
+	_apply_grid_dimensions(_layout_tile_size)
 	player_grid_helper = grid_placement.get_player_grid()
 	enemy_grid_helper = grid_placement.get_enemy_grid()
 
 	# Bench setup
 	bench_placement = BenchPlacement.new()
-	bench_placement.configure(bench_grid, UI.TILE_SIZE, BenchConstants.BENCH_CAPACITY)
+	bench_placement.configure(bench_grid, _layout_tile_size, BenchConstants.BENCH_CAPACITY)
 	bench_grid_helper = bench_placement.get_bench_grid()
 
 	# Items: drag router for item cards (route drops to units on board or bench)
@@ -446,6 +521,17 @@ func initialize() -> void:
 		Roster.bench_changed.connect(_on_bench_changed)
 	if Roster and not Roster.is_connected("max_team_size_changed", Callable(self, "_on_roster_max_team_size_changed")):
 		Roster.max_team_size_changed.connect(_on_roster_max_team_size_changed)
+	if Economy and not Economy.is_connected("gold_changed", Callable(self, "_on_economy_gold_changed_for_save")):
+		Economy.gold_changed.connect(_on_economy_gold_changed_for_save)
+	if Shop and not Shop.is_connected("offers_changed", Callable(self, "_on_shop_offers_changed_for_save")):
+		Shop.offers_changed.connect(_on_shop_offers_changed_for_save)
+	if Shop and not Shop.is_connected("locked_changed", Callable(self, "_on_shop_locked_changed_for_save")):
+		Shop.locked_changed.connect(_on_shop_locked_changed_for_save)
+	if Items:
+		if not Items.is_connected("inventory_changed", Callable(self, "_on_inventory_changed_for_save")):
+			Items.inventory_changed.connect(_on_inventory_changed_for_save)
+		if not Items.is_connected("equipped_changed", Callable(self, "_on_equipped_changed_for_save")):
+			Items.equipped_changed.connect(_on_equipped_changed_for_save)
 
 	_ensure_board_status_row()
 
@@ -461,7 +547,7 @@ func initialize() -> void:
 
 	# Arena + projectiles
 	arena_bridge = ArenaBridge.new()
-	arena_bridge.configure(arena_container, arena_units, planning_area, arena_background, player_grid_helper, enemy_grid_helper, preload("res://scripts/ui/combat/unit_actor.gd"), UI.TILE_SIZE)
+	arena_bridge.configure(arena_container, arena_units, planning_area, arena_background, player_grid_helper, enemy_grid_helper, preload("res://scripts/ui/combat/unit_actor.gd"), _layout_tile_size)
 
 	projectile_bridge = ProjectileBridge.new()
 	projectile_bridge.configure(parent, arena_bridge, player_grid_helper, enemy_grid_helper, manager, view_rng)
@@ -553,6 +639,8 @@ func _on_shop_grid_updated() -> void:
 		return
 	sell_grid_helper = shop_presenter.get_drop_grid()
 	_rebuild_bench_views(true)
+	if parent != null and parent.has_method("_apply_visual_theme_deferred"):
+		parent.call_deferred("_apply_visual_theme_deferred")
 
 func _ensure_board_status_row() -> void:
 	if board_status_row != null and is_instance_valid(board_status_row):
@@ -562,6 +650,7 @@ func _ensure_board_status_row() -> void:
 	var host: Control = player_grid.get_parent() as Control
 	if host == null:
 		return
+	_ensure_board_status_backplate(host)
 	var existing: HBoxContainer = host.get_node_or_null("BoardStatusRow") as HBoxContainer
 	if existing != null:
 		board_status_row = existing
@@ -569,17 +658,25 @@ func _ensure_board_status_row() -> void:
 		board_status_row = HBoxContainer.new()
 		board_status_row.name = "BoardStatusRow"
 		board_status_row.alignment = BoxContainer.ALIGNMENT_CENTER
-		board_status_row.add_theme_constant_override("separation", 18)
+		board_status_row.add_theme_constant_override("separation", 8)
 		board_status_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		board_status_row.custom_minimum_size = Vector2(414.0, 28.0)
+		board_status_row.z_index = 24
 		board_status_row.anchor_left = 0.5
 		board_status_row.anchor_right = 0.5
 		board_status_row.anchor_top = 0.0
 		board_status_row.anchor_bottom = 0.0
-		board_status_row.offset_left = -210.0
-		board_status_row.offset_right = 210.0
-		board_status_row.offset_top = 4.0
-		board_status_row.offset_bottom = 32.0
+		board_status_row.offset_left = -214.0
+		board_status_row.offset_right = 214.0
+		board_status_row.offset_top = 2.0
+		board_status_row.offset_bottom = 30.0
 		host.add_child(board_status_row)
+	board_timer_label = board_status_row.get_node_or_null("BoardTimerLabel") as Label
+	if board_timer_label == null:
+		board_timer_label = _make_board_status_label("BoardTimerLabel")
+		board_timer_label.text = "Plan --"
+		board_status_row.add_child(board_timer_label)
+	board_status_row.move_child(board_timer_label, 0)
 	board_capacity_label = board_status_row.get_node_or_null("BoardCapacityLabel") as Label
 	if board_capacity_label == null:
 		board_capacity_label = _make_board_status_label("BoardCapacityLabel")
@@ -590,13 +687,43 @@ func _ensure_board_status_row() -> void:
 		board_status_row.add_child(win_odds_label)
 	_update_board_status()
 
+func _ensure_board_status_backplate(host: Control) -> void:
+	var plate: Panel = host.get_node_or_null("BoardStatusBackplate") as Panel
+	if plate == null:
+		plate = Panel.new()
+		plate.name = "BoardStatusBackplate"
+		plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plate.z_index = 23
+		plate.anchor_left = 0.5
+		plate.anchor_right = 0.5
+		plate.anchor_top = 0.0
+		plate.anchor_bottom = 0.0
+		plate.offset_left = -226.0
+		plate.offset_right = 226.0
+		plate.offset_top = 0.0
+		plate.offset_bottom = 32.0
+		host.add_child(plate)
+	var fallback: StyleBoxFlat = StyleBoxFlat.new()
+	fallback.bg_color = Color(0.034, 0.026, 0.028, 0.86)
+	fallback.border_color = Color(0.54, 0.35, 0.18, 0.72)
+	fallback.border_width_left = 1
+	fallback.border_width_top = 1
+	fallback.border_width_right = 1
+	fallback.border_width_bottom = 1
+	fallback.corner_radius_top_left = 6
+	fallback.corner_radius_top_right = 6
+	fallback.corner_radius_bottom_right = 6
+	fallback.corner_radius_bottom_left = 6
+	plate.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.status_strip_style(Color(0.92, 0.82, 0.66, 0.94)), fallback))
+
 func _make_board_status_label(node_name: String) -> Label:
 	var label: Label = Label.new()
 	label.name = node_name
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.custom_minimum_size = Vector2(150.0, 26.0)
-	label.add_theme_font_size_override("font_size", 17)
+	var min_width: float = 116.0 if node_name == "BoardTimerLabel" or node_name == "BoardCapacityLabel" else 142.0
+	label.custom_minimum_size = Vector2(min_width, 26.0)
+	label.add_theme_font_size_override("font_size", 15)
 	label.add_theme_color_override("font_color", Color(0.94, 0.82, 0.58, 1.0))
 	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.75))
 	label.add_theme_constant_override("shadow_offset_x", 1)
@@ -606,6 +733,9 @@ func _make_board_status_label(node_name: String) -> Label:
 
 func _update_board_status() -> void:
 	_ensure_board_status_row()
+	if board_timer_label != null and String(board_timer_label.text).strip_edges() == "":
+		board_timer_label.text = "Plan --"
+		board_timer_label.tooltip_text = "Planning countdown before auto-start."
 	if board_capacity_label != null:
 		var board_count: int = manager.player_team.size() if manager != null else 0
 		var board_cap: int = _current_board_cap()
@@ -619,8 +749,34 @@ func _update_board_status() -> void:
 			var player_rating: float = TeamOddsEstimator.team_rating(manager.player_team)
 			var enemy_rating: float = TeamOddsEstimator.team_rating(manager.enemy_team)
 			var odds: int = TeamOddsEstimator.estimate_from_ratings(player_rating, enemy_rating)
+			var economy_node: Node = _autoload_node("Economy")
+			var gross_multiplier: float = 2.0
+			var quoted_payout: int = 0
+			var quoted_bet: int = 0
+			if economy_node != null:
+				if not bool(economy_node.get("combat_active")) and economy_node.has_method("set_projected_win_probability"):
+					economy_node.call("set_projected_win_probability", float(odds) / 100.0)
+				gross_multiplier = float(economy_node.get("quoted_gross_multiplier"))
+				quoted_bet = int(economy_node.get("current_bet"))
+				if economy_node.has_method("quoted_payout"):
+					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
 			win_odds_label.text = "Win Odds %d%%" % odds
-			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f." % [player_rating, enemy_rating]
+			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f. Quote: %dg -> %dg gross (%.2fx)." % [player_rating, enemy_rating, quoted_bet, quoted_payout, gross_multiplier]
+	if economy_ui != null:
+		economy_ui.refresh()
+	_sync_contract_market_overlay()
+	_queue_active_run_save()
+
+func set_board_timer_text(text: String, active: bool = true) -> void:
+	_ensure_board_status_row()
+	if board_timer_label == null:
+		return
+	var cleaned: String = String(text).strip_edges().replace("Plan:", "Plan")
+	if cleaned == "":
+		cleaned = "Plan --"
+	board_timer_label.visible = bool(active)
+	board_timer_label.text = cleaned
+	board_timer_label.tooltip_text = "Planning countdown before auto-start." if cleaned.begins_with("Plan") else "Current combat phase."
 
 func _current_board_cap() -> int:
 	var cap: int = 0
@@ -634,44 +790,61 @@ func _current_board_cap() -> int:
 		return 0
 	return cap
 
+func _responsive_tile_size() -> int:
+	if parent == null:
+		return int(UI.TILE_SIZE)
+	var viewport_size: Vector2 = parent.get_viewport_rect().size
+	if viewport_size.y <= 760.0:
+		return 56
+	if viewport_size.y <= 900.0 or viewport_size.x <= 1440.0:
+		return 68
+	return int(UI.TILE_SIZE)
+
 func _apply_grid_dimensions(tile: int) -> void:
 	# Compute desired grid size from constants and theme separations
 	if enemy_grid == null or player_grid == null:
 		return
-	var cols := 8
-	var rows := 3
-	var hsep := enemy_grid.get_theme_constant("h_separation", "GridContainer")
-	var vsep := enemy_grid.get_theme_constant("v_separation", "GridContainer")
-	var grid_w := tile * cols + hsep * (cols - 1)
-	var grid_h := tile * rows + vsep * (rows - 1)
+	var cols: int = 8
+	var rows: int = 3
+	var hsep: int = enemy_grid.get_theme_constant("h_separation", "GridContainer")
+	var vsep: int = enemy_grid.get_theme_constant("v_separation", "GridContainer")
+	var grid_w: int = tile * cols + hsep * (cols - 1)
+	var grid_h: int = tile * rows + vsep * (rows - 1)
+	var enemy_top_pad: float = 28.0
+	var player_top_pad: float = 36.0
+	var player_bottom_pad: float = 8.0
 
 	# Center enemy grid at top of its area
 	enemy_grid.anchor_left = 0.5
 	enemy_grid.anchor_right = 0.5
 	enemy_grid.offset_left = -float(grid_w) * 0.5
 	enemy_grid.offset_right = float(grid_w) * 0.5
-	enemy_grid.offset_bottom = grid_h
+	enemy_grid.offset_top = enemy_top_pad
+	enemy_grid.offset_bottom = enemy_top_pad + float(grid_h)
 
 	# Center player grid at bottom of its area
 	player_grid.anchor_left = 0.5
 	player_grid.anchor_right = 0.5
-	player_grid.anchor_top = 1.0
-	player_grid.anchor_bottom = 1.0
+	player_grid.anchor_top = 0.0
+	player_grid.anchor_bottom = 0.0
 	player_grid.offset_left = -float(grid_w) * 0.5
 	player_grid.offset_right = float(grid_w) * 0.5
-	player_grid.offset_top = -grid_h
+	player_grid.offset_top = player_top_pad
+	player_grid.offset_bottom = player_top_pad + float(grid_h)
 
 	# Make sure the containers holding the grids are tall enough
-	var top_area := enemy_grid.get_parent() as Control
+	var top_area: Control = enemy_grid.get_parent() as Control
 	if top_area:
-		top_area.custom_minimum_size.y = grid_h
-	var bottom_area := player_grid.get_parent() as Control
+		top_area.custom_minimum_size.y = float(grid_h) + enemy_top_pad
+	var bottom_area: Control = player_grid.get_parent() as Control
 	if bottom_area:
-		bottom_area.custom_minimum_size.y = grid_h + 38
+		bottom_area.custom_minimum_size.y = player_top_pad + float(grid_h) + player_bottom_pad
 
 func process(_delta: float) -> void:
 	if arena_container and arena_container.visible:
 		_sync_arena_units()
+	_sync_bottom_combat_visibility()
+	_update_pending_battle_start(_delta)
 	_update_combat_resolving_feedback(_delta)
 
 func _init_game() -> void:
@@ -682,6 +855,7 @@ func _init_game() -> void:
 	_clear_first_deploy_bench_highlight()
 	_first_deploy_bench_slot = -1
 	_end_combat_resolving_feedback()
+	_hide_result_banner()
 	if stats_tracker != null and stats_tracker.has_method("reset_run_totals"):
 		stats_tracker.reset_run_totals()
 	if continue_button:
@@ -710,7 +884,7 @@ func _init_game() -> void:
 	if manager:
 		manager.stage = 1
 		_on_log_line("Gamble Battle")
-		# Build preview after state set so it reflects Chapter 1 — Stage 1
+		# Build preview after state set so it reflects Chapter 1 — Round 1
 		manager.setup_stage_preview()
 		# Update label to reflect preview stage
 		_update_stage_label()
@@ -736,6 +910,11 @@ func _init_game() -> void:
 		traits_presenter = TraitsPresenter.new()
 		traits_presenter.configure(parent, manager)
 		traits_presenter.initialize()
+	if arena_bridge != null:
+		arena_bridge.exit_arena()
+	elif arena_container != null:
+		arena_container.visible = false
+	_sync_bottom_combat_visibility()
 
 func _on_items_action_log(t: String) -> void:
 	# Route item logs into the same UI logger used by combat engine
@@ -862,6 +1041,7 @@ func refresh_all_views() -> void:
 		selection.attach_clear_on(arena_background)
 	if selection != null and planning_area != null:
 		selection.attach_clear_on(planning_area)
+	_queue_active_run_save()
 	if selection != null and player_grid != null:
 		selection.attach_clear_on(player_grid)
 	if selection != null and enemy_grid != null:
@@ -896,6 +1076,10 @@ func _on_menu_pressed() -> void:
 func _on_continue_pressed() -> void:
 	if not continue_button:
 		return
+	var contract_shop: Node = _autoload_node("Shop")
+	if contract_shop != null and contract_shop.has_method("has_pending_contract_choice") and bool(contract_shop.call("has_pending_contract_choice")):
+		_show_contract_market()
+		return
 	if _is_continue_start_text():
 		Trace.step("Continue pressed: Start Battle branch")
 		if not (Engine.has_singleton("Economy") or parent.has_node("/root/Economy")):
@@ -915,6 +1099,7 @@ func _on_continue_pressed() -> void:
 			return
 		Trace.step("Economy bet accepted")
 		continue_button.disabled = true
+		_hide_result_banner()
 		_begin_combat_resolving_feedback()
 		if economy_ui:
 			economy_ui.set_bet_editable(false)
@@ -931,7 +1116,7 @@ func _on_continue_pressed() -> void:
 			player_grid.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		# Precompute arena positions from current planning layout so engine starts at chosen tiles
 		if grid_placement and arena_bridge and manager:
-			var ts: float = float(UI.TILE_SIZE)
+			var ts: float = float(_layout_tile_size)
 			var ppos: Array[Vector2] = []
 			var epos: Array[Vector2] = []
 			for pv in player_views:
@@ -942,7 +1127,7 @@ func _on_continue_pressed() -> void:
 				var idx2: int = ev.tile_idx
 				var pos2: Vector2 = enemy_grid_helper.get_center(idx2) if enemy_grid_helper and idx2 >= 0 else Vector2.ZERO
 				epos.append(pos2)
-			var bounds: Rect2 = arena_bridge.get_arena_bounds()
+			var bounds: Rect2 = arena_bridge.get_engine_arena_bounds()
 			if bounds.size.y <= 1.0 or bounds.size.x <= 1.0:
 				var all_pts: Array[Vector2] = []
 				for v in ppos: if typeof(v) == TYPE_VECTOR2: all_pts.append(v)
@@ -964,9 +1149,7 @@ func _on_continue_pressed() -> void:
 			# When bounds are valid, keep as-is
 			if manager.has_method("cache_arena_config"):
 				manager.cache_arena_config(ts, ppos, epos, bounds)
-		Trace.step("Calling manager.start_stage()")
-		manager.start_stage()
-		Trace.step("Returned from manager.start_stage()")
+		_queue_battle_start()
 		return
 	if continue_button.text == "Restart":
 		_init_game()
@@ -988,11 +1171,81 @@ func _on_continue_pressed() -> void:
 	if economy_ui:
 		economy_ui.set_bet_editable(false)
 	# Do not advance stage here; start whatever GameState currently points to
+	_queue_battle_start()
+
+func _queue_battle_start() -> void:
+	if _battle_start_pending:
+		return
+	_battle_start_pending = true
+	_battle_start_elapsed = 0.0
+	_battle_start_generation += 1
+	var generation: int = _battle_start_generation
+	Trace.step("Battle start queued generation=" + str(generation))
+	call_deferred("_execute_pending_battle_start", generation)
+
+func _execute_pending_battle_start(generation: int) -> void:
+	if not _battle_start_pending or generation != _battle_start_generation:
+		return
+	if manager == null or not is_instance_valid(manager):
+		_recover_pending_battle_start("combat manager became unavailable")
+		return
+	Trace.step("Calling manager.start_stage() generation=" + str(generation))
 	manager.start_stage()
+	Trace.step("Returned from manager.start_stage() generation=" + str(generation))
+	if _battle_start_pending and generation == _battle_start_generation:
+		_recover_pending_battle_start("setup returned before engine readiness")
+
+func _update_pending_battle_start(delta: float) -> void:
+	if not _battle_start_pending:
+		return
+	_battle_start_elapsed += max(0.0, float(delta))
+	if _battle_start_elapsed >= BATTLE_START_TIMEOUT_SECONDS:
+		_recover_pending_battle_start("setup exceeded %ds" % int(BATTLE_START_TIMEOUT_SECONDS))
+
+func _complete_pending_battle_start() -> void:
+	if not _battle_start_pending:
+		return
+	_battle_start_pending = false
+	_battle_start_elapsed = 0.0
+	_battle_start_generation += 1
+
+func _cancel_pending_battle_start() -> void:
+	_battle_start_pending = false
+	_battle_start_elapsed = 0.0
+	_battle_start_generation += 1
+
+func _recover_pending_battle_start(reason: String) -> void:
+	if not _battle_start_pending:
+		return
+	_cancel_pending_battle_start()
+	if manager != null and is_instance_valid(manager):
+		manager.clear_active_battle_runtime()
+		manager.setup_stage_preview()
+	if arena_container != null and arena_container.visible:
+		_exit_combat_arena()
+	if Engine.has_singleton("GameState") or (parent != null and parent.has_node("/root/GameState")):
+		GameState.set_phase(GameState.GamePhase.PREVIEW)
+	if grid_placement != null and manager != null and is_instance_valid(manager):
+		grid_placement.rebuild_enemy_views(manager.enemy_team)
+		enemy_views = grid_placement.get_enemy_views()
+		grid_placement.rebuild_player_views(manager.player_team, false)
+		player_views = grid_placement.get_player_views()
+		refresh_all_views()
+	if continue_button != null:
+		continue_button.disabled = false
+		_set_continue_to_start_text()
+	if attack_button != null:
+		attack_button.disabled = true
+	if economy_ui != null:
+		economy_ui.set_bet_editable(true)
+		economy_ui.refresh()
+	_on_log_line("%s %s; returned to planning." % [BATTLE_START_RECOVERY_PREFIX, reason])
 
 func _on_bench_changed() -> void:
 	# Rebuild bench views first so visuals reflect any immediate bench changes
 	_rebuild_bench_views(true)
+	if _active_run_restore_in_progress:
+		return
 	# Auto-try combines when bench changes during planning. This makes triples consistent
 	# whether they are formed by buying or by moving units between bench/board.
 	var in_planning: bool = true
@@ -1008,6 +1261,24 @@ func _on_bench_changed() -> void:
 			_play_promotions(promos)
 	_update_first_deploy_assist()
 	_update_board_status()
+
+func _on_economy_gold_changed_for_save(_gold: int) -> void:
+	_queue_active_run_save()
+
+func _on_shop_offers_changed_for_save(_offers: Array) -> void:
+	_queue_active_run_save()
+
+func _on_shop_locked_changed_for_save(_locked: bool) -> void:
+	_queue_active_run_save()
+
+func _on_inventory_changed_for_save() -> void:
+	_queue_active_run_save()
+
+func _on_equipped_changed_for_save(_unit: Variant) -> void:
+	_queue_active_run_save()
+
+func _on_player_placements_changed_for_save() -> void:
+	_queue_active_run_save()
 
 func _update_first_deploy_assist() -> void:
 	if not _first_deploy_assist_active:
@@ -1063,7 +1334,12 @@ func _play_promotions(promotions: Array) -> void:
 			_play_bench_promo(idx, to_level, delay)
 		elif kind == "board" and idx >= 0:
 			_play_board_promo(idx, to_level, delay)
+		var promoted_unit: Unit = p.get("unit") as Unit
+		if to_level >= 4 and promoted_unit != null and String(promoted_unit.ascension_path_id) == "" and not _pending_ascension_units.has(promoted_unit):
+			_pending_ascension_units.append(promoted_unit)
 		delay += 0.05
+	if not _pending_ascension_units.is_empty():
+		call_deferred("_show_next_ascension_choice")
 
 func _play_bench_promo(bench_index: int, to_level: int, delay: float) -> void:
 	if bench_grid == null:
@@ -1208,6 +1484,366 @@ func _auto_start_battle() -> void:
 		print("[CombatView] Auto-starting battle")
 	_on_continue_pressed()
 
+func set_auto_start_battle_enabled(enabled: bool) -> void:
+	auto_combat = enabled
+
+func _sync_contract_market_overlay() -> void:
+	var shop_node: Node = _autoload_node("Shop")
+	var should_show: bool = false
+	if shop_node != null and shop_node.has_method("has_pending_contract_choice"):
+		should_show = bool(shop_node.call("has_pending_contract_choice"))
+	if should_show and int(GameState.phase) != int(GameState.GamePhase.COMBAT):
+		_show_contract_market()
+	elif _contract_overlay != null and not should_show:
+		_contract_overlay.visible = false
+
+func _show_contract_market() -> void:
+	_ensure_contract_market_ui()
+	if _contract_overlay == null or _contract_choices == null:
+		return
+	if _contract_overlay.visible:
+		return
+	var shop_node: Node = _autoload_node("Shop")
+	if shop_node == null or not shop_node.has_method("get_contract_offers"):
+		return
+	for child: Node in _contract_choices.get_children():
+		child.queue_free()
+	var offers: Array = shop_node.call("get_contract_offers")
+	for index: int in range(offers.size()):
+		var offer: Dictionary = offers[index] as Dictionary
+		var button: Button = Button.new()
+		button.name = "ContractChoice%d" % index
+		button.text = "[%s] %s  •  PRICE %dg\nREWARD — %s\nRISK — %s\nNEXT FIGHT — %s" % [
+			String(offer.get("family", "contract")).to_upper(),
+			String(offer.get("name", "Contract")),
+			int(offer.get("price", 0)),
+			String(offer.get("reward", offer.get("description", "Unknown reward."))),
+			String(offer.get("drawback", "No listed drawback.")),
+			String(offer.get("fight_impact", "No visible fight impact listed.")),
+		]
+		button.custom_minimum_size = Vector2(880.0, 118.0)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 15)
+		button.disabled = bool(offer.get("exhausted", false))
+		button.pressed.connect(Callable(self, "_on_contract_choice_pressed").bind(index))
+		_contract_choices.add_child(button)
+	var pass_button: Button = Button.new()
+	pass_button.name = "ContractPass"
+	pass_button.text = "PASS — keep your gold and accept no new obligation"
+	pass_button.custom_minimum_size = Vector2(880.0, 48.0)
+	pass_button.add_theme_font_size_override("font_size", 15)
+	pass_button.pressed.connect(_on_contract_pass_pressed)
+	_contract_choices.add_child(pass_button)
+	if _contract_status != null:
+		_contract_status.text = "Choose one chapter contract. Compare price, reward, risk, and the visible next-fight consequence. The other offers expire."
+	_contract_overlay.visible = true
+	if continue_button != null:
+		continue_button.disabled = true
+
+func _ensure_contract_market_ui() -> void:
+	if _contract_layer != null and is_instance_valid(_contract_layer):
+		return
+	_contract_layer = CanvasLayer.new()
+	_contract_layer.name = "ChapterContractLayer"
+	_contract_layer.layer = 205
+	parent.add_child(_contract_layer)
+	_contract_overlay = Control.new()
+	_contract_overlay.name = "ChapterContractOverlay"
+	_contract_overlay.visible = false
+	_contract_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_contract_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_contract_layer.add_child(_contract_overlay)
+	var backdrop: ColorRect = ColorRect.new()
+	backdrop.color = Color(0.01, 0.008, 0.012, 0.88)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_contract_overlay.add_child(backdrop)
+	var center: CenterContainer = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_contract_overlay.add_child(center)
+	var panel: PanelContainer = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(980.0, 680.0)
+	center.add_child(panel)
+	var margin: MarginContainer = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 28)
+	margin.add_theme_constant_override("margin_top", 24)
+	margin.add_theme_constant_override("margin_right", 28)
+	margin.add_theme_constant_override("margin_bottom", 24)
+	panel.add_child(margin)
+	var stack: VBoxContainer = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 12)
+	margin.add_child(stack)
+	var title: Label = Label.new()
+	title.text = "Chapter Contracts"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 32)
+	stack.add_child(title)
+	_contract_status = Label.new()
+	_contract_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_contract_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_contract_status.add_theme_font_size_override("font_size", 16)
+	stack.add_child(_contract_status)
+	_contract_choices = VBoxContainer.new()
+	_contract_choices.add_theme_constant_override("separation", 10)
+	stack.add_child(_contract_choices)
+
+func _on_contract_choice_pressed(index: int) -> void:
+	var shop_node: Node = _autoload_node("Shop")
+	if shop_node == null:
+		return
+	var offers: Array = shop_node.call("get_contract_offers")
+	var chosen_offer: Dictionary = {}
+	if index >= 0 and index < offers.size():
+		chosen_offer = offers[index] as Dictionary
+	var result: Dictionary = shop_node.call("buy_contract", index)
+	if not bool(result.get("ok", false)):
+		if _contract_status != null:
+			_contract_status.text = "Cannot buy: %s" % String(result.get("error", "unknown"))
+		return
+	if String(chosen_offer.get("family", "")) == "champion":
+		_show_champion_contract_targets(chosen_offer)
+		return
+	_close_contract_market()
+
+func _on_contract_pass_pressed() -> void:
+	var shop_node: Node = _autoload_node("Shop")
+	if shop_node != null and shop_node.has_method("pass_contract"):
+		shop_node.call("pass_contract")
+	_close_contract_market()
+
+func _show_champion_contract_targets(offer: Dictionary) -> void:
+	if _contract_choices == null:
+		return
+	for child: Node in _contract_choices.get_children():
+		child.queue_free()
+	var doctrine: String = String(offer.get("doctrine", "")).strip_edges().to_lower()
+	if _contract_status != null:
+		_contract_status.text = "CHAMPION WRIT PURCHASED — choose its bearer. %s" % _doctrine_explanation(doctrine)
+	var candidates: Array[Unit] = _champion_contract_units()
+	for unit: Unit in candidates:
+		var target_button: Button = Button.new()
+		target_button.name = "ChampionTarget_%s" % String(unit.id)
+		var display_name: String = String(unit.name).strip_edges()
+		if display_name == "":
+			display_name = String(unit.id).capitalize()
+		var role: String = String(unit.primary_role).strip_edges().capitalize()
+		target_button.text = "%s  •  %s  •  Lv%d\n%s" % [display_name, role, max(1, int(unit.level)), _doctrine_fit_text(unit, doctrine)]
+		target_button.custom_minimum_size = Vector2(880.0, 72.0)
+		target_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		target_button.add_theme_font_size_override("font_size", 16)
+		target_button.pressed.connect(Callable(self, "_on_champion_contract_target_pressed").bind(unit, doctrine))
+		_contract_choices.add_child(target_button)
+	if candidates.is_empty() and _contract_status != null:
+		_contract_status.text = "Contract bought, but no owned unit is currently available. Assignment remains pending."
+
+func _champion_contract_units() -> Array[Unit]:
+	var candidates: Array[Unit] = []
+	if manager != null:
+		for unit: Unit in manager.player_team:
+			if unit != null and not candidates.has(unit):
+				candidates.append(unit)
+	var roster_node: Node = _autoload_node("Roster")
+	if roster_node != null and roster_node.has_method("compact"):
+		var bench_units_value: Variant = roster_node.call("compact")
+		if bench_units_value is Array:
+			for value: Variant in bench_units_value:
+				var bench_unit: Unit = value as Unit
+				if bench_unit != null and not candidates.has(bench_unit):
+					candidates.append(bench_unit)
+	return candidates
+
+func _on_champion_contract_target_pressed(unit: Unit, doctrine: String) -> void:
+	var shop_node: Node = _autoload_node("Shop")
+	if shop_node == null or not shop_node.has_method("apply_pending_champion_contract"):
+		return
+	var applied: Dictionary = shop_node.call("apply_pending_champion_contract", unit, doctrine)
+	if not bool(applied.get("ok", false)):
+		if _contract_status != null:
+			_contract_status.text = "Cannot assign writ: %s" % String(applied.get("error", "unknown"))
+		return
+	_close_contract_market()
+
+func _doctrine_explanation(doctrine: String) -> String:
+	match doctrine:
+		"backline":
+			return "Backline prioritizes distant carries."
+		"lowest_hp":
+			return "Lowest HP hunts wounded enemies for resets and executions."
+		"highest_threat":
+			return "Highest Threat attacks the enemy with the most offensive pressure."
+		"clump":
+			return "Clump seeks enemies surrounded by allies for area attacks."
+		"peel":
+			return "Peel protects your formation by attacking threats near vulnerable allies."
+	return "Front to Back attacks the nearest accessible enemy."
+
+func _doctrine_fit_text(unit: Unit, doctrine: String) -> String:
+	var role: String = String(unit.primary_role).strip_edges().to_lower()
+	var fit: String = "CONDITIONAL FIT"
+	if doctrine == "backline" and (role == "assassin" or role == "marksman"):
+		fit = "STRONG FIT"
+	elif doctrine == "lowest_hp" and (role == "assassin" or role == "brawler"):
+		fit = "STRONG FIT"
+	elif doctrine == "highest_threat" and (role == "marksman" or role == "mage"):
+		fit = "STRONG FIT"
+	elif doctrine == "clump" and role == "mage":
+		fit = "STRONG FIT"
+	elif doctrine == "peel" and (role == "tank" or role == "support"):
+		fit = "STRONG FIT"
+	elif doctrine == "front_to_back" and (role == "tank" or role == "brawler" or role == "marksman"):
+		fit = "STRONG FIT"
+	return "%s — %s" % [fit, _doctrine_explanation(doctrine)]
+
+func _close_contract_market() -> void:
+	if _contract_overlay != null:
+		_contract_overlay.visible = false
+	if continue_button != null:
+		continue_button.disabled = false
+	_update_board_status()
+
+func _show_next_ascension_choice() -> void:
+	while not _pending_ascension_units.is_empty():
+		var first_unit: Unit = _pending_ascension_units[0]
+		if first_unit == null or int(first_unit.level) < 4 or String(first_unit.ascension_path_id) != "":
+			_pending_ascension_units.pop_front()
+			continue
+		_show_ascension_choice(first_unit)
+		return
+	_close_ascension_choice()
+
+func _show_ascension_choice(unit: Unit) -> void:
+	_ensure_ascension_ui()
+	if _ascension_overlay == null or _ascension_choices == null:
+		return
+	for child: Node in _ascension_choices.get_children():
+		child.queue_free()
+	var display_name: String = String(unit.name).strip_edges()
+	if display_name == "":
+		display_name = String(unit.id).capitalize()
+	if _ascension_status != null:
+		_ascension_status.text = "%s reached Level 4. Choose one permanent legacy; this decision is saved with the run." % display_name
+	for option: Dictionary in UnitUpgradePaths.legacy_options(unit):
+		var button: Button = Button.new()
+		button.name = "Ascension_%s" % String(option.get("id", "path"))
+		button.text = "%s  •  %s\nTRIGGER — %s\nEFFECT — %s\nRISK — %s" % [
+			String(option.get("name", "Legacy")),
+			String(option.get("fit", "CONDITIONAL FIT")),
+			String(option.get("trigger", "Unknown")),
+			String(option.get("effect", "Unknown")),
+			String(option.get("risk", "Unknown")),
+		]
+		button.custom_minimum_size = Vector2(900.0, 132.0)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 16)
+		button.pressed.connect(Callable(self, "_on_ascension_choice_pressed").bind(unit, String(option.get("id", ""))))
+		_ascension_choices.add_child(button)
+	_ascension_overlay.visible = true
+	if continue_button != null:
+		continue_button.disabled = true
+
+func _ensure_ascension_ui() -> void:
+	if _ascension_layer != null and is_instance_valid(_ascension_layer):
+		return
+	_ascension_layer = CanvasLayer.new()
+	_ascension_layer.name = "UnitAscensionLayer"
+	_ascension_layer.layer = 210
+	parent.add_child(_ascension_layer)
+	_ascension_overlay = Control.new()
+	_ascension_overlay.name = "UnitAscensionOverlay"
+	_ascension_overlay.visible = false
+	_ascension_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_ascension_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ascension_layer.add_child(_ascension_overlay)
+	var backdrop: ColorRect = ColorRect.new()
+	backdrop.color = Color(0.012, 0.006, 0.010, 0.91)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ascension_overlay.add_child(backdrop)
+	var center: CenterContainer = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ascension_overlay.add_child(center)
+	var panel: PanelContainer = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(1020.0, 610.0)
+	panel.add_theme_stylebox_override("panel", _make_result_card_style(Color(0.92, 0.31, 0.12, 1.0)))
+	center.add_child(panel)
+	var margin: MarginContainer = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 34)
+	margin.add_theme_constant_override("margin_top", 30)
+	margin.add_theme_constant_override("margin_right", 34)
+	margin.add_theme_constant_override("margin_bottom", 30)
+	panel.add_child(margin)
+	var stack: VBoxContainer = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 18)
+	margin.add_child(stack)
+	var title: Label = Label.new()
+	title.text = "LEVEL FOUR ASCENSION"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color", Color(1.0, 0.75, 0.34, 1.0))
+	stack.add_child(title)
+	_ascension_status = Label.new()
+	_ascension_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ascension_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ascension_status.add_theme_font_size_override("font_size", 17)
+	stack.add_child(_ascension_status)
+	_ascension_choices = VBoxContainer.new()
+	_ascension_choices.add_theme_constant_override("separation", 14)
+	stack.add_child(_ascension_choices)
+
+func _on_ascension_choice_pressed(unit: Unit, legacy_id: String) -> void:
+	var result: Dictionary = UnitUpgradePaths.apply_legacy(unit, legacy_id)
+	if not bool(result.get("ok", false)):
+		if _ascension_status != null:
+			_ascension_status.text = "Cannot bind legacy: %s" % String(result.get("error", "unknown"))
+		return
+	_pending_ascension_units.erase(unit)
+	refresh_all_views()
+	_queue_active_run_save()
+	var chosen_name: String = String(legacy_id).replace("_", " ").capitalize()
+	_show_combat_event_banner("LEGACY BOUND\n%s" % chosen_name.to_upper(), Color(0.96, 0.52, 0.13, 1.0))
+	_show_next_ascension_choice()
+
+func _close_ascension_choice() -> void:
+	if _ascension_overlay != null:
+		_ascension_overlay.visible = false
+	if continue_button != null and (_contract_overlay == null or not _contract_overlay.visible):
+		continue_button.disabled = false
+	_update_board_status()
+
+func save_active_run_now() -> Dictionary:
+	_active_run_save_pending = false
+	if manager == null or manager.player_team.is_empty():
+		return {"ok": false, "error": "NO_ACTIVE_TEAM"}
+	if not (Engine.has_singleton("GameState") or parent.has_node("/root/GameState")):
+		return {"ok": false, "error": "NO_GAME_STATE"}
+	if int(GameState.phase) != int(GameState.GamePhase.PREVIEW):
+		return {"ok": false, "error": "UNSTABLE_PHASE"}
+	var snapshot: Dictionary = RunSnapshotCoordinator.capture(self)
+	if snapshot.is_empty():
+		return {"ok": false, "error": "CAPTURE_FAILED"}
+	return RunStateStore.save_snapshot(snapshot)
+
+func restore_active_run(snapshot: Dictionary) -> Dictionary:
+	_active_run_restore_in_progress = true
+	var result: Dictionary = RunSnapshotCoordinator.restore(self, snapshot)
+	_active_run_restore_in_progress = false
+	if bool(result.get("ok", false)):
+		_queue_active_run_save()
+	return result
+
+func _queue_active_run_save() -> void:
+	if _active_run_restore_in_progress or _active_run_save_pending or manager == null or manager.player_team.is_empty():
+		return
+	if not (Engine.has_singleton("GameState") or parent.has_node("/root/GameState")):
+		return
+	if int(GameState.phase) != int(GameState.GamePhase.PREVIEW):
+		return
+	_active_run_save_pending = true
+	call_deferred("_save_active_run_deferred")
+
+func _save_active_run_deferred() -> void:
+	save_active_run_now()
+
 func _on_bet_changed(val: float) -> void:
 	if economy_ui:
 		economy_ui.on_bet_changed(val)
@@ -1215,14 +1851,23 @@ func _on_bet_changed(val: float) -> void:
 
 func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	Trace.step("CombatView._on_battle_started: begin")
+	_complete_pending_battle_start()
+	if continue_button != null:
+		continue_button.text = BATTLE_LOCKED_TEXT
+	_encounter_escalations_seen = 0
 	_on_log_line("Prepare to fight.")
+	if projectile_bridge and projectile_bridge.has_method("set_visuals_enabled"):
+		projectile_bridge.set_visuals_enabled(true)
 	_refresh_hud()
 	_update_stage_label()
 	# Set COMBAT phase before starting Economy escrow so UI refresh sees correct phase
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.COMBAT)
+	_sync_bottom_combat_visibility()
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 		Economy.start_combat()
+	var battle_snapshot: Dictionary = _build_account_victory_snapshot()
+	AccountProgressionScript.record_battle_start(battle_snapshot)
 	if grid_placement and manager:
 		grid_placement.rebuild_enemy_views(manager.enemy_team)
 		enemy_views = grid_placement.get_enemy_views()
@@ -1472,6 +2117,20 @@ func _on_victory(_stage: int) -> void:
 		attack_button.disabled = true
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "victory"
+	var bounty_result: Dictionary = _evaluate_account_bounties()
+	var bounty_awards: Array = bounty_result.get("awards", []) as Array
+	var victory_detail: String = "Round secured. Preparing your next decision."
+	if not bounty_awards.is_empty():
+		var omen_total: int = 0
+		var titles: Array[String] = []
+		for raw_award: Variant in bounty_awards:
+			if raw_award is Dictionary:
+				var award: Dictionary = raw_award as Dictionary
+				omen_total += int(award.get("reward", 0))
+				titles.append(String(award.get("title", "Bounty")))
+		victory_detail = "+%d OMENS  •  %s" % [omen_total, ", ".join(titles)]
+		_on_log_line("Black Ledger: %s" % victory_detail)
+	_show_result_banner("VICTORY", victory_detail, Color(0.58, 0.72, 0.38, 1.0), Color(0.86, 0.94, 0.74, 1.0))
 	_auto_loop_running = false
 	_start_intermission(2.0)
 
@@ -1480,6 +2139,16 @@ func _on_defeat(_stage: int) -> void:
 		attack_button.disabled = true
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "defeat"
+	_show_result_banner("DEFEAT", "Round lost. Resolving the aftermath.", Color(0.74, 0.20, 0.16, 1.0), Color(1.0, 0.69, 0.60, 1.0))
+	_start_intermission(2.0)
+	_auto_loop_running = false
+
+func _on_tie(_stage: int) -> void:
+	if attack_button:
+		attack_button.disabled = true
+	_end_combat_resolving_feedback()
+	_post_combat_outcome = "tie"
+	_show_result_banner("STALEMATE", "Wager returned. Preparing your next decision.", Color(0.48, 0.38, 0.66, 1.0), Color(0.90, 0.84, 1.0, 1.0))
 	_start_intermission(2.0)
 	_auto_loop_running = false
 
@@ -1488,6 +2157,11 @@ func clear_log() -> void:
 		log_label.clear()
 
 func _start_intermission(seconds: float = 5.0) -> void:
+	if projectile_bridge:
+		if projectile_bridge.has_method("set_visuals_enabled"):
+			projectile_bridge.set_visuals_enabled(false)
+		else:
+			projectile_bridge.clear()
 	if intermission == null:
 		intermission = IntermissionController.new()
 		intermission.configure(parent)
@@ -1520,19 +2194,22 @@ func _on_intermission_finished() -> void:
 		if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 			if _post_combat_outcome != "":
 				var win: bool = (_post_combat_outcome == "victory")
-				Economy.resolve(win)
-				_apply_first_boss_prep_gold_floor(win)
-				_apply_chapter_two_stability_gold_floor(win)
-				_apply_chapter_three_stability_gold_floor(win)
-				_apply_boss_prep_gold_floor(win)
-				_apply_opening_retry_recovery(win)
-				_apply_early_run_retry_recovery(win)
+				if _post_combat_outcome == "tie" and Economy.has_method("resolve_tie"):
+					Economy.resolve_tie()
+				else:
+					Economy.resolve(win)
+					_apply_first_boss_prep_gold_floor(win)
+					_apply_chapter_two_stability_gold_floor(win)
+					_apply_chapter_three_stability_gold_floor(win)
+					_apply_boss_prep_gold_floor(win)
+					_apply_opening_retry_recovery(win)
+					_apply_early_run_retry_recovery(win)
 			if economy_ui:
 				economy_ui.refresh()
 				economy_ui.set_bet_editable(true)
 	# Optional: add layout prints here when debugging sizes
 			# Auto-refresh the shop after combat ends (respect lock; free refresh)
-			if Engine.has_singleton("Shop") or parent.has_node("/root/Shop"):
+			if _post_combat_outcome != "tie" and (Engine.has_singleton("Shop") or parent.has_node("/root/Shop")):
 				var locked: bool = (bool(Shop.state.locked) if Shop and Shop.state else false)
 				if not locked:
 					Shop.add_free_rerolls(1)
@@ -1542,6 +2219,8 @@ func _on_intermission_finished() -> void:
 	# Return to planning phase after post-combat housekeeping
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.PREVIEW)
+	_queue_active_run_save()
+	_sync_bottom_combat_visibility()
 	if parent and parent.has_method("reset_planning_timer"):
 		parent.call("reset_planning_timer")
 	if _post_combat_outcome == "defeat" and (Engine.has_singleton("Economy") or parent.has_node("/root/Economy")) and Economy.is_broke():
@@ -1605,7 +2284,7 @@ func _apply_first_boss_prep_gold_floor(win: bool) -> void:
 	var missing_gold: int = max(0, FIRST_BOSS_PREP_MIN_GOLD - int(Economy.gold))
 	if missing_gold <= 0:
 		return
-	Economy.add_gold(missing_gold)
+	Economy.add_gold(missing_gold, false, "recovery")
 	_on_log_line("First boss prep stipend: +%d gold." % missing_gold)
 
 func _apply_chapter_two_stability_gold_floor(win: bool) -> void:
@@ -1623,7 +2302,7 @@ func _apply_chapter_two_stability_gold_floor(win: bool) -> void:
 	var missing_gold: int = max(0, CHAPTER_TWO_STABILITY_MIN_GOLD - int(Economy.gold))
 	if missing_gold <= 0:
 		return
-	Economy.add_gold(missing_gold)
+	Economy.add_gold(missing_gold, false, "recovery")
 	_on_log_line("Chapter 2 stability stipend: +%d gold." % missing_gold)
 
 func _apply_chapter_three_stability_gold_floor(win: bool) -> void:
@@ -1641,7 +2320,7 @@ func _apply_chapter_three_stability_gold_floor(win: bool) -> void:
 	var missing_gold: int = max(0, CHAPTER_THREE_STABILITY_MIN_GOLD - int(Economy.gold))
 	if missing_gold <= 0:
 		return
-	Economy.add_gold(missing_gold)
+	Economy.add_gold(missing_gold, false, "recovery")
 	_on_log_line("Chapter 3 stability stipend: +%d gold." % missing_gold)
 
 func _apply_boss_prep_gold_floor(win: bool) -> void:
@@ -1658,7 +2337,7 @@ func _apply_boss_prep_gold_floor(win: bool) -> void:
 	var missing_gold: int = max(0, BOSS_PREP_MIN_GOLD - int(Economy.gold))
 	if missing_gold <= 0:
 		return
-	Economy.add_gold(missing_gold)
+	Economy.add_gold(missing_gold, false, "recovery")
 	_on_log_line("Boss prep stipend: +%d gold." % missing_gold)
 
 func _apply_opening_retry_recovery(win: bool) -> void:
@@ -1678,7 +2357,7 @@ func _apply_opening_retry_recovery(win: bool) -> void:
 	var missing_gold: int = max(0, OPENING_RETRY_MIN_GOLD - int(Economy.gold))
 	if missing_gold <= 0:
 		return
-	Economy.add_gold(missing_gold)
+	Economy.add_gold(missing_gold, false, "recovery")
 	_on_log_line("Opening retry recovery: +%d gold." % missing_gold)
 
 func _apply_early_run_retry_recovery(win: bool) -> void:
@@ -1697,7 +2376,7 @@ func _apply_early_run_retry_recovery(win: bool) -> void:
 	var missing_gold: int = max(0, EARLY_RETRY_RECOVERY_MIN_GOLD - int(Economy.gold))
 	if missing_gold <= 0:
 		return
-	Economy.add_gold(missing_gold)
+	Economy.add_gold(missing_gold, false, "recovery")
 	_on_log_line("Early retry recovery: +%d gold." % missing_gold)
 
 func _start_auto_loop() -> void:
@@ -1798,6 +2477,310 @@ func _on_vfx_knockup(team: String, index: int, duration: float) -> void:
 	if actor and is_instance_valid(actor):
 		actor.play_knockup(duration)
 
+func _on_encounter_escalated(_phase_id: String, label: String, _champion_index: int, revived_indices: Array[int], _affected_player_indices: Array[int], _pulse_damage: int, intensity: int) -> void:
+	_encounter_escalations_seen += 1
+	_show_reinforcement_callouts(revived_indices, intensity)
+	var text: String = "%s\n%d REINFORCEMENT%s RETURN" % [
+		label,
+		revived_indices.size(),
+		"" if revived_indices.size() == 1 else "S",
+	]
+	var accent: Color = Color(0.95, 0.23, 0.14, 1.0) if intensity >= 2 else Color(0.96, 0.55, 0.16, 1.0)
+	_show_combat_event_banner(text, accent)
+
+func _evaluate_account_bounties() -> Dictionary:
+	if manager == null:
+		return {"ok": false, "error": "NO_MANAGER", "awards": []}
+	var snapshot: Dictionary = _build_account_victory_snapshot()
+	return AccountProgressionScript.evaluate_victory(snapshot)
+
+func _build_account_victory_snapshot() -> Dictionary:
+	var chapter: int = int(GameState.chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else 1
+	var stage_in_chapter: int = int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else max(1, int(manager.stage))
+	var units: Array[Dictionary] = []
+	var roles: Array[String] = []
+	var team_slots: Array[String] = []
+	var team_identity_keys: Array[String] = []
+	var positioned_units: Array[Dictionary] = []
+	var survivor_count: int = 0
+	for index: int in range(manager.player_team.size()):
+		var unit: Unit = manager.player_team[index]
+		if unit == null:
+			continue
+		var role: String = String(unit.primary_role).strip_edges().to_lower()
+		if role != "" and not roles.has(role):
+			roles.append(role)
+		var alive: bool = unit.is_alive()
+		if alive:
+			survivor_count += 1
+		var instance_key: String = "%s#%d" % [String(unit.id).to_lower(), int(unit.get_instance_id())]
+		var tile_index: int = index
+		if index < player_views.size() and player_views[index] != null:
+			tile_index = int(player_views[index].tile_idx)
+		positioned_units.append({"key": instance_key, "tile": tile_index})
+		team_identity_keys.append(instance_key)
+		units.append({
+			"id": String(unit.id).strip_edges().to_lower(),
+			"instance_key": instance_key,
+			"level": int(unit.level),
+			"alive": alive,
+			"primary_role": role,
+			"traits": unit.traits.duplicate(),
+			"market_package_kind": String(unit.market_package_kind).strip_edges().to_lower(),
+			"doctrine": String(unit.targeting_mode_override).strip_edges().to_lower(),
+		})
+	positioned_units.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("tile", 0)) < int(b.get("tile", 0)))
+	for positioned: Dictionary in positioned_units:
+		team_slots.append(String(positioned.get("key", "")))
+	team_identity_keys.sort()
+	var compiled_traits: Dictionary = TraitCompilerScript.compile(manager.player_team)
+	var trait_tiers: Dictionary = compiled_traits.get("tiers", {}) as Dictionary
+	var active_trait_count: int = 0
+	for trait_id: Variant in trait_tiers.keys():
+		if int(trait_tiers.get(trait_id, -1)) >= 0:
+			active_trait_count += 1
+	var top_damage_unit_id: String = ""
+	var top_damage: float = -1.0
+	var ally_deaths: int = 0
+	if stats_tracker != null:
+		ally_deaths = int(stats_tracker.get_team_total("player", "deaths", "ALL"))
+		var rows: Array = stats_tracker.get_rows("player", "damage", "ALL")
+		for raw_row: Variant in rows:
+			if not raw_row is Dictionary:
+				continue
+			var row: Dictionary = raw_row as Dictionary
+			var damage: float = float(row.get("value", 0.0))
+			var row_unit: Unit = row.get("unit", null) as Unit
+			if row_unit != null and damage > top_damage:
+				top_damage = damage
+				top_damage_unit_id = String(row_unit.id).strip_edges().to_lower()
+	var economy: Node = _autoload_node("Economy")
+	var shop: Node = _autoload_node("Shop")
+	var roster: Node = _autoload_node("Roster")
+	var run_id: String = String(economy.get("run_id")) if economy != null else ""
+	var contract_families: Array[String] = []
+	var champion_fulfilled: bool = false
+	var pit_active: bool = false
+	if shop != null and shop.has_method("get_contract_snapshot"):
+		var contract_snapshot: Dictionary = shop.call("get_contract_snapshot")
+		var history_value: Variant = contract_snapshot.get("chosen_history", [])
+		if history_value is Array:
+			for raw_contract: Variant in history_value as Array:
+				if not raw_contract is Dictionary:
+					continue
+				var family: String = String((raw_contract as Dictionary).get("family", "")).strip_edges().to_lower()
+				if family != "" and not contract_families.has(family):
+					contract_families.append(family)
+	if shop != null and shop.has_method("get_contract_enemy_multiplier"):
+		pit_active = float(shop.call("get_contract_enemy_multiplier")) > 1.0
+	for unit_data: Dictionary in units:
+		if String(unit_data.get("doctrine", "")) != "":
+			champion_fulfilled = true
+			break
+	return {
+		"run_id": run_id,
+		"event_id": "%s:%d:%d:victory" % [run_id, chapter, stage_in_chapter],
+		"battle_key": "%s:%d:%d" % [run_id, chapter, stage_in_chapter],
+		"chapter": chapter,
+		"stage": stage_in_chapter,
+		"is_boss": RosterUtils.is_boss_stage(stage_in_chapter),
+		"multi_phase_boss": _encounter_escalations_seen > 0,
+		"units": units,
+		"team_size": units.size(),
+		"survivor_count": survivor_count,
+		"ally_deaths": ally_deaths,
+		"team_capacity": int(roster.get("max_team_size")) if roster != null else units.size(),
+		"primary_roles": roles,
+		"active_trait_count": active_trait_count,
+		"team_slots": team_slots,
+		"team_signature": "|".join(team_identity_keys),
+		"top_damage_unit_id": top_damage_unit_id,
+		"precombat_bankroll": int(economy.get("last_gold_start")) if economy != null else 0,
+		"wager": int(economy.get("last_bet_start")) if economy != null else 0,
+		"projected_win_probability": float(economy.get("projected_win_probability")) if economy != null else 1.0,
+		"paid_rerolls": int(shop.get("paid_rerolls")) if shop != null else 0,
+		"paid_xp_purchases": int(shop.get("paid_xp_purchases")) if shop != null else 0,
+		"paid_command_purchases": int(shop.get("paid_command_purchases")) if shop != null else 0,
+		"command_rank": int(shop.call("get_command_rank")) if shop != null and shop.has_method("get_command_rank") else 0,
+		"contract_families": contract_families,
+		"pit_active": pit_active,
+		"champion_fulfilled": champion_fulfilled and contract_families.has("champion"),
+	}
+
+func _on_contract_battle_event(event_type: String, label: String, _affected_player_indices: Array[int], _affected_enemy_indices: Array[int], value: int, intensity: int) -> void:
+	var text: String = "%s\n%d TOTAL EFFECT" % [label, max(0, value)]
+	var accent: Color = Color(0.94, 0.65, 0.18, 1.0)
+	if event_type == "starting_ward":
+		text = "%s\n%d SHIELD DEPLOYED" % [label, max(0, value)]
+		accent = Color(0.31, 0.74, 0.78, 1.0)
+	elif event_type == "death_inheritance":
+		text = "%s\nSURVIVORS CLAIM %d SHIELD" % [label, max(0, value)]
+		accent = Color(0.84, 0.66, 0.25, 1.0)
+	elif event_type == "arena_hazard":
+		text = "%s\nARENA PULSE - %d DAMAGE" % [label, max(0, value)]
+		accent = Color(0.98, 0.18, 0.11, 1.0) if intensity >= 2 else Color(0.88, 0.31, 0.13, 1.0)
+		_flash_contract_hazard(accent, intensity)
+	_show_combat_event_banner(text, accent)
+
+func _on_unit_upgrade_event(event_type: String, label: String, _affected_player_indices: Array[int], value: int, intensity: int) -> void:
+	var text: String = "%s\n%d TOTAL EFFECT" % [label, max(0, value)]
+	var accent: Color = Color(0.94, 0.48, 0.12, 1.0)
+	if event_type == "capital_blood_engine":
+		text = "%s\nHEALTH FOR SPEED" % label
+		accent = Color(0.92, 0.12, 0.10, 1.0)
+	elif event_type == "capital_iron_retinue":
+		text = "%s\n%d OPENING SHIELD" % [label, max(0, value)]
+		accent = Color(0.34, 0.70, 0.80, 1.0)
+	elif event_type == "legacy_executioner_crown":
+		text = "%s\nMANA FILLED • POWER UNCHAINED" % label
+		accent = Color(1.0, 0.28, 0.08, 1.0)
+	elif event_type == "legacy_martyr_seal":
+		text = "%s\nALLIES CLAIM %d SHIELD" % [label, max(0, value)]
+		accent = Color(0.90, 0.66, 0.18, 1.0)
+	if intensity >= 3:
+		_flash_contract_hazard(accent, 1)
+	_show_combat_event_banner(text, accent)
+
+func _flash_contract_hazard(accent: Color, intensity: int) -> void:
+	if arena_container == null or not is_instance_valid(arena_container):
+		return
+	var hazard_frame: Panel = Panel.new()
+	hazard_frame.name = "ContractHazardFlash"
+	hazard_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hazard_frame.z_index = 150
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(accent.r * 0.42, accent.g * 0.16, accent.b * 0.12, 0.54)
+	style.border_color = Color(accent.r, min(1.0, accent.g + 0.08), accent.b, 0.96)
+	var border_width: int = 10 if intensity >= 2 else 7
+	style.border_width_left = border_width
+	style.border_width_top = border_width
+	style.border_width_right = border_width
+	style.border_width_bottom = border_width
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_right = 10
+	style.corner_radius_bottom_left = 10
+	hazard_frame.add_theme_stylebox_override("panel", style)
+	arena_container.add_child(hazard_frame)
+	hazard_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hazard_frame.modulate.a = 0.0
+	var tween: Tween = parent.create_tween()
+	tween.tween_property(hazard_frame, "modulate:a", 0.78, 0.08)
+	tween.tween_property(hazard_frame, "modulate:a", 0.30, 0.12)
+	tween.tween_property(hazard_frame, "modulate:a", 0.72, 0.09)
+	tween.tween_interval(0.32)
+	tween.tween_property(hazard_frame, "modulate:a", 0.0, 1.20)
+	tween.tween_callback(hazard_frame.queue_free)
+
+func _show_combat_event_banner(text: String, accent: Color) -> void:
+	var banner: PanelContainer = _ensure_encounter_banner()
+	if banner == null or _encounter_banner_label == null:
+		return
+	_encounter_banner_label.text = text
+	banner.add_theme_stylebox_override("panel", _make_result_card_style(accent))
+	_encounter_banner_label.add_theme_color_override("font_color", Color(1.0, 0.91, 0.72, 1.0))
+	if _encounter_banner_tween != null and _encounter_banner_tween.is_valid():
+		_encounter_banner_tween.kill()
+	banner.visible = true
+	banner.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	banner.scale = Vector2(0.94, 0.94)
+	banner.pivot_offset = banner.size * 0.5
+	_encounter_banner_tween = parent.create_tween()
+	_encounter_banner_tween.set_parallel(true)
+	_encounter_banner_tween.tween_property(banner, "modulate:a", 1.0, 0.16)
+	_encounter_banner_tween.tween_property(banner, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_encounter_banner_tween.set_parallel(false)
+	_encounter_banner_tween.tween_interval(1.65)
+	_encounter_banner_tween.tween_property(banner, "modulate:a", 0.0, 0.42)
+	_encounter_banner_tween.tween_callback(func() -> void: banner.visible = false)
+
+func _show_reinforcement_callouts(revived_indices: Array[int], intensity: int) -> void:
+	if arena_bridge == null:
+		return
+	var lane_offsets: Array[Vector2] = [
+		Vector2(-104.0, -30.0),
+		Vector2(24.0, -58.0),
+		Vector2(-104.0, -86.0),
+		Vector2(24.0, -114.0),
+	]
+	for order_index: int in range(revived_indices.size()):
+		var revived_index: int = revived_indices[order_index]
+		var actor: UnitActor = arena_bridge.get_enemy_actor(revived_index)
+		if actor == null or not is_instance_valid(actor):
+			continue
+		actor.visible = true
+		var existing: Node = actor.get_node_or_null("ReinforcementCallout")
+		if existing != null:
+			existing.queue_free()
+		var callout: Label = Label.new()
+		callout.name = "ReinforcementCallout"
+		callout.text = "RETURNED %d" % [order_index + 1]
+		callout.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		callout.z_as_relative = false
+		callout.z_index = 170
+		callout.position = lane_offsets[order_index % lane_offsets.size()]
+		callout.size = Vector2(max(116.0, actor.size.x + 48.0), 27.0)
+		callout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		callout.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		callout.add_theme_font_size_override("font_size", 15 if intensity < 2 else 17)
+		callout.add_theme_color_override("font_color", Color(1.0, 0.92, 0.58, 1.0))
+		callout.add_theme_color_override("font_outline_color", Color(0.08, 0.01, 0.01, 1.0))
+		callout.add_theme_constant_override("outline_size", 3)
+		var callout_style: StyleBoxFlat = StyleBoxFlat.new()
+		callout_style.bg_color = Color(0.10, 0.015, 0.012, 0.90)
+		callout_style.border_color = Color(0.97, 0.54, 0.14, 0.96)
+		callout_style.set_border_width_all(2)
+		callout_style.corner_radius_top_left = 5
+		callout_style.corner_radius_top_right = 5
+		callout_style.corner_radius_bottom_left = 5
+		callout_style.corner_radius_bottom_right = 5
+		callout.add_theme_stylebox_override("normal", callout_style)
+		actor.add_child(callout)
+		callout.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		callout.scale = Vector2(0.70, 0.70)
+		callout.pivot_offset = callout.size * 0.5
+		var tween: Tween = actor.create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(callout, "modulate:a", 1.0, 0.10)
+		tween.tween_property(callout, "scale", Vector2.ONE, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.set_parallel(false)
+		tween.tween_interval(1.55)
+		tween.tween_property(callout, "modulate:a", 0.0, 0.35)
+		tween.tween_callback(callout.queue_free)
+
+func _ensure_encounter_banner() -> PanelContainer:
+	if parent == null:
+		return null
+	if _encounter_banner != null and is_instance_valid(_encounter_banner):
+		return _encounter_banner
+	_encounter_banner = PanelContainer.new()
+	_encounter_banner.name = "EncounterEscalationBanner"
+	_encounter_banner.visible = false
+	_encounter_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_encounter_banner.z_as_relative = false
+	_encounter_banner.z_index = 156
+	_encounter_banner.anchor_left = 0.18
+	_encounter_banner.anchor_right = 0.82
+	_encounter_banner.anchor_top = 0.0
+	_encounter_banner.anchor_bottom = 0.0
+	_encounter_banner.offset_top = 68.0
+	_encounter_banner.offset_bottom = 148.0
+	var margin: MarginContainer = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	_encounter_banner.add_child(margin)
+	_encounter_banner_label = Label.new()
+	_encounter_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_encounter_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_encounter_banner_label.add_theme_font_size_override("font_size", 24)
+	_encounter_banner_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+	_encounter_banner_label.add_theme_constant_override("outline_size", 3)
+	margin.add_child(_encounter_banner_label)
+	parent.add_child(_encounter_banner)
+	return _encounter_banner
+
 func _ensure_beam_overlay() -> void:
 	if _beam_overlay and is_instance_valid(_beam_overlay):
 		return
@@ -1854,6 +2837,162 @@ func set_player_team_ids(ids: Array) -> void:
 			manager.player_team.append(u)
 	_update_board_status()
 
+func _sync_bottom_combat_visibility(force: bool = false) -> void:
+	if parent == null:
+		return
+	var in_combat: bool = false
+	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
+		in_combat = int(GameState.phase) == int(GameState.GamePhase.COMBAT)
+	var planning_visible: bool = not in_combat
+	var visibility_state: int = 1 if planning_visible else 0
+	if not force and visibility_state == _bottom_combat_visibility_state:
+		return
+	_bottom_combat_visibility_state = visibility_state
+	_set_control_visible("MarginContainer/VBoxContainer/BenchArea", planning_visible)
+	_set_control_visible("MarginContainer/VBoxContainer/BottomStorageArea", planning_visible)
+	_set_root_control_visible("GothicShopPlate", planning_visible)
+	_set_root_control_visible("GothicShopCommandPlate", planning_visible)
+
+func _set_control_visible(path: String, visible_state: bool) -> void:
+	if parent == null:
+		return
+	var control: Control = parent.get_node_or_null(path) as Control
+	if control != null:
+		control.visible = visible_state
+
+func _set_root_control_visible(node_name: String, visible_state: bool) -> void:
+	if parent == null:
+		return
+	var control: Control = parent.get_node_or_null(node_name) as Control
+	if control != null:
+		control.visible = visible_state
+
+func _show_result_banner(title: String, detail: String, accent_color: Color, title_color: Color) -> void:
+	var banner: PanelContainer = _ensure_result_banner()
+	if banner == null:
+		return
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer
+	var title_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/OutcomeLabel") as Label
+	var detail_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/DetailLabel") as Label
+	var accent_rule: ColorRect = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/AccentRule") as ColorRect
+	if title_label != null:
+		title_label.text = title
+		title_label.add_theme_color_override("font_color", title_color)
+	if detail_label != null:
+		detail_label.text = detail
+	if accent_rule != null:
+		accent_rule.color = Color(accent_color.r, accent_color.g, accent_color.b, 0.86)
+	if card != null:
+		card.add_theme_stylebox_override("panel", _make_result_card_style(accent_color))
+	banner.add_theme_stylebox_override("panel", _make_result_scrim_style())
+	banner.visible = true
+
+func _hide_result_banner() -> void:
+	if _result_banner != null and is_instance_valid(_result_banner):
+		_result_banner.visible = false
+
+func _ensure_result_banner() -> PanelContainer:
+	if parent == null:
+		return null
+	if _result_banner != null and is_instance_valid(_result_banner):
+		return _result_banner
+	var existing: PanelContainer = parent.get_node_or_null("BattleResultBanner") as PanelContainer
+	if existing != null:
+		_result_banner = existing
+		return _result_banner
+	_result_banner = PanelContainer.new()
+	_result_banner.name = "BattleResultBanner"
+	_result_banner.visible = false
+	_result_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_result_banner.z_as_relative = false
+	_result_banner.z_index = 158
+	_result_banner.anchor_left = 0.0
+	_result_banner.anchor_right = 1.0
+	_result_banner.anchor_top = 0.0
+	_result_banner.anchor_bottom = 1.0
+	_result_banner.offset_left = 0.0
+	_result_banner.offset_right = 0.0
+	_result_banner.offset_top = 0.0
+	_result_banner.offset_bottom = 0.0
+	var center: CenterContainer = CenterContainer.new()
+	center.name = "Center"
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.offset_top = -34.0
+	center.offset_bottom = -34.0
+	_result_banner.add_child(center)
+	var card: PanelContainer = PanelContainer.new()
+	card.name = "BattleResultCard"
+	card.custom_minimum_size = Vector2(560.0, 176.0)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(card)
+	var margin: MarginContainer = MarginContainer.new()
+	margin.name = "CardMargin"
+	margin.add_theme_constant_override("margin_left", 34)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_right", 34)
+	margin.add_theme_constant_override("margin_bottom", 22)
+	card.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.name = "Content"
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+	var kicker: Label = Label.new()
+	kicker.name = "KickerLabel"
+	kicker.text = "BATTLE OUTCOME"
+	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	kicker.add_theme_font_size_override("font_size", 13)
+	kicker.add_theme_color_override("font_color", Color(0.72, 0.61, 0.45, 1.0))
+	content.add_child(kicker)
+	var title_label: Label = Label.new()
+	title_label.name = "OutcomeLabel"
+	title_label.custom_minimum_size = Vector2(0.0, 46.0)
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 36)
+	title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
+	title_label.add_theme_constant_override("outline_size", 2)
+	content.add_child(title_label)
+	var accent_rule: ColorRect = ColorRect.new()
+	accent_rule.name = "AccentRule"
+	accent_rule.custom_minimum_size = Vector2(0.0, 1.0)
+	accent_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(accent_rule)
+	var detail_label: Label = Label.new()
+	detail_label.name = "DetailLabel"
+	detail_label.custom_minimum_size = Vector2(0.0, 24.0)
+	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	detail_label.add_theme_font_size_override("font_size", 16)
+	detail_label.add_theme_color_override("font_color", Color(0.82, 0.79, 0.75, 1.0))
+	content.add_child(detail_label)
+	parent.add_child(_result_banner)
+	return _result_banner
+
+func _make_result_scrim_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.006, 0.005, 0.008, 0.46)
+	return style
+
+func _make_result_card_style(accent_color: Color) -> StyleBox:
+	var fallback: StyleBoxFlat = StyleBoxFlat.new()
+	fallback.bg_color = Color(0.026, 0.022, 0.030, 0.98)
+	fallback.border_color = Color(accent_color.r, accent_color.g, accent_color.b, 0.88)
+	fallback.border_width_left = 1
+	fallback.border_width_top = 1
+	fallback.border_width_right = 1
+	fallback.border_width_bottom = 1
+	fallback.corner_radius_top_left = 7
+	fallback.corner_radius_top_right = 7
+	fallback.corner_radius_bottom_right = 7
+	fallback.corner_radius_bottom_left = 7
+	fallback.shadow_size = 18
+	fallback.shadow_color = Color(0.0, 0.0, 0.0, 0.72)
+	return GothicUIAssets.style_or_fallback(
+		GothicUIAssets.wide_panel_style(Color(0.86, 0.82, 0.74, 0.98)),
+		fallback
+	)
+
 func _is_continue_start_text() -> bool:
 	if continue_button == null:
 		return false
@@ -1872,7 +3011,7 @@ func _begin_combat_resolving_feedback() -> void:
 	_combat_resolving_last_second = -1
 	_combat_resolving_watchdog_seen = false
 	if continue_button != null:
-		continue_button.text = BATTLE_LOCKED_TEXT
+		continue_button.text = BATTLE_PREPARING_TEXT
 
 func _end_combat_resolving_feedback() -> void:
 	_combat_resolving_active = false
@@ -1888,6 +3027,9 @@ func _update_combat_resolving_feedback(delta: float) -> void:
 	if continue_button == null:
 		return
 	_combat_resolving_elapsed += max(0.0, float(delta))
+	if not _battle_start_pending:
+		continue_button.text = BATTLE_LOCKED_TEXT
+		return
 	if _combat_resolving_elapsed < RESOLVING_PROGRESS_DELAY_SECONDS:
 		return
 	var elapsed_seconds: int = int(floor(_combat_resolving_elapsed))
@@ -1895,9 +3037,9 @@ func _update_combat_resolving_feedback(delta: float) -> void:
 		return
 	_combat_resolving_last_second = elapsed_seconds
 	if elapsed_seconds >= RESOLVING_STUCK_WARNING_SECONDS:
-		continue_button.text = "Still resolving %ds..." % elapsed_seconds
+		continue_button.text = "Startup delayed %ds..." % elapsed_seconds
 	else:
-		continue_button.text = "Resolving %ds..." % elapsed_seconds
+		continue_button.text = "Preparing battle %ds..." % elapsed_seconds
 
 func _mark_combat_resolving_fallback() -> void:
 	if not _combat_resolving_active:

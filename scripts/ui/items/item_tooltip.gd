@@ -6,18 +6,22 @@ const ItemDef := preload("res://scripts/game/items/item_def.gd")
 const PhaseRules := preload("res://scripts/game/items/phase_rules.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
-const TOOLTIP_WIDTH: float = 318.0
-const PADDING: float = 12.0
+const TOOLTIP_WIDTH: float = 320.0
+const PADDING: float = 18.0
 const EDGE_PADDING: float = 12.0
+const BOTTOM_UI_RESERVE: float = 236.0
+const LEFT_PANEL_RESERVE: float = 340.0
+const LEFT_PANEL_TOOLTIP_TOP: float = 164.0
+const TOOLTIP_GROUP: String = "gothic_hover_tooltip"
 const CURSOR_OFFSET: Vector2 = Vector2(18.0, -16.0)
 const COLOR_PANEL: Color = Color(0.023, 0.019, 0.027, 0.985)
 const COLOR_PANEL_INNER: Color = Color(0.047, 0.032, 0.040, 0.92)
 const COLOR_BORDER: Color = Color(0.72, 0.46, 0.22, 0.95)
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
-const COLOR_MUTED: Color = Color(0.66, 0.60, 0.52, 1.0)
+const COLOR_MUTED: Color = Color(0.74, 0.68, 0.58, 1.0)
 const COLOR_GOLD: Color = Color(0.96, 0.72, 0.34, 1.0)
-const COLOR_BLOOD: Color = Color(0.72, 0.08, 0.12, 1.0)
-const COLOR_STEEL: Color = Color(0.44, 0.56, 0.58, 1.0)
+const COLOR_BLOOD: Color = Color(0.90, 0.42, 0.24, 1.0)
+const COLOR_STEEL: Color = Color(0.58, 0.68, 0.66, 1.0)
 
 @onready var _background: ColorRect = $Background
 @onready var _vbox: VBoxContainer = $VBox
@@ -36,6 +40,7 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 900
+	add_to_group(TOOLTIP_GROUP)
 	custom_minimum_size.x = TOOLTIP_WIDTH
 	_apply_style()
 	_update_labels()
@@ -277,10 +282,15 @@ func _clamped_position(raw_position: Vector2) -> Vector2:
 		return raw_position
 	var viewport_size: Vector2 = viewport.get_visible_rect().size
 	var new_position: Vector2 = raw_position
+	if viewport_size.x >= 1200.0 and new_position.x < LEFT_PANEL_RESERVE:
+		new_position.x = EDGE_PADDING
+		new_position.y = min(new_position.y, LEFT_PANEL_TOOLTIP_TOP)
 	if new_position.x + size.x + EDGE_PADDING > viewport_size.x:
 		new_position.x = raw_position.x - size.x - CURSOR_OFFSET.x * 1.5
-	if new_position.y + size.y + EDGE_PADDING > viewport_size.y:
-		new_position.y = viewport_size.y - size.y - EDGE_PADDING
+	var bottom_reserve: float = min(BOTTOM_UI_RESERVE, viewport_size.y * 0.30)
+	var bottom_limit: float = viewport_size.y - EDGE_PADDING - bottom_reserve
+	if new_position.y + size.y > bottom_limit:
+		new_position.y = bottom_limit - size.y
 	if new_position.x < EDGE_PADDING:
 		new_position.x = EDGE_PADDING
 	if new_position.y < EDGE_PADDING:

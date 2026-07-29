@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "caldera_molten_core"
 name = "Molten Core"
 description = "Charges into the fight, hardens, erupts around the target, and leaves a burning zone."
+targeting_summary = "Current attack target, or lowest-health enemy if none; erupts around that target."
 base_cost = 60
 tags = ["damage", "engage", "zone", "aoe"]

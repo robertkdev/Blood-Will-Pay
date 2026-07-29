@@ -7,5 +7,6 @@ script = ExtResource("1")
 id = "volt_arc_lock"
 name = "Arc Lock"
 description = "Deals magic damage and stuns the target."
+targeting_summary = "Current attack target."
 base_cost = 60
 tags = Array[String](["damage", "stun"])

@@ -44,6 +44,9 @@ func _run() -> void:
 	_expect(tooltip != null and _control_inside_viewport(tooltip), "shop tooltip should stay inside the viewport")
 	if tooltip != null:
 		_expect(tooltip.get_theme_stylebox("panel") is StyleBoxTexture, "shop tooltip should use the generated panel asset")
+		_expect(_tooltip_contains(tooltip, "Attack Targeting:"), "shop tooltip should show attack targeting")
+		_expect(_tooltip_contains(tooltip, "Ability Targeting:"), "shop tooltip should show ability targeting")
+		_expect(not _tooltip_contains(tooltip, "Positioning:"), "shop tooltip should not prescribe positioning")
 	_move_hover(card)
 	await _settle_frames(2)
 	_expect(_tooltip_count() == 1, "shop hover motion should keep a single tooltip")
@@ -147,6 +150,15 @@ func _control_inside_viewport(control: Control) -> bool:
 	if viewport_rect.size.x <= 4.0 or viewport_rect.size.y <= 4.0:
 		viewport_rect = Rect2(Vector2.ZERO, Vector2(1280.0, 720.0))
 	return rect.position.x >= viewport_rect.position.x and rect.position.y >= viewport_rect.position.y and rect.end.x <= viewport_rect.end.x and rect.end.y <= viewport_rect.end.y
+
+func _tooltip_contains(control: Control, needle: String) -> bool:
+	if control == null:
+		return false
+	for node: Node in control.find_children("*", "Label", true, false):
+		var label: Label = node as Label
+		if label != null and String(label.text).contains(needle):
+			return true
+	return false
 
 func _settle_frames(count: int) -> void:
 	for _frame_index: int in range(count):

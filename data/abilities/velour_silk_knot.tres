@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "velour_silk_knot"
 name = "Silk Knot"
 description = "Pins a threat while healing and shielding the two lowest-health allies."
+targeting_summary = "Two lowest-health allies; pins up to two priority threats."
 base_cost = 60
 tags = ["support", "heal", "shield", "control"]

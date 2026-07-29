@@ -1,7 +1,7 @@
 [gd_resource type="StyleBoxFlat" format=3 uid="uid://cmswimmpmoshv"]
 
 [resource]
-bg_color = Color(0.34, 0.24, 0.46, 1)
+bg_color = Color(0.20, 0.38, 0.45, 0.98)
 corner_radius_top_left = 5
 corner_radius_top_right = 5
 corner_radius_bottom_right = 5
@@ -10,5 +10,5 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.96, 0.78, 1, 0.18)
+border_color = Color(0.78, 0.88, 0.78, 0.38)
 anti_aliasing = true

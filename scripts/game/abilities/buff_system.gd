@@ -26,6 +26,7 @@ var _buffs: Dictionary = {}
 var _stacks: Dictionary = {} # Map[Unit -> Dictionary[String, int]]
 var _cc_first: Dictionary = {} # Map[Unit -> bool]
 var _source_stack: Array[Dictionary] = []
+var _movement_blocker_count: int = 0
 
 signal cc_applied_first(team: String, index: int, kind: String)
 signal buff_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, fields: Dictionary, magnitude: float, duration: float)
@@ -40,6 +41,7 @@ func clear() -> void:
 	_stacks.clear()
 	_cc_first.clear()
 	_source_stack.clear()
+	_movement_blocker_count = 0
 
 func clear_reverting_stats() -> void:
 	# Revert any active 'stats' buffs before clearing so unit base stats
@@ -58,6 +60,7 @@ func clear_reverting_stats() -> void:
 	_stacks.clear()
 	_cc_first.clear()
 	_source_stack.clear()
+	_movement_blocker_count = 0
 
 func push_source(team: String, index: int, kind: String = "ability") -> void:
 	var source_team: String = String(team).strip_edges()
@@ -354,6 +357,7 @@ func cleanse(state: BattleState, team: String, index: int) -> Dictionary:
 			var f2: Dictionary = b2.get("fields", {})
 			if f2 and not f2.is_empty():
 				_apply_fields(u, f2, -1)
+		_track_removed_buff(b2)
 		arr.erase(b2)
 		removed += 1
 	if arr.is_empty():
@@ -420,6 +424,9 @@ func is_stunned(u: Unit) -> bool:
 
 func is_movement_blocked(state: BattleState, team: String, index: int) -> bool:
 	var u: Unit = _unit_at(state, team, index)
+	return is_unit_movement_blocked(u)
+
+func is_unit_movement_blocked(u: Unit) -> bool:
 	if u == null or not _buffs.has(u):
 		return false
 	for b in _buffs[u]:
@@ -435,21 +442,7 @@ func is_movement_blocked(state: BattleState, team: String, index: int) -> bool:
 	return false
 
 func has_movement_blockers() -> bool:
-	if _buffs.is_empty():
-		return false
-	for u in _buffs.keys():
-		var arr: Array = _buffs[u]
-		for b in arr:
-			if float(b.get("remaining", 0.0)) <= 0.0:
-				continue
-			var kind: String = String(b.get("kind", ""))
-			if kind == "stun":
-				return true
-			if kind == "tag":
-				var tag_name: String = String(b.get("tag", ""))
-				if tag_name == "root" or tag_name == "rooted":
-					return true
-	return false
+	return _movement_blocker_count > 0
 
 # === Stacks API ===
 
@@ -488,6 +481,7 @@ func _add_buff(u: Unit, buff: Dictionary) -> void:
 	if not _buffs.has(u):
 		_buffs[u] = []
 	_buffs[u].append(buff)
+	_track_added_buff(buff)
 
 func _expire_buff(u: Unit, buff: Dictionary) -> void:
 	if u == null:
@@ -501,6 +495,24 @@ func _expire_buff(u: Unit, buff: Dictionary) -> void:
 	# tag kind also expires passively
 	if kind == "shield":
 		_recompute_ui_shield(u)
+	_track_removed_buff(buff)
+
+func _track_added_buff(buff: Dictionary) -> void:
+	if _is_movement_blocker_buff(buff):
+		_movement_blocker_count += 1
+
+func _track_removed_buff(buff: Dictionary) -> void:
+	if _is_movement_blocker_buff(buff):
+		_movement_blocker_count = max(0, _movement_blocker_count - 1)
+
+func _is_movement_blocker_buff(buff: Dictionary) -> bool:
+	var kind: String = String(buff.get("kind", ""))
+	if kind == "stun":
+		return true
+	if kind != "tag":
+		return false
+	var tag_name: String = String(buff.get("tag", ""))
+	return tag_name == "root" or tag_name == "rooted"
 
 func _apply_fields(u: Unit, fields: Dictionary, sign: int) -> void:
 	for k in fields.keys():

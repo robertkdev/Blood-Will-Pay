@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "brute_slam"
 name = "Slam"
 description = "Leap to the nearest enemy, knocking up nearby foes for 0.75s, shattering shields, dealing 80/120/180 + 12 x Titan stacks physical damage, healing self for 130/185/260 + 20 x Titan stacks, and gaining 20 Armor/MR for 4s."
+targeting_summary = "Current attack target, or nearest enemy if none; hits nearby enemies on impact."
 base_cost = 60
 tags = ["heal", "damage", "cc"]

@@ -7,6 +7,6 @@ script = ExtResource( 1 )
 id = "bonko_bonk"
 name = "Bonk"
 description = "Smashes a single target for physical damage and stuns it. Deals bonus damage to already-stunned targets."
+targeting_summary = "Self-buff; next basic attacks keep using attack targeting."
 base_cost = 60
 tags = ["damage", "stun"]
-

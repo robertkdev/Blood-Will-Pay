@@ -38,8 +38,6 @@ func _check_assassin_backline_priority(failures: Array[String]) -> void:
 	var enemy_positions: Array[Vector2] = [Vector2(128.0, 180.0), Vector2(352.0, 180.0)]
 	var picked: int = Targeting.pick_by_priority(
 		assassin,
-		0,
-		"player",
 		Vector2(64.0, 180.0),
 		allies,
 		ally_positions,
@@ -52,7 +50,7 @@ func _check_assassin_backline_priority(failures: Array[String]) -> void:
 func _check_marksman_front_to_back_priority(failures: Array[String]) -> void:
 	var marksman: Unit = _spawn("sari")
 	var tank: Unit = _spawn("brute")
-	var mage: Unit = _spawn("cashmere")
+	var mage: Unit = _spawn("mara")
 	mage.hp = max(1, int(float(mage.max_hp) * 0.45))
 	var allies: Array[Unit] = [marksman]
 	var ally_positions: Array[Vector2] = [Vector2(64.0, 180.0)]
@@ -60,8 +58,6 @@ func _check_marksman_front_to_back_priority(failures: Array[String]) -> void:
 	var enemy_positions: Array[Vector2] = [Vector2(224.0, 180.0), Vector2(360.0, 180.0)]
 	var picked: int = Targeting.pick_by_priority(
 		marksman,
-		0,
-		"player",
 		Vector2(64.0, 180.0),
 		allies,
 		ally_positions,

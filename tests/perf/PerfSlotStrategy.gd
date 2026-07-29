@@ -2,7 +2,7 @@ extends Node
 
 const SlotStrategyScript: Script = preload("res://scripts/game/combat/movement/strategies/slot_strategy.gd")
 
-@export var samples_per_case: int = 2
+@export var samples_per_case: int = 3
 
 func _ready() -> void:
 	call_deferred("_run")

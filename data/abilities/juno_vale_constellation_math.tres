@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "juno_vale_constellation_math"
 name = "Constellation Math"
 description = "Links unlikely allies, grants mana and shields, then disrupts enemy formation through a star field."
+targeting_summary = "Linked allies with no shared traits; AoE around current attack target or lowest-health enemy."
 base_cost = 60
 tags = ["support", "zone", "disrupt", "redirect"]

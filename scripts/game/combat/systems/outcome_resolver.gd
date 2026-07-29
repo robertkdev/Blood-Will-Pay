@@ -69,9 +69,7 @@ func _outcome_from_board(player_team_defeated: bool, enemy_team_defeated: bool, 
             return "victory"
         elif e_cd < p_cd:
             return "defeat"
-        if rng and rng.randf() < 0.5:
-            return "victory"
-        return "defeat"
+        return "tie"
     elif player_team_defeated:
         return "defeat"
     elif enemy_team_defeated:

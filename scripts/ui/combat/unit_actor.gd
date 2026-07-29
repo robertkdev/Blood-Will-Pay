@@ -4,9 +4,11 @@ class_name UnitActor
 const UIBars := preload("res://scripts/ui/combat/ui_bars.gd")
 const UnitEffectPlayer := preload("res://scripts/ui/vfx/unit_effect_player.gd")
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
+const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
 var unit: Unit
 var focus_plate: Panel
+var bar_plate: Panel
 var sprite: TextureRect
 var hp_bar: ProgressBar
 var mana_bar: ProgressBar
@@ -104,10 +106,10 @@ func _ensure_focus_plate() -> void:
 	focus_plate.anchor_top = 0.0
 	focus_plate.anchor_right = 1.0
 	focus_plate.anchor_bottom = 1.0
-	focus_plate.offset_left = -9.0
-	focus_plate.offset_top = -9.0
-	focus_plate.offset_right = 9.0
-	focus_plate.offset_bottom = 9.0
+	focus_plate.offset_left = -18.0
+	focus_plate.offset_top = -5.0
+	focus_plate.offset_right = 18.0
+	focus_plate.offset_bottom = 18.0
 	add_child(focus_plate)
 	_apply_focus_plate_style()
 
@@ -115,19 +117,60 @@ func _apply_focus_plate_style() -> void:
 	if focus_plate == null:
 		return
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(_team_tint.r, _team_tint.g, _team_tint.b, min(_team_tint.a, 0.46))
-	style.border_color = Color(_team_tint.r, _team_tint.g, _team_tint.b, 0.96)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_right = 8
-	style.corner_radius_bottom_left = 8
+	style.bg_color = Color(_team_tint.r, _team_tint.g, _team_tint.b, min(_team_tint.a, 0.14))
+	style.border_color = Color(_team_tint.r, _team_tint.g, _team_tint.b, 0.68)
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 18
+	style.corner_radius_top_right = 18
+	style.corner_radius_bottom_right = 18
+	style.corner_radius_bottom_left = 18
 	style.shadow_size = 14
-	style.shadow_color = Color(_team_tint.r, _team_tint.g, _team_tint.b, 0.30)
-	focus_plate.add_theme_stylebox_override("panel", style)
+	style.shadow_color = Color(_team_tint.r, _team_tint.g, _team_tint.b, 0.22)
+	var is_player: bool = _team_tint.b >= _team_tint.r
+	var asset: StyleBoxTexture = GothicUIAssets.unit_base_style(is_player, Color(0.98, 0.90, 0.68, 0.96))
+	focus_plate.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(asset, style))
+
+func _ensure_bar_plate() -> void:
+	if bar_plate and is_instance_valid(bar_plate):
+		if bar_plate.get_parent() != self:
+			add_child(bar_plate)
+		_apply_bar_plate_style()
+		return
+	bar_plate = Panel.new()
+	bar_plate.name = "BarPlate"
+	bar_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_plate.anchor_left = 0.0
+	bar_plate.anchor_top = 0.0
+	bar_plate.anchor_right = 1.0
+	bar_plate.anchor_bottom = 0.0
+	bar_plate.offset_left = -6.0
+	bar_plate.offset_top = -32.0
+	bar_plate.offset_right = 6.0
+	bar_plate.offset_bottom = -5.0
+	bar_plate.z_index = 7
+	add_child(bar_plate)
+	_apply_bar_plate_style()
+
+func _apply_bar_plate_style() -> void:
+	if bar_plate == null:
+		return
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.018, 0.015, 0.021, 0.82)
+	style.border_color = Color(0.44, 0.32, 0.20, 0.72)
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 5
+	style.corner_radius_top_right = 5
+	style.corner_radius_bottom_right = 5
+	style.corner_radius_bottom_left = 5
+	style.shadow_size = 6
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.58)
+	bar_plate.add_theme_stylebox_override("panel", style)
 
 func _ensure_sprite() -> void:
 	if sprite and is_instance_valid(sprite):
@@ -150,6 +193,7 @@ func _ensure_sprite() -> void:
 	_update_effect_player_sprite()
 
 func _ensure_bars() -> void:
+	_ensure_bar_plate()
 	if not (hp_bar and is_instance_valid(hp_bar)):
 		hp_bar = UIBars.make_hp_bar()
 		add_child(hp_bar)
@@ -157,10 +201,10 @@ func _ensure_bars() -> void:
 		hp_bar.anchor_top = 0.0
 		hp_bar.anchor_right = 1.0
 		hp_bar.anchor_bottom = 0.0
-		hp_bar.offset_left = 0.0
-		hp_bar.offset_top = -22.0
-		hp_bar.offset_right = 0.0
-		hp_bar.offset_bottom = -14.0
+		hp_bar.offset_left = 5.0
+		hp_bar.offset_top = -25.0
+		hp_bar.offset_right = -5.0
+		hp_bar.offset_bottom = -16.0
 		hp_bar.z_index = 8
 		# HP tick marks
 		if not (hp_ticks and is_instance_valid(hp_ticks)):
@@ -170,10 +214,10 @@ func _ensure_bars() -> void:
 			hp_ticks.anchor_top = 0.0
 			hp_ticks.anchor_right = 1.0
 			hp_ticks.anchor_bottom = 0.0
-			hp_ticks.offset_left = 0.0
-			hp_ticks.offset_top = -22.0
-			hp_ticks.offset_right = 0.0
-			hp_ticks.offset_bottom = -14.0
+			hp_ticks.offset_left = 5.0
+			hp_ticks.offset_top = -25.0
+			hp_ticks.offset_right = -5.0
+			hp_ticks.offset_bottom = -16.0
 			hp_ticks.z_index = 9
 			hp_ticks.minor_step = 200
 			hp_ticks.major_step = 1000
@@ -186,10 +230,10 @@ func _ensure_bars() -> void:
 		mana_bar.anchor_top = 0.0
 		mana_bar.anchor_right = 1.0
 		mana_bar.anchor_bottom = 0.0
-		mana_bar.offset_left = 0.0
-		mana_bar.offset_top = -12.0
-		mana_bar.offset_right = 0.0
-		mana_bar.offset_bottom = -6.0
+		mana_bar.offset_left = 5.0
+		mana_bar.offset_top = -14.0
+		mana_bar.offset_right = -5.0
+		mana_bar.offset_bottom = -8.0
 		mana_bar.z_index = 8
 		# Mana tick marks
 		if not (mana_ticks and is_instance_valid(mana_ticks)):
@@ -199,10 +243,10 @@ func _ensure_bars() -> void:
 			mana_ticks.anchor_top = 0.0
 			mana_ticks.anchor_right = 1.0
 			mana_ticks.anchor_bottom = 0.0
-			mana_ticks.offset_left = 0.0
-			mana_ticks.offset_top = -12.0
-			mana_ticks.offset_right = 0.0
-			mana_ticks.offset_bottom = -6.0
+			mana_ticks.offset_left = 5.0
+			mana_ticks.offset_top = -14.0
+			mana_ticks.offset_right = -5.0
+			mana_ticks.offset_bottom = -8.0
 			mana_ticks.z_index = 9
 			mana_ticks.minor_step = 10
 			mana_ticks.major_step = 50
@@ -216,11 +260,11 @@ func _ensure_bars() -> void:
 			shield_bar.anchor_top = 0.0
 			shield_bar.anchor_right = 1.0
 			shield_bar.anchor_bottom = 0.0
-			shield_bar.offset_left = 0.0
+			shield_bar.offset_left = 5.0
 			shield_bar.offset_top = -30.0
-			shield_bar.offset_right = 0.0
+			shield_bar.offset_right = -5.0
 			shield_bar.offset_bottom = -23.0
-			shield_bar.z_index = 3
+			shield_bar.z_index = 8
 			shield_bar.show_percentage = false
 			shield_bar.min_value = 0
 			shield_bar.max_value = 1
@@ -249,11 +293,11 @@ func _ensure_bars() -> void:
 			shield_ticks.anchor_top = 0.0
 			shield_ticks.anchor_right = 1.0
 			shield_ticks.anchor_bottom = 0.0
-			shield_ticks.offset_left = 0.0
+			shield_ticks.offset_left = 5.0
 			shield_ticks.offset_top = -30.0
-			shield_ticks.offset_right = 0.0
+			shield_ticks.offset_right = -5.0
 			shield_ticks.offset_bottom = -23.0
-			shield_ticks.z_index = 4
+			shield_ticks.z_index = 9
 			shield_ticks.minor_step = 200
 			shield_ticks.major_step = 1000
 			shield_ticks.minor_color = Color(0.85, 0.95, 1.0, 0.55)

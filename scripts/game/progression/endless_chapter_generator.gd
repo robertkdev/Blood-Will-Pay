@@ -126,6 +126,8 @@ static func target_rating_for(chapter: int, stage_index: int) -> int:
 			multiplier = 2.25
 		ProgressionConfig.BOSS_STAGE:
 			multiplier = 2.65
+			if procedural_index == 1:
+				multiplier = 2.15
 		ProgressionConfig.MIRROR_STAGE:
 			multiplier = 2.65
 		_:
@@ -591,6 +593,8 @@ static func _desired_size_for_target(target: int, kind: String) -> int:
 
 static func _level_cap_for(chapter: int, kind: String) -> int:
 	var procedural_index: int = _procedural_index_for(chapter)
+	if procedural_index == 1 and kind == StageTypes.KIND_BOSS:
+		return 2
 	var cap: int = 5 + int(floor(float(procedural_index - 1) / 5.0))
 	if kind == StageTypes.KIND_BOSS:
 		cap += 1

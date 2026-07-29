@@ -4,9 +4,12 @@ class_name StageProgressTopBar
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
+const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
-const ICON_SIZE: Vector2 = Vector2(52.0, 52.0)
-const BAR_MIN_SIZE: Vector2 = Vector2(560.0, 66.0)
+const ICON_SIZE: Vector2 = Vector2(44.0, 44.0)
+const BAR_MIN_SIZE: Vector2 = Vector2(560.0, 56.0)
+const COMPACT_ICON_SIZE: Vector2 = Vector2(32.0, 32.0)
+const COMPACT_BAR_MIN_SIZE: Vector2 = Vector2(500.0, 48.0)
 const SELECTED_TEXTURE_PATHS: PackedStringArray = [
 	"res://assets/ui/stage_icons/stage_1_creep_selected.png",
 	"res://assets/ui/stage_icons/stage_2_challenge_selected.png",
@@ -22,11 +25,11 @@ const UNSELECTED_TEXTURE_PATHS: PackedStringArray = [
 	"res://assets/ui/stage_icons/stage_5_mirror_unselected.png",
 ]
 const STAGE_TOOLTIPS: PackedStringArray = [
-	"Stage 1: Creeps",
-	"Stage 2: Challenge",
-	"Stage 3: Challenge",
-	"Stage 4: Boss",
-	"Stage 5: Mirror",
+	"Round 1: Creeps",
+	"Round 2: Challenge",
+	"Round 3: Challenge",
+	"Round 4: Boss",
+	"Round 5: Mirror",
 ]
 
 var _row: HBoxContainer
@@ -56,6 +59,25 @@ func update_progress(chapter: int, stage_in_chapter: int, total_stages: int) -> 
 		icon.tooltip_text = _stage_tooltip_for(safe_chapter, stage_number)
 		icon.modulate = Color(1.0, 1.0, 1.0, 1.0) if selected else Color(0.78, 0.78, 0.78, 1.0)
 
+func set_compact_layout(compact: bool) -> void:
+	_ensure_built()
+	custom_minimum_size = COMPACT_BAR_MIN_SIZE if compact else BAR_MIN_SIZE
+	var margin: MarginContainer = get_node_or_null("Margin") as MarginContainer
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 10 if compact else 14)
+		margin.add_theme_constant_override("margin_top", 2 if compact else 6)
+		margin.add_theme_constant_override("margin_right", 10 if compact else 14)
+		margin.add_theme_constant_override("margin_bottom", 2 if compact else 5)
+	if _row != null:
+		_row.add_theme_constant_override("separation", 7 if compact else 10)
+	if _chapter_label != null:
+		_chapter_label.custom_minimum_size = Vector2(130.0 if compact else 150.0, 0.0)
+		_chapter_label.add_theme_font_size_override("font_size", 18 if compact else 22)
+	var icon_size: Vector2 = COMPACT_ICON_SIZE if compact else ICON_SIZE
+	for icon: TextureRect in _icons:
+		icon.custom_minimum_size = icon_size
+	queue_sort()
+
 func _ensure_built() -> void:
 	if _row != null:
 		return
@@ -68,16 +90,16 @@ func _ensure_built() -> void:
 	margin.name = "Margin"
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_top", 7)
+	margin.add_theme_constant_override("margin_top", 6)
 	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_bottom", 7)
+	margin.add_theme_constant_override("margin_bottom", 5)
 	add_child(margin)
 
 	_row = HBoxContainer.new()
 	_row.name = "Row"
 	_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_row.add_theme_constant_override("separation", 12)
+	_row.add_theme_constant_override("separation", 10)
 	margin.add_child(_row)
 
 	_chapter_label = Label.new()
@@ -87,7 +109,7 @@ func _ensure_built() -> void:
 	_chapter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_chapter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_chapter_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	_chapter_label.add_theme_font_size_override("font_size", 24)
+	_chapter_label.add_theme_font_size_override("font_size", 22)
 	_chapter_label.add_theme_color_override("font_color", Color(0.96, 0.84, 0.60, 1.0))
 	_chapter_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
 	_chapter_label.add_theme_constant_override("shadow_offset_x", 1)
@@ -134,7 +156,7 @@ func _stage_tooltip_for(chapter: int, stage_number: int) -> String:
 	if not challenge.is_empty():
 		var challenge_label: String = String(challenge.get("label", "")).strip_edges()
 		if challenge_label != "":
-			lines.append("RGA: %s" % challenge_label)
+			lines.append("Challenge: %s" % challenge_label)
 		var puzzle: String = String(challenge.get("puzzle", "")).strip_edges()
 		if puzzle != "":
 			lines.append("Plan: %s" % puzzle)
@@ -168,7 +190,7 @@ func _kind_label(kind: String) -> String:
 		StageTypes.KIND_CREEPS:
 			return "Creep reward"
 		StageTypes.KIND_NORMAL:
-			return "RGA challenge"
+			return "Challenge fight"
 		StageTypes.KIND_BOSS:
 			return "Boss"
 		StageTypes.KIND_MIRROR:
@@ -198,10 +220,10 @@ func _load_icon_texture(path: String) -> Texture2D:
 	_texture_cache[path] = texture
 	return texture
 
-func _make_panel_style() -> StyleBoxFlat:
+func _make_panel_style() -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.030, 0.024, 0.030, 0.86)
-	style.border_color = Color(0.54, 0.38, 0.18, 0.74)
+	style.bg_color = Color(0.030, 0.024, 0.030, 0.78)
+	style.border_color = Color(0.46, 0.34, 0.20, 0.62)
 	style.border_width_left = 1
 	style.border_width_top = 1
 	style.border_width_right = 1
@@ -210,4 +232,4 @@ func _make_panel_style() -> StyleBoxFlat:
 	style.corner_radius_top_right = 5
 	style.corner_radius_bottom_right = 5
 	style.corner_radius_bottom_left = 5
-	return style
+	return GothicUIAssets.style_or_fallback(GothicUIAssets.status_strip_style(Color(0.74, 0.68, 0.58, 0.76)), style)

@@ -13,7 +13,7 @@ Terminology: capital-C `Creep` (`data/units/creep.tres`) is a playable roster un
 | Bonko | bonko | brawler | brawler.attrition_dps | sustain, ramp | res://data/identity/unit_identities/bonko_identity.tres |
 | Brute | brute | tank | tank.frontline_absorb | engage, damage_reduction, lockdown | res://data/identity/unit_identities/brute_identity.tres |
 | Caldera | caldera | tank | tank.initiate_fight | engage, zone, aoe | res://data/identity/unit_identities/caldera_identity.tres |
-| Cashmere | cashmere | mage | mage.pick_burst | burst | res://data/identity/unit_identities/cashmere_identity.tres |
+| Mara | mara | mage | mage.pick_burst | burst | res://data/identity/unit_identities/mara_identity.tres |
 | Cinder | cinder | mage | mage.area_denial_zone | zone, aoe, dot | res://data/identity/unit_identities/cinder_identity.tres |
 | Creep | creep | assassin | assassin.backline_elimination | access_backline, aoe, damage_reduction | res://data/identity/unit_identities/creep_identity.tres |
 | Draxelle | draxelle | brawler | brawler.frontline_disruption | engage, disrupt, ramp | res://data/identity/unit_identities/draxelle_identity.tres |

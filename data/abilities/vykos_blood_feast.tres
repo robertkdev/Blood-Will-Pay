@@ -7,6 +7,6 @@ script = ExtResource( 1 )
 id = "vykos_blood_feast"
 name = "Blood Feast"
 description = "Slams a 2‑tile cone in front, dealing heavy physical damage scaling with AD; heals based on damage to each enemy hit and gains temporary Armor & Magic Resist. On kill, gains lifesteal briefly."
+targeting_summary = "Current attack target, or lowest-health enemy if none; cone casts face that target."
 base_cost = 60
 tags = ["damage", "aoe", "cone", "self-heal", "buff"]
-

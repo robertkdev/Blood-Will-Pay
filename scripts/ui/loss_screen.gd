@@ -4,6 +4,7 @@ class_name LossScreen
 const Scoreboard := preload("res://scenes/ui/stats/Scoreboard.tscn")
 const HighScore := preload("res://scripts/util/high_score.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 
 const BACKDROP_COLOR: Color = Color(0.006, 0.005, 0.008, 1.0)
 const FRAME_COLOR: Color = Color(0.075, 0.057, 0.061, 1.0)
@@ -30,6 +31,7 @@ var _pending_populate: bool = false
 var _new_game_hover_tween: Tween = null
 
 func _ready() -> void:
+	RunStateStore.clear()
 	_ready_done = true
 	_fit_full_rect()
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -78,19 +80,38 @@ func _populate() -> void:
 	# Title
 	if title_label:
 		title_label.text = "Defeat"
-	# Stage reached and high score
+	# Total-earned score and supporting run records.
 	var stage_reached: int = 1
+	var chapter_reached: int = 1
 	var gs: Node = _get_autoload("GameState")
 	if gs != null:
 		stage_reached = int(gs.get("stage"))
+		chapter_reached = int(gs.get("chapter"))
+	var economy_record: Dictionary = {}
+	var economy: Node = _get_autoload("Economy")
+	if economy != null and economy.has_method("snapshot_run_record"):
+		economy_record = economy.call("snapshot_run_record")
+	economy_record["stage"] = stage_reached
+	economy_record["chapter"] = chapter_reached
+	economy_record["identities"] = _run_identity_ids()
+	economy_record["contract_discoveries"] = _contract_discovery_ids()
 	if stage_label:
-		stage_label.text = "Stage Reached: %d" % stage_reached
-	var best: int = HighScore.submit_stage(stage_reached)
+		stage_label.text = "Total Earned: %dg  •  Chapter %d  •  Stage %d" % [
+			int(economy_record.get("total_money_earned", 0)),
+			chapter_reached,
+			stage_reached,
+		]
+	var records: Dictionary = HighScore.submit_run(economy_record)
 	if high_label:
-		high_label.text = "High Score (Stage): %d" % max(best, stage_reached)
+		high_label.text = "Best Total Earned: %dg  •  Peak Bank: %dg" % [
+			int(records.get("best_total_earned", 0)),
+			int(records.get("peak_bankroll", 0)),
+		]
 
 	# Interesting run stats (from last battle tracker)
 	var lines: Array[String] = []
+	lines.append("Biggest Wager Won: %dg" % int(economy_record.get("biggest_wager_won", 0)))
+	lines.append("Richest Fight: %dg" % int(economy_record.get("richest_fight", 0)))
 	if _tracker != null:
 		var use_run_totals: bool = _tracker.has_run_values("player")
 		var dmg_total: float = _tracker.get_run_team_total("player", "damage") if use_run_totals else _tracker.get_team_total("player", "damage", "ALL")
@@ -195,6 +216,47 @@ func _find_main() -> Node:
 		main = root.find_child("Main", true, false)
 	return main
 
+func _run_identity_ids() -> Array[String]:
+	var roster: Node = _get_autoload("Roster")
+	var current_team: Array = []
+	var main: Node = _find_main()
+	if main != null:
+		var combat_view: Node = main.get_node_or_null("CombatView")
+		if combat_view != null:
+			var manager: Variant = combat_view.get("manager")
+			if manager != null:
+				var team_value: Variant = manager.get("player_team")
+				if team_value is Array:
+					current_team = team_value
+	var identities: Array[String] = []
+	if roster != null and roster.has_method("owned_units"):
+		var owned_value: Variant = roster.call("owned_units", current_team)
+		if owned_value is Array:
+			for raw_unit: Variant in owned_value:
+				var unit: Unit = raw_unit as Unit
+				if unit == null:
+					continue
+				var unit_id: String = String(unit.id).strip_edges()
+				if unit_id != "" and not identities.has(unit_id):
+					identities.append(unit_id)
+	return identities
+
+func _contract_discovery_ids() -> Array[String]:
+	var shop: Node = _get_autoload("Shop")
+	if shop == null or not shop.has_method("get_contract_snapshot"):
+		return []
+	var snapshot: Dictionary = shop.call("get_contract_snapshot")
+	var history: Variant = snapshot.get("chosen_history", [])
+	var discoveries: Array[String] = []
+	if history is Array:
+		for entry: Variant in history:
+			if not entry is Dictionary:
+				continue
+			var contract_id: String = String((entry as Dictionary).get("id", "")).strip_edges()
+			if contract_id != "" and not discoveries.has(contract_id):
+				discoveries.append(contract_id)
+	return discoveries
+
 func _apply_styles() -> void:
 	if panel != null:
 		panel.add_theme_stylebox_override("panel", _make_style(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0))
@@ -227,7 +289,7 @@ func _apply_styles() -> void:
 		new_game_button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(), _make_style(Color(0.14, 0.053, 0.045, 1.0), FRAME_BORDER, 2, 5)))
 		new_game_button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.16, 1.06, 0.92, 1.0)), _make_style(Color(0.20, 0.07, 0.055, 1.0), DULL_GOLD, 2, 5)))
 		new_game_button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.84, 0.70, 0.66, 1.0)), _make_style(Color(0.09, 0.035, 0.035, 1.0), BLOOD_COLOR, 2, 5)))
-		new_game_button.add_theme_stylebox_override("focus", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.10, 1.02, 0.88, 1.0)), _make_style(Color(0.18, 0.058, 0.050, 1.0), DULL_GOLD, 2, 5)))
+		new_game_button.add_theme_stylebox_override("focus", GothicUIAssets.focus_outline_style(5, DULL_GOLD))
 
 func _wire_new_game_hover() -> void:
 	if new_game_button == null:

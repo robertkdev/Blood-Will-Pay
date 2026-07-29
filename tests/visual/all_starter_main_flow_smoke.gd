@@ -89,7 +89,7 @@ func _prepare_first_shop_planning(_result: Dictionary) -> void:
 	_set_planning_time_left(5.0)
 
 func _require_opener_board_reposition() -> bool:
-	return true
+	return false
 
 func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Dictionary:
 	var failure_start: int = _failures.size()
@@ -99,13 +99,11 @@ func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Diction
 	var unit_select_started_reset: bool = _unit_select_reset()
 	await _ensure_unit_select()
 	await _select_starter(starter_id)
-	await _settle_frames(4)
-	var combat_opened: bool = _node_visible("CombatView")
+	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	var board_repositioned: bool = false
-	if combat_opened and _require_opener_board_reposition():
-		board_repositioned = await _reposition_first_board_unit("starter %s board reposition" % starter_id)
-	_prepare_opener_planning(starter_id)
-	await _press_continue(true, "starter %s forced first fight" % starter_id)
+	if combat_opened:
+		_prepare_opener_planning(starter_id)
+		await _press_continue(true, "starter %s opening fight" % starter_id)
 	var first_result: String = await _wait_for_first_result(_first_fight_timeout_seconds())
 	var result: Dictionary = {
 		"id": starter_id,

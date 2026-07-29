@@ -4,6 +4,7 @@ const COMBAT_VIEW_SCENE: PackedScene = preload("res://scenes/CombatView.tscn")
 const SCOREBOARD_ROW_SCENE: PackedScene = preload("res://scenes/ui/stats/ScoreboardRow.tscn")
 const ShopPanelLib: Script = preload("res://scripts/ui/shop/shop_panel.gd")
 const ShopPresenterLib: Script = preload("res://scripts/ui/shop/shop_presenter.gd")
+const TraitsPresenterLib: Script = preload("res://scripts/ui/traits/traits_presenter.gd")
 
 const START_OPENING_FIGHT_TEXT: String = "Start Opening Fight"
 const OPENING_FIGHT_LABEL: String = "OPENING FIGHT"
@@ -16,6 +17,11 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	var window: Window = get_window()
+	if window != null:
+		window.size = Vector2i(1920, 1080)
+		window.content_scale_size = Vector2i(1920, 1080)
 	var view: Control = COMBAT_VIEW_SCENE.instantiate()
 	add_child(view)
 	await get_tree().process_frame
@@ -44,7 +50,7 @@ func _run() -> void:
 	var continue_button: Button = view.find_child("ContinueButton", true, false) as Button
 	_expect(continue_button != null, "ContinueButton missing", failures)
 	if continue_button != null:
-		_expect(continue_button.custom_minimum_size.x >= 230.0, "ContinueButton is not visually prioritized", failures)
+		_expect(continue_button.custom_minimum_size.x >= 220.0, "ContinueButton is not visually prioritized", failures)
 		var continue_style: StyleBox = continue_button.get_theme_stylebox("normal")
 		_expect(continue_style is StyleBoxTexture, "ContinueButton should use the generated primary button asset", failures)
 	var gold_label: Label = view.find_child("GoldLabel", true, false) as Label
@@ -56,25 +62,29 @@ func _run() -> void:
 	_expect(shop_grid != null, "ShopGrid missing", failures)
 	if shop_grid != null and shop_grid.get_child_count() > 0:
 		var first_slot: Control = shop_grid.get_child(0) as Control
-		_expect(first_slot != null and first_slot.custom_minimum_size.x >= 150.0, "Shop slots are too small", failures)
+		_expect(first_slot != null and first_slot.custom_minimum_size.x >= 140.0, "Shop slots are too small", failures)
 		_expect(first_slot != null and first_slot.custom_minimum_size.y <= 150.0, "Shop slots are too tall for 1080p layout", failures)
-		_expect(shop_grid.get_theme_constant("h_separation") >= 16, "Shop card gutters are too tight for pointer clarity", failures)
+		_expect(shop_grid.get_theme_constant("h_separation") >= 12, "Shop card gutters are too tight for pointer clarity", failures)
 	var bottom_storage: VBoxContainer = view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 	_expect(bottom_storage != null, "BottomStorageArea missing", failures)
 	_expect(view.get_node_or_null("GothicActionsRowPlate") == null, "Obsolete ActionsRow generated plate should not render over the arena header", failures)
 	if bottom_storage != null:
-		_expect(bottom_storage.get_theme_constant("separation") >= 14, "Command strip and shop cards are too tightly stacked", failures)
+		_expect(bottom_storage.get_theme_constant("separation") >= 10, "Command strip and shop cards are too tightly stacked", failures)
 		var shop_plate: Panel = view.get_node_or_null("GothicShopPlate") as Panel
-		_expect(shop_plate != null, "Generated bottom storage asset plate missing", failures)
-		if shop_plate != null:
+		var opening_shop_plate: bool = shop_grid != null and bool(shop_grid.get_meta("opening_fight_empty", false))
+		if opening_shop_plate:
+			_expect(shop_plate == null or not shop_plate.visible, "Opening fight should not render a wide empty shop plate", failures)
+		else:
+			_expect(shop_plate != null, "Generated bottom storage asset plate missing", failures)
+		if shop_plate != null and not opening_shop_plate:
 			var shop_plate_style: StyleBox = shop_plate.get_theme_stylebox("panel")
 			_expect(shop_plate_style is StyleBoxTexture, "Bottom storage should use the generated wide panel asset", failures)
-			_expect(shop_plate.size.y >= 230.0, "Bottom storage generated plate collapsed in the full layout", failures)
+			_expect(shop_plate.size.y >= 150.0, "Bottom storage generated plate collapsed in the full layout", failures)
 	if gold_label != null:
 		var command_bar: HBoxContainer = gold_label.get_parent() as HBoxContainer
 		_expect(command_bar != null, "Command bar missing", failures)
 		if command_bar != null:
-			_expect(command_bar.get_theme_constant("separation") >= 16, "Command controls are too tightly grouped", failures)
+			_expect(command_bar.get_theme_constant("separation") >= 14, "Command controls are too tightly grouped", failures)
 	_verify_forced_first_fight_bet_controls(view, failures)
 	await _verify_forced_first_fight_placeholder(failures)
 	await _verify_forced_first_fight_presenter_feedback(failures)
@@ -82,8 +92,27 @@ func _run() -> void:
 	_expect(player_tile != null, "Player tile missing", failures)
 	if player_tile != null:
 		_expect(player_tile.has_theme_stylebox_override("disabled"), "Player tile disabled style missing", failures)
-	var stats_plate: Panel = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/GothicStatsAreaPlate") as Panel
+		_expect(player_tile.get_theme_stylebox("disabled") is StyleBoxTexture, "Player tiles should use the generated gothic board asset", failures)
+	var enemy_tile: Button = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/EnemyGrid/TileE_00") as Button
+	_expect(enemy_tile != null, "Enemy tile missing", failures)
+	if enemy_tile != null:
+		_expect(enemy_tile.get_theme_stylebox("disabled") is StyleBoxTexture, "Enemy tiles should use the generated gothic board asset", failures)
+	_verify_board_surfaces(view, failures)
+	var stats_plate: Panel = view.get_node_or_null("GothicStatsAreaPlate") as Panel
 	_expect(stats_plate != null, "Stats backplate missing", failures)
+	if stats_plate != null:
+		_expect(stats_plate.size.y > 100.0, "Stats backplate collapsed", failures)
+	var items_plate: Panel = view.get_node_or_null("GothicItemsPlate") as Panel
+	_expect(items_plate != null, "Item storage backplate missing", failures)
+	if items_plate != null:
+		var item_style: StyleBox = items_plate.get_theme_stylebox("panel")
+		_expect(item_style is StyleBoxTexture, "Item storage should use a generated gothic panel asset", failures)
+		_expect(items_plate.size.y > 100.0, "Item storage backplate collapsed", failures)
+	var traits_panel: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
+	_expect(traits_panel != null, "Traits panel should live inside the left storage dock", failures)
+	if traits_panel != null:
+		_expect(traits_panel.custom_minimum_size.x >= 280.0, "Traits panel is too narrow for readable rows", failures)
+	_verify_trait_activation_checkpoint_sort(failures)
 	var scoreboard_row: ScoreboardRow = SCOREBOARD_ROW_SCENE.instantiate() as ScoreboardRow
 	add_child(scoreboard_row)
 	await get_tree().process_frame
@@ -101,6 +130,45 @@ func _run() -> void:
 func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:
 		failures.append(message)
+
+func _verify_board_surfaces(view: Control, failures: Array[String]) -> void:
+	var screen_backdrop: TextureRect = view.get_node_or_null("GothicScreenBackdrop") as TextureRect
+	_expect(screen_backdrop != null and screen_backdrop.texture != null, "Root screen should use the generated gothic backdrop asset", failures)
+	var screen_background: ColorRect = view.get_node_or_null("ColorRect") as ColorRect
+	_expect(screen_background != null, "Root ColorRect background missing", failures)
+	if screen_background != null:
+		_expect(screen_background.material == null, "Obsolete root background shader material should be disabled under the generated backdrop", failures)
+	var top_surface: TextureRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/GothicPlanningTopSurface") as TextureRect
+	_expect(top_surface != null and top_surface.texture != null, "Planning enemy board should use the generated battlefield surface", failures)
+	var bottom_surface: TextureRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/GothicPlanningBottomSurface") as TextureRect
+	_expect(bottom_surface != null and bottom_surface.texture != null, "Planning player board should use the generated battlefield surface", failures)
+	var arena_surface: TextureRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
+	_expect(arena_surface != null and arena_surface.texture != null, "Combat arena should use the generated battlefield surface", failures)
+	var arena_background: ColorRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground") as ColorRect
+	_expect(arena_background != null, "ArenaBackground missing", failures)
+	if arena_background != null:
+		_expect(arena_background.material == null, "Obsolete arena shader material should be disabled under the generated surface", failures)
+		_expect(arena_background.color.a <= 0.01, "Obsolete arena ColorRect should not cover the generated surface", failures)
+
+func _verify_trait_activation_checkpoint_sort(failures: Array[String]) -> void:
+	var presenter: TraitsPresenter = TraitsPresenterLib.new() as TraitsPresenter
+	var counts: Dictionary = {
+		"Aegis": 6,
+		"Sanguine": 2,
+		"Striker": 2,
+		"Vindicator": 2,
+	}
+	var thresholds_by_id: Dictionary = {
+		"Aegis": [2, 4, 6],
+		"Sanguine": [2, 4, 6],
+		"Striker": [2, 4, 6],
+		"Vindicator": [2, 4, 6],
+	}
+	var ordered: Array[String] = ["Sanguine", "Striker", "Vindicator", "Aegis"]
+	ordered.sort_custom(func(a: String, b: String) -> bool:
+		return presenter._compare_traits(a, b, counts, thresholds_by_id, true)
+	)
+	_expect(ordered.size() > 0 and ordered[0] == "Aegis", "Active traits should sort by highest activation checkpoint before count/name", failures)
 
 func _verify_forced_first_fight_bet_controls(view: Control, failures: Array[String]) -> void:
 	var continue_button: Button = view.find_child("ContinueButton", true, false) as Button
@@ -129,14 +197,14 @@ func _verify_forced_first_fight_placeholder(failures: Array[String]) -> void:
 	panel.set_empty_state(OPENING_FIGHT_LABEL, OPENING_FIGHT_HINT, true)
 	panel.set_offers([])
 	await get_tree().process_frame
-	_expect(grid.columns == 1, "First fight placeholder should occupy one wide shop panel", failures)
+	_expect(grid.columns == 1, "First fight placeholder should occupy one compact shop panel", failures)
 	_expect(grid.get_child_count() == 1, "First fight placeholder should be a single panel", failures)
 	var placeholder: PanelContainer = null
 	if grid.get_child_count() > 0:
 		placeholder = grid.get_child(0) as PanelContainer
 	_expect(placeholder != null, "First fight placeholder panel missing", failures)
 	if placeholder != null:
-		_expect(placeholder.custom_minimum_size.x >= 790.0, "First fight placeholder should span the shop strip", failures)
+		_expect(placeholder.custom_minimum_size.x >= 520.0 and placeholder.custom_minimum_size.x <= 620.0, "First fight placeholder should be compact and centered", failures)
 		var panel_style: StyleBox = placeholder.get_theme_stylebox("panel")
 		_expect(panel_style is StyleBoxTexture, "First fight placeholder should use the generated wide panel asset", failures)
 		_expect(placeholder.mouse_filter == Control.MOUSE_FILTER_STOP, "First fight placeholder should accept clicks for explanatory feedback", failures)

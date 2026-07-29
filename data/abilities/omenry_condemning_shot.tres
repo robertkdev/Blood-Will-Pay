@@ -7,5 +7,6 @@ script = ExtResource( 1 )
 id = "omenry_condemning_shot"
 name = "Condemning Shot"
 description = "Finds the most isolated enemy, fires a long-range shred shot, and repositions the firing line."
+targeting_summary = "Most isolated enemy; fires a long line shot through them."
 base_cost = 55
 tags = ["damage", "long_range", "on_hit_effect", "reposition"]

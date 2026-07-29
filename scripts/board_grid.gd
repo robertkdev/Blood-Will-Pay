@@ -89,6 +89,11 @@ func is_occupied(idx: int) -> bool:
 		return false
 	return _occupants[idx] != null
 
+func occupant_at(idx: int) -> Control:
+	if idx < 0 or idx >= _occupants.size():
+		return null
+	return _occupants[idx]
+
 func index_of(control: Control) -> int:
 	if _index_by_control.has(control):
 		return int(_index_by_control[control])

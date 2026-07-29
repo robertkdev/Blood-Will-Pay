@@ -1,6 +1,7 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const VisionSnapshot := preload("res://scripts/util/vision_snapshot.gd")
 const OUTPUT_DIR: String = "res://outputs/vision_snapshots/smoke"
 const STARTER_ID: String = "bonko"
@@ -37,7 +38,7 @@ func _run() -> void:
 	await _settle_frames(6)
 	await _capture("02_unit_select", ["NO CHAMPION CHOSEN", "START GAME"])
 	_call_main("_on_unit_selected", [STARTER_ID])
-	await _settle_frames(12)
+	await MainTransitionWait.for_combat_view(self, _main)
 	await _capture("03_opening_combat", ["START OPENING FIGHT", "OPENING FIGHT"])
 
 	_call_main("_open_system_menu")
