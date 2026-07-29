@@ -13,8 +13,11 @@ var default_flash_parent: Control
 
 var _active_effects: Dictionary[String, WeakRef] = {}
 
-func _exit_tree() -> void:
-	dispose()
+func _notification(what: int) -> void:
+	# Reparenting a UnitView also moves this child through an exit/enter cycle.
+	# Dispose only when the player is actually being destroyed.
+	if what == NOTIFICATION_PREDELETE:
+		dispose()
 
 func configure(_host: Control, _sprite: Control = null) -> void:
 	host = _host

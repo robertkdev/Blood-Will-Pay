@@ -6,6 +6,7 @@ const TraitIconScene := preload("res://scenes/ui/traits/TraitIcon.tscn")
 const AbilityCatalog := preload("res://scripts/game/abilities/ability_catalog.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
 const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
+const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
@@ -40,6 +41,8 @@ var _tooltip_title: String = ""
 var _tooltip_subtitle: String = ""
 var _tooltip_lines: Array[String] = []
 var _status_tip: String = ""
+var _package_level: int = 1
+var _package_kind: String = "standard"
 
 func _resolve_child(paths: Array) -> Node:
 	for p in paths:
@@ -67,6 +70,8 @@ func set_data(props: Dictionary) -> void:
 	offer_id = String(props.get("id", ""))
 	var title := String(props.get("name", "?"))
 	var price_i := int(props.get("price", props.get("cost", 0)))
+	_package_level = max(1, int(props.get("package_level", 1)))
+	_package_kind = String(props.get("package_kind", "standard"))
 	var img_path := String(props.get("image_path", props.get("sprite_path", "")))
 	var roles: Array = _coerce_array(props.get("roles", []))
 	var traits: Array = _coerce_array(props.get("traits", []))
@@ -82,9 +87,11 @@ func set_data(props: Dictionary) -> void:
 	var display_goal := _format_goal(primary_goal)
 
 	if _name_label:
-		_name_label.text = title
+		_name_label.text = "%s • Lv%d" % [title, _package_level] if _package_kind != "standard" else title
 	if _price_label:
 		_price_label.text = str(price_i) + "g"
+	if _name_label and _package_kind == "current_grade":
+		_name_label.text = "CAPITAL %s • Lv%d" % [title, _package_level]
 	if _icon:
 		var tex: Texture2D = null
 		if img_path != "":
@@ -111,6 +118,14 @@ func set_data(props: Dictionary) -> void:
 		tooltip_lines.append("Alt Goals: %s" % alt_text)
 	if identity_path != "":
 		tooltip_lines.append(identity_path)
+	if _package_kind != "standard":
+		tooltip_lines.append("%s package: arrives at level %d" % ["Current-grade" if _package_kind == "current_grade" else "Depth-grade", _package_level])
+	if _package_kind == "current_grade":
+		var charter: Dictionary = UnitUpgradePaths.charter_definition(UnitUpgradePaths.charter_for_role(primary_role))
+		tooltip_lines.append("CAPITAL CHARTER — %s" % String(charter.get("name", "Unknown Charter")))
+		tooltip_lines.append("BENEFIT — %s" % String(charter.get("benefit", "")))
+		tooltip_lines.append("DRAWBACK — %s" % String(charter.get("drawback", "")))
+		tooltip_lines.append("FIT — %s" % String(charter.get("fit", "")))
 	var identity_tip := "\n".join(tooltip_lines)
 	set_meta("identity_tooltip", identity_tip)
 	if _disabled_reason != "":
@@ -120,8 +135,14 @@ func set_data(props: Dictionary) -> void:
 	else:
 		tooltip_text = title
 	_tooltip_title = title
-	_tooltip_subtitle = "%dg" % price_i
+	_tooltip_subtitle = "%dg • %s Lv%d" % [price_i, "Current Grade" if _package_kind == "current_grade" else "Depth Grade", _package_level] if _package_kind != "standard" else "%dg" % price_i
 	_tooltip_lines = _build_tooltip_lines(display_role, display_goal, approaches, alt_goals, traits)
+	if _package_kind == "current_grade":
+		var capital_charter: Dictionary = UnitUpgradePaths.charter_definition(UnitUpgradePaths.charter_for_role(primary_role))
+		_tooltip_subtitle = "%dg • CAPITAL Lv%d" % [price_i, _package_level]
+		_tooltip_lines.push_front("DRAWBACK — %s" % String(capital_charter.get("drawback", "")))
+		_tooltip_lines.push_front("BENEFIT — %s" % String(capital_charter.get("benefit", "")))
+		_tooltip_lines.push_front("CAPITAL CHARTER — %s" % String(capital_charter.get("name", "")))
 	tooltip_text = ""
 	if _hovered:
 		_show_tooltip()
@@ -233,7 +254,7 @@ func _build_tooltip_lines(display_role: String, display_goal: String, approaches
 	var alt_text: String = _format_list(alt_goals, 3)
 	if alt_text != "":
 		lines.append("Alt Goals: %s" % alt_text)
-	var preview_unit: Unit = UnitFactory.spawn(offer_id) if offer_id.strip_edges() != "" else null
+	var preview_unit: Unit = UnitFactory.spawn_at_level(offer_id, _package_level) if offer_id.strip_edges() != "" else null
 	var attack_text: String = _format_attack_info(preview_unit)
 	if attack_text != "":
 		lines.append(attack_text)

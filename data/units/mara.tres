@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UnitProfile" load_steps=3]
+
+[ext_resource path="res://scripts/game/units/unit_profile.gd" type="Script" id=1]
+[ext_resource path="res://data/identity/unit_identities/mara_identity.tres" type="Resource" id=2]
+
+[resource]
+script = ExtResource( 1 )
+id = "mara"
+name = "Mara"
+# Retired-name artwork is retained only as an explicit temporary placeholder.
+# It must not be treated as approved Mara identity art.
+sprite_path = "res://assets/units/cashmere.png"
+ability_id = "mara_arcane_ledger"
+traits = ["Arcanist", "Mogul"]
+roles = ["mage"]
+cost = 1
+level = 1
+primary_role = ""
+primary_goal = ""
+approaches = []
+alt_goals = []
+identity = ExtResource( 2 )

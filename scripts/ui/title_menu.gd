@@ -10,6 +10,7 @@ const TextureUtils: GDScript = preload("res://scripts/util/texture_utils.gd")
 const UnitFactoryScript: GDScript = preload("res://scripts/unit_factory.gd")
 const UnitTargetingText: GDScript = preload("res://scripts/ui/unit_targeting_text.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 const SECTION_HOME: String = "home"
 const SECTION_HOW_TO_PLAY: String = "how_to_play"
@@ -49,6 +50,7 @@ var _subtitle: Label = null
 var _rule: ColorRect = null
 var _content_panel: PanelContainer = null
 var _content_stack: VBoxContainer = null
+var _content_scroll: ScrollContainer = null
 var _content_body: VBoxContainer = null
 var _section_title: Label = null
 var _section_hint: Label = null
@@ -59,8 +61,16 @@ var _role_entries: Array[Dictionary] = []
 var _goal_entries: Array[Dictionary] = []
 var _approach_entries: Array[Dictionary] = []
 var _nav_buttons: Array[Button] = []
+var _binding_buttons: Dictionary[StringName, Button] = {}
+var _binding_status: Label = null
+var _listening_action: StringName = StringName()
+var _intro_tween: Tween = null
+var _background_tween: Tween = null
+var _logo_tween: Tween = null
 
 func _ready() -> void:
+	UserSettingsScript.initialize(get_window())
+	_motion_enabled = not UserSettingsScript.get_reduced_motion()
 	_load_content_data()
 	_apply_gothic_layout()
 	_build_navigation()
@@ -77,6 +87,32 @@ func _ready() -> void:
 	visibility_changed.connect(_on_visibility_changed)
 	_start_bg_loop()
 	_start_logo_float()
+
+func _input(event: InputEvent) -> void:
+	if _listening_action == StringName():
+		return
+	var key_event: InputEventKey = event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.echo:
+		return
+	get_viewport().set_input_as_handled()
+	if key_event.keycode == KEY_ESCAPE or key_event.physical_keycode == KEY_ESCAPE:
+		_cancel_binding_capture("Binding capture canceled.")
+		return
+	if _is_modifier_only(key_event):
+		_set_binding_status("Choose a non-modifier key.", COLOR_BLOOD_HOT)
+		return
+	var result: Dictionary[String, Variant] = UserSettingsScript.set_keyboard_binding(_listening_action, key_event)
+	if not bool(result.get("ok", false)):
+		if String(result.get("error", "")) == "conflict":
+			var conflict_label: String = _action_label(StringName(result.get("conflict_action", "")))
+			_set_binding_status("That key is already assigned to %s. Choose another key or reset defaults." % conflict_label, COLOR_BLOOD_HOT)
+		else:
+			_set_binding_status("The binding could not be saved. Try another key.", COLOR_BLOOD_HOT)
+		return
+	var completed_action: StringName = _listening_action
+	_listening_action = StringName()
+	_refresh_binding_buttons()
+	_set_binding_status("%s is now bound to %s." % [_action_label(completed_action), UserSettingsScript.binding_text(completed_action)], COLOR_GREEN)
 
 func _load_content_data() -> void:
 	_unit_catalog = UnitCatalogScript.new() as UnitCatalog
@@ -218,6 +254,8 @@ func _build_approach_entries() -> void:
 		})
 
 func _apply_gothic_layout() -> void:
+	var compact: bool = _is_compact_layout()
+	var short_compact: bool = _is_short_compact_layout()
 	if background != null:
 		background.color = COLOR_VOID
 	if bg_rect != null:
@@ -234,19 +272,19 @@ func _apply_gothic_layout() -> void:
 			mat.set_shader_parameter("vignette_strength", 0.92)
 	if center != null:
 		center.anchor_left = 0.045
-		center.anchor_top = 0.08
+		center.anchor_top = 0.025 if short_compact else 0.08
 		center.anchor_right = 0.34
-		center.anchor_bottom = 0.92
+		center.anchor_bottom = 0.975 if short_compact else 0.92
 		center.offset_left = 0.0
 		center.offset_top = 0.0
 		center.offset_right = 0.0
 		center.offset_bottom = 0.0
 	if center_vbox != null:
-		center_vbox.custom_minimum_size = Vector2(350.0, 0.0)
-		center_vbox.add_theme_constant_override("separation", 13)
+		center_vbox.custom_minimum_size = Vector2(180.0 if short_compact else (200.0 if compact else 350.0), 0.0)
+		center_vbox.add_theme_constant_override("separation", 4 if short_compact else (9 if compact else 13))
 	if title_label != null:
-		title_label.text = "Gamble Battle"
-		title_label.add_theme_font_size_override("font_size", 64)
+		title_label.text = "Blood Will Pay"
+		title_label.add_theme_font_size_override("font_size", 28 if short_compact else (42 if compact else 64))
 		title_label.add_theme_color_override("font_color", COLOR_TEXT)
 		title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		title_label.add_theme_constant_override("outline_size", 5)
@@ -267,8 +305,6 @@ func _build_navigation() -> void:
 	_ensure_nav_button("UnitsButton", "Units", SECTION_UNITS)
 	_ensure_nav_button("RGAGlossaryButton", "Combat Terms", SECTION_RGA)
 	_ensure_nav_button("SettingsButton", "Settings", SECTION_SETTINGS)
-	if start_button != null:
-		start_button.text = "Start Run"
 	if quit_button != null:
 		quit_button.text = "Quit"
 	for nav_button: Button in _nav_buttons:
@@ -292,6 +328,7 @@ func _ensure_nav_button(node_name: String, button_text: String, section: String)
 	return button
 
 func _ensure_title_panel() -> void:
+	var short_compact: bool = _is_short_compact_layout()
 	_title_panel = get_node_or_null("TitlePanel") as Panel
 	if _title_panel == null:
 		_title_panel = Panel.new()
@@ -302,9 +339,9 @@ func _ensure_title_panel() -> void:
 			move_child(_title_panel, max(0, center.get_index()))
 	_title_panel.z_index = 2
 	_title_panel.anchor_left = 0.035
-	_title_panel.anchor_top = 0.115
+	_title_panel.anchor_top = 0.02 if short_compact else 0.115
 	_title_panel.anchor_right = 0.36
-	_title_panel.anchor_bottom = 0.895
+	_title_panel.anchor_bottom = 0.98 if short_compact else 0.895
 	_title_panel.offset_left = 0.0
 	_title_panel.offset_top = 0.0
 	_title_panel.offset_right = 0.0
@@ -359,13 +396,15 @@ func _ensure_sigil() -> void:
 func _ensure_subtitle() -> void:
 	if center_vbox == null:
 		return
+	var short_compact: bool = _is_short_compact_layout()
 	_subtitle = center_vbox.get_node_or_null("Subtitle") as Label
 	if _subtitle == null:
 		_subtitle = Label.new()
 		_subtitle.name = "Subtitle"
 		center_vbox.add_child(_subtitle)
 		center_vbox.move_child(_subtitle, min(1, center_vbox.get_child_count() - 1))
-	_subtitle.text = "Blood. Gold. Consequence."
+	_subtitle.text = "Their lives. Your odds."
+	_subtitle.visible = not short_compact
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_subtitle.add_theme_font_size_override("font_size", 17)
@@ -380,8 +419,10 @@ func _ensure_subtitle() -> void:
 		center_vbox.move_child(_rule, min(2, center_vbox.get_child_count() - 1))
 	_rule.custom_minimum_size = Vector2(240.0, 2.0)
 	_rule.color = Color(0.70, 0.42, 0.22, 0.86)
+	_rule.visible = not short_compact
 
 func _ensure_content_panel() -> void:
+	var compact: bool = _is_compact_layout()
 	_content_panel = get_node_or_null("ContentPanel") as PanelContainer
 	if _content_panel == null:
 		_content_panel = PanelContainer.new()
@@ -403,10 +444,10 @@ func _ensure_content_panel() -> void:
 		margin = MarginContainer.new()
 		margin.name = "Margin"
 		_content_panel.add_child(margin)
-	margin.add_theme_constant_override("margin_left", 22)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_right", 22)
-	margin.add_theme_constant_override("margin_bottom", 20)
+	margin.add_theme_constant_override("margin_left", 14 if compact else 22)
+	margin.add_theme_constant_override("margin_top", 12 if compact else 20)
+	margin.add_theme_constant_override("margin_right", 14 if compact else 22)
+	margin.add_theme_constant_override("margin_bottom", 12 if compact else 20)
 
 	_content_stack = margin.get_node_or_null("Stack") as VBoxContainer
 	if _content_stack == null:
@@ -456,21 +497,21 @@ func _ensure_content_panel() -> void:
 	if not _search_field.is_connected("text_changed", Callable(self, "_on_search_changed")):
 		_search_field.text_changed.connect(_on_search_changed)
 
-	var scroll: ScrollContainer = _content_stack.get_node_or_null("ContentScroll") as ScrollContainer
-	if scroll == null:
-		scroll = ScrollContainer.new()
-		scroll.name = "ContentScroll"
-		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		_content_stack.add_child(scroll)
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_content_scroll = _content_stack.get_node_or_null("ContentScroll") as ScrollContainer
+	if _content_scroll == null:
+		_content_scroll = ScrollContainer.new()
+		_content_scroll.name = "ContentScroll"
+		_content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_content_stack.add_child(_content_scroll)
+	_content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
-	_content_body = scroll.get_node_or_null("ContentBody") as VBoxContainer
+	_content_body = _content_scroll.get_node_or_null("ContentBody") as VBoxContainer
 	if _content_body == null:
 		_content_body = VBoxContainer.new()
 		_content_body.name = "ContentBody"
 		_content_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		scroll.add_child(_content_body)
+		_content_scroll.add_child(_content_body)
 	_content_body.add_theme_constant_override("separation", 12)
 
 func _select_section(section: String, clear_search: bool = true) -> void:
@@ -479,6 +520,11 @@ func _select_section(section: String, clear_search: bool = true) -> void:
 		_search_field.text = ""
 	_render_active_section()
 	_update_nav_state()
+	call_deferred("_reset_content_scroll")
+
+func _reset_content_scroll() -> void:
+	if _content_scroll != null and is_instance_valid(_content_scroll):
+		_content_scroll.scroll_vertical = 0
 
 func _render_active_section() -> void:
 	if _content_body == null:
@@ -497,6 +543,7 @@ func _render_active_section() -> void:
 			_render_settings()
 		_:
 			_render_home()
+	call_deferred("_reset_content_scroll")
 
 func _render_home() -> void:
 	_set_content_header("Command Menu", "Start a run, study the roster, learn combat terms, or tune local settings. Search here scans units, roles, goals, approaches, and tutorial entries.")
@@ -549,7 +596,7 @@ func _add_home_route_grid() -> void:
 	_add_card_to_parent(grid, "Run Flow", "Pick a starter, survive the forced first fight, then build through shop offers, bench deployment, combines, items, traits, and betting decisions.", "Start Here", "run flow start starter shop bench combines items traits betting", COLOR_GOLD, false, "HomeRunFlow")
 	_add_card_to_parent(grid, "Roster Library", "Live unit cards include ability text, traits, cost, role, goal, and approaches, so roster study stays tied to current resources.", "Units", "units roster ability traits cost role goal approaches", COLOR_BLOOD_HOT, false, "HomeRoster")
 	_add_card_to_parent(grid, "Combat Terms", "Role, Goal, and Approach explain what a unit is trying to do and why it belongs on a board.", "Glossary", "combat terms role goal approach trait board", COLOR_BLUE, false, "HomeRGA")
-	_add_card_to_parent(grid, "Settings", "Runtime controls for master volume and fullscreen behavior in the current menu session.", "Local", "settings volume fullscreen", COLOR_GREEN, false, "HomeSettings")
+	_add_card_to_parent(grid, "Settings", "Runtime controls for volume, fullscreen behavior, readable UI scaling, and keyboard bindings.", "Local", "settings volume fullscreen ui scale keyboard bindings accessibility", COLOR_GREEN, false, "HomeSettings")
 
 func _render_global_search_results() -> void:
 	var count: int = 0
@@ -565,12 +612,13 @@ func _render_how_to_play() -> void:
 	if _search_field != null:
 		_search_field.placeholder_text = "Search tutorial: shop, bench, combine, bet, item..."
 	_add_card("1. Pick a Starter", "Start Run opens the Unit Select screen. Pick one starter unit; that unit becomes your first board piece and anchors your opening plan.", "starter unit select start run board")
-	_add_card("2. Survive the Forced First Fight", "Chapter 1 Stage 1 begins as a forced opener. The shop is intentionally locked until you win that first fight, so focus on reading your unit and the battlefield.", "first fight forced opener chapter stage locked shop win")
-	_add_card("3. Spend Gold in the Shop", "After the opener, the shop offers five units. Buy affordable units, reroll when you need a different lane, lock when you want to preserve offers, and buy XP to raise shop odds.", "shop gold offers reroll lock xp odds buy unit")
-	_add_card("4. Use Bench and Board", "Bought units land on the bench. Drag bench units to highlighted board cells before the next fight. Three copies of the same unit and level combine into a stronger copy, up to level 3.", "bench board drag deploy combine three copies level")
+	_add_card("2. Survive the Forced First Fight", "Chapter 1 Round 1 begins as a forced opener. The shop is intentionally locked until you win that first fight, so focus on reading your unit and the battlefield.", "first fight forced opener chapter round locked shop win")
+	_add_card("3. Spend Gold in the Shop", "After the opener, the shop offers five units. Buy selectively, reroll when you need a different lane, lock valuable offers, and buy XP to raise your level, add board slots, and improve shop odds. CAPITAL marks the premium current-grade recruit.", "shop gold offers reroll lock xp level board slots odds buy unit capital current grade")
+	_add_card("4. Use Bench and Board", "Bought units land on the bench. Drag bench units to highlighted board cells before the next fight. Three copies of the same unit and level combine into a stronger copy, up to level 4; reaching level 4 requires a permanent legacy choice.", "bench board drag deploy combine three copies level legacy")
 	_add_card("5. Read Items and Traits", "Items and traits are multipliers on a unit's job. Traits come from unit tags; items add scaling combat effects and should support the unit's role, goal, and approach.", "items traits tags scaling role goal approach")
-	_add_card("6. Manage Bets and Health", "Planning purchases must preserve survival. Combat spending can borrow against the current bet, but bad spending can leave the next planning phase short on health or gold.", "bet health planning combat spending gold survival")
-	_add_card("7. Learn Roles Before Optimizing", "Tank, Brawler, Assassin, Marksman, Mage, and Support describe the broad combat job. Use the Units and Combat Terms pages to understand why two units in the same role can still play very differently.", "roles tank brawler assassin marksman mage support optimize")
+	_add_card("6. Shop, Then Wager", "After shopping, choose a wager with visible win odds and after-win or after-loss gold. Shop purchases reduce what you can risk next, and the wager locks when combat starts.", "bet wager shop planning win odds after win after loss gold lock")
+	_add_card("7. Read Chapter Contracts", "Chapter contracts show PRICE, REWARD, RISK, and NEXT FIGHT. Champion changes one unit, Stable changes your formation, and Pit raises danger for a better payout. Passing is always free.", "contract champion stable pit price reward risk next fight pass")
+	_add_card("8. Learn Roles Before Optimizing", "Tank, Brawler, Assassin, Marksman, Mage, and Support describe the broad combat job. Use the Units and Combat Terms pages to understand why two units in the same role can still play very differently.", "roles tank brawler assassin marksman mage support optimize")
 
 func _render_units() -> void:
 	_set_content_header("Units", "Searchable roster cards built from current unit, ability, and identity resources.")
@@ -584,28 +632,37 @@ func _render_rga() -> void:
 	_set_content_header("Combat Terms", "Player-facing language for reading units, boards, and fights.")
 	if _search_field != null:
 		_search_field.placeholder_text = "Search terms: backline, peel, sustained, role..."
-	_add_card("Role", "The broad job a unit is built to perform: tank, brawler, assassin, marksman, mage, or support.", "role tank brawler assassin marksman mage support")
-	_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition")
-	_add_card("Approach", "The toolkit a unit uses to reach its goal: peel, ramp, sustain, lockdown, dive, zone control, and similar combat patterns.", "approach toolkit peel ramp sustain lockdown dive zone")
-	_add_card("Active Trait", "A trait turns on when enough matching units are on your board. Active thresholds are highlighted on trait hover cards.", "trait active threshold board")
-	_add_card("Win Odds", "A quick read of current board strength. Use it as a warning light, not a promise.", "win odds board strength warning")
-	_add_card("Bench", "Bought units wait on the bench until you drag them to the board. Dropping a bench unit onto a board unit swaps their positions.", "bench drag swap positions")
+	var count: int = 0
+	count += _count_card(_add_card("Role", "The broad job a unit is built to perform: tank, brawler, assassin, marksman, mage, or support.", "role tank brawler assassin marksman mage support"))
+	count += _count_card(_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition"))
+	count += _count_card(_add_card("Approach", "The toolkit a unit uses to reach its goal: peel, ramp, sustain, lockdown, dive, zone control, and similar combat patterns.", "approach toolkit peel ramp sustain lockdown dive zone"))
+	count += _count_card(_add_card("Active Trait", "A trait turns on when enough matching units are on your board. Active thresholds are highlighted on trait hover cards.", "trait active threshold board"))
+	count += _count_card(_add_card("Win Odds", "A quick read of current board strength. Use it as a warning light, not a promise.", "win odds board strength warning"))
+	count += _count_card(_add_card("Bench", "Bought units wait on the bench until you drag them to the board. Dropping a bench unit onto a board unit swaps their positions.", "bench drag swap positions"))
 	_add_heading("Roles")
-	_render_role_cards(false)
+	count += _render_role_cards(false)
 	_add_heading("Goals")
-	_render_goal_cards(false, 0)
+	count += _render_goal_cards(false, 0)
 	_add_heading("Approaches")
-	_render_approach_cards(false, 0)
+	count += _render_approach_cards(false, 0)
+	if count == 0:
+		_add_empty_state("No combat terms match this search. Try role, goal, approach, trait, odds, or bench, or clear the search to browse every term.", true)
 
 func _render_settings() -> void:
-	_set_content_header("Settings", "Local runtime controls for the title menu and current game window.")
+	_listening_action = StringName()
+	_binding_buttons.clear()
+	_binding_status = null
+	_set_content_header("Settings", "Local runtime controls, readable UI scaling, reduced motion, and keyboard bindings.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search settings: volume, fullscreen..."
+		_search_field.placeholder_text = "Search settings: volume, fullscreen, UI scale, motion, keys..."
 	var added: int = 0
 	added += _add_volume_setting()
 	added += _add_fullscreen_setting()
+	added += _add_ui_scale_setting()
+	added += _add_motion_setting()
+	added += _add_input_settings()
 	if added == 0:
-		_add_empty_state("No settings match the search.")
+		_add_empty_state("No settings match this search. Clear the search to see every available setting.", true)
 
 func _render_unit_cards(compact: bool, limit: int) -> int:
 	var count: int = 0
@@ -731,6 +788,9 @@ func _add_card(title: String, body: String, search_blob: String, kicker: String 
 		return null
 	return _add_card_to_parent(_content_body, title, body, kicker, search_blob, accent, compact, "InfoCard")
 
+func _count_card(card: PanelContainer) -> int:
+	return 1 if card != null else 0
+
 func _add_card_to_parent(parent: Control, title: String, body: String, kicker: String, search_blob: String, accent: Color, compact: bool, node_name: String) -> PanelContainer:
 	if not _matches_query(search_blob + " " + title + " " + body + " " + kicker):
 		return null
@@ -765,7 +825,7 @@ func _add_heading(text: String) -> void:
 	label.custom_minimum_size = Vector2(0.0, 36.0)
 	_content_body.add_child(label)
 
-func _add_empty_state(text: String) -> void:
+func _add_empty_state(text: String, show_clear_search: bool = false) -> void:
 	var card: PanelContainer = _make_card_container("EmptyState", COLOR_PANEL_SOFT, Color(COLOR_MUTED.r, COLOR_MUTED.g, COLOR_MUTED.b, 0.56), 1)
 	_content_body.add_child(card)
 	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
@@ -774,6 +834,15 @@ func _add_empty_state(text: String) -> void:
 	margin.add_child(stack)
 	stack.add_child(_make_label("Nothing Found", 20, COLOR_TEXT, true))
 	stack.add_child(_make_label(text, 14, COLOR_MUTED, true))
+	if show_clear_search:
+		var clear_button: Button = Button.new()
+		clear_button.name = "ClearSearchButton"
+		clear_button.text = "Clear Search"
+		clear_button.focus_mode = Control.FOCUS_ALL
+		clear_button.custom_minimum_size = Vector2(180.0, 40.0)
+		_style_menu_button(clear_button, false)
+		clear_button.pressed.connect(_clear_search)
+		stack.add_child(clear_button)
 
 func _add_volume_setting() -> int:
 	if not _matches_query("master volume audio sound loud quiet"):
@@ -805,8 +874,90 @@ func _add_fullscreen_setting() -> int:
 	check.toggled.connect(_on_fullscreen_toggled)
 	return 1
 
+func _add_ui_scale_setting() -> int:
+	if not _matches_query("ui scale interface size text accessibility readable display"):
+		return 0
+	var card: PanelContainer = _make_card_container("UIScaleSetting", COLOR_PANEL_SOFT, Color(0.42, 0.31, 0.24, 0.88), 1)
+	_content_body.add_child(card)
+	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
+	var stack: VBoxContainer = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	margin.add_child(stack)
+	stack.add_child(_make_label("UI Scale", 18, COLOR_TEXT, false))
+	var option: OptionButton = OptionButton.new()
+	option.name = "UIScaleOption"
+	option.focus_mode = Control.FOCUS_ALL
+	option.custom_minimum_size = Vector2(220.0, 42.0)
+	var scale_values: Array[float] = [1.0, 1.25, 1.5]
+	var current_scale: float = UserSettingsScript.get_ui_scale()
+	for index: int in range(scale_values.size()):
+		var scale_value: float = scale_values[index]
+		option.add_item("%d%%" % int(roundf(scale_value * 100.0)), index)
+		option.set_item_metadata(index, scale_value)
+		if is_equal_approx(scale_value, current_scale):
+			option.select(index)
+	_style_menu_button(option, false)
+	option.item_selected.connect(_on_ui_scale_selected.bind(option))
+	stack.add_child(option)
+	stack.add_child(_make_label("Enlarges the game interface. Layout remains responsive at every supported scale.", 13, COLOR_MUTED, true))
+	return 1
+
+func _add_input_settings() -> int:
+	if not _matches_query("input keys keyboard remap bindings controls confirm accept cancel menu back accessibility"):
+		return 0
+	var card: PanelContainer = _make_card_container("InputBindingsSetting", COLOR_PANEL_SOFT, Color(0.42, 0.31, 0.24, 0.88), 1)
+	_content_body.add_child(card)
+	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
+	var stack: VBoxContainer = VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	margin.add_child(stack)
+	stack.add_child(_make_label("Keyboard Bindings", 18, COLOR_TEXT, false))
+	_add_binding_row(stack, &"ui_accept", "Confirm")
+	_add_binding_row(stack, &"ui_cancel", "Menu / Back")
+	_binding_status = _make_label("Choose a binding, then press a key. Escape cancels capture.", 13, COLOR_MUTED, true)
+	_binding_status.name = "BindingStatus"
+	stack.add_child(_binding_status)
+	var reset_button: Button = Button.new()
+	reset_button.name = "ResetBindingsButton"
+	reset_button.text = "Reset Defaults"
+	reset_button.focus_mode = Control.FOCUS_ALL
+	reset_button.custom_minimum_size = Vector2(180.0, 40.0)
+	_style_menu_button(reset_button, false)
+	reset_button.pressed.connect(_on_reset_bindings_pressed)
+	stack.add_child(reset_button)
+	return 1
+
+func _add_binding_row(parent: VBoxContainer, action: StringName, label_text: String) -> void:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var label: Label = _make_label(label_text, 15, COLOR_TEXT, false)
+	label.custom_minimum_size = Vector2(170.0, 40.0)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(label)
+	var button: Button = Button.new()
+	button.name = "Binding_%s" % String(action)
+	button.text = UserSettingsScript.binding_text(action)
+	button.focus_mode = Control.FOCUS_ALL
+	button.custom_minimum_size = Vector2(220.0, 40.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_menu_button(button, false)
+	button.pressed.connect(_begin_binding_capture.bind(action))
+	row.add_child(button)
+	_binding_buttons[action] = button
+
 func _add_motion_setting() -> int:
-	return 0
+	if not _matches_query("reduced motion animation accessibility comfort"):
+		return 0
+	var check: CheckBox = _add_checkbox_setting(
+		"Reduced Motion",
+		"ReducedMotionCheck",
+		UserSettingsScript.get_reduced_motion(),
+		"Stops menu fades, hover scaling, logo floating, and animated background drift.",
+		"reduced motion animation accessibility comfort"
+	)
+	check.toggled.connect(_on_reduce_motion_toggled)
+	return 1
 
 func _add_checkbox_setting(title: String, node_name: String, enabled: bool, body: String, search_blob: String) -> CheckBox:
 	var card: PanelContainer = _make_card_container(node_name + "Card", COLOR_PANEL_SOFT, Color(0.42, 0.31, 0.24, 0.88), 1)
@@ -896,9 +1047,11 @@ func _make_badge(text: String, color: Color) -> PanelContainer:
 func _style_menu_button(button: Button, primary: bool) -> void:
 	if button == null:
 		return
-	button.custom_minimum_size = Vector2(320.0, 48.0)
+	var compact: bool = _is_compact_layout()
+	var short_compact: bool = _is_short_compact_layout()
+	button.custom_minimum_size = Vector2(180.0 if short_compact else (200.0 if compact else 320.0), 30.0 if short_compact else (42.0 if compact else 48.0))
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.add_theme_font_size_override("font_size", 20 if primary else 17)
+	button.add_theme_font_size_override("font_size", (13 if primary else 12) if short_compact else ((17 if primary else 15) if compact else (20 if primary else 17)))
 	button.add_theme_color_override("font_color", COLOR_TEXT)
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.72, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.76, 0.55, 1.0))
@@ -912,6 +1065,15 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 		button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _make_button_style(Color(0.120, 0.078, 0.090, 0.99), Color(1.0, 0.80, 0.43, 1.0), 1)))
 		button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.86, 0.72, 0.68, 1.0)), _make_button_style(Color(0.20, 0.026, 0.044, 1.0), COLOR_GOLD, 2)))
 		button.add_theme_stylebox_override("focus", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.10, 1.02, 0.88, 1.0)), _make_button_style(Color(0.12, 0.07, 0.08, 1.0), COLOR_GOLD, 2)))
+
+func _is_compact_layout() -> bool:
+	return get_viewport_rect().size.x < 1000.0
+
+func _is_short_compact_layout() -> bool:
+	var viewport_height: float = get_viewport_rect().size.y
+	var compact_short: bool = _is_compact_layout() and viewport_height < 540.0
+	var maximum_scale_short: bool = UserSettingsScript.get_ui_scale() >= 1.49 and viewport_height < 800.0
+	return compact_short or maximum_scale_short
 
 func _update_nav_state() -> void:
 	for nav_button: Button in _nav_buttons:
@@ -1003,6 +1165,74 @@ func _clear_content_body() -> void:
 func _on_search_changed(_text: String) -> void:
 	_render_active_section()
 
+func _clear_search() -> void:
+	if _search_field == null:
+		return
+	_search_field.text = ""
+	_render_active_section()
+	_search_field.grab_focus()
+
+func _on_ui_scale_selected(index: int, option: OptionButton) -> void:
+	if option == null or index < 0 or index >= option.item_count:
+		return
+	var scale_value: float = float(option.get_item_metadata(index))
+	var save_error: Error = UserSettingsScript.set_ui_scale(scale_value, get_window())
+	if save_error != OK:
+		push_warning("TitleMenu: failed to save UI scale error=%d" % int(save_error))
+	call_deferred("_refresh_scaled_layout")
+
+func _refresh_scaled_layout() -> void:
+	_apply_gothic_layout()
+	_build_navigation()
+	_ensure_content_panel()
+	_render_active_section()
+	_update_nav_state()
+
+func _begin_binding_capture(action: StringName) -> void:
+	_listening_action = action
+	_set_binding_status("Press a key for %s. Escape cancels." % _action_label(action), COLOR_GOLD)
+	var button: Button = _binding_buttons.get(action) as Button
+	if button != null:
+		button.text = "Press a key..."
+
+func _cancel_binding_capture(message: String) -> void:
+	_listening_action = StringName()
+	_refresh_binding_buttons()
+	_set_binding_status(message, COLOR_MUTED)
+
+func _on_reset_bindings_pressed() -> void:
+	_listening_action = StringName()
+	var save_error: Error = UserSettingsScript.reset_input_defaults()
+	_refresh_binding_buttons()
+	if save_error == OK:
+		_set_binding_status("Keyboard bindings restored to defaults.", COLOR_GREEN)
+	else:
+		_set_binding_status("Default bindings were restored for this session but could not be saved.", COLOR_BLOOD_HOT)
+
+func _refresh_binding_buttons() -> void:
+	for action: StringName in _binding_buttons:
+		var button: Button = _binding_buttons.get(action) as Button
+		if button != null:
+			button.text = UserSettingsScript.binding_text(action)
+
+func _set_binding_status(message: String, color: Color) -> void:
+	if _binding_status != null:
+		_binding_status.text = message
+		_binding_status.add_theme_color_override("font_color", color)
+
+func _action_label(action: StringName) -> String:
+	match action:
+		&"ui_accept":
+			return "Confirm"
+		&"ui_cancel":
+			return "Menu / Back"
+		_:
+			return String(action)
+
+func _is_modifier_only(key_event: InputEventKey) -> bool:
+	var code: Key = key_event.physical_keycode if key_event.physical_keycode != KEY_NONE else key_event.keycode
+	return code == KEY_SHIFT or code == KEY_CTRL or code == KEY_ALT or code == KEY_META
+
 func _on_master_volume_changed(value: float) -> void:
 	var bus_index: int = AudioServer.get_bus_index("Master")
 	if bus_index < 0:
@@ -1014,7 +1244,15 @@ func _on_fullscreen_toggled(enabled: bool) -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if enabled else DisplayServer.WINDOW_MODE_WINDOWED)
 
 func _on_reduce_motion_toggled(enabled: bool) -> void:
-	_motion_enabled = true
+	_motion_enabled = not enabled
+	var save_error: Error = UserSettingsScript.set_reduced_motion(enabled)
+	if save_error != OK:
+		push_warning("TitleMenu: failed to save reduced motion error=%d" % int(save_error))
+	if enabled:
+		_stop_motion()
+	else:
+		_start_bg_loop()
+		_start_logo_float()
 
 func _current_master_volume_percent() -> float:
 	var bus_index: int = AudioServer.get_bus_index("Master")
@@ -1172,6 +1410,7 @@ func _display_key(value: String) -> String:
 
 func _on_visibility_changed() -> void:
 	if visible:
+		_motion_enabled = not UserSettingsScript.get_reduced_motion()
 		_apply_gothic_layout()
 		_build_navigation()
 		_ensure_content_panel()
@@ -1180,6 +1419,7 @@ func _on_visibility_changed() -> void:
 
 func _play_intro() -> void:
 	if not _motion_enabled:
+		_stop_motion()
 		_set_intro_alpha(1.0)
 		return
 	_set_intro_alpha(0.0)
@@ -1190,30 +1430,31 @@ func _play_intro() -> void:
 	if quit_button != null:
 		quit_button.scale = Vector2(0.98, 0.98)
 
-	var tween: Tween = create_tween()
-	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_kill_motion_tween(_intro_tween)
+	_intro_tween = create_tween()
+	_intro_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	if _title_panel != null:
-		tween.tween_property(_title_panel, "modulate:a", 1.0, 0.12)
+		_intro_tween.tween_property(_title_panel, "modulate:a", 1.0, 0.12)
 	if _content_panel != null:
-		tween.parallel().tween_property(_content_panel, "modulate:a", 1.0, 0.14)
+		_intro_tween.parallel().tween_property(_content_panel, "modulate:a", 1.0, 0.14)
 	if _hero != null:
-		tween.parallel().tween_property(_hero, "modulate:a", 0.28, 0.18)
+		_intro_tween.parallel().tween_property(_hero, "modulate:a", 0.28, 0.18)
 	if _sigil != null:
-		tween.parallel().tween_property(_sigil, "modulate:a", 0.20, 0.18)
+		_intro_tween.parallel().tween_property(_sigil, "modulate:a", 0.20, 0.18)
 	if title_label != null:
-		tween.tween_property(title_label, "modulate:a", 1.0, 0.16)
-		tween.parallel().tween_property(title_label, "scale", Vector2.ONE, 0.18)
+		_intro_tween.tween_property(title_label, "modulate:a", 1.0, 0.16)
+		_intro_tween.parallel().tween_property(title_label, "scale", Vector2.ONE, 0.18)
 	if _subtitle != null:
-		tween.parallel().tween_property(_subtitle, "modulate:a", 1.0, 0.18)
+		_intro_tween.parallel().tween_property(_subtitle, "modulate:a", 1.0, 0.18)
 	if _rule != null:
-		tween.parallel().tween_property(_rule, "modulate:a", 1.0, 0.18)
+		_intro_tween.parallel().tween_property(_rule, "modulate:a", 1.0, 0.18)
 	if logo != null:
-		tween.parallel().tween_property(logo, "modulate:a", 1.0, 0.16)
-	tween.tween_interval(0.02)
-	_fade_button(tween, start_button)
+		_intro_tween.parallel().tween_property(logo, "modulate:a", 1.0, 0.16)
+	_intro_tween.tween_interval(0.02)
+	_fade_button(_intro_tween, start_button)
 	for nav_button: Button in _nav_buttons:
-		_fade_button(tween, nav_button)
-	_fade_button(tween, quit_button)
+		_fade_button(_intro_tween, nav_button)
+	_fade_button(_intro_tween, quit_button)
 
 func _set_intro_alpha(alpha: float) -> void:
 	if title_label != null:
@@ -1298,21 +1539,51 @@ func _start_bg_loop() -> void:
 	if bg_rect != null and bg_rect.material is ShaderMaterial:
 		mat = bg_rect.material as ShaderMaterial
 	if mat != null:
-		var tween: Tween = create_tween()
-		tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tween.tween_property(mat, "shader_parameter/warp_strength", 3.2, 6.0)
-		tween.parallel().tween_property(mat, "shader_parameter/mix_amount", 1.7, 6.0)
-		tween.parallel().tween_property(mat, "shader_parameter/field_speed", 0.95, 6.0)
-		tween.tween_property(mat, "shader_parameter/warp_strength", 2.8, 6.0)
-		tween.parallel().tween_property(mat, "shader_parameter/mix_amount", 1.4, 6.0)
-		tween.parallel().tween_property(mat, "shader_parameter/field_speed", 1.05, 6.0)
-		tween.finished.connect(_start_bg_loop)
+		_kill_motion_tween(_background_tween)
+		_background_tween = create_tween()
+		_background_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_background_tween.tween_property(mat, "shader_parameter/warp_strength", 3.2, 6.0)
+		_background_tween.parallel().tween_property(mat, "shader_parameter/mix_amount", 1.7, 6.0)
+		_background_tween.parallel().tween_property(mat, "shader_parameter/field_speed", 0.95, 6.0)
+		_background_tween.tween_property(mat, "shader_parameter/warp_strength", 2.8, 6.0)
+		_background_tween.parallel().tween_property(mat, "shader_parameter/mix_amount", 1.4, 6.0)
+		_background_tween.parallel().tween_property(mat, "shader_parameter/field_speed", 1.05, 6.0)
+		_background_tween.finished.connect(_start_bg_loop)
 
 func _start_logo_float() -> void:
 	if not _motion_enabled or logo == null:
 		return
-	var tween: Tween = create_tween()
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(logo, "scale", Vector2(1.02, 1.02), 2.0)
-	tween.tween_property(logo, "scale", Vector2.ONE, 2.0)
-	tween.finished.connect(_start_logo_float)
+	_kill_motion_tween(_logo_tween)
+	_logo_tween = create_tween()
+	_logo_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_logo_tween.tween_property(logo, "scale", Vector2(1.02, 1.02), 2.0)
+	_logo_tween.tween_property(logo, "scale", Vector2.ONE, 2.0)
+	_logo_tween.finished.connect(_start_logo_float)
+
+func _stop_motion() -> void:
+	_kill_motion_tween(_intro_tween)
+	_kill_motion_tween(_background_tween)
+	_kill_motion_tween(_logo_tween)
+	_intro_tween = null
+	_background_tween = null
+	_logo_tween = null
+	_set_intro_alpha(1.0)
+	if title_label != null:
+		title_label.scale = Vector2.ONE
+	if logo != null:
+		logo.scale = Vector2.ONE
+	var buttons: Array[Button] = []
+	if start_button != null:
+		buttons.append(start_button)
+	if quit_button != null:
+		buttons.append(quit_button)
+	buttons.append_array(_nav_buttons)
+	for button: Button in buttons:
+		var hover_tween: Tween = button.get_meta("hover_tween") as Tween if button.has_meta("hover_tween") else null
+		_kill_motion_tween(hover_tween)
+		button.remove_meta("hover_tween")
+		button.scale = Vector2.ONE
+
+func _kill_motion_tween(tween: Tween) -> void:
+	if tween != null and is_instance_valid(tween):
+		tween.kill()

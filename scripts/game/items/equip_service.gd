@@ -120,6 +120,17 @@ func rebase_unit(unit) -> void:
 		return
 	_base[unit] = _capture_base(unit)
 
+func get_base_snapshot(unit) -> Dictionary:
+	if unit == null:
+		return {}
+	_snapshot_base_if_needed(unit)
+	return (_base[unit] as Dictionary).duplicate(true)
+
+func restore_base_snapshot(unit, snapshot: Dictionary) -> void:
+	if unit == null or snapshot.is_empty():
+		return
+	_base[unit] = snapshot.duplicate(true)
+
 # -- Internals --
 
 func _is_combat_phase() -> bool:

@@ -10,7 +10,9 @@ const Debug := preload("res://scripts/util/debug.gd")
 const AuditPanelScene: GDScript = preload("res://scripts/ui/audit/audit_panel.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
-const TITLE_SIGIL: Texture2D = preload("res://assets/ui/gold icon.png")
+const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
+const BlackLedgerScript: GDScript = preload("res://scripts/ui/black_ledger.gd")
+const TITLE_SCREEN_PATH: String = "res://assets/ui/title/blood_will_pay_title_screen_4k.png"
 
 const DEBUG_AUTO_START := false
 const DEBUG_TRACE := true
@@ -29,6 +31,14 @@ var _quit_game_button: Button
 var _audit_panel: CanvasLayer
 var _system_menu_open: bool = false
 var _title_page: Control
+var _starter_transition_pending: bool = false
+var _pending_starter_id: String = ""
+var _continue_run_button: Button
+var _black_ledger_title_button: Button
+var _black_ledger_system_button: Button
+var _black_ledger_layer: CanvasLayer
+var _black_ledger: Control
+var _ledger_previous_paused: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -40,6 +50,8 @@ func _ready() -> void:
 		start_button.pressed.connect(_on_start)
 	if quit_button and not quit_button.is_connected("pressed", Callable(self, "_on_quit")):
 		quit_button.pressed.connect(_on_quit)
+	_build_continue_run_button()
+	_build_black_ledger_title_button()
 	if combat_view:
 		combat_view.process_mode = Node.PROCESS_MODE_PAUSABLE
 	if unit_select:
@@ -75,6 +87,8 @@ func _set_menu_visible(show_menu: bool) -> void:
 		GameState.set_phase(GameState.GamePhase.MENU)
 
 func _on_start() -> void:
+	RunStateStore.clear()
+	_reset_run_state()
 	if _title_page != null:
 		_title_page.visible = false
 	_set_menu_visible(false)
@@ -85,13 +99,31 @@ func _on_start() -> void:
 	_sync_system_menu_button()
 
 func _on_quit() -> void:
+	if combat_view != null and combat_view.has_method("save_active_run_now"):
+		combat_view.call("save_active_run_now")
 	get_tree().paused = false
 	get_tree().quit()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if combat_view != null and combat_view.has_method("save_active_run_now"):
+			combat_view.call("save_active_run_now")
 
 func go_to_menu() -> void:
 	request_return_to_title()
 
 func _on_unit_selected(unit_id: String) -> void:
+	var starter_id: String = String(unit_id).strip_edges()
+	if starter_id == "" or _starter_transition_pending:
+		return
+	_set_starter_transition_pending(true, starter_id)
+	# Give the selection screen one rendered frame to show responsive feedback
+	# before the first combat setup performs its one-time cache and view work.
+	get_tree().process_frame.connect(_complete_unit_selection.bind(starter_id), CONNECT_ONE_SHOT)
+
+func _complete_unit_selection(unit_id: String) -> void:
+	if not _starter_transition_pending or unit_id != _pending_starter_id:
+		return
 	if unit_select and unit_select.has_method("hide_screen"):
 		unit_select.call("hide_screen")
 	if unit_select:
@@ -110,6 +142,13 @@ func _on_unit_selected(unit_id: String) -> void:
 	GameState.set_phase(GameState.GamePhase.PREVIEW)
 	if combat_view and combat_view.has_method("_auto_start_battle"):
 		combat_view.call_deferred("_auto_start_battle")
+	_set_starter_transition_pending(false)
+
+func _set_starter_transition_pending(pending: bool, unit_id: String = "") -> void:
+	_starter_transition_pending = pending
+	_pending_starter_id = String(unit_id).strip_edges() if pending else ""
+	if unit_select != null and unit_select.has_method("set_transition_pending"):
+		unit_select.call("set_transition_pending", pending)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_audit_panel_event(event):
@@ -147,13 +186,16 @@ func enable_audit_panel_for_test() -> CanvasLayer:
 
 func request_return_to_title() -> void:
 	_close_system_menu()
+	if combat_view != null and combat_view.has_method("save_active_run_now"):
+		combat_view.call("save_active_run_now")
 	_remove_runtime_overlays()
-	_reset_run_state()
 	_show_title_page()
+	_refresh_continue_run_button()
 
 func request_new_run() -> void:
 	_close_system_menu()
 	_remove_runtime_overlays()
+	RunStateStore.clear()
 	_reset_run_state()
 	_set_menu_visible(false)
 	if unit_select and unit_select.has_method("show_screen"):
@@ -245,6 +287,10 @@ func _build_system_menu() -> void:
 	_new_run_button.pressed.connect(request_new_run)
 	stack.add_child(_new_run_button)
 
+	_black_ledger_system_button = _make_menu_button("BlackLedgerButton", "Black Ledger")
+	_black_ledger_system_button.pressed.connect(open_black_ledger)
+	stack.add_child(_black_ledger_system_button)
+
 	_return_title_button = _make_menu_button("ReturnTitleButton", "Return to Title")
 	_return_title_button.pressed.connect(request_return_to_title)
 	stack.add_child(_return_title_button)
@@ -271,53 +317,65 @@ func _build_title_page() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_title_page.add_child(background)
-	var sigil: TextureRect = TextureRect.new()
-	sigil.name = "Sigil"
-	sigil.texture = TITLE_SIGIL
-	sigil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sigil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	sigil.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	sigil.modulate = Color(0.72, 0.48, 0.26, 0.24)
-	sigil.anchor_left = 0.22
-	sigil.anchor_top = 0.02
-	sigil.anchor_right = 0.78
-	sigil.anchor_bottom = 0.88
-	_title_page.add_child(sigil)
-	var center: CenterContainer = CenterContainer.new()
+	var artwork: TextureRect = TextureRect.new()
+	artwork.name = "Artwork"
+	artwork.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	artwork.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	artwork.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_title_page.add_child(artwork)
+	if ResourceLoader.exists(TITLE_SCREEN_PATH):
+		artwork.texture = ResourceLoader.load(TITLE_SCREEN_PATH, "Texture2D") as Texture2D
+	if artwork.texture == null:
+		_build_title_page_fallback(_title_page)
+	var center: Control = Control.new()
 	center.name = "Center"
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_title_page.add_child(center)
-	var stack: VBoxContainer = VBoxContainer.new()
+	var stack: Control = Control.new()
 	stack.name = "Stack"
-	stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack.custom_minimum_size = Vector2(720.0, 0.0)
-	stack.add_theme_constant_override("separation", 16)
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.add_child(stack)
-	var title: Label = Label.new()
-	title.name = "GameTitle"
-	title.text = "Gamble Battle"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 76)
-	title.add_theme_color_override("font_color", Color(0.93, 0.88, 0.78, 1.0))
-	title.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
-	title.add_theme_constant_override("outline_size", 5)
-	stack.add_child(title)
-	var subtitle: Label = Label.new()
-	subtitle.name = "Subtitle"
-	subtitle.text = "Blood. Gold. Consequence."
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 20)
-	subtitle.add_theme_color_override("font_color", Color(0.72, 0.66, 0.58, 1.0))
-	stack.add_child(subtitle)
 	var enter_button: Button = Button.new()
 	enter_button.name = "EnterButton"
-	enter_button.text = "Enter"
-	enter_button.custom_minimum_size = Vector2(260.0, 58.0)
+	enter_button.text = ""
+	enter_button.flat = true
 	enter_button.focus_mode = Control.FOCUS_ALL
-	_apply_button_style(enter_button, false)
+	enter_button.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	enter_button.accessibility_name = "Continue to Blood Will Pay main menu"
+	enter_button.accessibility_description = "Press any key or controller button, or click anywhere, to continue."
+	enter_button.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var empty_style: StyleBoxEmpty = StyleBoxEmpty.new()
+	for state_name: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+		enter_button.add_theme_stylebox_override(state_name, empty_style)
 	enter_button.pressed.connect(_dismiss_title_page)
 	stack.add_child(enter_button)
 	_title_page.gui_input.connect(_on_title_page_gui_input)
+
+func _build_title_page_fallback(title_page: Control) -> void:
+	var fallback_center: CenterContainer = CenterContainer.new()
+	fallback_center.name = "FallbackCenter"
+	fallback_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fallback_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title_page.add_child(fallback_center)
+	var fallback_stack: VBoxContainer = VBoxContainer.new()
+	fallback_stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	fallback_stack.add_theme_constant_override("separation", 16)
+	fallback_center.add_child(fallback_stack)
+	var fallback_title: Label = Label.new()
+	fallback_title.text = "BLOOD WILL PAY"
+	fallback_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fallback_title.add_theme_font_size_override("font_size", 76)
+	fallback_title.add_theme_color_override("font_color", Color(0.93, 0.88, 0.78, 1.0))
+	fallback_stack.add_child(fallback_title)
+	var fallback_subtitle: Label = Label.new()
+	fallback_subtitle.text = "THEIR LIVES. YOUR ODDS."
+	fallback_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fallback_subtitle.add_theme_font_size_override("font_size", 20)
+	fallback_subtitle.add_theme_color_override("font_color", Color(0.72, 0.66, 0.58, 1.0))
+	fallback_stack.add_child(fallback_subtitle)
 
 func _show_title_page() -> void:
 	_close_system_menu()
@@ -343,6 +401,14 @@ func _dismiss_title_page() -> void:
 	if _title_page != null:
 		_title_page.visible = false
 	_set_menu_visible(true)
+	_refresh_continue_run_button()
+	call_deferred("_focus_title_menu_entry")
+
+func _focus_title_menu_entry() -> void:
+	if _continue_run_button != null and _continue_run_button.visible and not _continue_run_button.disabled:
+		_continue_run_button.grab_focus()
+	elif start_button != null and start_button.visible and not start_button.disabled:
+		start_button.grab_focus()
 
 func _on_title_page_gui_input(event: InputEvent) -> void:
 	if _is_title_page_event(event):
@@ -438,8 +504,9 @@ func _sync_system_menu_button() -> void:
 	var title_is_visible: bool = title_menu != null and title_menu.visible
 	var title_page_is_visible: bool = _title_page != null and _title_page.visible
 	var loss_overlay_is_active: bool = _loss_overlay_active()
-	_system_menu_button.visible = not title_is_visible and not title_page_is_visible and not _system_menu_open and not loss_overlay_is_active
-	_system_menu_button.disabled = title_is_visible or title_page_is_visible or loss_overlay_is_active
+	var ledger_is_open: bool = _black_ledger != null and is_instance_valid(_black_ledger)
+	_system_menu_button.visible = not title_is_visible and not title_page_is_visible and not _system_menu_open and not loss_overlay_is_active and not ledger_is_open
+	_system_menu_button.disabled = title_is_visible or title_page_is_visible or loss_overlay_is_active or ledger_is_open
 	_system_menu_button.mouse_default_cursor_shape = Control.CURSOR_ARROW if _system_menu_button.disabled else Control.CURSOR_POINTING_HAND
 
 func _wire_system_button_hover(button: Button, compact: bool) -> void:
@@ -525,6 +592,7 @@ func _ensure_audit_panel() -> void:
 	add_child(_audit_panel)
 
 func _reset_run_state() -> void:
+	_set_starter_transition_pending(false)
 	RosterCatalog.start_new_run()
 
 	var economy: Node = _get_autoload("Economy")
@@ -554,6 +622,106 @@ func _reset_run_state() -> void:
 
 	if unit_select != null and unit_select.has_method("reset_selection"):
 		unit_select.call("reset_selection")
+
+func _build_continue_run_button() -> void:
+	if start_button == null or start_button.get_parent() == null:
+		return
+	var host: VBoxContainer = start_button.get_parent() as VBoxContainer
+	if host == null:
+		return
+	_continue_run_button = host.get_node_or_null("ContinueRunButton") as Button
+	if _continue_run_button == null:
+		_continue_run_button = start_button.duplicate() as Button
+		_continue_run_button.name = "ContinueRunButton"
+		host.add_child(_continue_run_button)
+		host.move_child(_continue_run_button, start_button.get_index())
+	if not _continue_run_button.is_connected("pressed", Callable(self, "_on_continue_run")):
+		_continue_run_button.pressed.connect(_on_continue_run)
+	_refresh_continue_run_button()
+
+func _build_black_ledger_title_button() -> void:
+	if start_button == null or start_button.get_parent() == null:
+		return
+	var host: VBoxContainer = start_button.get_parent() as VBoxContainer
+	if host == null:
+		return
+	_black_ledger_title_button = host.get_node_or_null("BlackLedgerButton") as Button
+	if _black_ledger_title_button == null:
+		_black_ledger_title_button = start_button.duplicate() as Button
+		_black_ledger_title_button.name = "BlackLedgerButton"
+		_black_ledger_title_button.text = "Black Ledger"
+		host.add_child(_black_ledger_title_button)
+		host.move_child(_black_ledger_title_button, quit_button.get_index())
+	if not _black_ledger_title_button.is_connected("pressed", Callable(self, "open_black_ledger")):
+		_black_ledger_title_button.pressed.connect(open_black_ledger)
+
+func open_black_ledger(account_profile_path: String = "user://account_profile_v1.json") -> void:
+	if _black_ledger != null and is_instance_valid(_black_ledger):
+		return
+	if _system_menu_open:
+		_close_system_menu()
+	_ledger_previous_paused = get_tree().paused
+	_black_ledger_layer = CanvasLayer.new()
+	_black_ledger_layer.name = "BlackLedgerLayer"
+	_black_ledger_layer.layer = SYSTEM_LAYER_INDEX + 10
+	_black_ledger_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_black_ledger_layer)
+	_black_ledger = BlackLedgerScript.new() as Control
+	_black_ledger.name = "BlackLedger"
+	_black_ledger.process_mode = Node.PROCESS_MODE_ALWAYS
+	_black_ledger.call("configure", account_profile_path)
+	_black_ledger_layer.add_child(_black_ledger)
+	_black_ledger.closed.connect(_close_black_ledger)
+	get_tree().paused = true
+	_sync_system_menu_button()
+
+func _close_black_ledger() -> void:
+	if _black_ledger != null and is_instance_valid(_black_ledger):
+		_black_ledger.queue_free()
+	_black_ledger = null
+	if _black_ledger_layer != null and is_instance_valid(_black_ledger_layer):
+		_black_ledger_layer.queue_free()
+	_black_ledger_layer = null
+	get_tree().paused = _ledger_previous_paused
+	_sync_system_menu_button()
+
+func _refresh_continue_run_button() -> void:
+	if _continue_run_button == null:
+		return
+	var available: bool = RunStateStore.has_save()
+	_continue_run_button.visible = available
+	_continue_run_button.disabled = not available
+	_continue_run_button.text = "Continue Run"
+	if start_button != null:
+		start_button.text = "New Run" if available else "Start"
+
+func _on_continue_run() -> void:
+	var loaded: Dictionary = RunStateStore.load_snapshot()
+	if not bool(loaded.get("ok", false)):
+		_mark_continue_unavailable()
+		return
+	if _title_page != null:
+		_title_page.visible = false
+	_set_menu_visible(false)
+	if combat_view == null:
+		return
+	combat_view.visible = true
+	combat_view.set_process(true)
+	if combat_view.has_method("_init_game"):
+		combat_view.call("_init_game")
+	var result: Dictionary = combat_view.call("restore_active_run", loaded.get("snapshot", {}))
+	if not bool(result.get("ok", false)):
+		_set_menu_visible(true)
+		_mark_continue_unavailable()
+		return
+	_sync_system_menu_button()
+
+func _mark_continue_unavailable() -> void:
+	if _continue_run_button == null:
+		return
+	_continue_run_button.visible = true
+	_continue_run_button.disabled = true
+	_continue_run_button.text = "Continue Unavailable"
 
 func _remove_runtime_overlays() -> void:
 	var root: Window = get_tree().root

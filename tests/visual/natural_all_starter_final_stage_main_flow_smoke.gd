@@ -12,7 +12,7 @@ const FINAL_STAGE_SEEDS: Dictionary = {
 	"bo": 4301,
 	"bonko": 4401,
 	"brute": 4501,
-	"cashmere": 4601,
+	"mara": 4601,
 	"grint": 4701,
 	"korath": 4801,
 	"morrak": 4901,

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Test whether calculated UI asset outlines can be used as ImageGen start sources to produce perfectly sized and shaped Gamble Battle GUI assets in the current gothic art approach.
+Test whether calculated UI asset outlines can be used as ImageGen start sources to produce perfectly sized and shaped Blood Will Pay GUI assets in the current gothic art approach.
 
 ## Inputs
 

@@ -21,6 +21,7 @@ Godot/app_userdata/
 # Generated outputs and transient temp files
 /outputs/
 /artifacts/
+/build/
 *.tmp
 __pycache__/
 *.py[cod]

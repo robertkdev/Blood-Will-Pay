@@ -105,6 +105,28 @@ static func set_procedural_seed(seed: int) -> void:
 static func set_endless_seed(seed: int) -> void:
 	set_procedural_seed(seed)
 
+static func snapshot_runtime() -> Dictionary:
+	_ensure_procedural_seed()
+	_ensure_procedural_state()
+	return {
+		"procedural_seed": _procedural_seed,
+		"procedural_state": _procedural_state.duplicate(true),
+		"procedural_spec_cache": _procedural_spec_cache.duplicate(true),
+		"procedural_seed_locked": _procedural_seed_locked,
+	}
+
+static func restore_runtime(snapshot: Dictionary) -> void:
+	_procedural_seed = int(snapshot.get("procedural_seed", ProgressionConfig.PROCEDURAL_DEFAULT_SEED))
+	if _procedural_seed == 0:
+		_procedural_seed = int(ProgressionConfig.PROCEDURAL_DEFAULT_SEED)
+	var state_value: Variant = snapshot.get("procedural_state", {})
+	_procedural_state = (state_value as Dictionary).duplicate(true) if state_value is Dictionary else {}
+	var cache_value: Variant = snapshot.get("procedural_spec_cache", {})
+	_procedural_spec_cache = (cache_value as Dictionary).duplicate(true) if cache_value is Dictionary else {}
+	_procedural_seed_locked = bool(snapshot.get("procedural_seed_locked", true))
+	_ensure_procedural_state()
+	EndlessChapterGenerator.clear_cache()
+
 static func get_spec(ch: int, sic: int) -> Dictionary:
 	var c: int = max(1, int(ch))
 	var s: int = clampi(max(1, int(sic)), 1, int(ChapterCatalog.stages_in(c)))

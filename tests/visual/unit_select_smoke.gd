@@ -45,7 +45,7 @@ func _run() -> void:
 	if art_plate != null:
 		_expect_texture_style(art_plate, "panel", "Preview art plate should use a generated texture frame", failures)
 	var selected_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/SelectedLabel") as Label
-	_expect(selected_label != null and selected_label.text == "No champion chosen", "Unit Select should begin with no inspected champion", failures)
+	_expect(selected_label != null and selected_label.text == "No starter chosen", "Unit Select should begin with no inspected starter", failures)
 	var details_scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll") as ScrollContainer
 	_expect(details_scroll != null, "Unit Select preview details should use a scrollable container", failures)
 	var details_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll/Details") as Label
@@ -90,14 +90,14 @@ func _run() -> void:
 		first_button.emit_signal("pressed")
 		await get_tree().process_frame
 		_expect(not start_button.disabled, "StartButton did not enable after unit selection", failures)
-		_expect(selected_label != null and selected_label.text != "No champion chosen", "Selection label did not update", failures)
+		_expect(selected_label != null and selected_label.text != "No starter chosen", "Selection label did not update", failures)
 		var art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
 		_expect(art != null and art.texture != null, "Preview art did not load", failures)
 		view.reset_selection()
 		await get_tree().process_frame
 		_expect(start_button.disabled, "StartButton did not disable after reset_selection", failures)
 		_expect(view.selected_id == "", "selected_id did not clear after reset_selection", failures)
-		_expect(selected_label != null and selected_label.text == "No champion chosen", "Selection label did not reset", failures)
+		_expect(selected_label != null and selected_label.text == "No starter chosen", "Selection label did not reset", failures)
 		_expect(art != null and art.texture == null, "Preview art did not clear after reset_selection", failures)
 		var unit_id: String = String(first_button.get_meta("unit_id")) if first_button.has_meta("unit_id") else ""
 		if unit_id != "":
@@ -118,7 +118,7 @@ func _run() -> void:
 					await get_tree().process_frame
 					await get_tree().process_frame
 					_expect(view.selected_id == "", "Scroll should not select a unit", failures)
-					_expect(selected_label != null and selected_label.text == "No champion chosen", "Scroll did not clear stale hover preview", failures)
+					_expect(selected_label != null and selected_label.text == "No starter chosen", "Scroll did not clear stale hover preview", failures)
 
 	if failures.size() > 0:
 		for failure: String in failures:

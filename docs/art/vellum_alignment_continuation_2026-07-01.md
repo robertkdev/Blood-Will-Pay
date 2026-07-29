@@ -1,11 +1,13 @@
 # Vellum Alignment Continuation - 2026-07-01
 
+> Mara naming note (2026-07-28): Mara is the current unit name. Any lower-case `cashmere` ID or path below is legacy provenance only; the ledger-clad candidate is not approved as current Mara art.
+
 Status: research continuation only. No live `assets/units/*.png` replacements were made, and no new proof was accepted.
 
 ## Standing Anchor
 
 - Vellum remains the primary and ultimate character style anchor: `outputs/art_pipeline/style_exploration/vellum_american_hard_matte_2026_06_29/vellum_10pct_real_deshine_selected_raw.png`.
-- Later candidates remain narrow review artifacts. Do not average Creep, Veyra, Cashmere, Totem, or other current candidates into the target style unless the user explicitly promotes them.
+- Later candidates remain narrow review artifacts. Do not average Creep, Veyra, Mara, Totem, or other current candidates into the target style unless the user explicitly promotes them.
 
 ## Creep Follow-Up
 
@@ -25,7 +27,7 @@ Verdict: v8 is not a pass and does not supersede `docs/art/creep_builtin_revisio
 
 Verdict: plausible current candidate pending human review, not an accepted proof. It improves the white-silver guardian lane by translating the source away from chrome/crystal shine into matte chipped bone, chalky ceramic, and dull amethyst. Watchpoints: it broadens the original narrow Veyra silhouette and makes the armor safer/duller than the source.
 
-## Cashmere Follow-Up
+## Mara Follow-Up
 
 - Raw v1: `outputs/art_pipeline/style_validation/cashmere_vellum_alignment_2026_07_01/cashmere_vellum_alignment_v1_raw_candidate.png`
 - Vellum-first audit sheet: `outputs/art_pipeline/style_validation/cashmere_vellum_alignment_2026_07_01/cashmere_vellum_alignment_v1_audit_sheet.png`
@@ -35,17 +37,17 @@ Verdict: pass-leaning current candidate pending human review, not an accepted pr
 
 ## Matrix Correction
 
-The Cashmere row in `docs/art/unit_art_roster_prompt_matrix.json` was corrected to match the live source image: pale platinum-blond formal occult businesswoman with glasses, black suit, white shirt, black tie, and long black coat. The older row described a bald suited mogul, which would cause future prompts to erase the current unit identity.
+The Mara row in `docs/art/unit_art_roster_prompt_matrix.json` was corrected to match the live source image: pale platinum-blond formal occult businesswoman with glasses, black suit, white shirt, black tie, and long black coat. The older row described a bald suited mogul, which would cause future prompts to erase the current unit identity.
 
 ## Current Queue Impact
 
 - Creep remains unresolved and must not be accepted without Vellum-first human review.
-- Veyra and Cashmere now have pre-ledger research candidates, but the completion audit should still treat them as missing accepted visual proofs until a review packet/ledger update is deliberately applied.
+- Veyra and Mara now have pre-ledger research candidates, but the completion audit should still treat them as missing accepted visual proofs until a review packet/ledger update is deliberately applied.
 - Remaining no-proof playable units from the prior completion audit are still `berebell`, `mortem`, `nyxa`, and `repo`; `cashmere` and `veyra` have research candidates only.
 
 ## Lore Gate Follow-Up
 
-User supplied stronger world context after the Veyra/Cashmere pass: the units come from an evil folklore world of endless suffering, famine, tragedy, occult bargains, demons, corruption, and collapsed sacred order. The game uses these units, but the world does not know about the game. Every unit should show visible survival psychology and marks of life in that world, not just a matte gothic palette.
+User supplied stronger world context after the Veyra/Mara pass: the units come from an evil folklore world of endless suffering, famine, tragedy, occult bargains, demons, corruption, and collapsed sacred order. The game uses these units, but the world does not know about the game. Every unit should show visible survival psychology and marks of life in that world, not just a matte gothic palette.
 
 The first test was Totem, because the prior Totem direction still read too clean-tree / heroic druid and the shiny blue eyes did not communicate a survival psychology.
 

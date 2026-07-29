@@ -17,7 +17,7 @@ user://difficulty_rating_audit.json
 On Windows MCP runs, that resolves to:
 
 ```text
-C:\Users\Flipm\AppData\Roaming\Godot\app_userdata\Gamble Battle\difficulty_rating_audit.json
+C:\Users\Flipm\AppData\Roaming\Godot\app_userdata\Blood Will Pay\difficulty_rating_audit.json
 ```
 
 The audit reports:

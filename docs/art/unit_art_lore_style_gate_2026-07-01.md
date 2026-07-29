@@ -4,7 +4,7 @@ Status: active art-direction constraint for research candidates. This is not a p
 
 ## World Premise For Art
 
-Gamble Battle uses units from an evil folklore world, but that world does not know about the game. The game is a spinoff of the folklore, not the in-world premise.
+Blood Will Pay uses units from an evil folklore world, but that world does not know about the game. The game is a spinoff of the folklore, not the in-world premise.
 
 The world is defined by endless suffering, famine, tragedy, occult bargains, demons, corruption, and collapsed sacred order. There is no good magic; every supernatural mark has a price. Beings with awareness carry the marks of surviving this place.
 

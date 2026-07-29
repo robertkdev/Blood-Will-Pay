@@ -1,4 +1,4 @@
-# Gamble Battle Roster Prompt Packets
+# Blood Will Pay Roster Prompt Packets
 
 - Source matrix: `docs\art\unit_art_roster_prompt_matrix.json`
 - Source style contract: `docs\art\unit_art_prompt_cases.json`

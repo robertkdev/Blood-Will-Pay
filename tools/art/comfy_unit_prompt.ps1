@@ -10,7 +10,7 @@ param(
 	[double]$Cfg = 1.0,
 	[string]$SamplerName = "euler",
 	[string]$Scheduler = "normal",
-	[string]$FilenamePrefix = "gamble_battle_unit_art"
+	[string]$FilenamePrefix = "blood_will_pay_unit_art"
 )
 
 $workflow = @{
@@ -73,7 +73,7 @@ $workflow = @{
 
 $body = @{
 	prompt = $workflow
-	client_id = "codex-gamble-battle-art"
+	client_id = "codex-blood-will-pay-art"
 } | ConvertTo-Json -Depth 20
 
 $response = Invoke-RestMethod -Uri "$Server/prompt" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 30

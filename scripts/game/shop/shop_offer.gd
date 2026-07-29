@@ -7,6 +7,11 @@ class_name ShopOffer
 var id: String = ""
 var name: String = ""
 var cost: int = 0
+var price: int = 0
+var stake_unit: int = 1
+var package_level: int = 1
+var package_multiplier: int = 1
+var package_kind: String = "standard"
 var sprite_path: String = ""
 var roles: Array[String] = []
 var traits: Array[String] = []
@@ -16,10 +21,15 @@ var approaches: Array[String] = []
 var alt_goals: Array[String] = []
 var identity_path: String = ""
 
-func _init(_id: String = "", _name: String = "", _cost: int = 0, _sprite_path: String = "", _roles = null, _traits = null, _primary_role: String = "", _primary_goal: String = "", _approaches = null, _identity_path: String = "", _alt_goals = null) -> void:
+func _init(_id: String = "", _name: String = "", _cost: int = 0, _sprite_path: String = "", _roles = null, _traits = null, _primary_role: String = "", _primary_goal: String = "", _approaches = null, _identity_path: String = "", _alt_goals = null, _price: int = 0, _stake_unit: int = 1, _package_level: int = 1, _package_multiplier: int = 1, _package_kind: String = "standard") -> void:
 	id = _id
 	name = _name
 	cost = int(_cost)
+	price = int(_price)
+	stake_unit = max(1, int(_stake_unit))
+	package_level = max(1, int(_package_level))
+	package_multiplier = max(1, int(_package_multiplier))
+	package_kind = String(_package_kind)
 	sprite_path = _sprite_path
 	roles = _clean_string_array(_roles, true)
 	traits = _clean_string_array(_traits, false)

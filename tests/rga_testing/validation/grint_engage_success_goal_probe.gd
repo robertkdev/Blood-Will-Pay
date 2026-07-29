@@ -5,7 +5,7 @@ const RoleCommon := preload("res://tests/rga_testing/metrics/_shared/role_common
 
 const SUBJECT_ID: String = "grint"
 const ALLY_ID: String = "brute"
-const ENEMY_ID: String = "cashmere"
+const ENEMY_ID: String = "mara"
 
 @export var do_quit_on_finish: bool = true
 

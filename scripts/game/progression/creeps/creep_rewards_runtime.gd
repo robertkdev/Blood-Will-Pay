@@ -177,10 +177,10 @@ func _execute_action(action_id: String, params: Dictionary) -> void:
 				amt = (mn if mx <= mn else _randi_range(mn, mx))
 			if amt != 0:
 				var eco: Node = _get_autoload("Economy")
-				if eco != null and eco.has_method("add_gold"):
-					eco.add_gold(amt)
-					_log("Creep reward: +%d gold" % amt)
-					_debug_log("action grant_gold: +%d" % amt)
+				if eco != null and eco.has_method("add_stake_units"):
+					var awarded: int = int(eco.call("add_stake_units", amt, true, "creep_reward"))
+					_log("Creep reward: +%d gold (%dU)" % [awarded, amt])
+					_debug_log("action grant_gold: +%dU = %d" % [amt, awarded])
 				else:
 					_debug_log("action grant_gold skipped: Economy missing")
 		"grant_rerolls":

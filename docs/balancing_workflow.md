@@ -20,6 +20,8 @@ This checklist outlines where to tune combat numbers, pacing, and kit knobs now 
 2. Run `tests/rga_testing/validation/UnitStatAudit.tscn` to diff live spawn stats against role profiles + scaler and catch unexpected overrides.
 3. Spawn units via `tests/rga_testing/validation/RoleMatrixProbe.tscn` (or QuickProbe) to compare role identity metrics before/after changes.
 4. When altering scaling logic, audit `UnitScaler.apply_cost_level_scaling` and `enemy_scaling.gd` in tandem, then rerun the role probes.
+5. Run `tests/rga_testing/validation/TeamOddsTimeoutReplayProbe.tscn` before calibrating displayed odds. The probe freezes the exact 13 timeout tuples recovered from reconstructed historical runtime snapshot `50f9111` and requires each seed to resolve identically twice under current engine watchdogs, including its terminal diagnostic snapshot. A deterministic 45-second combat time-limit decision is an explicit game-rule outcome; a live-unit no-progress timeout, simulator `timeout`, `missing`, or `wall_timeout` is unacceptable.
+6. Only after the timeout replay is green, run `tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn`. Its exit gate requires zero unacceptable timeouts, an overall predicted-versus-observed gap of at most `10%`, and every bucket with at least 12 samples to stay within `22%`.
 
 Keeping stat ownership centralized in role profiles makes tuning clearer: move archetype-wide numbers in one place, use kit systems for bespoke adjustments, and rely on systemic scalers for economy pacing.
 

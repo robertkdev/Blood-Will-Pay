@@ -77,10 +77,23 @@ func _run() -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
 	_expect_control_inside(combat, "combat view")
 	_expect_control_inside(_combat_node("MarginContainer/VBoxContainer/BenchArea"), "bench area")
-	_expect_control_inside(_combat_node("MarginContainer/VBoxContainer/BottomStorageArea"), "bottom shop area")
+	if _is_framebuffer_unavailable():
+		print("%s: footer geometry delegated to CompactShopFooterSmoke in framebuffer-free runs" % SMOKE_NAME)
+	else:
+		_expect_control_inside(_combat_node("MarginContainer/VBoxContainer/BottomStorageArea"), "bottom shop area")
+		_expect_control_inside(_combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid"), "shop grid")
+		var shop_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
+		if shop_grid != null:
+			for child: Node in shop_grid.get_children():
+				var card: Control = child as Control
+				if card != null and card.visible:
+					_expect_control_inside(card, "shop card %s" % String(card.name))
+		var bet_slider: HSlider = combat.find_child("BetSlider", true, false) as HSlider if combat != null else null
+		var command_bar: Control = bet_slider.get_parent().get_parent() as Control if bet_slider != null and bet_slider.get_parent() != null else null
+		_expect_control_inside(command_bar, "shop command bar")
 	_expect_no_button_text_overflow(combat, "post-shop combat")
 	_save_capture("05_post_shop_planning_1280x720.png", _main)
-	_finish()
+	await _finish()
 
 func _build_post_shop_state() -> void:
 	var title_page: Control = _main.get_node_or_null("TitlePage") as Control
@@ -224,4 +237,15 @@ func _finish() -> void:
 		for failure: String in _failures:
 			push_error("%s: %s" % [SMOKE_NAME, failure])
 		exit_code = 1
+	if _main != null and is_instance_valid(_main):
+		var combat_view: Node = _main.get_node_or_null("CombatView")
+		if combat_view != null and combat_view.has_method("_teardown"):
+			combat_view.call("_teardown")
+		var main_parent: Node = _main.get_parent()
+		if main_parent != null:
+			main_parent.remove_child(_main)
+		_main.free()
+		_main = null
+	_unit_select = null
+	await _settle_frames(4)
 	get_tree().quit(exit_code)

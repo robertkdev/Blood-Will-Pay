@@ -50,13 +50,20 @@ func _ready() -> void:
 	drag_size = Vector2(TILE_SIZE, TILE_SIZE)
 	# Drag phases left default (allowed) to avoid compile-time deps
 
-func _exit_tree() -> void:
-	if not is_queued_for_deletion():
+func _notification(what: int) -> void:
+	# Board moves reparent this same view between tile Controls. PREDELETE runs
+	# for actual destruction only, so transient tree exits keep all live state.
+	if what != NOTIFICATION_PREDELETE:
 		return
 	if _effect_player != null and is_instance_valid(_effect_player) and _effect_player.has_method("dispose"):
 		_effect_player.dispose()
 	_effect_player = null
+	if sprite != null and is_instance_valid(sprite):
+		sprite.texture = null
+	if _bench_frame != null and is_instance_valid(_bench_frame):
+		_bench_frame.remove_theme_stylebox_override("panel")
 	unit = null
+	_sprite_path_cache = ""
 
 func _ensure_children() -> void:
 	if _bench_frame == null:

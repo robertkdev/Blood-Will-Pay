@@ -24,7 +24,7 @@ func _run() -> void:
 	_presenter.configure(self, grid)
 	await get_tree().process_frame
 
-	var buy_xp: Button = _button_with_text("Buy XP")
+	var buy_xp: Button = _button_with_text_prefix("Buy XP")
 	_expect(buy_xp != null, "Buy XP button missing")
 	if buy_xp == null:
 		_finish()
@@ -84,13 +84,13 @@ func _press_button(button: Button) -> void:
 		return
 	button.emit_signal("pressed")
 
-func _button_with_text(text: String) -> Button:
+func _button_with_text_prefix(text: String) -> Button:
 	if _host == null:
 		return null
 	var buttons: Array[Node] = _host.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and String(button.text) == text:
+		if button != null and String(button.text).begins_with(text):
 			return button
 	return null
 

@@ -4,6 +4,7 @@ extends Node
 
 const ProgressionService := preload("res://scripts/game/progression/progression_service.gd")
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
+const LegacyProjectNameMigration: GDScript = preload("res://scripts/game/legacy_project_name_migration.gd")
 
 enum GamePhase { MENU, PREVIEW, COMBAT, POST_COMBAT }
 
@@ -15,6 +16,14 @@ var stage_in_chapter: int = 1
 signal phase_changed(prev: int, next: int)
 signal stage_changed(prev: int, next: int)
 signal chapter_changed(prev: int, next: int)
+
+func _ready() -> void:
+	var migration: Dictionary[String, Variant] = LegacyProjectNameMigration.migrate_default_user_directory()
+	var copied_files: int = int(migration.get("copied_files", 0))
+	if copied_files > 0:
+		print("[Blood Will Pay] Copied %d legacy player-data files into the renamed user directory." % copied_files)
+	if not bool(migration.get("ok", false)):
+		push_warning("[Blood Will Pay] Some legacy player data could not be copied: %s" % JSON.stringify(migration.get("errors", [])))
 
 func set_phase(p: int) -> void:
 	if p == phase:

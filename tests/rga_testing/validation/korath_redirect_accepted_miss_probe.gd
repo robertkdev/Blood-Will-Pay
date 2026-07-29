@@ -4,7 +4,7 @@ const RedirectApproachTest := preload("res://tests/rga_testing/metrics/approach/
 
 const SUBJECT_ID: String = "korath"
 const ALLY_ID: String = "brute"
-const ENEMY_ID: String = "cashmere"
+const ENEMY_ID: String = "mara"
 
 @export var do_quit_on_finish: bool = true
 

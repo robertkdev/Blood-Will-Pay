@@ -2,7 +2,7 @@ extends RefCounted
 class_name TraitsPresenter
 
 const TraitCompiler := preload("res://scripts/game/traits/trait_compiler.gd")
-const TraitIconScene := preload("res://scenes/ui/traits/TraitIcon.tscn")
+const TRAIT_ICON_SCENE_PATH: String = "res://scenes/ui/traits/TraitIcon.tscn"
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 
 var view: Control
@@ -12,6 +12,7 @@ var _overlay: Control = null
 var _scroll: ScrollContainer = null
 var _vbox: VBoxContainer = null
 var _trait_signature: String = ""
+var _trait_icon_scene: PackedScene = null
 
 const WIDTH: int = 296
 const PADDING_X: int = 10
@@ -243,7 +244,8 @@ func _add_trait_row(id: String, active_trait: bool, count: int, tier: int, thres
 	hbox.add_theme_constant_override("separation", 8)
 	margin.add_child(hbox)
 
-	var icon: Control = TraitIconScene.instantiate() as Control
+	var trait_icon_scene: PackedScene = _get_trait_icon_scene()
+	var icon: Control = trait_icon_scene.instantiate() as Control if trait_icon_scene != null else null
 	if icon != null:
 		icon.custom_minimum_size = Vector2(40.0, 40.0)
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -293,6 +295,11 @@ func _add_trait_row(id: String, active_trait: bool, count: int, tier: int, thres
 	hbox.add_child(count_label)
 
 	_vbox.add_child(row)
+
+func _get_trait_icon_scene() -> PackedScene:
+	if _trait_icon_scene == null:
+		_trait_icon_scene = ResourceLoader.load(TRAIT_ICON_SCENE_PATH, "PackedScene") as PackedScene
+	return _trait_icon_scene
 
 func _make_trait_row_style(active_trait: bool) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

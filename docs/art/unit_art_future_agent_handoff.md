@@ -1,6 +1,8 @@
-# Gamble Battle Unit Art Future Agent Handoff
+# Blood Will Pay Unit Art Future Agent Handoff
 
-Use this when a new Codex agent has no conversation history and needs to continue the Gamble Battle unit-art workflow without drifting away from the approved direction.
+> Mara naming note (2026-07-28): Mara is the only current unit name. Any lower-case `cashmere` path is legacy provenance, and the formal ledger-clad image from those paths must not be relabeled or promoted as current Mara art.
+
+Use this when a new Codex agent has no conversation history and needs to continue the Blood Will Pay unit-art workflow without drifting away from the approved direction.
 
 ## Current State
 
@@ -13,8 +15,8 @@ Use this when a new Codex agent has no conversation history and needs to continu
 - Candidate triage has a `prompt_context_status` column. Rows marked `blocked_*` are quarantined from prompt/style context until fresh Vellum-first review clears them or the user explicitly promotes/reclassifies them. Grint is accepted as narrow proof history but currently blocked from prompt influence until Vellum pairwise review clears the concern.
 - The current Creep pass is a revision candidate only: `creep_builtin_revision_candidate_v5_2026_07_01`.
 - Do not generate Veyra or broader roster batches until a new Creep revision resolves the active smooth-alien / Vellum-level matte-detail request.
-- Later user-directed continuation produced pre-ledger research artifacts for Creep v8, Veyra v1, and Cashmere v1 in `docs/art/vellum_alignment_continuation_2026-07-01.md`. These do not resolve the Creep gate and do not count as accepted proofs.
-- Cashmere's roster prompt identity was corrected to match the live source image: platinum-blond formal occult businesswoman with glasses and a long black coat, not a bald mogul.
+- Later user-directed continuation produced pre-ledger research artifacts for Creep v8, Veyra v1, and Mara v1 in `docs/art/vellum_alignment_continuation_2026-07-01.md`. These do not resolve the Creep gate and do not count as accepted proofs.
+- Mara's roster prompt identity was corrected to match the live source image: platinum-blond formal occult businesswoman with glasses and a long black coat, not a bald mogul.
 - User supplied a stronger world/lore target: the units come from an evil folklore world of endless suffering, famine, tragedy, occult bargains, demons, corruption, and collapsed sacred order. Every unit now needs a survival-psychology read on the face/body, not just Vellum-like matte material. Read `docs/art/unit_art_lore_style_gate_2026-07-01.md` before further generation.
 - Totem lore-alignment research produced v26 as the current best Totem direction: `outputs/art_pipeline/style_validation/totem_lore_alignment_2026_07_01/totem_lore_alignment_v26_raw_candidate.png`. It is not accepted or live, but it shows the new lore gate improves Totem by replacing clean tree/blue-eye fantasy with exhausted oath-bound dead-root endurance.
 - Do not replace any live `assets/units/*.png` file without explicit user approval.
@@ -112,7 +114,7 @@ That command validates the proof policy, completion audit, workflow docs, all 23
 Godot validation is separate because this repo requires MCP-only Godot execution. Run:
 
 ```text
-mcp godot run_project projectPath="C:\Users\Flipm\Documents\gamble-battle" scene="tests/rga_testing/validation/RoleMatrixProbe.tscn"
+mcp godot run_project projectPath="C:\Users\Flipm\Documents\blood-will-pay" scene="tests/rga_testing/validation/RoleMatrixProbe.tscn"
 mcp godot get_debug_output
 ```
 

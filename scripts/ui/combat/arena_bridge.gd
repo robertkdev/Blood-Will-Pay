@@ -5,6 +5,9 @@ const Trace := preload("res://scripts/util/trace.gd")
 const Debug := preload("res://scripts/util/debug.gd")
 const Strings := preload("res://scripts/util/strings.gd")
 const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.gd")
+const ACTOR_EXTRA_HORIZONTAL: float = 18.0
+const ACTOR_EXTRA_TOP: float = 32.0
+const ACTOR_EXTRA_BOTTOM: float = 18.0
 
 var arena: ArenaController = null
 var arena_container: Control
@@ -42,6 +45,20 @@ func get_arena_bounds() -> Rect2:
         var background_rect: Rect2 = arena_background.get_global_rect()
         return Rect2(background_rect.position, background_rect.size)
     return Rect2()
+
+func get_engine_arena_bounds() -> Rect2:
+    var render_bounds: Rect2 = get_arena_bounds()
+    if render_bounds.size.x <= 1.0 or render_bounds.size.y <= 1.0:
+        return render_bounds
+    var half_actor: float = maxf(28.0, float(tile_size) * 0.5)
+    var left: float = half_actor + ACTOR_EXTRA_HORIZONTAL
+    var right: float = half_actor + ACTOR_EXTRA_HORIZONTAL
+    var top: float = half_actor + ACTOR_EXTRA_TOP
+    var bottom: float = half_actor + ACTOR_EXTRA_BOTTOM
+    var safe_size: Vector2 = render_bounds.size - Vector2(left + right, top + bottom)
+    if safe_size.x <= 1.0 or safe_size.y <= 1.0:
+        return render_bounds
+    return Rect2(render_bounds.position + Vector2(left, top), safe_size)
 
 func _sync_container_to_planning_rect() -> void:
     if arena_container == null or not is_instance_valid(arena_container):
@@ -211,7 +228,7 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
             var ename: String = (ev.unit.name if ev and ev.unit else "?")
             e_summary.append("%d#%d:%s(%s)" % [j, idx2, str(pos2), ename])
     # Bounds from the planning board, not the full battle row, so actors stay out of side UI.
-    var bounds: Rect2 = get_arena_bounds()
+    var bounds: Rect2 = get_engine_arena_bounds()
     if bounds.size.y <= 1.0 or bounds.size.x <= 1.0:
         var all_pts: Array[Vector2] = []
         for v in ppos:
@@ -296,7 +313,7 @@ func _disconnect_position_signal() -> void:
 func _sync_engine_bounds(manager: CombatManager) -> void:
     if manager == null:
         return
-    var current_bounds: Rect2 = get_arena_bounds()
+    var current_bounds: Rect2 = get_engine_arena_bounds()
     if current_bounds.size.x <= 1.0 or current_bounds.size.y <= 1.0:
         return
     var engine_bounds: Rect2 = manager.get_arena_bounds()

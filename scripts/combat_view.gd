@@ -28,6 +28,8 @@ var _controller_script: Script = null
 @onready var gold_label: Label = $"MarginContainer/VBoxContainer/ActionsRow/GoldLabel"
 @onready var bet_slider: HSlider = $"MarginContainer/VBoxContainer/ActionsRow/BetRow/BetSlider"
 @onready var bet_value: Label = $"MarginContainer/VBoxContainer/ActionsRow/BetRow/BetValue"
+@onready var all_in_button: Button = $"MarginContainer/VBoxContainer/ActionsRow/BetRow/AllInButton"
+@onready var wager_summary: Label = $"MarginContainer/VBoxContainer/WagerSummary"
 ## Title screen removed
 
 var manager: CombatManager
@@ -110,6 +112,12 @@ func _teardown() -> void:
 func _init_game() -> void:
 	controller._init_game()
 
+func save_active_run_now() -> Dictionary:
+	return controller.save_active_run_now() if controller != null else {"ok": false, "error": "NO_CONTROLLER"}
+
+func restore_active_run(snapshot: Dictionary) -> Dictionary:
+	return controller.restore_active_run(snapshot) if controller != null else {"ok": false, "error": "NO_CONTROLLER"}
+
 func _on_attack_pressed() -> void:
 	# No manual attacks in realtime autobattler
 	pass
@@ -122,6 +130,10 @@ func _on_continue_pressed() -> void:
 
 func _auto_start_battle() -> void:
 	controller._auto_start_battle()
+
+func set_auto_start_battle_enabled(enabled: bool) -> void:
+	if controller != null:
+		controller.set_auto_start_battle_enabled(enabled)
 
 func _refresh_economy_ui() -> void:
 	controller.economy_ui.refresh()
@@ -349,9 +361,13 @@ func _apply_visual_theme_deferred() -> void:
 	_apply_responsive_layout()
 
 func _apply_responsive_layout() -> void:
+	if not is_inside_tree():
+		return
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
+	if stage_progress_top_bar != null and stage_progress_top_bar.has_method("set_compact_layout"):
+		stage_progress_top_bar.call("set_compact_layout", compact)
 	if margin != null:
 		margin.add_theme_constant_override("margin_left", 10 if compact else 20)
 		margin.add_theme_constant_override("margin_top", 8 if compact else 14)
@@ -379,6 +395,19 @@ func _apply_responsive_layout() -> void:
 	_set_box_separation("MarginContainer/VBoxContainer/ActionsRow", 10 if compact else 18)
 	_apply_shop_compact_layout(compact)
 	_update_external_backplates()
+	call_deferred("_update_external_backplates")
+	call_deferred("_finalize_responsive_layout")
+
+func _finalize_responsive_layout() -> void:
+	if not is_inside_tree():
+		return
+	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
+	var vbox: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
+	if vbox != null:
+		vbox.queue_sort()
+	if margin != null:
+		margin.size = get_viewport_rect().size
+		margin.queue_sort()
 	call_deferred("_update_external_backplates")
 
 func _set_minimum_size(path: String, minimum_size: Vector2) -> void:
@@ -443,13 +472,18 @@ func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool) -> void:
 func _apply_bet_row_layout(bet_row: HBoxContainer, compact: bool) -> void:
 	if bet_row == null:
 		return
-	bet_row.custom_minimum_size = Vector2(190.0 if compact else 226.0, 36.0 if compact else 46.0)
+	bet_row.custom_minimum_size = Vector2(270.0 if compact else 336.0, 36.0 if compact else 46.0)
 	bet_row.add_theme_constant_override("separation", 6 if compact else 8)
 	for child: Node in bet_row.get_children():
 		var slider: HSlider = child as HSlider
 		if slider != null:
-			slider.custom_minimum_size = Vector2(124.0 if compact else 166.0, 28.0)
+			slider.custom_minimum_size = Vector2(104.0 if compact else 150.0, 28.0)
 			slider.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			continue
+		var button: Button = child as Button
+		if button != null:
+			button.custom_minimum_size = Vector2(62.0 if compact else 76.0, 32.0 if compact else 38.0)
+			button.add_theme_font_size_override("font_size", 12 if compact else 14)
 			continue
 		var label: Label = child as Label
 		if label != null:
@@ -574,4 +608,6 @@ func _collect_nodes() -> Dictionary:
 		"gold_label": gold_label,
 		"bet_slider": bet_slider,
 		"bet_value": bet_value,
+		"all_in_button": all_in_button,
+		"wager_summary": wager_summary,
 	}

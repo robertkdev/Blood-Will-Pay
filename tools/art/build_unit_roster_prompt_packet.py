@@ -148,7 +148,7 @@ def render_positive_prompt(entry: dict[str, Any], style_reference: str) -> str:
             f"{entry.get('design_doc_ability', '')}"
         )
     return (
-        "Create a full-body centered Gamble Battle unit character in western dark gothic fantasy board-game art, "
+        "Create a full-body centered Blood Will Pay unit character in western dark gothic fantasy board-game art, "
         "about 10 percent grounded realism, premium tabletop-card painting, dry powder-matte skin, "
         "de-shined velvet cloth, dull aged metal, parchment, soot, ink, matte gouache, dry brush, "
         "high-detail matte gothic illustration, layered fabric, parchment, and dry edge wear, "
@@ -319,7 +319,7 @@ def main() -> int:
         written.append(path)
 
     index_lines = [
-        "# Gamble Battle Roster Prompt Packets",
+        "# Blood Will Pay Roster Prompt Packets",
         "",
         f"- Source matrix: `{ROSTER_MATRIX_PATH.relative_to(ROOT)}`",
         f"- Source style contract: `{CASES_PATH.relative_to(ROOT)}`",

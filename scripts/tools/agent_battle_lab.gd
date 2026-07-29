@@ -315,7 +315,7 @@ func _apply_preset(index: int) -> void:
 		enemy_items_edit.text = "chestplate\nbandana\n\n"
 		status_label.text = "Preset: trait and ability stack"
 	elif index == 2:
-		player_units_edit.text = "cashmere,korath,nyxa"
+		player_units_edit.text = "mara,korath,nyxa"
 		enemy_units_edit.text = "grint,brute,paisley"
 		player_items_edit.text = "doubleblade\nblood_engine\nmind_siphon"
 		enemy_items_edit.text = "wardheart\nthunderplate\nwindwall"
