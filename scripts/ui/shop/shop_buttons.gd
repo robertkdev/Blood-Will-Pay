@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ShopButtons
 
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+
 signal reroll_pressed()
 signal lock_pressed()
 signal buy_xp_pressed()
@@ -41,6 +43,9 @@ func _ensure_bar() -> void:
 	_buy_xp.text = "Buy XP"
 	_buy_xp.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_buy_xp.pressed.connect(func(): emit_signal("buy_xp_pressed"))
+	for action_button: Button in [_reroll, _lock, _buy_xp]:
+		action_button.focus_mode = Control.FOCUS_ALL
+		HardcoreUIAssets.apply_button_family(action_button, "utility")
 	_progress_label = Label.new()
 	_progress_label.text = "Lvl 1 (0/0)"
 	_progress_label.modulate = Color(1,1,1,0.9)

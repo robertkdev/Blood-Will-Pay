@@ -3,6 +3,7 @@ extends Node
 const UNIT_SELECT_SCENE: PackedScene = preload("res://scenes/UnitSelect.tscn")
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
 const UnitCatalogScript := preload("res://scripts/game/shop/unit_catalog.gd")
+const AccountProgressionScript := preload("res://scripts/game/account/account_progression.gd")
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -86,7 +87,7 @@ func _run() -> void:
 		_expect_texture_style(first_button, "normal", "Starter card normal state should use the generated 150x138 frame asset", failures)
 		_expect_texture_style(first_button, "hover", "Starter card hover state should use the generated 150x138 frame asset", failures)
 		_expect_texture_style(first_button, "pressed", "Starter card pressed state should use the generated 150x138 frame asset", failures)
-		_expect_focus_outline(first_button, "Starter card focus should preserve the underlying card state", failures)
+		_expect_texture_style(first_button, "focus", "Starter card focus should use the generated 150x138 focus asset", failures)
 		first_button.emit_signal("pressed")
 		await get_tree().process_frame
 		_expect(not start_button.disabled, "StartButton did not enable after unit selection", failures)
@@ -159,7 +160,12 @@ func _first_label_child(parent: Control) -> Label:
 func _verify_rendered_starter_surface(view: UnitSelect, failures: Array[String]) -> void:
 	var catalog: UnitCatalog = UnitCatalogScript.new()
 	catalog.refresh()
-	var expected_ids: Array[String] = _sorted_string_copy(catalog.list_starter_ids(ShopConfig.STARTING_LEVEL))
+	var eligible_ids: Array[String] = _sorted_string_copy(catalog.list_starter_ids(ShopConfig.STARTING_LEVEL))
+	var unlocked_ids: Array[String] = AccountProgressionScript.unlocked_starter_ids(view.account_profile_path)
+	var expected_ids: Array[String] = []
+	for unit_id: String in eligible_ids:
+		if unlocked_ids.has(unit_id.to_lower()):
+			expected_ids.append(unit_id)
 	var rendered_ids: Array[String] = _rendered_unit_button_ids(view)
 	_expect_lists_equal("rendered starter ids", expected_ids, rendered_ids, failures)
 	_expect(not rendered_ids.has("hexeon"), "Hexeon should remain hidden from the level-1 starter picker", failures)

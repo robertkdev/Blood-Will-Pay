@@ -2,6 +2,7 @@ extends Control
 class_name CombatVfxBridge
 
 const AttackVisualCatalog: GDScript = preload("res://scripts/ui/combat/attack_visual_catalog.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 
 const MAX_ACTIVE_BURSTS: int = 16
 const MAX_ACTIVE_LINES: int = 10
@@ -326,6 +327,7 @@ func _on_arena_pressure_changed(sustain_effectiveness: float, stage: int) -> voi
 	else:
 		var effectiveness_pct: int = clampi(int(round(sustain_effectiveness * 100.0)), 0, 100)
 		_pressure_label.text = "ARENA PRESSURE  |  HEALING + NEW SHIELDS %d%%" % effectiveness_pct
+	_pressure_banner.add_theme_stylebox_override("panel", HardcoreUIAssets.pressure_status_style(stage))
 	_pressure_banner.visible = true
 
 func _ensure_pressure_banner() -> void:

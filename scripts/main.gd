@@ -9,6 +9,7 @@ extends Control
 const Debug := preload("res://scripts/util/debug.gd")
 const AuditPanelScene: GDScript = preload("res://scripts/ui/audit/audit_panel.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 const BlackLedgerScript: GDScript = preload("res://scripts/ui/black_ledger.gd")
@@ -433,10 +434,7 @@ func _make_menu_button(node_name: String, label: String) -> Button:
 
 func _apply_button_style(button: Button, compact: bool) -> void:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.add_theme_stylebox_override("normal", _make_system_button_style(compact, Color.WHITE))
-	button.add_theme_stylebox_override("hover", _make_system_button_style(compact, Color(1.18, 1.08, 0.90, 1.0)))
-	button.add_theme_stylebox_override("pressed", _make_system_button_style(compact, Color(0.86, 0.72, 0.68, 1.0)))
-	button.add_theme_stylebox_override("focus", _make_system_button_style(compact, Color(1.10, 1.02, 0.88, 1.0)))
+	HardcoreUIAssets.apply_button_family(button, "compact" if compact else "poster")
 	button.add_theme_color_override("font_color", Color(0.9, 0.82, 0.68))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.88, 0.58))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.72, 0.48))
@@ -473,7 +471,7 @@ func _make_panel_style() -> StyleBox:
 	panel.corner_radius_top_right = 7
 	panel.corner_radius_bottom_right = 7
 	panel.corner_radius_bottom_left = 7
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), panel)
+	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.modal_style(), panel)
 
 func _open_system_menu() -> void:
 	if _title_page != null and _title_page.visible:

@@ -70,7 +70,8 @@ func _run() -> void:
 		var title_label: Label = title_menu.get_node_or_null("Center/VBox/GameTitle") as Label
 		_expect(title_label != null, "GameTitle missing", failures)
 		if title_label != null:
-			_expect(title_label.text == "Blood Will Pay", "GameTitle should use the new game name", failures)
+			var normalized_title: String = title_label.text.replace("\n", " ").strip_edges().to_lower()
+			_expect(normalized_title == "blood will pay", "GameTitle should use the new game name", failures)
 			_expect(title_label.get_theme_font_size("font_size") >= 54, "GameTitle is not visually prioritized", failures)
 		var subtitle: Label = title_menu.get_node_or_null("Center/VBox/Subtitle") as Label
 		_expect(subtitle != null and subtitle.text == "Their lives. Your odds.", "Title menu should use the new tagline", failures)

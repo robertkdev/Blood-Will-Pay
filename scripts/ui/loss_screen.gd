@@ -4,6 +4,7 @@ class_name LossScreen
 const Scoreboard := preload("res://scenes/ui/stats/Scoreboard.tscn")
 const HighScore := preload("res://scripts/util/high_score.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 
 const BACKDROP_COLOR: Color = Color(0.006, 0.005, 0.008, 1.0)
@@ -13,6 +14,9 @@ const BLOOD_COLOR: Color = Color(0.74, 0.10, 0.08, 1.0)
 const BONE_COLOR: Color = Color(0.86, 0.80, 0.68, 1.0)
 const DULL_GOLD: Color = Color(0.79, 0.61, 0.32, 1.0)
 const MUTED_TEXT: Color = Color(0.62, 0.57, 0.49, 1.0)
+const SUMMARY_INK: Color = Color(0.105, 0.075, 0.068, 1.0)
+const SUMMARY_BLOOD_INK: Color = Color(0.34, 0.055, 0.048, 1.0)
+const SUMMARY_KEYLINE: Color = Color(0.88, 0.82, 0.70, 0.72)
 
 @onready var panel: PanelContainer = $Panel
 @onready var backdrop: ColorRect = $Backdrop
@@ -29,6 +33,7 @@ var _tracker: StatsTracker = null
 var _ready_done: bool = false
 var _pending_populate: bool = false
 var _new_game_hover_tween: Tween = null
+var _loss_art: TextureRect = null
 
 func _ready() -> void:
 	RunStateStore.clear()
@@ -262,8 +267,9 @@ func _apply_styles() -> void:
 		panel.add_theme_stylebox_override("panel", _make_style(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0))
 	if backdrop != null:
 		backdrop.color = BACKDROP_COLOR
+	_ensure_loss_art()
 	if frame_panel != null:
-		frame_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _make_style(FRAME_COLOR, FRAME_BORDER, 2, 8)))
+		frame_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.loss_summary_style(), _make_style(FRAME_COLOR, FRAME_BORDER, 2, 8)))
 	if content_box != null:
 		content_box.add_theme_constant_override("separation", 16)
 	if title_label != null:
@@ -272,11 +278,11 @@ func _apply_styles() -> void:
 		title_label.add_theme_constant_override("shadow_offset_x", 2)
 		title_label.add_theme_constant_override("shadow_offset_y", 3)
 	if stage_label != null:
-		stage_label.add_theme_color_override("font_color", DULL_GOLD)
+		_apply_summary_ink(stage_label, SUMMARY_BLOOD_INK)
 	if high_label != null:
-		high_label.add_theme_color_override("font_color", BONE_COLOR)
+		_apply_summary_ink(high_label, SUMMARY_INK)
 	if stats_label != null:
-		stats_label.add_theme_color_override("font_color", MUTED_TEXT)
+		_apply_summary_ink(stats_label, SUMMARY_INK)
 		stats_label.add_theme_constant_override("line_spacing", 5)
 	if scoreboard_holder != null:
 		scoreboard_holder.custom_minimum_size = Vector2(720.0, 220.0)
@@ -286,10 +292,26 @@ func _apply_styles() -> void:
 		new_game_button.add_theme_color_override("font_color", BONE_COLOR)
 		new_game_button.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.76, 1.0))
 		new_game_button.add_theme_color_override("font_focus_color", Color(1.0, 0.92, 0.76, 1.0))
-		new_game_button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(), _make_style(Color(0.14, 0.053, 0.045, 1.0), FRAME_BORDER, 2, 5)))
-		new_game_button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.16, 1.06, 0.92, 1.0)), _make_style(Color(0.20, 0.07, 0.055, 1.0), DULL_GOLD, 2, 5)))
-		new_game_button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.84, 0.70, 0.66, 1.0)), _make_style(Color(0.09, 0.035, 0.035, 1.0), BLOOD_COLOR, 2, 5)))
-		new_game_button.add_theme_stylebox_override("focus", GothicUIAssets.focus_outline_style(5, DULL_GOLD))
+		HardcoreUIAssets.apply_button_family(new_game_button, "primary")
+		new_game_button.grab_focus()
+
+func _apply_summary_ink(label: Label, color: Color) -> void:
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", SUMMARY_KEYLINE)
+	label.add_theme_constant_override("outline_size", 3)
+
+func _ensure_loss_art() -> void:
+	_loss_art = get_node_or_null("LossBackdropArt") as TextureRect
+	if _loss_art == null:
+		_loss_art = TextureRect.new()
+		_loss_art.name = "LossBackdropArt"
+		_loss_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_loss_art)
+		move_child(_loss_art, 1)
+	_loss_art.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_loss_art.texture = HardcoreUIAssets.loss_backdrop_texture()
+	_loss_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_loss_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
 func _wire_new_game_hover() -> void:
 	if new_game_button == null:

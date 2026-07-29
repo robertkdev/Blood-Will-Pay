@@ -3,6 +3,7 @@ class_name ScoreboardRow
 
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 
 var team: String = "player"
 var index: int = -1
@@ -153,7 +154,7 @@ func _make_row_style(player_side: bool, hovered: bool = false) -> StyleBox:
 	style.shadow_size = 8 if hovered else 4
 	style.shadow_color = Color(0.60, 0.16, 0.040, 0.26) if hovered else Color(0.0, 0.0, 0.0, 0.38)
 	var modulate: Color = Color(1.14, 1.05, 0.92, 1.0) if hovered else Color(0.86, 0.82, 0.78, 0.94)
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(modulate), style)
+	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.scoreboard_row_style(hovered), style)
 
 func _ensure_value_well() -> void:
 	if content_box == null:

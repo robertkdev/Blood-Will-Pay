@@ -6,6 +6,7 @@ signal closed()
 const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
 const BountyCatalogScript: GDScript = preload("res://scripts/game/account/bounty_catalog.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 
 const COLOR_VOID: Color = Color(0.008, 0.006, 0.010, 0.98)
 const COLOR_PANEL: Color = Color(0.045, 0.031, 0.038, 0.99)
@@ -80,7 +81,7 @@ func _build_ui() -> void:
 	add_child(center)
 	_panel = PanelContainer.new()
 	_panel.name = "LedgerPanel"
-	_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _panel_style()))
+	_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.ledger_panel_style(), _panel_style()))
 	center.add_child(_panel)
 	var margin: MarginContainer = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 34)
@@ -283,10 +284,7 @@ func _style_button(button: Button, compact: bool) -> void:
 	button.add_theme_font_size_override("font_size", 13 if compact else 16)
 	button.add_theme_color_override("font_color", COLOR_BONE)
 	button.add_theme_color_override("font_disabled_color", COLOR_MUTED)
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _button_style(COLOR_BLOOD, COLOR_GOLD)))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.15, 1.05, 0.88, 1.0)), _button_style(COLOR_BLOOD.lightened(0.08), COLOR_GOLD)))
-	button.add_theme_stylebox_override("focus", GothicUIAssets.focus_outline_style(4, COLOR_GOLD))
-	button.add_theme_stylebox_override("disabled", _button_style(Color(0.035, 0.030, 0.038, 0.9), Color(0.20, 0.18, 0.19, 0.9)))
+	HardcoreUIAssets.apply_button_family(button, "utility")
 
 func _panel_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -296,7 +294,7 @@ func _panel_style() -> StyleBoxFlat:
 	style.set_corner_radius_all(7)
 	return style
 
-func _row_style(accessible: bool, complete: bool) -> StyleBoxFlat:
+func _row_style(accessible: bool, complete: bool) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.075, 0.050, 0.058, 0.92) if accessible else Color(0.030, 0.027, 0.033, 0.92)
 	style.border_color = Color(0.50, 0.34, 0.16, 0.75) if accessible else Color(0.16, 0.14, 0.17, 0.9)
@@ -309,7 +307,8 @@ func _row_style(accessible: bool, complete: bool) -> StyleBoxFlat:
 	style.content_margin_right = 12.0
 	style.content_margin_top = 5.0
 	style.content_margin_bottom = 5.0
-	return style
+	var state: String = "complete" if complete else ("available" if accessible else "sealed")
+	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.ledger_row_style(state), style)
 
 func _button_style(background: Color, border: Color) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

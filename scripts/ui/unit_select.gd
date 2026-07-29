@@ -10,13 +10,14 @@ const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
 const COLOR_PANEL: Color = Color(0.034, 0.029, 0.039, 0.94)
 const COLOR_PANEL_DEEP: Color = Color(0.018, 0.015, 0.023, 0.98)
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
-const COLOR_MUTED: Color = Color(0.65, 0.60, 0.53, 1.0)
+const COLOR_MUTED: Color = Color(0.78, 0.73, 0.64, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
 const COLOR_BLOOD: Color = Color(0.52, 0.040, 0.080, 1.0)
 const COLOR_BLOOD_HOT: Color = Color(0.82, 0.070, 0.120, 1.0)
@@ -61,6 +62,7 @@ var _right_plate: Panel = null
 var _preview_art_plate: Panel = null
 var _plate_reposition_queued: bool = false
 var _last_scroll_bar_value: float = 0.0
+var _hardcore_backdrop: TextureRect = null
 
 func _ready() -> void:
 	_ensure_grid_wrapper()
@@ -174,26 +176,22 @@ func _ensure_preview_panel() -> void:
 func _apply_gothic_layout() -> void:
 	if background:
 		background.color = COLOR_VOID
-		if background.material is ShaderMaterial:
-			var mat: ShaderMaterial = background.material as ShaderMaterial
-			mat.set_shader_parameter("top_color", Color(0.034, 0.026, 0.036, 1.0))
-			mat.set_shader_parameter("bottom_color", Color(0.006, 0.005, 0.008, 1.0))
-			mat.set_shader_parameter("vignette", 0.48)
-			mat.set_shader_parameter("vignette_softness", 0.62)
+		background.material = null
+	_ensure_hardcore_backdrop()
 	if hbox:
 		hbox.custom_minimum_size = Vector2(1320.0, 900.0)
 		hbox.add_theme_constant_override("separation", 34)
 	if left_column:
 		left_column.custom_minimum_size = Vector2(760.0, 880.0)
 		left_column.add_theme_constant_override("separation", 14)
-		_left_plate = _ensure_float_plate(left_column, "GothicRosterPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _make_panel_style(COLOR_PANEL, Color(0.36, 0.29, 0.27, 0.86), 1, 7)), -2, 10.0)
+		_left_plate = _ensure_float_plate(left_column, "GothicRosterPlate", GothicUIAssets.style_or_fallback(HardcoreUIAssets.unit_roster_style(), _make_panel_style(COLOR_PANEL, Color(0.36, 0.29, 0.27, 0.86), 1, 7)), -2, 10.0)
 	if right_column:
 		right_column.custom_minimum_size = Vector2(500.0, 880.0)
 		right_column.add_theme_constant_override("separation", 16)
-		_right_plate = _ensure_float_plate(right_column, "GothicPreviewPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _make_panel_style(Color(0.030, 0.025, 0.034, 0.96), Color(0.48, 0.34, 0.25, 0.88), 1, 7)), -2, 10.0)
+		_right_plate = _ensure_float_plate(right_column, "GothicPreviewPlate", GothicUIAssets.style_or_fallback(HardcoreUIAssets.unit_preview_style(), _make_panel_style(Color(0.030, 0.025, 0.034, 0.96), Color(0.48, 0.34, 0.25, 0.88), 1, 7)), -2, 10.0)
 	if heading_label:
-		heading_label.text = "Choose Your Starting Unit"
-		heading_label.add_theme_font_size_override("font_size", 38)
+		heading_label.text = "CHOOSE YOUR STARTER"
+		heading_label.add_theme_font_size_override("font_size", 34)
 		heading_label.add_theme_color_override("font_color", COLOR_TEXT)
 		heading_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.76))
 		heading_label.add_theme_constant_override("outline_size", 3)
@@ -222,14 +220,19 @@ func _apply_gothic_layout() -> void:
 		identity_goal_label.add_theme_color_override("font_color", COLOR_MUTED)
 	if details_label:
 		details_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		details_label.add_theme_font_size_override("font_size", 16)
-		details_label.add_theme_color_override("font_color", COLOR_MUTED)
+		details_label.add_theme_font_size_override("font_size", 17)
+		details_label.add_theme_color_override("font_color", COLOR_TEXT)
+		details_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+		details_label.add_theme_constant_override("outline_size", 2)
 	if details_scroll:
 		details_scroll.custom_minimum_size = Vector2(500.0, 126.0)
 		details_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		details_scroll.add_theme_stylebox_override("panel", HardcoreUIAssets.info_card_style())
 	if help_label:
 		help_label.add_theme_font_size_override("font_size", 16)
-		help_label.add_theme_color_override("font_color", COLOR_MUTED)
+		help_label.add_theme_color_override("font_color", COLOR_TEXT)
+		help_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+		help_label.add_theme_constant_override("outline_size", 2)
 	if preview_art:
 		preview_art.custom_minimum_size = Vector2(360.0, 360.0)
 		preview_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -237,13 +240,27 @@ func _apply_gothic_layout() -> void:
 	var art_wrap: Control = right_column.get_node_or_null("Preview/ArtWrap") as Control
 	if art_wrap:
 		art_wrap.custom_minimum_size = Vector2(430.0, 360.0)
-		_preview_art_plate = _ensure_float_plate(art_wrap, "GothicArtPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.grid_panel_style(), _make_panel_style(Color(0.014, 0.012, 0.018, 0.86), Color(0.32, 0.24, 0.23, 0.84), 1, 6)), -1, 8.0)
+		_preview_art_plate = _ensure_float_plate(art_wrap, "GothicArtPlate", GothicUIAssets.style_or_fallback(HardcoreUIAssets.portrait_large_style(), _make_panel_style(Color(0.014, 0.012, 0.018, 0.86), Color(0.32, 0.24, 0.23, 0.84), 1, 6)), -1, 8.0)
 		if not art_wrap.resized.is_connected(Callable(self, "_queue_gothic_plate_reposition")):
 			art_wrap.resized.connect(_queue_gothic_plate_reposition)
 	if right_column != null and not right_column.sort_children.is_connected(Callable(self, "_queue_gothic_plate_reposition")):
 		right_column.sort_children.connect(_queue_gothic_plate_reposition)
 	_queue_gothic_plate_reposition()
 	_style_start_button()
+
+func _ensure_hardcore_backdrop() -> void:
+	_hardcore_backdrop = get_node_or_null("HardcoreBackdrop") as TextureRect
+	if _hardcore_backdrop == null:
+		_hardcore_backdrop = TextureRect.new()
+		_hardcore_backdrop.name = "HardcoreBackdrop"
+		_hardcore_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_hardcore_backdrop)
+		move_child(_hardcore_backdrop, 0)
+	_hardcore_backdrop.z_index = -9
+	_hardcore_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hardcore_backdrop.texture = HardcoreUIAssets.unit_select_backdrop_texture()
+	_hardcore_backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_hardcore_backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
 func _ensure_grid_wrapper() -> void:
 	if scroll == null or grid == null:
@@ -865,17 +882,18 @@ func _style_unit_card(tile: VBoxContainer, button: Button, name_label: Label, ro
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.pivot_offset = button.size * 0.5 if button.size != Vector2.ZERO else button.custom_minimum_size * 0.5
 	button.add_theme_stylebox_override("normal", _make_unit_button_style(selected, hovered))
-	button.add_theme_stylebox_override("hover", _make_unit_button_style(false, true))
-	button.add_theme_stylebox_override("pressed", _make_unit_button_style(true, true))
-	button.add_theme_stylebox_override("focus", GothicUIAssets.focus_outline_style(5, COLOR_GOLD))
-	button.add_theme_stylebox_override("disabled", _make_unit_button_style(false, false))
+	button.add_theme_stylebox_override("hover", HardcoreUIAssets.unit_card_style("hover"))
+	button.add_theme_stylebox_override("pressed", HardcoreUIAssets.unit_card_style("selected"))
+	button.add_theme_stylebox_override("hover_pressed", HardcoreUIAssets.unit_card_style("hover_selected"))
+	button.add_theme_stylebox_override("focus", HardcoreUIAssets.unit_card_style("focus"))
+	button.add_theme_stylebox_override("disabled", HardcoreUIAssets.unit_card_style("disabled"))
 	if name_label:
-		name_label.add_theme_font_size_override("font_size", 13 if compact else 15)
+		name_label.add_theme_font_size_override("font_size", 14 if compact else 17)
 		name_label.add_theme_color_override("font_color", COLOR_TEXT if selected or hovered else Color(0.82, 0.78, 0.70, 1.0))
 		name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
 		name_label.add_theme_constant_override("outline_size", 1)
 	if role_label:
-		role_label.add_theme_font_size_override("font_size", 10 if compact else 11)
+		role_label.add_theme_font_size_override("font_size", 11 if compact else 12)
 		role_label.add_theme_color_override("font_color", COLOR_GOLD if selected or hovered else COLOR_MUTED)
 
 func _is_compact_layout() -> bool:
@@ -883,25 +901,18 @@ func _is_compact_layout() -> bool:
 	return viewport_size.y <= COMPACT_VIEWPORT_HEIGHT or viewport_size.x < 1400.0
 
 func _make_unit_button_style(selected: bool, highlighted: bool) -> StyleBox:
-	var bg: Color = Color(0.040, 0.035, 0.045, 0.96)
-	var border: Color = Color(0.24, 0.21, 0.22, 0.92)
-	var style_modulate: Color = Color.WHITE
 	if selected:
-		bg = Color(0.105, 0.044, 0.056, 0.98)
-		border = COLOR_GOLD
-		style_modulate = Color(1.14, 1.04, 0.84, 1.0)
+		return HardcoreUIAssets.unit_card_style("selected")
 	elif highlighted:
-		bg = Color(0.070, 0.047, 0.057, 0.98)
-		border = Color(0.62, 0.38, 0.25, 0.96)
-		style_modulate = Color(1.10, 1.02, 0.90, 1.0)
-	var sb: StyleBoxFlat = _make_panel_style(bg, border, 2 if selected or highlighted else 1, 5)
-	sb.shadow_size = 10 if selected or highlighted else 5
-	sb.shadow_color = Color(0.56, 0.15, 0.040, 0.30) if selected or highlighted else Color(0.0, 0.0, 0.0, 0.38)
+		return HardcoreUIAssets.unit_card_style("hover")
+	var sb: StyleBoxFlat = _make_panel_style(Color(0.040, 0.035, 0.045, 0.96), Color(0.24, 0.21, 0.22, 0.92), 1, 5)
+	sb.shadow_size = 5
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.38)
 	sb.content_margin_left = 6
 	sb.content_margin_right = 6
 	sb.content_margin_top = 6
 	sb.content_margin_bottom = 6
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(style_modulate), sb)
+	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.unit_card_style("normal"), sb)
 
 func _style_start_button() -> void:
 	if start_button == null:
@@ -913,11 +924,7 @@ func _style_start_button() -> void:
 	start_button.add_theme_color_override("font_hover_color", Color(1.0, 0.91, 0.76, 1.0))
 	start_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.80, 0.58, 1.0))
 	start_button.add_theme_color_override("font_disabled_color", Color(0.43, 0.40, 0.38, 1.0))
-	start_button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(), _make_panel_style(COLOR_BLOOD, Color(0.92, 0.47, 0.30, 0.86), 2, 5)))
-	start_button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.18, 1.06, 0.92, 1.0)), _make_panel_style(COLOR_BLOOD_HOT, COLOR_GOLD, 2, 5)))
-	start_button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.84, 0.70, 0.66, 1.0)), _make_panel_style(Color(0.22, 0.020, 0.040, 1.0), COLOR_GOLD, 2, 5)))
-	start_button.add_theme_stylebox_override("focus", GothicUIAssets.focus_outline_style(5, COLOR_GOLD))
-	start_button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.46, 0.44, 0.42, 0.80)), _make_panel_style(Color(0.030, 0.027, 0.034, 0.84), Color(0.16, 0.15, 0.17, 0.88), 1, 5)))
+	HardcoreUIAssets.apply_button_family(start_button, "primary")
 
 func _wire_start_button_hover() -> void:
 	if start_button == null:

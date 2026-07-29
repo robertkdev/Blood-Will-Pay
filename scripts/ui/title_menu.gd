@@ -10,6 +10,7 @@ const TextureUtils: GDScript = preload("res://scripts/util/texture_utils.gd")
 const UnitFactoryScript: GDScript = preload("res://scripts/unit_factory.gd")
 const UnitTargetingText: GDScript = preload("res://scripts/ui/unit_targeting_text.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 const SECTION_HOME: String = "home"
@@ -24,7 +25,7 @@ const COLOR_PANEL_SOFT: Color = Color(0.050, 0.040, 0.048, 0.90)
 const COLOR_PANEL_RICH: Color = Color(0.070, 0.038, 0.044, 0.92)
 const COLOR_PANEL_EDGE: Color = Color(0.42, 0.31, 0.24, 0.88)
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
-const COLOR_MUTED: Color = Color(0.62, 0.57, 0.50, 1.0)
+const COLOR_MUTED: Color = Color(0.76, 0.72, 0.65, 1.0)
 const COLOR_BLOOD: Color = Color(0.48, 0.035, 0.070, 1.0)
 const COLOR_BLOOD_HOT: Color = Color(0.78, 0.060, 0.105, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
@@ -67,6 +68,7 @@ var _listening_action: StringName = StringName()
 var _intro_tween: Tween = null
 var _background_tween: Tween = null
 var _logo_tween: Tween = null
+var _poster_border: TextureRect = null
 
 func _ready() -> void:
 	UserSettingsScript.initialize(get_window())
@@ -259,17 +261,12 @@ func _apply_gothic_layout() -> void:
 	if background != null:
 		background.color = COLOR_VOID
 	if bg_rect != null:
-		bg_rect.modulate = Color(0.70, 0.24, 0.27, 0.82)
-		if bg_rect.material is ShaderMaterial:
-			var mat: ShaderMaterial = bg_rect.material as ShaderMaterial
-			mat.set_shader_parameter("color_a", Color(0.012, 0.010, 0.014, 1.0))
-			mat.set_shader_parameter("color_b", Color(0.13, 0.020, 0.035, 1.0))
-			mat.set_shader_parameter("vine_color", Color(0.54, 0.045, 0.070, 1.0))
-			mat.set_shader_parameter("base_brightness", 0.70)
-			mat.set_shader_parameter("field_scale", 3.1)
-			mat.set_shader_parameter("line_width", 0.42)
-			mat.set_shader_parameter("mix_amount", 1.48)
-			mat.set_shader_parameter("vignette_strength", 0.92)
+		bg_rect.texture = HardcoreUIAssets.menu_backdrop_texture()
+		bg_rect.material = null
+		bg_rect.modulate = Color.WHITE
+		bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_ensure_poster_border()
 	if center != null:
 		center.anchor_left = 0.045
 		center.anchor_top = 0.025 if short_compact else 0.08
@@ -283,13 +280,13 @@ func _apply_gothic_layout() -> void:
 		center_vbox.custom_minimum_size = Vector2(180.0 if short_compact else (200.0 if compact else 350.0), 0.0)
 		center_vbox.add_theme_constant_override("separation", 4 if short_compact else (9 if compact else 13))
 	if title_label != null:
-		title_label.text = "Blood Will Pay"
-		title_label.add_theme_font_size_override("font_size", 28 if short_compact else (42 if compact else 64))
+		title_label.text = "BLOOD\nWILL PAY"
+		title_label.add_theme_font_size_override("font_size", 26 if short_compact else (38 if compact else 56))
 		title_label.add_theme_color_override("font_color", COLOR_TEXT)
 		title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		title_label.add_theme_constant_override("outline_size", 5)
 		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_ensure_title_panel()
 	_ensure_shade()
 	_remove_hero()
@@ -346,7 +343,7 @@ func _ensure_title_panel() -> void:
 	_title_panel.offset_top = 0.0
 	_title_panel.offset_right = 0.0
 	_title_panel.offset_bottom = 0.0
-	_title_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _make_panel_style(Color(0.023, 0.020, 0.028, 0.91), Color(0.55, 0.39, 0.22, 0.90), 1, 7, 28)))
+	_title_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.menu_rail_style(), _make_panel_style(Color(0.023, 0.020, 0.028, 0.91), Color(0.55, 0.39, 0.22, 0.90), 1, 7, 28)))
 	if center != null:
 		center.z_index = 5
 
@@ -361,6 +358,20 @@ func _ensure_shade() -> void:
 	_shade.z_index = 1
 	_shade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_shade.color = Color(0.0, 0.0, 0.0, 0.34)
+
+func _ensure_poster_border() -> void:
+	_poster_border = get_node_or_null("PosterBorder") as TextureRect
+	if _poster_border == null:
+		_poster_border = TextureRect.new()
+		_poster_border.name = "PosterBorder"
+		_poster_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_poster_border)
+		move_child(_poster_border, min(_poster_border.get_index(), 3))
+	_poster_border.z_index = 8
+	_poster_border.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_poster_border.texture = HardcoreUIAssets.menu_border_texture()
+	_poster_border.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_poster_border.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 
 func _ensure_hero() -> void:
 	_remove_hero()
@@ -437,7 +448,7 @@ func _ensure_content_panel() -> void:
 	_content_panel.offset_top = 0.0
 	_content_panel.offset_right = 0.0
 	_content_panel.offset_bottom = 0.0
-	_content_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _make_panel_style(Color(0.022, 0.019, 0.025, 0.96), Color(0.55, 0.39, 0.18, 0.94), 1, 7, 22)))
+	_content_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.menu_content_style(), _make_panel_style(Color(0.022, 0.019, 0.025, 0.96), Color(0.55, 0.39, 0.18, 0.94), 1, 7, 22)))
 
 	var margin: MarginContainer = _content_panel.get_node_or_null("Margin") as MarginContainer
 	if margin == null:
@@ -897,6 +908,9 @@ func _add_ui_scale_setting() -> int:
 		if is_equal_approx(scale_value, current_scale):
 			option.select(index)
 	_style_menu_button(option, false)
+	var popup: PopupMenu = option.get_popup()
+	popup.add_theme_stylebox_override("panel", HardcoreUIAssets.popup_menu_style())
+	popup.add_theme_stylebox_override("hover", HardcoreUIAssets.popup_highlight_style())
 	option.item_selected.connect(_on_ui_scale_selected.bind(option))
 	stack.add_child(option)
 	stack.add_child(_make_label("Enlarges the game interface. Layout remains responsive at every supported scale.", 13, COLOR_MUTED, true))
@@ -982,7 +996,7 @@ func _make_card_container(node_name: String, bg: Color, border: Color, border_wi
 	var card: PanelContainer = PanelContainer.new()
 	card.name = node_name
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var generated_style: StyleBoxTexture = GothicUIAssets.grid_panel_style(_card_modulate_from_border(border))
+	var generated_style: StyleBoxTexture = HardcoreUIAssets.info_card_style()
 	card.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(generated_style, _make_panel_style(bg, border, border_width, 6, 6)))
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "Margin"
@@ -1055,16 +1069,7 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 	button.add_theme_color_override("font_color", COLOR_TEXT)
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.72, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.76, 0.55, 1.0))
-	if primary:
-		button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(), _make_button_style(Color(0.34, 0.045, 0.062, 0.98), Color(0.96, 0.56, 0.30, 0.96), 2)))
-		button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.18, 1.06, 0.92, 1.0)), _make_button_style(Color(0.55, 0.055, 0.080, 1.0), Color(1.0, 0.82, 0.45, 1.0), 2)))
-		button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.84, 0.70, 0.66, 1.0)), _make_button_style(Color(0.20, 0.026, 0.044, 1.0), COLOR_GOLD, 2)))
-		button.add_theme_stylebox_override("focus", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.10, 1.02, 0.88, 1.0)), _make_button_style(Color(0.12, 0.07, 0.08, 1.0), COLOR_GOLD, 2)))
-	else:
-		button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _make_button_style(Color(0.043, 0.037, 0.047, 0.96), Color(0.36, 0.30, 0.26, 0.96), 1)))
-		button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _make_button_style(Color(0.120, 0.078, 0.090, 0.99), Color(1.0, 0.80, 0.43, 1.0), 1)))
-		button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.86, 0.72, 0.68, 1.0)), _make_button_style(Color(0.20, 0.026, 0.044, 1.0), COLOR_GOLD, 2)))
-		button.add_theme_stylebox_override("focus", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.10, 1.02, 0.88, 1.0)), _make_button_style(Color(0.12, 0.07, 0.08, 1.0), COLOR_GOLD, 2)))
+	HardcoreUIAssets.apply_button_family(button, "primary" if primary else "poster")
 
 func _is_compact_layout() -> bool:
 	return get_viewport_rect().size.x < 1000.0
@@ -1083,30 +1088,58 @@ func _update_nav_state() -> void:
 		nav_button.button_pressed = is_active
 		nav_button.add_theme_color_override("font_color", Color(1.0, 0.86, 0.58, 1.0) if is_active else COLOR_TEXT)
 		if is_active:
-			nav_button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.04, 0.84, 1.0)), _make_button_style(Color(0.15, 0.060, 0.062, 0.98), COLOR_GOLD, 1)))
+			nav_button.add_theme_stylebox_override("normal", HardcoreUIAssets.poster_button_style("selected"))
 		else:
-			nav_button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _make_button_style(Color(0.043, 0.037, 0.047, 0.96), Color(0.36, 0.30, 0.26, 0.96), 1)))
+			nav_button.add_theme_stylebox_override("normal", HardcoreUIAssets.poster_button_style("normal"))
 
 func _style_search_field(field: LineEdit) -> void:
 	if field == null:
 		return
-	field.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.74, 0.70, 0.66, 1.0)), _make_panel_style(Color(0.015, 0.013, 0.017, 0.96), Color(0.30, 0.23, 0.18, 0.94), 1, 5, 0)))
-	field.add_theme_stylebox_override("focus", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.12, 1.02, 0.84, 1.0)), _make_panel_style(Color(0.030, 0.022, 0.028, 0.98), COLOR_GOLD, 1, 5, 0)))
+	field.add_theme_stylebox_override("normal", HardcoreUIAssets.input_style("normal"))
+	field.add_theme_stylebox_override("focus", HardcoreUIAssets.input_style("focus"))
+	field.add_theme_stylebox_override("read_only", HardcoreUIAssets.input_style("disabled"))
+	if not field.is_connected("mouse_entered", Callable(self, "_on_input_hover_entered").bind(field)):
+		field.mouse_entered.connect(Callable(self, "_on_input_hover_entered").bind(field))
+	if not field.is_connected("mouse_exited", Callable(self, "_on_input_hover_exited").bind(field)):
+		field.mouse_exited.connect(Callable(self, "_on_input_hover_exited").bind(field))
+	if not field.is_connected("text_changed", Callable(self, "_on_input_text_visual_changed").bind(field)):
+		field.text_changed.connect(Callable(self, "_on_input_text_visual_changed").bind(field))
 
 func _style_slider(slider: HSlider) -> void:
 	if slider == null:
 		return
-	slider.add_theme_stylebox_override("slider", GothicUIAssets.style_or_fallback(GothicUIAssets.item_slot_style(Color(0.72, 0.68, 0.62, 1.0)), _make_panel_style(Color(0.018, 0.015, 0.020, 0.96), Color(0.30, 0.23, 0.18, 0.94), 1, 4, 0)))
-	slider.add_theme_stylebox_override("grabber_area", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.92, 0.78, 0.56, 1.0)), _make_panel_style(Color(0.16, 0.070, 0.050, 0.96), COLOR_GOLD, 1, 4, 0)))
-	slider.add_theme_stylebox_override("grabber_area_highlight", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.18, 0.96, 0.68, 1.0)), _make_panel_style(Color(0.24, 0.090, 0.070, 0.98), COLOR_GOLD, 1, 4, 0)))
+	slider.add_theme_stylebox_override("slider", HardcoreUIAssets.slider_style("track"))
+	slider.add_theme_stylebox_override("grabber_area", HardcoreUIAssets.slider_style("fill"))
+	slider.add_theme_stylebox_override("grabber_area_highlight", HardcoreUIAssets.slider_style("fill"))
+	slider.add_theme_icon_override("grabber", HardcoreUIAssets.slider_icon("normal"))
+	slider.add_theme_icon_override("grabber_highlight", HardcoreUIAssets.slider_icon("hover"))
+	slider.add_theme_icon_override("grabber_disabled", HardcoreUIAssets.slider_icon("disabled"))
 
 func _style_checkbox(check: CheckBox) -> void:
 	if check == null:
 		return
-	check.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.78, 0.72, 0.66, 1.0)), _make_button_style(Color(0.043, 0.037, 0.047, 0.96), Color(0.36, 0.30, 0.26, 0.96), 1)))
-	check.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _make_button_style(Color(0.120, 0.078, 0.090, 0.99), Color(1.0, 0.80, 0.43, 1.0), 1)))
-	check.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.92, 0.76, 0.68, 1.0)), _make_button_style(Color(0.20, 0.026, 0.044, 1.0), COLOR_GOLD, 2)))
-	check.add_theme_stylebox_override("focus", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.10, 1.02, 0.88, 1.0)), _make_button_style(Color(0.12, 0.07, 0.08, 1.0), COLOR_GOLD, 2)))
+	HardcoreUIAssets.apply_button_family(check, "compact")
+	check.add_theme_icon_override("unchecked", HardcoreUIAssets.checkbox_icon(false))
+	check.add_theme_icon_override("unchecked_hover", HardcoreUIAssets.checkbox_icon(false, "hover"))
+	check.add_theme_icon_override("unchecked_pressed", HardcoreUIAssets.checkbox_icon(false, "hover"))
+	check.add_theme_icon_override("unchecked_disabled", HardcoreUIAssets.checkbox_icon(false, "disabled"))
+	check.add_theme_icon_override("checked", HardcoreUIAssets.checkbox_icon(true))
+	check.add_theme_icon_override("checked_hover", HardcoreUIAssets.checkbox_icon(true, "hover"))
+	check.add_theme_icon_override("checked_pressed", HardcoreUIAssets.checkbox_icon(true, "hover"))
+	check.add_theme_icon_override("checked_disabled", HardcoreUIAssets.checkbox_icon(true, "disabled"))
+
+func _on_input_hover_entered(field: LineEdit) -> void:
+	if field != null and not field.has_focus():
+		field.add_theme_stylebox_override("normal", HardcoreUIAssets.input_style("hover"))
+
+func _on_input_hover_exited(field: LineEdit) -> void:
+	if field != null and not field.has_focus():
+		_on_input_text_visual_changed(field.text, field)
+
+func _on_input_text_visual_changed(text: String, field: LineEdit) -> void:
+	if field == null or field.has_focus():
+		return
+	field.add_theme_stylebox_override("normal", HardcoreUIAssets.input_style("populated" if text.strip_edges() != "" else "normal"))
 
 func _card_modulate_from_border(border: Color) -> Color:
 	return Color(

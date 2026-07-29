@@ -8,6 +8,7 @@ const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const Debug := preload("res://scripts/util/debug.gd")
 const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 
 const ArenaBridge := preload("res://scripts/ui/combat/arena_bridge.gd")
 const GridPlacement := preload("res://scripts/ui/combat/grid_placement.gd")
@@ -1525,6 +1526,7 @@ func _show_contract_market() -> void:
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.add_theme_font_size_override("font_size", 15)
 		button.disabled = bool(offer.get("exhausted", false))
+		HardcoreUIAssets.apply_button_family(button, "choice")
 		button.pressed.connect(Callable(self, "_on_contract_choice_pressed").bind(index))
 		_contract_choices.add_child(button)
 	var pass_button: Button = Button.new()
@@ -1532,6 +1534,7 @@ func _show_contract_market() -> void:
 	pass_button.text = "PASS — keep your gold and accept no new obligation"
 	pass_button.custom_minimum_size = Vector2(880.0, 48.0)
 	pass_button.add_theme_font_size_override("font_size", 15)
+	HardcoreUIAssets.apply_button_family(pass_button, "poster")
 	pass_button.pressed.connect(_on_contract_pass_pressed)
 	_contract_choices.add_child(pass_button)
 	if _contract_status != null:
@@ -1563,6 +1566,7 @@ func _ensure_contract_market_ui() -> void:
 	_contract_overlay.add_child(center)
 	var panel: PanelContainer = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(980.0, 680.0)
+	panel.add_theme_stylebox_override("panel", HardcoreUIAssets.modal_style())
 	center.add_child(panel)
 	var margin: MarginContainer = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 28)
@@ -1631,6 +1635,7 @@ func _show_champion_contract_targets(offer: Dictionary) -> void:
 		target_button.custom_minimum_size = Vector2(880.0, 72.0)
 		target_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		target_button.add_theme_font_size_override("font_size", 16)
+		HardcoreUIAssets.apply_button_family(target_button, "choice")
 		target_button.pressed.connect(Callable(self, "_on_champion_contract_target_pressed").bind(unit, doctrine))
 		_contract_choices.add_child(target_button)
 	if candidates.is_empty() and _contract_status != null:
@@ -1735,6 +1740,7 @@ func _show_ascension_choice(unit: Unit) -> void:
 		button.custom_minimum_size = Vector2(900.0, 132.0)
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.add_theme_font_size_override("font_size", 16)
+		HardcoreUIAssets.apply_button_family(button, "choice")
 		button.pressed.connect(Callable(self, "_on_ascension_choice_pressed").bind(unit, String(option.get("id", ""))))
 		_ascension_choices.add_child(button)
 	_ascension_overlay.visible = true
@@ -1764,7 +1770,7 @@ func _ensure_ascension_ui() -> void:
 	_ascension_overlay.add_child(center)
 	var panel: PanelContainer = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(1020.0, 610.0)
-	panel.add_theme_stylebox_override("panel", _make_result_card_style(Color(0.92, 0.31, 0.12, 1.0)))
+	panel.add_theme_stylebox_override("panel", HardcoreUIAssets.modal_style())
 	center.add_child(panel)
 	var margin: MarginContainer = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 34)
@@ -2486,7 +2492,7 @@ func _on_encounter_escalated(_phase_id: String, label: String, _champion_index: 
 		"" if revived_indices.size() == 1 else "S",
 	]
 	var accent: Color = Color(0.95, 0.23, 0.14, 1.0) if intensity >= 2 else Color(0.96, 0.55, 0.16, 1.0)
-	_show_combat_event_banner(text, accent)
+	_show_combat_event_banner(text, accent, intensity)
 
 func _evaluate_account_bounties() -> Dictionary:
 	if manager == null:
@@ -2620,7 +2626,7 @@ func _on_contract_battle_event(event_type: String, label: String, _affected_play
 		text = "%s\nARENA PULSE - %d DAMAGE" % [label, max(0, value)]
 		accent = Color(0.98, 0.18, 0.11, 1.0) if intensity >= 2 else Color(0.88, 0.31, 0.13, 1.0)
 		_flash_contract_hazard(accent, intensity)
-	_show_combat_event_banner(text, accent)
+	_show_combat_event_banner(text, accent, intensity)
 
 func _on_unit_upgrade_event(event_type: String, label: String, _affected_player_indices: Array[int], value: int, intensity: int) -> void:
 	var text: String = "%s\n%d TOTAL EFFECT" % [label, max(0, value)]
@@ -2660,7 +2666,7 @@ func _flash_contract_hazard(accent: Color, intensity: int) -> void:
 	style.corner_radius_top_right = 10
 	style.corner_radius_bottom_right = 10
 	style.corner_radius_bottom_left = 10
-	hazard_frame.add_theme_stylebox_override("panel", style)
+	hazard_frame.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.hazard_border_style(), style))
 	arena_container.add_child(hazard_frame)
 	hazard_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hazard_frame.modulate.a = 0.0
@@ -2672,12 +2678,12 @@ func _flash_contract_hazard(accent: Color, intensity: int) -> void:
 	tween.tween_property(hazard_frame, "modulate:a", 0.0, 1.20)
 	tween.tween_callback(hazard_frame.queue_free)
 
-func _show_combat_event_banner(text: String, accent: Color) -> void:
+func _show_combat_event_banner(text: String, accent: Color, intensity: int = 1) -> void:
 	var banner: PanelContainer = _ensure_encounter_banner()
 	if banner == null or _encounter_banner_label == null:
 		return
 	_encounter_banner_label.text = text
-	banner.add_theme_stylebox_override("panel", _make_result_card_style(accent))
+	banner.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.pressure_impact_style(intensity), _make_result_card_style(accent)))
 	_encounter_banner_label.add_theme_color_override("font_color", Color(1.0, 0.91, 0.72, 1.0))
 	if _encounter_banner_tween != null and _encounter_banner_tween.is_valid():
 		_encounter_banner_tween.kill()
@@ -2734,7 +2740,7 @@ func _show_reinforcement_callouts(revived_indices: Array[int], intensity: int) -
 		callout_style.corner_radius_top_right = 5
 		callout_style.corner_radius_bottom_left = 5
 		callout_style.corner_radius_bottom_right = 5
-		callout.add_theme_stylebox_override("normal", callout_style)
+		callout.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(HardcoreUIAssets.reinforcement_style(intensity >= 2), callout_style))
 		actor.add_child(callout)
 		callout.modulate = Color(1.0, 1.0, 1.0, 0.0)
 		callout.scale = Vector2(0.70, 0.70)
@@ -2883,8 +2889,9 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	if accent_rule != null:
 		accent_rule.color = Color(accent_color.r, accent_color.g, accent_color.b, 0.86)
 	if card != null:
-		card.add_theme_stylebox_override("panel", _make_result_card_style(accent_color))
-	banner.add_theme_stylebox_override("panel", _make_result_scrim_style())
+		var is_bounty: bool = detail.findn("bounty") >= 0
+		card.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.result_style(title, is_bounty), _make_result_card_style(accent_color)))
+	banner.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.result_scrim_style(), _make_result_scrim_style()))
 	banner.visible = true
 
 func _hide_result_banner() -> void:

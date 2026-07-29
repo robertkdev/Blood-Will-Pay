@@ -1,6 +1,8 @@
 extends RefCounted
 class_name EconomyUI
 
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+
 var gold_label: Label
 var bet_slider: HSlider
 var bet_value: Label
@@ -24,6 +26,8 @@ func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all
 		bet_slider.step = 1.0
 	if all_in_button != null and not all_in_button.is_connected("pressed", Callable(self, "_on_all_in_pressed")):
 		all_in_button.pressed.connect(_on_all_in_pressed)
+	if all_in_button != null:
+		HardcoreUIAssets.apply_button_family(all_in_button, "wager")
 	refresh()
 	if _has_economy():
 		_gold_changed_cb = Callable(self, "_on_economy_gold_changed")

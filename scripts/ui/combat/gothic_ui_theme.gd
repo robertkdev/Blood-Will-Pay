@@ -2,6 +2,7 @@ extends Object
 class_name GothicUITheme
 
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const CombatVfxInstallerScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_installer.gd")
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
@@ -178,6 +179,9 @@ static func _apply_button_node(button: Button) -> void:
 	if button.name == "ContinueButton":
 		_style_button_node(button, true)
 		return
+	if _has_ancestor_named(button, "BetRow"):
+		HardcoreUIAssets.apply_button_family(button, "wager")
+		return
 	if button.name == "MenuButton":
 		button.custom_minimum_size = Vector2(76.0, 32.0)
 		button.add_theme_font_size_override("font_size", 14)
@@ -339,12 +343,7 @@ static func _apply_bench_slot(button: Button) -> void:
 
 static func _style_shop_card(button: Button) -> void:
 	button.custom_minimum_size = Vector2(144.0, 124.0)
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(), _style(Color(0.036, 0.030, 0.038, 0.98), Color(0.50, 0.37, 0.28, 0.98), 2, 5)))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(1.14, 1.05, 0.92, 1.0)), _hover_style(Color(0.105, 0.046, 0.056, 0.99), COLOR_GOLD_HOT, 2, 5)))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(0.92, 0.82, 0.78, 1.0)), _style(COLOR_PANEL_DEEP, COLOR_BLOOD_HOT, 2, 5)))
-	button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(1.02, 0.88, 0.80, 1.0)), _hover_style(Color(0.16, 0.045, 0.058, 0.99), COLOR_GOLD_HOT, 2, 5)))
-	button.add_theme_stylebox_override("focus", _focus_outline(5))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(0.48, 0.46, 0.44, 0.74)), _style(Color(0.028, 0.025, 0.030, 0.82), Color(0.20, 0.18, 0.18, 0.72), 1, 5)))
+	HardcoreUIAssets.apply_shop_card_states(button)
 	button.add_theme_font_size_override("font_size", 13)
 	button.clip_text = false
 
@@ -352,23 +351,13 @@ static func _style_shop_action_button(button: Button) -> void:
 	button.custom_minimum_size = Vector2(96.0, 40.0)
 	button.add_theme_font_size_override("font_size", 15)
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.58, 0.52, 1.0))
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _style(Color(0.055, 0.047, 0.058, 0.97), Color(0.31, 0.27, 0.28, 0.96), 1, 5)))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.18, 1.08, 0.90, 1.0)), _hover_style(Color(0.13, 0.078, 0.088, 0.99), COLOR_GOLD_HOT, 1, 5)))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.88, 0.72, 0.68, 1.0)), _style(Color(0.17, 0.040, 0.055, 0.98), COLOR_BLOOD_HOT, 1, 5)))
-	button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.98, 0.82, 0.72, 1.0)), _hover_style(Color(0.18, 0.045, 0.060, 0.99), COLOR_GOLD_HOT, 1, 5)))
-	button.add_theme_stylebox_override("focus", _focus_outline(5))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.60, 0.56, 0.50, 0.86)), _style(Color(0.046, 0.041, 0.045, 0.88), Color(0.34, 0.30, 0.25, 0.86), 1, 5)))
+	HardcoreUIAssets.apply_button_family(button, "utility")
 
 static func _style_metric_button(button: Button) -> void:
 	var is_small_expand: bool = button.name == "ExpandButton"
 	button.custom_minimum_size = Vector2(48.0, 36.0) if is_small_expand else Vector2(76.0, 36.0)
 	button.add_theme_font_size_override("font_size", 14)
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _style(Color(0.044, 0.038, 0.048, 0.96), Color(0.28, 0.25, 0.28, 0.92), 1, 4)))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _hover_style(Color(0.12, 0.073, 0.085, 0.99), COLOR_GOLD_HOT, 1, 4)))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.86, 0.72, 0.68, 1.0)), _style(Color(0.17, 0.034, 0.050, 0.98), COLOR_BLOOD_HOT, 1, 4)))
-	button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.98, 0.82, 0.72, 1.0)), _hover_style(Color(0.18, 0.042, 0.056, 0.99), COLOR_GOLD_HOT, 1, 4)))
-	button.add_theme_stylebox_override("focus", _focus_outline(4))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.48, 0.46, 0.43, 0.72)), _style(Color(0.028, 0.026, 0.030, 0.76), Color(0.18, 0.17, 0.17, 0.64), 1, 4)))
+	HardcoreUIAssets.apply_button_family(button, "utility")
 
 static func _apply_metric_tabs(tabs: Control) -> void:
 	tabs.custom_minimum_size = Vector2(max(tabs.custom_minimum_size.x, 294.0), 52.0)

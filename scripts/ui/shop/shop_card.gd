@@ -8,6 +8,7 @@ const UnitFactory := preload("res://scripts/unit_factory.gd")
 const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
 const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
 const COLOR_MUTED: Color = Color(0.66, 0.60, 0.52, 1.0)
@@ -330,8 +331,9 @@ func _apply_static_style() -> void:
 	add_theme_stylebox_override("normal", _make_card_style(false, false))
 	add_theme_stylebox_override("hover", _make_card_style(false, true))
 	add_theme_stylebox_override("pressed", _make_card_style(true, true))
+	add_theme_stylebox_override("hover_pressed", HardcoreUIAssets.shop_card_style("hover_selected"))
 	add_theme_stylebox_override("disabled", _make_card_style(false, false, true))
-	add_theme_stylebox_override("focus", _make_card_style(false, true))
+	add_theme_stylebox_override("focus", HardcoreUIAssets.shop_card_style("focus"))
 	add_theme_color_override("font_disabled_color", Color(0.74, 0.67, 0.56, 0.92))
 	if _border_gradient != null:
 		_border_gradient.visible = false
@@ -410,7 +412,8 @@ func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bo
 	style.corner_radius_bottom_left = 5
 	style.shadow_size = 12 if highlighted else 8
 	style.shadow_color = Color(0.58, 0.18, 0.060, 0.30) if highlighted else Color(0.0, 0.0, 0.0, 0.46)
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(modulate), style)
+	var state: String = "disabled" if disabled_state else ("pressed" if pressed_state else ("hover" if highlighted else "normal"))
+	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.shop_card_style(state), style)
 
 func _wire_hover() -> void:
 	if not is_connected("mouse_entered", Callable(self, "_on_hover_entered")):
@@ -451,7 +454,7 @@ func _apply_hover_motion(active: bool) -> void:
 	z_index = 20 if highlight else 0
 	add_theme_stylebox_override("normal", _make_card_style(false, highlight))
 	add_theme_stylebox_override("hover", _make_card_style(false, highlight))
-	add_theme_stylebox_override("focus", _make_card_style(false, highlight))
+	add_theme_stylebox_override("focus", HardcoreUIAssets.shop_card_style("focus"))
 	if highlight:
 		if _icon != null:
 			_icon.modulate = Color(1.0, 0.93, 0.78, 1.0)
@@ -564,7 +567,7 @@ func _make_tooltip_style() -> StyleBox:
 	style.content_margin_bottom = 10
 	style.shadow_size = 14
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.62)
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.grid_panel_style(), style)
+	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.texture_style(HardcoreUIAssets.GOTHIC_V3_ROOT + "utility_tooltip.png", Vector4(28.0, 24.0, 28.0, 24.0), Vector4(12.0, 10.0, 12.0, 10.0)), style)
 
 func _clear_tooltip() -> void:
 	if _tooltip != null and is_instance_valid(_tooltip):
