@@ -305,9 +305,19 @@ window.GAMBLE_BATTLE_UNIT_ART_HISTORY = {
 			kind: "candidate",
 			version: "Review V1",
 			label: "Pit enforcer gauntlet concept",
-			status: "Latest review candidate; no default change",
+			status: "Historical review candidate",
 			local_path: "history/kett/kett-review-v1.png",
 			path: "tools/art/history/kett/kett-review-v1.png"
+		},
+		{
+			unit: "kett",
+			source_unit: "kett",
+			kind: "candidate",
+			version: "Review V2",
+			label: "Piston gauntlet and bone muzzle",
+			status: "Latest review candidate; no default change",
+			local_path: "history/kett/kett-review-v2.png",
+			path: "tools/art/history/kett/kett-review-v2.png"
 		}
 	],
 	excluded_source_categories: [
