@@ -38,8 +38,13 @@ func _run() -> void:
 			_expect(artwork.anchor_left == 0.0 and artwork.anchor_top == 0.0 and artwork.anchor_right == 1.0 and artwork.anchor_bottom == 1.0, "TitlePage Artwork should fill the viewport", failures)
 		var enter_button: Button = main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
 		_expect(enter_button != null, "TitlePage EnterButton missing", failures)
+		var continue_prompt: Label = main.get_node_or_null("TitlePage/Center/Stack/ContinuePrompt") as Label
+		_expect(continue_prompt != null and continue_prompt.visible, "TitlePage should show a visible continue prompt", failures)
+		if continue_prompt != null:
+			_expect(continue_prompt.text == "CLICK OR PRESS ANY KEY", "TitlePage continue prompt should explain both mouse and keyboard entry", failures)
+			_expect(continue_prompt.get_theme_font_size("font_size") >= 18, "TitlePage continue prompt should remain readable at 1920x1080", failures)
 		if enter_button != null:
-			_expect(enter_button.text == "", "TitlePage should not show a visible continue prompt", failures)
+			_expect(enter_button.text == "", "TitlePage full-screen interaction surface should remain text-free behind the visible prompt", failures)
 			_expect(enter_button.flat, "TitlePage interaction surface should remain visually transparent", failures)
 			_expect(enter_button.accessibility_name.contains("Blood Will Pay"), "TitlePage should expose the renamed title to assistive technology", failures)
 			_expect(enter_button.has_focus(), "TitlePage interaction surface should receive initial focus", failures)

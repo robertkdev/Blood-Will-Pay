@@ -65,6 +65,8 @@ func _run() -> void:
 	_expect(_continue_button_text() == "Start Battle", "post-win planning did not restore Start Battle, got %s" % _continue_button_text())
 	_expect(not _continue_button_disabled(), "post-win Start Battle button stayed disabled")
 	_expect(_planning_time_left() >= MIN_RESTORED_PLANNING_SECONDS, "post-win planning timer was not reset; got %.2f" % _planning_time_left())
+	var result_banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
+	_expect(result_banner != null and not result_banner.visible, "battle result overlay remained visible after the two-second intermission")
 	_normalize_restored_planning_capture_timer()
 	await get_tree().process_frame
 	_save_capture("02_post_win_planning_restored.png")

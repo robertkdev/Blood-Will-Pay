@@ -21,7 +21,7 @@ const COLOR_MUTED: Color = Color(0.78, 0.73, 0.64, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
 const COLOR_BLOOD: Color = Color(0.52, 0.040, 0.080, 1.0)
 const COLOR_BLOOD_HOT: Color = Color(0.82, 0.070, 0.120, 1.0)
-const FULL_LAYOUT_SIZE: Vector2 = Vector2(1320.0, 900.0)
+const FULL_LAYOUT_SIZE: Vector2 = Vector2(1320.0, 940.0)
 const COMPACT_VIEWPORT_HEIGHT: float = 780.0
 const IDENTITY_PANEL_MIN_HEIGHT: float = 96.0
 const START_BUTTON_READY_TEXT: String = "Start Game"
@@ -132,13 +132,13 @@ func _ensure_preview_panel() -> void:
 			old_art.queue_free()
 		art_wrap = CenterContainer.new()
 		art_wrap.name = "ArtWrap"
-		art_wrap.custom_minimum_size = Vector2(380, 300)
+		art_wrap.custom_minimum_size = Vector2(380, 320)
 		preview.add_child(art_wrap)
 	preview_art = art_wrap.get_node_or_null("Art") as TextureRect
 	if preview_art == null:
 		preview_art = TextureRect.new()
 		preview_art.name = "Art"
-		preview_art.custom_minimum_size = Vector2(360, 360)
+		preview_art.custom_minimum_size = Vector2(320, 320)
 		preview_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		preview_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		preview_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -227,6 +227,7 @@ func _apply_gothic_layout() -> void:
 	if details_scroll:
 		details_scroll.custom_minimum_size = Vector2(500.0, 126.0)
 		details_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		details_scroll.clip_contents = true
 		details_scroll.add_theme_stylebox_override("panel", HardcoreUIAssets.info_card_style())
 	if help_label:
 		help_label.add_theme_font_size_override("font_size", 16)
@@ -234,12 +235,12 @@ func _apply_gothic_layout() -> void:
 		help_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
 		help_label.add_theme_constant_override("outline_size", 2)
 	if preview_art:
-		preview_art.custom_minimum_size = Vector2(360.0, 360.0)
+		preview_art.custom_minimum_size = Vector2(320.0, 320.0)
 		preview_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		preview_art.modulate = Color(0.92, 0.88, 0.82, 1.0)
 	var art_wrap: Control = right_column.get_node_or_null("Preview/ArtWrap") as Control
 	if art_wrap:
-		art_wrap.custom_minimum_size = Vector2(430.0, 360.0)
+		art_wrap.custom_minimum_size = Vector2(430.0, 320.0)
 		_preview_art_plate = _ensure_float_plate(art_wrap, "GothicArtPlate", GothicUIAssets.style_or_fallback(HardcoreUIAssets.portrait_large_style(), _make_panel_style(Color(0.014, 0.012, 0.018, 0.86), Color(0.32, 0.24, 0.23, 0.84), 1, 6)), -1, 8.0)
 		if not art_wrap.resized.is_connected(Callable(self, "_queue_gothic_plate_reposition")):
 			art_wrap.resized.connect(_queue_gothic_plate_reposition)
@@ -708,7 +709,7 @@ func _on_resized() -> void:
 	var tile_width: float = 138.0 if compact else 150.0
 	var tile_height: float = 166.0 if compact else 184.0
 	var button_size: Vector2 = Vector2(138.0, 116.0) if compact else Vector2(150.0, 138.0)
-	var preview_art_size: float = 270.0 if compact else 360.0
+	var preview_art_size: float = 270.0 if compact else 320.0
 	if hbox != null:
 		hbox.custom_minimum_size = Vector2(layout_width, layout_height)
 		hbox.add_theme_constant_override("separation", int(gap))
@@ -729,7 +730,7 @@ func _on_resized() -> void:
 	if details_scroll != null:
 		details_scroll.custom_minimum_size = Vector2(right_width, 92.0 if compact else 126.0)
 	if details_label != null:
-		details_label.add_theme_font_size_override("font_size", 15 if compact else 16)
+		details_label.add_theme_font_size_override("font_size", 14)
 	if preview_art != null:
 		preview_art.custom_minimum_size = Vector2(preview_art_size, preview_art_size)
 	var art_wrap: Control = null

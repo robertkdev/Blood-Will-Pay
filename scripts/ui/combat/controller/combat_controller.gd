@@ -2174,6 +2174,7 @@ func _start_intermission(seconds: float = 5.0) -> void:
 	intermission.start(seconds, Callable(self, "_on_intermission_finished"))
 
 func _on_intermission_finished() -> void:
+	_hide_result_banner()
 	if arena_container and arena_container.visible:
 		_exit_combat_arena()
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):

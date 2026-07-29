@@ -75,6 +75,27 @@ Telegram review trail: messages 3704-3716.
 
 Two broad legacy visual fixtures remain unsuitable as acceptance gates: their synthetic mouse/window assumptions do not match the authoritative runtime. `ShopCardHoverSmoke` cannot keep an OS-level hover through its synthetic warp, while the fresh real-game capture proves the card hover and tooltip together. `CompactViewportVisualAuditSmoke` constructs a direct synthetic 720p layout that clips the footer, while the targeted compact footer smoke and the authoritative 1080p gameplay run pass. Neither fixture was weakened or left modified.
 
+## First independent audit and repair
+
+The first clean-checkpoint audit correctly returned FAIL against `8dd2750`.
+Its three player-facing defects were repaired before requesting another review:
+
+- The victory/defeat/stalemate card is now hidden when the two-second intermission completes, before planning resumes. `PostCombatPlanningBeatSmoke` asserts that the card is gone while the restored planning timer is still at least 55 seconds.
+- The 1920x1080 starter layout now reserves 940 vertical pixels, uses a 320-pixel portrait, clips the details scroller, and contains all Axiom targeting copy above Start Game. `UnitSelectSmoke` verifies the clipping and geometry.
+- The gothic gateway now shows a restrained `CLICK OR PRESS ANY KEY` affordance while retaining its full-screen accessible interaction surface. `TitleMenuSmoke` verifies the prompt and input handoff.
+
+Fresh repair proof:
+
+- `%APPDATA%\Godot\app_userdata\Blood Will Pay\hardcore_ui_title_prompt_repair_2026_07_29.png` (Telegram 3725)
+- `%APPDATA%\Godot\app_userdata\Blood Will Pay\hardcore_ui_roster_overflow_repair_2026_07_29.png` (Telegram 3726)
+
+Post-repair targeted results: `TitleMenuSmoke`, `UnitSelectSmoke`,
+`PostCombatPlanningBeatSmoke`, `HardcoreUIAssetAudit`, `BlackLedgerSmoke`, and
+`LossScreenSmoke` pass with zero gameplay/script errors. Headless capture-only
+errors from the contract visual fixture are not treated as visual acceptance;
+contract and escalation rendering must be checked through the framebuffer by
+the next independent reviewer.
+
 ## Independent audit context
 
 The reviewer must use the exact file manifest in

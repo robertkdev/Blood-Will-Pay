@@ -49,6 +49,8 @@ func _run() -> void:
 	_expect(selected_label != null and selected_label.text == "No starter chosen", "Unit Select should begin with no inspected starter", failures)
 	var details_scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll") as ScrollContainer
 	_expect(details_scroll != null, "Unit Select preview details should use a scrollable container", failures)
+	if details_scroll != null:
+		_expect(details_scroll.clip_contents, "Unit Select preview details must clip long targeting copy inside the scroll panel", failures)
 	var details_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll/Details") as Label
 	_expect(details_label != null and details_label.text == "Hover a unit to preview", "Unit Select should begin with neutral preview help", failures)
 	var initial_art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
@@ -94,6 +96,19 @@ func _run() -> void:
 		_expect(selected_label != null and selected_label.text != "No starter chosen", "Selection label did not update", failures)
 		var art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
 		_expect(art != null and art.texture != null, "Preview art did not load", failures)
+		if details_scroll != null:
+			var help_label: Label = view.get_node_or_null("Center/HBox/Right/HelpLabel") as Label
+			var scroll_rect: Rect2 = details_scroll.get_global_rect()
+			var start_rect: Rect2 = start_button.get_global_rect()
+			_expect(help_label != null and not help_label.visible, "Selected starter should hide the redundant footer help row", failures)
+			_expect(
+				scroll_rect.end.y <= start_rect.position.y + 0.5,
+				"Preview details panel should end before Start Game (scroll_bottom=%.1f start_top=%.1f)" % [
+					scroll_rect.end.y,
+					start_rect.position.y
+				],
+				failures
+			)
 		view.reset_selection()
 		await get_tree().process_frame
 		_expect(start_button.disabled, "StartButton did not disable after reset_selection", failures)

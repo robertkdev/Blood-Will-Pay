@@ -402,3 +402,17 @@ A	tools/art/source/hardcore_ui_2026_07_29/menu_backdrop_source.png
 A	tools/art/source/hardcore_ui_2026_07_29/menu_backdrop_source.png.import
 A	tools/art/source/hardcore_ui_2026_07_29/recovery_report.json
 ```
+
+## First-audit repair delta
+
+The following paths changed after the first independent review of `8dd2750`:
+
+```text
+M	docs/art/blood_will_pay_hardcore_ui_implementation_2026-07-29.md
+M	scripts/main.gd
+M	scripts/ui/combat/controller/combat_controller.gd
+M	scripts/ui/unit_select.gd
+M	tests/visual/post_combat_planning_beat_smoke.gd
+M	tests/visual/title_menu_smoke.gd
+M	tests/visual/unit_select_smoke.gd
+```

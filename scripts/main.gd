@@ -353,6 +353,26 @@ func _build_title_page() -> void:
 		enter_button.add_theme_stylebox_override(state_name, empty_style)
 	enter_button.pressed.connect(_dismiss_title_page)
 	stack.add_child(enter_button)
+	var continue_prompt: Label = Label.new()
+	continue_prompt.name = "ContinuePrompt"
+	continue_prompt.text = "CLICK OR PRESS ANY KEY"
+	continue_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	continue_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	continue_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	continue_prompt.add_theme_font_size_override("font_size", 18)
+	continue_prompt.add_theme_color_override("font_color", Color(0.84, 0.79, 0.68, 0.96))
+	continue_prompt.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+	continue_prompt.add_theme_constant_override("outline_size", 3)
+	continue_prompt.anchor_left = 0.5
+	continue_prompt.anchor_right = 0.5
+	continue_prompt.anchor_top = 1.0
+	continue_prompt.anchor_bottom = 1.0
+	continue_prompt.offset_left = -240.0
+	continue_prompt.offset_right = 240.0
+	continue_prompt.offset_top = -108.0
+	continue_prompt.offset_bottom = -64.0
+	continue_prompt.z_index = 2
+	stack.add_child(continue_prompt)
 	_title_page.gui_input.connect(_on_title_page_gui_input)
 
 func _build_title_page_fallback(title_page: Control) -> void:
