@@ -21,7 +21,7 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 29) fail(`Expected curated history with 29 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 30) fail(`Expected curated history with 30 entries, got ${manifest.items.length}.`);
 if (manifest.items.filter((item) => item.unit === "creep").length !== 3) fail("Creep must have exactly V3, V4, and V5 provenance entries.");
 if (!manifest.items.some((item) => item.unit === "luna" && item.version === "Refit V1")) fail("Luna refit is missing.");
 if (!manifest.items.some((item) => item.unit === "mara" && item.source_unit.includes("mara"))) fail("Mara history is missing.");
@@ -39,6 +39,12 @@ if (sableReviews.map((item) => item.version).join("|") !== expectedSableVersions
 if (sableReviews.some((item) => item.current)) fail("Sable review history must not replace the default.");
 if (!sableReviews[7].status.includes("Latest review candidate") || !sableReviews[7].label.includes("corrected sleeves")) fail("Sable corrected-sleeves pass must remain the newest review candidate.");
 if (!/\{ unit: "sable"[^}]*current: true[^}]*path: "units\/sable\.png" \}/.test(html)) fail("Sable's existing P2 default is missing or was changed.");
+
+const kettReviews = manifest.items.filter((item) => item.unit === "kett");
+if (kettReviews.length !== 1 || kettReviews[0].version !== "Review V1") fail("Kett Review V1 is missing or out of order.");
+if (kettReviews.some((item) => item.current)) fail("Kett review history must not replace the default.");
+if (!kettReviews[0].status.includes("Latest review candidate") || !kettReviews[0].label.includes("Pit enforcer")) fail("Kett pit-enforcer concept must remain the newest review candidate.");
+if (!/\{ unit: "kett"[^}]*current: true[^}]*path: "units\/kett\.png" \}/.test(html)) fail("Kett's existing P2 default is missing or was changed.");
 
 for (const item of manifest.items) {
 	if (!item.local_path) fail(`Curated history entry is not bundled locally: ${item.path}`);
@@ -118,4 +124,4 @@ if (html.includes("padding: clamp(10px, 2vw, 30px)")) fail("Comparison artwork s
 if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use the full available review workspace.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=29 mara=17 sable-reviews=8 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=30 mara=17 sable-reviews=8 kett-reviews=1 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");

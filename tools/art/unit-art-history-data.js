@@ -298,6 +298,16 @@ window.GAMBLE_BATTLE_UNIT_ART_HISTORY = {
 			status: "Latest review candidate; no default change",
 			local_path: "history/sable/sable-review-v8.png",
 			path: "tools/art/history/sable/sable-review-v8.png"
+		},
+		{
+			unit: "kett",
+			source_unit: "kett",
+			kind: "candidate",
+			version: "Review V1",
+			label: "Pit enforcer gauntlet concept",
+			status: "Latest review candidate; no default change",
+			local_path: "history/kett/kett-review-v1.png",
+			path: "tools/art/history/kett/kett-review-v1.png"
 		}
 	],
 	excluded_source_categories: [
