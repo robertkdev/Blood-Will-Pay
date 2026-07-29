@@ -2,6 +2,7 @@ extends Node
 
 const SMOKE_NAME: String = "ShopCardHoverSmoke"
 const ShopPresenterLib: Script = preload("res://scripts/ui/shop/shop_presenter.gd")
+const OUTPUT_DIR: String = "res://outputs/visual_iter/shop_card_hover_pass"
 
 var _failures: Array[String] = []
 var _presenter: ShopPresenter = null
@@ -47,6 +48,7 @@ func _run() -> void:
 		_expect(_tooltip_contains(tooltip, "Attack Targeting:"), "shop tooltip should show attack targeting")
 		_expect(_tooltip_contains(tooltip, "Ability Targeting:"), "shop tooltip should show ability targeting")
 		_expect(not _tooltip_contains(tooltip, "Positioning:"), "shop tooltip should not prescribe positioning")
+	_save_capture("01_shop_card_hover_tooltip.png")
 	_move_hover(card)
 	await _settle_frames(2)
 	_expect(_tooltip_count() == 1, "shop hover motion should keep a single tooltip")
@@ -163,6 +165,28 @@ func _tooltip_contains(control: Control, needle: String) -> bool:
 func _settle_frames(count: int) -> void:
 	for _frame_index: int in range(count):
 		await get_tree().process_frame
+
+func _save_capture(filename: String) -> void:
+	var display_name: String = DisplayServer.get_name().to_lower()
+	var driver_name: String = RenderingServer.get_current_rendering_driver_name().to_lower()
+	if display_name == "headless" or display_name == "server" or display_name == "dummy" or driver_name.contains("dummy"):
+		print("%s: skipped %s because framebuffer capture is unavailable" % [SMOKE_NAME, filename])
+		return
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture == null or not texture.get_rid().is_valid():
+		push_error("%s: viewport unavailable for %s" % [SMOKE_NAME, filename])
+		return
+	var image: Image = texture.get_image()
+	if image == null or image.is_empty():
+		push_error("%s: image unavailable for %s" % [SMOKE_NAME, filename])
+		return
+	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
+	var error: Error = image.save_png(path)
+	if error != OK:
+		push_error("%s: save failed %s error=%d" % [SMOKE_NAME, path, int(error)])
+		return
+	print("%s: saved %s" % [SMOKE_NAME, ProjectSettings.globalize_path(path)])
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
