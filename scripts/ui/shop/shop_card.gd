@@ -38,6 +38,7 @@ var slot_index: int = -1
 var _hover_tween: Tween = null
 var _hovered: bool = false
 var _tooltip: PanelContainer = null
+var _tooltip_layer: CanvasLayer = null
 var _tooltip_title: String = ""
 var _tooltip_subtitle: String = ""
 var _tooltip_lines: Array[String] = []
@@ -477,6 +478,8 @@ func _show_tooltip() -> void:
 	tooltip.top_level = true
 	tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tooltip.z_index = 950
+	tooltip.set_meta("source_card_instance_id", get_instance_id())
+	tooltip.set_meta("source_offer_id", offer_id)
 	tooltip.custom_minimum_size.x = TOOLTIP_WIDTH
 	tooltip.add_theme_stylebox_override("panel", _make_tooltip_style())
 	var box: VBoxContainer = VBoxContainer.new()
@@ -491,7 +494,12 @@ func _show_tooltip() -> void:
 	for line: String in lines:
 		var color: Color = Color(0.92, 0.76, 0.58, 1.0) if line == _status_tip and _status_tip != "" else COLOR_TEXT
 		_add_tooltip_label(box, line, 13, color)
-	tree.root.add_child(tooltip)
+	var tooltip_layer: CanvasLayer = CanvasLayer.new()
+	tooltip_layer.name = "ShopCardTooltipLayer"
+	tooltip_layer.layer = 400
+	tree.root.add_child(tooltip_layer)
+	tooltip_layer.add_child(tooltip)
+	_tooltip_layer = tooltip_layer
 	_tooltip = tooltip
 	_sync_tooltip_size()
 	var viewport: Viewport = get_viewport()
@@ -571,8 +579,22 @@ func _make_tooltip_style() -> StyleBox:
 
 func _clear_tooltip() -> void:
 	if _tooltip != null and is_instance_valid(_tooltip):
-		_tooltip.queue_free()
+		var tooltip_parent: Node = _tooltip.get_parent()
+		if tooltip_parent != null:
+			tooltip_parent.remove_child(_tooltip)
+		_tooltip.free()
 	_tooltip = null
+	if _tooltip_layer != null and is_instance_valid(_tooltip_layer):
+		var layer_parent: Node = _tooltip_layer.get_parent()
+		if layer_parent != null:
+			layer_parent.remove_child(_tooltip_layer)
+		_tooltip_layer.free()
+	_tooltip_layer = null
+
+func clear_transient_state() -> void:
+	_hovered = false
+	_apply_hover_motion(false)
+	_clear_tooltip()
 
 func _exit_tree() -> void:
 	if _hover_tween != null and is_instance_valid(_hover_tween):

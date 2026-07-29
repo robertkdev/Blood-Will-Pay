@@ -416,3 +416,62 @@ M	tests/visual/post_combat_planning_beat_smoke.gd
 M	tests/visual/title_menu_smoke.gd
 M	tests/visual/unit_select_smoke.gd
 ```
+
+## Objective-exact audit repair delta
+
+The following intentional paths changed after the zero-history objective audit
+of `64dd5df8`. Godot-generated `.import`, `.uid`, and translation artifacts
+were quarantined and are not part of this delta.
+
+```text
+M	assets/ui/gothic_v3/button_utility_disabled.png
+M	assets/ui/gothic_v3/button_wager_disabled.png
+M	assets/ui/gothic_v3/ledger_row_sealed.png
+M	assets/ui/gothic_v3/shop_card_disabled.png
+M	assets/ui/gothic_v3/stats_tab_disabled.png
+M	assets/ui/hardcore/button_choice_disabled.png
+M	assets/ui/hardcore/button_choice_exhausted.png
+M	assets/ui/hardcore/button_compact_disabled.png
+M	assets/ui/hardcore/button_poster_row_disabled.png
+M	assets/ui/hardcore/button_primary_disabled.png
+M	assets/ui/hardcore/checkbox_disabled.png
+M	assets/ui/hardcore/input_disabled.png
+M	assets/ui/hardcore/intermission_track.png
+M	assets/ui/hardcore/scroll_grabber_disabled.png
+M	assets/ui/hardcore/scroll_track.png
+M	assets/ui/hardcore/slider_fill.png
+M	assets/ui/hardcore/slider_fill_disabled.png
+M	assets/ui/hardcore/slider_grabber_disabled.png
+M	assets/ui/hardcore/slider_track.png
+M	assets/ui/hardcore/slider_track_disabled.png
+M	assets/ui/hardcore/stamp_sold.png
+M	assets/ui/hardcore/unit_card_disabled.png
+M	docs/art/blood_will_pay_hardcore_ui_changed_files_2026-07-29.md
+M	docs/art/blood_will_pay_hardcore_ui_implementation_2026-07-29.md
+M	scripts/game/settings/user_settings.gd
+M	scripts/main.gd
+M	scripts/ui/black_ledger.gd
+M	scripts/ui/combat/combat_vfx_bridge.gd
+M	scripts/ui/combat/controller/combat_controller.gd
+M	scripts/ui/combat/economy_ui.gd
+M	scripts/ui/loss_screen.gd
+M	scripts/ui/shop/shop_card.gd
+M	scripts/ui/shop/shop_panel.gd
+M	scripts/ui/title_menu.gd
+M	scripts/ui/unit_select.gd
+M	tests/visual/accessibility_settings_smoke.gd
+A	tests/visual/ArenaPressureVisualSmoke.tscn
+M	tests/visual/betting_economy_smoke.gd
+M	tests/visual/contract_system_visual_capture.gd
+M	tests/visual/hardcore_ui_asset_audit.gd
+M	tests/visual/loss_screen_smoke.gd
+M	tests/visual/post_combat_planning_beat_smoke.gd
+M	tests/visual/shop_card_hover_smoke.gd
+M	tests/visual/system_menu_hover_stability_smoke.gd
+A	tests/visual/UIResolutionMatrixSmoke.tscn
+M	tests/visual/unit_select_smoke.gd
+A	tests/visual/arena_pressure_visual_smoke.gd
+A	tests/visual/ui_resolution_matrix_smoke.gd
+M	tools/art/recover_hardcore_ui.py
+M	tools/art/source/hardcore_ui_2026_07_29/recovery_report.json
+```

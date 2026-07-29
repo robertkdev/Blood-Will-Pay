@@ -255,29 +255,29 @@ func _build_system_menu() -> void:
 
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "Margin"
-	margin.add_theme_constant_override("margin_left", 38)
-	margin.add_theme_constant_override("margin_top", 34)
-	margin.add_theme_constant_override("margin_right", 38)
-	margin.add_theme_constant_override("margin_bottom", 34)
+	margin.add_theme_constant_override("margin_left", 6)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_right", 6)
+	margin.add_theme_constant_override("margin_bottom", 6)
 	panel.add_child(margin)
 
 	var stack: VBoxContainer = VBoxContainer.new()
 	stack.name = "Stack"
 	stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack.add_theme_constant_override("separation", 14)
+	stack.add_theme_constant_override("separation", 5)
 	margin.add_child(stack)
 
 	var title: Label = Label.new()
 	title.name = "Title"
 	title.text = "System"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_font_size_override("font_size", 26)
 	title.add_theme_color_override("font_color", Color(0.94, 0.84, 0.66))
 	stack.add_child(title)
 
 	var rule: HSeparator = HSeparator.new()
 	rule.name = "Rule"
-	rule.custom_minimum_size = Vector2(0.0, 18.0)
+	rule.custom_minimum_size = Vector2(0.0, 3.0)
 	stack.add_child(rule)
 
 	_resume_button = _make_menu_button("ResumeButton", "Resume")
@@ -449,6 +449,7 @@ func _make_menu_button(node_name: String, label: String) -> Button:
 	button.text = label
 	button.focus_mode = Control.FOCUS_ALL
 	button.custom_minimum_size = Vector2(320.0, 52.0)
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_apply_button_style(button, false)
 	return button
 

@@ -44,6 +44,8 @@ func _run() -> void:
 	var tooltip: Control = _first_tooltip()
 	_expect(tooltip != null and _control_inside_viewport(tooltip), "shop tooltip should stay inside the viewport")
 	if tooltip != null:
+		var tooltip_layer: CanvasLayer = tooltip.get_parent() as CanvasLayer
+		_expect(tooltip_layer != null and tooltip_layer.layer >= 400, "shop tooltip should live above shop/footer CanvasLayers")
 		_expect(tooltip.get_theme_stylebox("panel") is StyleBoxTexture, "shop tooltip should use the generated panel asset")
 		_expect(_tooltip_contains(tooltip, "Attack Targeting:"), "shop tooltip should show attack targeting")
 		_expect(_tooltip_contains(tooltip, "Ability Targeting:"), "shop tooltip should show ability targeting")
@@ -53,10 +55,15 @@ func _run() -> void:
 	await _settle_frames(2)
 	_expect(_tooltip_count() == 1, "shop hover motion should keep a single tooltip")
 
+	var old_card_instance_id: int = card.get_instance_id()
 	var reroll_result: Dictionary = Shop.reroll()
 	_expect(bool(reroll_result.get("ok", false)), "shop reroll should succeed during hover cleanup test")
+	_expect(_tooltip_count() == 0, "shop rebuild should synchronously clear tooltip from old hovered card")
 	await _settle_frames(8)
-	_expect(_tooltip_count() == 0, "shop rebuild should clear tooltip from old hovered card")
+	_expect(_tooltip_count() <= 1, "shop rebuild should never leave stacked old and new tooltips")
+	var rebuilt_tooltip: Control = _first_tooltip()
+	if rebuilt_tooltip != null:
+		_expect(int(rebuilt_tooltip.get_meta("source_card_instance_id", 0)) != old_card_instance_id, "shop rebuild should clear tooltip owned by the old hovered card")
 
 	var next_card: ShopCard = _first_shop_card()
 	_expect(next_card != null, "shop card missing after reroll")

@@ -120,8 +120,8 @@ func _assert_result_card() -> void:
 	var card_rect: Rect2 = card.get_global_rect()
 	var viewport: Viewport = get_viewport()
 	var viewport_size: Vector2 = viewport.get_visible_rect().size if viewport != null else Vector2.ZERO
-	_expect(card_rect.size.x >= 500.0 and card_rect.size.x <= 640.0, "result card width should stay restrained, got %.1f" % card_rect.size.x)
-	_expect(card_rect.size.y >= 150.0 and card_rect.size.y <= 230.0, "result card height should stay restrained, got %.1f" % card_rect.size.y)
+	_expect(is_equal_approx(card_rect.size.x, 560.0), "result card width must match the frozen 560px contract, got %.1f" % card_rect.size.x)
+	_expect(is_equal_approx(card_rect.size.y, 176.0), "result card height must match the frozen 176px contract, got %.1f" % card_rect.size.y)
 	_expect(card_rect.size.x < viewport_size.x * 0.55, "result card should not read as a full-screen color panel")
 	_expect(card.get_theme_stylebox("panel") != null, "result card should have a gothic panel style")
 

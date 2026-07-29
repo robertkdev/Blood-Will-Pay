@@ -50,7 +50,7 @@ func _sync_to_viewport() -> void:
 			minf(610.0, maxf(400.0, viewport_size.y - 16.0))
 		)
 	if _unlock_column != null:
-		_unlock_column.custom_minimum_size.x = minf(455.0, maxf(360.0, viewport_size.x * 0.48))
+		_unlock_column.custom_minimum_size.x = 340.0 if viewport_size.x < 960.0 else minf(455.0, maxf(360.0, viewport_size.x * 0.48))
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key_event: InputEventKey = event as InputEventKey
@@ -104,6 +104,9 @@ func _build_ui() -> void:
 	title.add_theme_color_override("font_color", COLOR_BONE)
 	title_box.add_child(title)
 	_progress_label = Label.new()
+	_progress_label.custom_minimum_size.x = 0.0
+	_progress_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_progress_label.add_theme_font_size_override("font_size", 14)
 	_progress_label.add_theme_color_override("font_color", COLOR_MUTED)
 	title_box.add_child(_progress_label)

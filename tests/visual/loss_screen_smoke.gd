@@ -40,6 +40,17 @@ func _ready() -> void:
 		_expect_texture_style(new_game_button, "focus", "NewGameButton focus should use the generated primary button asset", failures)
 	if stage_label != null:
 		_expect(stage_label.text == "Total Earned: 8g  •  Chapter 1  •  Stage 3", "StageLabel did not use live run score and GameState", failures)
+	if stage_label != null:
+		_expect(_luminance(stage_label.get_theme_color("font_color")) >= 0.42, "Loss stage summary should use high-luminance ink over grunge", failures)
+		_expect(_luminance(stage_label.get_theme_color("font_outline_color")) <= 0.08, "Loss stage summary should use a dark keyline", failures)
+	for summary_path: String in [
+		"Panel/Center/Frame/VBox/HighLabel",
+		"Panel/Center/Frame/VBox/Stats",
+	]:
+		var summary_label: Label = screen.get_node_or_null(summary_path) as Label
+		_expect(summary_label != null, "Loss summary label missing: %s" % summary_path, failures)
+		if summary_label != null:
+			_expect(_luminance(summary_label.get_theme_color("font_color")) >= 0.70, "Loss summary copy should remain bright over the poster texture: %s" % summary_path, failures)
 	var scoreboard: Node = screen.get_node_or_null("Panel/Center/Frame/VBox/ScoreboardHolder/Scoreboard")
 	_expect(scoreboard != null, "Loss scoreboard missing", failures)
 	if scoreboard != null:
@@ -153,6 +164,9 @@ func _label_texts(root: Node) -> Array[String]:
 func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:
 		failures.append(message)
+
+func _luminance(color: Color) -> float:
+	return color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722
 
 func _expect_texture_style(control: Control, style_name: String, message: String, failures: Array[String]) -> void:
 	if control == null:

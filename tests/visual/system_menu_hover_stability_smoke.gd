@@ -2,6 +2,7 @@ extends Node
 
 const SMOKE_NAME: String = "SystemMenuHoverStabilitySmoke"
 const MAIN_SCRIPT: GDScript = preload("res://scripts/main.gd")
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 
 var _style_host: Control = null
 var _button: Button = null
@@ -30,6 +31,25 @@ func _run() -> void:
 	_expect(rect_before.position.is_equal_approx(rect_after.position), "fixed SystemMenuButton position drifted on hover: before=%s after=%s" % [str(rect_before), str(rect_after)])
 	_expect(rect_before.size.is_equal_approx(rect_after.size), "fixed SystemMenuButton size drifted on hover: before=%s after=%s" % [str(rect_before), str(rect_after)])
 	_expect(not _button.has_meta("hover_tween"), "fixed SystemMenuButton should not create a hover tween")
+	var main: Control = MAIN_SCENE.instantiate() as Control
+	get_tree().root.add_child(main)
+	await _settle_frames(5)
+	var overlay: Control = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay") as Control
+	if overlay != null:
+		overlay.visible = true
+	await _settle_frames(3)
+	var panel: PanelContainer = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel") as PanelContainer
+	_expect(panel != null, "System Menu panel missing")
+	if panel != null:
+		_expect(panel.size.is_equal_approx(Vector2(430.0, 430.0)), "System Menu must match the frozen 430x430 contract, got %s" % str(panel.size))
+	for button_name: String in ["ResumeButton", "NewRunButton", "BlackLedgerButton", "ReturnTitleButton", "QuitGameButton"]:
+		var action: Button = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel/Margin/Stack/%s" % button_name) as Button
+		_expect(action != null, "System Menu action missing: %s" % button_name)
+		if action != null:
+			_expect(action.size.is_equal_approx(Vector2(320.0, 52.0)), "System Menu action %s must match 320x52, got %s" % [button_name, str(action.size)])
+	if main != null and is_instance_valid(main):
+		get_tree().root.remove_child(main)
+		main.free()
 	await _finish()
 
 func _expect(condition: bool, message: String) -> void:

@@ -51,6 +51,9 @@ func _ready() -> void:
 			var state_path: String = "res://%s%s.png" % [family, state]
 			if not FileAccess.file_exists(state_path):
 				failures.append("Missing state asset: %s" % state_path)
+		var disabled_path: String = "res://%sdisabled.png" % family
+		if FileAccess.file_exists(disabled_path):
+			_validate_disabled_cross(disabled_path, failures)
 	if failures.is_empty():
 		print("HARDCORE_UI_ASSET_AUDIT: PASS assets=%d families=%d states=%d" % [
 			EXPECTED_ASSET_COUNT,
@@ -81,3 +84,33 @@ func _validate_asset(asset: Dictionary, failures: Array[String]) -> void:
 			str(expected_size),
 			str(image.get_size()),
 		])
+
+func _validate_disabled_cross(resource_path: String, failures: Array[String]) -> void:
+	var image: Image = Image.new()
+	var load_error: Error = image.load(ProjectSettings.globalize_path(resource_path))
+	if load_error != OK:
+		failures.append("Could not inspect disabled state: %s" % resource_path)
+		return
+	var size: Vector2i = image.get_size()
+	var inset: int = maxi(2, roundi(float(mini(size.x, size.y)) * 0.16))
+	var rising_hits: int = 0
+	var falling_hits: int = 0
+	for step: int in range(17):
+		var t: float = 0.18 + float(step) * 0.04
+		var x: int = roundi(lerpf(float(inset), float(size.x - inset - 1), t))
+		var rising_y: int = roundi(lerpf(float(size.y - inset - 1), float(inset), t))
+		var falling_y: int = roundi(lerpf(float(inset), float(size.y - inset - 1), t))
+		if _is_strike_pixel(image.get_pixel(x, rising_y)):
+			rising_hits += 1
+		if _is_strike_pixel(image.get_pixel(x, falling_y)):
+			falling_hits += 1
+	if rising_hits < 12 or falling_hits < 12:
+		failures.append("Disabled state lacks a clear non-color X cue: %s rising=%d falling=%d" % [
+			resource_path,
+			rising_hits,
+			falling_hits,
+		])
+
+func _is_strike_pixel(color: Color) -> bool:
+	var luminance: float = color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722
+	return color.a >= 0.70 and luminance >= 0.58

@@ -201,7 +201,16 @@ def _paper_panel(
         result = Image.alpha_composite(result, shade)
     if state in ("disabled", "exhausted"):
         draw = ImageDraw.Draw(result)
-        draw.line((inset * 2, height - inset * 2, width - inset * 2, inset * 2), fill=(94, 87, 78, 185), width=max(2, minimum // 28))
+        strike_inset = max(inset * 2, round(minimum * 0.16))
+        strike_width = max(4, minimum // 16)
+        strike_shadow = (12, 10, 11, 235)
+        strike_bone = (196, 184, 162, 224)
+        rising = (strike_inset, height - strike_inset, width - strike_inset, strike_inset)
+        falling = (strike_inset, strike_inset, width - strike_inset, height - strike_inset)
+        draw.line(rising, fill=strike_shadow, width=strike_width + 4)
+        draw.line(falling, fill=strike_shadow, width=strike_width + 4)
+        draw.line(rising, fill=strike_bone, width=strike_width)
+        draw.line(falling, fill=strike_bone, width=strike_width)
     return result
 
 
@@ -413,7 +422,12 @@ def main() -> None:
         ("slider_fill", "selected"),
         ("slider_fill_disabled", "disabled"),
     ]:
-        _save(_paper_panel(hardcore_source, (512, 12), name, state, "hardcore", radius=3, roughness=0), HARDCORE_DIR / f"{name}.png", report)
+        slider_bar = _paper_panel(hardcore_source, (512, 12), name, state, "hardcore", radius=3, roughness=0)
+        slider_draw = ImageDraw.Draw(slider_bar)
+        slider_color = (214, 196, 164, 232) if state == "normal" else ((170, 30, 38, 242) if state == "selected" else (112, 104, 92, 210))
+        slider_draw.line((14, 6, 498, 6), fill=(10, 8, 9, 245), width=5)
+        slider_draw.line((14, 6, 498, 6), fill=slider_color, width=2)
+        _save(slider_bar, HARDCORE_DIR / f"{name}.png", report)
     for state in ["normal", "hover", "focus", "pressed", "disabled"]:
         _save(_paper_panel(hardcore_source, (28, 28), "slider_grabber", state, "hardcore", radius=4, roughness=1), HARDCORE_DIR / f"slider_grabber_{state}.png", report)
     _save(_paper_panel(hardcore_source, (16, 96), "scroll_track", "disabled", "hardcore", radius=4, roughness=0), HARDCORE_DIR / "scroll_track.png", report)

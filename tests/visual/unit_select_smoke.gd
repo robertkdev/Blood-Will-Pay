@@ -20,6 +20,10 @@ func _run() -> void:
 	await get_tree().process_frame
 
 	var failures: Array[String] = []
+	var full_layout: HBoxContainer = view.get_node_or_null("Center/HBox") as HBoxContainer
+	_expect(full_layout != null, "Unit Select full layout missing", failures)
+	if full_layout != null:
+		_expect(full_layout.size.is_equal_approx(Vector2(1320.0, 900.0)), "Unit Select full layout must match 1320x900, got %s" % str(full_layout.size), failures)
 	var roster_plate: Panel = view.get_node_or_null("GothicRosterPlate") as Panel
 	_expect(roster_plate != null, "Roster gothic plate missing", failures)
 	if roster_plate != null:

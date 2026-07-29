@@ -1072,11 +1072,12 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 	HardcoreUIAssets.apply_button_family(button, "primary" if primary else "poster")
 
 func _is_compact_layout() -> bool:
-	return get_viewport_rect().size.x < 1000.0
+	var viewport_size: Vector2 = get_viewport_rect().size
+	return viewport_size.x < 1360.0 or viewport_size.y < 800.0
 
 func _is_short_compact_layout() -> bool:
 	var viewport_height: float = get_viewport_rect().size.y
-	var compact_short: bool = _is_compact_layout() and viewport_height < 540.0
+	var compact_short: bool = _is_compact_layout() and viewport_height < 640.0
 	var maximum_scale_short: bool = UserSettingsScript.get_ui_scale() >= 1.49 and viewport_height < 800.0
 	return compact_short or maximum_scale_short
 

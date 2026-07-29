@@ -9,6 +9,7 @@ const Debug := preload("res://scripts/util/debug.gd")
 const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 const ArenaBridge := preload("res://scripts/ui/combat/arena_bridge.gd")
 const GridPlacement := preload("res://scripts/ui/combat/grid_placement.gd")
@@ -2670,6 +2671,12 @@ func _flash_contract_hazard(accent: Color, intensity: int) -> void:
 	hazard_frame.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.hazard_border_style(), style))
 	arena_container.add_child(hazard_frame)
 	hazard_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if _reduced_motion_enabled():
+		hazard_frame.modulate.a = 0.62
+		var reduced_tween: Tween = parent.create_tween()
+		reduced_tween.tween_interval(0.55)
+		reduced_tween.tween_callback(hazard_frame.queue_free)
+		return
 	hazard_frame.modulate.a = 0.0
 	var tween: Tween = parent.create_tween()
 	tween.tween_property(hazard_frame, "modulate:a", 0.78, 0.08)
@@ -2689,6 +2696,13 @@ func _show_combat_event_banner(text: String, accent: Color, intensity: int = 1) 
 	if _encounter_banner_tween != null and _encounter_banner_tween.is_valid():
 		_encounter_banner_tween.kill()
 	banner.visible = true
+	if _reduced_motion_enabled():
+		banner.modulate = Color.WHITE
+		banner.scale = Vector2.ONE
+		_encounter_banner_tween = parent.create_tween()
+		_encounter_banner_tween.tween_interval(1.65)
+		_encounter_banner_tween.tween_callback(func() -> void: banner.visible = false)
+		return
 	banner.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	banner.scale = Vector2(0.94, 0.94)
 	banner.pivot_offset = banner.size * 0.5
@@ -2743,6 +2757,13 @@ func _show_reinforcement_callouts(revived_indices: Array[int], intensity: int) -
 		callout_style.corner_radius_bottom_right = 5
 		callout.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(HardcoreUIAssets.reinforcement_style(intensity >= 2), callout_style))
 		actor.add_child(callout)
+		if _reduced_motion_enabled():
+			callout.modulate = Color.WHITE
+			callout.scale = Vector2.ONE
+			var reduced_tween: Tween = actor.create_tween()
+			reduced_tween.tween_interval(1.55)
+			reduced_tween.tween_callback(callout.queue_free)
+			continue
 		callout.modulate = Color(1.0, 1.0, 1.0, 0.0)
 		callout.scale = Vector2(0.70, 0.70)
 		callout.pivot_offset = callout.size * 0.5
@@ -2754,6 +2775,9 @@ func _show_reinforcement_callouts(revived_indices: Array[int], intensity: int) -
 		tween.tween_interval(1.55)
 		tween.tween_property(callout, "modulate:a", 0.0, 0.35)
 		tween.tween_callback(callout.queue_free)
+
+func _reduced_motion_enabled() -> bool:
+	return bool(UserSettingsScript.get_reduced_motion())
 
 func _ensure_encounter_banner() -> PanelContainer:
 	if parent == null:
@@ -2936,10 +2960,10 @@ func _ensure_result_banner() -> PanelContainer:
 	center.add_child(card)
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "CardMargin"
-	margin.add_theme_constant_override("margin_left", 34)
-	margin.add_theme_constant_override("margin_top", 22)
-	margin.add_theme_constant_override("margin_right", 34)
-	margin.add_theme_constant_override("margin_bottom", 22)
+	margin.add_theme_constant_override("margin_left", 0)
+	margin.add_theme_constant_override("margin_top", 0)
+	margin.add_theme_constant_override("margin_right", 0)
+	margin.add_theme_constant_override("margin_bottom", 0)
 	card.add_child(margin)
 	var content: VBoxContainer = VBoxContainer.new()
 	content.name = "Content"

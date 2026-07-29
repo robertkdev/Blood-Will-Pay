@@ -146,3 +146,52 @@ The final accepted validation set includes `HardcoreUIAssetAudit` (178 assets,
 of the Black Ledger, loss states, contracts/champion targeting, ascension,
 Warded Lines, Cinder Clock, escalation, reinforcements, pressure callouts, and
 the full state gallery.
+
+## Objective-exact audit repair iteration
+
+A later zero-history reviewer audited the complete 394-path manifest against
+the literal objective at `64dd5df8` and returned **FAIL**. That supersedes the
+earlier acceptance claim for objective-level completion. The repair iteration
+addressed all eight concrete P2 findings:
+
+- Shop tooltips now use a dedicated CanvasLayer at layer 400, clear
+  synchronously on shop rebuild, and identify their owning card so stale and
+  replacement tooltips can be distinguished.
+- Every disabled/exhausted asset now carries a high-contrast crossed-out
+  non-color cue. `HardcoreUIAssetAudit` samples both diagonals in all nine
+  state families.
+- The wager uses authored track/fill/grabber assets plus an explicit rendered
+  rail behind the HSlider; the live planning capture shows the complete rail.
+- Loss-summary text uses bone/red ink with a dark keyline over the grunge
+  poster.
+- Frozen contracts are enforced at runtime: System Menu 430x430 with 320x52
+  actions, Unit Select 1320x900, result card 560x176, and Arena Pressure
+  572x40 at the 82px arena offset.
+- Black Ledger compact widths now fit 1280x720 at 150% UI scale.
+- controller A/B defaults are restored and preserved across keyboard remaps;
+  controller A activates a focused title-menu action in the smoke test.
+- Arena Pressure has direct low/high/critical/reduced-motion captures,
+  replacement/no-stacking checks, and modal/result z-order checks.
+
+The new `UIResolutionMatrixSmoke` passes all 12 combinations of 1280x720,
+1920x1080, 2560x1080, and 3840x2160 at 100%, 125%, and 150%. The contract
+visual fixture now captures market, error, accepted champion targeting,
+ascension, Warded Lines, and Cinder Clock states directly.
+
+Fresh targeted runtime results in this iteration:
+
+- `HardcoreUIAssetAudit`: PASS (178 assets, 9 families, 7 states)
+- `AccessibilitySettingsSmoke`: PASS
+- `SystemMenuHoverStabilitySmoke`: PASS
+- `UnitSelectSmoke`: PASS
+- `ShopCardHoverSmoke`: PASS
+- `LossScreenSmoke`: PASS
+- `BettingEconomySmoke`: PASS
+- `PostCombatPlanningBeatSmoke`: PASS
+- `ArenaPressureVisualSmoke`: PASS
+- `UIResolutionMatrixSmoke`: PASS (4x3)
+- `ContractSystemVisualCapture`: 8 framebuffer captures, no errors
+
+Telegram repair evidence: 3766-3773. The user requested that the goal stop
+after this iteration, so a new zero-history final reviewer has deliberately
+not been spawned yet. Objective-level PASS remains pending that future review.

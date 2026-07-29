@@ -363,9 +363,9 @@ func _ensure_pressure_banner() -> void:
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "Margin"
 	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_top", 0)
 	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_bottom", 6)
+	margin.add_theme_constant_override("margin_bottom", 0)
 	_pressure_banner.add_child(margin)
 	_pressure_label = Label.new()
 	_pressure_label.name = "Label"

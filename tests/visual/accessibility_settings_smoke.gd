@@ -5,6 +5,7 @@ const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const TEST_SETTINGS_PATH: String = "user://accessibility_settings_smoke.cfg"
 const TEST_ACCOUNT_PROFILE_PATH: String = "user://accessibility_settings_account_profile.json"
+const OUTPUT_DIR: String = "res://outputs/visual_iter/accessibility_settings_pass"
 
 @export var viewport_size: Vector2i = Vector2i(1280, 720)
 
@@ -33,6 +34,8 @@ func _run() -> void:
 	UserSettingsScript.initialize(window)
 	var defaults_error: Error = UserSettingsScript.reset_input_defaults()
 	_expect(defaults_error == OK, "default bindings should save to the isolated test config")
+	_expect(_has_joypad_button(&"ui_accept", JOY_BUTTON_A), "Confirm defaults should include controller A")
+	_expect(_has_joypad_button(&"ui_cancel", JOY_BUTTON_B), "Menu / Back defaults should include controller B")
 
 	_main = MAIN_SCENE.instantiate() as Control
 	get_tree().root.add_child(_main)
@@ -134,11 +137,26 @@ func _run() -> void:
 	_expect(not bool(title_menu.get("_motion_enabled")), "Reduced Motion should stop title-menu animation")
 
 	var remap_key: InputEventKey = _make_key(KEY_F6)
-	var remap_result: Dictionary[String, Variant] = UserSettingsScript.set_keyboard_binding(&"ui_accept", remap_key)
-	_expect(bool(remap_result.get("ok", false)), "Confirm should accept an unused keyboard binding")
-	var conflict_result: Dictionary[String, Variant] = UserSettingsScript.set_keyboard_binding(&"ui_cancel", remap_key)
-	_expect(not bool(conflict_result.get("ok", true)) and String(conflict_result.get("error", "")) == "conflict", "duplicate binding should report a conflict")
-	_expect(_non_key_event_count(&"ui_accept") == _non_key_count(_original_accept_events), "remapping Confirm should preserve its non-key events")
+	var binding_status: Label = title_menu.find_child("BindingStatus", true, false) as Label if title_menu != null else null
+	if title_menu != null:
+		title_menu.call("_begin_binding_capture", &"ui_accept")
+	await _settle_frames(2)
+	_expect(binding_status != null and String(binding_status.text).contains("Press a key"), "binding listening state should explain the next action")
+	_save_capture("01_binding_listening.png")
+	if title_menu != null:
+		title_menu.call("_input", remap_key)
+	await _settle_frames(2)
+	_expect(UserSettingsScript.binding_text(&"ui_accept").contains("F6"), "Confirm should accept an unused keyboard binding")
+	_expect(binding_status != null and String(binding_status.text).contains("now bound"), "binding success state should confirm the new key")
+	_save_capture("02_binding_success.png")
+	if title_menu != null:
+		title_menu.call("_begin_binding_capture", &"ui_cancel")
+		title_menu.call("_input", remap_key)
+	await _settle_frames(2)
+	_expect(binding_status != null and String(binding_status.text).contains("already assigned"), "duplicate binding should show a visible conflict state")
+	_save_capture("03_binding_conflict.png")
+	_expect(_non_key_event_count(&"ui_accept") >= _non_key_count(_original_accept_events), "remapping Confirm should preserve its existing non-key events")
+	_expect(_has_joypad_button(&"ui_accept", JOY_BUTTON_A), "remapping Confirm should preserve controller A")
 
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
@@ -156,6 +174,17 @@ func _run() -> void:
 	await _settle_frames(1)
 	_expect(UserSettingsScript.binding_text(&"ui_accept").contains("Enter"), "reset should restore Confirm to Enter")
 	_expect(UserSettingsScript.binding_text(&"ui_cancel").contains("Escape"), "reset should restore Menu / Back to Escape")
+	_expect(_has_joypad_button(&"ui_accept", JOY_BUTTON_A), "reset should preserve controller A")
+	_expect(_has_joypad_button(&"ui_cancel", JOY_BUTTON_B), "reset should preserve controller B")
+	var how_to_button: Button = title_menu.find_child("HowToPlayButton", true, false) as Button if title_menu != null else null
+	_expect(how_to_button != null, "How To Play controller target missing")
+	if how_to_button != null:
+		how_to_button.grab_focus()
+		await _settle_frames(1)
+		_send_joypad_button(JOY_BUTTON_A, true)
+		_send_joypad_button(JOY_BUTTON_A, false)
+		await _settle_frames(4)
+		_expect(String(title_menu.get("_active_section")) == "how_to_play", "controller A should activate the focused title-menu action")
 	_finish()
 
 func _copy_events(action: StringName) -> Array[InputEvent]:
@@ -185,6 +214,21 @@ func _non_key_count(events: Array[InputEvent]) -> int:
 			count += 1
 	return count
 
+func _has_joypad_button(action: StringName, button_index: JoyButton) -> bool:
+	for event: InputEvent in InputMap.action_get_events(action):
+		var joypad_event: InputEventJoypadButton = event as InputEventJoypadButton
+		if joypad_event != null and joypad_event.button_index == button_index:
+			return true
+	return false
+
+func _send_joypad_button(button_index: JoyButton, pressed: bool) -> void:
+	var event: InputEventJoypadButton = InputEventJoypadButton.new()
+	event.device = 0
+	event.button_index = button_index
+	event.pressed = pressed
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+
 func _make_key(keycode: Key) -> InputEventKey:
 	var key_event: InputEventKey = InputEventKey.new()
 	key_event.keycode = keycode
@@ -206,6 +250,24 @@ func _expect(condition: bool, message: String) -> void:
 func _settle_frames(count: int) -> void:
 	for _frame_index: int in range(count):
 		await get_tree().process_frame
+
+func _save_capture(filename: String) -> void:
+	var display_name: String = DisplayServer.get_name().to_lower()
+	var driver_name: String = RenderingServer.get_current_rendering_driver_name().to_lower()
+	if display_name == "headless" or display_name == "server" or display_name == "dummy" or driver_name.contains("dummy"):
+		return
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture == null or not texture.get_rid().is_valid():
+		_failures.append("viewport unavailable for %s" % filename)
+		return
+	var image: Image = texture.get_image()
+	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
+	var save_error: Error = image.save_png(path)
+	if save_error != OK:
+		_failures.append("capture failed for %s error=%d" % [filename, int(save_error)])
+		return
+	print("%s: saved %s" % [SMOKE_NAME, ProjectSettings.globalize_path(path)])
 
 func _finish() -> void:
 	if _main != null and is_instance_valid(_main):

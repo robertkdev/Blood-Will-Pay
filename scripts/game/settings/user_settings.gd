@@ -23,6 +23,7 @@ static func initialize(window: Window, settings_path: String = "") -> void:
 		_loaded = false
 	if not _loaded:
 		_load()
+	_ensure_controller_defaults()
 	_apply_ui_scale(window)
 
 static func configure_storage_path(settings_path: String) -> void:
@@ -81,6 +82,7 @@ static func reset_input_defaults() -> Error:
 	_ensure_loaded()
 	_replace_keyboard_events(&"ui_accept", [_make_key_event(KEY_ENTER)])
 	_replace_keyboard_events(&"ui_cancel", [_make_key_event(KEY_ESCAPE)])
+	_ensure_controller_defaults()
 	return _save()
 
 static func reload(window: Window) -> void:
@@ -124,6 +126,21 @@ static func _save() -> Error:
 static func _apply_ui_scale(window: Window) -> void:
 	if window != null:
 		window.content_scale_factor = _ui_scale
+
+static func _ensure_controller_defaults() -> void:
+	_ensure_joypad_button(&"ui_accept", JOY_BUTTON_A)
+	_ensure_joypad_button(&"ui_cancel", JOY_BUTTON_B)
+
+static func _ensure_joypad_button(action: StringName, button_index: JoyButton) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	for event: InputEvent in InputMap.action_get_events(action):
+		var joypad_event: InputEventJoypadButton = event as InputEventJoypadButton
+		if joypad_event != null and joypad_event.button_index == button_index:
+			return
+	var joypad_event: InputEventJoypadButton = InputEventJoypadButton.new()
+	joypad_event.button_index = button_index
+	InputMap.action_add_event(action, joypad_event)
 
 static func _replace_keyboard_events(action: StringName, keyboard_events: Array[InputEventKey]) -> void:
 	if not InputMap.has_action(action):

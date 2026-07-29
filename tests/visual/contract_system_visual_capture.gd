@@ -37,12 +37,49 @@ func _run() -> void:
 	controller.call("_show_contract_market")
 	await _settle(0.20)
 	_save_capture("00_contract_market.png")
-	controller.call("_show_champion_contract_targets", offers[0])
+	if Engine.has_singleton("Economy") or has_node("/root/Economy"):
+		Economy.gold = 0
+	controller.call("_on_contract_choice_pressed", 0)
 	await _settle(0.20)
-	_save_capture("01_champion_targeting.png")
+	var contract_status: Label = null
+	for status_candidate: Node in view.find_children("*", "Label", true, false):
+		var status_label: Label = status_candidate as Label
+		if status_label != null and String(status_label.text).begins_with("Cannot buy:"):
+			contract_status = status_label
+			break
+	if contract_status == null or not String(contract_status.text).begins_with("Cannot buy:"):
+		push_error("ContractSystemVisualCapture: contract error state missing")
+		get_tree().quit(1)
+		return
+	_save_capture("01_contract_error.png")
+	if Engine.has_singleton("Economy") or has_node("/root/Economy"):
+		Economy.gold = 1000
+	var champion_index: int = -1
+	for offer_index: int in range(offers.size()):
+		if String(offers[offer_index].get("family", "")) == "champion":
+			champion_index = offer_index
+			break
+	if champion_index < 0:
+		push_error("ContractSystemVisualCapture: champion offer missing")
+		get_tree().quit(1)
+		return
+	controller.call("_on_contract_choice_pressed", champion_index)
+	await _settle(0.20)
+	_save_capture("02_contract_accepted_champion_targeting.png")
 	if Engine.has_singleton("Shop") or has_node("/root/Shop"):
 		Shop.restore_contract_snapshot({})
 	controller.call("_close_contract_market")
+	var ascension_unit: Unit = manager.player_team[0]
+	ascension_unit.level = 4
+	controller.call("_show_ascension_choice", ascension_unit)
+	await _settle(0.20)
+	var ascension_overlay: Control = view.find_child("UnitAscensionOverlay", true, false) as Control
+	if ascension_overlay == null or not ascension_overlay.visible:
+		push_error("ContractSystemVisualCapture: ascension choice missing")
+		get_tree().quit(1)
+		return
+	_save_capture("03_ascension_choice.png")
+	controller.call("_close_ascension_choice")
 
 	var result: Dictionary[String, Variant] = manager.start_custom_battle(
 		["brute", "hexeon", "luna"],
@@ -68,13 +105,13 @@ func _run() -> void:
 	var engine: Variant = manager.get_engine()
 	engine.configure_contract_battle(battle_config)
 	await _settle(0.08)
-	_save_capture("02_warded_lines_banner.png")
+	_save_capture("04_warded_lines_banner.png")
 	await _settle(0.30)
-	_save_capture("03_warded_lines_shields.png")
+	_save_capture("05_warded_lines_shields.png")
 	await _settle(2.20)
-	_save_capture("04_cinder_clock_banner.png")
+	_save_capture("06_cinder_clock_banner.png")
 	await _settle(0.30)
-	_save_capture("05_cinder_clock_aftermath.png")
+	_save_capture("07_cinder_clock_aftermath.png")
 	print("CONTRACT_SYSTEM_VISUAL_CAPTURE READY captures=%d output=%s" % [saved_captures, ProjectSettings.globalize_path(OUTPUT_DIR)])
 	await get_tree().create_timer(8.0).timeout
 	get_tree().quit(0)

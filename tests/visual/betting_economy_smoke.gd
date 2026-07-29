@@ -184,6 +184,13 @@ func _verify_post_shop_bet_controls() -> void:
 	_expect(gold > 1, "post-opener gold should allow a meaningful bet, got %d" % gold)
 	_expect(slider.visible, "post-shop bet slider should be visible")
 	_expect(slider.editable, "post-shop bet slider should be editable")
+	_expect(slider.get_theme_stylebox("slider") is StyleBoxTexture, "post-shop wager rail should use the generated track asset")
+	_expect(slider.get_theme_stylebox("grabber_area") is StyleBoxTexture, "post-shop wager fill should use the generated fill asset")
+	_expect(slider.get_theme_icon("grabber") != null, "post-shop wager should use the generated grabber asset")
+	_expect(slider.get_theme_icon("grabber_highlight") != null, "post-shop wager should expose a distinct hover grabber")
+	_expect(slider.get_theme_icon("grabber_disabled") != null, "post-shop wager should expose a disabled grabber")
+	var authored_rail: TextureRect = slider.get_node_or_null("HardcoreWagerRail") as TextureRect
+	_expect(authored_rail != null and authored_rail.visible and authored_rail.texture != null, "post-shop wager should render its authored rail behind the grabber")
 	_expect(label == null or label.visible, "post-shop Bet label should be visible")
 	_expect(int(slider.min_value) == 1, "post-shop bet slider min should be 1")
 	_expect(int(slider.max_value) == gold, "post-shop bet slider max should equal current gold")

@@ -14,9 +14,9 @@ const BLOOD_COLOR: Color = Color(0.74, 0.10, 0.08, 1.0)
 const BONE_COLOR: Color = Color(0.86, 0.80, 0.68, 1.0)
 const DULL_GOLD: Color = Color(0.79, 0.61, 0.32, 1.0)
 const MUTED_TEXT: Color = Color(0.62, 0.57, 0.49, 1.0)
-const SUMMARY_INK: Color = Color(0.105, 0.075, 0.068, 1.0)
-const SUMMARY_BLOOD_INK: Color = Color(0.34, 0.055, 0.048, 1.0)
-const SUMMARY_KEYLINE: Color = Color(0.88, 0.82, 0.70, 0.72)
+const SUMMARY_INK: Color = Color(0.94, 0.89, 0.79, 1.0)
+const SUMMARY_BLOOD_INK: Color = Color(1.0, 0.48, 0.38, 1.0)
+const SUMMARY_KEYLINE: Color = Color(0.015, 0.010, 0.012, 0.96)
 
 @onready var panel: PanelContainer = $Panel
 @onready var backdrop: ColorRect = $Backdrop

@@ -24,6 +24,13 @@ func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all
 	if bet_slider:
 		_bet_row = bet_slider.get_parent()
 		bet_slider.step = 1.0
+		bet_slider.add_theme_stylebox_override("slider", HardcoreUIAssets.slider_style("track"))
+		bet_slider.add_theme_stylebox_override("grabber_area", HardcoreUIAssets.slider_style("fill"))
+		bet_slider.add_theme_stylebox_override("grabber_area_highlight", HardcoreUIAssets.slider_style("fill"))
+		bet_slider.add_theme_icon_override("grabber", HardcoreUIAssets.slider_icon("normal"))
+		bet_slider.add_theme_icon_override("grabber_highlight", HardcoreUIAssets.slider_icon("hover"))
+		bet_slider.add_theme_icon_override("grabber_disabled", HardcoreUIAssets.slider_icon("disabled"))
+		_ensure_visible_wager_rail()
 	if all_in_button != null and not all_in_button.is_connected("pressed", Callable(self, "_on_all_in_pressed")):
 		all_in_button.pressed.connect(_on_all_in_pressed)
 	if all_in_button != null:
@@ -40,6 +47,29 @@ func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all
 	var gs: Variant = _get_gamestate()
 	if gs and not gs.is_connected("phase_changed", Callable(self, "_on_phase_changed")):
 		gs.phase_changed.connect(_on_phase_changed)
+
+func _ensure_visible_wager_rail() -> void:
+	if bet_slider == null:
+		return
+	var rail: TextureRect = bet_slider.get_node_or_null("HardcoreWagerRail") as TextureRect
+	if rail == null:
+		rail = TextureRect.new()
+		rail.name = "HardcoreWagerRail"
+		rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rail.show_behind_parent = true
+		rail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		rail.stretch_mode = TextureRect.STRETCH_SCALE
+		rail.anchor_left = 0.0
+		rail.anchor_right = 1.0
+		rail.anchor_top = 0.5
+		rail.anchor_bottom = 0.5
+		rail.offset_left = 2.0
+		rail.offset_right = -2.0
+		rail.offset_top = -6.0
+		rail.offset_bottom = 6.0
+		bet_slider.add_child(rail)
+		bet_slider.move_child(rail, 0)
+	rail.texture = HardcoreUIAssets.texture(HardcoreUIAssets.HARDCORE_ROOT + "slider_track.png")
 
 func teardown() -> void:
 	if Engine.has_singleton("Economy"):

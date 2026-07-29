@@ -38,6 +38,8 @@ func clear() -> void:
     if _grid != null and is_instance_valid(_grid):
         for c in _grid.get_children():
             if c is Node:
+                if c.has_method("clear_transient_state"):
+                    c.call("clear_transient_state")
                 _grid.remove_child(c)
                 c.free()
     _cards.clear()
@@ -56,6 +58,8 @@ func set_offers(offers: Array) -> void:
         return
     for c in _grid.get_children():
         if c is Node:
+            if c.has_method("clear_transient_state"):
+                c.call("clear_transient_state")
             c.queue_free()
     _cards.clear()
     _grid.columns = 1 if _single_empty_state and offers.is_empty() else _slot_count
