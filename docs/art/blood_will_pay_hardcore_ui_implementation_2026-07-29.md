@@ -73,7 +73,13 @@ Fresh real-game captures:
 
 Telegram review trail: messages 3704-3716.
 
-Two broad legacy visual fixtures remain unsuitable as acceptance gates: their synthetic mouse/window assumptions do not match the authoritative runtime. `ShopCardHoverSmoke` cannot keep an OS-level hover through its synthetic warp, while the fresh real-game capture proves the card hover and tooltip together. `CompactViewportVisualAuditSmoke` constructs a direct synthetic 720p layout that clips the footer, while the targeted compact footer smoke and the authoritative 1080p gameplay run pass. Neither fixture was weakened or left modified.
+`ShopCardHoverSmoke` now captures its own framebuffer proof and routes hover
+motion through Godot's input pipeline, so the same test covers the generated
+tooltip asset, targeting copy, viewport containment, reroll cleanup, and
+hover-exit cleanup. `CompactViewportVisualAuditSmoke` remains unsuitable as a
+release gate because its direct synthetic 720p construction does not match the
+authoritative responsive runtime; `CompactShopFooterSmoke` and the real 1080p
+game remain the compact-layout gates.
 
 ## First independent audit and repair
 
@@ -100,3 +106,43 @@ the next independent reviewer.
 
 The reviewer must use the exact file manifest in
 `docs/art/blood_will_pay_hardcore_ui_changed_files_2026-07-29.md`, run the game through the player-facing entrypoint, take new screenshots, inspect every surface/state family above, and return PASS only if the complete hybrid direction is coherent, readable, correctly sized, and interaction states are visibly distinct.
+
+## Final independent acceptance
+
+Final acceptance was issued against `17bddaa` after four independent review
+passes. Earlier reviews served as real defect discovery rather than waived
+evidence:
+
+- The first audit found the overlong result card, starter-copy overflow, and
+  missing gateway affordance; all three were repaired and targeted by smokes.
+- A later audit found white starter-screen holes and an electric-blue,
+  block-corrupted victory arena. Six task-launched Godot editors had written
+  the same transient `.godot/imported` cache concurrently. All task editors
+  were closed, the corrupted cache was quarantined, and one editor rebuilt all
+  828 imports before the failed states were replayed.
+- Clean single-writer repair proof is
+  `%APPDATA%\Godot\app_userdata\Blood Will Pay\hybrid_ui_clean_reimport_roster_2026_07_29.png`
+  (Telegram 3751) and
+  `%APPDATA%\Godot\app_userdata\Blood Will Pay\hybrid_ui_clean_reimport_victory_2026_07_29.png`
+  (Telegram 3752).
+
+The final fresh reviewer started from a clean worktree, launched one editor,
+ran the real `Main.tscn` at 1920x1080, and returned **PASS** with no unresolved
+P0-P2 UI/art issue. Its own evidence:
+
+- Telegram 3753: gothic title gateway and visible input affordance.
+- Telegram 3754: unselected starter roster without white holes.
+- Telegram 3755: selected Axiom with contained targeting copy.
+- Telegram 3756: clean opening gothic battle.
+- Telegram 3757: restored planning/shop after victory without arena corruption.
+- Telegram 3758: real shop hover and contained targeting tooltip.
+- Telegram 3759: exercised All In state with updated wager/outcome summary.
+- `clean_final_09_system_menu.png`: hardcore System modal over the dark world.
+
+The final accepted validation set includes `HardcoreUIAssetAudit` (178 assets,
+9 families, 7 state classes), `StatsPanelClickSmoke`,
+`CompactShopFooterSmoke`, `PostCombatPlanningBeatSmoke`,
+`ShopCardHoverSmoke`, and `ShopPurchaseFeedbackSmoke`, plus framebuffer review
+of the Black Ledger, loss states, contracts/champion targeting, ascension,
+Warded Lines, Cinder Clock, escalation, reinforcements, pressure callouts, and
+the full state gallery.
