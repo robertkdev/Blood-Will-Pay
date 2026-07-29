@@ -21,7 +21,7 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 30) fail(`Expected curated history with 30 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 31) fail(`Expected curated history with 31 entries, got ${manifest.items.length}.`);
 if (manifest.items.filter((item) => item.unit === "creep").length !== 3) fail("Creep must have exactly V3, V4, and V5 provenance entries.");
 if (!manifest.items.some((item) => item.unit === "luna" && item.version === "Refit V1")) fail("Luna refit is missing.");
 if (!manifest.items.some((item) => item.unit === "mara" && item.source_unit.includes("mara"))) fail("Mara history is missing.");
