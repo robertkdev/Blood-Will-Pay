@@ -113,11 +113,11 @@ func _first_shop_card() -> ShopCard:
 func _hover_card(card: ShopCard) -> void:
 	var center: Vector2 = card.get_global_rect().get_center()
 	Input.warp_mouse(center)
-	card.emit_signal("mouse_entered")
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.position = center
 	event.global_position = center
-	card.emit_signal("gui_input", event)
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
 
 func _move_hover(card: ShopCard) -> void:
 	var position: Vector2 = card.get_global_rect().get_center() + Vector2(20.0, 12.0)
@@ -125,7 +125,8 @@ func _move_hover(card: ShopCard) -> void:
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.position = position
 	event.global_position = position
-	card.emit_signal("gui_input", event)
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
 
 func _unhover_card(card: ShopCard) -> void:
 	card.emit_signal("mouse_exited")
