@@ -33,6 +33,8 @@ const TeamOddsEstimator := preload("res://scripts/game/combat/team_odds_estimato
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 const RunSnapshotCoordinator := preload("res://scripts/game/run/run_snapshot_coordinator.gd")
 const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.gd")
+const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
+const TraitCompilerScript: GDScript = preload("res://scripts/game/traits/trait_compiler.gd")
 
 const START_BATTLE_TEXT: String = "Start Battle"
 const START_FORCED_FIGHT_TEXT: String = "Start Opening Fight"
@@ -169,6 +171,7 @@ var _bottom_combat_visibility_state: int = -1
 var _layout_tile_size: int = UI.TILE_SIZE
 var _active_run_save_pending: bool = false
 var _active_run_restore_in_progress: bool = false
+var _encounter_escalations_seen: int = 0
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -1851,6 +1854,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	_complete_pending_battle_start()
 	if continue_button != null:
 		continue_button.text = BATTLE_LOCKED_TEXT
+	_encounter_escalations_seen = 0
 	_on_log_line("Prepare to fight.")
 	if projectile_bridge and projectile_bridge.has_method("set_visuals_enabled"):
 		projectile_bridge.set_visuals_enabled(true)
@@ -1862,6 +1866,8 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	_sync_bottom_combat_visibility()
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 		Economy.start_combat()
+	var battle_snapshot: Dictionary = _build_account_victory_snapshot()
+	AccountProgressionScript.record_battle_start(battle_snapshot)
 	if grid_placement and manager:
 		grid_placement.rebuild_enemy_views(manager.enemy_team)
 		enemy_views = grid_placement.get_enemy_views()
@@ -2111,7 +2117,20 @@ func _on_victory(_stage: int) -> void:
 		attack_button.disabled = true
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "victory"
-	_show_result_banner("VICTORY", "Round secured. Preparing your next decision.", Color(0.58, 0.72, 0.38, 1.0), Color(0.86, 0.94, 0.74, 1.0))
+	var bounty_result: Dictionary = _evaluate_account_bounties()
+	var bounty_awards: Array = bounty_result.get("awards", []) as Array
+	var victory_detail: String = "Round secured. Preparing your next decision."
+	if not bounty_awards.is_empty():
+		var omen_total: int = 0
+		var titles: Array[String] = []
+		for raw_award: Variant in bounty_awards:
+			if raw_award is Dictionary:
+				var award: Dictionary = raw_award as Dictionary
+				omen_total += int(award.get("reward", 0))
+				titles.append(String(award.get("title", "Bounty")))
+		victory_detail = "+%d OMENS  •  %s" % [omen_total, ", ".join(titles)]
+		_on_log_line("Black Ledger: %s" % victory_detail)
+	_show_result_banner("VICTORY", victory_detail, Color(0.58, 0.72, 0.38, 1.0), Color(0.86, 0.94, 0.74, 1.0))
 	_auto_loop_running = false
 	_start_intermission(2.0)
 
@@ -2459,6 +2478,7 @@ func _on_vfx_knockup(team: String, index: int, duration: float) -> void:
 		actor.play_knockup(duration)
 
 func _on_encounter_escalated(_phase_id: String, label: String, _champion_index: int, revived_indices: Array[int], _affected_player_indices: Array[int], _pulse_damage: int, intensity: int) -> void:
+	_encounter_escalations_seen += 1
 	_show_reinforcement_callouts(revived_indices, intensity)
 	var text: String = "%s\n%d REINFORCEMENT%s RETURN" % [
 		label,
@@ -2467,6 +2487,125 @@ func _on_encounter_escalated(_phase_id: String, label: String, _champion_index: 
 	]
 	var accent: Color = Color(0.95, 0.23, 0.14, 1.0) if intensity >= 2 else Color(0.96, 0.55, 0.16, 1.0)
 	_show_combat_event_banner(text, accent)
+
+func _evaluate_account_bounties() -> Dictionary:
+	if manager == null:
+		return {"ok": false, "error": "NO_MANAGER", "awards": []}
+	var snapshot: Dictionary = _build_account_victory_snapshot()
+	return AccountProgressionScript.evaluate_victory(snapshot)
+
+func _build_account_victory_snapshot() -> Dictionary:
+	var chapter: int = int(GameState.chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else 1
+	var stage_in_chapter: int = int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else max(1, int(manager.stage))
+	var units: Array[Dictionary] = []
+	var roles: Array[String] = []
+	var team_slots: Array[String] = []
+	var team_identity_keys: Array[String] = []
+	var positioned_units: Array[Dictionary] = []
+	var survivor_count: int = 0
+	for index: int in range(manager.player_team.size()):
+		var unit: Unit = manager.player_team[index]
+		if unit == null:
+			continue
+		var role: String = String(unit.primary_role).strip_edges().to_lower()
+		if role != "" and not roles.has(role):
+			roles.append(role)
+		var alive: bool = unit.is_alive()
+		if alive:
+			survivor_count += 1
+		var instance_key: String = "%s#%d" % [String(unit.id).to_lower(), int(unit.get_instance_id())]
+		var tile_index: int = index
+		if index < player_views.size() and player_views[index] != null:
+			tile_index = int(player_views[index].tile_idx)
+		positioned_units.append({"key": instance_key, "tile": tile_index})
+		team_identity_keys.append(instance_key)
+		units.append({
+			"id": String(unit.id).strip_edges().to_lower(),
+			"instance_key": instance_key,
+			"level": int(unit.level),
+			"alive": alive,
+			"primary_role": role,
+			"traits": unit.traits.duplicate(),
+			"market_package_kind": String(unit.market_package_kind).strip_edges().to_lower(),
+			"doctrine": String(unit.targeting_mode_override).strip_edges().to_lower(),
+		})
+	positioned_units.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("tile", 0)) < int(b.get("tile", 0)))
+	for positioned: Dictionary in positioned_units:
+		team_slots.append(String(positioned.get("key", "")))
+	team_identity_keys.sort()
+	var compiled_traits: Dictionary = TraitCompilerScript.compile(manager.player_team)
+	var trait_tiers: Dictionary = compiled_traits.get("tiers", {}) as Dictionary
+	var active_trait_count: int = 0
+	for trait_id: Variant in trait_tiers.keys():
+		if int(trait_tiers.get(trait_id, -1)) >= 0:
+			active_trait_count += 1
+	var top_damage_unit_id: String = ""
+	var top_damage: float = -1.0
+	var ally_deaths: int = 0
+	if stats_tracker != null:
+		ally_deaths = int(stats_tracker.get_team_total("player", "deaths", "ALL"))
+		var rows: Array = stats_tracker.get_rows("player", "damage", "ALL")
+		for raw_row: Variant in rows:
+			if not raw_row is Dictionary:
+				continue
+			var row: Dictionary = raw_row as Dictionary
+			var damage: float = float(row.get("value", 0.0))
+			var row_unit: Unit = row.get("unit", null) as Unit
+			if row_unit != null and damage > top_damage:
+				top_damage = damage
+				top_damage_unit_id = String(row_unit.id).strip_edges().to_lower()
+	var economy: Node = _autoload_node("Economy")
+	var shop: Node = _autoload_node("Shop")
+	var roster: Node = _autoload_node("Roster")
+	var run_id: String = String(economy.get("run_id")) if economy != null else ""
+	var contract_families: Array[String] = []
+	var champion_fulfilled: bool = false
+	var pit_active: bool = false
+	if shop != null and shop.has_method("get_contract_snapshot"):
+		var contract_snapshot: Dictionary = shop.call("get_contract_snapshot")
+		var history_value: Variant = contract_snapshot.get("chosen_history", [])
+		if history_value is Array:
+			for raw_contract: Variant in history_value as Array:
+				if not raw_contract is Dictionary:
+					continue
+				var family: String = String((raw_contract as Dictionary).get("family", "")).strip_edges().to_lower()
+				if family != "" and not contract_families.has(family):
+					contract_families.append(family)
+	if shop != null and shop.has_method("get_contract_enemy_multiplier"):
+		pit_active = float(shop.call("get_contract_enemy_multiplier")) > 1.0
+	for unit_data: Dictionary in units:
+		if String(unit_data.get("doctrine", "")) != "":
+			champion_fulfilled = true
+			break
+	return {
+		"run_id": run_id,
+		"event_id": "%s:%d:%d:victory" % [run_id, chapter, stage_in_chapter],
+		"battle_key": "%s:%d:%d" % [run_id, chapter, stage_in_chapter],
+		"chapter": chapter,
+		"stage": stage_in_chapter,
+		"is_boss": RosterUtils.is_boss_stage(stage_in_chapter),
+		"multi_phase_boss": _encounter_escalations_seen > 0,
+		"units": units,
+		"team_size": units.size(),
+		"survivor_count": survivor_count,
+		"ally_deaths": ally_deaths,
+		"team_capacity": int(roster.get("max_team_size")) if roster != null else units.size(),
+		"primary_roles": roles,
+		"active_trait_count": active_trait_count,
+		"team_slots": team_slots,
+		"team_signature": "|".join(team_identity_keys),
+		"top_damage_unit_id": top_damage_unit_id,
+		"precombat_bankroll": int(economy.get("last_gold_start")) if economy != null else 0,
+		"wager": int(economy.get("last_bet_start")) if economy != null else 0,
+		"projected_win_probability": float(economy.get("projected_win_probability")) if economy != null else 1.0,
+		"paid_rerolls": int(shop.get("paid_rerolls")) if shop != null else 0,
+		"paid_xp_purchases": int(shop.get("paid_xp_purchases")) if shop != null else 0,
+		"paid_command_purchases": int(shop.get("paid_command_purchases")) if shop != null else 0,
+		"command_rank": int(shop.call("get_command_rank")) if shop != null and shop.has_method("get_command_rank") else 0,
+		"contract_families": contract_families,
+		"pit_active": pit_active,
+		"champion_fulfilled": champion_fulfilled and contract_families.has("champion"),
+	}
 
 func _on_contract_battle_event(event_type: String, label: String, _affected_player_indices: Array[int], _affected_enemy_indices: Array[int], value: int, intensity: int) -> void:
 	var text: String = "%s\n%d TOTAL EFFECT" % [label, max(0, value)]

@@ -10,6 +10,7 @@ const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
 const COLOR_PANEL: Color = Color(0.034, 0.029, 0.039, 0.94)
@@ -24,6 +25,8 @@ const COMPACT_VIEWPORT_HEIGHT: float = 780.0
 const IDENTITY_PANEL_MIN_HEIGHT: float = 96.0
 const START_BUTTON_READY_TEXT: String = "Start Game"
 const START_BUTTON_PENDING_TEXT: String = "Preparing Battle..."
+
+var account_profile_path: String = "user://account_profile_v1.json"
 
 @onready var background: ColorRect = $Background
 @onready var hbox: HBoxContainer = $Center/HBox
@@ -304,6 +307,7 @@ func _ensure_identity_panel(preview: VBoxContainer) -> void:
 
 func show_screen() -> void:
 	visible = true
+	_populate_units()
 	_apply_gothic_layout()
 	_style_unit_cards()
 	start_button.disabled = selected_id == ""
@@ -343,14 +347,18 @@ func _populate_units() -> void:
 	buttons_by_id.clear()
 	_preview_units_by_id.clear()
 	for child in grid.get_children():
+		grid.remove_child(child)
 		child.queue_free()
 	# Use catalog to obtain starter-eligible units at starting level
 	var catalog: UnitCatalog = UnitCatalog.new()
 	catalog.refresh()
 	var level: int = int(ShopConfig.STARTING_LEVEL)
 	var ids: Array[String] = catalog.list_starter_ids(level)
+	var unlocked_ids: Array[String] = AccountProgressionScript.unlocked_starter_ids(account_profile_path)
 	var meta_items: Array[Dictionary] = []
 	for uid: String in ids:
+		if not unlocked_ids.has(uid.to_lower()):
+			continue
 		var meta: Dictionary = catalog.get_unit_meta(String(uid))
 		if meta.is_empty():
 			continue

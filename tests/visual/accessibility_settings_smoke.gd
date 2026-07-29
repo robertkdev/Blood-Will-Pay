@@ -4,6 +4,7 @@ const SMOKE_NAME: String = "AccessibilitySettingsSmoke"
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const TEST_SETTINGS_PATH: String = "user://accessibility_settings_smoke.cfg"
+const TEST_ACCOUNT_PROFILE_PATH: String = "user://accessibility_settings_account_profile.json"
 
 @export var viewport_size: Vector2i = Vector2i(1280, 720)
 
@@ -85,6 +86,7 @@ func _run() -> void:
 	for control_name: String in [
 		"GameTitle",
 		"StartButton",
+		"BlackLedgerButton",
 		"HomeButton",
 		"HowToPlayButton",
 		"UnitsButton",
@@ -98,6 +100,37 @@ func _run() -> void:
 			"150 percent title control %s should remain inside the %dx%d viewport rect=%s viewport=%s"
 			% [control_name, viewport_size.x, viewport_size.y, str(navigation_control.get_global_rect() if navigation_control != null else Rect2()), str(viewport_rect)]
 		)
+	if _main != null:
+		_main.call("open_black_ledger", TEST_ACCOUNT_PROFILE_PATH)
+	await _settle_frames(3)
+	var ledger: Control = _main.find_child("BlackLedger", true, false) as Control if _main != null else null
+	var ledger_panel: PanelContainer = ledger.find_child("*", true, false) as PanelContainer if ledger != null else null
+	if ledger != null:
+		for candidate: Node in ledger.find_children("*", "PanelContainer", true, false):
+			var panel_candidate: PanelContainer = candidate as PanelContainer
+			if panel_candidate != null and panel_candidate.custom_minimum_size.x >= 1000.0:
+				ledger_panel = panel_candidate
+				break
+	var ledger_viewport: Rect2 = ledger.get_viewport().get_visible_rect() if ledger != null else Rect2()
+	_expect(
+		ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), ledger_viewport.grow(2.0)),
+		"150 percent Black Ledger should remain inside the %dx%d viewport panel=%s viewport=%s"
+		% [viewport_size.x, viewport_size.y, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(ledger_viewport)]
+	)
+	var ledger_close: Button = ledger.find_child("*", true, false) as Button if ledger != null else null
+	if ledger != null:
+		for candidate: Node in ledger.find_children("*", "Button", true, false):
+			var button_candidate: Button = candidate as Button
+			if button_candidate != null and button_candidate.text == "Close":
+				ledger_close = button_candidate
+				break
+	_expect(
+		ledger_close != null and _rect_inside(ledger_close.get_global_rect(), ledger_viewport.grow(2.0)),
+		"150 percent Black Ledger Close button should remain visible"
+	)
+	if _main != null:
+		_main.call("_close_black_ledger")
+	await _settle_frames(2)
 	motion_check = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	reset_button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
 	if motion_check != null:
@@ -199,6 +232,10 @@ func _finish() -> void:
 			window.size = _original_window_size
 			window.content_scale_size = _original_window_size
 	UserSettingsScript.configure_storage_path(UserSettingsScript.DEFAULT_SETTINGS_PATH)
+	var account_paths: Array[String] = [TEST_ACCOUNT_PROFILE_PATH, "%s.tmp" % TEST_ACCOUNT_PROFILE_PATH, "%s.bak" % TEST_ACCOUNT_PROFILE_PATH]
+	for account_path: String in account_paths:
+		if FileAccess.file_exists(account_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(account_path))
 	_remove_test_settings()
 	if _failures.is_empty():
 		print(SMOKE_NAME + ": OK")

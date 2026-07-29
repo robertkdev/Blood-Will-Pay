@@ -11,7 +11,9 @@ const AuditPanelScene: GDScript = preload("res://scripts/ui/audit/audit_panel.gd
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
+const BlackLedgerScript: GDScript = preload("res://scripts/ui/black_ledger.gd")
 const TITLE_SIGIL: Texture2D = preload("res://assets/ui/gold icon.png")
+const BLACK_LEDGER_CAPTURE_REQUEST_PATH: String = "user://black_ledger_capture_request.json"
 
 const DEBUG_AUTO_START := false
 const DEBUG_TRACE := true
@@ -33,6 +35,11 @@ var _title_page: Control
 var _starter_transition_pending: bool = false
 var _pending_starter_id: String = ""
 var _continue_run_button: Button
+var _black_ledger_title_button: Button
+var _black_ledger_system_button: Button
+var _black_ledger_layer: CanvasLayer
+var _black_ledger: Control
+var _ledger_previous_paused: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -45,6 +52,7 @@ func _ready() -> void:
 	if quit_button and not quit_button.is_connected("pressed", Callable(self, "_on_quit")):
 		quit_button.pressed.connect(_on_quit)
 	_build_continue_run_button()
+	_build_black_ledger_title_button()
 	if combat_view:
 		combat_view.process_mode = Node.PROCESS_MODE_PAUSABLE
 	if unit_select:
@@ -61,6 +69,8 @@ func _ready() -> void:
 		if Debug.enabled:
 			print("[Main] Debug auto-start enabled; starting game")
 		call_deferred("_on_start")
+	if OS.is_debug_build() and FileAccess.file_exists(BLACK_LEDGER_CAPTURE_REQUEST_PATH):
+		call_deferred("_run_black_ledger_capture_request")
 
 func _set_menu_visible(show_menu: bool) -> void:
 	if show_menu:
@@ -280,6 +290,10 @@ func _build_system_menu() -> void:
 	_new_run_button.pressed.connect(request_new_run)
 	stack.add_child(_new_run_button)
 
+	_black_ledger_system_button = _make_menu_button("BlackLedgerButton", "Black Ledger")
+	_black_ledger_system_button.pressed.connect(open_black_ledger)
+	stack.add_child(_black_ledger_system_button)
+
 	_return_title_button = _make_menu_button("ReturnTitleButton", "Return to Title")
 	_return_title_button.pressed.connect(request_return_to_title)
 	stack.add_child(_return_title_button)
@@ -473,8 +487,9 @@ func _sync_system_menu_button() -> void:
 	var title_is_visible: bool = title_menu != null and title_menu.visible
 	var title_page_is_visible: bool = _title_page != null and _title_page.visible
 	var loss_overlay_is_active: bool = _loss_overlay_active()
-	_system_menu_button.visible = not title_is_visible and not title_page_is_visible and not _system_menu_open and not loss_overlay_is_active
-	_system_menu_button.disabled = title_is_visible or title_page_is_visible or loss_overlay_is_active
+	var ledger_is_open: bool = _black_ledger != null and is_instance_valid(_black_ledger)
+	_system_menu_button.visible = not title_is_visible and not title_page_is_visible and not _system_menu_open and not loss_overlay_is_active and not ledger_is_open
+	_system_menu_button.disabled = title_is_visible or title_page_is_visible or loss_overlay_is_active or ledger_is_open
 	_system_menu_button.mouse_default_cursor_shape = Control.CURSOR_ARROW if _system_menu_button.disabled else Control.CURSOR_POINTING_HAND
 
 func _wire_system_button_hover(button: Button, compact: bool) -> void:
@@ -606,6 +621,84 @@ func _build_continue_run_button() -> void:
 	if not _continue_run_button.is_connected("pressed", Callable(self, "_on_continue_run")):
 		_continue_run_button.pressed.connect(_on_continue_run)
 	_refresh_continue_run_button()
+
+func _build_black_ledger_title_button() -> void:
+	if start_button == null or start_button.get_parent() == null:
+		return
+	var host: VBoxContainer = start_button.get_parent() as VBoxContainer
+	if host == null:
+		return
+	_black_ledger_title_button = host.get_node_or_null("BlackLedgerButton") as Button
+	if _black_ledger_title_button == null:
+		_black_ledger_title_button = start_button.duplicate() as Button
+		_black_ledger_title_button.name = "BlackLedgerButton"
+		_black_ledger_title_button.text = "Black Ledger"
+		host.add_child(_black_ledger_title_button)
+		host.move_child(_black_ledger_title_button, quit_button.get_index())
+	if not _black_ledger_title_button.is_connected("pressed", Callable(self, "open_black_ledger")):
+		_black_ledger_title_button.pressed.connect(open_black_ledger)
+
+func open_black_ledger(account_profile_path: String = "user://account_profile_v1.json") -> void:
+	if _black_ledger != null and is_instance_valid(_black_ledger):
+		return
+	if _system_menu_open:
+		_close_system_menu()
+	_ledger_previous_paused = get_tree().paused
+	_black_ledger_layer = CanvasLayer.new()
+	_black_ledger_layer.name = "BlackLedgerLayer"
+	_black_ledger_layer.layer = SYSTEM_LAYER_INDEX + 10
+	_black_ledger_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_black_ledger_layer)
+	_black_ledger = BlackLedgerScript.new() as Control
+	_black_ledger.name = "BlackLedger"
+	_black_ledger.process_mode = Node.PROCESS_MODE_ALWAYS
+	_black_ledger.call("configure", account_profile_path)
+	_black_ledger_layer.add_child(_black_ledger)
+	_black_ledger.closed.connect(_close_black_ledger)
+	get_tree().paused = true
+	_sync_system_menu_button()
+
+func _close_black_ledger() -> void:
+	if _black_ledger != null and is_instance_valid(_black_ledger):
+		_black_ledger.queue_free()
+	_black_ledger = null
+	if _black_ledger_layer != null and is_instance_valid(_black_ledger_layer):
+		_black_ledger_layer.queue_free()
+	_black_ledger_layer = null
+	get_tree().paused = _ledger_previous_paused
+	_sync_system_menu_button()
+
+func _run_black_ledger_capture_request() -> void:
+	var file: FileAccess = FileAccess.open(BLACK_LEDGER_CAPTURE_REQUEST_PATH, FileAccess.READ)
+	if file == null:
+		return
+	var request_value: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not request_value is Dictionary:
+		return
+	var request: Dictionary = request_value as Dictionary
+	var output_path: String = String(request.get("output_path", "")).strip_edges()
+	if output_path == "":
+		return
+	var account_profile_path: String = String(request.get("profile_path", "user://account_profile_v1.json"))
+	open_black_ledger(account_profile_path)
+	for _frame_index: int in range(45):
+		await get_tree().process_frame
+	RenderingServer.force_draw(false)
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture != null and texture.get_rid().is_valid():
+		var image: Image = texture.get_image()
+		if image != null and not image.is_empty():
+			var output_dir: String = output_path.get_base_dir()
+			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output_dir))
+			var error: Error = image.save_png(output_path)
+			if error == OK:
+				print("BLACK_LEDGER_MAIN_CAPTURE:PASS %s" % ProjectSettings.globalize_path(output_path))
+			else:
+				push_error("BLACK_LEDGER_MAIN_CAPTURE:SAVE_FAILED %d" % int(error))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(BLACK_LEDGER_CAPTURE_REQUEST_PATH))
+	if bool(request.get("quit_after_capture", true)):
+		get_tree().quit()
 
 func _refresh_continue_run_button() -> void:
 	if _continue_run_button == null:

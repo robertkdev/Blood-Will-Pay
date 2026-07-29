@@ -33,6 +33,9 @@ var _board_team_provider: Callable = Callable()
 var _opening_starter_id: String = ""
 var _opening_helper_shops_consumed: int = 0
 var _opening_retry_team_bonus_active: bool = false
+var paid_rerolls: int = 0
+var paid_xp_purchases: int = 0
+var paid_command_purchases: int = 0
 
 func _ready() -> void:
 	_rng = ShopRng.new()
@@ -98,6 +101,9 @@ func reset_run() -> void:
 	_opening_starter_id = ""
 	_opening_helper_shops_consumed = 0
 	_opening_retry_team_bonus_active = false
+	paid_rerolls = 0
+	paid_xp_purchases = 0
+	paid_command_purchases = 0
 	if _progress:
 		_progress.reset()
 	if _contracts:
@@ -218,6 +224,9 @@ func snapshot_run_state() -> Dictionary:
 		"opening_starter_id": _opening_starter_id,
 		"opening_helper_shops_consumed": _opening_helper_shops_consumed,
 		"opening_retry_team_bonus_active": _opening_retry_team_bonus_active,
+		"paid_rerolls": paid_rerolls,
+		"paid_xp_purchases": paid_xp_purchases,
+		"paid_command_purchases": paid_command_purchases,
 		"rng_seed": _rng.get_seed() if _rng != null else 0,
 		"rng_state": _rng.get_state() if _rng != null else 0,
 	}
@@ -246,6 +255,9 @@ func restore_run_state(snapshot_data: Dictionary) -> void:
 	_opening_starter_id = String(snapshot_data.get("opening_starter_id", ""))
 	_opening_helper_shops_consumed = max(0, int(snapshot_data.get("opening_helper_shops_consumed", 0)))
 	_opening_retry_team_bonus_active = bool(snapshot_data.get("opening_retry_team_bonus_active", false))
+	paid_rerolls = max(0, int(snapshot_data.get("paid_rerolls", 0)))
+	paid_xp_purchases = max(0, int(snapshot_data.get("paid_xp_purchases", 0)))
+	paid_command_purchases = max(0, int(snapshot_data.get("paid_command_purchases", 0)))
 	if _rng != null:
 		_rng.set_seed(int(snapshot_data.get("rng_seed", _rng.get_seed())))
 		if snapshot_data.has("rng_state"):
@@ -300,6 +312,7 @@ func reroll() -> Dictionary:
 	var cost: int = int(res.get("gold_spent", 0))
 	# Spend gold or record combat spend
 	if cost > 0 and _has_autoload("Economy"):
+		paid_rerolls += 1
 		if _is_combat_phase() and Economy.has_method("adjust_combat_spent"):
 			Economy.adjust_combat_spent(cost)
 		else:
@@ -338,6 +351,11 @@ func buy_xp() -> Dictionary:
 		return res
 	var cost: int = int(res.get("gold_spent", 0))
 	if cost > 0 and _has_autoload("Economy"):
+		var purchase_kind: String = String(res.get("purchase_kind", "xp"))
+		if purchase_kind == "command":
+			paid_command_purchases += 1
+		else:
+			paid_xp_purchases += 1
 		if _is_combat_phase() and Economy.has_method("adjust_combat_spent"):
 			Economy.adjust_combat_spent(cost)
 		else:

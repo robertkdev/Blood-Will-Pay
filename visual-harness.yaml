@@ -1,6 +1,29 @@
 version: 1
 project: Gamble Battle
 scenarios:
+  - id: black-ledger
+    title: Ledger
+    adapter: godot
+    objective: Verify readable fresh and veteran account progression in Main.
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Capture-BlackLedgerEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/black_ledger/captures.json"
+    required_groups: [ledger]
+    runtime_provenance:
+      entrypoint: "Godot 4.5 Main scene game framebuffer"
+      scene: "res://scenes/Main.tscn"
+      build: "current Black Ledger integration worktree"
+    evidence:
+      required_cameras: [p]
+      required_layers: [f]
+      required_states: [fresh, veteran]
+      required_viewports: [1920x1080]
+      required_events: [f, v]
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 300
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 3
+    telegram_context: "Gamble Battle Black Ledger"
   - id: godot-visibility
     title: Godot player-facing visibility gate
     adapter: godot
