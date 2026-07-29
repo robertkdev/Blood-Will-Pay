@@ -1,7 +1,7 @@
 # Main Menu Redesign Goal: The World Is the Breakdown
 
 Date: 2026-07-28
-Status: revised direction; prior Basement Threshold concept rejected
+Status: title-screen direction approved; 4K production master created but not wired into the game
 
 ## Core Intent
 
@@ -46,11 +46,13 @@ consequence. It should feel like the held breath before a breakdown lands.
 The player is not entering a concert. The player is crossing into a conflict
 that has the pressure and inevitability of one.
 
-Preserve the existing title-screen copy:
+Use the approved title-screen copy:
 
-- `GAMBLE BATTLE`
-- `Blood. Gold. Consequence.`
-- `ENTER`
+- `BLOOD WILL PAY`
+- `THEIR LIVES. YOUR ODDS.`
+
+The title screen is a click-anywhere continuation surface. It has no visible
+`ENTER` button, instructional prompt, or other call to action.
 
 ## Emotional Construction
 
@@ -95,8 +97,9 @@ specific consequence without requiring lore text.
 - Build one dominant mass, one rupture, and one area of visual silence.
 - Let the title occupy the silence as a hard graphic interruption rather than a
   diegetic sign or poster.
-- Make `ENTER` a stark command integrated into the game UI, not a ticket,
-  plaque, prop, or location label.
+- Leave the lower-left space beneath the tagline visually quiet. The entire
+  screen advances on click, keyboard input, or controller input rather than
+  presenting a visible button.
 
 ## World Materials and Palette
 
@@ -134,8 +137,9 @@ The UI can inherit metal's force without pretending to be music memorabilia:
   Gamble Battle.
 - No stage, crowd-as-audience, performer, venue, ticket, flyer, speaker,
   amplifier, or tour metaphor is visible.
-- The title, tagline, and focused `ENTER` action remain readable at 1920x1080
-  and 1280x720.
+- The title and tagline remain readable at 3840x2160, 1920x1080, and 1280x720.
+- No visible button, prompt, cursor, instruction, or additional text competes
+  with the title image.
 - The composition feels like pressure before impact rather than a poster
   advertising impact.
 - Horror comes from place, consequence, scale, and implication—not Halloween
@@ -149,3 +153,10 @@ The creative rule is:
 
 > Do not put metal culture into the world. Build the kind of world that makes
 > metal feel like the natural way to describe it.
+
+Approved production artwork:
+
+- `assets/ui/title/blood_will_pay_title_screen_4k.png`
+- 3840x2160 PNG
+- Button-free click-anywhere composition
+- Not yet connected to the runtime title scene
