@@ -22,6 +22,12 @@ var _frame: Panel = null
 var _value_well: Panel = null
 var _hovered: bool = false
 var _record_emphasis: bool = false
+var _compact_layout: bool = false
+
+func set_compact_layout(enabled: bool) -> void:
+	_compact_layout = enabled
+	set_meta("compact_layout", enabled)
+	_refresh()
 
 func set_record_emphasis(enabled: bool) -> void:
 	_record_emphasis = enabled
@@ -75,10 +81,12 @@ func _update_identity() -> void:
 		unit_name = display_name.strip_edges()
 	elif unit_ref != null and String(unit_ref.name).strip_edges() != "":
 		unit_name = String(unit_ref.name)
-	name_label.text = unit_name
+	var team_prefix: String = "FOE" if team == "enemy" else "YOU"
+	name_label.text = "%s // %s" % [team_prefix, unit_name.left(2).to_upper()] if _compact_layout else unit_name
+	name_label.tooltip_text = "%s team — %s" % ["Enemy" if team == "enemy" else "Your", unit_name]
 
 func _apply_visual_style() -> void:
-	custom_minimum_size.y = max(custom_minimum_size.y, 94.0 if _record_emphasis else 54.0)
+	custom_minimum_size.y = 40.0 if _compact_layout else 94.0 if _record_emphasis else 54.0
 	var player_side: bool = team != "enemy"
 	var fill_color: Color = Color(0.66, 0.055, 0.070, 0.92) if player_side else Color(0.42, 0.030, 0.045, 0.90)
 	var bg_color: Color = Color(0.016, 0.014, 0.018, 0.42)
@@ -89,12 +97,12 @@ func _apply_visual_style() -> void:
 	if bar_fill != null:
 		bar_fill.color = Color(fill_color.r + 0.06, fill_color.g + 0.05, fill_color.b + 0.04, 1.0) if _hovered else fill_color
 	if name_label != null:
-		name_label.add_theme_font_size_override("font_size", 22 if _record_emphasis else 17)
+		name_label.add_theme_font_size_override("font_size", 14 if _compact_layout else 22 if _record_emphasis else 17)
 		name_label.add_theme_color_override("font_color", Color(0.96, 0.90, 0.78, 1.0) if _hovered else Color(0.88, 0.84, 0.76, 1.0))
 		name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		name_label.add_theme_constant_override("outline_size", 1)
 	if value_label != null:
-		value_label.add_theme_font_size_override("font_size", 26 if _record_emphasis else 18)
+		value_label.add_theme_font_size_override("font_size", 15 if _compact_layout else 26 if _record_emphasis else 18)
 		value_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.60, 1.0) if _hovered else Color(0.95, 0.56, 0.50, 1.0))
 		value_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		value_label.add_theme_constant_override("outline_size", 1)
@@ -116,31 +124,32 @@ func _ensure_layout() -> void:
 		_frame.offset_bottom = 0.0
 	if hbox != null:
 		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-		hbox.offset_left = 12.0 if _record_emphasis else 8.0
-		hbox.offset_top = 8.0 if _record_emphasis else 6.0
-		hbox.offset_right = -12.0 if _record_emphasis else -8.0
-		hbox.offset_bottom = -8.0 if _record_emphasis else -6.0
-		hbox.add_theme_constant_override("separation", 12 if _record_emphasis else 8)
+		hbox.offset_left = 5.0 if _compact_layout else 12.0 if _record_emphasis else 8.0
+		hbox.offset_top = 3.0 if _compact_layout else 8.0 if _record_emphasis else 6.0
+		hbox.offset_right = -5.0 if _compact_layout else -12.0 if _record_emphasis else -8.0
+		hbox.offset_bottom = -3.0 if _compact_layout else -8.0 if _record_emphasis else -6.0
+		hbox.add_theme_constant_override("separation", 0 if _compact_layout else 12 if _record_emphasis else 8)
 	if portrait != null:
-		portrait.custom_minimum_size = Vector2(78.0, 78.0) if _record_emphasis else Vector2(40.0, 40.0)
+		portrait.visible = not _compact_layout
+		portrait.custom_minimum_size = Vector2.ZERO if _compact_layout else Vector2(78.0, 78.0) if _record_emphasis else Vector2(40.0, 40.0)
 	if content_box != null:
-		content_box.custom_minimum_size = Vector2(0.0, 78.0) if _record_emphasis else Vector2(0.0, 42.0)
+		content_box.custom_minimum_size = Vector2(0.0, 34.0) if _compact_layout else Vector2(0.0, 78.0) if _record_emphasis else Vector2(0.0, 42.0)
 		_ensure_value_well()
 	if name_label != null:
 		name_label.anchor_left = 0.0
 		name_label.anchor_right = 1.0
 		name_label.anchor_top = 0.0
 		name_label.anchor_bottom = 1.0
-		name_label.offset_left = 16.0 if _record_emphasis else 10.0
-		name_label.offset_right = -126.0 if _record_emphasis else -84.0
+		name_label.offset_left = 4.0 if _compact_layout else 16.0 if _record_emphasis else 10.0
+		name_label.offset_right = -48.0 if _compact_layout else -126.0 if _record_emphasis else -84.0
 		name_label.clip_text = true
 	if value_label != null:
 		value_label.anchor_left = 1.0
 		value_label.anchor_right = 1.0
 		value_label.anchor_top = 0.0
 		value_label.anchor_bottom = 1.0
-		value_label.offset_left = -116.0 if _record_emphasis else -76.0
-		value_label.offset_right = -14.0 if _record_emphasis else -10.0
+		value_label.offset_left = -44.0 if _compact_layout else -116.0 if _record_emphasis else -76.0
+		value_label.offset_right = -4.0 if _compact_layout else -14.0 if _record_emphasis else -10.0
 
 func _make_row_style(player_side: bool, hovered: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -166,7 +175,7 @@ func _ensure_value_well() -> void:
 	_value_well.anchor_right = 1.0
 	_value_well.anchor_top = 0.0
 	_value_well.anchor_bottom = 1.0
-	_value_well.offset_left = -122.0 if _record_emphasis else -82.0
+	_value_well.offset_left = -48.0 if _compact_layout else -122.0 if _record_emphasis else -82.0
 	_value_well.offset_right = 0.0
 	_value_well.offset_top = 3.0
 	_value_well.offset_bottom = -3.0
@@ -221,6 +230,9 @@ func _center_value_label() -> void:
 	value_label.offset_bottom = top + text_h
 
 func _ready() -> void:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	_compact_layout = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0
+	set_meta("compact_layout", _compact_layout)
 	_ensure_layout()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

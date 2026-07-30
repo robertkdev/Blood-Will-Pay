@@ -42,18 +42,21 @@ missing image, or an incomplete packet is a hard failure. Headless runs still
 write a unique manifest with `status: "blocked"` and exit nonzero; they never
 fall back to software mockups.
 
-The packet covers:
+The packet covers 26 independently captured runtime states:
 
-- Title, command menu, and settings at desktop size
-- Settings at compact size
+- Title at desktop and compact 150% scale
+- Command menu and settings at desktop size
+- Settings at compact 100% and 150% scale
 - Fresh and veteran Black Ledger states
+- Veteran Black Ledger at compact 150% scale
 - Selected starter shell at desktop and compact sizes
 - Planning board at compact and desktop sizes
 - Planning board at real 125% and 150% UI scale
 - Compact in-game system menu
 - Active-combat onset, midfight, and reduced-motion states
 - Victory entry and hold, plus stalemate and defeat hold states
-- Loss record
+- Defeat hold and loss record at compact 150% scale
+- Loss record at desktop size
 
 Unit art is present only because these are authentic player-facing runtime
 states. Unit and ability visuals are outside the board's review scope.

@@ -37,8 +37,14 @@ func _ready() -> void:
 			var flat_frame: StyleBoxFlat = frame_style as StyleBoxFlat
 			_expect(flat_frame.corner_radius_top_left == 0 and flat_frame.corner_radius_top_right == 0 and flat_frame.corner_radius_bottom_left == 0 and flat_frame.corner_radius_bottom_right == 0, "Loss frame should not retain the rounded bone silhouette", failures)
 		var frame_damage: Control = frame_panel.get_node_or_null("FrameDamageLayer") as Control
-		_expect(frame_damage != null and frame_damage.get_child_count() >= 3, "Loss frame should layer a reading matte, wound slash, and forfeiture stamp", failures)
+		_expect(frame_damage != null and frame_damage.get_child_count() >= 6, "Loss frame should layer its reading matte, rupture gashes, wound slash, and forfeiture stamp", failures)
 		_expect(frame_panel.get_node_or_null("FrameDamageLayer/ForfeitStamp") != null, "Loss frame should expose the forest-claim forfeiture stamp", failures)
+		_expect(frame_panel.get_node_or_null("FrameDamageLayer/RuptureGashA") != null and frame_panel.get_node_or_null("FrameDamageLayer/RuptureGashB") != null and frame_panel.get_node_or_null("FrameDamageLayer/RuptureGashC") != null, "Loss frame should visibly retain the woodland rupture through the casualty file", failures)
+		var reading_matte: ColorRect = frame_panel.get_node_or_null("FrameDamageLayer/ReadingMatte") as ColorRect
+		_expect(reading_matte != null and reading_matte.color.a <= 0.48, "Loss reading matte should allow the woodland aftermath to remain perceptible", failures)
+		if frame_style is StyleBoxFlat:
+			var transparent_frame: StyleBoxFlat = frame_style as StyleBoxFlat
+			_expect(transparent_frame.bg_color.a <= 0.76, "Loss casualty frame should not suppress the physical woodland backdrop", failures)
 	var record_header: Label = screen.get_node_or_null("Panel/Center/Frame/VBox/RecordHeader") as Label
 	var record_chronology: Label = screen.get_node_or_null("Panel/Center/Frame/VBox/RecordChronology") as Label
 	var record_stamp: Label = screen.get_node_or_null("Panel/Center/Frame/VBox/RecordStamp") as Label
@@ -56,10 +62,17 @@ func _ready() -> void:
 	var loss_art: TextureRect = screen.get_node_or_null("LossBackdropArt") as TextureRect
 	var pressure_layer: Control = screen.get_node_or_null("LossPressureLayer") as Control
 	var casualty_ghost: Label = screen.get_node_or_null("LossPressureLayer/CasualtyGhost") as Label
+	var blood_tide: TextureRect = screen.get_node_or_null("LossPressureLayer/BloodTide") as TextureRect
+	var woodland_rupture: Control = screen.get_node_or_null("LossPressureLayer/WoodlandRupture") as Control
+	var aftermath_caption: Label = screen.get_node_or_null("LossPressureLayer/AftermathCaption") as Label
 	_expect(loss_art != null and loss_art.texture != null, "Loss screen should preserve the authored forest-horror backdrop", failures)
+	_expect(loss_art != null and loss_art.visible and loss_art.modulate.r >= 2.0 and loss_art.modulate.g >= 1.5, "Loss backdrop should be perceptually lifted rather than merely wired behind black", failures)
 	_expect(loss_art != null and loss_art.z_index >= 0, "Loss backdrop should remain visible above the opaque canvas backdrop", failures)
-	_expect(pressure_layer != null and pressure_layer.get_child_count() >= 3, "Loss screen should carry blood-fall and wound-pressure layers", failures)
+	_expect(pressure_layer != null and pressure_layer.get_child_count() >= 6, "Loss screen should carry a blood tide, branch rupture, aftermath text, and wound-pressure layers", failures)
 	_expect(pressure_layer != null and loss_art != null and pressure_layer.z_index > loss_art.z_index, "Loss pressure marks should remain visible over the forest backdrop", failures)
+	_expect(blood_tide != null and blood_tide.texture is GradientTexture2D, "Loss screen should culminate in a material blood-tide aftermath", failures)
+	_expect(woodland_rupture != null and woodland_rupture.get_child_count() >= 6, "Loss screen should expose multiple physical woodland rupture marks", failures)
+	_expect(aftermath_caption != null and aftermath_caption.text == "THE WOODS\nTOOK THE COMPANY" and aftermath_caption.get_theme_font_size("font_size") >= 40, "Loss screen should state the woodland consequence as environmental aftermath", failures)
 	_expect(casualty_ghost != null and casualty_ghost.text == "DEBT COLLECTED", "Loss screen should expose the full environmental consequence stamp", failures)
 	if casualty_ghost != null and frame_panel != null:
 		_expect(_rect_inside(casualty_ghost.get_global_rect(), frame_panel.get_global_rect().grow(2.0)), "DEBT COLLECTED stamp should be intentionally contained by the casualty record", failures)
@@ -120,6 +133,19 @@ func _ready() -> void:
 		_expect(labels.has("Axiom"), "Loss scoreboard should show player row", failures)
 		_expect(not labels.has("Beegle"), "Loss scoreboard should not expose hidden enemy name", failures)
 		_expect(not labels.has("1.2k"), "Loss scoreboard should not expose hidden enemy damage", failures)
+	await _settle_frames(3)
+	if _framebuffer_capture_available():
+		RenderingServer.force_draw(false)
+		var proof_texture: ViewportTexture = get_viewport().get_texture()
+		var proof_image: Image = proof_texture.get_image() if proof_texture != null and proof_texture.get_rid().is_valid() else null
+		_expect(proof_image != null and not proof_image.is_empty(), "Loss backdrop visibility probe could not read the final runtime composite", failures)
+		if proof_image != null and not proof_image.is_empty():
+			var probe_height: int = mini(112, proof_image.get_height())
+			var backdrop_stats: Dictionary = _region_luminance_stats(proof_image, Rect2i(0, 0, proof_image.get_width(), probe_height))
+			_expect(float(backdrop_stats.get("mean", 0.0)) >= 0.035, "Loss runtime top field remained perceptually black instead of showing the woodland backdrop", failures)
+			_expect(float(backdrop_stats.get("range", 0.0)) >= 0.12, "Loss runtime top field lacked the tonal structure of the physical backdrop", failures)
+			_expect(float(backdrop_stats.get("bright_fraction", 0.0)) >= 0.01, "Loss runtime top field did not expose enough visible paper/woodland aftermath", failures)
+			_expect(float(backdrop_stats.get("detail_energy", 0.0)) >= 0.004, "Loss runtime top field lacked visible woodland/paper texture detail", failures)
 	_expect(_save_capture("01_loss_overlay_default.png"), "default loss capture failed", failures)
 	if new_game_button != null:
 		_warp_mouse_to_control(new_game_button)
@@ -215,6 +241,44 @@ func _luminance(color: Color) -> float:
 
 func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
 	return outer.has_point(inner.position) and outer.has_point(inner.end)
+
+func _region_luminance_stats(image: Image, region: Rect2i) -> Dictionary:
+	if image == null or image.is_empty() or region.size.x <= 0 or region.size.y <= 0:
+		return {"mean": 0.0, "range": 0.0, "bright_fraction": 0.0}
+	var bounded: Rect2i = region.intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+	if bounded.size.x <= 0 or bounded.size.y <= 0:
+		return {"mean": 0.0, "range": 0.0, "bright_fraction": 0.0}
+	var step_x: int = maxi(1, int(floor(float(bounded.size.x) / 160.0)))
+	var step_y: int = maxi(1, int(floor(float(bounded.size.y) / 24.0)))
+	var luminance_sum: float = 0.0
+	var minimum_luminance: float = 1.0
+	var maximum_luminance: float = 0.0
+	var bright_count: int = 0
+	var sample_count: int = 0
+	var detail_sum: float = 0.0
+	var detail_count: int = 0
+	for y: int in range(bounded.position.y, bounded.end.y, step_y):
+		var previous_luminance: float = -1.0
+		for x: int in range(bounded.position.x, bounded.end.x, step_x):
+			var luminance: float = _luminance(image.get_pixel(x, y))
+			luminance_sum += luminance
+			minimum_luminance = minf(minimum_luminance, luminance)
+			maximum_luminance = maxf(maximum_luminance, luminance)
+			if luminance >= 0.16:
+				bright_count += 1
+			if previous_luminance >= 0.0:
+				detail_sum += absf(luminance - previous_luminance)
+				detail_count += 1
+			previous_luminance = luminance
+			sample_count += 1
+	if sample_count <= 0:
+		return {"mean": 0.0, "range": 0.0, "bright_fraction": 0.0, "detail_energy": 0.0}
+	return {
+		"mean": luminance_sum / float(sample_count),
+		"range": maximum_luminance - minimum_luminance,
+		"bright_fraction": float(bright_count) / float(sample_count),
+		"detail_energy": detail_sum / float(maxi(1, detail_count)),
+	}
 
 func _expect_hard_flat_style(control: Control, style_name: String, message: String, failures: Array[String]) -> void:
 	if control == null:

@@ -52,7 +52,7 @@ func initialize() -> void:
 
 func set_compact_layout(width: float, row_height: float, icon_size: float, compact: bool) -> void:
 	_layout_width = maxf(96.0, width)
-	_layout_row_height = maxf(34.0, row_height)
+	_layout_row_height = maxf(32.0, row_height)
 	_layout_icon_size = maxf(22.0, icon_size)
 	_compact_layout = compact
 	_update_layout()
@@ -222,6 +222,7 @@ func _update_layout() -> void:
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	if _vbox:
 		_vbox.custom_minimum_size.x = maxf(1.0, _layout_width - float(PADDING_X * 2))
+		_vbox.add_theme_constant_override("separation", 2 if _compact_layout else SPACING)
 
 func _compare_traits(a: String, b: String, counts: Dictionary, thresholds_by_id: Dictionary, use_checkpoint: bool) -> bool:
 	var count_a: int = int(counts.get(a, 0))
@@ -357,14 +358,14 @@ func _apply_trait_row_layout(row: PanelContainer) -> void:
 	var trait_thresholds: Dictionary = row.get_meta("trait_thresholds", {}) as Dictionary
 	if name_label != null:
 		name_label.custom_minimum_size.x = 0.0
-		name_label.custom_minimum_size.y = 19.0 if _compact_layout else 0.0
+		name_label.custom_minimum_size.y = 20.0 if _compact_layout else 0.0
 		name_label.clip_text = true
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		var display_name: String = _trait_display_name(trait_id)
 		var compact_name: String = display_name.left(6).to_upper()
 		name_label.text = "%s // %s" % [compact_name, _compact_checkpoint_text(trait_id, trait_count, trait_active, trait_thresholds)] if _compact_layout else display_name
 		name_label.tooltip_text = display_name
-		name_label.add_theme_font_size_override("font_size", 12 if _compact_layout else 14)
+		name_label.add_theme_font_size_override("font_size", 13 if _compact_layout else 14)
 	if checkpoint_label != null:
 		checkpoint_label.custom_minimum_size.x = 0.0
 		checkpoint_label.clip_text = true

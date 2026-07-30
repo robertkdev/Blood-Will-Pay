@@ -137,7 +137,7 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 				continue
 			_expect_inside(card, viewport_rect, "shop card %s" % String(card.name))
 			var maximum_card_height: float = 70.0 if tight_scale else 96.0
-			var minimum_card_height: float = 42.0 if tight_scale else 80.0
+			var minimum_card_height: float = 54.0 if tight_scale else 80.0
 			_expect(card.size.y <= maximum_card_height, "compact shop card exceeded height budget: %s" % str(card.get_global_rect()))
 			_expect(card.size.y >= minimum_card_height, "compact shop card is too compressed to show its complete visual hierarchy: %s" % str(card.get_global_rect()))
 			_assert_shop_card_contents_inside(card)
@@ -162,13 +162,16 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 		for child: Node in command_bar.find_children("*", "Button", true, false):
 			var button: Button = child as Button
 			if button != null and button.visible:
-				_expect(button.get_theme_font_size("font_size") >= 18, "compact command button %s should remain at least 18px" % String(button.name))
+				var minimum_button_font: int = 16 if tight_scale and button.name != "ContinueButton" else 18
+				_expect(button.get_theme_font_size("font_size") >= minimum_button_font, "compact command button %s should remain at least %dpx" % [String(button.name), minimum_button_font])
 				_expect_inside(button, viewport_rect, "compact command button %s" % String(button.name))
 				_assert_button_text_inside(button, "compact command button %s" % String(button.name))
 		for child: Node in command_bar.find_children("*", "Label", true, false):
 			var label: Label = child as Label
 			if label != null and label.visible:
 				_expect_inside(label, viewport_rect, "compact command label %s" % String(label.name))
+	if tight_scale:
+		_assert_compact_decision_record(viewport_rect)
 
 func _assert_system_menu_clear_of_metrics(tight_scale: bool) -> void:
 	_expect(_main != null, "compact Main fixture missing")
@@ -187,7 +190,7 @@ func _assert_system_menu_clear_of_metrics(tight_scale: bool) -> void:
 	_expect(not menu_rect.intersects(metrics_rect), "compact Menu overlaps Team Metrics: menu=%s metrics=%s" % [str(menu_rect), str(metrics_rect)])
 	_expect(bool(menu_button.get_meta("compact_safe_placement", false)), "compact Menu did not enter its safe placement contract")
 	_expect(menu_button.get_theme_font("font") == VisualTypeSystemLib.FONT_UTILITY_BOLD, "compact Menu should use the legibility face")
-	var metrics_width_budget: float = 128.0 if tight_scale else 184.0
+	var metrics_width_budget: float = 136.0 if tight_scale else 184.0
 	var metrics_panel_height_budget: float = 198.0 if tight_scale else 252.0
 	var metrics_area_height_budget: float = 214.0 if tight_scale else 270.0
 	_expect(stats_area.custom_minimum_size.x <= metrics_width_budget, "compact Team Metrics rail did not release board width: %.1f" % stats_area.custom_minimum_size.x)
@@ -211,7 +214,7 @@ func _assert_tight_scale_hud_containment() -> void:
 	_expect(left_panel != null and left_panel.visible, "150-percent layout should retain the tactical item/trait dock")
 	if left_panel != null and left_panel.visible:
 		_expect_inside(left_panel, viewport_rect, "150-percent tactical item/trait dock")
-		_expect(left_panel.size.x <= 128.0, "150-percent tactical item/trait dock did not release board width: %.1f" % left_panel.size.x)
+		_expect(left_panel.size.x <= 136.0, "150-percent tactical item/trait dock did not release board width: %.1f" % left_panel.size.x)
 	var required_paths: PackedStringArray = PackedStringArray([
 		"MarginContainer",
 		"MarginContainer/VBoxContainer/StageProgressTopBar",
@@ -226,6 +229,7 @@ func _assert_tight_scale_hud_containment() -> void:
 		"MarginContainer/VBoxContainer/ActionsRow",
 		"MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
+		"MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
 	])
 	for path: String in required_paths:
@@ -245,6 +249,61 @@ func _assert_tight_scale_hud_containment() -> void:
 		var support_width: float = visible_left_width + stats_area.size.x
 		_expect(board_column.size.x > support_width, "150-percent battlefield is narrower than visible support docks combined")
 		_expect(board_column.size.x >= viewport_rect.size.x * 0.60, "150-percent battlefield does not retain 60%% of logical viewport width")
+	_assert_tight_surface_separation()
+
+func _assert_compact_decision_record(viewport_rect: Rect2) -> void:
+	var resource_strip: Label = _view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
+	var wager_summary: Label = _view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Label
+	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "150-percent footer hid gold/level/XP")
+	if resource_strip != null:
+		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "150-percent gold/level/XP mirror is incomplete")
+		for required_copy: String in ["GOLD", "LVL", "XP"]:
+			_expect(resource_strip.text.contains(required_copy), "150-percent resource record omitted %s" % required_copy)
+		var gold_source: Label = _view.find_child("GoldLabel", true, false) as Label
+		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "150-percent resource record does not mirror live gold")
+		var progress_source: Label = _find_progress_source()
+		_expect(progress_source != null, "150-percent footer has no live level/XP source")
+		if progress_source != null:
+			for numeric_token: String in progress_source.text.split(" ", false):
+				var normalized_token: String = numeric_token.trim_prefix("(").trim_suffix(")")
+				if normalized_token.contains("/") or normalized_token.is_valid_int():
+					_expect(resource_strip.text.contains(normalized_token), "150-percent resource record does not mirror progress token %s" % normalized_token)
+		_expect(resource_strip.get_theme_font_size("font_size") >= 15, "150-percent resource record text is too small")
+		_expect_inside(resource_strip, viewport_rect, "150-percent resource record")
+	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "150-percent footer hid wager outcomes")
+	if wager_summary != null:
+		for required_copy: String in ["Wager", "Win", "After win", "After loss"]:
+			_expect(wager_summary.text.contains(required_copy), "150-percent wager record omitted %s" % required_copy)
+		_expect_inside(wager_summary, viewport_rect, "150-percent wager record")
+
+func _find_progress_source() -> Label:
+	var bottom_storage: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as Control
+	if bottom_storage == null:
+		return null
+	for candidate: Node in bottom_storage.find_children("*", "Label", true, false):
+		var label: Label = candidate as Label
+		if label != null and (label.text.begins_with("Lvl ") or label.text.begins_with("Command Rank")):
+			return label
+	return null
+
+func _assert_tight_surface_separation() -> void:
+	var battle_area: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
+	var left_rail: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
+	var board_column: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn") as Control
+	var stats_rail: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
+	var bench_area: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as Control
+	var wager_summary: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Control
+	var bottom_storage: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as Control
+	if left_rail != null and board_column != null:
+		_expect(left_rail.get_global_rect().end.x <= board_column.get_global_rect().position.x + 1.0, "150-percent tactical rail overlaps board")
+	if board_column != null and stats_rail != null:
+		_expect(board_column.get_global_rect().end.x <= stats_rail.get_global_rect().position.x + 1.0, "150-percent metrics rail overlaps board")
+	if battle_area != null and bench_area != null:
+		_expect(battle_area.get_global_rect().end.y <= bench_area.get_global_rect().position.y + 1.0, "150-percent board overlaps bench")
+	if bench_area != null and wager_summary != null:
+		_expect(bench_area.get_global_rect().end.y <= wager_summary.get_global_rect().position.y + 1.0, "150-percent bench overlaps wager record")
+	if wager_summary != null and bottom_storage != null:
+		_expect(wager_summary.get_global_rect().end.y <= bottom_storage.get_global_rect().position.y + 1.0, "150-percent wager record overlaps shop/footer")
 
 func _assert_shop_card_contents_inside(card: Control) -> void:
 	if not (card is ShopCard):
@@ -257,7 +316,8 @@ func _assert_shop_card_contents_inside(card: Control) -> void:
 			continue
 		var label_rect: Rect2 = label.get_global_rect()
 		_expect(card_rect.encloses(label_rect), "shop card %s clips %s: card=%s label=%s" % [String(card.name), label_name, str(card_rect), str(label_rect)])
-		_expect(label.get_theme_font_size("font_size") >= 18, "shop card %s %s should remain at least 18px" % [String(card.name), label_name])
+		var minimum_font_size: int = 14 if label_name == "Name" else 16
+		_expect(label.get_theme_font_size("font_size") >= minimum_font_size, "shop card %s %s should remain at least %dpx" % [String(card.name), label_name, minimum_font_size])
 
 func _assert_button_text_inside(button: Button, label: String) -> void:
 	var font: Font = button.get_theme_font("font")

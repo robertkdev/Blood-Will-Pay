@@ -784,11 +784,13 @@ func _ensure_content_construction_cues(header: VBoxContainer, compact: bool, sho
 	blood_tick.color = Color(0.62, 0.035, 0.060, 0.90)
 
 func _select_section(section: String, clear_search: bool = true) -> void:
+	_stabilize_command_chrome()
 	_active_section = section
 	if clear_search and _search_field != null:
 		_search_field.text = ""
 	_render_active_section()
 	_update_nav_state()
+	_stabilize_command_chrome()
 	call_deferred("_reset_content_scroll")
 
 func _reset_content_scroll() -> void:
@@ -2105,6 +2107,7 @@ func _on_visibility_changed() -> void:
 		_ensure_content_panel()
 		_render_active_section()
 		_sync_action_hierarchy()
+		_stabilize_command_chrome()
 		_play_intro()
 
 func register_runtime_action_button(button: Button, primary: bool) -> void:
@@ -2178,45 +2181,53 @@ func _fit_title_panel_to_rail() -> void:
 	_title_panel.size = panel_rect.size
 
 func _play_intro() -> void:
+	_stabilize_command_chrome()
 	if not _motion_enabled:
 		_stop_motion()
-		_set_intro_alpha(1.0)
 		return
-	_set_intro_alpha(0.0)
-	if title_label != null:
-		title_label.scale = Vector2(0.94, 0.94)
-	if start_button != null:
-		start_button.scale = Vector2(0.98, 0.98)
-	if quit_button != null:
-		quit_button.scale = Vector2(0.98, 0.98)
-
 	_kill_motion_tween(_intro_tween)
+	_set_intro_alpha(1.0)
+	if title_label != null:
+		title_label.scale = Vector2(0.975, 0.975)
+	if start_button != null:
+		start_button.scale = Vector2(0.99, 0.99)
+	if quit_button != null:
+		quit_button.scale = Vector2(0.99, 0.99)
+
 	_intro_tween = create_tween()
 	_intro_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	if _title_panel != null:
-		_intro_tween.tween_property(_title_panel, "modulate:a", 1.0, 0.12)
-	if _content_panel != null:
-		_intro_tween.parallel().tween_property(_content_panel, "modulate:a", 1.0, 0.14)
-	if _hero != null:
-		_intro_tween.parallel().tween_property(_hero, "modulate:a", 0.28, 0.18)
-	if _sigil != null:
-		_intro_tween.parallel().tween_property(_sigil, "modulate:a", 0.20, 0.18)
 	if title_label != null:
-		_intro_tween.tween_property(title_label, "modulate:a", 1.0, 0.16)
-		_intro_tween.parallel().tween_property(title_label, "scale", Vector2.ONE, 0.18)
+		_intro_tween.tween_property(title_label, "scale", Vector2.ONE, 0.16)
+	else:
+		_intro_tween.tween_interval(0.16)
+	if start_button != null:
+		_intro_tween.parallel().tween_property(start_button, "scale", Vector2.ONE, 0.12)
+	if quit_button != null:
+		_intro_tween.parallel().tween_property(quit_button, "scale", Vector2.ONE, 0.12)
+
+func _stabilize_command_chrome() -> void:
+	if _title_panel != null:
+		_title_panel.modulate.a = 1.0
+	if _content_panel != null:
+		_content_panel.modulate.a = 1.0
+	if title_label != null:
+		title_label.modulate.a = 1.0
 	if _subtitle != null:
-		_intro_tween.parallel().tween_property(_subtitle, "modulate:a", 1.0, 0.18)
+		_subtitle.modulate.a = 1.0
 	if _rule != null:
-		_intro_tween.parallel().tween_property(_rule, "modulate:a", 1.0, 0.18)
+		_rule.modulate.a = 1.0
 	if logo != null:
-		_intro_tween.parallel().tween_property(logo, "modulate:a", 1.0, 0.16)
-	_intro_tween.tween_interval(0.02)
-	_fade_button(_intro_tween, start_button)
+		logo.modulate.a = 1.0
+	if start_button != null:
+		start_button.modulate.a = 1.0
+	if quit_button != null:
+		quit_button.modulate.a = 1.0
 	for nav_button: Button in _nav_buttons:
-		_fade_button(_intro_tween, nav_button)
+		if nav_button != null:
+			nav_button.modulate.a = 1.0
 	for runtime_button: Button in _runtime_action_buttons:
-		_fade_button(_intro_tween, runtime_button)
-	_fade_button(_intro_tween, quit_button)
+		if runtime_button != null:
+			runtime_button.modulate.a = 1.0
 
 func _set_intro_alpha(alpha: float) -> void:
 	if title_label != null:

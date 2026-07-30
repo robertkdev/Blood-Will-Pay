@@ -36,6 +36,7 @@ var manager: CombatManager
 var controller
 var _teardown_done: bool = false
 var stage_progress_top_bar: Control
+var _compact_resource_strip: Label = null
 
 var player_name: String = "Hero"
 
@@ -214,6 +215,7 @@ func _set_sprite_texture(rect: TextureRect, path: String, fallback_color: Color)
 func _process(_delta: float) -> void:
 	controller.process(_delta)
 	_update_planning_timer(_delta)
+	_sync_compact_resource_strip()
 
 
 func _get_gs() -> Node:
@@ -385,28 +387,35 @@ func _apply_responsive_layout() -> void:
 		margin.add_theme_constant_override("margin_top", 4 if tight_compact else 8 if compact else 14)
 		margin.add_theme_constant_override("margin_right", 6 if tight_compact else 10 if compact else 20)
 		margin.add_theme_constant_override("margin_bottom", 4 if tight_compact else 8 if compact else 18)
+	stage_label.visible = not compact
+	stage_label.custom_minimum_size = Vector2.ZERO if compact else Vector2(0.0, 64.0)
 	_set_minimum_size("MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
-	var battle_height: float = 168.0 if tight_compact else 330.0 if compact else 604.0
-	var board_half_height: float = 78.0 if tight_compact else 160.0 if compact else 264.0
+	var battle_height: float = 192.0 if tight_compact else 330.0 if compact else 604.0
+	var board_half_height: float = 92.0 if tight_compact else 160.0 if compact else 264.0
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea", Vector2(0.0, battle_height))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(128.0 if tight_compact else 184.0 if compact else 310.0, 158.0 if tight_compact else 260.0 if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(128.0 if tight_compact else 180.0 if compact else 286.0, 158.0 if tight_compact else battle_height if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(128.0 if tight_compact else 172.0 if compact else 286.0, 62.0 if tight_compact else 82.0 if compact else 164.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(128.0 if tight_compact else 172.0 if compact else 286.0, 94.0 if tight_compact else 208.0 if compact else 398.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 164.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 118.0 if tight_compact else 208.0 if compact else 398.0))
 	_apply_side_panel_layout(compact, tight_compact)
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", Vector2(0.0, board_half_height))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", Vector2(0.0, board_half_height))
 	_apply_board_tile_size(compact, tight_compact)
 	_set_minimum_size("MarginContainer/VBoxContainer/BenchArea/BenchGrid", Vector2(0.0, 38.0 if tight_compact else 46.0 if compact else 88.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea", Vector2(700.0 if tight_compact else 900.0 if compact else 1120.0, 46.0 if tight_compact else 94.0 if compact else 152.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea", Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 104.0 if tight_compact else 94.0 if compact else 152.0))
 	var opening_shop: bool = shop_grid != null and bool(shop_grid.get_meta("opening_fight_empty", false))
-	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 42.0) if opening_shop and tight_compact else Vector2(520.0, 88.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(700.0 if tight_compact else 900.0 if compact else 1120.0, 42.0 if tight_compact else 86.0 if compact else 108.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 54.0) if opening_shop and tight_compact else Vector2(520.0, 88.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(640.0 if tight_compact else 900.0 if compact else 1120.0, 56.0 if tight_compact else 86.0 if compact else 108.0))
 	if shop_grid != null:
 		shop_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if opening_shop else Control.SIZE_EXPAND_FILL
-	_set_minimum_size("MarginContainer/VBoxContainer/ActionsRow", Vector2(700.0 if tight_compact else 900.0 if compact else 1120.0, 30.0 if tight_compact else 36.0 if compact else 56.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(196.0 if tight_compact else 190.0 if compact else 226.0, 28.0 if tight_compact else 32.0 if compact else 46.0))
-	wager_summary.add_theme_font_size_override("font_size", 20 if compact else 22)
-	wager_summary.custom_minimum_size = Vector2(0.0, 20.0 if tight_compact else 0.0)
+	var planning_actions_row: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
+	if planning_actions_row != null:
+		planning_actions_row.visible = not tight_compact
+		planning_actions_row.custom_minimum_size = Vector2.ZERO if tight_compact else Vector2(900.0 if compact else 1120.0, 36.0 if compact else 56.0)
+	_set_minimum_size("MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(254.0 if tight_compact else 334.0 if compact else 392.0, 36.0 if tight_compact else 44.0 if compact else 50.0))
+	wager_summary.add_theme_font_size_override("font_size", 14 if tight_compact else 18 if compact else 22)
+	wager_summary.custom_minimum_size = Vector2(0.0, 22.0 if tight_compact else 0.0)
+	wager_summary.autowrap_mode = TextServer.AUTOWRAP_OFF if tight_compact else TextServer.AUTOWRAP_WORD_SMART
+	wager_summary.clip_text = false
 	_set_box_separation("MarginContainer/VBoxContainer", 2 if tight_compact else 4 if compact else 6)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 6 if tight_compact else 10 if compact else 20)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", 2 if tight_compact else 8 if compact else 10)
@@ -420,6 +429,7 @@ func _apply_responsive_layout() -> void:
 	_apply_shop_action_bar_layout(compact, tight_compact)
 	_apply_functional_typography(compact, tight_compact)
 	_apply_planning_action_hierarchy(compact, tight_compact)
+	_sync_compact_resource_strip()
 	if controller != null and controller.has_method("refresh_result_banner_layout"):
 		controller.call("refresh_result_banner_layout")
 	_update_external_backplates()
@@ -458,7 +468,7 @@ func _set_grid_separation(grid: GridContainer, separation: int) -> void:
 		grid.add_theme_constant_override("v_separation", separation)
 
 func _apply_board_tile_size(compact: bool, tight_compact: bool) -> void:
-	var tile_size: Vector2 = Vector2(30.0, 30.0) if tight_compact else Vector2(42.0, 42.0) if compact else Vector2(72.0, 72.0)
+	var tile_size: Vector2 = Vector2(32.0, 32.0) if tight_compact else Vector2(42.0, 42.0) if compact else Vector2(72.0, 72.0)
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		if grid == null:
 			continue
@@ -510,8 +520,8 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			traits_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	if controller != null and controller.traits_presenter != null:
 		controller.traits_presenter.set_compact_layout(
-			128.0 if tight_compact else 172.0 if compact else 286.0,
-			38.0 if tight_compact else 44.0 if compact else 48.0,
+			136.0 if tight_compact else 172.0 if compact else 286.0,
+			34.0 if tight_compact else 44.0 if compact else 48.0,
 			26.0 if tight_compact else 34.0 if compact else 40.0,
 			tight_compact
 		)
@@ -520,7 +530,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 	var stats_panel: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel") as Control
 	if stats_panel != null:
-		stats_panel.custom_minimum_size = Vector2(128.0 if tight_compact else 178.0 if compact else 292.0, 156.0 if tight_compact else 252.0 if compact else 560.0)
+		stats_panel.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
 		stats_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_panel.clip_contents = false
 		var stats_vbox: VBoxContainer = stats_panel.get_node_or_null("VBox") as VBoxContainer
@@ -534,25 +544,19 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			recent_button.visible = not compact
 	var scoreboard: Control = find_child("Scoreboard", true, false) as Control
 	if scoreboard != null:
-		scoreboard.custom_minimum_size = Vector2(128.0 if tight_compact else 178.0 if compact else 294.0, 110.0 if tight_compact else 156.0 if compact else 430.0)
+		scoreboard.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 294.0, 142.0 if tight_compact else 156.0 if compact else 430.0)
 		var scoreboard_header: Control = scoreboard.get_node_or_null("Header") as Control
 		if scoreboard_header != null:
 			# "TEAM METRICS" already supplies the surface label. Removing the
 			# duplicate scoreboard header at tight scale preserves the rows.
 			scoreboard_header.visible = not tight_compact
-		if tight_compact:
-			for row_node: Node in scoreboard.find_children("*", "Control", true, false):
-				var row_control: Control = row_node as Control
-				if row_control == null:
-					continue
-				if row_control.has_node("HBox/Portrait"):
-					row_control.custom_minimum_size.y = 42.0
-				var portrait: TextureRect = row_control.get_node_or_null("HBox/Portrait") as TextureRect
-				if portrait != null:
-					portrait.custom_minimum_size = Vector2(32.0, 32.0)
+		for row_node: Node in scoreboard.find_children("*", "Control", true, false):
+			var row_control: Control = row_node as Control
+			if row_control != null and row_control.has_method("set_compact_layout"):
+				row_control.call("set_compact_layout", tight_compact)
 	var metric_tabs: Control = find_child("MetricTabs", true, false) as Control
 	if metric_tabs != null:
-		metric_tabs.custom_minimum_size = Vector2(128.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
+		metric_tabs.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
 		# The eight-column desktop metric selector cannot remain legible inside
 		# a 178px rail. Compact keeps the default Total scoreboard and removes
 		# the selector row instead of squeezing its controls into noise.
@@ -567,7 +571,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_title.clip_text = false
 
 func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
-	var card_size: Vector2 = Vector2(96.0, 42.0) if tight_compact else Vector2(118.0, 86.0) if compact else Vector2(144.0, 124.0)
+	var card_size: Vector2 = Vector2(120.0, 56.0) if tight_compact else Vector2(118.0, 86.0) if compact else Vector2(144.0, 124.0)
 	if shop_grid != null:
 		shop_grid.add_theme_constant_override("h_separation", 6 if tight_compact else 10 if compact else 16)
 		shop_grid.add_theme_constant_override("v_separation", 4 if tight_compact else 6 if compact else 10)
@@ -583,21 +587,20 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 				else:
 					control.custom_minimum_size = card_size
 					control.clip_contents = tight_compact
-					if tight_compact:
-						for descendant: Node in control.find_children("*", "Control", true, false):
-							var descendant_control: Control = descendant as Control
-							if descendant_control != null:
-								descendant_control.custom_minimum_size = Vector2.ZERO
+					if control.has_method("set_compact_presentation"):
+						control.call("set_compact_presentation", tight_compact)
+					elif tight_compact:
+						_apply_tight_shop_placeholder(control)
 					var name_label: Label = control.find_child("Name", true, false) as Label
 					var price_label: Label = control.find_child("Price", true, false) as Label
 					if name_label != null:
-						name_label.add_theme_font_size_override("font_size", 18)
+						name_label.add_theme_font_size_override("font_size", 14 if tight_compact else 18)
 						VisualTypeSystem.set_utility_bold(name_label)
 						name_label.clip_text = tight_compact
 						if tight_compact:
 							name_label.custom_minimum_size.x = 0.0
 					if price_label != null:
-						price_label.add_theme_font_size_override("font_size", 19)
+						price_label.add_theme_font_size_override("font_size", 16 if tight_compact else 19)
 						price_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.47, 1.0))
 						VisualTypeSystem.set_utility_bold(price_label)
 						price_label.clip_text = tight_compact
@@ -615,6 +618,32 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 		_apply_action_bar_layout(action_bar, compact, tight_compact)
 	_apply_bet_row_layout(live_bet_row, compact, tight_compact)
 
+func _apply_tight_shop_placeholder(placeholder: Control) -> void:
+	var panel: PanelContainer = placeholder as PanelContainer
+	if panel == null:
+		return
+	panel.custom_minimum_size = Vector2(120.0, 56.0)
+	panel.add_theme_stylebox_override("panel", _make_field_panel_style(Color(0.28, 0.18, 0.14, 0.90)))
+	var stack: VBoxContainer = panel.get_child(0) as VBoxContainer if panel.get_child_count() > 0 else null
+	if stack != null:
+		stack.add_theme_constant_override("separation", 0)
+	var texture_nodes: Array[Node] = panel.find_children("*", "TextureRect", true, false)
+	var icon: TextureRect = texture_nodes[0] as TextureRect if not texture_nodes.is_empty() else null
+	if icon != null:
+		icon.custom_minimum_size = Vector2(22.0, 22.0)
+	var visible_label_claimed: bool = false
+	for candidate: Node in panel.find_children("*", "Label", true, false):
+		var label: Label = candidate as Label
+		if label == null:
+			continue
+		label.visible = not visible_label_claimed
+		if label.visible:
+			visible_label_claimed = true
+			label.custom_minimum_size = Vector2.ZERO
+			label.add_theme_font_size_override("font_size", 11)
+			label.autowrap_mode = TextServer.AUTOWRAP_OFF
+			label.clip_text = true
+
 func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
 	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 	if bottom_storage == null:
@@ -623,14 +652,14 @@ func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
 		var action_bar: HBoxContainer = child as HBoxContainer
 		if action_bar == null:
 			continue
-		action_bar.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 30.0 if tight_compact else 40.0 if compact else 54.0)
+		action_bar.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 38.0 if tight_compact else 40.0 if compact else 54.0)
 		action_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		action_bar.add_theme_constant_override("separation", 6 if tight_compact else 8 if compact else 16)
 		for action_child: Node in action_bar.get_children():
 			var button: Button = action_child as Button
 			if button != null:
 				var primary_commit: bool = button.name == "ContinueButton"
-				var font_size: int = (20 if tight_compact else 23 if compact else 26) if primary_commit else (18 if compact else 20)
+				var font_size: int = (20 if tight_compact else 23 if compact else 26) if primary_commit else (16 if tight_compact else 18 if compact else 20)
 				button.add_theme_font_size_override("font_size", font_size)
 				if primary_commit:
 					button.set_meta("visual_role", "primary_commit")
@@ -638,7 +667,7 @@ func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
 				else:
 					VisualTypeSystem.set_utility_bold(button)
 				var text_width: float = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size).x
-				var minimum_width: float = maxf(76.0, text_width + 22.0)
+				var minimum_width: float = maxf(66.0, text_width + (16.0 if tight_compact else 22.0))
 				if primary_commit:
 					minimum_width = maxf(minimum_width, 176.0 if tight_compact else 236.0 if compact else 304.0)
 				button.custom_minimum_size = Vector2(minimum_width, (38.0 if tight_compact else 46.0 if compact else 54.0) if primary_commit else (30.0 if tight_compact else 34.0 if compact else 40.0))
@@ -679,11 +708,11 @@ func _apply_functional_typography(compact: bool, tight_compact: bool) -> void:
 			if trait_label == null:
 				continue
 			VisualTypeSystem.set_utility_bold(trait_label)
-			trait_label.add_theme_font_size_override("font_size", 14 if tight_compact else max(17, trait_label.get_theme_font_size("font_size")))
+			trait_label.add_theme_font_size_override("font_size", 13 if tight_compact else max(17, trait_label.get_theme_font_size("font_size")))
 			trait_label.add_theme_color_override("font_color", Color(0.94, 0.90, 0.82, 1.0))
 			if tight_compact:
 				trait_label.custom_minimum_size.x = 0.0
-				trait_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				trait_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	if stats_panel != null:
 		for candidate: Node in stats_panel.find_children("*", "Label", true, false):
 			var stats_label: Label = candidate as Label
@@ -691,7 +720,8 @@ func _apply_functional_typography(compact: bool, tight_compact: bool) -> void:
 				continue
 			VisualTypeSystem.set_utility_bold(stats_label)
 			if stats_label.name != "Title":
-				stats_label.add_theme_font_size_override("font_size", 14 if tight_compact else 17 if compact else 18)
+				var compact_stats_size: int = 15 if stats_label.name == "Value" else 14
+				stats_label.add_theme_font_size_override("font_size", compact_stats_size if tight_compact else 17 if compact else 18)
 				stats_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.83, 1.0))
 				if tight_compact:
 					stats_label.custom_minimum_size.x = 0.0
@@ -743,7 +773,7 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool, tight_compact: bool) -> void:
 	if action_bar == null:
 		return
-	action_bar.custom_minimum_size = Vector2(700.0 if tight_compact else 900.0 if compact else 1120.0, 30.0 if tight_compact else 34.0 if compact else 54.0)
+	action_bar.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 38.0 if tight_compact else 34.0 if compact else 54.0)
 	action_bar.add_theme_constant_override("separation", 6 if tight_compact else 8 if compact else 16)
 	for child: Node in action_bar.get_children():
 		var button: Button = child as Button
@@ -752,8 +782,10 @@ func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool, tight_co
 				button.custom_minimum_size = Vector2(176.0 if tight_compact else 236.0 if compact else 304.0, 38.0 if tight_compact else 46.0 if compact else 54.0)
 				button.add_theme_font_size_override("font_size", 20 if tight_compact else 23 if compact else 26)
 			else:
-				button.custom_minimum_size = Vector2(108.0 if tight_compact else 124.0 if compact else 112.0, 30.0 if tight_compact else 32.0 if compact else 40.0)
-				button.add_theme_font_size_override("font_size", 18 if compact else 20)
+				var button_font_size: int = 16 if tight_compact else 18 if compact else 20
+				var button_text_width: float = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, button_font_size).x
+				button.custom_minimum_size = Vector2(maxf(66.0, button_text_width + (16.0 if tight_compact else 22.0)), 34.0 if tight_compact else 32.0 if compact else 40.0)
+				button.add_theme_font_size_override("font_size", button_font_size)
 			continue
 		var label: Label = child as Label
 		if label != null:
@@ -763,6 +795,67 @@ func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool, tight_co
 			else:
 				label.add_theme_font_size_override("font_size", 18 if compact else 20)
 	action_bar.queue_sort()
+
+func _sync_compact_resource_strip() -> void:
+	var tight_compact: bool = bool(get_meta("tight_scale_layout", false))
+	var strip: Label = _ensure_compact_resource_strip()
+	if strip == null:
+		return
+	strip.visible = tight_compact
+	if not tight_compact:
+		return
+	var gold_text: String = gold_label.text.strip_edges().to_upper() if gold_label != null else "GOLD --"
+	gold_text = gold_text.replace(":", "")
+	var progress_text: String = _compact_progress_text()
+	strip.text = "%s  //  %s" % [gold_text, progress_text]
+	strip.tooltip_text = "Current spendable gold, command level, and XP progress remain visible at enlarged UI scales."
+	strip.set_meta("decision_data_complete", gold_text.contains("GOLD") and progress_text.contains("LVL") and progress_text.contains("XP"))
+
+func _ensure_compact_resource_strip() -> Label:
+	if _compact_resource_strip != null and is_instance_valid(_compact_resource_strip):
+		return _compact_resource_strip
+	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
+	if bottom_storage == null:
+		return null
+	var existing: Label = bottom_storage.get_node_or_null("CompactResourceStrip") as Label
+	if existing != null:
+		_compact_resource_strip = existing
+		return _compact_resource_strip
+	_compact_resource_strip = Label.new()
+	_compact_resource_strip.name = "CompactResourceStrip"
+	_compact_resource_strip.custom_minimum_size = Vector2(0.0, 24.0)
+	_compact_resource_strip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_compact_resource_strip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_compact_resource_strip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_compact_resource_strip.add_theme_font_size_override("font_size", 15)
+	_compact_resource_strip.add_theme_color_override("font_color", Color(1.0, 0.84, 0.50, 1.0))
+	_compact_resource_strip.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+	_compact_resource_strip.add_theme_constant_override("outline_size", 2)
+	_compact_resource_strip.add_theme_stylebox_override("normal", _make_bet_value_style())
+	VisualTypeSystem.set_utility_bold(_compact_resource_strip)
+	bottom_storage.add_child(_compact_resource_strip)
+	bottom_storage.move_child(_compact_resource_strip, 0)
+	return _compact_resource_strip
+
+func _compact_progress_text() -> String:
+	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
+	if bottom_storage == null:
+		return "LVL -- // XP --"
+	for candidate: Node in bottom_storage.find_children("*", "Label", true, false):
+		var label: Label = candidate as Label
+		if label == null or label == _compact_resource_strip or label == gold_label:
+			continue
+		var source: String = label.text.strip_edges()
+		var source_lower: String = source.to_lower()
+		if source_lower.begins_with("lvl "):
+			var open_index: int = source.find("(")
+			var close_index: int = source.rfind(")")
+			var level_text: String = source.left(open_index).strip_edges().to_upper() if open_index >= 0 else source.to_upper()
+			var xp_text: String = source.substr(open_index + 1, close_index - open_index - 1).strip_edges().to_upper() if open_index >= 0 and close_index > open_index else "--"
+			return "%s // XP %s" % [level_text, xp_text]
+		if source_lower.begins_with("command rank"):
+			return "%s // XP N/A" % source.to_upper()
+	return "LVL -- // XP --"
 
 func _apply_bet_row_layout(bet_row: HBoxContainer, compact: bool, tight_compact: bool) -> void:
 	if bet_row == null:

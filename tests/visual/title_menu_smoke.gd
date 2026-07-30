@@ -39,19 +39,29 @@ func _run() -> void:
 		var enter_button: Button = main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
 		_expect(enter_button != null, "TitlePage EnterButton missing", failures)
 		var continue_prompt: Label = main.get_node_or_null("TitlePage/Center/Stack/ContinuePrompt") as Label
-		_expect(continue_prompt != null and continue_prompt.visible, "TitlePage should show a visible continue prompt", failures)
-		if continue_prompt != null:
-			_expect(continue_prompt.text == "CLICK OR PRESS ANY KEY", "TitlePage continue prompt should explain both mouse and keyboard entry", failures)
-			_expect(continue_prompt.get_theme_font_size("font_size") >= 18, "TitlePage continue prompt should remain readable at 1920x1080", failures)
+		_expect(continue_prompt == null, "TitlePage should preserve the accepted prompt-free composition", failures)
+		_expect(_find_visible_label(title_page) == null, "TitlePage should not add visible instructions or copy over the authored artwork", failures)
+		var title_distress: Control = main.get_node_or_null("TitlePage/TitleMarkDistress") as Control
+		_expect(title_distress != null and title_distress.visible, "TitlePage should carry a restrained non-text registration treatment", failures)
+		if title_distress != null:
+			var expected_marks: Array[String] = ["BloodRegistration", "MisregisterSlash", "InkKnockout", "LowerRegistration"]
+			for mark_name: String in expected_marks:
+				var mark: ColorRect = title_distress.get_node_or_null(mark_name) as ColorRect
+				_expect(mark != null and mark.visible and mark.color.a >= 0.60, "TitlePage distress mark %s should remain perceptible" % mark_name, failures)
+				if mark != null:
+					var stays_restrained: bool = mark.size.x <= 10.0 or mark.size.y <= 8.0
+					_expect(stays_restrained, "TitlePage distress mark %s should stay thin enough to preserve the baked wordmark" % mark_name, failures)
 		if enter_button != null:
-			_expect(enter_button.text == "", "TitlePage full-screen interaction surface should remain text-free behind the visible prompt", failures)
+			_expect(enter_button.text == "", "TitlePage full-screen interaction surface should remain text-free", failures)
 			_expect(enter_button.flat, "TitlePage interaction surface should remain visually transparent", failures)
 			_expect(enter_button.accessibility_name.contains("Blood Will Pay"), "TitlePage should expose the renamed title to assistive technology", failures)
+			_expect(enter_button.accessibility_description.contains("click anywhere"), "TitlePage should retain non-visual entry instructions for assistive technology", failures)
 			_expect(enter_button.has_focus(), "TitlePage interaction surface should receive initial focus", failures)
 			enter_button.emit_signal("pressed")
 			await get_tree().process_frame
 			await get_tree().process_frame
 		_expect(title_menu.visible, "TitleMenu is not visible after entering from title page", failures)
+		_expect_command_chrome_visible(title_menu, "Title-page dismissal", failures)
 		var expected_focus: Control = main.get_node_or_null("TitleMenu/Center/VBox/ContinueRunButton") as Control
 		if expected_focus == null or not expected_focus.visible:
 			expected_focus = main.get_node_or_null("TitleMenu/Center/VBox/StartButton") as Control
@@ -232,7 +242,9 @@ func _run() -> void:
 			_expect_content_panels_generated(title_menu, "How To Play cards should use generated texture styling", failures)
 		if settings_button != null:
 			settings_button.emit_signal("pressed")
+			_expect_command_chrome_visible(title_menu, "Settings transition immediate frame", failures)
 			await get_tree().process_frame
+			_expect_command_chrome_visible(title_menu, "Settings transition settled frame", failures)
 			_expect(bool(settings_button.get_meta("active_page", false)), "Settings should retain a persistent active-page state", failures)
 			_expect(settings_button.text.begins_with("ACTIVE //"), "Settings active-page state should be visible in its label", failures)
 			var settings_pressed_style: StyleBoxFlat = settings_button.get_theme_stylebox("pressed") as StyleBoxFlat
@@ -323,6 +335,18 @@ func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:
 		failures.append(message)
 
+func _expect_command_chrome_visible(title_menu: Control, context: String, failures: Array[String]) -> void:
+	var title_panel: Panel = title_menu.get_node_or_null("TitlePanel") as Panel
+	var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer
+	var title_label: Label = title_menu.get_node_or_null("Center/VBox/GameTitle") as Label
+	var section_title: Label = title_menu.find_child("SectionTitle", true, false) as Label
+	var settings_button: Button = title_menu.get_node_or_null("Center/VBox/SettingsButton") as Button
+	_expect(title_panel != null and title_panel.visible and title_panel.modulate.a >= 0.99, "%s should keep the command rail visible" % context, failures)
+	_expect(content_panel != null and content_panel.visible and content_panel.modulate.a >= 0.99, "%s should keep the command record visible" % context, failures)
+	_expect(title_label != null and title_label.visible and title_label.modulate.a >= 0.99 and title_label.text.strip_edges() != "", "%s should keep the title label visible" % context, failures)
+	_expect(section_title != null and section_title.visible and section_title.modulate.a >= 0.99 and section_title.text.strip_edges() != "", "%s should keep the active record label visible" % context, failures)
+	_expect(settings_button != null and settings_button.visible and settings_button.modulate.a >= 0.99 and settings_button.text.strip_edges() != "", "%s should keep the Settings route visible" % context, failures)
+
 func _expect_content_panels_generated(title_menu: Control, message: String, failures: Array[String]) -> void:
 	var body: Control = null
 	if title_menu != null:
@@ -393,6 +417,18 @@ func _find_label_containing_text(root: Node, needle: String) -> Label:
 		return label
 	for child: Node in root.get_children():
 		var found: Label = _find_label_containing_text(child, needle)
+		if found != null:
+			return found
+	return null
+
+func _find_visible_label(root: Node) -> Label:
+	if root == null:
+		return null
+	var label: Label = root as Label
+	if label != null and label.visible and label.text.strip_edges() != "":
+		return label
+	for child: Node in root.get_children():
+		var found: Label = _find_visible_label(child)
 		if found != null:
 			return found
 	return null

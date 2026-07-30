@@ -785,6 +785,7 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	_ensure_arena_woodland_backdrop(arena)
 	_ensure_arena_woodland_silhouettes(arena)
 	_ensure_arena_weather_banks(arena)
+	_ensure_arena_wet_ground_reflection(arena)
 	_ensure_arena_threat_veil(arena)
 	_ensure_arena_pressure_lighting(arena)
 	_ensure_arena_threat_incursions(arena)
@@ -1008,7 +1009,7 @@ static func _ensure_arena_woodland_backdrop(arena: Control) -> void:
 	woodland.texture = woodland_texture
 	woodland.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	woodland.stretch_mode = TextureRect.STRETCH_SCALE
-	woodland.modulate = Color(0.84, 0.80, 0.76, 0.96)
+	woodland.modulate = Color(1.12, 1.02, 0.92, 1.0)
 
 static func _ensure_arena_woodland_silhouettes(arena: Control) -> void:
 	var silhouettes: Control = arena.get_node_or_null("ArenaWoodlandSilhouettes") as Control
@@ -1153,6 +1154,27 @@ static func _ensure_arena_weather_banks(arena: Control) -> void:
 		smoke_texture.fill_to = Vector2(0.12, 0.56)
 		smoke_texture.gradient = smoke_gradient
 		smoke.texture = smoke_texture
+
+static func _ensure_arena_wet_ground_reflection(arena: Control) -> void:
+	var reflection: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaWetGroundReflection", -3)
+	if reflection == null:
+		return
+	var reflection_gradient: Gradient = Gradient.new()
+	reflection_gradient.offsets = PackedFloat32Array([0.0, 0.44, 0.63, 0.78, 1.0])
+	reflection_gradient.colors = PackedColorArray([
+		Color(0.0, 0.0, 0.0, 0.0),
+		Color(0.0, 0.0, 0.0, 0.0),
+		Color(0.78, 0.66, 0.48, 0.06),
+		Color(0.92, 0.18, 0.10, 0.13),
+		Color(0.22, 0.20, 0.17, 0.05),
+	])
+	var reflection_texture: GradientTexture2D = GradientTexture2D.new()
+	reflection_texture.width = 512
+	reflection_texture.height = 512
+	reflection_texture.fill_from = Vector2(0.5, 0.0)
+	reflection_texture.fill_to = Vector2(0.5, 1.0)
+	reflection_texture.gradient = reflection_gradient
+	reflection.texture = reflection_texture
 
 static func _ensure_arena_rect(parent_control: Control, node_name: String) -> ColorRect:
 	var rect: ColorRect = parent_control.get_node_or_null(node_name) as ColorRect
@@ -1434,11 +1456,11 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	if is_player:
-		style.bg_color = Color(0.055, 0.074, 0.072, 0.34)
+		style.bg_color = Color(0.055, 0.074, 0.072, 0.20)
 		style.border_color = Color(0.75, 0.70, 0.58, 0.78)
 		style.border_width_top = 3
 	else:
-		style.bg_color = Color(0.12, 0.025, 0.030, 0.36)
+		style.bg_color = Color(0.12, 0.025, 0.030, 0.22)
 		style.border_color = Color(0.80, 0.075, 0.09, 0.84)
 		style.border_width_bottom = 3
 	return style

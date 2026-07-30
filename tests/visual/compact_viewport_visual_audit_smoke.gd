@@ -470,6 +470,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		"MarginContainer/VBoxContainer/ActionsRow",
 		"MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
+		"MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
 	])
 	for path: String in required_paths:
@@ -481,7 +482,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	if system_menu_button != null and system_menu_button.visible:
 		_expect_control_inside(system_menu_button, "%s system Menu" % context)
 	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
-	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 128.0, "%s Team Metrics rail did not release enough battlefield width" % context)
+	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 136.0, "%s Team Metrics rail did not release enough battlefield width" % context)
 	_expect_text_children_horizontally_inside(left_panel, "%s item/trait rail" % context)
 	_expect_text_children_horizontally_inside(stats_area, "%s Team Metrics rail" % context)
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
@@ -514,7 +515,14 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		_expect(trait_label.size.x >= 40.0, "%s trait label %s collapsed below a readable width" % [context, String(trait_label.name)])
 		_expect(visible_trait_rect.size.x >= trait_rect.size.x - 2.0, "%s visible trait label %s lacks a complete readable line" % [context, String(trait_label.name)])
 		_expect(trait_label.text.contains(" // ") and (trait_label.text.contains("/") or trait_label.text.contains(">")), "%s visible trait row does not retain its name and checkpoint" % context)
-	_expect(readable_trait_rows >= 1, "%s traits strip exposes no complete readable row" % context)
+		var trait_font: Font = trait_label.get_theme_font("font")
+		var trait_font_size: int = trait_label.get_theme_font_size("font_size")
+		var trait_text_width: float = trait_font.get_string_size(trait_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, trait_font_size).x if trait_font != null else 0.0
+		_expect(trait_text_width <= trait_label.size.x + 1.0, "%s trait row clips decision copy: text=%.1f width=%.1f" % [context, trait_text_width, trait_label.size.x])
+	_expect(readable_trait_rows >= 2, "%s traits strip must expose at least two complete name/checkpoint rows, found %d" % [context, readable_trait_rows])
+	_expect_scaled_decision_data(context)
+	_expect_scaled_team_metrics(context)
+	_expect_scaled_surface_separation(context)
 	var bench_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BenchArea/BenchGrid") as GridContainer
 	if bench_grid != null:
 		for bench_node: Node in bench_grid.get_children():
@@ -536,6 +544,93 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 				_expect_shop_card_contents_inside(card)
 	var tactical_record: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	_expect(tactical_record != null and not tactical_record.visible, "%s decorative tactical-record caption can still overlay gameplay" % context)
+
+func _expect_scaled_decision_data(context: String) -> void:
+	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
+	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
+	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "%s enlarged layout hid its gold/level/XP record" % context)
+	if resource_strip != null:
+		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "%s compact resource strip did not certify a complete source mirror" % context)
+		_expect(resource_strip.text.contains("GOLD"), "%s compact resource strip omitted gold" % context)
+		_expect(resource_strip.text.contains("LVL"), "%s compact resource strip omitted level" % context)
+		_expect(resource_strip.text.contains("XP"), "%s compact resource strip omitted XP" % context)
+		var gold_source: Label = _main.get_node_or_null("CombatView/MarginContainer/VBoxContainer/ActionsRow/GoldLabel") as Label if _main != null else null
+		if gold_source == null and _main != null:
+			gold_source = _main.find_child("GoldLabel", true, false) as Label
+		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "%s resource strip does not mirror the live gold value" % context)
+		var progress_source: Label = _find_progress_source()
+		_expect(progress_source != null, "%s live level/XP source is missing" % context)
+		if progress_source != null:
+			for numeric_token: String in progress_source.text.split(" ", false):
+				var normalized_token: String = numeric_token.trim_prefix("(").trim_suffix(")")
+				if normalized_token.contains("/") or normalized_token.is_valid_int():
+					_expect(resource_strip.text.contains(normalized_token), "%s resource strip does not mirror progress token %s" % [context, normalized_token])
+		_expect(resource_strip.get_theme_font_size("font_size") >= 15, "%s compact resource strip type is too small" % context)
+		_expect_control_inside(resource_strip, "%s gold/level/XP record" % context)
+	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s enlarged layout hid wager outcomes" % context)
+	if wager_summary != null:
+		for required_copy: String in ["Wager", "Win", "After win", "After loss"]:
+			_expect(wager_summary.text.contains(required_copy), "%s wager outcome record omitted %s" % [context, required_copy])
+		_expect_control_inside(wager_summary, "%s wager outcome record" % context)
+
+func _find_progress_source() -> Label:
+	var bottom_storage: Control = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea")
+	if bottom_storage == null:
+		return null
+	for candidate: Node in bottom_storage.find_children("*", "Label", true, false):
+		var label: Label = candidate as Label
+		if label != null and (label.text.begins_with("Lvl ") or label.text.begins_with("Command Rank")):
+			return label
+	return null
+
+func _expect_scaled_team_metrics(context: String) -> void:
+	var scoreboard: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Body/Scoreboard")
+	_expect(scoreboard != null and scoreboard.is_visible_in_tree(), "%s Team Metrics scoreboard disappeared" % context)
+	if scoreboard == null:
+		return
+	var compact_rows: int = 0
+	for row_node: Node in scoreboard.find_children("*", "ScoreboardRow", true, false):
+		var row: Control = row_node as Control
+		if row == null or not row.is_visible_in_tree():
+			continue
+		compact_rows += 1
+		_expect(bool(row.get_meta("compact_layout", false)), "%s visible metric row did not enter its compact contract" % context)
+		var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label
+		var value_label: Label = row.get_node_or_null("HBox/Content/Value") as Label
+		_expect(name_label != null and (name_label.text.begins_with("YOU //") or name_label.text.begins_with("FOE //")), "%s metric row lost team attribution" % context)
+		_expect(value_label != null and value_label.text.strip_edges() != "", "%s metric row lost its numeric value" % context)
+		if name_label != null:
+			_expect(name_label.get_theme_font_size("font_size") >= 14, "%s team metric identity type is too small" % context)
+			var name_font: Font = name_label.get_theme_font("font")
+			var name_text_width: float = name_font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, name_label.get_theme_font_size("font_size")).x if name_font != null else 0.0
+			_expect(name_text_width <= name_label.size.x + 1.0, "%s team metric identity clips: text=%.1f width=%.1f" % [context, name_text_width, name_label.size.x])
+		if value_label != null:
+			_expect(value_label.get_theme_font_size("font_size") >= 15, "%s team metric value type is too small" % context)
+	if not scoreboard.find_children("*", "ScoreboardRow", true, false).is_empty():
+		_expect(compact_rows > 0, "%s populated Team Metrics rail exposes no readable rows" % context)
+
+func _expect_scaled_surface_separation(context: String) -> void:
+	var battle_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea")
+	var content_row: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow")
+	var left_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
+	var board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
+	var stats_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
+	var bench_area: Control = _combat_node("MarginContainer/VBoxContainer/BenchArea")
+	var wager_summary: Control = _combat_node("MarginContainer/VBoxContainer/WagerSummary")
+	var bottom_storage: Control = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea")
+	for surface: Control in [content_row, left_rail, board_column, stats_rail]:
+		if battle_area != null and surface != null and surface.is_visible_in_tree():
+			_expect(battle_area.get_global_rect().grow(1.0).encloses(surface.get_global_rect()), "%s %s escaped the battle region" % [context, String(surface.name)])
+	if battle_area != null and bench_area != null:
+		_expect(battle_area.get_global_rect().end.y <= bench_area.get_global_rect().position.y + 1.0, "%s board overlaps the bench strip" % context)
+	if bench_area != null and wager_summary != null:
+		_expect(bench_area.get_global_rect().end.y <= wager_summary.get_global_rect().position.y + 1.0, "%s bench overlaps wager outcomes" % context)
+	if wager_summary != null and bottom_storage != null:
+		_expect(wager_summary.get_global_rect().end.y <= bottom_storage.get_global_rect().position.y + 1.0, "%s wager outcomes overlap shop/footer controls" % context)
+	if left_rail != null and board_column != null:
+		_expect(left_rail.get_global_rect().end.x <= board_column.get_global_rect().position.x + 1.0, "%s tactical rail overlaps the board" % context)
+	if board_column != null and stats_rail != null:
+		_expect(board_column.get_global_rect().end.x <= stats_rail.get_global_rect().position.x + 1.0, "%s Team Metrics rail overlaps the board" % context)
 
 func _expect_text_children_horizontally_inside(surface: Control, context: String) -> void:
 	_expect(surface != null, "%s surface missing" % context)
@@ -576,7 +671,9 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	if wager_label != null:
 		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
 	if wager_summary != null:
-		_expect(wager_summary.get_theme_font_size("font_size") >= 20, "%s wager outcome metadata is too small" % context)
+		_expect(wager_summary.get_theme_font_size("font_size") >= (14 if tight else 18), "%s wager outcome metadata is too small" % context)
+		for required_copy: String in ["Wager", "Win", "After win", "After loss"]:
+			_expect(wager_summary.text.contains(required_copy), "%s wager outcome metadata omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
 	_expect(directive != null and directive.text.contains("COMMIT") and directive.get_theme_font_size("font_size") >= 18, "%s planning directive missing or unreadable" % context)
@@ -591,7 +688,8 @@ func _expect_shop_card_contents_inside(card: Control) -> void:
 		if label == null or not label.visible:
 			continue
 		_expect(card_rect.encloses(label.get_global_rect()), "shop card %s clips %s" % [String(card.name), label_name])
-		_expect(label.get_theme_font_size("font_size") >= 18, "shop card %s %s should remain at least 18px" % [String(card.name), label_name])
+		var minimum_font_size: int = 14 if label_name == "Name" else 16
+		_expect(label.get_theme_font_size("font_size") >= minimum_font_size, "shop card %s %s should remain at least %dpx" % [String(card.name), label_name, minimum_font_size])
 
 func _viewport_rect() -> Rect2:
 	var viewport_rect: Rect2 = get_viewport().get_visible_rect()

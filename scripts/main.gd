@@ -443,6 +443,36 @@ func _build_title_page() -> void:
 		artwork.texture = ResourceLoader.load(TITLE_SCREEN_PATH, "Texture2D") as Texture2D
 	if artwork.texture == null:
 		_build_title_page_fallback(_title_page)
+	var title_mark_distress: Control = Control.new()
+	title_mark_distress.name = "TitleMarkDistress"
+	title_mark_distress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_mark_distress.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title_mark_distress.z_index = 1
+	_title_page.add_child(title_mark_distress)
+	_add_title_distress_mark(
+		title_mark_distress,
+		"BloodRegistration",
+		Rect2(0.038, 0.137, 0.004, 0.146),
+		Color(0.69, 0.018, 0.034, 0.78)
+	)
+	_add_title_distress_mark(
+		title_mark_distress,
+		"MisregisterSlash",
+		Rect2(0.056, 0.272, 0.186, 0.004),
+		Color(0.74, 0.026, 0.042, 0.72)
+	)
+	_add_title_distress_mark(
+		title_mark_distress,
+		"InkKnockout",
+		Rect2(0.212, 0.126, 0.049, 0.003),
+		Color(0.018, 0.014, 0.018, 0.82)
+	)
+	_add_title_distress_mark(
+		title_mark_distress,
+		"LowerRegistration",
+		Rect2(0.046, 0.287, 0.078, 0.002),
+		Color(0.83, 0.69, 0.50, 0.62)
+	)
 	var center: Control = Control.new()
 	center.name = "Center"
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -467,28 +497,18 @@ func _build_title_page() -> void:
 		enter_button.add_theme_stylebox_override(state_name, empty_style)
 	enter_button.pressed.connect(_dismiss_title_page)
 	stack.add_child(enter_button)
-	var continue_prompt: Label = Label.new()
-	continue_prompt.name = "ContinuePrompt"
-	continue_prompt.text = "CLICK OR PRESS ANY KEY"
-	continue_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	continue_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	continue_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	continue_prompt.add_theme_font_size_override("font_size", 22)
-	continue_prompt.add_theme_color_override("font_color", Color(0.94, 0.87, 0.74, 1.0))
-	VisualTypeSystem.set_action(continue_prompt)
-	continue_prompt.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
-	continue_prompt.add_theme_constant_override("outline_size", 3)
-	continue_prompt.anchor_left = 0.5
-	continue_prompt.anchor_right = 0.5
-	continue_prompt.anchor_top = 1.0
-	continue_prompt.anchor_bottom = 1.0
-	continue_prompt.offset_left = -240.0
-	continue_prompt.offset_right = 240.0
-	continue_prompt.offset_top = -108.0
-	continue_prompt.offset_bottom = -64.0
-	continue_prompt.z_index = 2
-	stack.add_child(continue_prompt)
 	_title_page.gui_input.connect(_on_title_page_gui_input)
+
+func _add_title_distress_mark(parent: Control, mark_name: String, normalized_rect: Rect2, color: Color) -> void:
+	var mark: ColorRect = ColorRect.new()
+	mark.name = mark_name
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.color = color
+	mark.anchor_left = normalized_rect.position.x
+	mark.anchor_top = normalized_rect.position.y
+	mark.anchor_right = normalized_rect.end.x
+	mark.anchor_bottom = normalized_rect.end.y
+	parent.add_child(mark)
 
 func _build_title_page_fallback(title_page: Control) -> void:
 	var fallback_center: CenterContainer = CenterContainer.new()

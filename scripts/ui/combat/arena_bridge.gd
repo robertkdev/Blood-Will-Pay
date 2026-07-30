@@ -37,6 +37,12 @@ func configure(_arena_container: Control, _arena_units: Control, _planning_area:
         arena = ArenaControllerClass.new()
 
 func get_arena_bounds() -> Rect2:
+    if arena_container != null and is_instance_valid(arena_container) and bool(arena_container.get_meta("use_full_combat_bounds", false)):
+        var battle_area: Control = arena_container.get_parent() as Control
+        if battle_area != null:
+            var combat_rect: Rect2 = battle_area.get_global_rect()
+            if combat_rect.size.x > 1.0 and combat_rect.size.y > 1.0:
+                return Rect2(combat_rect.position, combat_rect.size)
     if planning_area != null and is_instance_valid(planning_area):
         var planning_rect: Rect2 = planning_area.get_global_rect()
         if planning_rect.size.x > 1.0 and planning_rect.size.y > 1.0:
@@ -227,8 +233,12 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
         if j < 8:
             var ename: String = (ev.unit.name if ev and ev.unit else "?")
             e_summary.append("%d#%d:%s(%s)" % [j, idx2, str(pos2), ename])
-    # Bounds from the planning board, not the full battle row, so actors stay out of side UI.
+    # Planning preserves board-relative bounds; combat promotes the same
+    # formations into the full survival field after its side UI is removed.
     var bounds: Rect2 = get_engine_arena_bounds()
+    if arena_container != null and bool(arena_container.get_meta("use_full_combat_bounds", false)) and bounds.size.x > 1.0 and bounds.size.y > 1.0:
+        _recenter_team_formation(ppos, bounds, Vector2(0.44, 0.66))
+        _recenter_team_formation(epos, bounds, Vector2(0.56, 0.34))
     if bounds.size.y <= 1.0 or bounds.size.x <= 1.0:
         var all_pts: Array[Vector2] = []
         for v in ppos:
@@ -286,6 +296,25 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
     if Debug.enabled:
         print("[Arena] tile=", ts, " bounds=", bounds)
     _log_start_positions_and_targets(manager)
+
+func _recenter_team_formation(positions: Array[Vector2], bounds: Rect2, target_ratio: Vector2) -> void:
+    if positions.is_empty() or bounds.size.x <= 1.0 or bounds.size.y <= 1.0:
+        return
+    var centroid: Vector2 = Vector2.ZERO
+    for position_value: Vector2 in positions:
+        centroid += position_value
+    centroid /= float(positions.size())
+    var target: Vector2 = bounds.position + bounds.size * target_ratio
+    var shift: Vector2 = target - centroid
+    var inset: Vector2 = Vector2(maxf(38.0, float(tile_size) * 0.55), maxf(44.0, float(tile_size) * 0.65))
+    var minimum: Vector2 = bounds.position + inset
+    var maximum: Vector2 = bounds.end - inset
+    for index: int in range(positions.size()):
+        var shifted: Vector2 = positions[index] + shift
+        positions[index] = Vector2(
+            clampf(shifted.x, minimum.x, maximum.x),
+            clampf(shifted.y, minimum.y, maximum.y)
+        )
 
 func _ensure_position_signal(manager: CombatManager) -> bool:
     if manager == null:

@@ -3020,6 +3020,21 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 	var battle_area: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	if battle_area != null:
 		battle_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		if in_combat:
+			if not battle_area.has_meta("planning_minimum_height"):
+				battle_area.set_meta("planning_minimum_height", battle_area.custom_minimum_size.y)
+			var viewport_height: float = parent.get_viewport_rect().size.y
+			battle_area.custom_minimum_size.y = maxf(680.0, viewport_height - 104.0)
+		elif battle_area.has_meta("planning_minimum_height"):
+			battle_area.custom_minimum_size.y = float(battle_area.get_meta("planning_minimum_height", 604.0))
+			battle_area.remove_meta("planning_minimum_height")
+	if stage_label != null:
+		stage_label.visible = not in_combat
+	var planning_timer: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Control
+	if planning_timer != null:
+		planning_timer.visible = not in_combat
+	if arena_container != null:
+		arena_container.set_meta("use_full_combat_bounds", in_combat)
 	var arena_objective: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
 	if arena_objective != null:
 		arena_objective.text = "FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
@@ -3070,6 +3085,29 @@ func _protect_persistent_hud_chrome() -> void:
 		stage_bar.z_index = 220
 		stage_bar.modulate = Color.WHITE
 		stage_bar.self_modulate = Color.WHITE
+		var chapter: int = int(GameState.chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else 1
+		var stage: int = int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else 1
+		var total: int = int(ChapterCatalog.stages_in(chapter))
+		if stage_bar.has_method("update_progress"):
+			stage_bar.call("update_progress", chapter, stage, total)
+		if stage_bar.has_method("set_combat_state"):
+			stage_bar.call("set_combat_state", _tactical_phase_visual_state == 1)
+		var chapter_label: Label = stage_bar.find_child("ChapterLabel", true, false) as Label
+		var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label
+		if chapter_label != null:
+			chapter_label.visible = true
+			chapter_label.modulate = Color.WHITE
+			chapter_label.self_modulate = Color.WHITE
+		if phase_label != null:
+			phase_label.visible = true
+			phase_label.modulate = Color.WHITE
+			phase_label.self_modulate = Color.WHITE
+		for token_index: int in range(1, 6):
+			var token: Control = stage_bar.find_child("StageToken%d" % token_index, true, false) as Control
+			if token != null and token_index <= total:
+				token.visible = true
+				token.modulate = Color.WHITE
+				token.self_modulate = Color.WHITE
 	var tree: SceneTree = parent.get_tree()
 	var system_menu: Button = tree.root.find_child("SystemMenuButton", true, false) as Button if tree != null else null
 	if system_menu != null:
@@ -3137,6 +3175,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	if skip_button != null:
 		skip_button.text = "ENTER / SPACE // SKIP"
 		skip_button.disabled = true
+	_configure_result_aftermath(banner, title, accent_color, title_color)
 	banner.add_theme_stylebox_override("panel", _make_result_scrim_style(title))
 	banner.visible = true
 	banner.modulate = Color.WHITE
@@ -3374,9 +3413,68 @@ func _ensure_result_banner() -> PanelContainer:
 	# scrim. Consequence cards interrupt play, not navigation or run context.
 	_result_banner.offset_top = 82.0
 	_result_banner.offset_bottom = 0.0
+	var aftermath: Control = Control.new()
+	aftermath.name = "BattleResultAftermath"
+	aftermath.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	aftermath.z_index = 0
+	aftermath.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_result_banner.add_child(aftermath)
+	var field_art: TextureRect = TextureRect.new()
+	field_art.name = "AftermathFieldArt"
+	field_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	field_art.set_anchors_preset(Control.PRESET_FULL_RECT)
+	field_art.texture = GothicUIAssets.battlefield_texture()
+	field_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	field_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	aftermath.add_child(field_art)
+	var blood_wash: TextureRect = TextureRect.new()
+	blood_wash.name = "AftermathBloodWash"
+	blood_wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	blood_wash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blood_wash.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	blood_wash.stretch_mode = TextureRect.STRETCH_SCALE
+	aftermath.add_child(blood_wash)
+	var rupture_layer: Control = Control.new()
+	rupture_layer.name = "AftermathRuptureField"
+	rupture_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rupture_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	aftermath.add_child(rupture_layer)
+	var rupture_specs: Array[Dictionary] = [
+		{"name": "SplinterWestA", "left": -0.04, "right": 0.31, "top": 0.18, "height": 16.0, "rotation": -0.15},
+		{"name": "SplinterWestB", "left": -0.02, "right": 0.25, "top": 0.70, "height": 8.0, "rotation": 0.21},
+		{"name": "SplinterEastA", "left": 0.72, "right": 1.04, "top": 0.15, "height": 14.0, "rotation": 0.13},
+		{"name": "SplinterEastB", "left": 0.76, "right": 1.03, "top": 0.76, "height": 9.0, "rotation": -0.18},
+		{"name": "FieldBreak", "left": 0.06, "right": 0.94, "top": 0.54, "height": 4.0, "rotation": -0.025},
+	]
+	for rupture_spec: Dictionary in rupture_specs:
+		var rupture: ColorRect = ColorRect.new()
+		rupture.name = String(rupture_spec.get("name", "AftermathSplinter"))
+		rupture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rupture.anchor_left = float(rupture_spec.get("left", 0.0))
+		rupture.anchor_right = float(rupture_spec.get("right", 1.0))
+		rupture.anchor_top = float(rupture_spec.get("top", 0.5))
+		rupture.anchor_bottom = rupture.anchor_top
+		rupture.offset_bottom = float(rupture_spec.get("height", 6.0))
+		rupture.rotation = float(rupture_spec.get("rotation", 0.0))
+		rupture_layer.add_child(rupture)
+	var aftermath_stamp: Label = Label.new()
+	aftermath_stamp.name = "AftermathStamp"
+	aftermath_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	aftermath_stamp.anchor_left = 0.72
+	aftermath_stamp.anchor_right = 0.97
+	aftermath_stamp.anchor_top = 0.70
+	aftermath_stamp.anchor_bottom = 0.90
+	aftermath_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	aftermath_stamp.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	aftermath_stamp.add_theme_font_size_override("font_size", 34)
+	aftermath_stamp.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.96))
+	aftermath_stamp.add_theme_constant_override("outline_size", 4)
+	VisualTypeSystem.set_impact(aftermath_stamp)
+	aftermath.add_child(aftermath_stamp)
 	var center: CenterContainer = CenterContainer.new()
 	center.name = "Center"
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.z_index = 2
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.offset_top = -34.0
 	center.offset_bottom = -34.0
@@ -3530,6 +3628,45 @@ func _ensure_result_banner() -> PanelContainer:
 	parent.add_child(_result_banner)
 	return _result_banner
 
+func _configure_result_aftermath(banner: PanelContainer, title: String, accent_color: Color, title_color: Color) -> void:
+	if banner == null:
+		return
+	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control
+	var field_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathFieldArt") as TextureRect
+	var blood_wash: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathBloodWash") as TextureRect
+	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control
+	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label
+	if aftermath != null:
+		aftermath.visible = true
+		aftermath.set_meta("outcome_variant", title.to_lower())
+	if field_art != null:
+		field_art.modulate = Color(1.10, 0.88, 0.80, 0.74) if title == "VICTORY" else Color(0.70, 0.66, 0.74, 0.70) if title == "STALEMATE" else Color(1.12, 0.56, 0.52, 0.80)
+	if blood_wash != null:
+		var gradient: Gradient = Gradient.new()
+		gradient.offsets = PackedFloat32Array([0.0, 0.30, 0.66, 1.0])
+		gradient.colors = PackedColorArray([
+			Color(accent_color.r, accent_color.g, accent_color.b, 0.44),
+			Color(0.02, 0.01, 0.015, 0.05),
+			Color(0.14, 0.0, 0.015, 0.14),
+			Color(accent_color.r, accent_color.g, accent_color.b, 0.54),
+		])
+		var gradient_texture: GradientTexture2D = GradientTexture2D.new()
+		gradient_texture.width = 512
+		gradient_texture.height = 512
+		gradient_texture.fill_from = Vector2(0.02, 0.08)
+		gradient_texture.fill_to = Vector2(0.96, 0.90)
+		gradient_texture.gradient = gradient
+		blood_wash.texture = gradient_texture
+	if rupture_field != null:
+		for child: Node in rupture_field.get_children():
+			if child is ColorRect:
+				var rupture: ColorRect = child as ColorRect
+				var alpha: float = 0.36 if title == "VICTORY" else 0.28 if title == "STALEMATE" else 0.66
+				rupture.color = Color(accent_color.r, accent_color.g, accent_color.b, alpha)
+	if aftermath_stamp != null:
+		aftermath_stamp.text = "THE FIELD\nSTILL BREATHES" if title == "VICTORY" else "NOTHING LEFT.\nNOTHING RELEASED." if title == "STALEMATE" else "THE WOODS\nTOOK THEIR DUE"
+		aftermath_stamp.add_theme_color_override("font_color", Color(title_color.r, title_color.g, title_color.b, 0.74))
+
 func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.18, 0.022, 0.035, 0.98) if active else Color(0.048, 0.038, 0.044, 0.98)
@@ -3622,7 +3759,7 @@ func _add_result_damage_marks(card: PanelContainer) -> void:
 
 func _make_result_scrim_style(outcome: String = "") -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	var alpha: float = 0.61 if outcome == "VICTORY" else 0.70 if outcome == "STALEMATE" else 0.78
+	var alpha: float = 0.36 if outcome == "VICTORY" else 0.44 if outcome == "STALEMATE" else 0.52
 	style.bg_color = Color(0.006, 0.005, 0.008, alpha)
 	return style
 

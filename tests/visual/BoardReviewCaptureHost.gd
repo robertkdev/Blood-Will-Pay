@@ -35,6 +35,11 @@ const EXPECTED_FILES: Array[String] = [
 	"19_stalemate_hold_1920x1080.png",
 	"20_defeat_hold_1920x1080.png",
 	"21_loss_1920x1080.png",
+	"22_title_1280x720_150pct.png",
+	"23_settings_1280x720_150pct.png",
+	"24_ledger_1280x720_150pct.png",
+	"25_defeat_hold_1280x720_150pct.png",
+	"26_loss_1280x720_150pct.png",
 ]
 
 var _main: Control = null
@@ -69,7 +74,7 @@ func _run() -> void:
 		await _finish()
 		return
 
-	_configure_window(DESKTOP_SIZE)
+	_configure_window(DESKTOP_SIZE, false)
 	var window: Window = get_window()
 	USER_SETTINGS_SCRIPT.configure_storage_path(_settings_path)
 	USER_SETTINGS_SCRIPT.initialize(window)
@@ -86,6 +91,11 @@ func _run() -> void:
 	get_tree().root.add_child(_main)
 	await _settle_frames(10)
 	await _capture("01_title_1920x1080.png", "title", DESKTOP_SIZE)
+	_configure_scaled_window(COMPACT_SIZE, 1.5)
+	await _settle_frames(12)
+	await _capture("22_title_1280x720_150pct.png", "title_150_percent", COMPACT_SIZE)
+	_configure_window(DESKTOP_SIZE)
+	await _settle_frames(8)
 
 	_main.call("_dismiss_title_page")
 	await _settle_frames(8)
@@ -104,6 +114,11 @@ func _run() -> void:
 		title_menu.call_deferred("_refresh_scaled_layout")
 	await _settle_frames(12)
 	await _capture("04_settings_1280x720.png", "settings", COMPACT_SIZE)
+	_configure_scaled_window(COMPACT_SIZE, 1.5)
+	if title_menu != null:
+		title_menu.call_deferred("_refresh_scaled_layout")
+	await _settle_frames(12)
+	await _capture("23_settings_1280x720_150pct.png", "settings_150_percent", COMPACT_SIZE)
 
 	_configure_window(DESKTOP_SIZE)
 	if title_menu != null:
@@ -141,6 +156,13 @@ func _run() -> void:
 		ledger.call("refresh")
 	await _settle_frames(10)
 	await _capture("06_veteran_ledger_1920x1080.png", "black_ledger_veteran", DESKTOP_SIZE)
+	_configure_scaled_window(COMPACT_SIZE, 1.5)
+	if ledger != null and ledger.has_method("_refresh_scaled_layout"):
+		ledger.call_deferred("_refresh_scaled_layout")
+	await _settle_frames(12)
+	await _capture("24_ledger_1280x720_150pct.png", "black_ledger_veteran_150_percent", COMPACT_SIZE)
+	_configure_window(DESKTOP_SIZE)
+	await _settle_frames(8)
 	_main.call("_close_black_ledger")
 	await _settle_frames(4)
 
@@ -249,12 +271,26 @@ func _run() -> void:
 			Color(1.0, 0.69, 0.60, 1.0),
 			"20_defeat_hold_1920x1080.png"
 		)
+		_configure_scaled_window(COMPACT_SIZE, 1.5)
+		if combat != null and combat.has_method("_apply_responsive_layout"):
+			combat.call("_apply_responsive_layout")
+		if controller.has_method("refresh_result_banner_layout"):
+			controller.call("refresh_result_banner_layout")
+		await _settle_frames(12)
+		await _capture("25_defeat_hold_1280x720_150pct.png", "defeat_150_percent", COMPACT_SIZE)
 
 	Engine.time_scale = 1.0
+	_configure_window(DESKTOP_SIZE)
 	await _free_main()
 	await _build_loss_surface()
 	await _settle_frames(10)
 	await _capture("21_loss_1920x1080.png", "loss", DESKTOP_SIZE)
+	_configure_scaled_window(COMPACT_SIZE, 1.5)
+	var loss_screen: Control = _loss_layer.get_child(0) as Control if _loss_layer != null and _loss_layer.get_child_count() > 0 else null
+	if loss_screen != null and loss_screen.has_method("_sync_layout"):
+		loss_screen.call_deferred("_sync_layout")
+	await _settle_frames(12)
+	await _capture("26_loss_1280x720_150pct.png", "loss_150_percent", COMPACT_SIZE)
 	await _finish()
 
 
@@ -537,7 +573,7 @@ func _write_manifest() -> void:
 	print("%s: MANIFEST %s" % [CAPTURE_NAME, ProjectSettings.globalize_path(_manifest_path)])
 
 
-func _configure_window(size: Vector2i) -> void:
+func _configure_window(size: Vector2i, reset_ui_scale: bool = true) -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(size)
 	var window: Window = get_window()
@@ -546,6 +582,8 @@ func _configure_window(size: Vector2i) -> void:
 		window.size = size
 		window.content_scale_size = size
 		window.content_scale_factor = 1.0
+		if reset_ui_scale:
+			USER_SETTINGS_SCRIPT.set_ui_scale(1.0, window)
 
 
 func _configure_scaled_window(physical_size: Vector2i, ui_scale: float) -> void:

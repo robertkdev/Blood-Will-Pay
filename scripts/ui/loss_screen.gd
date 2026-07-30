@@ -176,6 +176,7 @@ func _populate() -> void:
 		if sb.has_method("set_expanded"):
 			sb.set_expanded(false)
 		_style_loss_scoreboard(sb)
+	_sync_layout()
 
 func _style_loss_scoreboard(scoreboard: Node) -> void:
 	if scoreboard == null:
@@ -344,22 +345,22 @@ func _apply_styles() -> void:
 		new_game_button.grab_focus()
 	_sync_layout()
 
-func _make_loss_frame_style() -> StyleBox:
+func _make_loss_frame_style(tight_compact: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.024, 0.006, 0.010, 0.94)
+	style.bg_color = Color(0.024, 0.006, 0.010, 0.72)
 	style.border_color = Color(0.63, 0.10, 0.11, 0.98)
-	style.border_width_left = 13
+	style.border_width_left = 8 if tight_compact else 13
 	style.border_width_top = 2
 	style.border_width_right = 2
-	style.border_width_bottom = 9
+	style.border_width_bottom = 6 if tight_compact else 9
 	style.set_corner_radius_all(0)
-	style.content_margin_left = 52
-	style.content_margin_right = 52
-	style.content_margin_top = 38
-	style.content_margin_bottom = 54
+	style.content_margin_left = 22 if tight_compact else 52
+	style.content_margin_right = 22 if tight_compact else 52
+	style.content_margin_top = 12 if tight_compact else 38
+	style.content_margin_bottom = 16 if tight_compact else 54
 	style.shadow_color = Color(0.46, 0.0, 0.02, 0.42)
-	style.shadow_size = 18
-	style.shadow_offset = Vector2(12.0, 10.0)
+	style.shadow_size = 8 if tight_compact else 18
+	style.shadow_offset = Vector2(6.0, 5.0) if tight_compact else Vector2(12.0, 10.0)
 	return style
 
 func _ensure_frame_damage() -> void:
@@ -378,7 +379,7 @@ func _ensure_frame_damage() -> void:
 	var reading_matte: ColorRect = ColorRect.new()
 	reading_matte.name = "ReadingMatte"
 	reading_matte.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	reading_matte.color = Color(0.022, 0.006, 0.010, 0.82)
+	reading_matte.color = Color(0.022, 0.006, 0.010, 0.44)
 	reading_matte.set_anchors_preset(Control.PRESET_FULL_RECT)
 	reading_matte.offset_left = 17.0
 	reading_matte.offset_top = 16.0
@@ -399,6 +400,9 @@ func _ensure_frame_damage() -> void:
 	wound_slash.offset_bottom = 34.0
 	wound_slash.rotation_degrees = -3.0
 	_frame_damage_layer.add_child(wound_slash)
+	_add_frame_rupture("RuptureGashA", Vector2(0.10, 0.15), Vector2(0.40, 0.15), 13.0, 5.0, Color(0.72, 0.015, 0.026, 0.24))
+	_add_frame_rupture("RuptureGashB", Vector2(0.60, 0.70), Vector2(0.96, 0.70), -8.0, 7.0, Color(0.64, 0.008, 0.020, 0.20))
+	_add_frame_rupture("RuptureGashC", Vector2(0.02, 0.89), Vector2(0.34, 0.89), -4.0, 4.0, Color(0.88, 0.08, 0.055, 0.26))
 	var forfeit_stamp: Label = Label.new()
 	forfeit_stamp.name = "ForfeitStamp"
 	forfeit_stamp.text = "FOREST CLAIM // BODY COUNT FINAL"
@@ -419,6 +423,22 @@ func _ensure_frame_damage() -> void:
 	forfeit_stamp.add_theme_stylebox_override("normal", _make_record_stamp_style())
 	VisualTypeSystem.set_action(forfeit_stamp)
 	_frame_damage_layer.add_child(forfeit_stamp)
+
+func _add_frame_rupture(node_name: String, from_anchor: Vector2, to_anchor: Vector2, rotation: float, thickness: float, color: Color) -> void:
+	if _frame_damage_layer == null:
+		return
+	var rupture: ColorRect = ColorRect.new()
+	rupture.name = node_name
+	rupture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rupture.color = color
+	rupture.anchor_left = from_anchor.x
+	rupture.anchor_top = from_anchor.y
+	rupture.anchor_right = to_anchor.x
+	rupture.anchor_bottom = to_anchor.y
+	rupture.offset_top = -thickness * 0.5
+	rupture.offset_bottom = thickness * 0.5
+	rupture.rotation_degrees = rotation
+	_frame_damage_layer.add_child(rupture)
 
 func _ensure_record_labels() -> void:
 	if content_box == null:
@@ -569,10 +589,11 @@ func _ensure_loss_art() -> void:
 	_loss_art.texture = HardcoreUIAssets.loss_backdrop_texture()
 	_loss_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_loss_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	_loss_art.z_index = 0
-	_loss_art.modulate = Color(1.82, 1.34, 1.28, 1.0)
+	_loss_art.visible = true
+	_loss_art.z_index = 1
+	_loss_art.modulate = Color(2.55, 1.82, 1.60, 1.0)
 	if backdrop != null:
-		backdrop.z_index = -1
+		backdrop.z_index = 0
 	if panel != null:
 		panel.z_index = 10
 
@@ -584,8 +605,30 @@ func _ensure_pressure_layer() -> void:
 		_pressure_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_pressure_layer)
 	_pressure_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_pressure_layer.z_index = 2
+	_pressure_layer.z_index = 3
 	if _pressure_layer.get_child_count() == 0:
+		var blood_tide: TextureRect = TextureRect.new()
+		blood_tide.name = "BloodTide"
+		blood_tide.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		blood_tide.set_anchors_preset(Control.PRESET_FULL_RECT)
+		blood_tide.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		blood_tide.stretch_mode = TextureRect.STRETCH_SCALE
+		var tide_gradient: Gradient = Gradient.new()
+		tide_gradient.offsets = PackedFloat32Array([0.0, 0.48, 0.78, 1.0])
+		tide_gradient.colors = PackedColorArray([
+			Color(0.10, 0.0, 0.01, 0.0),
+			Color(0.18, 0.0, 0.015, 0.03),
+			Color(0.46, 0.0, 0.025, 0.23),
+			Color(0.72, 0.0, 0.025, 0.48),
+		])
+		var tide_texture: GradientTexture2D = GradientTexture2D.new()
+		tide_texture.gradient = tide_gradient
+		tide_texture.width = 32
+		tide_texture.height = 512
+		tide_texture.fill_from = Vector2(0.5, 0.0)
+		tide_texture.fill_to = Vector2(0.5, 1.0)
+		blood_tide.texture = tide_texture
+		_pressure_layer.add_child(blood_tide)
 		var blood_fall: ColorRect = ColorRect.new()
 		blood_fall.name = "BloodFall"
 		blood_fall.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -605,6 +648,34 @@ func _ensure_pressure_layer() -> void:
 		wound_band.anchor_bottom = 0.18
 		wound_band.rotation_degrees = -2.0
 		_pressure_layer.add_child(wound_band)
+		var rupture_field: Control = Control.new()
+		rupture_field.name = "WoodlandRupture"
+		rupture_field.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rupture_field.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_pressure_layer.add_child(rupture_field)
+		_add_woodland_rupture(rupture_field, "LeftSplinterA", Vector2(-38.0, 210.0), Vector2(390.0, 20.0), 17.0, Color(0.57, 0.018, 0.026, 0.62))
+		_add_woodland_rupture(rupture_field, "LeftSplinterB", Vector2(-80.0, 720.0), Vector2(420.0, 16.0), -13.0, Color(0.35, 0.012, 0.020, 0.74))
+		_add_woodland_rupture(rupture_field, "LeftBoneBreak", Vector2(22.0, 508.0), Vector2(310.0, 5.0), 32.0, Color(0.78, 0.60, 0.48, 0.42))
+		_add_woodland_rupture(rupture_field, "RightSplinterA", Vector2(1540.0, 170.0), Vector2(480.0, 22.0), -14.0, Color(0.58, 0.015, 0.028, 0.64))
+		_add_woodland_rupture(rupture_field, "RightSplinterB", Vector2(1580.0, 760.0), Vector2(420.0, 18.0), 11.0, Color(0.38, 0.008, 0.018, 0.76))
+		_add_woodland_rupture(rupture_field, "RightBoneBreak", Vector2(1608.0, 475.0), Vector2(300.0, 5.0), -29.0, Color(0.78, 0.60, 0.48, 0.38))
+		var aftermath_caption: Label = Label.new()
+		aftermath_caption.name = "AftermathCaption"
+		aftermath_caption.text = "THE WOODS\nTOOK THE COMPANY"
+		aftermath_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		aftermath_caption.anchor_left = 0.025
+		aftermath_caption.anchor_top = 0.62
+		aftermath_caption.anchor_right = 0.195
+		aftermath_caption.anchor_bottom = 0.82
+		aftermath_caption.rotation_degrees = -3.0
+		aftermath_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		aftermath_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		aftermath_caption.add_theme_font_size_override("font_size", 42)
+		aftermath_caption.add_theme_color_override("font_color", Color(0.78, 0.055, 0.060, 0.74))
+		aftermath_caption.add_theme_color_override("font_outline_color", Color(0.01, 0.004, 0.006, 0.96))
+		aftermath_caption.add_theme_constant_override("outline_size", 4)
+		VisualTypeSystem.set_impact(aftermath_caption)
+		_pressure_layer.add_child(aftermath_caption)
 		_casualty_ghost_label = Label.new()
 		_casualty_ghost_label.name = "CasualtyGhost"
 		_casualty_ghost_label.text = "DEBT COLLECTED"
@@ -622,17 +693,73 @@ func _ensure_pressure_layer() -> void:
 		_casualty_ghost_label.z_index = 30
 		_pressure_layer.add_child(_casualty_ghost_label)
 
+func _add_woodland_rupture(parent: Control, node_name: String, position_value: Vector2, size_value: Vector2, rotation: float, color: Color) -> void:
+	if parent == null:
+		return
+	var rupture: ColorRect = ColorRect.new()
+	rupture.name = node_name
+	rupture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rupture.position = position_value
+	rupture.size = size_value
+	rupture.rotation_degrees = rotation
+	rupture.color = color
+	parent.add_child(rupture)
+
 func _sync_layout() -> void:
 	if frame_panel == null:
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var frame_width: float = clampf(viewport_size.x - 96.0, 900.0, 1120.0)
-	var frame_height: float = clampf(viewport_size.y - 96.0, 680.0, 780.0)
+	var tight_compact: bool = viewport_size.x <= 1000.0 or viewport_size.y <= 520.0
+	var frame_width: float = maxf(640.0, viewport_size.x - 32.0) if tight_compact else clampf(viewport_size.x - 96.0, 900.0, 1120.0)
+	var frame_height: float = maxf(420.0, viewport_size.y - 24.0) if tight_compact else clampf(viewport_size.y - 96.0, 680.0, 780.0)
 	frame_panel.custom_minimum_size = Vector2(frame_width, frame_height)
+	frame_panel.add_theme_stylebox_override("panel", _make_loss_frame_style(tight_compact))
+	if content_box != null:
+		content_box.add_theme_constant_override("separation", 3 if tight_compact else 8)
+	if title_label != null:
+		title_label.add_theme_font_size_override("font_size", 32 if tight_compact else 48)
+	if stage_label != null:
+		stage_label.add_theme_font_size_override("font_size", 15 if tight_compact else 24)
+	if high_label != null:
+		high_label.add_theme_font_size_override("font_size", 15 if tight_compact else 24)
+	if stats_label != null:
+		stats_label.custom_minimum_size.y = 96.0 if tight_compact else 148.0
+		stats_label.add_theme_font_size_override("font_size", 12 if tight_compact else 20)
+		stats_label.add_theme_constant_override("line_spacing", 0 if tight_compact else 3)
+	if scoreboard_holder != null:
+		scoreboard_holder.custom_minimum_size = Vector2(620.0, 78.0) if tight_compact else Vector2(840.0, 176.0)
+		for raw_row: Node in scoreboard_holder.find_children("*", "ScoreboardRow", true, false):
+			if raw_row.has_method("set_record_emphasis"):
+				raw_row.call("set_record_emphasis", not tight_compact)
+			if raw_row.has_method("set_compact_layout"):
+				raw_row.call("set_compact_layout", tight_compact)
+		var scoreboard_title: Label = scoreboard_holder.find_child("Title", true, false) as Label
+		if scoreboard_title != null:
+			scoreboard_title.add_theme_font_size_override("font_size", 14 if tight_compact else 21)
+	if new_game_button != null:
+		new_game_button.custom_minimum_size = Vector2(280.0, 40.0) if tight_compact else Vector2(360.0, 64.0)
+		new_game_button.add_theme_font_size_override("font_size", 20 if tight_compact else 24)
+	if _record_header_label != null:
+		_record_header_label.add_theme_font_size_override("font_size", 11 if tight_compact else 17)
+	if _record_chronology_label != null:
+		_record_chronology_label.add_theme_font_size_override("font_size", 11 if tight_compact else 17)
+	if _record_stamp_label != null:
+		_record_stamp_label.custom_minimum_size.y = 26.0 if tight_compact else 44.0
+		_record_stamp_label.add_theme_font_size_override("font_size", 12 if tight_compact else 18)
+	if _record_footer_label != null:
+		_record_footer_label.add_theme_font_size_override("font_size", 11 if tight_compact else 16)
 	if _casualty_ghost_label != null:
 		var frame_origin: Vector2 = (viewport_size - Vector2(frame_width, frame_height)) * 0.5
 		_casualty_ghost_label.position = Vector2(frame_origin.x + frame_width - 346.0, frame_origin.y + 45.0)
 		_casualty_ghost_label.size = Vector2(302.0, 62.0)
+	var aftermath_caption: Label = _pressure_layer.get_node_or_null("AftermathCaption") as Label if _pressure_layer != null else null
+	if aftermath_caption != null:
+		var compact: bool = viewport_size.x < 1500.0 or viewport_size.y < 900.0
+		aftermath_caption.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		aftermath_caption.position = Vector2(20.0, 14.0) if compact else Vector2(30.0, 20.0)
+		aftermath_caption.size = Vector2(300.0, 92.0) if compact else Vector2(390.0, 118.0)
+		aftermath_caption.rotation_degrees = -1.5
+		aftermath_caption.add_theme_font_size_override("font_size", 26 if compact else 42)
 
 func _wire_new_game_hover() -> void:
 	if new_game_button == null:

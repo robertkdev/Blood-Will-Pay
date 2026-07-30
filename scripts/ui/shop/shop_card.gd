@@ -38,6 +38,8 @@ var _disabled_reason: String = ""
 var slot_index: int = -1
 var _hover_tween: Tween = null
 var _hovered: bool = false
+var _compact_presentation: bool = false
+var _has_identity_content: bool = false
 var _tooltip: PanelContainer = null
 var _tooltip_layer: CanvasLayer = null
 var _tooltip_title: String = ""
@@ -166,7 +168,52 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 	if _approach_tags:
 		_approach_tags.visible = false
 	if _identity_panel:
-		_identity_panel.visible = has_identity
+		_has_identity_content = has_identity
+		_identity_panel.visible = _has_identity_content and not _compact_presentation
+
+func set_compact_presentation(enabled: bool) -> void:
+	_compact_presentation = enabled
+	if enabled:
+		custom_minimum_size = Vector2(120.0, 56.0)
+	if _icon != null:
+		_icon.custom_minimum_size = Vector2.ZERO if enabled else Vector2(112.0, 112.0)
+		_icon.anchor_left = 0.10 if enabled else 0.12
+		_icon.anchor_top = 0.04 if enabled else 0.21
+		_icon.anchor_right = 0.90 if enabled else 0.88
+		_icon.anchor_bottom = 0.61 if enabled else 0.78
+	if _traits_box != null:
+		_traits_box.visible = false
+		_traits_box.custom_minimum_size = Vector2.ZERO if enabled else Vector2(0.0, 48.0)
+	if _identity_panel != null:
+		_identity_panel.visible = false if enabled else _has_identity_content
+		_identity_panel.custom_minimum_size = Vector2.ZERO
+	if _name_label != null:
+		_name_label.anchor_left = 0.0
+		_name_label.anchor_top = 0.61 if enabled else 1.0
+		_name_label.anchor_right = 0.80 if enabled else 0.76
+		_name_label.anchor_bottom = 1.0
+		_name_label.offset_left = 4.0 if enabled else 8.0
+		_name_label.offset_top = 0.0 if enabled else -23.0
+		_name_label.offset_right = -2.0 if enabled else -4.0
+		_name_label.offset_bottom = -2.0
+		_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_name_label.clip_text = enabled
+		_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if enabled else TextServer.OVERRUN_NO_TRIMMING
+		_name_label.add_theme_font_size_override("font_size", 14 if enabled else 20)
+	if _price_label != null:
+		_price_label.anchor_left = 0.80 if enabled else 0.76
+		_price_label.anchor_top = 0.61 if enabled else 1.0
+		_price_label.anchor_right = 1.0
+		_price_label.anchor_bottom = 1.0
+		_price_label.offset_left = 0.0
+		_price_label.offset_top = 0.0 if enabled else -23.0
+		_price_label.offset_right = -4.0 if enabled else -8.0
+		_price_label.offset_bottom = -2.0
+		_price_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_price_label.clip_text = enabled
+		_price_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if enabled else TextServer.OVERRUN_NO_TRIMMING
+		_price_label.add_theme_font_size_override("font_size", 16 if enabled else 20)
+	set_meta("compact_presentation", enabled)
 
 func set_affordable(affordable: bool) -> void:
 	var ok: bool = bool(affordable)
@@ -329,7 +376,8 @@ func _apply_static_style() -> void:
 	tooltip_text = ""
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
-	custom_minimum_size = Vector2(120.0, 94.0) if compact else Vector2(150.0, 138.0)
+	var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0
+	custom_minimum_size = Vector2(120.0, 56.0) if tight_compact else Vector2(120.0, 94.0) if compact else Vector2(150.0, 138.0)
 	add_theme_stylebox_override("normal", _make_card_style(false, false))
 	add_theme_stylebox_override("hover", _make_card_style(false, true))
 	add_theme_stylebox_override("pressed", _make_card_style(true, true))
@@ -389,6 +437,7 @@ func _apply_static_style() -> void:
 		_price_label.add_theme_color_override("font_color", COLOR_GOLD)
 		_price_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_price_label.add_theme_constant_override("outline_size", 1)
+	set_compact_presentation(tight_compact)
 
 func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
