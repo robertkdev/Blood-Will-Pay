@@ -9,6 +9,7 @@ const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
 const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
 const COLOR_MUTED: Color = Color(0.66, 0.60, 0.52, 1.0)
@@ -16,7 +17,7 @@ const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
 const COLOR_BLOOD: Color = Color(0.52, 0.040, 0.072, 1.0)
 const COLOR_PANEL: Color = Color(0.045, 0.037, 0.047, 0.97)
 const COLOR_IRON: Color = Color(0.40, 0.34, 0.32, 0.94)
-const TOOLTIP_WIDTH: float = 330.0
+const TOOLTIP_WIDTH: float = 400.0
 const TOOLTIP_CURSOR_OFFSET: Vector2 = Vector2(18.0, -14.0)
 const TOOLTIP_EDGE_PADDING: float = 12.0
 
@@ -332,9 +333,9 @@ func _apply_static_style() -> void:
 	add_theme_stylebox_override("normal", _make_card_style(false, false))
 	add_theme_stylebox_override("hover", _make_card_style(false, true))
 	add_theme_stylebox_override("pressed", _make_card_style(true, true))
-	add_theme_stylebox_override("hover_pressed", HardcoreUIAssets.shop_card_style("hover_selected"))
+	add_theme_stylebox_override("hover_pressed", _make_card_style(true, true))
 	add_theme_stylebox_override("disabled", _make_card_style(false, false, true))
-	add_theme_stylebox_override("focus", HardcoreUIAssets.shop_card_style("focus"))
+	add_theme_stylebox_override("focus", _make_card_focus_style())
 	add_theme_color_override("font_disabled_color", Color(0.74, 0.67, 0.56, 0.92))
 	if _border_gradient != null:
 		_border_gradient.visible = false
@@ -367,7 +368,8 @@ func _apply_static_style() -> void:
 	if _legacy_role_label:
 		_legacy_role_label.visible = false
 	if _role_badge:
-		_role_badge.add_theme_font_size_override("font_size", 11)
+		_role_badge.add_theme_font_size_override("font_size", 16)
+		VisualTypeSystem.set_action(_role_badge)
 		_role_badge.add_theme_color_override("font_color", COLOR_GOLD)
 		_role_badge.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.70))
 		_role_badge.add_theme_constant_override("outline_size", 1)
@@ -375,13 +377,15 @@ func _apply_static_style() -> void:
 		_goal_label.add_theme_color_override("font_color", COLOR_MUTED)
 	if _name_label:
 		_name_label.z_index = 6
-		_name_label.add_theme_font_size_override("font_size", 13)
+		_name_label.add_theme_font_size_override("font_size", 20)
+		VisualTypeSystem.set_utility_bold(_name_label)
 		_name_label.add_theme_color_override("font_color", COLOR_TEXT)
 		_name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_name_label.add_theme_constant_override("outline_size", 1)
 	if _price_label:
 		_price_label.z_index = 6
-		_price_label.add_theme_font_size_override("font_size", 13)
+		_price_label.add_theme_font_size_override("font_size", 20)
+		VisualTypeSystem.set_action(_price_label)
 		_price_label.add_theme_color_override("font_color", COLOR_GOLD)
 		_price_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_price_label.add_theme_constant_override("outline_size", 1)
@@ -407,14 +411,24 @@ func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bo
 	style.border_width_top = 2
 	style.border_width_right = 2
 	style.border_width_bottom = 2
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.shadow_size = 12 if highlighted else 8
+	style.corner_radius_top_left = 0
+	style.corner_radius_top_right = 0
+	style.corner_radius_bottom_right = 0
+	style.corner_radius_bottom_left = 0
+	style.shadow_size = 8 if highlighted else 3
 	style.shadow_color = Color(0.58, 0.18, 0.060, 0.30) if highlighted else Color(0.0, 0.0, 0.0, 0.46)
-	var state: String = "disabled" if disabled_state else ("pressed" if pressed_state else ("hover" if highlighted else "normal"))
-	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.shop_card_style(state), style)
+	return style
+
+func _make_card_focus_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	style.border_color = COLOR_GOLD
+	style.set_border_width_all(2)
+	style.expand_margin_left = 2.0
+	style.expand_margin_top = 2.0
+	style.expand_margin_right = 2.0
+	style.expand_margin_bottom = 2.0
+	return style
 
 func _wire_hover() -> void:
 	if not is_connected("mouse_entered", Callable(self, "_on_hover_entered")):
@@ -455,7 +469,7 @@ func _apply_hover_motion(active: bool) -> void:
 	z_index = 20 if highlight else 0
 	add_theme_stylebox_override("normal", _make_card_style(false, highlight))
 	add_theme_stylebox_override("hover", _make_card_style(false, highlight))
-	add_theme_stylebox_override("focus", HardcoreUIAssets.shop_card_style("focus"))
+	add_theme_stylebox_override("focus", _make_card_focus_style())
 	if highlight:
 		if _icon != null:
 			_icon.modulate = Color(1.0, 0.93, 0.78, 1.0)
@@ -488,12 +502,12 @@ func _show_tooltip() -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tooltip.add_child(box)
 	if _tooltip_title.strip_edges() != "":
-		_add_tooltip_label(box, _tooltip_title, 18, COLOR_GOLD)
+		_add_tooltip_label(box, _tooltip_title, 22, COLOR_GOLD)
 	if _tooltip_subtitle.strip_edges() != "":
-		_add_tooltip_label(box, _tooltip_subtitle, 12, COLOR_MUTED)
+		_add_tooltip_label(box, _tooltip_subtitle, 17, Color(0.80, 0.75, 0.68, 1.0))
 	for line: String in lines:
 		var color: Color = Color(0.92, 0.76, 0.58, 1.0) if line == _status_tip and _status_tip != "" else COLOR_TEXT
-		_add_tooltip_label(box, line, 13, color)
+		_add_tooltip_label(box, line, 18, color)
 	var tooltip_layer: CanvasLayer = CanvasLayer.new()
 	tooltip_layer.name = "ShopCardTooltipLayer"
 	tooltip_layer.layer = 400
@@ -521,6 +535,10 @@ func _add_tooltip_label(parent: VBoxContainer, text: String, font_size: int, col
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size.x = TOOLTIP_WIDTH - 24.0
 	label.add_theme_font_size_override("font_size", font_size)
+	if font_size >= 22:
+		VisualTypeSystem.set_action(label)
+	else:
+		VisualTypeSystem.set_utility(label)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.75))
 	label.add_theme_constant_override("outline_size", 1)

@@ -78,20 +78,83 @@ func _run() -> void:
 			var normalized_title: String = title_label.text.replace("\n", " ").strip_edges().to_lower()
 			_expect(normalized_title == "blood will pay", "GameTitle should use the new game name", failures)
 			_expect(title_label.get_theme_font_size("font_size") >= 54, "GameTitle is not visually prioritized", failures)
+			_expect(title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT, "GameTitle should use an asymmetric field-record alignment", failures)
+			_expect(title_label.get_theme_constant("outline_size") <= 2, "GameTitle should avoid a glossy poster-style outline", failures)
 		var subtitle: Label = title_menu.get_node_or_null("Center/VBox/Subtitle") as Label
 		_expect(subtitle != null and subtitle.text == "Their lives. Your odds.", "Title menu should use the new tagline", failures)
+		var title_record_mark: Label = title_menu.get_node_or_null("Center/VBox/TitleRecordMark") as Label
+		_expect(title_record_mark != null and title_record_mark.text == "FIELD RECORD 01 // DEBT OUTSTANDING", "Title rail should bridge into an in-world field record", failures)
+		_expect(title_record_mark != null and title_record_mark.get_theme_font_size("font_size") >= 17, "Title record mark should remain functional-size copy", failures)
+		var consequence_mark: Label = title_menu.get_node_or_null("Center/VBox/WarDebtConsequenceMark") as Label
+		_expect(consequence_mark != null and consequence_mark.text.contains("BWP CASUALTY OFFICE"), "Title rail should name the Blood Will Pay casualty institution", failures)
+		var misregister: Label = title_menu.get_node_or_null("Center/VBox/GameTitle/Misregister") as Label
+		var strike_band: ColorRect = title_menu.get_node_or_null("Center/VBox/GameTitle/StrikeBand") as ColorRect
+		_expect(misregister != null and misregister.text == title_label.text, "GameTitle should expose a misregistered duplicate impression", failures)
+		_expect(strike_band != null and strike_band.color.a >= 0.75, "GameTitle should carry a visible struck-through treatment", failures)
+		var threat_signal: Label = title_menu.get_node_or_null("ImmediateThreatSignal") as Label
+		_expect(threat_signal != null and threat_signal.text.contains("CONTACT MOVING"), "Command menu should expose an immediate authored danger signal", failures)
+		var action_docket: Label = title_menu.get_node_or_null("Center/VBox/ActionDocket") as Label
+		_expect(action_docket != null and action_docket.visible and action_docket.text.contains("ENTER THE INTAKE"), "Desktop command rail should expose an authored active-order docket", failures)
+		_expect(action_docket != null and action_docket.get_theme_font_size("font_size") >= 16, "Command-rail action docket should use readable utility type", failures)
 		var hero: TextureRect = title_menu.get_node_or_null("TitleHero") as TextureRect
 		_expect(hero == null, "TitleHero should not render a background unit over the menu", failures)
 		var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer
 		_expect(content_panel != null, "ContentPanel missing", failures)
 		if content_panel != null:
 			var content_style: StyleBox = content_panel.get_theme_stylebox("panel")
-			_expect(content_style is StyleBoxTexture, "ContentPanel should use the generated wide panel asset", failures)
+			_expect(content_style is StyleBoxFlat, "ContentPanel should use the authored hardcore document surface", failures)
+			if content_style is StyleBoxFlat:
+				var content_flat: StyleBoxFlat = content_style as StyleBoxFlat
+				_expect(content_flat.bg_color.a < 0.86, "ContentPanel should leave the horror environment visible beneath the record", failures)
+				_expect(content_flat.border_width_top > 0 and content_flat.border_width_left == 0 and content_flat.border_width_right == 0 and content_flat.border_width_bottom == 0, "ContentPanel should use one asymmetrical document edge instead of a uniform dashboard frame", failures)
+		var title_panel: Panel = title_menu.get_node_or_null("TitlePanel") as Panel
+		_expect(title_panel != null, "TitlePanel missing", failures)
+		if title_panel != null:
+			var rail_style: StyleBox = title_panel.get_theme_stylebox("panel")
+			_expect(rail_style is StyleBoxFlat, "TitlePanel should use an authored field-record rail", failures)
+			if rail_style is StyleBoxFlat:
+				var rail_flat: StyleBoxFlat = rail_style as StyleBoxFlat
+				_expect(rail_flat.border_width_left > rail_flat.border_width_right, "TitlePanel should keep an asymmetric blood edge", failures)
+		var registration_mark: Label = title_menu.get_node_or_null("ContentPanel/Margin/Stack/Header/ConstructionRule/RegistrationMark") as Label
+		_expect(registration_mark != null and registration_mark.text == "FIELD ORDER // NO RETREAT", "Command shell should use in-world war-horror registration copy", failures)
+		var copy_index: Label = title_menu.get_node_or_null("ContentPanel/Margin/Stack/Header/ConstructionRule/CopyIndex") as Label
+		_expect(copy_index != null and copy_index.text == "COPY 01 / 01", "Command shell should expose a bounded field-record copy index", failures)
+		var backing: Panel = title_menu.get_node_or_null("ContentRecordBacking") as Panel
+		var fasteners: Label = title_menu.get_node_or_null("ContentFasteners") as Label
+		_expect(backing != null and backing.z_index < content_panel.z_index, "Command shell should retain a visible rear document layer", failures)
+		_expect(fasteners != null and fasteners.text == "O\nO", "Command shell should expose an anchored binding treatment", failures)
+		_expect(_find_label_containing_text(title_menu, "CUT // PASTE // SURVIVE") == null, "Command shell should not advertise its collage technique", failures)
+		_expect(_find_label_containing_text(title_menu, "FIELD ORDER // FIRST BLOOD") != null, "Home screen should present a dominant issued order", failures)
+		var initial_home_search: LineEdit = title_menu.get_node_or_null("ContentPanel/Margin/Stack/Header/SearchField") as LineEdit
+		_expect(initial_home_search != null and initial_home_search.text == "", "Home search should start empty before rendering its order (found '%s')" % (initial_home_search.text if initial_home_search != null else "<missing>"), failures)
+		var opening_order: PanelContainer = title_menu.get_node_or_null("ContentPanel/Margin/Stack/ContentScroll/ContentBody/OpeningOrder") as PanelContainer
+		var route_manifest: VBoxContainer = title_menu.get_node_or_null("ContentPanel/Margin/Stack/ContentScroll/ContentBody/HomeRouteManifest") as VBoxContainer
+		_expect(opening_order != null, "Home screen should expose one dominant opening order", failures)
+		_expect(route_manifest != null, "Home screen should replace equal dashboard cards with a route manifest", failures)
+		_expect(title_menu.find_child("HomeRouteGrid", true, false) == null, "Home screen should not rebuild the equal-card dashboard grid", failures)
+		if route_manifest != null:
+			var manifest_width: float = route_manifest.size.x
+			for record_number: String in ["01", "02", "03", "04"]:
+				var route: Button = route_manifest.get_node_or_null("ManifestRoute%s" % record_number) as Button
+				_expect(route != null, "Available Records should expose joined row %s" % record_number, failures)
+				if route != null:
+					var bound_copy: HBoxContainer = route.get_node_or_null("BoundCopy") as HBoxContainer
+					var serial: Label = route.get_node_or_null("BoundCopy/Serial") as Label
+					var record_title: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordTitle") as Label
+					var record_description: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordDescription") as Label
+					_expect(route.size.x >= manifest_width - 2.0, "Record %s should fill the manifest width" % record_number, failures)
+					_expect(bound_copy != null and serial != null and record_title != null and record_description != null, "Record %s should bind serial, title, and description in one focusable row" % record_number, failures)
+					_expect_stylebox_flat(route, "focus", "Record %s should expose a persistent focus surface" % record_number, failures)
+			var first_route: Button = route_manifest.get_node_or_null("ManifestRoute01") as Button
+			if first_route != null:
+				var route_focus: StyleBoxFlat = first_route.get_theme_stylebox("focus") as StyleBoxFlat
+				var route_pressed: StyleBoxFlat = first_route.get_theme_stylebox("pressed") as StyleBoxFlat
+				_expect(route_focus != null and route_pressed != null and route_focus.border_color != route_pressed.border_color, "Record focus must remain distinct from the blood pressed state", failures)
 		var search_field: LineEdit = title_menu.get_node_or_null("ContentPanel/Margin/Stack/Header/SearchField") as LineEdit
 		_expect(search_field != null, "SearchField missing", failures)
 		if search_field != null:
-			_expect_stylebox_texture(search_field, "normal", "SearchField normal should use generated texture styling", failures)
-			_expect_stylebox_texture(search_field, "focus", "SearchField focus should use generated texture styling", failures)
+			_expect_stylebox_flat(search_field, "normal", "SearchField normal should use the authored paper-input styling", failures)
+			_expect_stylebox_flat(search_field, "focus", "SearchField focus should use the authored paper-input styling", failures)
 		var how_to_play_button: Button = title_menu.get_node_or_null("Center/VBox/HowToPlayButton") as Button
 		var units_button: Button = title_menu.get_node_or_null("Center/VBox/UnitsButton") as Button
 		var rga_button: Button = title_menu.get_node_or_null("Center/VBox/RGAGlossaryButton") as Button
@@ -100,6 +163,9 @@ func _run() -> void:
 		_expect(units_button != null, "UnitsButton missing", failures)
 		_expect(rga_button != null, "RGAGlossaryButton missing", failures)
 		_expect(settings_button != null, "SettingsButton missing", failures)
+		var persistent_actions: Array[Button] = [how_to_play_button, units_button, rga_button, settings_button]
+		for persistent_action: Button in persistent_actions:
+			_expect(persistent_action != null and persistent_action.modulate.a >= 0.99, "First command-menu state should keep every navigation route visibly available", failures)
 		_expect_button_states(how_to_play_button, "HowToPlayButton", failures)
 		_expect_button_states(units_button, "UnitsButton", failures)
 		_expect_button_states(rga_button, "RGAGlossaryButton", failures)
@@ -167,25 +233,43 @@ func _run() -> void:
 		if settings_button != null:
 			settings_button.emit_signal("pressed")
 			await get_tree().process_frame
+			_expect(bool(settings_button.get_meta("active_page", false)), "Settings should retain a persistent active-page state", failures)
+			_expect(settings_button.text.begins_with("ACTIVE //"), "Settings active-page state should be visible in its label", failures)
+			var settings_pressed_style: StyleBoxFlat = settings_button.get_theme_stylebox("pressed") as StyleBoxFlat
+			var settings_focus_style: StyleBoxFlat = settings_button.get_theme_stylebox("focus") as StyleBoxFlat
+			_expect(settings_pressed_style != null and settings_focus_style != null, "Settings should expose authored active and keyboard-focus surfaces", failures)
+			if settings_pressed_style != null and settings_focus_style != null:
+				_expect(settings_pressed_style.border_color != settings_focus_style.border_color, "Settings active-page state should remain distinct from keyboard focus", failures)
+				_expect(settings_focus_style.border_color.b > settings_focus_style.border_color.r, "Settings keyboard focus should use the non-red signal-blue channel", failures)
+			var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer
+			var settings_docket_title: Label = title_menu.find_child("SettingsDocketTitle", true, false) as Label
+			_expect(settings_docket != null and settings_docket_title != null and settings_docket_title.text.contains("ACTIVE PAGE"), "Settings should open as a joined local-machine field record", failures)
 			var volume_slider: HSlider = title_menu.find_child("MasterVolumeSlider", true, false) as HSlider
 			_expect(volume_slider != null, "Settings did not expose master volume slider", failures)
 			if volume_slider != null:
-				_expect_stylebox_texture(volume_slider, "slider", "MasterVolumeSlider track should use generated texture styling", failures)
-				_expect_stylebox_texture(volume_slider, "grabber_area", "MasterVolumeSlider filled area should use generated texture styling", failures)
+				_expect_stylebox_flat(volume_slider, "slider", "MasterVolumeSlider track should use the authored hardcore styling", failures)
+				_expect_stylebox_flat(volume_slider, "grabber_area", "MasterVolumeSlider filled area should use the authored blood-fill styling", failures)
 			var fullscreen_check: CheckBox = title_menu.find_child("FullscreenCheck", true, false) as CheckBox
 			var motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
 			var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton
+			var readability_setting: PanelContainer = title_menu.find_child("ReadabilitySetting", true, false) as PanelContainer
+			var readability_status: Label = title_menu.find_child("ReadabilityStatus", true, false) as Label
+			var scale_guidance: Label = title_menu.find_child("UIScaleGuidance", true, false) as Label
 			var accept_binding: Button = title_menu.find_child("Binding_ui_accept", true, false) as Button
 			var cancel_binding: Button = title_menu.find_child("Binding_ui_cancel", true, false) as Button
 			var reset_bindings: Button = title_menu.find_child("ResetBindingsButton", true, false) as Button
 			_expect(fullscreen_check != null, "FullscreenCheck missing", failures)
 			_expect(motion_check != null, "Settings should expose Reduced Motion", failures)
 			_expect(ui_scale_option != null and ui_scale_option.item_count == 3, "Settings should expose three supported UI scales", failures)
+			_expect(readability_setting != null, "Settings should expose a visible readability and contrast record", failures)
+			_expect(readability_status != null and readability_status.text.contains("HIGH CONTRAST"), "Settings should state the enforced high-contrast default", failures)
+			_expect(readability_status != null and readability_status.get_theme_font_size("font_size") >= 18, "Readability status should remain functional-size copy", failures)
+			_expect(scale_guidance != null and not scale_guidance.text.contains("every supported scale"), "UI scale guidance should avoid an unbounded responsiveness claim", failures)
 			_expect(accept_binding != null, "Settings should expose Confirm remapping", failures)
 			_expect(cancel_binding != null, "Settings should expose Menu / Back remapping", failures)
 			_expect(reset_bindings != null, "Settings should expose binding reset", failures)
-			_expect_button_states(fullscreen_check, "FullscreenCheck", failures)
-			_expect_button_states(motion_check, "ReducedMotionCheck", failures)
+			_expect_flat_button_states(fullscreen_check, "FullscreenCheck", failures)
+			_expect_flat_button_states(motion_check, "ReducedMotionCheck", failures)
 		var start_button: Button = title_menu.get_node_or_null("Center/VBox/StartButton") as Button
 		_expect(start_button != null, "StartButton missing", failures)
 		if start_button != null:
@@ -194,9 +278,27 @@ func _run() -> void:
 			title_menu.call("_build_navigation")
 			_expect(String(start_button.text) == "New Run", "Title menu navigation rebuild should preserve the save-aware New Run label", failures)
 			start_button.text = stateful_start_copy
-			_expect(start_button.custom_minimum_size.x >= 300.0, "StartButton is not visually prioritized", failures)
+			var continue_button: Button = title_menu.find_child("ContinueRunButton", true, false) as Button
+			var continue_is_primary: bool = continue_button != null and continue_button.visible
+			var primary_run_button: Button = continue_button if continue_is_primary else start_button
+			_expect(primary_run_button.visible and primary_run_button.modulate.a >= 0.99, "First command-menu state should expose its primary run route without waiting for the intro sequence", failures)
+			_expect(primary_run_button.text == ("Continue Run" if continue_is_primary else "New Run"), "Primary command route should use an unmistakable run action label", failures)
+			_expect(
+				String(start_button.get_meta("visual_role", "")) == ("secondary" if continue_is_primary else "primary"),
+				"StartButton hierarchy should follow whether Continue Run is the primary action",
+				failures
+			)
+			if continue_is_primary:
+				_expect(String(continue_button.get_meta("visual_role", "")) == "primary", "Continue Run should own the primary hierarchy role", failures)
+			else:
+				_expect(start_button.custom_minimum_size.x >= 300.0, "StartButton is not visually prioritized without a resumable run", failures)
 			var start_style: StyleBox = start_button.get_theme_stylebox("normal")
-			_expect(start_style is StyleBoxTexture, "Title StartButton should use the generated primary button asset", failures)
+			_expect(start_style is StyleBoxTexture, "Title StartButton should use generated hierarchy styling", failures)
+			var ledger_button: Button = title_menu.find_child("BlackLedgerButton", true, false) as Button
+			var quit_button: Button = title_menu.find_child("QuitButton", true, false) as Button
+			_expect(ledger_button != null and String(ledger_button.get_meta("visual_role", "")) == "ledger", "Black Ledger should use a distinct ledger hierarchy role", failures)
+			_expect(quit_button != null and String(quit_button.get_meta("visual_role", "")) == "quit", "Quit should use a distinct destructive hierarchy role", failures)
+			_expect(settings_button != null and String(settings_button.get_meta("visual_role", "")).contains("navigation"), "Settings should remain in the navigation hierarchy", failures)
 			start_button.emit_signal("pressed")
 			await get_tree().process_frame
 			var unit_select: Control = main.get_node_or_null("UnitSelect") as Control
@@ -234,7 +336,7 @@ func _expect_content_panels_generated(title_menu: Control, message: String, fail
 		if panel == null:
 			continue
 		panel_count += 1
-		_expect_stylebox_texture(panel, "panel", "%s: %s" % [message, str(panel.name)], failures)
+		_expect_stylebox_authored(panel, "panel", "%s: %s" % [message, str(panel.name)], failures)
 	_expect(panel_count > 0, message, failures)
 
 func _expect_button_states(button: Button, label: String, failures: Array[String]) -> void:
@@ -243,7 +345,15 @@ func _expect_button_states(button: Button, label: String, failures: Array[String
 		return
 	var states: Array[String] = ["normal", "hover", "pressed", "focus"]
 	for state: String in states:
-		_expect_stylebox_texture(button, state, "%s %s should use generated texture styling" % [label, state], failures)
+		_expect_stylebox_flat(button, state, "%s %s should use asymmetrical field-navigation styling" % [label, state], failures)
+
+func _expect_flat_button_states(button: Button, label: String, failures: Array[String]) -> void:
+	_expect(button != null, "%s missing" % label, failures)
+	if button == null:
+		return
+	var states: Array[String] = ["normal", "hover", "pressed", "focus"]
+	for state: String in states:
+		_expect_stylebox_flat(button, state, "%s %s should use authored hardcore styling" % [label, state], failures)
 
 func _expect_stylebox_texture(control: Control, style_name: String, message: String, failures: Array[String]) -> void:
 	_expect(control != null, message, failures)
@@ -251,6 +361,29 @@ func _expect_stylebox_texture(control: Control, style_name: String, message: Str
 		return
 	var style: StyleBox = control.get_theme_stylebox(style_name)
 	_expect(style is StyleBoxTexture, message, failures)
+
+func _expect_stylebox_flat(control: Control, style_name: String, message: String, failures: Array[String]) -> void:
+	_expect(control != null, message, failures)
+	if control == null:
+		return
+	var style: StyleBox = control.get_theme_stylebox(style_name)
+	_expect(style is StyleBoxFlat, message, failures)
+	if style is StyleBoxFlat:
+		var flat_style: StyleBoxFlat = style as StyleBoxFlat
+		var border_recorded: bool = flat_style.border_width_left > 0 or flat_style.border_width_top > 0 or flat_style.border_width_right > 0 or flat_style.border_width_bottom > 0
+		_expect(border_recorded, "%s should retain a visible authored edge" % message, failures)
+
+func _expect_stylebox_authored(control: Control, style_name: String, message: String, failures: Array[String]) -> void:
+	_expect(control != null, message, failures)
+	if control == null:
+		return
+	var style: StyleBox = control.get_theme_stylebox(style_name)
+	var authored: bool = style is StyleBoxTexture or style is StyleBoxFlat
+	_expect(authored, message, failures)
+	if style is StyleBoxFlat:
+		var flat_style: StyleBoxFlat = style as StyleBoxFlat
+		var border_recorded: bool = flat_style.border_width_left > 0 or flat_style.border_width_top > 0 or flat_style.border_width_right > 0 or flat_style.border_width_bottom > 0
+		_expect(border_recorded, "%s should retain a visible authored edge" % message, failures)
 
 func _find_label_containing_text(root: Node, needle: String) -> Label:
 	if root == null:

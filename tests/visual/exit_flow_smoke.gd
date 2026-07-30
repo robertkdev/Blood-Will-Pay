@@ -42,9 +42,9 @@ func _run() -> void:
 	_expect(get_tree().paused, "opening system menu should pause the game")
 	_expect(_overlay_visible(), "system menu overlay should be visible during unit select")
 	_expect(_system_backdrop_alpha_in_range(), "system menu backdrop should keep underlying context readable")
-	_expect(_control_uses_texture_style("SystemMenuButton", "normal"), "system menu button should use the generated small button asset")
-	_expect(_control_uses_texture_style("SystemMenuOverlay/Center/Panel", "panel"), "system menu overlay should use the generated wide panel asset")
-	_expect(_control_uses_texture_style("SystemMenuOverlay/Center/Panel/Margin/Stack/ResumeButton", "normal"), "resume button should use the generated primary button asset")
+	_expect(_control_uses_hard_flat_style("SystemMenuButton", "normal"), "system menu button should use hard rectangular routine furniture")
+	_expect(_control_uses_hard_flat_style("SystemMenuOverlay/Center/Panel", "panel"), "system menu overlay should use hard rectangular field furniture")
+	_expect(_control_uses_hard_flat_style("SystemMenuOverlay/Center/Panel/Margin/Stack/ResumeButton", "normal"), "resume button should use a hard rectangular action state")
 	_expect(_button_exists("ResumeButton"), "resume button missing")
 	_expect(_button_exists("NewRunButton"), "new run button missing")
 	_expect(_button_exists("ReturnTitleButton"), "return to title button missing")
@@ -180,6 +180,19 @@ func _control_uses_texture_style(path_or_name: String, style_name: String) -> bo
 		return false
 	return control.get_theme_stylebox(style_name) is StyleBoxTexture
 
+func _control_uses_hard_flat_style(path_or_name: String, style_name: String) -> bool:
+	if _main == null:
+		return false
+	var control: Control = _main.get_node_or_null("SystemMenuLayer/" + path_or_name) as Control
+	if control == null:
+		control = _main.find_child(path_or_name, true, false) as Control
+	if control == null:
+		return false
+	var style: StyleBoxFlat = control.get_theme_stylebox(style_name) as StyleBoxFlat
+	if style == null:
+		return false
+	return style.corner_radius_top_left == 0 and style.corner_radius_top_right == 0 and style.corner_radius_bottom_left == 0 and style.corner_radius_bottom_right == 0
+
 func _overlay_visible() -> bool:
 	var overlay: Control = _main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay") as Control
 	return overlay != null and overlay.visible
@@ -221,15 +234,15 @@ func _save_capture(filename: String) -> void:
 		return
 	var texture: ViewportTexture = get_viewport().get_texture()
 	if texture == null or not texture.get_rid().is_valid():
-		print("ExitFlowSmoke: skipped %s because viewport texture is unavailable" % filename)
+		_expect(false, "capture failed for %s because viewport texture is unavailable" % filename)
 		return
 	var image: Image = texture.get_image()
 	if image == null or image.is_empty():
-		print("ExitFlowSmoke: skipped %s because viewport image is unavailable" % filename)
+		_expect(false, "capture failed for %s because viewport image is unavailable" % filename)
 		return
 	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
 	var err: Error = image.save_png(path)
 	if err != OK:
-		print("ExitFlowSmoke: failed to save %s error=%d" % [ProjectSettings.globalize_path(path), int(err)])
+		_expect(false, "failed to save %s error=%d" % [ProjectSettings.globalize_path(path), int(err)])
 		return
 	print("ExitFlowSmoke: saved %s" % ProjectSettings.globalize_path(path))

@@ -31,6 +31,12 @@ func _run() -> void:
 	_expect(rect_before.position.is_equal_approx(rect_after.position), "fixed SystemMenuButton position drifted on hover: before=%s after=%s" % [str(rect_before), str(rect_after)])
 	_expect(rect_before.size.is_equal_approx(rect_after.size), "fixed SystemMenuButton size drifted on hover: before=%s after=%s" % [str(rect_before), str(rect_after)])
 	_expect(not _button.has_meta("hover_tween"), "fixed SystemMenuButton should not create a hover tween")
+	var routine_style: StyleBoxFlat = _button.get_theme_stylebox("normal") as StyleBoxFlat
+	var hover_style: StyleBoxFlat = _button.get_theme_stylebox("hover") as StyleBoxFlat
+	_expect(routine_style != null and _is_hard_rectangle(routine_style), "fixed SystemMenuButton normal state must be hard rectangular routine furniture")
+	_expect(hover_style != null and _is_hard_rectangle(hover_style), "fixed SystemMenuButton hover state must remain hard rectangular")
+	if routine_style != null and hover_style != null:
+		_expect(routine_style.bg_color != hover_style.bg_color or routine_style.border_color != hover_style.border_color, "fixed SystemMenuButton must retain a distinct hover state")
 	var main: Control = MAIN_SCENE.instantiate() as Control
 	get_tree().root.add_child(main)
 	await _settle_frames(5)
@@ -41,12 +47,32 @@ func _run() -> void:
 	var panel: PanelContainer = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel") as PanelContainer
 	_expect(panel != null, "System Menu panel missing")
 	if panel != null:
-		_expect(panel.size.is_equal_approx(Vector2(430.0, 430.0)), "System Menu must match the frozen 430x430 contract, got %s" % str(panel.size))
-	for button_name: String in ["ResumeButton", "NewRunButton", "BlackLedgerButton", "ReturnTitleButton", "QuitGameButton"]:
+		_expect(panel.size.is_equal_approx(Vector2(500.0, 452.0)), "System Menu must match the authored five-action 500x452 contract, got %s" % str(panel.size))
+	var stack: VBoxContainer = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel/Margin/Stack") as VBoxContainer
+	var title: Label = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel/Margin/Stack/Title") as Label
+	var filing_mark: Label = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel/Margin/Stack/FilingMark") as Label
+	var panel_scars: Label = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel/PanelScars") as Label
+	_expect(stack != null, "System Menu stack missing")
+	_expect(title != null, "System Menu title missing")
+	_expect(filing_mark != null and filing_mark.text.contains("FIELD INTERRUPTION"), "System Menu should carry an in-world interruption filing mark")
+	_expect(panel_scars != null, "System Menu should carry authored reproduction scars")
+	if stack != null and title != null:
+		_expect(_rect_inside(title.get_global_rect(), stack.get_global_rect().grow(1.0)), "System Menu title escaped stack bounds title=%s stack=%s" % [str(title.get_global_rect()), str(stack.get_global_rect())])
+		_expect(panel != null and _rect_inside(title.get_global_rect(), panel.get_global_rect().grow(1.0)), "System Menu title escaped panel bounds title=%s panel=%s" % [str(title.get_global_rect()), str(panel.get_global_rect() if panel != null else Rect2())])
+		_expect(title.size.x >= stack.size.x - 2.0, "System Menu title must span the full action stack, got title=%s stack=%s" % [str(title.size), str(stack.size)])
+		_expect(title.get_line_count() == 1, "System Menu title must remain a single unclipped line")
+	var authored_widths: Dictionary[String, float] = {
+		"ResumeButton": 338.0,
+		"NewRunButton": 326.0,
+		"BlackLedgerButton": 344.0,
+		"ReturnTitleButton": 318.0,
+		"QuitGameButton": 332.0,
+	}
+	for button_name: String in authored_widths:
 		var action: Button = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel/Margin/Stack/%s" % button_name) as Button
 		_expect(action != null, "System Menu action missing: %s" % button_name)
 		if action != null:
-			_expect(action.size.is_equal_approx(Vector2(320.0, 52.0)), "System Menu action %s must match 320x52, got %s" % [button_name, str(action.size)])
+			_expect(action.size.is_equal_approx(Vector2(authored_widths[button_name], 52.0)), "System Menu action %s must preserve its assembled width, got %s" % [button_name, str(action.size)])
 	if main != null and is_instance_valid(main):
 		get_tree().root.remove_child(main)
 		main.free()
@@ -55,6 +81,17 @@ func _run() -> void:
 func _expect(condition: bool, message: String) -> void:
 	if not condition and not _failures.has(message):
 		_failures.append(message)
+
+func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
+	return outer.has_point(inner.position) and outer.has_point(inner.end)
+
+func _is_hard_rectangle(style: StyleBoxFlat) -> bool:
+	return (
+		style.corner_radius_top_left == 0
+		and style.corner_radius_top_right == 0
+		and style.corner_radius_bottom_left == 0
+		and style.corner_radius_bottom_right == 0
+	)
 
 func _settle_frames(count: int) -> void:
 	for _index: int in range(count):

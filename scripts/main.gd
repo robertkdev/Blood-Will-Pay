@@ -8,8 +8,8 @@ extends Control
 
 const Debug := preload("res://scripts/util/debug.gd")
 const AuditPanelScene: GDScript = preload("res://scripts/ui/audit/audit_panel.gd")
-const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 const BlackLedgerScript: GDScript = preload("res://scripts/ui/black_ledger.gd")
@@ -31,6 +31,7 @@ var _new_run_button: Button
 var _quit_game_button: Button
 var _audit_panel: CanvasLayer
 var _system_menu_open: bool = false
+var _new_run_confirmation_pending: bool = false
 var _title_page: Control
 var _starter_transition_pending: bool = false
 var _pending_starter_id: String = ""
@@ -60,6 +61,8 @@ func _ready() -> void:
 	if title_menu:
 		title_menu.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_build_system_menu()
+	if not get_viewport().size_changed.is_connected(_layout_system_menu_button):
+		get_viewport().size_changed.connect(_layout_system_menu_button)
 	_disable_embedded_menu_buttons()
 	_build_title_page()
 	_show_title_page()
@@ -226,6 +229,7 @@ func _build_system_menu() -> void:
 	_system_menu_button.pressed.connect(_open_system_menu)
 	_apply_button_style(_system_menu_button, true)
 	_system_layer.add_child(_system_menu_button)
+	_layout_system_menu_button()
 
 	_system_overlay = Control.new()
 	_system_overlay.name = "SystemMenuOverlay"
@@ -249,29 +253,55 @@ func _build_system_menu() -> void:
 
 	var panel: PanelContainer = PanelContainer.new()
 	panel.name = "Panel"
-	panel.custom_minimum_size = Vector2(430.0, 430.0)
+	panel.custom_minimum_size = Vector2(500.0, 452.0)
 	panel.add_theme_stylebox_override("panel", _make_panel_style())
 	center.add_child(panel)
+	var panel_scars: Label = Label.new()
+	panel_scars.name = "PanelScars"
+	panel_scars.text = "////    X   //////////\n   ///////////   X\n///   X      //////"
+	panel_scars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel_scars.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	panel_scars.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	panel_scars.add_theme_font_size_override("font_size", 14)
+	panel_scars.add_theme_color_override("font_color", Color(0.72, 0.09, 0.10, 0.28))
+	VisualTypeSystem.set_utility(panel_scars)
+	panel.add_child(panel_scars)
+	_build_system_assembly_layer(panel)
 
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "Margin"
-	margin.add_theme_constant_override("margin_left", 6)
-	margin.add_theme_constant_override("margin_top", 6)
-	margin.add_theme_constant_override("margin_right", 6)
-	margin.add_theme_constant_override("margin_bottom", 6)
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_bottom", 22)
 	panel.add_child(margin)
 
 	var stack: VBoxContainer = VBoxContainer.new()
 	stack.name = "Stack"
 	stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack.add_theme_constant_override("separation", 5)
+	stack.add_theme_constant_override("separation", 11)
 	margin.add_child(stack)
+	var filing_mark: Label = Label.new()
+	filing_mark.name = "FilingMark"
+	filing_mark.text = "FIELD INTERRUPTION // SIGNAL CUT // INPUT HELD"
+	filing_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	filing_mark.rotation_degrees = -1.0
+	filing_mark.add_theme_font_size_override("font_size", 13)
+	filing_mark.add_theme_color_override("font_color", Color(0.80, 0.23, 0.19, 0.94))
+	VisualTypeSystem.set_action(filing_mark)
+	stack.add_child(filing_mark)
 
 	var title: Label = Label.new()
 	title.name = "Title"
-	title.text = "System"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.text = "SYSTEM HELD // NO SAFE STATE"
+	title.custom_minimum_size = Vector2(0.0, 40.0)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	title.add_theme_font_size_override("font_size", 26)
+	VisualTypeSystem.set_impact(title)
 	title.add_theme_color_override("font_color", Color(0.94, 0.84, 0.66))
 	stack.add_child(title)
 
@@ -282,25 +312,109 @@ func _build_system_menu() -> void:
 
 	_resume_button = _make_menu_button("ResumeButton", "Resume")
 	_resume_button.pressed.connect(_close_system_menu)
+	_apply_system_action_style(_resume_button, "safe")
 	stack.add_child(_resume_button)
 
-	_new_run_button = _make_menu_button("NewRunButton", "New Run")
-	_new_run_button.pressed.connect(request_new_run)
+	_new_run_button = _make_menu_button("NewRunButton", "BURN THIS RUN // NEW BLOOD")
+	_new_run_button.pressed.connect(_on_new_run_menu_pressed)
+	_apply_system_action_style(_new_run_button, "danger")
 	stack.add_child(_new_run_button)
 
-	_black_ledger_system_button = _make_menu_button("BlackLedgerButton", "Black Ledger")
+	_black_ledger_system_button = _make_menu_button("BlackLedgerButton", "OPEN THE BLACK LEDGER")
 	_black_ledger_system_button.pressed.connect(open_black_ledger)
+	_apply_system_action_style(_black_ledger_system_button, "neutral")
 	stack.add_child(_black_ledger_system_button)
 
-	_return_title_button = _make_menu_button("ReturnTitleButton", "Return to Title")
+	_return_title_button = _make_menu_button("ReturnTitleButton", "RETURN TO TITLE // PRESERVE FILE")
 	_return_title_button.pressed.connect(request_return_to_title)
+	_apply_system_action_style(_return_title_button, "warning")
 	stack.add_child(_return_title_button)
 
-	_quit_game_button = _make_menu_button("QuitGameButton", "Quit Game")
+	_quit_game_button = _make_menu_button("QuitGameButton", "QUIT TO DESKTOP // PRESERVE FILE")
 	_quit_game_button.pressed.connect(_on_quit)
+	_apply_system_action_style(_quit_game_button, "danger_muted")
 	stack.add_child(_quit_game_button)
 
 	_sync_system_menu_button()
+
+func _build_system_assembly_layer(panel: PanelContainer) -> void:
+	if panel == null:
+		return
+	var assembly_layer: Control = Control.new()
+	assembly_layer.name = "SystemAssemblyLayer"
+	assembly_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(assembly_layer)
+	panel.move_child(assembly_layer, 1)
+	assembly_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var top_binding: ColorRect = ColorRect.new()
+	top_binding.name = "TopBinding"
+	top_binding.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_binding.color = Color(0.62, 0.49, 0.31, 0.34)
+	top_binding.offset_left = 38.0
+	top_binding.offset_top = -4.0
+	top_binding.offset_right = 206.0
+	top_binding.offset_bottom = 10.0
+	top_binding.rotation_degrees = -1.8
+	assembly_layer.add_child(top_binding)
+	var right_repair: ColorRect = ColorRect.new()
+	right_repair.name = "RightRepair"
+	right_repair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	right_repair.color = Color(0.61, 0.025, 0.040, 0.26)
+	right_repair.anchor_left = 1.0
+	right_repair.anchor_right = 1.0
+	right_repair.offset_left = -22.0
+	right_repair.offset_top = 84.0
+	right_repair.offset_right = 4.0
+	right_repair.offset_bottom = 332.0
+	right_repair.rotation_degrees = 1.4
+	assembly_layer.add_child(right_repair)
+	var filing_cut: ColorRect = ColorRect.new()
+	filing_cut.name = "FilingCut"
+	filing_cut.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	filing_cut.color = Color(0.71, 0.075, 0.070, 0.22)
+	filing_cut.anchor_top = 1.0
+	filing_cut.anchor_right = 1.0
+	filing_cut.anchor_bottom = 1.0
+	filing_cut.offset_left = 24.0
+	filing_cut.offset_top = -72.0
+	filing_cut.offset_right = -42.0
+	filing_cut.offset_bottom = -65.0
+	filing_cut.rotation_degrees = -0.8
+	assembly_layer.add_child(filing_cut)
+	var interruption_stamp: Label = Label.new()
+	interruption_stamp.name = "InterruptionStamp"
+	interruption_stamp.text = "INTERRUPTION ORDER // COPY 02"
+	interruption_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	interruption_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	interruption_stamp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	interruption_stamp.anchor_left = 1.0
+	interruption_stamp.anchor_top = 1.0
+	interruption_stamp.anchor_right = 1.0
+	interruption_stamp.anchor_bottom = 1.0
+	interruption_stamp.offset_left = -286.0
+	interruption_stamp.offset_top = -55.0
+	interruption_stamp.offset_right = -28.0
+	interruption_stamp.offset_bottom = -28.0
+	interruption_stamp.rotation_degrees = -2.0
+	interruption_stamp.add_theme_font_size_override("font_size", 12)
+	interruption_stamp.add_theme_color_override("font_color", Color(0.84, 0.16, 0.14, 0.50))
+	interruption_stamp.add_theme_stylebox_override("normal", _system_stamp_box())
+	VisualTypeSystem.set_action(interruption_stamp)
+	assembly_layer.add_child(interruption_stamp)
+
+func _system_stamp_box() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.15, 0.015, 0.024, 0.28)
+	style.border_color = Color(0.62, 0.065, 0.075, 0.58)
+	style.border_width_left = 5
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.content_margin_left = 8.0
+	style.content_margin_right = 8.0
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
+	return style
 
 func _build_title_page() -> void:
 	if _title_page != null and is_instance_valid(_title_page):
@@ -359,8 +473,9 @@ func _build_title_page() -> void:
 	continue_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	continue_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	continue_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	continue_prompt.add_theme_font_size_override("font_size", 18)
-	continue_prompt.add_theme_color_override("font_color", Color(0.84, 0.79, 0.68, 0.96))
+	continue_prompt.add_theme_font_size_override("font_size", 22)
+	continue_prompt.add_theme_color_override("font_color", Color(0.94, 0.87, 0.74, 1.0))
+	VisualTypeSystem.set_action(continue_prompt)
 	continue_prompt.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
 	continue_prompt.add_theme_constant_override("outline_size", 3)
 	continue_prompt.anchor_left = 0.5
@@ -389,12 +504,14 @@ func _build_title_page_fallback(title_page: Control) -> void:
 	fallback_title.text = "BLOOD WILL PAY"
 	fallback_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fallback_title.add_theme_font_size_override("font_size", 76)
+	VisualTypeSystem.set_impact(fallback_title)
 	fallback_title.add_theme_color_override("font_color", Color(0.93, 0.88, 0.78, 1.0))
 	fallback_stack.add_child(fallback_title)
 	var fallback_subtitle: Label = Label.new()
 	fallback_subtitle.text = "THEIR LIVES. YOUR ODDS."
 	fallback_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fallback_subtitle.add_theme_font_size_override("font_size", 20)
+	VisualTypeSystem.set_action(fallback_subtitle)
 	fallback_subtitle.add_theme_color_override("font_color", Color(0.72, 0.66, 0.58, 1.0))
 	fallback_stack.add_child(fallback_subtitle)
 
@@ -448,51 +565,132 @@ func _make_menu_button(node_name: String, label: String) -> Button:
 	button.name = node_name
 	button.text = label
 	button.focus_mode = Control.FOCUS_ALL
-	button.custom_minimum_size = Vector2(320.0, 52.0)
+	var authored_width: float = 320.0
+	match node_name:
+		"ResumeButton":
+			authored_width = 338.0
+		"NewRunButton":
+			authored_width = 326.0
+		"BlackLedgerButton":
+			authored_width = 344.0
+		"ReturnTitleButton":
+			authored_width = 318.0
+		"QuitGameButton":
+			authored_width = 332.0
+	button.custom_minimum_size = Vector2(authored_width, 52.0)
 	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_apply_button_style(button, false)
+	if node_name == "ReturnTitleButton" or node_name == "QuitGameButton":
+		button.add_theme_font_size_override("font_size", 21)
 	return button
 
 func _apply_button_style(button: Button, compact: bool) -> void:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	HardcoreUIAssets.apply_button_family(button, "compact" if compact else "poster")
+	if compact:
+		_apply_system_control_style(button)
+	else:
+		HardcoreUIAssets.apply_button_family(button, "poster")
 	button.add_theme_color_override("font_color", Color(0.9, 0.82, 0.68))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.88, 0.58))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.72, 0.48))
-	button.add_theme_font_size_override("font_size", 15 if compact else 21)
+	button.add_theme_font_size_override("font_size", 18 if compact else 23)
+	VisualTypeSystem.set_action(button)
 	# The fixed top-right Menu control must not move into the viewport edge or
 	# adjacent HUD when hovered. Full-size modal actions keep their subtle scale.
 	if not compact:
 		_wire_system_button_hover(button, compact)
 
-func _make_system_button_style(compact: bool, modulate: Color) -> StyleBox:
-	var fallback: StyleBoxFlat = StyleBoxFlat.new()
-	fallback.bg_color = Color(0.12, 0.035, 0.028, 0.94)
-	fallback.border_color = Color(0.55, 0.34, 0.13, 0.95)
-	fallback.border_width_left = 1
-	fallback.border_width_top = 1
-	fallback.border_width_right = 1
-	fallback.border_width_bottom = 1
-	fallback.corner_radius_top_left = 5
-	fallback.corner_radius_top_right = 5
-	fallback.corner_radius_bottom_right = 5
-	fallback.corner_radius_bottom_left = 5
-	var asset_style: StyleBoxTexture = GothicUIAssets.small_button_style(modulate) if compact else GothicUIAssets.primary_button_style(modulate)
-	return GothicUIAssets.style_or_fallback(asset_style, fallback)
+func _apply_system_control_style(button: Button) -> void:
+	var normal: StyleBoxFlat = _system_control_box(Color(0.032, 0.029, 0.031, 0.96), Color(0.48, 0.43, 0.36, 0.92), 3)
+	var hover: StyleBoxFlat = _system_control_box(Color(0.085, 0.067, 0.052, 0.98), Color(0.88, 0.68, 0.36, 1.0), 5)
+	var pressed: StyleBoxFlat = _system_control_box(Color(0.14, 0.030, 0.035, 0.99), Color(0.82, 0.08, 0.10, 1.0), 5)
+	var disabled: StyleBoxFlat = _system_control_box(Color(0.025, 0.023, 0.025, 0.82), Color(0.30, 0.28, 0.26, 0.72), 2)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("focus", hover)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("hover_pressed", pressed)
+	button.add_theme_stylebox_override("disabled", disabled)
+
+func _system_control_box(background: Color, border: Color, left_rule_width: int) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.border_width_left = left_rule_width
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.content_margin_left = 12.0
+	style.content_margin_right = 12.0
+	style.content_margin_top = 7.0
+	style.content_margin_bottom = 7.0
+	return style
 
 func _make_panel_style() -> StyleBox:
 	var panel: StyleBoxFlat = StyleBoxFlat.new()
-	panel.bg_color = Color(0.045, 0.032, 0.034, 0.98)
-	panel.border_color = Color(0.55, 0.36, 0.15, 0.9)
-	panel.border_width_left = 2
+	panel.bg_color = Color(0.022, 0.018, 0.022, 0.985)
+	panel.border_color = Color(0.72, 0.60, 0.42, 0.90)
+	panel.border_width_left = 11
 	panel.border_width_top = 2
-	panel.border_width_right = 2
-	panel.border_width_bottom = 2
-	panel.corner_radius_top_left = 7
-	panel.corner_radius_top_right = 7
-	panel.corner_radius_bottom_right = 7
-	panel.corner_radius_bottom_left = 7
-	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.modal_style(), panel)
+	panel.border_width_right = 1
+	panel.border_width_bottom = 8
+	panel.content_margin_left = 0.0
+	panel.content_margin_top = 0.0
+	panel.content_margin_right = 0.0
+	panel.content_margin_bottom = 0.0
+	panel.shadow_color = Color(0.0, 0.0, 0.0, 0.72)
+	panel.shadow_size = 26
+	panel.shadow_offset = Vector2(12.0, 10.0)
+	return panel
+
+func _apply_system_action_style(button: Button, role: String) -> void:
+	if button == null:
+		return
+	var normal_bg: Color = Color(0.055, 0.048, 0.050, 0.98)
+	var normal_border: Color = Color(0.45, 0.40, 0.34, 0.82)
+	var hover_bg: Color = Color(0.095, 0.078, 0.070, 0.99)
+	var hover_border: Color = Color(0.86, 0.69, 0.42, 0.98)
+	var font_color: Color = Color(0.91, 0.86, 0.77, 1.0)
+	if role == "safe":
+		normal_bg = Color(0.12, 0.105, 0.078, 0.99)
+		normal_border = Color(0.90, 0.73, 0.42, 1.0)
+		hover_bg = Color(0.18, 0.145, 0.09, 1.0)
+		hover_border = Color(1.0, 0.86, 0.58, 1.0)
+		font_color = Color(1.0, 0.91, 0.72, 1.0)
+	elif role == "warning":
+		normal_border = Color(0.62, 0.39, 0.19, 0.95)
+		hover_border = Color(0.92, 0.58, 0.24, 1.0)
+	elif role == "danger":
+		normal_bg = Color(0.13, 0.025, 0.030, 0.99)
+		normal_border = Color(0.76, 0.075, 0.095, 1.0)
+		hover_bg = Color(0.23, 0.030, 0.040, 1.0)
+		hover_border = Color(1.0, 0.12, 0.14, 1.0)
+		font_color = Color(1.0, 0.79, 0.70, 1.0)
+	elif role == "danger_muted":
+		normal_border = Color(0.48, 0.11, 0.12, 0.88)
+		hover_bg = Color(0.15, 0.028, 0.035, 1.0)
+		hover_border = Color(0.82, 0.09, 0.11, 1.0)
+	for state_name: String in ["normal", "focus"]:
+		button.add_theme_stylebox_override(state_name, _system_action_box(normal_bg, normal_border, state_name == "focus"))
+	for state_name: String in ["hover", "pressed", "hover_pressed"]:
+		button.add_theme_stylebox_override(state_name, _system_action_box(hover_bg, hover_border, true))
+	button.add_theme_color_override("font_color", font_color)
+	button.add_theme_color_override("font_hover_color", font_color.lightened(0.10))
+	button.add_theme_color_override("font_pressed_color", font_color.lightened(0.16))
+
+func _system_action_box(background: Color, border: Color, focused: bool) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.border_width_left = 5 if focused else 3
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.content_margin_left = 18.0
+	style.content_margin_right = 18.0
+	style.content_margin_top = 9.0
+	style.content_margin_bottom = 9.0
+	return style
 
 func _open_system_menu() -> void:
 	if _title_page != null and _title_page.visible:
@@ -503,6 +701,7 @@ func _open_system_menu() -> void:
 		return
 	if _system_overlay == null:
 		return
+	_reset_new_run_confirmation()
 	_system_menu_open = true
 	_system_overlay.visible = true
 	_sync_system_menu_button()
@@ -511,15 +710,35 @@ func _open_system_menu() -> void:
 		_resume_button.grab_focus()
 
 func _close_system_menu() -> void:
+	_reset_new_run_confirmation()
 	_system_menu_open = false
 	if _system_overlay != null:
 		_system_overlay.visible = false
 	get_tree().paused = false
 	_sync_system_menu_button()
 
+func _on_new_run_menu_pressed() -> void:
+	if not RunStateStore.has_save():
+		request_new_run()
+		return
+	if _new_run_confirmation_pending:
+		request_new_run()
+		return
+	_new_run_confirmation_pending = true
+	if _new_run_button != null:
+		_new_run_button.text = "CONFIRM: ERASE CURRENT RUN"
+		_apply_system_action_style(_new_run_button, "danger")
+		_new_run_button.grab_focus()
+
+func _reset_new_run_confirmation() -> void:
+	_new_run_confirmation_pending = false
+	if _new_run_button != null:
+		_new_run_button.text = "New Run — Clears Current"
+
 func _sync_system_menu_button() -> void:
 	if _system_menu_button == null:
 		return
+	_layout_system_menu_button()
 	var title_is_visible: bool = title_menu != null and title_menu.visible
 	var title_page_is_visible: bool = _title_page != null and _title_page.visible
 	var loss_overlay_is_active: bool = _loss_overlay_active()
@@ -527,6 +746,34 @@ func _sync_system_menu_button() -> void:
 	_system_menu_button.visible = not title_is_visible and not title_page_is_visible and not _system_menu_open and not loss_overlay_is_active and not ledger_is_open
 	_system_menu_button.disabled = title_is_visible or title_page_is_visible or loss_overlay_is_active or ledger_is_open
 	_system_menu_button.mouse_default_cursor_shape = Control.CURSOR_ARROW if _system_menu_button.disabled else Control.CURSOR_POINTING_HAND
+
+func _layout_system_menu_button() -> void:
+	if _system_menu_button == null:
+		return
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var compact: bool = viewport_size.x <= 1400.0 or viewport_size.y <= 760.0
+	_system_menu_button.set_meta("compact_safe_placement", compact)
+	VisualTypeSystem.set_utility_bold(_system_menu_button)
+	if compact:
+		# Keep the global escape hatch in its own upper-left utility cell. The
+		# combat metrics rail occupies the upper-right at compact resolutions.
+		_system_menu_button.anchor_left = 0.0
+		_system_menu_button.anchor_right = 0.0
+		_system_menu_button.offset_left = 14.0
+		_system_menu_button.offset_top = 12.0
+		_system_menu_button.offset_right = 118.0
+		_system_menu_button.offset_bottom = 46.0
+		_system_menu_button.custom_minimum_size = Vector2(104.0, 34.0)
+		_system_menu_button.add_theme_font_size_override("font_size", 17)
+	else:
+		_system_menu_button.anchor_left = 1.0
+		_system_menu_button.anchor_right = 1.0
+		_system_menu_button.offset_left = -154.0
+		_system_menu_button.offset_top = 18.0
+		_system_menu_button.offset_right = -18.0
+		_system_menu_button.offset_bottom = 56.0
+		_system_menu_button.custom_minimum_size = Vector2(132.0, 38.0)
+		_system_menu_button.add_theme_font_size_override("font_size", 18)
 
 func _wire_system_button_hover(button: Button, compact: bool) -> void:
 	if button == null:
@@ -654,8 +901,12 @@ func _build_continue_run_button() -> void:
 		_continue_run_button.name = "ContinueRunButton"
 		host.add_child(_continue_run_button)
 		host.move_child(_continue_run_button, start_button.get_index())
+	_continue_run_button.modulate.a = 1.0
+	_continue_run_button.scale = Vector2.ONE
 	if not _continue_run_button.is_connected("pressed", Callable(self, "_on_continue_run")):
 		_continue_run_button.pressed.connect(_on_continue_run)
+	if title_menu != null and title_menu.has_method("register_runtime_action_button"):
+		title_menu.call("register_runtime_action_button", _continue_run_button, true)
 	_refresh_continue_run_button()
 
 func _build_black_ledger_title_button() -> void:
@@ -671,8 +922,12 @@ func _build_black_ledger_title_button() -> void:
 		_black_ledger_title_button.text = "Black Ledger"
 		host.add_child(_black_ledger_title_button)
 		host.move_child(_black_ledger_title_button, quit_button.get_index())
+	_black_ledger_title_button.modulate.a = 1.0
+	_black_ledger_title_button.scale = Vector2.ONE
 	if not _black_ledger_title_button.is_connected("pressed", Callable(self, "open_black_ledger")):
 		_black_ledger_title_button.pressed.connect(open_black_ledger)
+	if title_menu != null and title_menu.has_method("register_runtime_action_button"):
+		title_menu.call("register_runtime_action_button", _black_ledger_title_button, false)
 
 func open_black_ledger(account_profile_path: String = "user://account_profile_v1.json") -> void:
 	if _black_ledger != null and is_instance_valid(_black_ledger):

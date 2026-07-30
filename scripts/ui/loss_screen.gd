@@ -3,13 +3,13 @@ class_name LossScreen
 
 const Scoreboard := preload("res://scenes/ui/stats/Scoreboard.tscn")
 const HighScore := preload("res://scripts/util/high_score.gd")
-const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
+const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 
 const BACKDROP_COLOR: Color = Color(0.006, 0.005, 0.008, 1.0)
-const FRAME_COLOR: Color = Color(0.075, 0.057, 0.061, 1.0)
-const FRAME_BORDER: Color = Color(0.48, 0.35, 0.18, 0.92)
+const FRAME_COLOR: Color = Color(0.024, 0.006, 0.010, 0.90)
+const FRAME_BORDER: Color = Color(0.84, 0.79, 0.68, 0.96)
 const BLOOD_COLOR: Color = Color(0.74, 0.10, 0.08, 1.0)
 const BONE_COLOR: Color = Color(0.86, 0.80, 0.68, 1.0)
 const DULL_GOLD: Color = Color(0.79, 0.61, 0.32, 1.0)
@@ -34,6 +34,13 @@ var _ready_done: bool = false
 var _pending_populate: bool = false
 var _new_game_hover_tween: Tween = null
 var _loss_art: TextureRect = null
+var _record_header_label: Label = null
+var _record_chronology_label: Label = null
+var _record_stamp_label: Label = null
+var _record_footer_label: Label = null
+var _pressure_layer: Control = null
+var _casualty_ghost_label: Label = null
+var _frame_damage_layer: Control = null
 
 func _ready() -> void:
 	RunStateStore.clear()
@@ -42,6 +49,8 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_apply_styles()
 	_wire_new_game_hover()
+	if not get_viewport().size_changed.is_connected(_sync_layout):
+		get_viewport().size_changed.connect(_sync_layout)
 	if new_game_button and not new_game_button.is_connected("pressed", Callable(self, "_on_new_game")):
 		new_game_button.pressed.connect(_on_new_game)
 	if _pending_populate or _tracker != null:
@@ -73,6 +82,8 @@ func teardown() -> void:
 			if child.has_method("teardown"):
 				child.call("teardown")
 	_tracker = null
+	if get_viewport() != null and get_viewport().size_changed.is_connected(_sync_layout):
+		get_viewport().size_changed.disconnect(_sync_layout)
 
 func configure(tracker: StatsTracker) -> void:
 	_tracker = tracker
@@ -84,7 +95,7 @@ func configure(tracker: StatsTracker) -> void:
 func _populate() -> void:
 	# Title
 	if title_label:
-		title_label.text = "Defeat"
+		title_label.text = "THE RUN IS DEAD"
 	# Total-earned score and supporting run records.
 	var stage_reached: int = 1
 	var chapter_reached: int = 1
@@ -101,14 +112,14 @@ func _populate() -> void:
 	economy_record["identities"] = _run_identity_ids()
 	economy_record["contract_discoveries"] = _contract_discovery_ids()
 	if stage_label:
-		stage_label.text = "Total Earned: %dg  •  Chapter %d  •  Stage %d" % [
+		stage_label.text = "TOTAL EARNED %dg  //  CHAPTER %d  //  STAGE %d" % [
 			int(economy_record.get("total_money_earned", 0)),
 			chapter_reached,
 			stage_reached,
 		]
 	var records: Dictionary = HighScore.submit_run(economy_record)
 	if high_label:
-		high_label.text = "Best Total Earned: %dg  •  Peak Bank: %dg" % [
+		high_label.text = "BEST HAUL %dg  //  PEAK BANK %dg" % [
 			int(records.get("best_total_earned", 0)),
 			int(records.get("peak_bankroll", 0)),
 		]
@@ -153,7 +164,7 @@ func _populate() -> void:
 			sb.configure(_tracker)
 		var scoreboard_window: String = "RUN" if _tracker != null and _tracker.has_run_values("player") else "ALL"
 		if sb.has_method("set_title"):
-			sb.set_title("Run Damage Leaders" if scoreboard_window == "RUN" else "Final Battle Damage")
+			sb.set_title("DAMAGE RECORD // RUN LEADERS" if scoreboard_window == "RUN" else "DAMAGE RECORD // FINAL BATTLE")
 		if sb.has_method("set_metric"):
 			sb.set_metric("damage")
 		if sb.has_method("set_window"):
@@ -164,6 +175,20 @@ func _populate() -> void:
 			sb.set_expand_enabled(false)
 		if sb.has_method("set_expanded"):
 			sb.set_expanded(false)
+		_style_loss_scoreboard(sb)
+
+func _style_loss_scoreboard(scoreboard: Node) -> void:
+	if scoreboard == null:
+		return
+	var scoreboard_title: Label = scoreboard.get_node_or_null("Header/Title") as Label
+	if scoreboard_title != null:
+		scoreboard_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		scoreboard_title.add_theme_font_size_override("font_size", 21)
+		scoreboard_title.add_theme_color_override("font_color", Color(0.94, 0.84, 0.69, 1.0))
+		VisualTypeSystem.set_utility_bold(scoreboard_title)
+	for raw_row: Node in scoreboard.find_children("*", "ScoreboardRow", true, false):
+		if raw_row.has_method("set_record_emphasis"):
+			raw_row.call("set_record_emphasis", true)
 
 func _on_new_game() -> void:
 	# Reset run-related singletons and return to unit select flow
@@ -268,32 +293,264 @@ func _apply_styles() -> void:
 	if backdrop != null:
 		backdrop.color = BACKDROP_COLOR
 	_ensure_loss_art()
+	_ensure_pressure_layer()
+	_ensure_record_labels()
+	_ensure_frame_damage()
 	if frame_panel != null:
-		frame_panel.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(HardcoreUIAssets.loss_summary_style(), _make_style(FRAME_COLOR, FRAME_BORDER, 2, 8)))
+		frame_panel.add_theme_stylebox_override("panel", _make_loss_frame_style())
 	if content_box != null:
-		content_box.add_theme_constant_override("separation", 16)
+		content_box.add_theme_constant_override("separation", 8)
 	if title_label != null:
+		title_label.text = "THE RUN IS DEAD"
+		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		VisualTypeSystem.set_impact(title_label)
 		title_label.add_theme_color_override("font_color", BLOOD_COLOR)
 		title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.82))
 		title_label.add_theme_constant_override("shadow_offset_x", 2)
 		title_label.add_theme_constant_override("shadow_offset_y", 3)
 	if stage_label != null:
+		stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		VisualTypeSystem.set_action(stage_label)
 		_apply_summary_ink(stage_label, SUMMARY_BLOOD_INK)
 	if high_label != null:
+		high_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		VisualTypeSystem.set_utility_bold(high_label)
 		_apply_summary_ink(high_label, SUMMARY_INK)
 	if stats_label != null:
+		stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		stats_label.custom_minimum_size.y = 148.0
+		VisualTypeSystem.set_utility(stats_label)
 		_apply_summary_ink(stats_label, SUMMARY_INK)
-		stats_label.add_theme_constant_override("line_spacing", 5)
+		stats_label.add_theme_constant_override("line_spacing", 3)
+		stats_label.add_theme_stylebox_override("normal", _make_damage_record_style())
 	if scoreboard_holder != null:
-		scoreboard_holder.custom_minimum_size = Vector2(720.0, 220.0)
+		scoreboard_holder.custom_minimum_size = Vector2(840.0, 176.0)
 	if new_game_button != null:
+		new_game_button.text = "START NEW RUN"
+		new_game_button.custom_minimum_size = Vector2(360.0, 64.0)
+		VisualTypeSystem.set_impact(new_game_button)
 		new_game_button.focus_mode = Control.FOCUS_ALL
 		new_game_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		new_game_button.add_theme_color_override("font_color", BONE_COLOR)
 		new_game_button.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.76, 1.0))
 		new_game_button.add_theme_color_override("font_focus_color", Color(1.0, 0.92, 0.76, 1.0))
-		HardcoreUIAssets.apply_button_family(new_game_button, "primary")
+		new_game_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.74, 0.52, 1.0))
+		new_game_button.add_theme_stylebox_override("normal", _make_restart_style("normal"))
+		new_game_button.add_theme_stylebox_override("hover", _make_restart_style("hover"))
+		new_game_button.add_theme_stylebox_override("pressed", _make_restart_style("pressed"))
+		new_game_button.add_theme_stylebox_override("focus", _make_restart_style("focus"))
+		new_game_button.add_theme_stylebox_override("disabled", _make_restart_style("disabled"))
 		new_game_button.grab_focus()
+	_sync_layout()
+
+func _make_loss_frame_style() -> StyleBox:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.024, 0.006, 0.010, 0.94)
+	style.border_color = Color(0.63, 0.10, 0.11, 0.98)
+	style.border_width_left = 13
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 9
+	style.set_corner_radius_all(0)
+	style.content_margin_left = 52
+	style.content_margin_right = 52
+	style.content_margin_top = 38
+	style.content_margin_bottom = 54
+	style.shadow_color = Color(0.46, 0.0, 0.02, 0.42)
+	style.shadow_size = 18
+	style.shadow_offset = Vector2(12.0, 10.0)
+	return style
+
+func _ensure_frame_damage() -> void:
+	if frame_panel == null:
+		return
+	_frame_damage_layer = frame_panel.get_node_or_null("FrameDamageLayer") as Control
+	if _frame_damage_layer == null:
+		_frame_damage_layer = Control.new()
+		_frame_damage_layer.name = "FrameDamageLayer"
+		_frame_damage_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame_panel.add_child(_frame_damage_layer)
+		frame_panel.move_child(_frame_damage_layer, 0)
+	_frame_damage_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	if _frame_damage_layer.get_child_count() > 0:
+		return
+	var reading_matte: ColorRect = ColorRect.new()
+	reading_matte.name = "ReadingMatte"
+	reading_matte.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	reading_matte.color = Color(0.022, 0.006, 0.010, 0.82)
+	reading_matte.set_anchors_preset(Control.PRESET_FULL_RECT)
+	reading_matte.offset_left = 17.0
+	reading_matte.offset_top = 16.0
+	reading_matte.offset_right = -17.0
+	reading_matte.offset_bottom = -16.0
+	_frame_damage_layer.add_child(reading_matte)
+	var wound_slash: ColorRect = ColorRect.new()
+	wound_slash.name = "WoundSlash"
+	wound_slash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wound_slash.color = Color(0.72, 0.012, 0.026, 0.38)
+	wound_slash.anchor_left = 0.66
+	wound_slash.anchor_top = 0.0
+	wound_slash.anchor_right = 0.93
+	wound_slash.anchor_bottom = 0.0
+	wound_slash.offset_left = 0.0
+	wound_slash.offset_top = 24.0
+	wound_slash.offset_right = 0.0
+	wound_slash.offset_bottom = 34.0
+	wound_slash.rotation_degrees = -3.0
+	_frame_damage_layer.add_child(wound_slash)
+	var forfeit_stamp: Label = Label.new()
+	forfeit_stamp.name = "ForfeitStamp"
+	forfeit_stamp.text = "FOREST CLAIM // BODY COUNT FINAL"
+	forfeit_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	forfeit_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	forfeit_stamp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	forfeit_stamp.anchor_left = 0.0
+	forfeit_stamp.anchor_top = 1.0
+	forfeit_stamp.anchor_right = 0.0
+	forfeit_stamp.anchor_bottom = 1.0
+	forfeit_stamp.offset_left = 52.0
+	forfeit_stamp.offset_top = -47.0
+	forfeit_stamp.offset_right = 390.0
+	forfeit_stamp.offset_bottom = -16.0
+	forfeit_stamp.rotation_degrees = -1.5
+	forfeit_stamp.add_theme_font_size_override("font_size", 15)
+	forfeit_stamp.add_theme_color_override("font_color", Color(0.92, 0.18, 0.16, 0.66))
+	forfeit_stamp.add_theme_stylebox_override("normal", _make_record_stamp_style())
+	VisualTypeSystem.set_action(forfeit_stamp)
+	_frame_damage_layer.add_child(forfeit_stamp)
+
+func _ensure_record_labels() -> void:
+	if content_box == null:
+		return
+	_record_header_label = content_box.get_node_or_null("RecordHeader") as Label
+	if _record_header_label == null:
+		_record_header_label = Label.new()
+		_record_header_label.name = "RecordHeader"
+		content_box.add_child(_record_header_label)
+	_record_header_label.text = "CASUALTY / DEBT RECORD  //  NO SURVIVORS  //  FILE 0X-13"
+	_record_header_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_record_header_label.add_theme_font_size_override("font_size", 17)
+	VisualTypeSystem.set_utility_bold(_record_header_label)
+	_record_header_label.add_theme_color_override("font_color", Color(0.71, 0.64, 0.54, 1.0))
+	content_box.move_child(_record_header_label, 0)
+
+	_record_chronology_label = content_box.get_node_or_null("RecordChronology") as Label
+	if _record_chronology_label == null:
+		_record_chronology_label = Label.new()
+		_record_chronology_label.name = "RecordChronology"
+		content_box.add_child(_record_chronology_label)
+	_record_chronology_label.text = "01 WAGER CLAIMED  /  02 COMPANY ERASED  /  03 ACCOUNT CLOSED"
+	_record_chronology_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_record_chronology_label.add_theme_font_size_override("font_size", 17)
+	VisualTypeSystem.set_utility_bold(_record_chronology_label)
+	_record_chronology_label.add_theme_color_override("font_color", Color(0.92, 0.43, 0.36, 0.96))
+	var chronology_index: int = title_label.get_index() + 1 if title_label != null else 2
+	content_box.move_child(_record_chronology_label, chronology_index)
+
+	_record_stamp_label = content_box.get_node_or_null("RecordStamp") as Label
+	if _record_stamp_label == null:
+		_record_stamp_label = Label.new()
+		_record_stamp_label.name = "RecordStamp"
+		content_box.add_child(_record_stamp_label)
+	_record_stamp_label.text = "ACCOUNT CLOSED // NAMES CROSSED OUT"
+	_record_stamp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_record_stamp_label.custom_minimum_size.y = 44.0
+	_record_stamp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_record_stamp_label.add_theme_font_size_override("font_size", 18)
+	VisualTypeSystem.set_action(_record_stamp_label)
+	_record_stamp_label.add_theme_color_override("font_color", Color(1.0, 0.46, 0.36, 1.0))
+	_record_stamp_label.add_theme_stylebox_override("normal", _make_record_stamp_style())
+	var stamp_index: int = high_label.get_index() + 1 if high_label != null else min(4, content_box.get_child_count() - 1)
+	content_box.move_child(_record_stamp_label, stamp_index)
+
+	_record_footer_label = content_box.get_node_or_null("RecordFooter") as Label
+	if _record_footer_label == null:
+		_record_footer_label = Label.new()
+		_record_footer_label.name = "RecordFooter"
+		content_box.add_child(_record_footer_label)
+	_record_footer_label.text = "NO APPEAL // THE WOODS KEEP THE BALANCE // WALK BACK IN"
+	_record_footer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_record_footer_label.add_theme_font_size_override("font_size", 16)
+	VisualTypeSystem.set_utility_bold(_record_footer_label)
+	_record_footer_label.add_theme_color_override("font_color", Color(0.68, 0.59, 0.49, 0.92))
+	var button_index: int = new_game_button.get_index() if new_game_button != null else content_box.get_child_count() - 1
+	content_box.move_child(_record_footer_label, button_index)
+
+func _make_record_stamp_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.19, 0.018, 0.025, 0.62)
+	style.border_color = Color(0.68, 0.055, 0.075, 0.94)
+	style.border_width_left = 7
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.content_margin_left = 12.0
+	style.content_margin_right = 12.0
+	style.content_margin_top = 7.0
+	style.content_margin_bottom = 7.0
+	return style
+
+func _make_damage_record_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.012, 0.009, 0.012, 0.90)
+	style.border_color = Color(0.52, 0.075, 0.082, 0.94)
+	style.border_width_left = 9
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 2
+	style.content_margin_left = 18.0
+	style.content_margin_right = 18.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	style.set_corner_radius_all(0)
+	return style
+
+func _make_environment_stamp_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.16, 0.008, 0.018, 0.72)
+	style.border_color = Color(0.88, 0.075, 0.085, 0.94)
+	style.border_width_left = 8
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.content_margin_left = 12.0
+	style.content_margin_right = 12.0
+	style.content_margin_top = 7.0
+	style.content_margin_bottom = 7.0
+	style.set_corner_radius_all(0)
+	return style
+
+func _make_restart_style(state: String) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	var normalized_state: String = state.strip_edges().to_lower()
+	match normalized_state:
+		"hover", "focus":
+			style.bg_color = Color(0.58, 0.025, 0.045, 1.0)
+			style.border_color = Color(1.0, 0.42, 0.23, 1.0)
+			style.border_width_left = 10
+		"pressed":
+			style.bg_color = Color(0.25, 0.012, 0.020, 1.0)
+			style.border_color = Color(0.92, 0.62, 0.28, 1.0)
+			style.border_width_left = 12
+		"disabled":
+			style.bg_color = Color(0.030, 0.026, 0.030, 0.96)
+			style.border_color = Color(0.30, 0.27, 0.25, 0.88)
+			style.border_width_left = 5
+		_:
+			style.bg_color = Color(0.42, 0.018, 0.034, 0.98)
+			style.border_color = Color(0.82, 0.085, 0.090, 0.98)
+			style.border_width_left = 8
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.content_margin_left = 20.0
+	style.content_margin_right = 20.0
+	style.content_margin_top = 10.0
+	style.content_margin_bottom = 10.0
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.52)
+	style.shadow_size = 5
+	return style
 
 func _apply_summary_ink(label: Label, color: Color) -> void:
 	label.add_theme_color_override("font_color", color)
@@ -312,6 +569,70 @@ func _ensure_loss_art() -> void:
 	_loss_art.texture = HardcoreUIAssets.loss_backdrop_texture()
 	_loss_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_loss_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_loss_art.z_index = 0
+	_loss_art.modulate = Color(1.82, 1.34, 1.28, 1.0)
+	if backdrop != null:
+		backdrop.z_index = -1
+	if panel != null:
+		panel.z_index = 10
+
+func _ensure_pressure_layer() -> void:
+	_pressure_layer = get_node_or_null("LossPressureLayer") as Control
+	if _pressure_layer == null:
+		_pressure_layer = Control.new()
+		_pressure_layer.name = "LossPressureLayer"
+		_pressure_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_pressure_layer)
+	_pressure_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pressure_layer.z_index = 2
+	if _pressure_layer.get_child_count() == 0:
+		var blood_fall: ColorRect = ColorRect.new()
+		blood_fall.name = "BloodFall"
+		blood_fall.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		blood_fall.color = Color(0.42, 0.0, 0.015, 0.20)
+		blood_fall.anchor_left = 0.0
+		blood_fall.anchor_top = 0.0
+		blood_fall.anchor_right = 0.16
+		blood_fall.anchor_bottom = 1.0
+		_pressure_layer.add_child(blood_fall)
+		var wound_band: ColorRect = ColorRect.new()
+		wound_band.name = "WoundBand"
+		wound_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		wound_band.color = Color(0.62, 0.005, 0.018, 0.14)
+		wound_band.anchor_left = 0.0
+		wound_band.anchor_top = 0.14
+		wound_band.anchor_right = 1.0
+		wound_band.anchor_bottom = 0.18
+		wound_band.rotation_degrees = -2.0
+		_pressure_layer.add_child(wound_band)
+		_casualty_ghost_label = Label.new()
+		_casualty_ghost_label.name = "CasualtyGhost"
+		_casualty_ghost_label.text = "DEBT COLLECTED"
+		_casualty_ghost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_casualty_ghost_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_casualty_ghost_label.rotation_degrees = -2.0
+		_casualty_ghost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_casualty_ghost_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_casualty_ghost_label.add_theme_font_size_override("font_size", 34)
+		_casualty_ghost_label.add_theme_color_override("font_color", Color(0.98, 0.24, 0.19, 0.92))
+		_casualty_ghost_label.add_theme_color_override("font_outline_color", Color(0.015, 0.006, 0.009, 0.96))
+		_casualty_ghost_label.add_theme_constant_override("outline_size", 3)
+		_casualty_ghost_label.add_theme_stylebox_override("normal", _make_environment_stamp_style())
+		VisualTypeSystem.set_impact(_casualty_ghost_label)
+		_casualty_ghost_label.z_index = 30
+		_pressure_layer.add_child(_casualty_ghost_label)
+
+func _sync_layout() -> void:
+	if frame_panel == null:
+		return
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var frame_width: float = clampf(viewport_size.x - 96.0, 900.0, 1120.0)
+	var frame_height: float = clampf(viewport_size.y - 96.0, 680.0, 780.0)
+	frame_panel.custom_minimum_size = Vector2(frame_width, frame_height)
+	if _casualty_ghost_label != null:
+		var frame_origin: Vector2 = (viewport_size - Vector2(frame_width, frame_height)) * 0.5
+		_casualty_ghost_label.position = Vector2(frame_origin.x + frame_width - 346.0, frame_origin.y + 45.0)
+		_casualty_ghost_label.size = Vector2(302.0, 62.0)
 
 func _wire_new_game_hover() -> void:
 	if new_game_button == null:

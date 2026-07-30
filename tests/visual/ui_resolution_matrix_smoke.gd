@@ -3,6 +3,7 @@ extends Node
 const SMOKE_NAME: String = "UIResolutionMatrixSmoke"
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const AccountProfileStoreScript: GDScript = preload("res://scripts/game/account/account_profile_store.gd")
 const TEST_SETTINGS_PATH: String = "user://ui_resolution_matrix_smoke.cfg"
 const TEST_ACCOUNT_PROFILE_PATH: String = "user://ui_resolution_matrix_account.json"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/ui_resolution_matrix_pass"
@@ -18,6 +19,7 @@ var _failures: Array[String] = []
 var _main: Control = null
 var _original_window_size: Vector2i = Vector2i.ZERO
 var _original_scale: float = 1.0
+var _capture_count: int = 0
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -27,6 +29,7 @@ func _run() -> void:
 	_original_window_size = window.size if window != null else Vector2i.ZERO
 	_original_scale = window.content_scale_factor if window != null else 1.0
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	AccountProfileStoreScript.clear(TEST_ACCOUNT_PROFILE_PATH)
 	for viewport_size: Vector2i in VIEWPORTS:
 		for ui_scale: float in SCALES:
 			await _verify_configuration(viewport_size, ui_scale)
@@ -55,6 +58,8 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	var viewport_rect: Rect2 = title_menu.get_viewport().get_visible_rect() if title_menu != null else Rect2()
 	var label: String = "%dx%d @ %d%%" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
 	_expect(title_menu != null and title_menu.visible, "%s title menu missing" % label)
+	var title_panel: Panel = title_menu.get_node_or_null("TitlePanel") as Panel if title_menu != null else null
+	_expect(title_panel != null, "%s TitlePanel missing" % label)
 	for control_name: String in [
 		"GameTitle",
 		"StartButton",
@@ -70,16 +75,109 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		var control: Control = title_menu.find_child(control_name, true, false) as Control if title_menu != null else null
 		_expect(control != null and _rect_inside(control.get_global_rect(), viewport_rect.grow(2.0)), "%s %s escaped viewport rect=%s viewport=%s" % [label, control_name, str(control.get_global_rect() if control != null else Rect2()), str(viewport_rect)])
 		_expect(control != null and control.is_visible_in_tree() and control.modulate.a >= 0.90, "%s %s was contained but not visibly reviewable" % [label, control_name])
+	for rail_control_name: String in [
+		"GameTitle",
+		"StartButton",
+		"BlackLedgerButton",
+		"HomeButton",
+		"HowToPlayButton",
+		"UnitsButton",
+		"RGAGlossaryButton",
+		"SettingsButton",
+		"QuitButton",
+	]:
+		var rail_control: Control = title_menu.find_child(rail_control_name, true, false) as Control if title_menu != null else null
+		_expect(
+			title_panel != null and rail_control != null and _rect_inside(rail_control.get_global_rect(), title_panel.get_global_rect().grow(2.0)),
+			"%s %s escaped TitlePanel rail control=%s panel=%s" % [label, rail_control_name, str(rail_control.get_global_rect() if rail_control != null else Rect2()), str(title_panel.get_global_rect() if title_panel != null else Rect2())]
+		)
+	var start_button: Button = title_menu.find_child("StartButton", true, false) as Button if title_menu != null else null
+	var continue_button: Button = title_menu.find_child("ContinueRunButton", true, false) as Button if title_menu != null else null
+	var settings_button: Button = title_menu.find_child("SettingsButton", true, false) as Button if title_menu != null else null
+	var ledger_button: Button = title_menu.find_child("BlackLedgerButton", true, false) as Button if title_menu != null else null
+	var quit_button: Button = title_menu.find_child("QuitButton", true, false) as Button if title_menu != null else null
+	var continue_is_primary: bool = continue_button != null and continue_button.visible
+	var primary_action: Button = continue_button if continue_is_primary else start_button
+	_expect(primary_action != null and String(primary_action.get_meta("visual_role", "")) == "primary", "%s resumable or fresh-run entry should own the primary hierarchy role" % label)
+	_expect(start_button != null and String(start_button.get_meta("visual_role", "")) == ("secondary" if continue_is_primary else "primary"), "%s New Run should become secondary only while Continue Run is available" % label)
+	if continue_is_primary:
+		_expect(title_panel != null and _rect_inside(continue_button.get_global_rect(), title_panel.get_global_rect().grow(2.0)), "%s Continue Run escaped TitlePanel" % label)
+	_expect(settings_button != null and String(settings_button.get_meta("visual_role", "")) == "selected_navigation", "%s Settings should expose the selected navigation hierarchy role" % label)
+	_expect(settings_button != null and bool(settings_button.get_meta("active_page", false)), "%s Settings should retain a persistent active-page marker" % label)
+	_expect(settings_button != null and settings_button.text.begins_with("ACTIVE //"), "%s Settings active-page label should survive responsive layout" % label)
+	var settings_pressed_style: StyleBoxFlat = settings_button.get_theme_stylebox("pressed") as StyleBoxFlat if settings_button != null else null
+	var settings_focus_style: StyleBoxFlat = settings_button.get_theme_stylebox("focus") as StyleBoxFlat if settings_button != null else null
+	_expect(
+		settings_pressed_style != null and settings_focus_style != null and settings_pressed_style.border_color != settings_focus_style.border_color,
+		"%s Settings active-page and keyboard-focus surfaces should remain distinct" % label
+	)
+	_expect(
+		settings_focus_style != null and settings_focus_style.border_color.b > settings_focus_style.border_color.r,
+		"%s Settings focus should use the non-red signal-blue channel" % label
+	)
+	var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer if title_menu != null else null
+	_expect(settings_docket != null and _rect_inside(settings_docket.get_global_rect(), viewport_rect.grow(2.0)), "%s Settings field-record docket escaped the viewport" % label)
+	_expect(ledger_button != null and String(ledger_button.get_meta("visual_role", "")) == "ledger", "%s Black Ledger should expose a distinct ledger hierarchy role" % label)
+	_expect(quit_button != null and String(quit_button.get_meta("visual_role", "")) == "quit", "%s Quit should expose a distinct destructive hierarchy role" % label)
+	_expect(
+		primary_action != null and settings_button != null and ledger_button != null and quit_button != null
+		and _style_texture_path(primary_action) != _style_texture_path(settings_button)
+		and _style_texture_path(settings_button) != _style_texture_path(ledger_button)
+		and _style_texture_path(ledger_button) != _style_texture_path(quit_button),
+		"%s primary, selected, ledger, and Quit actions should use visibly distinct plate families" % label
+	)
+	var effective_height: float = float(viewport_size.y) / ui_scale
+	if effective_height < 640.0:
+		var compact_actions: Array[Button] = [start_button, settings_button, ledger_button, quit_button]
+		for compact_action: Button in compact_actions:
+			_expect(
+				compact_action != null and compact_action.get_theme_font_size("font_size") >= 16,
+				"%s compact action text should remain at least 16px" % label
+			)
 	if _should_capture(viewport_size, ui_scale):
-		_save_capture("%dx%d_%d_percent_title_menu.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+		var settings_filename: String = "%dx%d_%d_percent_title_menu.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
+		_expect(_save_capture(settings_filename), "%s settings capture was not produced" % label)
+	if title_menu != null:
+		title_menu.call("_select_section", "home", true)
+	await _settle_frames(3)
+	var route_manifest: VBoxContainer = title_menu.find_child("HomeRouteManifest", true, false) as VBoxContainer if title_menu != null else null
+	_expect(route_manifest != null and _rect_inside(route_manifest.get_global_rect(), viewport_rect.grow(2.0)), "%s Available Records manifest escaped the viewport" % label)
+	if route_manifest != null:
+		for record_number: String in ["01", "02", "03", "04"]:
+			var route: Button = route_manifest.get_node_or_null("ManifestRoute%s" % record_number) as Button
+			var serial: Label = route.get_node_or_null("BoundCopy/Serial") as Label if route != null else null
+			var record_title: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordTitle") as Label if route != null else null
+			var record_description: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordDescription") as Label if route != null else null
+			_expect(route != null and route.size.x >= route_manifest.size.x - 2.0, "%s Record %s should fill the joined manifest width" % [label, record_number])
+			_expect(serial != null and record_title != null and record_description != null, "%s Record %s should bind serial, title, and description" % [label, record_number])
+			_expect(record_description != null and record_description.get_theme_font_size("font_size") >= 18, "%s Record %s description should remain functional-size copy" % [label, record_number])
+			var route_focus: StyleBoxFlat = route.get_theme_stylebox("focus") as StyleBoxFlat if route != null else null
+			var route_pressed: StyleBoxFlat = route.get_theme_stylebox("pressed") as StyleBoxFlat if route != null else null
+			_expect(route_focus != null and route_pressed != null and route_focus.border_color != route_pressed.border_color, "%s Record %s focus should remain distinct from pressed blood" % [label, record_number])
 	if _main != null:
 		_main.call("open_black_ledger", TEST_ACCOUNT_PROFILE_PATH)
 	await _settle_frames(3)
 	var ledger: Control = _main.find_child("BlackLedger", true, false) as Control if _main != null else null
 	var ledger_panel: PanelContainer = ledger.find_child("LedgerPanel", true, false) as PanelContainer if ledger != null else null
 	_expect(ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), viewport_rect.grow(2.0)), "%s Black Ledger escaped viewport panel=%s viewport=%s" % [label, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(viewport_rect)])
+	var effective_width: float = float(viewport_size.x) / ui_scale
+	if effective_width >= 1440.0:
+		_expect(
+			ledger_panel != null and ledger_panel.size.y >= 630.0 and ledger_panel.size.y <= 670.0,
+			"%s sparse Black Ledger should remain content-height at wide scale, got %.1f" % [label, ledger_panel.size.y if ledger_panel != null else -1.0]
+		)
+	if viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.0):
+		_expect(
+			ledger != null and bool(ledger.get("_sparse_content_record")),
+			"%s fresh Black Ledger should identify its actually rendered content as sparse" % label
+		)
+		_expect(
+			ledger_panel != null and ledger_panel.size.y >= 630.0 and ledger_panel.size.y <= 670.0,
+			"%s fresh Black Ledger should preserve its dedicated record and footer gutters, got %.1f" % [label, ledger_panel.size.y if ledger_panel != null else -1.0]
+		)
 	if _should_capture(viewport_size, ui_scale):
-		_save_capture("%dx%d_%d_percent_ledger.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+		var ledger_filename: String = "%dx%d_%d_percent_ledger.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
+		_expect(_save_capture(ledger_filename), "%s Black Ledger capture was not produced" % label)
 	if _main != null:
 		_main.call("_close_black_ledger")
 	await _settle_frames(1)
@@ -96,19 +194,44 @@ func _should_capture(viewport_size: Vector2i, ui_scale: float) -> bool:
 func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
 	return outer.has_point(inner.position) and outer.has_point(inner.end)
 
-func _save_capture(filename: String) -> void:
-	var display_name: String = DisplayServer.get_name().to_lower()
-	var driver_name: String = RenderingServer.get_current_rendering_driver_name().to_lower()
-	if display_name == "headless" or display_name == "server" or display_name == "dummy" or driver_name.contains("dummy"):
-		return
+func _style_texture_path(control: Control) -> String:
+	if control == null:
+		return ""
+	var style: StyleBoxTexture = control.get_theme_stylebox("normal") as StyleBoxTexture
+	if style == null or style.texture == null:
+		return ""
+	return style.texture.resource_path
+
+func _save_capture(filename: String) -> bool:
+	if not _framebuffer_capture_available():
+		print("%s: explicit headless capture skipped for %s" % [SMOKE_NAME, filename])
+		return true
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
-	var image: Image = get_viewport().get_texture().get_image()
+	RenderingServer.force_draw(false)
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture == null or not texture.get_rid().is_valid():
+		_failures.append("capture failed for %s: viewport texture unavailable" % filename)
+		return false
+	var image: Image = texture.get_image()
+	if image == null or image.is_empty() or image.get_width() <= 0 or image.get_height() <= 0:
+		_failures.append("capture failed for %s: viewport image unavailable" % filename)
+		return false
 	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
 	var save_error: Error = image.save_png(path)
 	if save_error != OK:
 		_failures.append("capture failed for %s error=%d" % [filename, int(save_error)])
-		return
+		return false
+	if not FileAccess.file_exists(path) or FileAccess.get_file_as_bytes(path).is_empty():
+		_failures.append("capture failed for %s: saved file was missing or empty" % filename)
+		return false
+	_capture_count += 1
 	print("%s: saved %s" % [SMOKE_NAME, ProjectSettings.globalize_path(path)])
+	return true
+
+func _framebuffer_capture_available() -> bool:
+	var display_name: String = DisplayServer.get_name().to_lower()
+	var driver_name: String = RenderingServer.get_current_rendering_driver_name().to_lower()
+	return display_name != "headless" and display_name != "server" and display_name != "dummy" and not driver_name.contains("dummy")
 
 func _cleanup_main() -> void:
 	if _main == null or not is_instance_valid(_main):
@@ -143,6 +266,8 @@ func _finish() -> void:
 	for path: String in [TEST_SETTINGS_PATH, TEST_ACCOUNT_PROFILE_PATH, "%s.tmp" % TEST_ACCOUNT_PROFILE_PATH, "%s.bak" % TEST_ACCOUNT_PROFILE_PATH]:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	if _framebuffer_capture_available():
+		_expect(_capture_count == 10, "expected 10 non-empty settings/Ledger proof images, produced %d" % _capture_count)
 	if _failures.is_empty():
 		print(SMOKE_NAME + ": OK matrix=4x3")
 		get_tree().quit(0)

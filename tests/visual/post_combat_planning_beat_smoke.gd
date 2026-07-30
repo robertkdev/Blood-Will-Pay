@@ -40,8 +40,13 @@ func _run() -> void:
 	var opener_started: bool = await _wait_for_combat_active(5.0)
 	_expect(opener_started, "opening fight did not start immediately after starter select")
 	_expect(not _bottom_planning_visible(), "bottom planning/shop area stayed visible during the opening fight")
+	var active_stage_phase: Label = _main.find_child("PhaseLabel", true, false) as Label
+	_expect(active_stage_phase != null and active_stage_phase.text == "/// FIGHT", "active combat stage strip did not expose /// FIGHT")
+	_assert_active_combat_shell()
 	if _finish_if_failed():
 		return
+	await _settle_frames(2)
+	_save_capture("00_active_combat.png")
 
 	var intermission_seen: bool = await _wait_for_intermission_bar(24.0)
 	_expect(intermission_seen, "post-combat intermission bar did not appear before planning returned")
@@ -49,10 +54,14 @@ func _run() -> void:
 		return
 	await _settle_frames(2)
 	_assert_result_card()
-	_assert_shared_result_variants()
 	if _finish_if_failed():
 		return
 	_save_capture("01_post_win_intermission_bar.png")
+	await _assert_shared_result_variants()
+	if _finish_if_failed():
+		return
+	var result_skip_requested: bool = await _request_result_skip()
+	_expect(result_skip_requested, "result hold did not accept its visible Enter/Space skip affordance")
 
 	var restored: bool = await _wait_for_post_win_planning(8.0)
 	_expect(restored, "post-win planning did not restore after intermission")
@@ -66,7 +75,7 @@ func _run() -> void:
 	_expect(not _continue_button_disabled(), "post-win Start Battle button stayed disabled")
 	_expect(_planning_time_left() >= MIN_RESTORED_PLANNING_SECONDS, "post-win planning timer was not reset; got %.2f" % _planning_time_left())
 	var result_banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
-	_expect(result_banner != null and not result_banner.visible, "battle result overlay remained visible after the two-second intermission")
+	_expect(result_banner != null and not result_banner.visible, "battle result overlay remained visible after the authored intermission")
 	_normalize_restored_planning_capture_timer()
 	await get_tree().process_frame
 	_save_capture("02_post_win_planning_restored.png")
@@ -114,35 +123,218 @@ func _assert_result_card() -> void:
 	var title_label: Label = card.get_node_or_null("CardMargin/Content/OutcomeLabel") as Label
 	var detail_label: Label = card.get_node_or_null("CardMargin/Content/DetailLabel") as Label
 	var kicker_label: Label = card.get_node_or_null("CardMargin/Content/KickerLabel") as Label
+	var outcome_signal: Label = card.get_node_or_null("CardMargin/Content/OutcomeSignal") as Label
+	var record_label: Label = card.get_node_or_null("CardMargin/Content/RecordRow/RecordLabel") as Label
+	var settlement_label: Label = card.get_node_or_null("CardMargin/Content/RecordRow/SettlementLabel") as Label
+	var impact_stamp: Label = card.get_node_or_null("CardMargin/Content/ImpactStamp") as Label
+	var hold_progress: ProgressBar = card.get_node_or_null("CardMargin/Content/ResultHoldProgress") as ProgressBar
+	var hold_label: Label = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label
+	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
 	_expect(title_label != null and title_label.text == "VICTORY", "post-win result title should read VICTORY")
-	_expect(detail_label != null and detail_label.text.contains("Preparing"), "post-win result detail should explain the transition")
-	_expect(kicker_label != null and kicker_label.text == "BATTLE OUTCOME", "post-win result card should include its outcome context")
+	_expect(detail_label != null and detail_label.text.contains("WAGER") and detail_label.text.contains("RETURN") and detail_label.text.contains("RESULTING BANK"), "post-win result detail should expose wager, return, and resulting bank")
+	_assert_result_detail_bounds(card, detail_label, "VICTORY")
+	_expect(kicker_label != null and kicker_label.text == "/// SURVIVAL HAS A PRICE ///", "post-win result card should frame survival as a horror consequence")
+	_expect(outcome_signal != null and outcome_signal.text.contains("WOODS REMEMBER"), "post-win result card should sustain the forest-horror threat after combat")
+	_expect(record_label != null and record_label.text.contains("FIELD RECORD"), "post-win result card should expose authored field-record metadata")
+	_expect(settlement_label != null and settlement_label.text.contains("6.0 SEC HOLD"), "post-win result card should state its readable minimum hold")
+	_expect(impact_stamp != null and impact_stamp.text == "PAID IN BLOOD // WALKING", "post-win result card should close with an authored survival stamp")
+	_expect(hold_progress != null and hold_progress.max_value == 1.0, "result card should expose visible hold progress")
+	_expect(hold_label != null and hold_label.text.begins_with("AUTO-ADVANCE IN"), "result card should name its automatic advance countdown")
+	_expect(skip_button != null and skip_button.text.contains("SKIP"), "result card should expose a visible keyboard skip affordance")
+	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, "VICTORY")
+	_assert_persistent_combat_chrome("VICTORY result")
+	var record_wash: TextureRect = card.get_node_or_null("RecordWash") as TextureRect
+	_expect(record_wash != null and record_wash.texture != null, "result card should carry a restrained war-record texture pass")
+	_expect(card.get_node_or_null("DamageMarks/DamageMarkTop") != null and card.get_node_or_null("DamageMarks/DamageMarkRake") != null and card.get_node_or_null("DamageMarks/TornCornerNW") != null, "result card should read as damaged assembled ephemera rather than an empty clean rectangle")
 	var card_rect: Rect2 = card.get_global_rect()
 	var viewport: Viewport = get_viewport()
 	var viewport_size: Vector2 = viewport.get_visible_rect().size if viewport != null else Vector2.ZERO
-	_expect(is_equal_approx(card_rect.size.x, 760.0), "result card width must match the authored 760px interruption contract, got %.1f" % card_rect.size.x)
-	_expect(is_equal_approx(card_rect.size.y, 260.0), "result card height must match the authored 260px interruption contract, got %.1f" % card_rect.size.y)
-	_expect(card_rect.size.x < viewport_size.x * 0.55, "result card should not read as a full-screen color panel")
-	_expect(card.get_theme_stylebox("panel") != null, "result card should have a gothic panel style")
+	_expect(is_equal_approx(card.custom_minimum_size.x, 940.0), "victory result should use its authored wide survival-record silhouette, got %.1f" % card.custom_minimum_size.x)
+	_expect(is_equal_approx(card.custom_minimum_size.y, 436.0), "victory result should use its authored survival-record height, got %.1f" % card.custom_minimum_size.y)
+	_expect(card_rect.size.x < viewport_size.x * 0.58, "result card should not read as a full-screen color panel")
+	_expect(card.get_theme_stylebox("panel") is StyleBoxFlat, "result card should keep an accessible high-contrast field surface")
+	_expect(String(card.get_meta("result_variant", "")) == "victory", "victory card should expose a semantic visual variant")
+	_expect(String(card.get_meta("tear_direction", "")) == "rising_open", "victory result should open upward rather than sharing the defeat tear")
+	var controller: Variant = _combat_controller()
+	_expect(controller != null and controller.has_method("_result_minimum_dwell_seconds"), "result controller should expose its readable dwell contract")
+	if controller != null and controller.has_method("_result_minimum_dwell_seconds"):
+		_expect(float(controller.call("_result_minimum_dwell_seconds")) >= 6.0, "result card minimum dwell must be at least six seconds")
 
 func _assert_shared_result_variants() -> void:
 	var controller: Variant = _combat_controller()
 	_expect(controller != null and controller.has_method("_show_result_banner"), "result controller should expose the shared banner builder")
 	if controller == null or not controller.has_method("_show_result_banner"):
 		return
-	controller.call("_show_result_banner", "DEFEAT", "Round lost. Resolving the aftermath.", Color(0.72, 0.18, 0.16, 1.0), Color(1.0, 0.66, 0.60, 1.0))
-	_expect_result_copy("DEFEAT", "aftermath")
-	controller.call("_show_result_banner", "STALEMATE", "Wager returned. Preparing your next decision.", Color(0.76, 0.62, 0.32, 1.0), Color(0.98, 0.85, 0.58, 1.0))
-	_expect_result_copy("STALEMATE", "Wager returned")
-	controller.call("_show_result_banner", "VICTORY", "Round secured. Preparing your next decision.", Color(0.42, 0.78, 0.24, 1.0), Color(0.82, 1.0, 0.66, 1.0))
-	_expect_result_copy("VICTORY", "Preparing")
+	var accelerated_scale: float = Engine.time_scale
+	Engine.time_scale = 0.0
+	var defeat_detail: String = String(controller.call("_build_result_economy_detail", "defeat"))
+	controller.call("_show_result_banner", "DEFEAT", defeat_detail, Color(0.72, 0.18, 0.16, 1.0), Color(1.0, 0.66, 0.60, 1.0))
+	_pin_result_variant_visible()
+	await _settle_result_variant()
+	_expect_result_copy("DEFEAT", "LOST")
+	_save_capture("result_defeat.png")
+	var tie_detail: String = String(controller.call("_build_result_economy_detail", "tie"))
+	controller.call("_show_result_banner", "STALEMATE", tie_detail, Color(0.76, 0.62, 0.32, 1.0), Color(0.98, 0.85, 0.58, 1.0))
+	_pin_result_variant_visible()
+	await _settle_result_variant()
+	_expect_result_copy("STALEMATE", "RETURNED")
+	_save_capture("result_stalemate.png")
+	Engine.time_scale = accelerated_scale
+
+func _settle_result_variant() -> void:
+	# The real victory intermission remains active while the shared variants are
+	# exercised.  Keep this capture window shorter than its accelerated timeout
+	# so the intermission callback cannot hide the later stalemate card.
+	await _settle_frames(2)
+
+func _pin_result_variant_visible() -> void:
+	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
+	_expect(banner != null, "shared result banner should exist for variant capture")
+	if banner == null:
+		return
+	banner.visible = true
+	banner.modulate.a = 1.0
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer
+	if card != null:
+		card.scale = Vector2.ONE
 
 func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
 	var title_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/OutcomeLabel") as Label if banner != null else null
 	var detail_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/DetailLabel") as Label if banner != null else null
+	var impact_stamp: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ImpactStamp") as Label if banner != null else null
+	var kicker_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/KickerLabel") as Label if banner != null else null
+	var outcome_signal: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/OutcomeSignal") as Label if banner != null else null
+	var settlement_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/RecordRow/SettlementLabel") as Label if banner != null else null
+	var hold_progress: ProgressBar = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldProgress") as ProgressBar if banner != null else null
+	var hold_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label if banner != null else null
+	var skip_button: Button = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if banner != null else null
+	_expect(banner != null and banner.visible and banner.modulate.a > 0.99, "shared result card should remain visibly captureable for %s" % expected_title)
 	_expect(title_label != null and title_label.text == expected_title, "shared result card should render %s" % expected_title)
 	_expect(detail_label != null and detail_label.text.contains(detail_token), "%s detail should contain %s" % [expected_title, detail_token])
+	_expect(detail_label != null and detail_label.text.contains("WAGER") and detail_label.text.contains("RESULTING BANK"), "%s detail should state wager and resulting bank without relying on color" % expected_title)
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
+	_assert_result_detail_bounds(card, detail_label, expected_title)
+	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, expected_title)
+	_assert_persistent_combat_chrome("%s result" % expected_title)
+	_expect(impact_stamp != null and impact_stamp.text != "FIELD RECORD CLOSED", "%s should carry an authored result-specific settlement stamp" % expected_title)
+	_expect(card != null and String(card.get_meta("result_variant", "")) == expected_title.to_lower(), "%s should expose a semantic visual variant" % expected_title)
+	if expected_title == "DEFEAT":
+		_expect(card != null and card.custom_minimum_size == Vector2(920.0, 462.0), "defeat should use a taller, heavier consequence silhouette")
+		_expect(card != null and String(card.get_meta("tear_direction", "")) == "downward_collapse", "defeat should collapse downward")
+		_expect(kicker_label != null and kicker_label.text.contains("WOODS COLLECT"), "defeat should name the environmental threat")
+		_expect(outcome_signal != null and outcome_signal.text.contains("DARK KEEPS"), "defeat should communicate a visceral horror consequence")
+		_expect(settlement_label != null and settlement_label.text.contains("FORFEITED"), "defeat should expose forfeiture rather than generic settlement")
+		_expect(impact_stamp != null and impact_stamp.text.contains("BLOOD TAKEN"), "defeat should carry a distinct blood-cost stamp")
+	elif expected_title == "STALEMATE":
+		_expect(card != null and card.custom_minimum_size == Vector2(840.0, 402.0), "stalemate should use a materially narrower suspended-record silhouette")
+		_expect(card != null and String(card.get_meta("tear_direction", "")) == "suspended_split", "stalemate should use a suspended split tear")
+		_expect(kicker_label != null and kicker_label.text.contains("DEBT WAITS"), "stalemate should read as unresolved danger")
+		_expect(outcome_signal != null and outcome_signal.text.contains("NOTHING LET YOU LEAVE"), "stalemate should communicate unresolved forest horror")
+		_expect(settlement_label != null and settlement_label.text.contains("RETURNED"), "stalemate should expose returned escrow rather than generic settlement")
+		_expect(impact_stamp != null and impact_stamp.text.contains("NO ESCAPE"), "stalemate should carry a distinct unresolved stamp")
+
+func _assert_active_combat_shell() -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	_expect(combat != null, "active combat shell missing")
+	if combat == null:
+		return
+	_expect(String(combat.get_meta("tactical_phase_visual", "")) == "combat", "combat shell did not expose its semantic combat state")
+	var threat_boundary: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary") as Control
+	var objective: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
+	var woodland: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWoodlandHorizon") as TextureRect
+	var silhouettes: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWoodlandSilhouettes") as Control
+	var palisade: ColorRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWoodlandSilhouettes/RuinedPalisadeBeam") as ColorRect
+	var watch_post: ColorRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWoodlandSilhouettes/HostileWatchPost") as ColorRect
+	var fog: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaGroundFog") as TextureRect
+	var smoke: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaHostileSmoke") as TextureRect
+	var planning_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry") as Control
+	var actions: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as Control
+	var stats: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
+	var items: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
+	_expect(threat_boundary != null and threat_boundary.visible, "combat shell lacks non-color threat-boundary geometry")
+	_expect(objective != null and objective.text.contains("SURVIVE"), "combat shell lacks an explicit survival objective signal")
+	_expect(woodland != null and woodland.texture != null and woodland.visible, "combat shell lacks the title-connected woodland horizon")
+	_expect(silhouettes != null and silhouettes.visible and silhouettes.get_child_count() >= 12, "combat shell lacks authored hostile woodland depth")
+	_expect(palisade != null and watch_post != null, "combat shell lacks ruined fortification and distant hostile structure silhouettes")
+	_expect(fog != null and fog.texture != null and smoke != null and smoke.texture != null, "combat shell lacks bounded fog/smoke weather layers")
+	_expect(planning_geometry != null and not planning_geometry.visible, "planning deployment geometry stayed active during combat")
+	_expect(actions != null and not actions.visible, "planning action chrome stayed visible during combat")
+	_expect(stats != null and not stats.visible, "planning metrics rail stayed visible during combat")
+	_expect(items != null and not items.visible, "planning item rail stayed visible during combat")
+	var tactical_record: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
+	_expect(tactical_record != null and not tactical_record.visible, "decorative tactical-record caption remained over the live battlefield")
+	_assert_persistent_combat_chrome("active combat")
+
+func _assert_persistent_combat_chrome(context: String) -> void:
+	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
+	var chapter_label: Label = _main.find_child("ChapterLabel", true, false) as Label if _main != null else null
+	var phase_label: Label = _main.find_child("PhaseLabel", true, false) as Label if _main != null else null
+	var system_menu: Button = _main.find_child("SystemMenuButton", true, false) as Button if _main != null else null
+	_expect(stage_bar != null and stage_bar.is_visible_in_tree(), "%s lost the stage/chapter strip" % context)
+	_expect(chapter_label != null and chapter_label.is_visible_in_tree() and chapter_label.modulate.a >= 0.99, "%s lost persistent chapter copy" % context)
+	_expect(phase_label != null and phase_label.is_visible_in_tree() and phase_label.modulate.a >= 0.99, "%s lost persistent phase copy" % context)
+	_expect(system_menu != null and system_menu.is_visible_in_tree() and system_menu.text == "Menu" and system_menu.modulate.a >= 0.99, "%s lost the persistent Menu action" % context)
+	if stage_bar != null:
+		_expect(stage_bar.z_index >= 200, "%s stage strip is not protected above combat/result pressure layers" % context)
+	if system_menu != null:
+		_expect(system_menu.z_index >= 200, "%s Menu is not protected above combat/result pressure layers" % context)
+
+func _assert_result_hold_copy_unobstructed(
+	card: PanelContainer,
+	hold_progress: ProgressBar,
+	hold_label: Label,
+	skip_button: Button,
+	outcome: String
+) -> void:
+	_expect(card != null and hold_progress != null and hold_label != null and skip_button != null, "%s result hold controls are incomplete" % outcome)
+	if card == null or hold_progress == null or hold_label == null or skip_button == null:
+		return
+	var critical_rects: Array[Rect2] = [
+		hold_progress.get_global_rect(),
+		hold_label.get_global_rect(),
+		skip_button.get_global_rect(),
+	]
+	var marks: Control = card.get_node_or_null("DamageMarks") as Control
+	_expect(marks != null and marks.z_index < 2, "%s decorative damage marks are not layered behind result copy" % outcome)
+	if marks == null:
+		return
+	for child: Node in marks.get_children():
+		var mark: ColorRect = child as ColorRect
+		if mark == null or not mark.visible or String(mark.name).begins_with("TornCorner"):
+			continue
+		var mark_rect: Rect2 = mark.get_global_rect()
+		for critical_rect: Rect2 in critical_rects:
+			_expect(not mark_rect.intersects(critical_rect), "%s decorative mark %s crosses hold/skip copy" % [outcome, String(mark.name)])
+
+func _request_result_skip() -> bool:
+	var controller: Variant = _combat_controller()
+	if controller == null or not controller.has_method("handle_result_input"):
+		return false
+	Engine.time_scale = maxf(1.0, Engine.time_scale)
+	var deadline: int = Time.get_ticks_msec() + 1500
+	var skip_button: Button = _main.find_child("ResultSkipButton", true, false) as Button
+	while Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+		if skip_button != null and not skip_button.disabled:
+			break
+	var skip_event: InputEventAction = InputEventAction.new()
+	skip_event.action = "ui_accept"
+	skip_event.pressed = true
+	return bool(controller.call("handle_result_input", skip_event))
+
+func _assert_result_detail_bounds(card: PanelContainer, detail_label: Label, outcome: String) -> void:
+	_expect(card != null, "%s result card missing for detail-bounds assertion" % outcome)
+	_expect(detail_label != null, "%s detail label missing for detail-bounds assertion" % outcome)
+	if card == null or detail_label == null:
+		return
+	var card_rect: Rect2 = card.get_global_rect()
+	var detail_rect: Rect2 = detail_label.get_global_rect()
+	_expect(card_rect.encloses(detail_rect), "%s detail escaped result card: card=%s detail=%s" % [outcome, str(card_rect), str(detail_rect)])
+	_expect(detail_label.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART, "%s detail lost smart wrapping" % outcome)
+	_expect(not detail_label.clip_text, "%s detail must not use horizontal clipping" % outcome)
+	_expect(detail_label.custom_minimum_size.y >= 64.0, "%s detail lacks a two-line economic context budget" % outcome)
+	_expect(detail_label.text.contains("\nRESULTING BANK"), "%s detail should deliberately wrap the resulting-bank context" % outcome)
 
 func _bottom_planning_visible() -> bool:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control

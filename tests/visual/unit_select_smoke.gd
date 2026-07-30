@@ -23,7 +23,8 @@ func _run() -> void:
 	var full_layout: HBoxContainer = view.get_node_or_null("Center/HBox") as HBoxContainer
 	_expect(full_layout != null, "Unit Select full layout missing", failures)
 	if full_layout != null:
-		_expect(full_layout.size.is_equal_approx(Vector2(1320.0, 900.0)), "Unit Select full layout must match 1320x900, got %s" % str(full_layout.size), failures)
+		_expect(absf(full_layout.size.x - 1320.0) <= 1.0, "Unit Select full layout must retain the authored 1320px width, got %s" % str(full_layout.size), failures)
+		_expect(_rect_inside(full_layout.get_global_rect(), view.get_viewport().get_visible_rect().grow(2.0)), "Unit Select full layout escaped the 1920x1080 viewport", failures)
 	var roster_plate: Panel = view.get_node_or_null("GothicRosterPlate") as Panel
 	_expect(roster_plate != null, "Roster gothic plate missing", failures)
 	if roster_plate != null:
@@ -32,8 +33,7 @@ func _run() -> void:
 	_expect(preview_plate != null, "Preview gothic plate missing", failures)
 	if preview_plate != null:
 		_expect(preview_plate.size.y > 300.0, "Preview gothic plate collapsed", failures)
-		var preview_plate_style: StyleBox = preview_plate.get_theme_stylebox("panel")
-		_expect(preview_plate_style is StyleBoxTexture, "Preview gothic plate should use the generated wide panel asset", failures)
+		_expect_flat_style_with_border(preview_plate, "panel", 6, "Preview dossier plate should retain its authored hard-left rule", failures)
 	var heading: Label = view.get_node_or_null("Center/HBox/Left/Label") as Label
 	_expect(heading != null, "Heading missing", failures)
 	if heading != null:
@@ -43,12 +43,12 @@ func _run() -> void:
 	if start_button != null:
 		_expect(start_button.disabled, "StartButton should begin disabled", failures)
 		_expect(start_button.custom_minimum_size.x >= 500.0, "StartButton width is not visually prioritized", failures)
-		_expect_texture_style(start_button, "normal", "Unit Select StartButton normal state should use the generated primary button asset", failures)
-		_expect_texture_style(start_button, "disabled", "Unit Select StartButton disabled state should use the generated primary button asset", failures)
+		_expect_flat_style_with_border(start_button, "normal", 5, "Unit Select StartButton normal state should retain its hardcore action stripe", failures)
+		_expect_flat_style_with_border(start_button, "disabled", 3, "Unit Select StartButton disabled state should retain a visible locked stripe", failures)
 	var art_plate: Panel = view.get_node_or_null("GothicArtPlate") as Panel
 	_expect(art_plate != null, "Preview art gothic plate missing", failures)
 	if art_plate != null:
-		_expect_texture_style(art_plate, "panel", "Preview art plate should use a generated texture frame", failures)
+		_expect_flat_style_with_border(art_plate, "panel", 3, "Preview art plate should retain its authored dossier frame", failures)
 	var selected_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/SelectedLabel") as Label
 	_expect(selected_label != null and selected_label.text == "No starter chosen", "Unit Select should begin with no inspected starter", failures)
 	var details_scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll") as ScrollContainer
@@ -59,7 +59,9 @@ func _run() -> void:
 	_expect(details_label != null and details_label.text == "Hover a unit to preview", "Unit Select should begin with neutral preview help", failures)
 	var initial_art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
 	_expect(initial_art != null and initial_art.texture == null, "Unit Select should begin without default preview art", failures)
+	var scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Left/Scroll") as ScrollContainer
 	_verify_rendered_starter_surface(view, failures)
+	_verify_card_chrome_contained(view, scroll, 16, "1920x1080", failures)
 	var sari_button: Button = _button_for_unit(view, "sari")
 	_expect(sari_button != null, "Sari starter button missing", failures)
 	if sari_button != null:
@@ -123,8 +125,7 @@ func _run() -> void:
 		if unit_id != "":
 			first_button.emit_signal("mouse_entered")
 			await get_tree().process_frame
-			_expect(selected_label != null and selected_label.text.begins_with("Inspecting "), "Hover preview did not show inspecting state", failures)
-			var scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Left/Scroll") as ScrollContainer
+			_expect(selected_label != null and selected_label.text.begins_with("INSPECTING /// "), "Hover preview did not show inspecting state", failures)
 			var scroll_bar: VScrollBar = scroll.get_v_scroll_bar() if scroll != null else null
 			if scroll_bar != null and scroll_bar.max_value > scroll_bar.min_value:
 				var start_value: float = float(scroll.scroll_vertical)
@@ -151,13 +152,16 @@ func _run() -> void:
 	await get_tree().process_frame
 	var compact_viewport: Rect2 = view.get_viewport().get_visible_rect()
 	var compact_layout: HBoxContainer = view.get_node_or_null("Center/HBox") as HBoxContainer
+	var compact_dossier_mark: Label = view.get_node_or_null("StarterRegistrationMarks/TopMark") as Label
 	_expect(compact_layout != null and _rect_inside(compact_layout.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter layout escaped the viewport", failures)
 	_expect(heading != null and _rect_inside(heading.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter heading escaped the viewport", failures)
 	_expect(start_button != null and _rect_inside(start_button.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 Start Game escaped the viewport", failures)
+	_expect(compact_dossier_mark != null and compact_dossier_mark.position.x >= 132.0, "1280x720 starter dossier mark did not clear the compact Menu reserve", failures)
+	_verify_card_chrome_contained(view, scroll, 15, "1280x720", failures)
 	if start_button != null:
 		view.set_transition_pending(true)
-		var loading_style: StyleBoxTexture = start_button.get_theme_stylebox("normal") as StyleBoxTexture
-		_expect(loading_style != null and loading_style.texture != null and String(loading_style.texture.resource_path).ends_with("button_primary_loading.png"), "Preparing Battle must render the authored loading state", failures)
+		_expect(start_button.text == "Preparing Battle...", "Preparing Battle must retain its explicit pending label", failures)
+		_expect_flat_style_with_border(start_button, "normal", 5, "Preparing Battle must retain the authored hardcore action surface", failures)
 		view.set_transition_pending(false)
 
 	if failures.size() > 0:
@@ -173,12 +177,39 @@ func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:
 		failures.append(message)
 
+func _verify_card_chrome_contained(view: UnitSelect, roster_scroll: ScrollContainer, minimum_role_size: int, viewport_label: String, failures: Array[String]) -> void:
+	if view == null or roster_scroll == null:
+		failures.append("%s starter chrome containment prerequisites missing" % viewport_label)
+		return
+	var scroll_rect: Rect2 = roster_scroll.get_global_rect().grow(1.0)
+	for node: Node in view.find_children("UnitRole", "Label", true, false):
+		var role_label: Label = node as Label
+		if role_label == null:
+			continue
+		_expect(
+			_rect_inside(role_label.get_global_rect(), scroll_rect),
+			"%s role strip %s should remain fully inside the roster scroll shell" % [viewport_label, role_label.get_parent().name],
+			failures
+		)
+		_expect(
+			role_label.get_theme_font_size("font_size") >= minimum_role_size,
+			"%s role strip %s should remain readable at %dpx or larger" % [viewport_label, role_label.get_parent().name, minimum_role_size],
+			failures
+		)
+
 func _expect_texture_style(control: Control, style_name: String, message: String, failures: Array[String]) -> void:
 	if control == null:
 		failures.append(message)
 		return
 	var style: StyleBox = control.get_theme_stylebox(style_name)
 	_expect(style is StyleBoxTexture, message, failures)
+
+func _expect_flat_style_with_border(control: Control, style_name: String, minimum_left_border: int, message: String, failures: Array[String]) -> void:
+	if control == null:
+		failures.append(message)
+		return
+	var style: StyleBoxFlat = control.get_theme_stylebox(style_name) as StyleBoxFlat
+	_expect(style != null and style.border_width_left >= minimum_left_border, message, failures)
 
 func _expect_focus_outline(control: Control, message: String, failures: Array[String]) -> void:
 	if control == null:

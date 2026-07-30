@@ -6,6 +6,8 @@ const VisionSnapshot := preload("res://scripts/util/vision_snapshot.gd")
 const SMOKE_NAME: String = "CompactViewportVisualAuditSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/compact_viewport_audit"
 const VIEWPORT_SIZE: Vector2i = Vector2i(1280, 720)
+const LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1024, 576)
+const LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(853, 480)
 
 var _main: Control = null
 var _unit_select: UnitSelect = null
@@ -16,16 +18,17 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	DisplayServer.window_set_size(VIEWPORT_SIZE)
-	var window: Window = get_window()
-	if window != null:
-		window.size = VIEWPORT_SIZE
-		window.content_scale_size = VIEWPORT_SIZE
+	_set_window_size(VIEWPORT_SIZE)
+	await _settle_frames(12)
+	_set_window_size(VIEWPORT_SIZE)
+	await _settle_frames(12)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
 
 	_main = MAIN_SCENE.instantiate() as Control
 	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
 	get_tree().root.add_child(_main)
+	_set_window_size(VIEWPORT_SIZE)
+	await _settle_frames(12)
 	await _settle_frames(8)
 	_expect_control_inside(_main.get_node_or_null("TitlePage/Center/Stack") as Control, "title page stack")
 	_save_capture("01_title_page_1280x720.png", _main)
@@ -47,6 +50,8 @@ func _run() -> void:
 	_unit_select = UNIT_SELECT_SCENE.instantiate() as UnitSelect
 	_unit_select.set_anchors_preset(Control.PRESET_FULL_RECT)
 	get_tree().root.add_child(_unit_select)
+	_set_window_size(VIEWPORT_SIZE)
+	await _settle_frames(12)
 	await _settle_frames(8)
 	var first_button: Button = _first_unit_button()
 	_expect(first_button != null, "unit select first button missing")
@@ -55,6 +60,9 @@ func _run() -> void:
 	await _settle_frames(8)
 	_expect_control_inside(_unit_select.get_node_or_null("Center/HBox") as Control, "unit select content")
 	_expect_no_button_text_overflow(_unit_select, "unit select")
+	_expect_starter_shell_material("compact hover")
+	_expect_compact_starter_dossier_clearance()
+	_expect_compact_starter_roster()
 	_save_capture("03_starter_hover_1280x720.png", _unit_select)
 
 	if first_button != null:
@@ -62,7 +70,23 @@ func _run() -> void:
 		first_button.emit_signal("pressed")
 	await _settle_frames(8)
 	_expect_control_inside(_unit_select.get_node_or_null("Center/HBox") as Control, "unit select selected content")
+	_expect_selected_starter_details_boundary()
+	_expect_starter_shell_material("compact selected")
+	_expect_compact_starter_roster()
+	_expect_shell_selection_state(first_button)
 	_save_capture("04_starter_selected_1280x720.png", _unit_select)
+
+	_set_window_size(Vector2i(1920, 1080))
+	await _settle_frames(12)
+	_set_window_size(Vector2i(1920, 1080))
+	await _settle_frames(12)
+	_expect_control_inside(_unit_select.get_node_or_null("Center/HBox") as Control, "full starter dossier")
+	_expect_starter_shell_material("full selected")
+	_expect_full_starter_dossier_position()
+	_expect_roster_panel_utilization("full selected")
+	_save_capture("04b_starter_selected_1920x1080.png", _unit_select)
+	_set_window_size(VIEWPORT_SIZE)
+	await _settle_frames(8)
 
 	if _unit_select != null and is_instance_valid(_unit_select):
 		_unit_select.queue_free()
@@ -71,12 +95,20 @@ func _run() -> void:
 	_main = MAIN_SCENE.instantiate() as Control
 	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
 	get_tree().root.add_child(_main)
+	_set_window_size(VIEWPORT_SIZE)
+	await _settle_frames(12)
 	await _settle_frames(8)
 	_build_post_shop_state()
 	await _settle_frames(16)
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
 	_expect_control_inside(combat, "combat view")
 	_expect_control_inside(_combat_node("MarginContainer/VBoxContainer/BenchArea"), "bench area")
+	_expect_compact_side_header("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle", "traits side-panel header")
+	var stats_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel")
+	var stats_title: Label = stats_panel.find_child("Title", true, false) as Label if stats_panel != null else null
+	_expect_control_inside(stats_title, "team metrics side-panel header")
+	_expect_compact_battlefield_dominance()
+	_expect_planning_action_hierarchy("1280 planning", false)
 	if _is_framebuffer_unavailable():
 		print("%s: footer geometry delegated to CompactShopFooterSmoke in framebuffer-free runs" % SMOKE_NAME)
 	else:
@@ -88,11 +120,38 @@ func _run() -> void:
 				var card: Control = child as Control
 				if card != null and card.visible:
 					_expect_control_inside(card, "shop card %s" % String(card.name))
+					_expect_shop_card_contents_inside(card)
 		var bet_slider: HSlider = combat.find_child("BetSlider", true, false) as HSlider if combat != null else null
 		var command_bar: Control = bet_slider.get_parent().get_parent() as Control if bet_slider != null and bet_slider.get_parent() != null else null
 		_expect_control_inside(command_bar, "shop command bar")
 	_expect_no_button_text_overflow(combat, "post-shop combat")
 	_save_capture("05_post_shop_planning_1280x720.png", _main)
+
+	_set_physical_window_with_logical_size(VIEWPORT_SIZE, LOGICAL_125_PERCENT_SIZE)
+	await _settle_frames(12)
+	if combat != null:
+		combat.call("_apply_responsive_layout")
+	if _main != null and _main.has_method("_sync_system_menu_button"):
+		_main.call("_sync_system_menu_button")
+	await _settle_frames(12)
+	_expect_planning_action_hierarchy("125-percent planning", true)
+	_expect_scaled_tactical_surface_containment("125-percent", LOGICAL_125_PERCENT_SIZE)
+	_expect_compact_battlefield_dominance()
+	_expect_no_button_text_overflow(combat, "125-percent post-shop combat")
+	_save_capture("05b_post_shop_planning_1280x720_125pct.png", _main)
+
+	_set_physical_window_with_logical_size(VIEWPORT_SIZE, LOGICAL_150_PERCENT_SIZE)
+	await _settle_frames(12)
+	if combat != null:
+		combat.call("_apply_responsive_layout")
+	if _main != null and _main.has_method("_sync_system_menu_button"):
+		_main.call("_sync_system_menu_button")
+	await _settle_frames(12)
+	_expect_scaled_tactical_surface_containment("150-percent", LOGICAL_150_PERCENT_SIZE)
+	_expect_planning_action_hierarchy("150-percent planning", true)
+	_expect_compact_battlefield_dominance()
+	_expect_no_button_text_overflow(combat, "150-percent post-shop combat")
+	_save_capture("06_post_shop_planning_1280x720_150pct.png", _main)
 	await _finish()
 
 func _build_post_shop_state() -> void:
@@ -160,6 +219,167 @@ func _first_unit_button() -> Button:
 		return null
 	return _unit_select.find_child("UnitButton_*", true, false) as Button
 
+func _expect_selected_starter_details_boundary() -> void:
+	if _unit_select == null:
+		_expect(false, "selected starter screen missing")
+		return
+	var heading: Label = _unit_select.get_node_or_null("Center/HBox/Left/Label") as Label
+	_expect(heading != null and heading.visible and heading.text == "CHOOSE YOUR STARTER", "starter heading should remain persistent after selection")
+	var background: ColorRect = _unit_select.get_node_or_null("Background") as ColorRect
+	var backdrop: TextureRect = _unit_select.get_node_or_null("HardcoreBackdrop") as TextureRect
+	var registration_mark: Label = _unit_select.get_node_or_null("StarterRegistrationMarks/TopMark") as Label
+	var grid_wrap: Control = _unit_select.get_node_or_null("Center/HBox/Left/Scroll/GridWrap") as Control
+	_expect(background != null and background.color.a < 0.75, "starter backdrop is still buried beneath an opaque background")
+	_expect(backdrop != null and backdrop.texture != null and backdrop.visible, "starter war-horror backdrop is missing")
+	_expect(registration_mark != null and registration_mark.text.contains("STARTER DOSSIER"), "starter dossier registration marks are missing")
+	_expect(grid_wrap != null and grid_wrap.size_flags_vertical == Control.SIZE_SHRINK_BEGIN, "starter roster should stay top-aligned instead of vertically centering")
+	var details_scroll: ScrollContainer = _unit_select.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll") as ScrollContainer
+	var details_label: Label = _unit_select.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll/Details") as Label
+	var start_button: Button = _unit_select.get_node_or_null("Center/HBox/Right/StartButton") as Button
+	_expect(details_scroll != null, "selected starter details viewport missing")
+	_expect(details_label != null, "selected starter details label missing")
+	_expect(start_button != null, "selected starter action missing")
+	if details_scroll == null or details_label == null or start_button == null:
+		return
+	var details_rect: Rect2 = details_scroll.get_global_rect()
+	var button_rect: Rect2 = start_button.get_global_rect()
+	_expect(details_rect.end.y <= button_rect.position.y + 1.0, "selected starter details overlap the fixed action boundary")
+	_expect(absf(details_scroll.size.y - details_scroll.custom_minimum_size.y) <= 1.0, "selected starter details viewport expanded to a non-deterministic partial-line height")
+	var font_size: int = details_label.get_theme_font_size("font_size")
+	var font: Font = details_label.get_theme_font("font")
+	var line_spacing: int = details_label.get_theme_constant("line_spacing")
+	var glyph_height: float = ceilf(font.get_height(font_size)) if font != null else float(font_size + 4)
+	var line_step: float = glyph_height + float(line_spacing)
+	var visible_lines: float = (details_scroll.size.y + float(line_spacing)) / maxf(1.0, line_step)
+	_expect(absf(visible_lines - roundf(visible_lines)) <= 0.05, "selected starter details viewport exposes a partial text line: visible_lines=%.3f" % visible_lines)
+
+func _expect_starter_shell_material(context: String) -> void:
+	if _unit_select == null:
+		_expect(false, "%s starter shell missing" % context)
+		return
+	var background: ColorRect = _unit_select.get_node_or_null("Background") as ColorRect
+	var backdrop: TextureRect = _unit_select.get_node_or_null("HardcoreBackdrop") as TextureRect
+	var center: Control = _unit_select.get_node_or_null("Center") as Control
+	var roster_record: Label = _unit_select.get_node_or_null("Center/HBox/Left/RosterRecord") as Label
+	var preview_record: Label = _unit_select.get_node_or_null("Center/HBox/Right/Preview/RecordMark") as Label
+	_expect(background != null, "%s background layer missing" % context)
+	_expect(backdrop != null and backdrop.texture != null and backdrop.visible, "%s authored war-horror backdrop missing" % context)
+	_expect(center != null, "%s functional starter layer missing" % context)
+	_expect(roster_record != null and roster_record.text.contains("INTAKE GRID"), "%s intake record material missing" % context)
+	_expect(preview_record != null and preview_record.text.contains("PERSONNEL RECORD"), "%s personnel record material missing" % context)
+	_expect(_unit_select.z_index >= 10, "%s starter shell is not raised above Main's dormant background shells" % context)
+	if background != null and backdrop != null:
+		_expect(backdrop.z_index > background.z_index, "%s authored backdrop is ordered behind the flat background" % context)
+		_expect(background.color.a <= 0.20, "%s flat background is too opaque for authored backdrop" % context)
+		var backdrop_rect: Rect2 = backdrop.get_global_rect()
+		var viewport_rect: Rect2 = _viewport_rect()
+		_expect(backdrop_rect.encloses(viewport_rect), "%s backdrop does not cover viewport: backdrop=%s viewport=%s" % [context, str(backdrop_rect), str(viewport_rect)])
+	if backdrop != null and center != null:
+		_expect(backdrop.z_index < center.z_index, "%s backdrop is not behind functional starter UI" % context)
+
+func _expect_compact_starter_roster() -> void:
+	if _unit_select == null:
+		_expect(false, "compact starter roster missing")
+		return
+	var scroll_container: ScrollContainer = _unit_select.get_node_or_null("Center/HBox/Left/Scroll") as ScrollContainer
+	var roster_grid: GridContainer = _unit_select.get_node_or_null("Center/HBox/Left/Scroll/GridWrap/Grid") as GridContainer
+	var grid_wrapper: Control = _unit_select.get_node_or_null("Center/HBox/Left/Scroll/GridWrap") as Control
+	_expect(scroll_container != null, "compact starter scroll missing")
+	_expect(roster_grid != null, "compact starter grid missing")
+	_expect(grid_wrapper != null, "compact starter grid wrapper missing")
+	if scroll_container == null or roster_grid == null or grid_wrapper == null:
+		return
+	_expect(roster_grid.get_child_count() == 6, "compact starter roster should expose all six entries, found %d" % roster_grid.get_child_count())
+	if roster_grid.get_child_count() >= 6:
+		_expect(roster_grid.columns == 3, "compact starter roster should use a 3x2 fit, columns=%d" % roster_grid.columns)
+	var horizontal_bar: HScrollBar = scroll_container.get_h_scroll_bar()
+	var vertical_bar: VScrollBar = scroll_container.get_v_scroll_bar()
+	_expect(scroll_container.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "compact starter roster permits horizontal scrolling")
+	_expect(horizontal_bar == null or horizontal_bar.max_value <= horizontal_bar.page + 1.0, "compact starter roster has hidden horizontal overflow")
+	_expect(vertical_bar == null or vertical_bar.max_value <= vertical_bar.page + 1.0, "compact starter roster should fit all six entries without vertical scrolling")
+	var scroll_rect: Rect2 = scroll_container.get_global_rect()
+	for tile_node: Node in roster_grid.get_children():
+		var tile: VBoxContainer = tile_node as VBoxContainer
+		if tile == null:
+			continue
+		_expect(scroll_rect.encloses(tile.get_global_rect()), "compact starter tile %s is clipped by roster viewport" % String(tile.name))
+		for label_name: String in ["UnitName", "UnitRole"]:
+			var label: Label = tile.get_node_or_null(label_name) as Label
+			_expect(label != null, "compact starter tile %s missing %s" % [String(tile.name), label_name])
+			if label != null:
+				_expect(scroll_rect.encloses(label.get_global_rect()), "compact starter tile %s clips %s" % [String(tile.name), label_name])
+				_expect(label.size.y >= label.get_minimum_size().y - 1.0, "compact starter tile %s truncates %s height" % [String(tile.name), label_name])
+	_expect(scroll_container.size.y <= grid_wrapper.size.y + 2.0, "compact starter roster contains unstructured empty panel height")
+
+func _expect_compact_starter_dossier_clearance() -> void:
+	if _unit_select == null:
+		_expect(false, "compact starter dossier shell missing")
+		return
+	var top_mark: Label = _unit_select.get_node_or_null("StarterRegistrationMarks/TopMark") as Label
+	_expect(top_mark != null, "compact starter dossier registration mark missing")
+	if top_mark == null:
+		return
+	_expect(top_mark.position.x >= 132.0, "compact starter dossier mark overlaps the Menu reserve")
+	_expect_control_inside(top_mark, "compact starter dossier registration mark")
+
+func _expect_full_starter_dossier_position() -> void:
+	if _unit_select == null:
+		_expect(false, "full starter dossier shell missing")
+		return
+	var top_mark: Label = _unit_select.get_node_or_null("StarterRegistrationMarks/TopMark") as Label
+	_expect(top_mark != null, "full starter dossier registration mark missing")
+	if top_mark == null:
+		return
+	_expect(absf(top_mark.position.x - 22.0) <= 1.0, "full starter dossier mark did not return to its authored edge position")
+	_expect_control_inside(top_mark, "full starter dossier registration mark")
+
+func _expect_roster_panel_utilization(context: String) -> void:
+	if _unit_select == null:
+		_expect(false, "%s starter shell missing" % context)
+		return
+	var left_column_control: Control = _unit_select.get_node_or_null("Center/HBox/Left") as Control
+	var scroll_container: ScrollContainer = _unit_select.get_node_or_null("Center/HBox/Left/Scroll") as ScrollContainer
+	var grid_wrapper: Control = _unit_select.get_node_or_null("Center/HBox/Left/Scroll/GridWrap") as Control
+	_expect(left_column_control != null and scroll_container != null and grid_wrapper != null, "%s roster utilization controls missing" % context)
+	if left_column_control == null or scroll_container == null or grid_wrapper == null:
+		return
+	_expect(scroll_container.size.y <= grid_wrapper.size.y + 2.0, "%s roster scroll contains a large blank lower field" % context)
+	var used_bottom: float = scroll_container.get_global_rect().end.y
+	var panel_bottom: float = left_column_control.get_global_rect().end.y
+	_expect(panel_bottom - used_bottom <= 32.0, "%s roster panel leaves %.1fpx of unstructured lower void" % [context, panel_bottom - used_bottom])
+
+func _expect_shell_selection_state(selected_button: Button) -> void:
+	_expect(selected_button != null and selected_button.button_pressed, "starter shell selection control is not pressed")
+	if selected_button == null:
+		return
+	var tile: VBoxContainer = selected_button.get_parent() as VBoxContainer
+	var name_label: Label = tile.get_node_or_null("UnitName") as Label if tile != null else null
+	_expect(name_label != null, "selected starter shell label missing")
+	if name_label == null:
+		return
+	var label_style: StyleBoxFlat = name_label.get_theme_stylebox("normal") as StyleBoxFlat
+	_expect(label_style != null, "selected starter shell has no label-level selection record")
+	if label_style != null:
+		_expect(label_style.border_width_left >= 5, "selected starter shell lacks a strong dossier selection stripe")
+
+func _set_window_size(size: Vector2i) -> void:
+	DisplayServer.window_set_size(size)
+	var window: Window = get_window()
+	if window != null:
+		window.size = size
+		window.content_scale_size = size
+		window.content_scale_factor = 1.0
+
+func _set_physical_window_with_logical_size(physical_size: Vector2i, logical_size: Vector2i) -> void:
+	var framebuffer_unavailable: bool = _is_framebuffer_unavailable()
+	var applied_window_size: Vector2i = logical_size if framebuffer_unavailable else physical_size
+	DisplayServer.window_set_size(applied_window_size)
+	var window: Window = get_window()
+	if window != null:
+		window.size = applied_window_size
+		window.content_scale_size = applied_window_size
+		window.content_scale_factor = 1.0 if framebuffer_unavailable else float(physical_size.x) / float(logical_size.x)
+
 func _expect_control_inside(control: Control, label: String) -> void:
 	_expect(control != null, "%s missing" % label)
 	if control == null:
@@ -181,6 +401,197 @@ func _expect_no_button_text_overflow(root: Node, context: String) -> void:
 		var text_size: Vector2 = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, button.get_theme_font_size("font_size"))
 		var available_width: float = maxf(1.0, button.size.x - 12.0)
 		_expect(text_size.x <= available_width + 1.0, "%s button text overflows %s: text_width=%.1f available=%.1f" % [context, str(button.name), text_size.x, available_width])
+
+func _expect_compact_side_header(path: String, label: String) -> void:
+	var header: Label = _combat_node(path) as Label
+	_expect_control_inside(header, label)
+	if header != null:
+		_expect(not header.clip_text, "%s should not clip its title" % label)
+		_expect(header.get_theme_font_size("font_size") >= 18, "%s should remain at least 18px" % label)
+		var text_width: float = header.get_theme_font("font").get_string_size(header.text, HORIZONTAL_ALIGNMENT_LEFT, -1, header.get_theme_font_size("font_size")).x
+		_expect(text_width <= header.size.x + 1.0, "%s text exceeds its compact header width: text=%.1f width=%.1f" % [label, text_width, header.size.x])
+
+func _expect_compact_battlefield_dominance() -> void:
+	var board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
+	var left_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
+	var right_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
+	if board_column == null or left_panel == null or right_panel == null:
+		_expect(false, "compact battlefield dominance controls are missing")
+		return
+	var left_width: float = left_panel.size.x if left_panel.visible else 0.0
+	var right_width: float = right_panel.size.x if right_panel.visible else 0.0
+	var support_width: float = left_width + right_width
+	var viewport_width: float = _viewport_rect().size.x
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var tight_scale_layout: bool = combat != null and bool(combat.get_meta("tight_scale_layout", false))
+	var minimum_board_share: float = 0.60 if tight_scale_layout else 0.55
+	_expect(board_column.size.x > support_width, "compact battlefield should remain wider than all visible support docks combined")
+	_expect(board_column.size.x >= viewport_width * minimum_board_share, "compact battlefield should retain at least %.0f%% of logical viewport width: board=%.1f viewport=%.1f" % [minimum_board_share * 100.0, board_column.size.x, viewport_width])
+
+func _expect_scaled_tactical_surface_containment(context: String, expected_logical_size: Vector2i) -> void:
+	var viewport_rect: Rect2 = _viewport_rect()
+	_expect(absf(viewport_rect.size.x - float(expected_logical_size.x)) <= 2.0, "%s audit did not produce the expected logical width: %s" % [context, str(viewport_rect)])
+	_expect(absf(viewport_rect.size.y - float(expected_logical_size.y)) <= 2.0, "%s audit did not produce the expected logical height: %s" % [context, str(viewport_rect)])
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	_expect(combat != null, "%s combat view missing" % context)
+	if combat == null:
+		return
+	var layout_vbox: VBoxContainer = combat.get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
+	if layout_vbox != null:
+		print(
+			"CompactViewportVisualAuditSmoke: %s vbox_rect=%s combined_min=%s viewport=%s"
+			% [context, str(layout_vbox.get_global_rect()), str(layout_vbox.get_combined_minimum_size()), str(viewport_rect)]
+		)
+		for layout_child: Node in layout_vbox.get_children():
+			var layout_control: Control = layout_child as Control
+			if layout_control != null and layout_control.is_visible_in_tree():
+				print(
+					"CompactViewportVisualAuditSmoke: %s child=%s rect=%s combined_min=%s custom_min=%s"
+					% [context, String(layout_control.name), str(layout_control.get_global_rect()), str(layout_control.get_combined_minimum_size()), str(layout_control.custom_minimum_size)]
+				)
+	_expect(bool(combat.get_meta("tight_scale_layout", false)), "%s combat view did not enter tight-scale layout" % context)
+	var left_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
+	_expect(left_panel != null and left_panel.is_visible_in_tree(), "%s layout removed the item/trait tactical dock" % context)
+	var required_paths: PackedStringArray = PackedStringArray([
+		"MarginContainer",
+		"MarginContainer/VBoxContainer/StageProgressTopBar",
+		"MarginContainer/VBoxContainer/BattleArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Header/Title",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Body/Scoreboard",
+		"MarginContainer/VBoxContainer/BenchArea",
+		"MarginContainer/VBoxContainer/BenchArea/BenchGrid",
+		"MarginContainer/VBoxContainer/ActionsRow",
+		"MarginContainer/VBoxContainer/WagerSummary",
+		"MarginContainer/VBoxContainer/BottomStorageArea",
+		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
+	])
+	for path: String in required_paths:
+		var surface: Control = combat.get_node_or_null(path) as Control
+		_expect(surface != null, "%s HUD surface missing: %s" % [context, path])
+		if surface != null and surface.is_visible_in_tree():
+			_expect_control_inside(surface, "%s HUD surface %s" % [context, path])
+	var system_menu_button: Button = _main.find_child("SystemMenuButton", true, false) as Button
+	if system_menu_button != null and system_menu_button.visible:
+		_expect_control_inside(system_menu_button, "%s system Menu" % context)
+	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
+	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 128.0, "%s Team Metrics rail did not release enough battlefield width" % context)
+	_expect_text_children_horizontally_inside(left_panel, "%s item/trait rail" % context)
+	_expect_text_children_horizontally_inside(stats_area, "%s Team Metrics rail" % context)
+	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
+	_expect(item_grid != null and item_grid.columns == 6, "%s item inventory did not reflow into its bounded three-row grid" % context)
+	if item_grid != null:
+		for item_node: Node in item_grid.get_children():
+			var item_control: Control = item_node as Control
+			if item_control != null and item_control.is_visible_in_tree():
+				_expect(item_grid.get_global_rect().encloses(item_control.get_global_rect()), "%s inventory child %s escaped its bounded grid" % [context, String(item_control.name)])
+	var traits_scroll: ScrollContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsScroll") as ScrollContainer
+	_expect(traits_scroll != null and traits_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s traits strip permits horizontal overflow" % context)
+	if traits_scroll != null:
+		var traits_hbar: HScrollBar = traits_scroll.get_h_scroll_bar()
+		_expect(traits_hbar == null or traits_hbar.max_value <= traits_hbar.page + 1.0, "%s traits strip has hidden horizontal content" % context)
+	var visible_trait_names: Array[Node] = left_panel.find_children("TraitName", "Label", true, false) if left_panel != null else []
+	_expect(not visible_trait_names.is_empty(), "%s traits strip has no readable trait name" % context)
+	var readable_trait_rows: int = 0
+	var traits_scroll_rect: Rect2 = traits_scroll.get_global_rect() if traits_scroll != null else Rect2()
+	for trait_node: Node in visible_trait_names:
+		var trait_label: Label = trait_node as Label
+		if trait_label == null or not trait_label.is_visible_in_tree():
+			continue
+		var trait_rect: Rect2 = trait_label.get_global_rect()
+		if not traits_scroll_rect.intersects(trait_rect):
+			continue
+		var visible_trait_rect: Rect2 = traits_scroll_rect.intersection(trait_rect)
+		if visible_trait_rect.size.y < 19.0:
+			continue
+		readable_trait_rows += 1
+		_expect(trait_label.size.x >= 40.0, "%s trait label %s collapsed below a readable width" % [context, String(trait_label.name)])
+		_expect(visible_trait_rect.size.x >= trait_rect.size.x - 2.0, "%s visible trait label %s lacks a complete readable line" % [context, String(trait_label.name)])
+		_expect(trait_label.text.contains(" // ") and (trait_label.text.contains("/") or trait_label.text.contains(">")), "%s visible trait row does not retain its name and checkpoint" % context)
+	_expect(readable_trait_rows >= 1, "%s traits strip exposes no complete readable row" % context)
+	var bench_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BenchArea/BenchGrid") as GridContainer
+	if bench_grid != null:
+		for bench_node: Node in bench_grid.get_children():
+			var bench_control: Control = bench_node as Control
+			if bench_control != null and bench_control.is_visible_in_tree():
+				_expect(bench_grid.get_global_rect().encloses(bench_control.get_global_rect()), "%s bench child %s escaped its tactical strip" % [context, String(bench_control.name)])
+	var actions_row: Control = _combat_node("MarginContainer/VBoxContainer/ActionsRow")
+	if actions_row != null:
+		for node: Node in actions_row.find_children("*", "Control", true, false):
+			var action_control: Control = node as Control
+			if action_control != null and action_control.is_visible_in_tree():
+				_expect_control_inside(action_control, "%s action/footer %s" % [context, String(action_control.name)])
+	var shop_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
+	if shop_grid != null:
+		for child: Node in shop_grid.get_children():
+			var card: Control = child as Control
+			if card != null and card.is_visible_in_tree():
+				_expect_control_inside(card, "%s shop card %s" % [context, String(card.name)])
+				_expect_shop_card_contents_inside(card)
+	var tactical_record: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
+	_expect(tactical_record != null and not tactical_record.visible, "%s decorative tactical-record caption can still overlay gameplay" % context)
+
+func _expect_text_children_horizontally_inside(surface: Control, context: String) -> void:
+	_expect(surface != null, "%s surface missing" % context)
+	if surface == null:
+		return
+	var surface_rect: Rect2 = surface.get_global_rect()
+	for label_node: Node in surface.find_children("*", "Label", true, false):
+		var label: Label = label_node as Label
+		if label == null or not label.is_visible_in_tree():
+			continue
+		var label_rect: Rect2 = label.get_global_rect()
+		_expect(label_rect.position.x >= surface_rect.position.x - 1.0, "%s label %s escaped left edge" % [context, String(label.name)])
+		_expect(label_rect.end.x <= surface_rect.end.x + 1.0, "%s label %s escaped right edge" % [context, String(label.name)])
+
+func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var continue_button: Button = combat.find_child("ContinueButton", true, false) as Button if combat != null else null
+	var bet_row: Control = combat.find_child("BetRow", true, false) as Control if combat != null else null
+	var all_in_button: Button = bet_row.find_child("AllInButton", true, false) as Button if bet_row != null else null
+	var wager_label: Label = bet_row.find_child("BetLabel", true, false) as Label if bet_row != null else null
+	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
+	var planning_geometry: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry")
+	var directive: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
+	_expect(continue_button != null, "%s primary Start Battle action missing" % context)
+	_expect(bet_row != null and all_in_button != null and wager_label != null, "%s wager utility group missing" % context)
+	if continue_button != null:
+		_expect(String(continue_button.get_meta("visual_role", "")) == "primary_commit", "%s Start Battle lacks primary commitment semantics" % context)
+		_expect(continue_button.custom_minimum_size.x >= (176.0 if tight else 236.0), "%s Start Battle is not wide enough to dominate" % context)
+		_expect(continue_button.custom_minimum_size.y >= (38.0 if tight else 46.0), "%s Start Battle lacks dominant action height" % context)
+		_expect(continue_button.get_theme_font_size("font_size") >= (20 if tight else 23), "%s Start Battle type is too small" % context)
+		_expect_control_inside(continue_button, "%s Start Battle" % context)
+	if bet_row != null:
+		_expect(String(bet_row.get_meta("visual_role", "")) == "planning_utility_group", "%s wager controls are not grouped as utilities" % context)
+		_expect(bet_row.custom_minimum_size.x >= (254.0 if tight else 334.0), "%s wager controls are too compressed" % context)
+		_expect_control_inside(bet_row, "%s wager controls" % context)
+	if all_in_button != null and continue_button != null:
+		_expect(continue_button.custom_minimum_size.x > all_in_button.custom_minimum_size.x * 2.0, "%s Start Battle does not dominate its wager utility" % context)
+	if wager_label != null:
+		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
+	if wager_summary != null:
+		_expect(wager_summary.get_theme_font_size("font_size") >= 20, "%s wager outcome metadata is too small" % context)
+		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
+	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
+	_expect(directive != null and directive.text.contains("COMMIT") and directive.get_theme_font_size("font_size") >= 18, "%s planning directive missing or unreadable" % context)
+
+func _expect_shop_card_contents_inside(card: Control) -> void:
+	if not (card is ShopCard):
+		return
+	var card_rect: Rect2 = card.get_global_rect()
+	for label_name: String in ["Name", "Price"]:
+		var label: Label = card.find_child(label_name, true, false) as Label
+		_expect(label != null, "shop card %s missing %s" % [String(card.name), label_name])
+		if label == null or not label.visible:
+			continue
+		_expect(card_rect.encloses(label.get_global_rect()), "shop card %s clips %s" % [String(card.name), label_name])
+		_expect(label.get_theme_font_size("font_size") >= 18, "shop card %s %s should remain at least 18px" % [String(card.name), label_name])
 
 func _viewport_rect() -> Rect2:
 	var viewport_rect: Rect2 = get_viewport().get_visible_rect()

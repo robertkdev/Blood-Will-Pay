@@ -2,9 +2,6 @@ extends Control
 class_name ScoreboardRow
 
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
-const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
-const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
-
 var team: String = "player"
 var index: int = -1
 var unit_ref: Unit = null
@@ -24,6 +21,11 @@ var display_name: String = ""
 var _frame: Panel = null
 var _value_well: Panel = null
 var _hovered: bool = false
+var _record_emphasis: bool = false
+
+func set_record_emphasis(enabled: bool) -> void:
+	_record_emphasis = enabled
+	_refresh()
 
 func set_row_data(row: Dictionary) -> void:
 	team = String(row.get("team", team))
@@ -56,6 +58,8 @@ func _update_bar() -> void:
 	var fill_w: float = w * share
 	bar_fill.anchor_left = 0.0
 	bar_fill.anchor_right = 0.0
+	bar_fill.anchor_top = 0.72 if _record_emphasis else 0.78
+	bar_fill.anchor_bottom = 0.92 if _record_emphasis else 0.90
 	bar_fill.offset_left = 0.0
 	bar_fill.offset_right = fill_w
 	bar_fill.offset_top = 0.0
@@ -74,10 +78,10 @@ func _update_identity() -> void:
 	name_label.text = unit_name
 
 func _apply_visual_style() -> void:
-	custom_minimum_size.y = max(custom_minimum_size.y, 54.0)
+	custom_minimum_size.y = max(custom_minimum_size.y, 94.0 if _record_emphasis else 54.0)
 	var player_side: bool = team != "enemy"
-	var fill_color: Color = Color(0.20, 0.38, 0.40, 0.96) if player_side else Color(0.62, 0.07, 0.10, 0.96)
-	var bg_color: Color = Color(0.020, 0.018, 0.024, 0.96)
+	var fill_color: Color = Color(0.66, 0.055, 0.070, 0.92) if player_side else Color(0.42, 0.030, 0.045, 0.90)
+	var bg_color: Color = Color(0.016, 0.014, 0.018, 0.42)
 	if _frame != null:
 		_frame.add_theme_stylebox_override("panel", _make_row_style(player_side, _hovered))
 	if bar_bg != null:
@@ -85,20 +89,17 @@ func _apply_visual_style() -> void:
 	if bar_fill != null:
 		bar_fill.color = Color(fill_color.r + 0.06, fill_color.g + 0.05, fill_color.b + 0.04, 1.0) if _hovered else fill_color
 	if name_label != null:
-		name_label.add_theme_font_size_override("font_size", 14)
+		name_label.add_theme_font_size_override("font_size", 22 if _record_emphasis else 17)
 		name_label.add_theme_color_override("font_color", Color(0.96, 0.90, 0.78, 1.0) if _hovered else Color(0.88, 0.84, 0.76, 1.0))
 		name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		name_label.add_theme_constant_override("outline_size", 1)
 	if value_label != null:
-		value_label.add_theme_font_size_override("font_size", 15)
-		value_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.50, 1.0) if _hovered else Color(0.95, 0.75, 0.42, 1.0))
+		value_label.add_theme_font_size_override("font_size", 26 if _record_emphasis else 18)
+		value_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.60, 1.0) if _hovered else Color(0.95, 0.56, 0.50, 1.0))
 		value_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		value_label.add_theme_constant_override("outline_size", 1)
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		value_label.clip_text = true
-	if portrait != null:
-		portrait.custom_minimum_size = Vector2(42.0, 42.0)
-		portrait.modulate = Color(1.0, 0.94, 0.80, 1.0) if _hovered else Color(0.95, 0.90, 0.82, 1.0)
 
 func _ensure_layout() -> void:
 	if _frame == null:
@@ -115,46 +116,43 @@ func _ensure_layout() -> void:
 		_frame.offset_bottom = 0.0
 	if hbox != null:
 		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-		hbox.offset_left = 8.0
-		hbox.offset_top = 6.0
-		hbox.offset_right = -8.0
-		hbox.offset_bottom = -6.0
-		hbox.add_theme_constant_override("separation", 8)
+		hbox.offset_left = 12.0 if _record_emphasis else 8.0
+		hbox.offset_top = 8.0 if _record_emphasis else 6.0
+		hbox.offset_right = -12.0 if _record_emphasis else -8.0
+		hbox.offset_bottom = -8.0 if _record_emphasis else -6.0
+		hbox.add_theme_constant_override("separation", 12 if _record_emphasis else 8)
+	if portrait != null:
+		portrait.custom_minimum_size = Vector2(78.0, 78.0) if _record_emphasis else Vector2(40.0, 40.0)
 	if content_box != null:
-		content_box.custom_minimum_size = Vector2(0.0, 42.0)
+		content_box.custom_minimum_size = Vector2(0.0, 78.0) if _record_emphasis else Vector2(0.0, 42.0)
 		_ensure_value_well()
 	if name_label != null:
 		name_label.anchor_left = 0.0
 		name_label.anchor_right = 1.0
 		name_label.anchor_top = 0.0
 		name_label.anchor_bottom = 1.0
-		name_label.offset_left = 10.0
-		name_label.offset_right = -84.0
+		name_label.offset_left = 16.0 if _record_emphasis else 10.0
+		name_label.offset_right = -126.0 if _record_emphasis else -84.0
 		name_label.clip_text = true
 	if value_label != null:
 		value_label.anchor_left = 1.0
 		value_label.anchor_right = 1.0
 		value_label.anchor_top = 0.0
 		value_label.anchor_bottom = 1.0
-		value_label.offset_left = -76.0
-		value_label.offset_right = -10.0
+		value_label.offset_left = -116.0 if _record_emphasis else -76.0
+		value_label.offset_right = -14.0 if _record_emphasis else -10.0
 
 func _make_row_style(player_side: bool, hovered: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.050, 0.038, 0.044, 0.94) if hovered else Color(0.032, 0.028, 0.036, 0.88)
-	style.border_color = Color(0.96, 0.70, 0.34, 0.96) if hovered else Color(0.24, 0.34, 0.34, 0.74) if player_side else Color(0.48, 0.045, 0.070, 0.80)
-	style.border_width_left = 1
+	style.bg_color = Color(0.050, 0.030, 0.034, 0.98) if hovered else Color(0.027, 0.023, 0.028, 0.96)
+	style.border_color = Color(0.96, 0.55, 0.23, 0.98) if hovered else Color(0.46, 0.34, 0.22, 0.88) if player_side else Color(0.58, 0.035, 0.060, 0.92)
+	style.border_width_left = 5
 	style.border_width_top = 1
 	style.border_width_right = 1
 	style.border_width_bottom = 1
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.shadow_size = 8 if hovered else 4
-	style.shadow_color = Color(0.60, 0.16, 0.040, 0.26) if hovered else Color(0.0, 0.0, 0.0, 0.38)
-	var modulate: Color = Color(1.14, 1.05, 0.92, 1.0) if hovered else Color(0.86, 0.82, 0.78, 0.94)
-	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.scoreboard_row_style(hovered), style)
+	style.shadow_size = 4 if hovered else 2
+	style.shadow_color = Color(0.60, 0.025, 0.035, 0.24) if hovered else Color(0.0, 0.0, 0.0, 0.42)
+	return style
 
 func _ensure_value_well() -> void:
 	if content_box == null:
@@ -168,7 +166,7 @@ func _ensure_value_well() -> void:
 	_value_well.anchor_right = 1.0
 	_value_well.anchor_top = 0.0
 	_value_well.anchor_bottom = 1.0
-	_value_well.offset_left = -82.0
+	_value_well.offset_left = -122.0 if _record_emphasis else -82.0
 	_value_well.offset_right = 0.0
 	_value_well.offset_top = 3.0
 	_value_well.offset_bottom = -3.0
@@ -180,16 +178,15 @@ func _ensure_value_well() -> void:
 
 func _make_value_well_style() -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.018, 0.015, 0.020, 0.82)
-	style.border_color = Color(0.30, 0.22, 0.18, 0.54)
-	style.border_width_left = 1
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_right = 4
-	style.corner_radius_bottom_left = 4
+	style.bg_color = Color(0.010, 0.009, 0.012, 0.94)
+	style.border_color = Color(0.48, 0.30, 0.18, 0.82)
+	style.border_width_left = 3
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
 	style.content_margin_left = 6
 	style.content_margin_right = 8
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.68, 0.64, 0.60, 0.70)), style)
+	return style
 
 func _format_value(v: float) -> String:
 	if metric_key == "dps":

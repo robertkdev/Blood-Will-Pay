@@ -6,6 +6,7 @@ const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_s
 const TEST_SETTINGS_PATH: String = "user://accessibility_settings_smoke.cfg"
 const TEST_ACCOUNT_PROFILE_PATH: String = "user://accessibility_settings_account_profile.json"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/accessibility_settings_pass"
+const STRESS_VIEWPORT_SIZE: Vector2i = Vector2i(1024, 576)
 
 @export var viewport_size: Vector2i = Vector2i(1280, 720)
 
@@ -58,11 +59,17 @@ func _run() -> void:
 	var accept_button: Button = title_menu.find_child("Binding_ui_accept", true, false) as Button if title_menu != null else null
 	var cancel_button: Button = title_menu.find_child("Binding_ui_cancel", true, false) as Button if title_menu != null else null
 	var reset_button: Button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
+	var readability_status: Label = title_menu.find_child("ReadabilityStatus", true, false) as Label if title_menu != null else null
+	var readability_guidance: Label = title_menu.find_child("ReadabilityGuidance", true, false) as Label if title_menu != null else null
 	_expect(scale_option != null, "UI scale option missing")
 	_expect(motion_check != null, "Reduced Motion option missing")
 	_expect(accept_button != null, "Confirm binding button missing")
 	_expect(cancel_button != null, "Menu / Back binding button missing")
 	_expect(reset_button != null, "Reset Defaults button missing")
+	_expect(readability_status != null and readability_status.text.contains("HIGH CONTRAST"), "Settings should expose the enforced high-contrast readability default")
+	_expect(readability_status != null and int(readability_status.get_meta("utility_type_floor_px", 0)) >= 15, "Settings should publish a 15px utility typography floor")
+	_expect(readability_status != null and int(readability_status.get_meta("functional_type_floor_px", 0)) >= 16, "Settings should publish a 16px functional typography floor")
+	_expect(readability_guidance != null and readability_guidance.get_theme_font_size("font_size") >= 18, "Readability guidance should use legible utility typography")
 
 	if scale_option != null:
 		scale_option.select(1)
@@ -118,7 +125,7 @@ func _run() -> void:
 	if ledger != null:
 		for candidate: Node in ledger.find_children("*", "Button", true, false):
 			var button_candidate: Button = candidate as Button
-			if button_candidate != null and button_candidate.text == "Close":
+			if button_candidate != null and button_candidate.text.to_upper().begins_with("CLOSE"):
 				ledger_close = button_candidate
 				break
 	_expect(
@@ -128,6 +135,7 @@ func _run() -> void:
 	if _main != null:
 		_main.call("_close_black_ledger")
 	await _settle_frames(2)
+	await _verify_stress_menu(title_menu, window)
 	motion_check = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	reset_button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
 	if motion_check != null:
@@ -186,6 +194,60 @@ func _run() -> void:
 		await _settle_frames(4)
 		_expect(String(title_menu.get("_active_section")) == "how_to_play", "controller A should activate the focused title-menu action")
 	_finish()
+
+func _verify_stress_menu(title_menu: Control, window: Window) -> void:
+	DisplayServer.window_set_size(STRESS_VIEWPORT_SIZE)
+	if window != null:
+		window.size = STRESS_VIEWPORT_SIZE
+		window.content_scale_size = STRESS_VIEWPORT_SIZE
+	if title_menu != null:
+		title_menu.call("_select_section", "settings", false)
+		title_menu.call_deferred("_refresh_scaled_layout")
+	await _settle_frames(5)
+	var title_panel: Panel = title_menu.find_child("TitlePanel", true, false) as Panel if title_menu != null else null
+	var quit_button: Button = title_menu.find_child("QuitButton", true, false) as Button if title_menu != null else null
+	var stress_viewport: Rect2 = title_menu.get_viewport().get_visible_rect() if title_menu != null else Rect2()
+	var stress_title: Label = title_menu.find_child("GameTitle", true, false) as Label if title_menu != null else null
+	_expect(title_panel != null, "1024x576 stress menu TitlePanel missing")
+	_expect(
+		title_panel != null and _rect_inside(title_panel.get_global_rect(), stress_viewport.grow(1.0)),
+		"1024x576 title rail should remain fully inside the physical viewport"
+	)
+	_expect(stress_title != null and not stress_title.text.contains("\n"), "1024x576 at 150 percent should use the single-line compact wordmark")
+	_expect(
+		title_panel != null and quit_button != null and _rect_inside(quit_button.get_global_rect(), title_panel.get_global_rect().grow(1.0)),
+		"1024x576 Quit button should remain fully contained by the title rail"
+	)
+	for action_name: String in [
+		"StartButton",
+		"BlackLedgerButton",
+		"HomeButton",
+		"HowToPlayButton",
+		"UnitsButton",
+		"RGAGlossaryButton",
+		"SettingsButton",
+		"QuitButton",
+	]:
+		var action_button: Button = title_menu.find_child(action_name, true, false) as Button if title_menu != null else null
+		_expect(action_button != null, "1024x576 action %s missing" % action_name)
+		_expect(
+			action_button != null and action_button.get_theme_font_size("font_size") >= 16,
+			"1024x576 action %s should use at least 16px functional type" % action_name
+		)
+		_expect(
+			action_button != null and _rect_inside(action_button.get_global_rect(), stress_viewport.grow(1.0)),
+			"1024x576 action %s should remain fully visible in the physical viewport" % action_name
+		)
+	var section_hint: Label = title_menu.find_child("SectionHint", true, false) as Label if title_menu != null else null
+	var binding_status: Label = title_menu.find_child("BindingStatus", true, false) as Label if title_menu != null else null
+	_expect(section_hint != null and section_hint.get_theme_font_size("font_size") >= 15, "1024x576 section guidance should remain at least 15px")
+	_expect(binding_status != null and binding_status.get_theme_font_size("font_size") >= 15, "1024x576 binding guidance should remain at least 15px")
+	var settings_button: Button = title_menu.find_child("SettingsButton", true, false) as Button if title_menu != null else null
+	var ledger_button: Button = title_menu.find_child("BlackLedgerButton", true, false) as Button if title_menu != null else null
+	_expect(settings_button != null and String(settings_button.get_meta("visual_role", "")) == "selected_navigation", "selected navigation should expose a distinct selected hierarchy role")
+	_expect(ledger_button != null and String(ledger_button.get_meta("visual_role", "")) == "ledger", "Black Ledger should expose a distinct ledger hierarchy role")
+	_expect(quit_button != null and String(quit_button.get_meta("visual_role", "")) == "quit", "Quit should expose a distinct destructive hierarchy role")
+	_save_capture("00_settings_stress_1024x576.png")
 
 func _copy_events(action: StringName) -> Array[InputEvent]:
 	var copied: Array[InputEvent] = []
