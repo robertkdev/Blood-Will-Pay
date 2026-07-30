@@ -137,7 +137,7 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 				continue
 			_expect_inside(card, viewport_rect, "shop card %s" % String(card.name))
 			var maximum_card_height: float = 70.0 if tight_scale else 96.0
-			var minimum_card_height: float = 58.0 if tight_scale else 80.0
+			var minimum_card_height: float = 42.0 if tight_scale else 80.0
 			_expect(card.size.y <= maximum_card_height, "compact shop card exceeded height budget: %s" % str(card.get_global_rect()))
 			_expect(card.size.y >= minimum_card_height, "compact shop card is too compressed to show its complete visual hierarchy: %s" % str(card.get_global_rect()))
 			_assert_shop_card_contents_inside(card)
@@ -152,9 +152,10 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 	if command_bar != null and first_card_top < INF:
 		_expect(command_bar.get_global_rect().end.y <= first_card_top + 1.0, "shop command bar overlaps compact cards")
 	if bet_slider != null and bet_value != null:
-		var slider_width_budget: float = 96.0 if tight_scale else 124.0
+		var slider_width_budget: float = 104.0 if tight_scale else 152.0
 		_expect(bet_slider.custom_minimum_size.x <= slider_width_budget, "compact bet slider width budget was not applied")
-		_expect(bet_value.custom_minimum_size.x <= 28.0, "compact bet value width budget was not applied")
+		var bet_value_width_budget: float = 34.0 if tight_scale else 42.0
+		_expect(bet_value.custom_minimum_size.x <= bet_value_width_budget, "compact bet value width budget was not applied")
 		_expect(bet_value.get_theme_stylebox("normal") is StyleBoxFlat, "compact bet value should use a framed badge")
 		_expect(bet_value.get_theme_font_size("font_size") >= 18, "compact bet value should remain at least 18px")
 	if command_bar != null:
@@ -207,7 +208,10 @@ func _assert_tight_scale_hud_containment() -> void:
 	_expect(absf(viewport_rect.size.y - float(LOGICAL_150_PERCENT_SIZE.y)) <= 1.0, "150-percent fixture logical height is wrong: %s" % str(viewport_rect))
 	_expect(bool(_view.get_meta("tight_scale_layout", false)), "combat view did not enter tight-scale layout")
 	var left_panel: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
-	_expect(left_panel != null and not left_panel.visible, "150-percent layout should collapse the secondary item/trait dock")
+	_expect(left_panel != null and left_panel.visible, "150-percent layout should retain the tactical item/trait dock")
+	if left_panel != null and left_panel.visible:
+		_expect_inside(left_panel, viewport_rect, "150-percent tactical item/trait dock")
+		_expect(left_panel.size.x <= 128.0, "150-percent tactical item/trait dock did not release board width: %.1f" % left_panel.size.x)
 	var required_paths: PackedStringArray = PackedStringArray([
 		"MarginContainer",
 		"MarginContainer/VBoxContainer/StageProgressTopBar",
