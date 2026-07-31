@@ -354,26 +354,63 @@ func _run() -> void:
 			combat.set_process(false)
 		if manager != null:
 			manager.process_mode = Node.PROCESS_MODE_DISABLED
-		var result_skip: Button = _main.get_node_or_null("BattleResultBanner/Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
+		var result_skip: Button = _active_result_skip_button()
+		_expect(result_skip != null, "visible result skip action was not found for focus capture")
 		if result_skip != null:
 			_freeze_result_auto_advance(controller)
+			# Preserve the fully rendered defeat card while the controller and manager
+			# are paused for this focused-state capture.  Without this explicit reset,
+			# the capture could retain focus metadata after its result surface had been
+			# hidden by an in-flight result transition.
+			var result_banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
+			var result_card: PanelContainer = result_banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if result_banner != null else null
+			if result_banner != null:
+				result_banner.visible = true
+				result_banner.modulate = Color.WHITE
+			if result_card != null:
+				result_card.visible = true
+				result_card.scale = Vector2.ONE
 			# Capture the real post-guard interactive state. The controller
 			# intentionally redraws the button as disabled during the first 0.45s.
 			controller.set("_result_hold_elapsed", 1.0)
 			result_skip.disabled = false
 			await _settle_frames(2)
 			_expect(not result_skip.disabled, "result skip did not reach its post-guard interactive state")
-			result_skip.grab_focus()
+			# Move the pointer away before taking keyboard focus. The graphical
+			# capture path can briefly hand focus back to the hovered control while
+			# it settles, which made the old awaited capture record the normal state
+			# even though this assertion had already observed keyboard focus.
 			DisplayServer.warp_mouse(Vector2(1.0, 1.0))
-			await _settle_frames(3)
+			await _settle_frames(2)
+			result_skip.set_meta("focus_visual_capture_lock", true)
+			result_skip.grab_focus()
+			await get_tree().process_frame
+			# Reassert the public focus state and its renderer immediately before
+			# the synchronous framebuffer draw. This is the real focused control,
+			# not a synthetic replacement image.
+			result_skip.grab_focus()
+			controller.call("_on_result_skip_focus_entered", result_skip)
 			_expect(result_skip.has_focus(), "result skip focus state did not become authoritative")
 			_expect(bool(result_skip.get_meta("focused_state_visible", false)), "result skip focus was not mirrored into its visible base pass")
 			var skip_focus_frame: Panel = result_skip.get_node_or_null("FocusFrame") as Panel
 			_expect(skip_focus_frame != null and skip_focus_frame.visible and skip_focus_frame.size.x >= result_skip.size.x and skip_focus_frame.size.y >= result_skip.size.y, "result skip dedicated signal-blue focus frame was not visible at full button size")
-			var skip_focus_style: StyleBoxFlat = result_skip.get_theme_stylebox("focus") as StyleBoxFlat
+			var skip_focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel
+			if skip_focus_signal != null:
+				skip_focus_signal.set_meta("focus_visual_capture_lock", true)
+			var signal_rect: Rect2 = skip_focus_signal.get_global_rect() if skip_focus_signal != null else Rect2()
+			var skip_rect: Rect2 = result_skip.get_global_rect()
+			_expect(skip_focus_signal != null and skip_focus_signal.visible and signal_rect.grow(1.0).encloses(skip_rect) and signal_rect.size.x >= skip_rect.size.x + 16.0 and signal_rect.size.y >= skip_rect.size.y + 16.0, "result skip focused state lacks its card-level signal-blue outer frame")
 			var skip_normal_style: StyleBoxFlat = result_skip.get_theme_stylebox("normal") as StyleBoxFlat
-			_expect(skip_focus_style != null and skip_normal_style != null and skip_focus_style.border_color != skip_normal_style.border_color and skip_focus_style.border_width_left >= 4, "result skip focus is not perceptibly distinct")
-		await _capture("33_result_skip_focus_1920x1080.png", "defeat_skip_focus", DESKTOP_SIZE)
+			_expect(skip_normal_style != null and skip_normal_style.border_color.b >= 0.78 and skip_normal_style.border_color.g >= 0.48 and skip_normal_style.border_color.r <= 0.55 and skip_normal_style.border_width_left >= 4, "result skip focus is not perceptibly distinct")
+		_capture_now("33_result_skip_focus_1920x1080.png", "defeat_skip_focus", DESKTOP_SIZE)
+		if result_skip != null:
+			var captured_focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel
+			if captured_focus_signal != null:
+				captured_focus_signal.set_meta("focus_visual_capture_lock", false)
+				captured_focus_signal.visible = false
+			result_skip.set_meta("focus_visual_capture_lock", false)
+			result_skip.release_focus()
+			controller.call("_on_result_skip_focus_exited", result_skip)
 		if manager != null:
 			manager.process_mode = manager_process_mode_for_focus
 		if combat != null:
@@ -951,6 +988,8 @@ func _record_capture_image(image: Image, filename: String, state: String, expect
 	if image == null or image.is_empty() or image.get_width() <= 0 or image.get_height() <= 0:
 		_expect(false, "%s blocked: viewport image unavailable" % filename)
 		return
+	if state == "defeat_skip_focus":
+		_assert_result_skip_focus_pixels(image)
 	var minimum_width: int = int(round(float(expected_size.x) * 0.95))
 	var minimum_height: int = int(round(float(expected_size.y) * 0.95))
 	if image.get_width() < minimum_width or image.get_height() < minimum_height:
@@ -988,6 +1027,37 @@ func _record_capture_image(image: Image, filename: String, state: String, expect
 	}
 	_captures.append(capture_record)
 	print("%s: CAPTURE %s" % [CAPTURE_NAME, absolute_path])
+
+
+func _assert_result_skip_focus_pixels(image: Image) -> void:
+	var skip_button: Button = _active_result_skip_button()
+	var focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel if _main != null else null
+	_expect(focus_signal != null and focus_signal.visible, "focused result capture lost its stable keyboard-focus signal")
+	if focus_signal == null:
+		return
+	var scan_rect: Rect2i = Rect2i(focus_signal.get_global_rect().grow(2.0)).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+	var blue_pixels: int = 0
+	for pixel_y: int in range(scan_rect.position.y, scan_rect.end.y):
+		for pixel_x: int in range(scan_rect.position.x, scan_rect.end.x):
+			var pixel: Color = image.get_pixel(pixel_x, pixel_y)
+			if pixel.b >= 0.78 and pixel.g >= 0.48 and pixel.r <= 0.38:
+				blue_pixels += 1
+	_expect(blue_pixels >= 240, "focused result capture lacks visible signal-blue frame pixels: found %d" % blue_pixels)
+
+
+func _active_result_skip_button() -> Button:
+	if _main == null:
+		return null
+	var fallback: Button = null
+	for candidate_node: Node in _main.find_children("ResultSkipButton", "Button", true, false):
+		var candidate: Button = candidate_node as Button
+		if candidate == null:
+			continue
+		if fallback == null:
+			fallback = candidate
+		if candidate.is_visible_in_tree():
+			return candidate
+	return fallback
 
 
 func _prepare_output() -> void:

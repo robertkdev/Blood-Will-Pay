@@ -320,15 +320,20 @@ class ArenaPressurePainter:
 		set_meta("reduced_motion", reduced_motion)
 		set_meta("casualty_event_index", casualty_event_index)
 		set_meta("bounded_edge_pressure", true)
-		set_meta("protected_center_rect", Rect2(0.28, 0.20, 0.44, 0.60))
+		# This is a deployment board, not a clean arena floor.  Preserve the cells,
+		# but reserve the centre for one readable material event rather than hiding
+		# every consequence at the perimeter.
+		set_meta("protected_center_rect", Rect2(0.34, 0.24, 0.32, 0.52))
 		set_meta("kinetic_mark_budget", 0)
 		set_meta("reduced_motion_scene_parity", "same_physical_field_static")
 		set_meta("full_field_warning_chevrons", false)
-		set_meta("pressure_visual_language", "physical_smoke_and_event_residue")
+		set_meta("pressure_visual_language", "central_collision_rupture_drag_residue")
 		set_meta("debug_primitives_suppressed", true)
-		set_meta("player_scale_evidence_count", 9 if reduced_motion else 4 + pressure_phase * 3)
-		set_meta("terrain_floor_lift", 0.22 if reduced_motion else 0.16 + float(pressure_phase) * 0.07)
-		set_meta("physical_lane_encroachment", "static_casualty_barricades" if reduced_motion else "breach_debris_then_collision")
+		set_meta("player_scale_evidence_count", 12 if reduced_motion else 6 + pressure_phase * 4)
+		set_meta("terrain_floor_lift", 0.26 if reduced_motion else 0.18 + float(pressure_phase) * 0.08)
+		set_meta("physical_lane_encroachment", "static_collision_aftermath" if reduced_motion else "breach_then_central_collision")
+		set_meta("central_collision_visible", pressure_phase >= 1 or reduced_motion)
+		set_meta("central_collision_read", "static_rupture_and_drag" if reduced_motion else "impact_crater_drag_and_residue" if pressure_phase >= 1 else "threatened_intact_ground")
 		queue_redraw()
 
 	func _process(delta: float) -> void:
@@ -346,6 +351,10 @@ class ArenaPressurePainter:
 		# structure. Pressure adds only soft edge atmosphere and event-grounded
 		# residue; outline craters, rays, streaks, and ruler-straight fences made
 		# the field read as a debug overlay rather than a physical killing ground.
+		if pressure_phase == 0 and not reduced_motion:
+			_draw_onset_breach_warning()
+		else:
+			_draw_collision_rupture()
 		_draw_casualty_residue()
 		_draw_smoke_banks(motion_clock)
 		_draw_perimeter_consequence()
@@ -358,6 +367,83 @@ class ArenaPressurePainter:
 			_draw_ground_ruts()
 			if reduced_motion:
 				_draw_static_urgent_substitute()
+
+	func _draw_onset_breach_warning() -> void:
+		# Onset is still playable ground, but a dark, displaced rim points toward
+		# where the two forces are about to meet.  It is intentionally incomplete.
+		var left_gouge: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x * 0.30, size.y * 0.43), Vector2(size.x * 0.38, size.y * 0.39),
+			Vector2(size.x * 0.43, size.y * 0.45), Vector2(size.x * 0.39, size.y * 0.50),
+			Vector2(size.x * 0.32, size.y * 0.49),
+		])
+		var right_gouge: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x * 0.70, size.y * 0.58), Vector2(size.x * 0.62, size.y * 0.61),
+			Vector2(size.x * 0.57, size.y * 0.55), Vector2(size.x * 0.61, size.y * 0.50),
+			Vector2(size.x * 0.68, size.y * 0.52),
+		])
+		draw_colored_polygon(left_gouge, Color(0.10, 0.045, 0.025, 0.42))
+		draw_colored_polygon(right_gouge, Color(0.16, 0.022, 0.018, 0.42))
+		draw_polyline(left_gouge, Color(0.58, 0.22, 0.075, 0.36), 3.0, true)
+		draw_polyline(right_gouge, Color(0.70, 0.075, 0.038, 0.38), 3.0, true)
+		_draw_drag_gouge(Vector2(size.x * 0.18, size.y * 0.48), Vector2(size.x * 0.33, size.y * 0.46), 0.42)
+		_draw_drag_gouge(Vector2(size.x * 0.82, size.y * 0.53), Vector2(size.x * 0.67, size.y * 0.55), 0.42)
+
+	func _draw_collision_rupture() -> void:
+		# The primary midfight read: a broad impact bowl, torn toward both teams.
+		# This is deliberately irregular and layered so it reads as churned ground,
+		# not a circular spell marker or a tidy tactics-grid decal.
+		var center: Vector2 = Vector2(size.x * 0.50, size.y * (0.53 if not reduced_motion else 0.48))
+		var width: float = size.x * (0.245 if not reduced_motion else 0.275)
+		var height: float = size.y * (0.155 if not reduced_motion else 0.180)
+		var lip: PackedVector2Array = _rupture_ring(center, width, height, 18, 0.19)
+		draw_colored_polygon(lip, Color(0.23, 0.085, 0.038, 0.78))
+		draw_polyline(lip, Color(0.74, 0.28, 0.085, 0.56), 5.0, true)
+		var bowl: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.015, height * 0.10), width * 0.78, height * 0.68, 16, 0.71)
+		draw_colored_polygon(bowl, Color(0.045, 0.016, 0.014, 0.90))
+		var pooled: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.04, height * 0.17), width * 0.48, height * 0.28, 14, 1.32)
+		draw_colored_polygon(pooled, Color(0.34, 0.012, 0.014, 0.68))
+		draw_polyline(pooled, Color(0.88, 0.16, 0.050, 0.42), 3.0, true)
+		var broken_side: float = -1.0 if reduced_motion else sin(elapsed_seconds * 0.8) * 0.10
+		for shard_index: int in range(9):
+			var angle: float = TAU * float(shard_index) / 9.0 + 0.21 + broken_side
+			var start: Vector2 = center + Vector2(cos(angle) * width * 0.62, sin(angle) * height * 0.54)
+			var finish: Vector2 = center + Vector2(cos(angle) * width * (1.04 + float(shard_index % 3) * 0.10), sin(angle) * height * (0.96 + float(shard_index % 2) * 0.18))
+			draw_line(start, finish, Color(0.09, 0.030, 0.018, 0.90), 9.0 if shard_index % 2 == 0 else 6.0, true)
+			draw_line(start, finish, Color(0.66, 0.20, 0.065, 0.36), 2.0, true)
+		_draw_drag_gouge(Vector2(size.x * 0.18, size.y * 0.48), center + Vector2(-width * 0.74, -height * 0.10), 1.0)
+		_draw_drag_gouge(Vector2(size.x * 0.82, size.y * 0.58), center + Vector2(width * 0.72, height * 0.13), 1.0)
+		_draw_rupture_debris(center, width, height)
+
+	func _rupture_ring(center: Vector2, radius_x: float, radius_y: float, point_count: int, phase: float) -> PackedVector2Array:
+		var points: PackedVector2Array = PackedVector2Array()
+		for point_index: int in range(point_count):
+			var angle: float = TAU * float(point_index) / float(point_count)
+			var wobble: float = 0.78 + float((point_index * 7 + 3) % 6) * 0.065 + sin(angle * 3.0 + phase) * 0.045
+			points.append(center + Vector2(cos(angle) * radius_x * wobble, sin(angle) * radius_y * wobble))
+		return points
+
+	func _draw_drag_gouge(start: Vector2, finish: Vector2, intensity: float) -> void:
+		var direction: Vector2 = finish - start
+		var normal: Vector2 = Vector2(-direction.y, direction.x).normalized()
+		for gouge_index: int in range(3):
+			var offset: float = (float(gouge_index) - 1.0) * 12.0
+			var from: Vector2 = start + normal * offset
+			var to: Vector2 = finish + normal * offset * 0.35
+			draw_line(from, to, Color(0.018, 0.008, 0.008, 0.76 * intensity), 8.0 - float(gouge_index) * 1.4, true)
+			draw_line(from + Vector2(0.0, 3.0), to + Vector2(0.0, 3.0), Color(0.62, 0.16, 0.052, 0.28 * intensity), 2.0, true)
+
+	func _draw_rupture_debris(center: Vector2, width: float, height: float) -> void:
+		var debris_offsets: Array[Vector2] = [
+			Vector2(-0.98, -0.52), Vector2(-0.75, 0.74), Vector2(-0.38, -0.92),
+			Vector2(0.42, 0.86), Vector2(0.78, -0.64), Vector2(1.02, 0.36),
+		]
+		for debris_index: int in range(debris_offsets.size()):
+			var debris_center: Vector2 = center + Vector2(debris_offsets[debris_index].x * width, debris_offsets[debris_index].y * height)
+			var chunk: PackedVector2Array = _rupture_ring(debris_center, width * 0.105, height * 0.22, 6, float(debris_index))
+			draw_colored_polygon(chunk, Color(0.11, 0.044, 0.022, 0.92))
+			draw_polyline(chunk, Color(0.61, 0.22, 0.078, 0.46), 2.0, true)
+			if debris_index % 2 == 0:
+				draw_line(debris_center + Vector2(-width * 0.06, -height * 0.12), debris_center + Vector2(width * 0.09, height * 0.17), Color(0.035, 0.012, 0.010, 0.95), 7.0, true)
 
 	func _draw_perimeter_consequence() -> void:
 		# These are deliberately broad, physical silhouettes at player scale: broken

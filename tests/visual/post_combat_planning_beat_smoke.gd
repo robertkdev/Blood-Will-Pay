@@ -518,6 +518,14 @@ func _request_result_skip() -> bool:
 		await get_tree().process_frame
 		if skip_button != null and not skip_button.disabled:
 			break
+	if skip_button != null:
+		skip_button.grab_focus()
+		await get_tree().process_frame
+		var focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel
+		var skip_rect: Rect2 = skip_button.get_global_rect()
+		var signal_rect: Rect2 = focus_signal.get_global_rect() if focus_signal != null else Rect2()
+		_expect(skip_button.has_focus() and focus_signal != null and focus_signal.visible and signal_rect.grow(1.0).encloses(skip_rect) and signal_rect.size.x >= skip_rect.size.x + 16.0, "result skip keyboard focus lacks its card-level signal-blue outer frame")
+		_save_capture("result_skip_keyboard_focus.png")
 	var skip_event: InputEventAction = InputEventAction.new()
 	skip_event.action = "ui_accept"
 	skip_event.pressed = true
