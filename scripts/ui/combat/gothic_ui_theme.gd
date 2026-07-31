@@ -300,6 +300,66 @@ class ArenaEvidencePainter:
 			var finish: Vector2 = start + Vector2(5.0 + float(index % 3) * 3.0, -2.0 - float(index % 2) * 3.0)
 			draw_line(start, finish, Color(0.78, 0.68, 0.54, 0.26), 1.5, true)
 
+class PlanningFieldPainter:
+	extends Control
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_meta("planning_field_material", "wet_earth_broken_cover_wreckage_and_trench_lanes")
+		set_meta("planning_widescreen_composition", "anchored_landmarks_with_open_deployment_lanes")
+		set_meta("planning_diagram_primitives_suppressed", true)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		# A quiet floor lift makes the authored mud readable, then the fragments at
+		# the edges make the empty deployment board feel like a place under siege.
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.16, 0.085, 0.042, 0.16), true)
+		_draw_wreckage_cluster(Vector2(size.x * 0.10, size.y * 0.22), 0.95, false)
+		_draw_wreckage_cluster(Vector2(size.x * 0.88, size.y * 0.76), 1.15, true)
+		_draw_mud_lane(Vector2(size.x * 0.04, size.y * 0.72), Vector2(size.x * 0.31, size.y * 0.57), 0.46)
+		_draw_mud_lane(Vector2(size.x * 0.96, size.y * 0.31), Vector2(size.x * 0.70, size.y * 0.45), 0.38)
+		_draw_broken_cover(Vector2(size.x * 0.20, size.y * 0.90), 1.0, false)
+		_draw_broken_cover(Vector2(size.x * 0.78, size.y * 0.10), 0.92, true)
+
+	func _draw_mud_lane(from: Vector2, to: Vector2, alpha: float) -> void:
+		var direction: Vector2 = to - from
+		var normal: Vector2 = Vector2(-direction.y, direction.x).normalized()
+		for mark_index: int in range(4):
+			var fraction: float = (float(mark_index) + 0.2) / 4.4
+			var center: Vector2 = from.lerp(to, fraction) + normal * (18.0 if mark_index % 2 == 0 else -14.0)
+			draw_circle(center, 24.0 + float(mark_index % 2) * 8.0, Color(0.045, 0.020, 0.013, alpha), true)
+			draw_circle(center + Vector2(3.0, -2.0), 12.0, Color(0.34, 0.08, 0.035, alpha * 0.34), true)
+
+	func _draw_wreckage_cluster(anchor: Vector2, scale_factor: float, mirrored: bool) -> void:
+		var direction: float = -1.0 if mirrored else 1.0
+		var iron: Color = Color(0.075, 0.045, 0.028, 0.92)
+		var edge: Color = Color(0.43, 0.16, 0.06, 0.45)
+		draw_line(anchor + Vector2(-42.0 * direction, 28.0) * scale_factor, anchor + Vector2(66.0 * direction, -20.0) * scale_factor, iron, 18.0 * scale_factor, true)
+		draw_line(anchor + Vector2(-40.0 * direction, 24.0) * scale_factor, anchor + Vector2(62.0 * direction, -24.0) * scale_factor, edge, 3.0 * scale_factor, true)
+		var wheel_center: Vector2 = anchor + Vector2(4.0 * direction, 6.0) * scale_factor
+		var wheel_radius: float = 25.0 * scale_factor
+		draw_circle(wheel_center, wheel_radius, Color(0.035, 0.023, 0.016, 0.82), true)
+		draw_arc(wheel_center, wheel_radius, 0.0, TAU, 24, edge, 3.0 * scale_factor, true)
+		draw_arc(wheel_center, wheel_radius * 0.30, 0.0, TAU, 16, edge, 2.0 * scale_factor, true)
+		for spoke_index: int in range(6):
+			var spoke_angle: float = TAU * float(spoke_index) / 6.0 + 0.18
+			var spoke_inner: Vector2 = wheel_center + Vector2(cos(spoke_angle), sin(spoke_angle)) * wheel_radius * 0.30
+			var spoke_outer: Vector2 = wheel_center + Vector2(cos(spoke_angle), sin(spoke_angle)) * wheel_radius * 0.88
+			draw_line(spoke_inner, spoke_outer, edge, 2.0 * scale_factor, true)
+		for spar_index: int in range(3):
+			var base: Vector2 = anchor + Vector2((-28.0 + float(spar_index) * 27.0) * direction, 18.0) * scale_factor
+			draw_line(base, base + Vector2(18.0 * direction, -48.0 + float(spar_index % 2) * 16.0) * scale_factor, iron, 8.0 * scale_factor, true)
+
+	func _draw_broken_cover(anchor: Vector2, scale_factor: float, mirrored: bool) -> void:
+		var direction: float = -1.0 if mirrored else 1.0
+		var timber: Color = Color(0.10, 0.046, 0.022, 0.78)
+		for beam_index: int in range(3):
+			var origin: Vector2 = anchor + Vector2(float(beam_index) * 24.0 * direction, float(beam_index % 2) * 10.0) * scale_factor
+			draw_line(origin, origin + Vector2(46.0 * direction, -18.0 + float(beam_index) * 11.0) * scale_factor, timber, 11.0 * scale_factor, true)
+
+
 class ArenaPressurePainter:
 	extends Control
 
@@ -389,29 +449,33 @@ class ArenaPressurePainter:
 		_draw_drag_gouge(Vector2(size.x * 0.82, size.y * 0.53), Vector2(size.x * 0.67, size.y * 0.55), 0.42)
 
 	func _draw_collision_rupture() -> void:
-		# The primary midfight read: a broad impact bowl, torn toward both teams.
-		# This is deliberately irregular and layered so it reads as churned ground,
-		# not a circular spell marker or a tidy tactics-grid decal.
-		var center: Vector2 = Vector2(size.x * 0.50, size.y * (0.53 if not reduced_motion else 0.48))
-		var width: float = size.x * (0.245 if not reduced_motion else 0.275)
-		var height: float = size.y * (0.155 if not reduced_motion else 0.180)
-		var lip: PackedVector2Array = _rupture_ring(center, width, height, 18, 0.19)
-		draw_colored_polygon(lip, Color(0.23, 0.085, 0.038, 0.78))
-		draw_polyline(lip, Color(0.74, 0.28, 0.085, 0.56), 5.0, true)
-		var bowl: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.015, height * 0.10), width * 0.78, height * 0.68, 16, 0.71)
-		draw_colored_polygon(bowl, Color(0.045, 0.016, 0.014, 0.90))
-		var pooled: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.04, height * 0.17), width * 0.48, height * 0.28, 14, 1.32)
-		draw_colored_polygon(pooled, Color(0.34, 0.012, 0.014, 0.68))
-		draw_polyline(pooled, Color(0.88, 0.16, 0.050, 0.42), 3.0, true)
-		var broken_side: float = -1.0 if reduced_motion else sin(elapsed_seconds * 0.8) * 0.10
-		for shard_index: int in range(9):
-			var angle: float = TAU * float(shard_index) / 9.0 + 0.21 + broken_side
-			var start: Vector2 = center + Vector2(cos(angle) * width * 0.62, sin(angle) * height * 0.54)
-			var finish: Vector2 = center + Vector2(cos(angle) * width * (1.04 + float(shard_index % 3) * 0.10), sin(angle) * height * (0.96 + float(shard_index % 2) * 0.18))
-			draw_line(start, finish, Color(0.09, 0.030, 0.018, 0.90), 9.0 if shard_index % 2 == 0 else 6.0, true)
-			draw_line(start, finish, Color(0.66, 0.20, 0.065, 0.36), 2.0, true)
-		_draw_drag_gouge(Vector2(size.x * 0.18, size.y * 0.48), center + Vector2(-width * 0.74, -height * 0.10), 1.0)
-		_draw_drag_gouge(Vector2(size.x * 0.82, size.y * 0.58), center + Vector2(width * 0.72, height * 0.13), 1.0)
+		# A broad, uneven patch of compacted earth is easier to read as an actual
+		# collision site than a clean crater outline. Soft overlapping mud masses,
+		# scattered clods, and displaced blood replace the old target-like ring.
+		var center: Vector2 = Vector2(size.x * 0.50, size.y * (0.54 if not reduced_motion else 0.50))
+		var width: float = size.x * (0.285 if not reduced_motion else 0.305)
+		var height: float = size.y * (0.175 if not reduced_motion else 0.195)
+		var west_bank: PackedVector2Array = _rupture_ring(center + Vector2(-width * 0.34, height * 0.04), width * 0.66, height * 0.72, 21, 0.37)
+		var east_bank: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.34, -height * 0.05), width * 0.70, height * 0.68, 23, 1.11)
+		var churn: PackedVector2Array = _rupture_ring(center + Vector2(-width * 0.02, height * 0.08), width * 0.74, height * 0.57, 25, 2.03)
+		var pooled: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.10, height * 0.22), width * 0.38, height * 0.24, 19, 2.71)
+		draw_colored_polygon(west_bank, Color(0.19, 0.075, 0.032, 0.50))
+		draw_colored_polygon(east_bank, Color(0.14, 0.050, 0.026, 0.56))
+		draw_colored_polygon(churn, Color(0.060, 0.025, 0.017, 0.68))
+		draw_colored_polygon(pooled, Color(0.24, 0.016, 0.018, 0.42))
+		var clod_offsets: Array[Vector2] = [
+			Vector2(-0.70, -0.24), Vector2(-0.53, 0.35), Vector2(-0.35, -0.48),
+			Vector2(-0.18, 0.52), Vector2(0.04, -0.41), Vector2(0.19, 0.42),
+			Vector2(0.36, -0.31), Vector2(0.51, 0.28), Vector2(0.69, -0.10),
+		]
+		for clod_index: int in range(clod_offsets.size()):
+			var clod_offset: Vector2 = clod_offsets[clod_index]
+			var clod_center: Vector2 = center + Vector2(clod_offset.x * width, clod_offset.y * height)
+			var clod_radius: float = 10.0 + float(clod_index % 3) * 4.0
+			draw_circle(clod_center, clod_radius, Color(0.20, 0.075, 0.032, 0.62), true)
+			draw_line(clod_center + Vector2(-clod_radius * 0.8, 2.0), clod_center + Vector2(clod_radius, -5.0), Color(0.44, 0.16, 0.055, 0.28), 2.0, true)
+		_draw_drag_gouge(Vector2(size.x * 0.12, size.y * 0.47), center + Vector2(-width * 0.48, -height * 0.02), 0.72)
+		_draw_drag_gouge(Vector2(size.x * 0.88, size.y * 0.59), center + Vector2(width * 0.44, height * 0.18), 0.72)
 		_draw_rupture_debris(center, width, height)
 
 	func _rupture_ring(center: Vector2, radius_x: float, radius_y: float, point_count: int, phase: float) -> PackedVector2Array:
@@ -1273,6 +1337,10 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	var planning: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea") as Control
 	if planning == null:
 		return
+	var top_area: Control = planning.get_node_or_null("TopArea") as Control
+	var bottom_area: Control = planning.get_node_or_null("BottomArea") as Control
+	_ensure_planning_field_painter(top_area, "PlanningWarFieldTopPainter")
+	_ensure_planning_field_painter(bottom_area, "PlanningWarFieldBottomPainter")
 	var geometry: Control = planning.get_node_or_null("PlanningDeploymentGeometry") as Control
 	if geometry == null:
 		geometry = Control.new()
@@ -1355,6 +1423,27 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	directive.add_theme_stylebox_override("normal", directive_style)
 	directive.set_meta("persistent_copy_uses_utility_face", true)
 	VisualTypeSystem.set_utility_bold(directive)
+
+
+static func _ensure_planning_field_painter(parent: Control, painter_name: String) -> void:
+	if parent == null:
+		return
+	var painter: PlanningFieldPainter = parent.get_node_or_null(painter_name) as PlanningFieldPainter
+	if painter == null:
+		painter = PlanningFieldPainter.new()
+		painter.name = painter_name
+		painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		painter.z_index = -4
+		parent.add_child(painter)
+		painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		painter.offset_left = 0.0
+		painter.offset_top = 0.0
+		painter.offset_right = 0.0
+		painter.offset_bottom = 0.0
+	painter.visible = true
+	painter.z_index = -4
+	painter.queue_redraw()
+
 
 static func _ensure_planning_breach_marks(area: Control, enemy_side: bool) -> void:
 	var cluster_name: String = "HostileBreachMarks" if enemy_side else "SurvivalBreachMarks"
