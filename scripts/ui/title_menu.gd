@@ -59,6 +59,7 @@ var _content_panel: PanelContainer = null
 var _content_stack: VBoxContainer = null
 var _content_scroll: ScrollContainer = null
 var _content_body: VBoxContainer = null
+var _settings_scroll_cue: Label = null
 var _section_title: Label = null
 var _section_hint: Label = null
 var _search_field: LineEdit = null
@@ -548,6 +549,8 @@ func _ensure_action_docket() -> void:
 func _ensure_wordmark_treatment() -> void:
 	if title_label == null:
 		return
+	title_label.set_meta("wordmark_identity_mark", "double_misregister_cut_stencil_pay_block")
+	title_label.set_meta("wordmark_custom_treatment_revision", 2)
 	var misregister: Label = title_label.get_node_or_null("Misregister") as Label
 	if misregister == null:
 		misregister = Label.new()
@@ -566,6 +569,41 @@ func _ensure_wordmark_treatment() -> void:
 	misregister.add_theme_font_size_override("font_size", title_label.get_theme_font_size("font_size"))
 	misregister.add_theme_color_override("font_color", Color(0.70, 0.025, 0.050, 0.72))
 	VisualTypeSystem.set_impact(misregister)
+	var bone_ghost: Label = title_label.get_node_or_null("BoneGhost") as Label
+	if bone_ghost == null:
+		bone_ghost = Label.new()
+		bone_ghost.name = "BoneGhost"
+		bone_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title_label.add_child(bone_ghost)
+	bone_ghost.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bone_ghost.offset_left = -2.0
+	bone_ghost.offset_top = -1.0
+	bone_ghost.offset_right = -2.0
+	bone_ghost.offset_bottom = -1.0
+	bone_ghost.z_index = -2
+	bone_ghost.text = title_label.text
+	bone_ghost.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	bone_ghost.autowrap_mode = TextServer.AUTOWRAP_OFF
+	bone_ghost.add_theme_font_size_override("font_size", title_label.get_theme_font_size("font_size"))
+	bone_ghost.add_theme_color_override("font_color", Color(0.98, 0.82, 0.60, 0.32))
+	VisualTypeSystem.set_impact(bone_ghost)
+	var pay_block: ColorRect = title_label.get_node_or_null("PayBlock") as ColorRect
+	if pay_block == null:
+		pay_block = ColorRect.new()
+		pay_block.name = "PayBlock"
+		pay_block.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title_label.add_child(pay_block)
+	pay_block.anchor_left = 0.48
+	pay_block.anchor_top = 0.56
+	pay_block.anchor_right = 1.02
+	pay_block.anchor_bottom = 0.98
+	pay_block.offset_left = -3.0
+	pay_block.offset_top = 0.0
+	pay_block.offset_right = 3.0
+	pay_block.offset_bottom = 0.0
+	pay_block.z_index = -3
+	pay_block.color = Color(0.54, 0.018, 0.040, 0.62)
+	pay_block.rotation_degrees = -1.0
 	var strike: ColorRect = title_label.get_node_or_null("StrikeBand") as ColorRect
 	if strike == null:
 		strike = ColorRect.new()
@@ -582,6 +620,23 @@ func _ensure_wordmark_treatment() -> void:
 	strike.offset_bottom = 2.0
 	strike.color = Color(0.74, 0.035, 0.060, 0.82)
 	strike.rotation_degrees = -1.5
+	for index: int in range(3):
+		var fracture_name: String = "Fracture%02d" % (index + 1)
+		var fracture: ColorRect = title_label.get_node_or_null(fracture_name) as ColorRect
+		if fracture == null:
+			fracture = ColorRect.new()
+			fracture.name = fracture_name
+			fracture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			title_label.add_child(fracture)
+		fracture.anchor_left = 0.11 + float(index) * 0.25
+		fracture.anchor_right = fracture.anchor_left + 0.085
+		fracture.anchor_top = 0.12 + float(index % 2) * 0.36
+		fracture.anchor_bottom = fracture.anchor_top
+		fracture.offset_top = 0.0
+		fracture.offset_bottom = 3.0
+		fracture.z_index = 2
+		fracture.rotation_degrees = -14.0 if index != 1 else 11.0
+		fracture.color = Color(0.012, 0.008, 0.012, 0.92)
 
 func _ensure_threat_signal() -> void:
 	var signal_label: Label = get_node_or_null("ImmediateThreatSignal") as Label
@@ -703,6 +758,8 @@ func _ensure_content_panel() -> void:
 		_content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		_content_stack.add_child(_content_scroll)
 	_content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var scroll_bar: VScrollBar = _content_scroll.get_v_scroll_bar()
+	scroll_bar.custom_minimum_size.x = 10.0 if compact else 8.0
 
 	_content_body = _content_scroll.get_node_or_null("ContentBody") as VBoxContainer
 	if _content_body == null:
@@ -712,6 +769,39 @@ func _ensure_content_panel() -> void:
 		_content_scroll.add_child(_content_body)
 	_content_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_content_body.add_theme_constant_override("separation", 6 if short_compact else (8 if compact else 12))
+	_settings_scroll_cue = _content_stack.get_node_or_null("SettingsScrollCue") as Label
+	if _settings_scroll_cue == null:
+		_settings_scroll_cue = Label.new()
+		_settings_scroll_cue.name = "SettingsScrollCue"
+		_settings_scroll_cue.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_content_stack.add_child(_settings_scroll_cue)
+	_settings_scroll_cue.text = "MORE MACHINE CONTROLS BELOW  ↓  SCROLL"
+	_settings_scroll_cue.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_settings_scroll_cue.custom_minimum_size.y = 22.0
+	_settings_scroll_cue.add_theme_font_size_override("font_size", 15)
+	_settings_scroll_cue.add_theme_color_override("font_color", Color(0.98, 0.70, 0.28, 1.0))
+	VisualTypeSystem.set_utility_bold(_settings_scroll_cue)
+	_settings_scroll_cue.visible = _active_section == SECTION_SETTINGS and short_compact
+	_apply_section_material()
+
+func _apply_section_material() -> void:
+	if _content_panel == null:
+		return
+	var is_settings: bool = _active_section == SECTION_SETTINGS
+	var surface: StyleBoxFlat = _make_panel_style(
+		Color(0.035, 0.045, 0.040, 0.94) if is_settings else Color(0.018, 0.016, 0.020, 0.82),
+		Color(0.76, 0.58, 0.24, 0.96) if is_settings else Color(0.56, 0.50, 0.42, 0.92),
+		0,
+		0,
+		22
+	)
+	surface.border_width_top = 3 if is_settings else 2
+	surface.border_width_left = 4 if is_settings else 0
+	surface.border_color = Color(0.84, 0.61, 0.24, 0.96) if is_settings else Color(0.79, 0.70, 0.56, 0.90)
+	_content_panel.add_theme_stylebox_override("panel", surface)
+	_content_panel.set_meta("material_role", "machine_console_olive_steel" if is_settings else "field_order_carbon_record")
+	if _settings_scroll_cue != null:
+		_settings_scroll_cue.visible = is_settings and _is_short_compact_layout()
 
 func _ensure_content_record_assembly() -> void:
 	if _content_panel == null:
@@ -827,6 +917,7 @@ func _reset_content_scroll() -> void:
 func _render_active_section() -> void:
 	if _content_body == null:
 		return
+	_apply_section_material()
 	_clear_content_body()
 	match _active_section:
 		SECTION_HOME:

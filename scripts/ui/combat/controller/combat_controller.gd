@@ -4121,11 +4121,13 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 		aftermath_stamp.text = "THE FIELD\nSTILL BREATHES" if title == "VICTORY" else "NOTHING LEFT.\nNOTHING RELEASED." if title == "STALEMATE" else "THE WOODS\nTOOK THEIR DUE"
 		aftermath_stamp.add_theme_color_override("font_color", Color(title_color.r, title_color.g, title_color.b, 0.74))
 		aftermath_stamp.add_theme_font_size_override("font_size", 20 if compact_layout else 34)
+		aftermath_stamp.visible = not compact_layout
+		aftermath_stamp.set_meta("compact_stamp_suppressed", compact_layout)
 		if compact_layout:
-			aftermath_stamp.anchor_left = 0.34
-			aftermath_stamp.anchor_right = 0.66
-			aftermath_stamp.anchor_top = 0.80
-			aftermath_stamp.anchor_bottom = 0.96
+			aftermath_stamp.anchor_left = 0.0
+			aftermath_stamp.anchor_right = 0.0
+			aftermath_stamp.anchor_top = 0.0
+			aftermath_stamp.anchor_bottom = 0.0
 			aftermath_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			aftermath_stamp.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 		else:

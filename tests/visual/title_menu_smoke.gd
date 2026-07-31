@@ -115,9 +115,14 @@ func _run() -> void:
 			_expect(incident_copy.contains("ONE WITNESS") and incident_copy.contains("ASH CELLAR"), "Title incident should retain concrete survivor evidence", failures)
 			_expect(incident_record.get_theme_font_size("font_size") >= 16, "Title incident record should remain functional-size copy", failures)
 		var misregister: Label = title_menu.get_node_or_null("Center/VBox/GameTitle/Misregister") as Label
+		var bone_ghost: Label = title_menu.get_node_or_null("Center/VBox/GameTitle/BoneGhost") as Label
+		var pay_block: ColorRect = title_menu.get_node_or_null("Center/VBox/GameTitle/PayBlock") as ColorRect
 		var strike_band: ColorRect = title_menu.get_node_or_null("Center/VBox/GameTitle/StrikeBand") as ColorRect
 		_expect(misregister != null and misregister.text == title_label.text, "GameTitle should expose a misregistered duplicate impression", failures)
+		_expect(bone_ghost != null and bone_ghost.text == title_label.text, "GameTitle should expose a second bone-ink misregister", failures)
+		_expect(pay_block != null and pay_block.color.a >= 0.55, "GameTitle should carry an ownable PAY debt block", failures)
 		_expect(strike_band != null and strike_band.color.a >= 0.75, "GameTitle should carry a visible struck-through treatment", failures)
+		_expect(int(title_label.get_meta("wordmark_custom_treatment_revision", 0)) >= 2, "GameTitle should publish its custom cut-stencil treatment revision", failures)
 		var threat_signal: Label = title_menu.get_node_or_null("ImmediateThreatSignal") as Label
 		_expect(threat_signal != null and threat_signal.text.contains("CONTACT MOVING"), "Command menu should expose an immediate authored danger signal", failures)
 		var action_docket: Label = title_menu.get_node_or_null("Center/VBox/ActionDocket") as Label
@@ -281,6 +286,7 @@ func _run() -> void:
 			var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer
 			var settings_docket_title: Label = title_menu.find_child("SettingsDocketTitle", true, false) as Label
 			_expect(settings_docket != null and settings_docket_title != null and settings_docket_title.text.contains("ACTIVE PAGE"), "Settings should open as a joined local-machine field record", failures)
+			_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "Settings should use a machine-console material distinct from the field-order record", failures)
 			var volume_slider: HSlider = title_menu.find_child("MasterVolumeSlider", true, false) as HSlider
 			_expect(volume_slider != null, "Settings did not expose master volume slider", failures)
 			if volume_slider != null:

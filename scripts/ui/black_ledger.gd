@@ -80,6 +80,19 @@ func _sync_to_viewport() -> void:
 		_ledger_frame.add_theme_constant_override("separation", 10 if compact else 14)
 	if _page_scroll != null:
 		_page_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if compact or _sparse_content_record else ScrollContainer.SCROLL_MODE_DISABLED
+		_page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_page_scroll.get_v_scroll_bar().custom_minimum_size.x = 12.0 if compact else 8.0
+		_page_scroll.set_meta("compact_scroll_finish", "wide_vertical_track_no_horizontal_escape" if compact else "record_track")
+	if _witness_stamp_label != null:
+		_witness_stamp_label.visible = not compact
+		_witness_stamp_label.set_meta("compact_status_folded_into_metadata", compact)
+	if _close_button != null:
+		_close_button.text = "CLOSE" if compact else "CLOSE FILE"
+		_close_button.custom_minimum_size = Vector2(124.0, 46.0) if compact else Vector2(142.0, 56.0)
+		_close_button.set_meta("compact_header_action", "close_only" if compact else "close_file")
+		var header: HBoxContainer = _close_button.get_parent() as HBoxContainer
+		if header != null:
+			header.add_theme_constant_override("separation", 9 if compact else 18)
 	if _footer_band != null:
 		_footer_band.custom_minimum_size = Vector2(0.0, 44.0 if compact else 50.0)
 	if _footer_stamp_label != null:
@@ -678,7 +691,7 @@ func _style_scroll_container(scroll: ScrollContainer) -> void:
 	if scroll == null:
 		return
 	var bar: VScrollBar = scroll.get_v_scroll_bar()
-	bar.custom_minimum_size.x = 8.0
+	bar.custom_minimum_size.x = 12.0 if get_viewport_rect().size.x < 1440.0 else 8.0
 	var track: StyleBoxFlat = StyleBoxFlat.new()
 	track.bg_color = Color(0.018, 0.015, 0.019, 0.96)
 	track.border_color = Color(0.25, 0.22, 0.20, 0.80)

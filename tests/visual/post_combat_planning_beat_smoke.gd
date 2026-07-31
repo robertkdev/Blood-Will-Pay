@@ -222,10 +222,12 @@ func _assert_compact_defeat_result(controller: Variant, defeat_detail: String) -
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
 	var title_label: Label = card.get_node_or_null("CardMargin/Content/OutcomeLabel") as Label if card != null else null
+	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label if banner != null else null
 	_expect(card != null and bool(card.get_meta("compact_centered_stack", false)), "150% defeat result did not enter its centered compact stack")
 	_expect(card != null and is_equal_approx(float(card.get_meta("ui_scale_compensation", 0.0)), 1.5), "150% defeat result did not compensate its logical frame for UI scale")
 	_expect(card != null and card.custom_minimum_size.x <= 470.0, "150% defeat logical width stayed too large for the 1280px safe area")
 	_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER, "150% defeat headline drifted back to the right edge")
+	_expect(aftermath_stamp != null and not aftermath_stamp.visible and bool(aftermath_stamp.get_meta("compact_stamp_suppressed", false)), "150% defeat retained its colliding environmental stamp")
 	if banner != null and card != null:
 		_assert_result_frame_inside_viewport(card, card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button, "DEFEAT 1280x720 150%")
 	_save_capture("result_defeat_1280x720_150pct.png")

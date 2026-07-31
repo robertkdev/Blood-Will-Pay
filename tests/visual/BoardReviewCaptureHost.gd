@@ -121,6 +121,7 @@ func _run() -> void:
 	if title_menu != null:
 		title_menu.call_deferred("_refresh_scaled_layout")
 	await _settle_frames(12)
+	_assert_compact_settings_finish()
 	await _capture("23_settings_1280x720_150pct.png", "settings_150_percent", COMPACT_SIZE)
 
 	_configure_window(DESKTOP_SIZE)
@@ -163,6 +164,7 @@ func _run() -> void:
 	if ledger != null and ledger.has_method("_refresh_scaled_layout"):
 		ledger.call_deferred("_refresh_scaled_layout")
 	await _settle_frames(12)
+	_assert_compact_ledger_finish(ledger)
 	await _capture("24_ledger_1280x720_150pct.png", "black_ledger_veteran_150_percent", COMPACT_SIZE)
 	_configure_window(DESKTOP_SIZE)
 	await _settle_frames(8)
@@ -206,6 +208,7 @@ func _run() -> void:
 	if _main.has_method("_sync_system_menu_button"):
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(14)
+	_assert_compact_shop_hover_safety("125% planning")
 	await _capture("12_planning_1280x720_125pct.png", "planning_125_percent", COMPACT_SIZE)
 
 	_configure_scaled_window(COMPACT_SIZE, 1.5)
@@ -215,6 +218,7 @@ func _run() -> void:
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(14)
 	_assert_planning_footer_and_metric_contract("150% planning")
+	_assert_compact_shop_hover_safety("150% planning")
 	await _capture("13_planning_1280x720_150pct.png", "planning_150_percent", COMPACT_SIZE)
 
 	_configure_window(DESKTOP_SIZE)
@@ -482,6 +486,7 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	var reduced_lock: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	var pressure_painter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ArenaPressurePainter") as Control
 	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
+	var arena_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
 	_expect(arena != null and String(arena.get_meta("battlefield_pressure_phase", "")) == expected_phase, "%s capture did not reach the requested environment phase" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("battlefield_reduced_motion", not reduced_motion)) == reduced_motion, "%s capture reduced-motion metadata is wrong" % expected_phase)
 	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("physical_warfield/"), "%s capture lacks a physical battlefield signature" % expected_phase)
@@ -496,6 +501,8 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(pressure_painter != null and int(pressure_painter.get_meta("pressure_phase", -1)) == int(arena.get_meta("battlefield_pressure_index", -2)), "%s kinetic layer did not receive the environmental phase event" % expected_phase)
 	_expect(pressure_painter != null and pressure_painter.has_meta("protected_center_rect"), "%s kinetic pressure does not publish a protected actor-clarity center" % expected_phase)
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
+	_expect(arena_surface != null and String(arena_surface.get_meta("battlefield_foundation", "")) == "muddy_rural_killing_ground_v1", "%s capture lacks the physical rural horror foundation" % expected_phase)
+	_expect(arena_surface != null and arena_surface.modulate.a >= 0.75, "%s capture washes the physical battlefield back into a flat texture" % expected_phase)
 	if aftermath != null and arena != null and onset != null and midfight != null and reduced_lock != null and reduced_motion:
 		_expect(aftermath.scale == Vector2.ONE, "%s reduced-motion capture retained an animated environment transform" % expected_phase)
 		_expect(float(arena.get_meta("battlefield_overlay_density", 1.0)) <= 0.20, "%s reduced-motion capture retained excessive overlay density" % expected_phase)
@@ -555,6 +562,50 @@ func _assert_settings_rail_contract() -> void:
 		visible_navigation_labels += 1
 		_expect(button.modulate.a >= 0.99 and button.self_modulate.a >= 0.99, "desktop Settings navigation action %s remained faded" % String(button.name))
 	_expect(visible_navigation_labels >= 6, "desktop Settings navigation rail exposes too few readable actions")
+
+
+func _assert_compact_settings_finish() -> void:
+	var title_menu: Control = _main.get_node_or_null("TitleMenu") as Control if _main != null else null
+	var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer if title_menu != null else null
+	var content_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer if title_menu != null else null
+	var scroll_cue: Label = title_menu.find_child("SettingsScrollCue", true, false) as Label if title_menu != null else null
+	_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "150% Settings did not select its distinct machine-console material")
+	_expect(content_scroll != null and content_scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED, "150% Settings content is not scrollable")
+	_expect(content_scroll != null and content_scroll.get_v_scroll_bar().custom_minimum_size.x >= 10.0, "150% Settings scrollbar remains too cramped")
+	_expect(scroll_cue != null and scroll_cue.is_visible_in_tree() and scroll_cue.text.contains("SCROLL"), "150% Settings does not explain the intentionally continued record")
+
+
+func _assert_compact_ledger_finish(ledger: Control) -> void:
+	_expect(ledger != null, "150% Ledger finish check has no ledger")
+	if ledger == null:
+		return
+	var page_scroll: ScrollContainer = ledger.get("_page_scroll") as ScrollContainer
+	var close_button: Button = ledger.get("_close_button") as Button
+	var witness_stamp: Label = ledger.get("_witness_stamp_label") as Label
+	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "150% Ledger exposes a horizontal scrollbar")
+	_expect(page_scroll != null and page_scroll.get_v_scroll_bar().custom_minimum_size.x >= 12.0, "150% Ledger vertical scrollbar remains too cramped")
+	_expect(close_button != null and close_button.text == "CLOSE" and close_button.custom_minimum_size.x <= 128.0, "150% Ledger close action did not collapse to its compact header treatment")
+	_expect(witness_stamp != null and not witness_stamp.visible, "150% Ledger keeps the witness stamp jammed beside the close action")
+
+
+func _assert_compact_shop_hover_safety(context: String) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var shop_grid: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer if combat != null else null
+	var shop_card: Control = null
+	if shop_grid != null:
+		for raw_child: Node in shop_grid.get_children():
+			var candidate: Control = raw_child as Control
+			if candidate != null and candidate.visible and candidate.has_method("_show_tooltip"):
+				shop_card = candidate
+				break
+	_expect(shop_card != null, "%s has no hoverable shop card for the obstruction check" % context)
+	if shop_card == null:
+		return
+	shop_card.call("_show_tooltip")
+	_expect(String(shop_card.get_meta("compact_tooltip_policy", "")) == "suppress_hover", "%s did not select the compact hover-suppression policy" % context)
+	_expect(bool(shop_card.get_meta("tooltip_suppressed_for_compact", false)), "%s did not record that the obstructive hover was suppressed" % context)
+	_expect(get_tree().root.find_child("ShopCardTooltip", true, false) == null, "%s opened a shop tooltip over the tactical controls" % context)
+	_expect(get_tree().root.find_child("ShopCardTooltipLayer", true, false) == null, "%s retained an obstructive tooltip layer" % context)
 
 
 func _assert_starter_header_separation() -> void:
@@ -675,6 +726,7 @@ func _assert_compact_result_contract() -> void:
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
 	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
+	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label if banner != null else null
 	_expect(card != null and String(card.get_meta("responsive_result_layout", "")) == "compact_safe", "150% defeat did not select the compact result layout")
 	if card == null or skip_button == null:
 		_expect(false, "150% defeat is missing its card or skip control")
@@ -685,6 +737,7 @@ func _assert_compact_result_contract() -> void:
 	_expect(viewport_rect.encloses(card_rect), "150%% defeat frame exceeds the logical viewport: viewport=%s card=%s" % [str(viewport_rect), str(card_rect)])
 	_expect(card_rect.encloses(skip_rect), "150%% defeat skip control exceeds the lower frame: card=%s skip=%s" % [str(card_rect), str(skip_rect)])
 	_expect(skip_rect.end.y <= viewport_rect.end.y - 2.0, "150% defeat skip control is clipped by the lower viewport edge")
+	_expect(aftermath_stamp != null and not aftermath_stamp.visible and bool(aftermath_stamp.get_meta("compact_stamp_suppressed", false)), "150% defeat retained the colliding environmental stamp")
 
 func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
 	var contract: Dictionary[String, Variant] = {"state": state}

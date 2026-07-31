@@ -176,6 +176,10 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	_compact_presentation = enabled
 	_tight_presentation = enabled and tight
+	set_meta("compact_tooltip_policy", "suppress_hover" if _tight_presentation else "full_detail")
+	set_meta("tooltip_suppressed_for_compact", false)
+	if _tight_presentation:
+		_clear_tooltip()
 	custom_minimum_size = Vector2(120.0, 54.0) if _tight_presentation else Vector2(132.0, 80.0) if enabled else Vector2(150.0, 122.0)
 	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	set_meta("shop_safe_bottom_gutter", 2.0 if _tight_presentation else 6.0 if enabled else 16.0)
@@ -540,6 +544,10 @@ func _apply_hover_motion(active: bool) -> void:
 
 func _show_tooltip() -> void:
 	_clear_tooltip()
+	if _tight_presentation:
+		set_meta("tooltip_suppressed_for_compact", true)
+		return
+	set_meta("tooltip_suppressed_for_compact", false)
 	if not is_inside_tree():
 		return
 	var lines: Array[String] = _current_tooltip_lines()

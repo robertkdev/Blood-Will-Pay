@@ -493,7 +493,12 @@ static func _apply_named_nodes(root: Control) -> void:
 	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(1.0, 0.78, 0.68, 0.96))
 	_ensure_planning_pressure(root)
 	_ensure_planning_phase_geometry(root)
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaSurface", GothicUIAssets.battlefield_texture(), -7, Color(0.86, 0.82, 0.78, 0.38))
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaSurface", GothicUIAssets.battlefield_texture(), -7, Color(0.93, 0.86, 0.78, 0.78))
+	var arena_surface: TextureRect = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
+	if arena_surface != null:
+		arena_surface.set_meta("battlefield_foundation", "muddy_rural_killing_ground_v1")
+		arena_surface.set_meta("physical_depth_language", "wet_mud_ditch_standing_water_broken_barricade_wagon_debris")
+		arena_surface.set_meta("horror_lighting", "hostile_red_upper_survival_pale_lower")
 	_ensure_arena_zone_guides(root)
 	_ensure_tactical_shell_marks(root)
 	_style_label(root, "MarginContainer/VBoxContainer/StageLabel", 42, COLOR_TEXT, true)

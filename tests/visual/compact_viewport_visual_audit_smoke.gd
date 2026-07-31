@@ -147,6 +147,7 @@ func _run() -> void:
 	_expect_scaled_tactical_surface_containment("compact 125-percent", COMPACT_LOGICAL_125_PERCENT_SIZE)
 	_expect_connected_planning_composition("compact 125-percent planning", false)
 	_expect_no_button_text_overflow(combat, "compact 125-percent post-shop combat")
+	_expect_compact_shop_tooltip_suppressed("compact 125-percent planning")
 	_save_capture("05a_post_shop_planning_1280x720_125pct.png", _main)
 
 	_set_persisted_scaled_window(VIEWPORT_SIZE, 1.5, COMPACT_LOGICAL_150_PERCENT_SIZE)
@@ -160,6 +161,7 @@ func _run() -> void:
 	_expect_scaled_tactical_surface_containment("compact 150-percent", COMPACT_LOGICAL_150_PERCENT_SIZE)
 	_expect_connected_planning_composition("compact 150-percent planning", false)
 	_expect_no_button_text_overflow(combat, "compact 150-percent post-shop combat")
+	_expect_compact_shop_tooltip_suppressed("compact 150-percent planning")
 	_save_capture("05b_post_shop_planning_1280x720_150pct.png", _main)
 
 	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.0, STANDARD_VIEWPORT_SIZE)
@@ -201,8 +203,26 @@ func _run() -> void:
 	_expect_compact_battlefield_dominance()
 	_expect_connected_planning_composition("150-percent planning", false)
 	_expect_no_button_text_overflow(combat, "150-percent post-shop combat")
+	_expect_compact_shop_tooltip_suppressed("150-percent planning")
 	_save_capture("06_post_shop_planning_1920x1080_150pct.png", _main)
 	await _finish()
+
+func _expect_compact_shop_tooltip_suppressed(context: String) -> void:
+	var shop_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
+	var card: Control = null
+	if shop_grid != null:
+		for raw_child: Node in shop_grid.get_children():
+			var candidate: Control = raw_child as Control
+			if candidate != null and candidate.visible and candidate.has_method("_show_tooltip"):
+				card = candidate
+				break
+	_expect(card != null, "%s lacks a hoverable shop card" % context)
+	if card == null:
+		return
+	card.call("_show_tooltip")
+	_expect(String(card.get_meta("compact_tooltip_policy", "")) == "suppress_hover", "%s did not select compact hover suppression" % context)
+	_expect(bool(card.get_meta("tooltip_suppressed_for_compact", false)), "%s did not report hover suppression" % context)
+	_expect(get_tree().root.find_child("ShopCardTooltipLayer", true, false) == null, "%s created an obstructive tooltip layer" % context)
 
 func _build_post_shop_state() -> void:
 	var title_page: Control = _main.get_node_or_null("TitlePage") as Control
