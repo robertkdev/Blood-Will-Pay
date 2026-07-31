@@ -109,6 +109,7 @@ func _run() -> void:
 		title_menu.call("_select_section", "settings", false)
 		title_menu.call_deferred("_refresh_scaled_layout")
 	await _settle_frames(8)
+	_assert_settings_rail_contract()
 	await _capture("03_settings_1920x1080.png", "settings", DESKTOP_SIZE)
 
 	_configure_window(COMPACT_SIZE)
@@ -182,6 +183,7 @@ func _run() -> void:
 
 	_configure_window(COMPACT_SIZE)
 	await _settle_frames(12)
+	_assert_starter_header_separation()
 	await _capture("08_starter_selected_1280x720.png", "starter_selected", COMPACT_SIZE)
 
 	await _build_planning_surface()
@@ -212,6 +214,7 @@ func _run() -> void:
 	if _main.has_method("_sync_system_menu_button"):
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(14)
+	_assert_planning_footer_and_metric_contract("150% planning")
 	await _capture("13_planning_1280x720_150pct.png", "planning_150_percent", COMPACT_SIZE)
 
 	_configure_window(DESKTOP_SIZE)
@@ -529,6 +532,83 @@ func _assert_title_gateway_contract(context: String, compact: bool) -> void:
 	_expect(bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "%s entry affordance lost its restrained CTA contract" % context)
 
 
+func _assert_settings_rail_contract() -> void:
+	var title_menu: Control = _main.get_node_or_null("TitleMenu") as Control if _main != null else null
+	var rail: Panel = title_menu.get_node_or_null("TitlePanel") as Panel if title_menu != null else null
+	var logo: TextureRect = title_menu.find_child("Logo", true, false) as TextureRect if title_menu != null else null
+	_expect(title_menu != null and title_menu.is_visible_in_tree(), "desktop Settings command surface is not visible")
+	_expect(rail != null and rail.is_visible_in_tree(), "desktop Settings navigation rail is missing")
+	if rail == null:
+		return
+	_expect(rail.modulate.a >= 0.99 and rail.self_modulate.a >= 0.99, "desktop Settings navigation rail remained faded after its transition")
+	_expect(bool(title_menu.get_meta("command_chrome_is_settled", false)), "desktop Settings navigation rail lacks its settled-opacity contract")
+	_expect(float(title_menu.get_meta("command_rail_minimum_contrast_ratio", 0.0)) >= 7.0, "desktop Settings navigation rail lacks its high-contrast contract")
+	if logo != null:
+		_expect(logo.modulate.a >= 0.99 and logo.self_modulate.a >= 0.99, "desktop Settings wordmark remained faded")
+	var visible_navigation_labels: int = 0
+	for node: Node in title_menu.find_children("*", "Button", true, false):
+		var button: Button = node as Button
+		if button == null or not button.is_visible_in_tree():
+			continue
+		if button.text.strip_edges().is_empty():
+			continue
+		visible_navigation_labels += 1
+		_expect(button.modulate.a >= 0.99 and button.self_modulate.a >= 0.99, "desktop Settings navigation action %s remained faded" % String(button.name))
+	_expect(visible_navigation_labels >= 6, "desktop Settings navigation rail exposes too few readable actions")
+
+
+func _assert_starter_header_separation() -> void:
+	var top_mark: Label = _main.get_node_or_null("UnitSelect/StarterRegistrationMarks/TopMark") as Label if _main != null else null
+	var system_menu: Button = _main.find_child("SystemMenuButton", true, false) as Button if _main != null else null
+	_expect(top_mark != null and top_mark.is_visible_in_tree(), "compact starter dossier mark is missing")
+	_expect(system_menu != null and system_menu.is_visible_in_tree(), "compact starter system-menu escape hatch is missing")
+	if top_mark == null or system_menu == null:
+		return
+	var top_mark_rect: Rect2 = top_mark.get_global_rect()
+	var system_menu_rect: Rect2 = system_menu.get_global_rect()
+	var horizontal_gap: float = top_mark_rect.position.x - system_menu_rect.end.x
+	_expect(not top_mark_rect.intersects(system_menu_rect), "compact starter dossier mark overlaps SYS // MENU")
+	_expect(horizontal_gap >= 12.0, "compact starter header separation is below 12px: gap=%.1f" % horizontal_gap)
+
+
+func _assert_planning_footer_and_metric_contract(context: String) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var shop_grid: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer if combat != null else null
+	var bottom_gutter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopBottomGutter") as Control if combat != null else null
+	_expect(shop_grid != null and shop_grid.is_visible_in_tree(), "%s shop grid is missing" % context)
+	_expect(bottom_gutter != null and bottom_gutter.is_visible_in_tree(), "%s lacks a real shop bottom-gutter control" % context)
+	if shop_grid != null:
+		var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+		var visible_gutter: float = viewport_rect.end.y - shop_grid.get_global_rect().end.y
+		_expect(visible_gutter >= 8.0, "%s shop grid still terminates against the framebuffer: gutter=%.1f" % [context, visible_gutter])
+		var shop_plate: Control = combat.get_node_or_null("GothicShopPlate") as Control
+		if shop_plate != null and shop_plate.is_visible_in_tree():
+			var plate_gutter: float = viewport_rect.end.y - shop_plate.get_global_rect().end.y
+			_expect(plate_gutter >= 8.0, "%s shop backplate still terminates against the framebuffer: gutter=%.1f" % [context, plate_gutter])
+	if bottom_gutter != null:
+		_expect(bottom_gutter.size.y >= 8.0 and bottom_gutter.size.y <= 12.0, "%s shop bottom gutter is outside the authored 8-12px range: %.1f" % [context, bottom_gutter.size.y])
+	var found_bonko: bool = false
+	var found_berebell: bool = false
+	var metric_rows: Array[Node] = combat.find_children("*", "ScoreboardRow", true, false) if combat != null else []
+	for node: Node in metric_rows:
+		var row: Control = node as Control
+		var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label if row != null else null
+		if name_label == null or not name_label.is_visible_in_tree():
+			continue
+		var identity: String = name_label.text.strip_edges().to_upper()
+		found_bonko = found_bonko or identity.contains("BONKO")
+		found_berebell = found_berebell or identity.contains("BEREBELL")
+		_expect(not identity.contains("BOKO"), "%s corrupts BONKO into BOKO" % context)
+		var identity_name: String = identity.trim_prefix("YOU ").trim_prefix("FOE ").trim_prefix("Y ").trim_prefix("F ").strip_edges()
+		_expect(identity_name != "BELL", "%s ambiguously truncates BEREBELL to BELL" % context)
+		var font: Font = name_label.get_theme_font("font")
+		var font_size: int = name_label.get_theme_font_size("font_size")
+		var text_width: float = font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x if font != null else 0.0
+		_expect(text_width <= name_label.size.x + 1.0, "%s metric identity clips: %s text=%.1f width=%.1f" % [context, identity, text_width, name_label.size.x])
+	_expect(found_bonko, "%s metrics lost the full BONKO identity" % context)
+	_expect(found_berebell, "%s metrics lost the full BEREBELL identity" % context)
+
+
 func _assert_result_outcome_contract(outcome: String) -> void:
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
 	_expect(banner != null and banner.visible, "%s result contract missing visible banner" % outcome)
@@ -550,6 +630,11 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 	_expect(hold_label != null and not hold_label.text.contains("."), "%s result leaked a decimal auto-advance telemetry readout" % outcome)
 	_expect(skip_button != null and not skip_button.text.contains("(") and skip_button.text.contains("ENTER / SPACE"), "%s result leaked its internal skip threshold" % outcome)
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its physical aftermath signature" % outcome)
+	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
+	var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label if stage_bar != null else null
+	_expect(phase_label != null and phase_label.text.contains("RECORDED") and not phase_label.text.contains("FIGHT"), "%s result leaves the stage strip in an active-fight state" % outcome)
+	_expect(stage_bar != null and bool(stage_bar.get_meta("result_state_active", false)), "%s result stage strip lacks resolved-state metadata" % outcome)
+	_expect(stage_bar != null and String(stage_bar.get_meta("result_outcome", "")) == outcome.to_lower(), "%s result stage strip exposes the wrong outcome metadata" % outcome)
 	_assert_physical_result_geometry(victory_geometry, "victory", outcome == "VICTORY", 6, outcome)
 	_assert_physical_result_geometry(stalemate_geometry, "stalemate", outcome == "STALEMATE", 6, outcome)
 	_assert_physical_result_geometry(defeat_geometry, "defeat", outcome == "DEFEAT", 7, outcome)

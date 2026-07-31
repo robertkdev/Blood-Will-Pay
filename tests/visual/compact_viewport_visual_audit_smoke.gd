@@ -722,6 +722,11 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	if shop_grid != null:
 		var safe_gutter: float = float(shop_grid.get_meta("safe_bottom_gutter", 0.0))
 		_expect(safe_gutter >= 8.0, "%s shop grid lacks its authored bottom safe gutter" % context)
+		var bottom_gutter: Control = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopBottomGutter")
+		_expect(bottom_gutter != null and bottom_gutter.is_visible_in_tree(), "%s shop footer lacks a real layout gutter" % context)
+		if bottom_gutter != null:
+			_expect(bottom_gutter.size.y >= 8.0 and bottom_gutter.size.y <= 12.0, "%s shop footer gutter is outside 8-12px: %.1f" % [context, bottom_gutter.size.y])
+			_expect(shop_grid.get_global_rect().end.y <= bottom_gutter.get_global_rect().position.y + 1.0, "%s shop cards overlap the bottom gutter" % context)
 		for child: Node in shop_grid.get_children():
 			var card: Control = child as Control
 			if card != null and card.is_visible_in_tree():
@@ -751,6 +756,7 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 		"MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
+		"MarginContainer/VBoxContainer/BottomStorageArea/ShopBottomGutter",
 	])
 	for path: String in required_paths:
 		var surface: Control = combat.get_node_or_null(path) as Control
@@ -831,6 +837,9 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		var stats_text_width: float = stats_font.get_multiline_string_size(stats_title.text, HORIZONTAL_ALIGNMENT_LEFT, stats_title.size.x, stats_title.get_theme_font_size("font_size")).x if stats_font != null else 0.0
 		_expect(stats_text_width <= stats_title.size.x + 1.0, "%s Team Metrics title overflows its rail: text=%.1f width=%.1f" % [context, stats_text_width, stats_title.size.x])
 	var compact_rows: int = 0
+	var found_bonko: bool = false
+	var found_berebell: bool = false
+	var full_berebell_fits: bool = scoreboard.size.x >= 160.0
 	for row_node: Node in scoreboard.find_children("*", "ScoreboardRow", true, false):
 		var row: Control = row_node as Control
 		if row == null or not row.is_visible_in_tree():
@@ -839,12 +848,22 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		_expect(bool(row.get_meta("compact_layout", false)), "%s visible metric row did not enter its compact contract" % context)
 		var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label
 		var value_label: Label = row.get_node_or_null("HBox/Content/Value") as Label
-		_expect(name_label != null and (name_label.text.begins_with("YOU ") or name_label.text.begins_with("FOE ")), "%s metric row lost its intentional team badge" % context)
+		var has_team_badge: bool = name_label != null and (
+			name_label.text.begins_with("YOU ")
+			or name_label.text.begins_with("FOE ")
+			or name_label.text.begins_with("Y ")
+			or name_label.text.begins_with("F ")
+		)
+		_expect(has_team_badge, "%s metric row lost its intentional text team badge" % context)
 		_expect(value_label != null and value_label.text.strip_edges() != "", "%s metric row lost its numeric value" % context)
 		if name_label != null:
 			_expect(bool(name_label.get_meta("compact_identity_complete", false)), "%s metric row reverted to raw unit-name truncation" % context)
 			_expect(not name_label.text.contains("//"), "%s metric row still exposes accidental identifier truncation" % context)
-			var identity_copy: String = name_label.text.trim_prefix("YOU ").trim_prefix("FOE ").strip_edges()
+			var identity_copy: String = name_label.text.trim_prefix("YOU ").trim_prefix("FOE ").trim_prefix("Y ").trim_prefix("F ").strip_edges()
+			found_bonko = found_bonko or identity_copy == "BONKO"
+			found_berebell = found_berebell or identity_copy == "BEREBELL" or (not full_berebell_fits and identity_copy.begins_with("BERE") and identity_copy.length() >= 4)
+			_expect(identity_copy != "BOKO", "%s corrupts BONKO into BOKO" % context)
+			_expect(identity_copy != "BELL", "%s ambiguously truncates BEREBELL to BELL" % context)
 			_expect(not identity_copy.is_valid_int(), "%s metric row exposes only an ambiguous ordinal instead of its identity" % context)
 			_expect(name_label.get_theme_font_size("font_size") >= 14, "%s team metric identity type is too small" % context)
 			var name_font: Font = name_label.get_theme_font("font")
@@ -854,6 +873,8 @@ func _expect_scaled_team_metrics(context: String) -> void:
 			_expect(value_label.get_theme_font_size("font_size") >= 15, "%s team metric value type is too small" % context)
 	if not scoreboard.find_children("*", "ScoreboardRow", true, false).is_empty():
 		_expect(compact_rows > 0, "%s populated Team Metrics rail exposes no readable rows" % context)
+		_expect(found_bonko, "%s populated Team Metrics rail omits full BONKO" % context)
+		_expect(found_berebell, "%s populated Team Metrics rail omits full BEREBELL or an unambiguous tight fallback" % context)
 
 func _expect_scaled_surface_separation(context: String) -> void:
 	var battle_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea")

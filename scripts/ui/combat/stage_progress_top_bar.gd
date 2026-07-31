@@ -38,6 +38,7 @@ var _phase_label: Label
 var _tokens: Array[PanelContainer] = []
 var _compat_icons: Array[TextureRect] = []
 var _texture_cache: Dictionary[String, Texture2D] = {}
+var _result_state_active: bool = false
 
 func _ready() -> void:
 	_ensure_built()
@@ -73,10 +74,27 @@ func set_combat_state(in_combat: bool) -> void:
 	_ensure_built()
 	if _phase_label == null:
 		return
+	if _result_state_active:
+		return
 	_phase_label.text = "/// FIGHT" if in_combat else "/// READY"
 	_phase_label.add_theme_color_override("font_color", Color(1.0, 0.22, 0.22, 1.0) if in_combat else Color(0.82, 0.75, 0.64, 0.92))
 	_phase_label.add_theme_constant_override("outline_size", 2 if in_combat else 1)
 	_phase_label.tooltip_text = "Combat active. Hold the line." if in_combat else "Planning state. Prepare the next stage."
+
+func set_result_state(active: bool, outcome: String = "") -> void:
+	_ensure_built()
+	_result_state_active = active
+	set_meta("result_state_active", active)
+	set_meta("result_outcome", outcome.to_lower() if active else "")
+	if _phase_label == null:
+		return
+	if active:
+		_phase_label.text = "/// RECORDED"
+		_phase_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.36, 1.0))
+		_phase_label.add_theme_constant_override("outline_size", 2)
+		_phase_label.tooltip_text = "%s recorded. Review the consequence." % (outcome.capitalize() if not outcome.is_empty() else "Outcome")
+		return
+	_phase_label.tooltip_text = ""
 
 func set_compact_layout(compact: bool) -> void:
 	_ensure_built()

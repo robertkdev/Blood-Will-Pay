@@ -3339,8 +3339,13 @@ func _protect_persistent_hud_chrome() -> void:
 		var total: int = int(ChapterCatalog.stages_in(chapter))
 		if stage_bar.has_method("update_progress"):
 			stage_bar.call("update_progress", chapter, stage, total)
-		if stage_bar.has_method("set_combat_state"):
-			stage_bar.call("set_combat_state", combat_context_visible)
+		if result_visible and stage_bar.has_method("set_result_state"):
+			stage_bar.call("set_result_state", true, _last_result_title)
+		else:
+			if stage_bar.has_method("set_result_state"):
+				stage_bar.call("set_result_state", false)
+			if stage_bar.has_method("set_combat_state"):
+				stage_bar.call("set_combat_state", combat_context_visible)
 		var chapter_label: Label = stage_bar.find_child("ChapterLabel", true, false) as Label
 		var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label
 		if chapter_label != null:
@@ -3704,6 +3709,15 @@ func _apply_result_damage_geometry(card: PanelContainer, title: String) -> void:
 func _hide_result_banner() -> void:
 	if _result_banner != null and is_instance_valid(_result_banner):
 		_result_banner.visible = false
+	var stage_bar: Control = parent.find_child("StageProgressTopBar", true, false) as Control if parent != null else null
+	if stage_bar != null:
+		if stage_bar.has_method("set_result_state"):
+			stage_bar.call("set_result_state", false)
+		if stage_bar.has_method("set_combat_state"):
+			var in_combat: bool = false
+			if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
+				in_combat = int(GameState.phase) == int(GameState.GamePhase.COMBAT)
+			stage_bar.call("set_combat_state", in_combat)
 	_result_hold_active = false
 	_result_hold_finishing = false
 	_result_hold_elapsed = 0.0

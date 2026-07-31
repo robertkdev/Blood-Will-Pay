@@ -32,6 +32,10 @@ const COLOR_BLOOD_HOT: Color = Color(0.78, 0.060, 0.105, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
 const COLOR_GREEN: Color = Color(0.42, 0.70, 0.50, 1.0)
 const COLOR_BLUE: Color = Color(0.34, 0.55, 0.72, 1.0)
+const COLOR_RAIL_TEXT: Color = Color(0.98, 0.95, 0.88, 1.0)
+const COLOR_RAIL_BACKGROUND: Color = Color(0.018, 0.015, 0.020, 1.0)
+const COMMAND_CHROME_SETTLED_ALPHA: float = 1.0
+const COMMAND_RAIL_MIN_CONTRAST_RATIO: float = 7.0
 
 @onready var center_vbox: VBoxContainer = $Center/VBox
 @onready var title_label: Label = $Center/VBox/GameTitle
@@ -81,6 +85,10 @@ func _ready() -> void:
 	UserSettingsScript.initialize(get_window())
 	set_meta("effective_ui_scale", _actual_ui_scale())
 	set_meta("effective_layout_size", _effective_layout_size())
+	set_meta("command_chrome_settled_alpha", COMMAND_CHROME_SETTLED_ALPHA)
+	set_meta("command_rail_minimum_contrast_ratio", COMMAND_RAIL_MIN_CONTRAST_RATIO)
+	set_meta("command_rail_text_color", COLOR_RAIL_TEXT)
+	set_meta("command_rail_background_color", COLOR_RAIL_BACKGROUND)
 	_motion_enabled = not UserSettingsScript.get_reduced_motion()
 	_load_content_data()
 	_apply_gothic_layout()
@@ -1608,7 +1616,7 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 		VisualTypeSystem.set_utility_bold(button)
 	else:
 		VisualTypeSystem.set_action(button)
-	button.add_theme_color_override("font_color", Color(0.96, 0.71, 0.62, 1.0) if visual_role == "quit" else COLOR_TEXT)
+	button.add_theme_color_override("font_color", Color(1.0, 0.74, 0.66, 1.0) if visual_role == "quit" else COLOR_RAIL_TEXT)
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.72, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.76, 0.55, 1.0))
 	HardcoreUIAssets.apply_button_family(button, family)
@@ -1656,10 +1664,12 @@ func _update_nav_state() -> void:
 		nav_button.toggle_mode = true
 		nav_button.button_pressed = is_active
 		nav_button.text = "ACTIVE // " + base_label if is_active else base_label
-		nav_button.add_theme_color_override("font_color", Color(1.0, 0.86, 0.58, 1.0) if is_active else COLOR_TEXT)
+		nav_button.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62, 1.0) if is_active else COLOR_RAIL_TEXT)
 		nav_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.91, 0.68, 1.0) if is_active else Color(1.0, 0.76, 0.55, 1.0))
 		_apply_field_navigation_style(nav_button, is_active)
 		nav_button.set_meta("active_page", is_active)
+		nav_button.set_meta("settled_opacity", COMMAND_CHROME_SETTLED_ALPHA)
+		nav_button.set_meta("minimum_contrast_ratio", COMMAND_RAIL_MIN_CONTRAST_RATIO)
 		if is_active:
 			nav_button.set_meta("visual_role", "selected_navigation")
 		else:
@@ -1668,10 +1678,10 @@ func _update_nav_state() -> void:
 func _apply_field_navigation_style(button: Button, selected: bool) -> void:
 	if button == null:
 		return
-	var normal_fill: Color = Color(0.090, 0.026, 0.032, 0.88) if selected else Color(0.010, 0.009, 0.012, 0.40)
+	var normal_fill: Color = Color(0.090, 0.026, 0.032, 0.92) if selected else Color(0.018, 0.015, 0.020, 0.86)
 	var hover_fill: Color = Color(0.13, 0.035, 0.042, 0.94)
 	var pressed_fill: Color = Color(0.18, 0.025, 0.035, 0.98)
-	var edge: Color = Color(0.78, 0.065, 0.085, 0.98) if selected else Color(0.67, 0.60, 0.50, 0.72)
+	var edge: Color = Color(0.78, 0.065, 0.085, 0.98) if selected else Color(0.76, 0.69, 0.58, 0.90)
 	button.add_theme_stylebox_override("normal", _field_navigation_row(normal_fill, edge, 7 if selected else 2))
 	button.add_theme_stylebox_override("hover", _field_navigation_row(hover_fill, Color(0.94, 0.70, 0.42, 1.0), 5))
 	var selected_fill: Color = Color(0.105, 0.082, 0.050, 0.98)
@@ -2295,28 +2305,38 @@ func _play_intro() -> void:
 		_intro_tween.parallel().tween_property(quit_button, "scale", Vector2.ONE, 0.12)
 
 func _stabilize_command_chrome() -> void:
+	modulate = Color.WHITE
+	self_modulate = Color.WHITE
 	if _title_panel != null:
-		_title_panel.modulate.a = 1.0
+		_set_control_settled_color(_title_panel)
 	if _content_panel != null:
-		_content_panel.modulate.a = 1.0
+		_set_control_settled_color(_content_panel)
 	if title_label != null:
-		title_label.modulate.a = 1.0
+		_set_control_settled_color(title_label)
 	if _subtitle != null:
-		_subtitle.modulate.a = 1.0
+		_set_control_settled_color(_subtitle)
 	if _rule != null:
-		_rule.modulate.a = 1.0
+		_set_control_settled_color(_rule)
 	if logo != null:
-		logo.modulate.a = 1.0
+		_set_control_settled_color(logo)
 	if start_button != null:
-		start_button.modulate.a = 1.0
+		_set_control_settled_color(start_button)
 	if quit_button != null:
-		quit_button.modulate.a = 1.0
+		_set_control_settled_color(quit_button)
 	for nav_button: Button in _nav_buttons:
 		if nav_button != null:
-			nav_button.modulate.a = 1.0
+			_set_control_settled_color(nav_button)
 	for runtime_button: Button in _runtime_action_buttons:
 		if runtime_button != null:
-			runtime_button.modulate.a = 1.0
+			_set_control_settled_color(runtime_button)
+	set_meta("command_chrome_is_settled", true)
+
+func _set_control_settled_color(control: Control) -> void:
+	if control == null:
+		return
+	control.modulate = Color.WHITE
+	control.self_modulate = Color.WHITE
+	control.set_meta("settled_opacity", COMMAND_CHROME_SETTLED_ALPHA)
 
 func _set_intro_alpha(alpha: float) -> void:
 	if title_label != null:

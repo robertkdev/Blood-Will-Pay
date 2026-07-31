@@ -86,7 +86,13 @@ func _update_identity() -> void:
 	elif unit_ref != null and String(unit_ref.name).strip_edges() != "":
 		unit_name = String(unit_ref.name)
 	var team_prefix: String = "FOE" if team == "enemy" else "YOU"
-	name_label.text = "%s %s" % [team_prefix, _compact_identity_name(unit_name)] if _compact_layout else unit_name
+	if _compact_layout:
+		var compact_identity: String = _compact_identity_for_width(unit_name, team_prefix, _compact_identity_available_width())
+		name_label.text = compact_identity
+		name_label.set_meta("compact_identity_source", unit_name.to_upper())
+		name_label.set_meta("compact_identity_lossless", compact_identity.contains(unit_name.to_upper()))
+	else:
+		name_label.text = unit_name
 	name_label.set_meta("compact_identity_complete", _compact_layout)
 	name_label.tooltip_text = "%s team — %s" % ["Enemy" if team == "enemy" else "Your", unit_name]
 
@@ -114,23 +120,57 @@ func _apply_visual_style() -> void:
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		value_label.clip_text = true
 
+func _compact_identity_for_width(unit_name: String, team_prefix: String, available_width: float) -> String:
+	var clean_name: String = unit_name.strip_edges().to_upper()
+	if clean_name == "":
+		clean_name = "UNIT"
+	var font: Font = name_label.get_theme_font("font") if name_label != null else null
+	var font_size: int = 14
+	var full_badge: String = "%s %s" % [team_prefix, clean_name]
+	if _compact_text_width(full_badge, font, font_size) <= available_width:
+		return full_badge
+	var distinctive_name: String = _compact_identity_name(clean_name)
+	var distinctive_full_badge: String = "%s %s" % [team_prefix, distinctive_name]
+	if _compact_text_width(distinctive_full_badge, font, font_size) <= available_width:
+		return distinctive_full_badge
+	var short_team: String = "F" if team_prefix == "FOE" else "Y"
+	var short_badge: String = "%s %s" % [short_team, clean_name]
+	if _compact_text_width(short_badge, font, font_size) <= available_width:
+		return short_badge
+	var distinctive_badge: String = "%s %s" % [short_team, distinctive_name]
+	return distinctive_badge
+
+func _compact_identity_available_width() -> float:
+	if name_label == null:
+		return 72.0
+	if name_label.size.x > 1.0:
+		return name_label.size.x
+	if content_box != null and content_box.size.x > 1.0:
+		return maxf(32.0, content_box.size.x - 52.0)
+	return maxf(32.0, size.x - 62.0)
+
+func _compact_text_width(text: String, font: Font, font_size: int) -> float:
+	if font != null:
+		return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+	return float(text.length() * 8)
+
 func _compact_identity_name(unit_name: String) -> String:
 	var clean_name: String = unit_name.strip_edges()
 	if clean_name == "":
 		return "UNIT"
-	if clean_name.length() <= 4:
+	if clean_name.length() <= 6:
 		return clean_name.to_upper()
 	var duplicate_marker: int = clean_name.rfind("#")
 	if duplicate_marker > 0:
 		var suffix: String = clean_name.substr(duplicate_marker).strip_edges()
-		var base_budget: int = maxi(1, 4 - suffix.length())
+		var base_budget: int = maxi(2, 6 - suffix.length())
 		return "%s%s" % [clean_name.left(base_budget).to_upper(), suffix]
 	var words: PackedStringArray = clean_name.split(" ", false)
 	if words.size() > 1:
-		var first_code: String = words[0].left(2).to_upper()
-		var final_code: String = words[words.size() - 1].left(1).to_upper()
+		var first_code: String = words[0].left(3).to_upper()
+		var final_code: String = words[words.size() - 1].left(2).to_upper()
 		return "%s%s" % [first_code, final_code]
-	return "%s%s" % [clean_name.left(2).to_upper(), clean_name.right(2).to_upper()]
+	return "%s%s" % [clean_name.left(4).to_upper(), clean_name.right(2).to_upper()]
 
 func _ensure_layout() -> void:
 	if _frame == null:
@@ -164,14 +204,14 @@ func _ensure_layout() -> void:
 		name_label.anchor_top = 0.0
 		name_label.anchor_bottom = 1.0
 		name_label.offset_left = 4.0 if _compact_layout else 16.0 if _record_emphasis else 10.0
-		name_label.offset_right = -48.0 if _compact_layout else -126.0 if _record_emphasis else -84.0
+		name_label.offset_right = -40.0 if _compact_layout else -126.0 if _record_emphasis else -84.0
 		name_label.clip_text = true
 	if value_label != null:
 		value_label.anchor_left = 1.0
 		value_label.anchor_right = 1.0
 		value_label.anchor_top = 0.0
 		value_label.anchor_bottom = 1.0
-		value_label.offset_left = -44.0 if _compact_layout else -116.0 if _record_emphasis else -76.0
+		value_label.offset_left = -36.0 if _compact_layout else -116.0 if _record_emphasis else -76.0
 		value_label.offset_right = -4.0 if _compact_layout else -14.0 if _record_emphasis else -10.0
 
 func _make_row_style(player_side: bool, hovered: bool = false) -> StyleBox:
@@ -198,7 +238,7 @@ func _ensure_value_well() -> void:
 	_value_well.anchor_right = 1.0
 	_value_well.anchor_top = 0.0
 	_value_well.anchor_bottom = 1.0
-	_value_well.offset_left = -48.0 if _compact_layout else -122.0 if _record_emphasis else -82.0
+	_value_well.offset_left = -40.0 if _compact_layout else -122.0 if _record_emphasis else -82.0
 	_value_well.offset_right = 0.0
 	_value_well.offset_top = 3.0
 	_value_well.offset_bottom = -3.0
@@ -272,6 +312,10 @@ func _ready() -> void:
 		resized.connect(_update_bar)
 	if content_box and not content_box.is_connected("resized", Callable(self, "_update_bar")):
 		content_box.resized.connect(_update_bar)
+	if not is_connected("resized", Callable(self, "_update_identity")):
+		resized.connect(_update_identity)
+	if content_box and not content_box.is_connected("resized", Callable(self, "_update_identity")):
+		content_box.resized.connect(_update_identity)
 	if value_label:
 		value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_center_value_label()

@@ -25,7 +25,9 @@ const COLOR_BLOOD_HOT: Color = Color(0.82, 0.070, 0.120, 1.0)
 const FULL_LAYOUT_SIZE: Vector2 = Vector2(1320.0, 900.0)
 const COMPACT_VIEWPORT_HEIGHT: float = 780.0
 const REGISTRATION_MARK_POSITION: Vector2 = Vector2(22.0, 18.0)
-const COMPACT_REGISTRATION_MARK_POSITION: Vector2 = Vector2(132.0, 18.0)
+const COMPACT_MENU_RESERVED_RIGHT: float = 132.0
+const COMPACT_REGISTRATION_MARK_GAP: float = 16.0
+const COMPACT_REGISTRATION_MARK_POSITION: Vector2 = Vector2(COMPACT_MENU_RESERVED_RIGHT + COMPACT_REGISTRATION_MARK_GAP, 18.0)
 const IDENTITY_PANEL_MIN_HEIGHT: float = 96.0
 const START_BUTTON_READY_TEXT: String = "Start Game"
 const START_BUTTON_PENDING_TEXT: String = "Preparing Battle..."
@@ -367,6 +369,8 @@ func _ensure_registration_marks() -> void:
 	top_mark.add_theme_color_override("font_color", Color(0.82, 0.74, 0.62, 0.82))
 	top_mark.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
 	top_mark.add_theme_constant_override("outline_size", 2)
+	top_mark.set_meta("global_menu_reserved_right_px", COMPACT_MENU_RESERVED_RIGHT)
+	top_mark.set_meta("minimum_shell_gap_px", 12.0)
 	_position_registration_mark(get_viewport_rect().size)
 	var bottom_mark: Label = _registration_overlay.get_node_or_null("BottomMark") as Label
 	if bottom_mark == null:

@@ -82,6 +82,10 @@ func _run() -> void:
 	_expect(_planning_time_left() >= MIN_RESTORED_PLANNING_SECONDS, "post-win planning timer was not reset; got %.2f" % _planning_time_left())
 	var result_banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
 	_expect(result_banner != null and not result_banner.visible, "battle result overlay remained visible after the authored intermission")
+	var restored_stage_phase: Label = _main.find_child("PhaseLabel", true, false) as Label
+	var restored_stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control
+	_expect(restored_stage_phase != null and restored_stage_phase.text == "/// READY", "planning restored without resetting the resolved stage phase")
+	_expect(restored_stage_bar != null and not bool(restored_stage_bar.get_meta("result_state_active", true)), "planning restored while the stage strip still exposed result metadata")
 	_normalize_restored_planning_capture_timer()
 	await get_tree().process_frame
 	_save_capture("02_post_win_planning_restored.png")
@@ -161,6 +165,7 @@ func _assert_result_card() -> void:
 	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, "VICTORY")
 	_assert_result_frame_inside_viewport(card, skip_button, "VICTORY")
 	_assert_persistent_combat_chrome("VICTORY result")
+	_assert_resolved_stage_phase("VICTORY")
 	var record_wash: TextureRect = card.get_node_or_null("RecordWash") as TextureRect
 	_expect(record_wash != null and record_wash.texture != null, "result card should carry a restrained war-record texture pass")
 	_expect(card.get_node_or_null("DamageMarks/DamageMarkTop") != null and card.get_node_or_null("DamageMarks/DamageMarkRake") != null and card.get_node_or_null("DamageMarks/TornCornerNW") != null, "result card should read as damaged assembled ephemera rather than an empty clean rectangle")
@@ -272,6 +277,7 @@ func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, expected_title)
 	_assert_result_frame_inside_viewport(card, skip_button, expected_title)
 	_assert_persistent_combat_chrome("%s result" % expected_title)
+	_assert_resolved_stage_phase(expected_title)
 	_expect(impact_stamp != null and impact_stamp.text != "FIELD RECORD CLOSED", "%s should carry an authored result-specific settlement stamp" % expected_title)
 	_expect(card != null and String(card.get_meta("result_variant", "")) == expected_title.to_lower(), "%s should expose a semantic visual variant" % expected_title)
 	_expect(hold_label != null and hold_label.text.begins_with("AUTO-ADVANCE IN ") and not hold_label.text.contains("."), "%s countdown should use natural integer copy rather than QA telemetry" % expected_title)
@@ -387,6 +393,13 @@ func _assert_persistent_combat_chrome(context: String) -> void:
 		_expect(system_menu.z_index >= 200, "%s Menu is not protected above combat/result pressure layers" % context)
 	if instruction_ribbon != null:
 		_expect(not instruction_ribbon.z_as_relative and instruction_ribbon.z_index >= 200, "%s instruction ribbon is not protected above combat/result pressure layers" % context)
+
+func _assert_resolved_stage_phase(outcome: String) -> void:
+	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
+	var phase_label: Label = _main.find_child("PhaseLabel", true, false) as Label if _main != null else null
+	_expect(phase_label != null and phase_label.text == "/// RECORDED", "%s result left the persistent stage strip in an active-fight state" % outcome)
+	_expect(stage_bar != null and bool(stage_bar.get_meta("result_state_active", false)), "%s result did not publish resolved stage metadata" % outcome)
+	_expect(stage_bar != null and String(stage_bar.get_meta("result_outcome", "")) == outcome.to_lower(), "%s result stage metadata did not preserve its outcome identity" % outcome)
 
 func _assert_outcome_aftermath_geometry(banner: PanelContainer, outcome: String) -> void:
 	_expect(banner != null, "%s outcome geometry cannot be checked without a result banner" % outcome)

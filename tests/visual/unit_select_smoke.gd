@@ -156,7 +156,14 @@ func _run() -> void:
 	_expect(compact_layout != null and _rect_inside(compact_layout.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter layout escaped the viewport", failures)
 	_expect(heading != null and _rect_inside(heading.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter heading escaped the viewport", failures)
 	_expect(start_button != null and _rect_inside(start_button.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 Start Game escaped the viewport", failures)
-	_expect(compact_dossier_mark != null and compact_dossier_mark.position.x >= 132.0, "1280x720 starter dossier mark did not clear the compact Menu reserve", failures)
+	if compact_dossier_mark != null:
+		var menu_reserved_right: float = float(compact_dossier_mark.get_meta("global_menu_reserved_right_px", 0.0))
+		var minimum_shell_gap: float = float(compact_dossier_mark.get_meta("minimum_shell_gap_px", 0.0))
+		var actual_shell_gap: float = compact_dossier_mark.position.x - menu_reserved_right
+		_expect(minimum_shell_gap >= 12.0, "1280x720 starter dossier mark should publish a 12px minimum Menu gap", failures)
+		_expect(actual_shell_gap >= minimum_shell_gap, "1280x720 starter dossier mark must clear SYS // MENU by at least %.1fpx, got %.1fpx" % [minimum_shell_gap, actual_shell_gap], failures)
+	else:
+		_expect(false, "1280x720 starter dossier mark missing", failures)
 	_verify_card_chrome_contained(view, scroll, 15, "1280x720", failures)
 	if start_button != null:
 		view.set_transition_pending(true)

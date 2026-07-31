@@ -38,6 +38,7 @@ var controller
 var _teardown_done: bool = false
 var stage_progress_top_bar: Control
 var _compact_resource_strip: Label = null
+var _shop_bottom_gutter: Control = null
 
 var player_name: String = "Hero"
 
@@ -218,6 +219,7 @@ func _process(_delta: float) -> void:
 	_update_planning_timer(_delta)
 	_sync_compact_resource_strip()
 	_enforce_compact_metric_badges()
+	_update_external_backplates()
 
 
 func _get_gs() -> Node:
@@ -451,6 +453,7 @@ func _apply_responsive_layout() -> void:
 	if bottom_storage != null:
 		bottom_storage.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 96.0 if tight_compact else 94.0 if compact else 152.0)
 		bottom_storage.size_flags_vertical = Control.SIZE_SHRINK_END
+		_ensure_shop_bottom_gutter(bottom_storage, compact)
 	var opening_shop: bool = shop_grid != null and bool(shop_grid.get_meta("opening_fight_empty", false))
 	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 62.0) if opening_shop and tight_compact else Vector2(520.0, 92.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(640.0 if tight_compact else 900.0 if compact else 1120.0, 62.0 if tight_compact else 92.0 if compact else 108.0))
 	if shop_grid != null:
@@ -769,10 +772,9 @@ func _apply_compact_metric_badge(row: Control, compact: bool) -> void:
 	var identity_changed: Callable = Callable(self, "_on_compact_metric_identity_changed").bind(row)
 	if not name_label.minimum_size_changed.is_connected(identity_changed):
 		name_label.minimum_size_changed.connect(identity_changed)
+	if row.has_method("refresh_compact_identity"):
+		row.call("refresh_compact_identity")
 	var team_name: String = String(row.get("team"))
-	var team_badge: String = "FOE" if team_name == "enemy" else "YOU"
-	var row_index: int = int(row.get("index")) + 1
-	name_label.text = "%s %02d" % [team_badge, maxi(1, row_index)]
 	var display_name: String = String(row.get("display_name")).strip_edges()
 	if display_name == "":
 		var unit_ref: Variant = row.get("unit_ref")
@@ -854,6 +856,26 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 	for action_bar: HBoxContainer in action_bars:
 		_apply_action_bar_layout(action_bar, compact, tight_compact)
 	_apply_bet_row_layout(live_bet_row, compact, tight_compact)
+
+func _ensure_shop_bottom_gutter(bottom_storage: VBoxContainer, compact: bool) -> void:
+	if bottom_storage == null:
+		return
+	if _shop_bottom_gutter == null or not is_instance_valid(_shop_bottom_gutter):
+		_shop_bottom_gutter = bottom_storage.get_node_or_null("ShopBottomGutter") as Control
+	if _shop_bottom_gutter == null:
+		_shop_bottom_gutter = Control.new()
+		_shop_bottom_gutter.name = "ShopBottomGutter"
+		_shop_bottom_gutter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_shop_bottom_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bottom_storage.add_child(_shop_bottom_gutter)
+	bottom_storage.move_child(_shop_bottom_gutter, bottom_storage.get_child_count() - 1)
+	var gutter_height: float = 8.0 if compact else 12.0
+	_shop_bottom_gutter.custom_minimum_size = Vector2(0.0, gutter_height)
+	_shop_bottom_gutter.visible = true
+	_shop_bottom_gutter.set_meta("visual_safe_gutter", true)
+	_shop_bottom_gutter.set_meta("safe_gutter_height", gutter_height)
+	if shop_grid != null:
+		shop_grid.set_meta("safe_bottom_gutter", maxf(gutter_height, float(shop_grid.get_meta("safe_bottom_gutter", 0.0))))
 
 func _apply_tight_shop_placeholder(placeholder: Control) -> void:
 	var panel: PanelContainer = placeholder as PanelContainer
@@ -1171,6 +1193,11 @@ func _update_external_backplates() -> void:
 		if plate == null or not plate.has_meta("target_path"):
 			continue
 		var target: Control = get_node_or_null(plate.get_meta("target_path")) as Control
+		if plate_name == "GothicShopPlate" and shop_grid != null:
+			# The card plate should end with the cards, not wrap the semantic
+			# resource strip and the real footer gutter below them.
+			target = shop_grid
+			plate.set_meta("target_path", get_path_to(shop_grid))
 		if target == null:
 			continue
 		if plate_name == "GothicShopPlate" and shop_grid != null and bool(shop_grid.get_meta("opening_fight_empty", false)):

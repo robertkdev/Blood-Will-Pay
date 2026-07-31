@@ -4,6 +4,7 @@ const SMOKE_NAME: String = "CompactShopFooterSmoke"
 const COMBAT_VIEW_SCENE: PackedScene = preload("res://scenes/CombatView.tscn")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const SHOP_CARD_SCENE: PackedScene = preload("res://scenes/ui/shop/ShopCard.tscn")
+const SCOREBOARD_ROW_SCENE: PackedScene = preload("res://scenes/ui/stats/ScoreboardRow.tscn")
 const VisualTypeSystemLib: Script = preload("res://scripts/ui/visual_type_system.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const TEST_SETTINGS_PATH: String = "user://compact_shop_footer_smoke_settings.cfg"
@@ -87,6 +88,7 @@ func _run() -> void:
 	_assert_footer_layout(true)
 	_assert_system_menu_clear_of_metrics(true)
 	_assert_tight_scale_hud_containment()
+	await _assert_compact_metric_identity_contract()
 	_finish()
 
 func _build_compact_main_fixture() -> void:
@@ -179,7 +181,6 @@ func _assert_standard_1080p_planning(context: String, expected_scale: float, exp
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel",
 		"MarginContainer/VBoxContainer/BenchArea",
-		"MarginContainer/VBoxContainer/ActionsRow",
 		"MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
@@ -212,6 +213,12 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 	var viewport_rect: Rect2 = _view.get_viewport().get_visible_rect()
 	var shop_grid: GridContainer = _view.get("shop_grid") as GridContainer
 	_expect_inside(shop_grid, viewport_rect, "shop grid")
+	var gutter: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopBottomGutter") as Control
+	_expect(gutter != null and gutter.is_visible_in_tree(), "shop footer lacks a real visible layout gutter below the card backplate")
+	if gutter != null:
+		_expect(gutter.custom_minimum_size.y >= 8.0 and gutter.size.y >= 8.0, "shop footer gutter collapsed below eight pixels")
+		_expect(shop_grid != null and gutter.get_parent() == shop_grid.get_parent() and gutter.get_index() > shop_grid.get_index(), "shop footer gutter is not a sibling laid out below ShopGrid")
+		_expect_inside(gutter, viewport_rect, "shop bottom gutter")
 	var first_card_top: float = INF
 	var safe_gutter: float = float(shop_grid.get_meta("safe_bottom_gutter", 0.0)) if shop_grid != null else 0.0
 	_expect(safe_gutter >= 8.0, "compact shop grid lacks its authored bottom safe gutter")
@@ -228,6 +235,14 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 			_assert_shop_card_contents_inside(card)
 			_expect(card.get_global_rect().end.y <= viewport_rect.end.y - safe_gutter + 1.0, "compact shop card lacks a visible framebuffer gutter: %s" % str(card.get_global_rect()))
 			first_card_top = min(first_card_top, card.get_global_rect().position.y)
+	var shop_plate: Control = _view.get_node_or_null("GothicShopPlate") as Control
+	var rendered_shop_end: float = shop_grid.get_global_rect().end.y if shop_grid != null else viewport_rect.end.y
+	if shop_plate != null and shop_plate.is_visible_in_tree():
+		rendered_shop_end = maxf(rendered_shop_end, shop_plate.get_global_rect().end.y)
+	var visible_bottom_gutter: float = viewport_rect.end.y - rendered_shop_end
+	_expect(visible_bottom_gutter >= 8.0, "shop grid/backplate has only %.1fpx of visible bottom gutter: grid=%s plate=%s spacer=%s viewport=%s" % [visible_bottom_gutter, str(shop_grid.get_global_rect()) if shop_grid != null else "<missing>", str(shop_plate.get_global_rect()) if shop_plate != null else "<missing>", str(gutter.get_global_rect()) if gutter != null else "<missing>", str(viewport_rect)])
+	if tight_scale:
+		_expect(visible_bottom_gutter <= 12.0, "150-percent shop grid/backplate gutter grew beyond the authored 8-12px band: %.1fpx" % visible_bottom_gutter)
 	var bet_slider: HSlider = _view.get("bet_slider") as HSlider
 	var bet_value: Label = _view.get("bet_value") as Label
 	var bet_row: HBoxContainer = bet_slider.get_parent() as HBoxContainer if bet_slider != null else null
@@ -287,6 +302,39 @@ func _assert_system_menu_clear_of_metrics(tight_scale: bool) -> void:
 	_expect(window_all != null and not window_all.visible and window_recent != null and not window_recent.visible, "compact metrics header retained desktop window controls")
 	var metric_tabs: Control = stats_panel.find_child("MetricTabs", true, false) as Control
 	_expect(metric_tabs != null and not metric_tabs.visible, "compact Team Metrics retained the illegible eight-column desktop selector")
+
+func _assert_compact_metric_identity_contract() -> void:
+	if _viewport == null:
+		_fail("metric identity fixture lacks a viewport")
+		return
+	var row: ScoreboardRow = SCOREBOARD_ROW_SCENE.instantiate() as ScoreboardRow
+	_expect(row != null, "metric identity row failed to instantiate")
+	if row == null:
+		return
+	row.position = Vector2(20.0, 20.0)
+	row.size = Vector2(178.0, 40.0)
+	_viewport.add_child(row)
+	await _settle_frames(2)
+	row.set_compact_layout(true)
+	row.set_row_data({"team": "player", "index": 0, "display_name": "Bonko", "value": 12.0, "share": 0.5, "metric": "damage"})
+	await _settle_frames(2)
+	var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label
+	_expect(name_label != null and name_label.text.contains("BONKO"), "compact 178px metric row abbreviates BONKO despite sufficient rail width")
+	row.set_row_data({"team": "enemy", "index": 0, "display_name": "Berebell", "value": 12.0, "share": 0.5, "metric": "damage"})
+	await _settle_frames(2)
+	_expect(name_label != null and name_label.text.contains("BEREBELL"), "compact 178px metric row abbreviates BEREBELL despite sufficient rail width")
+	row.size = Vector2(136.0, 40.0)
+	await _settle_frames(2)
+	row.set_row_data({"team": "enemy", "index": 0, "display_name": "Berebell", "value": 12.0, "share": 0.5, "metric": "damage"})
+	await _settle_frames(2)
+	if name_label != null:
+		_expect(not name_label.text.contains("BELL") or name_label.text.contains("BEREBELL"), "tight metric fallback regressed to the ambiguous BELL label")
+		_expect(name_label.text.contains("BERE"), "tight metric fallback lost BEREBELL's distinctive prefix: %s" % name_label.text)
+	row.set_row_data({"team": "player", "index": 0, "display_name": "Bonko", "value": 12.0, "share": 0.5, "metric": "damage"})
+	await _settle_frames(2)
+	if name_label != null:
+		_expect(name_label.text.contains("BONKO"), "tight metric fallback regressed to the ambiguous BOKO label: %s" % name_label.text)
+	row.queue_free()
 
 func _assert_tight_scale_hud_containment() -> void:
 	if _view == null or _viewport == null:

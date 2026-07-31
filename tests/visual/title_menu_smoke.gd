@@ -262,6 +262,14 @@ func _run() -> void:
 			_expect_command_chrome_visible(title_menu, "Settings transition immediate frame", failures)
 			await get_tree().process_frame
 			_expect_command_chrome_visible(title_menu, "Settings transition settled frame", failures)
+			await get_tree().create_timer(0.30).timeout
+			_expect_command_chrome_visible(title_menu, "Settings transition post-animation frame", failures)
+			_expect(bool(title_menu.get_meta("command_chrome_is_settled", false)), "Settings should publish a settled command-chrome state", failures)
+			var minimum_contrast_ratio: float = float(title_menu.get_meta("command_rail_minimum_contrast_ratio", 0.0))
+			var rail_text_color: Color = title_menu.get_meta("command_rail_text_color", Color.TRANSPARENT) as Color
+			var rail_background_color: Color = title_menu.get_meta("command_rail_background_color", Color.TRANSPARENT) as Color
+			_expect(minimum_contrast_ratio >= 7.0, "Settings command rail should publish a WCAG AAA contrast target", failures)
+			_expect(_contrast_ratio(rail_text_color, rail_background_color) >= minimum_contrast_ratio, "Settings command rail ink and settled background do not meet the published contrast target", failures)
 			_expect(bool(settings_button.get_meta("active_page", false)), "Settings should retain a persistent active-page state", failures)
 			_expect(settings_button.text.begins_with("ACTIVE //"), "Settings active-page state should be visible in its label", failures)
 			var settings_pressed_style: StyleBoxFlat = settings_button.get_theme_stylebox("pressed") as StyleBoxFlat
@@ -363,6 +371,25 @@ func _expect_command_chrome_visible(title_menu: Control, context: String, failur
 	_expect(title_label != null and title_label.visible and title_label.modulate.a >= 0.99 and title_label.text.strip_edges() != "", "%s should keep the title label visible" % context, failures)
 	_expect(section_title != null and section_title.visible and section_title.modulate.a >= 0.99 and section_title.text.strip_edges() != "", "%s should keep the active record label visible" % context, failures)
 	_expect(settings_button != null and settings_button.visible and settings_button.modulate.a >= 0.99 and settings_button.text.strip_edges() != "", "%s should keep the Settings route visible" % context, failures)
+	var settled_controls: Array[Control] = [title_panel, content_panel, title_label, section_title, settings_button]
+	for settled_control: Control in settled_controls:
+		if settled_control == null:
+			continue
+		_expect(settled_control.modulate == Color.WHITE, "%s should restore %s to full modulate" % [context, settled_control.name], failures)
+		_expect(settled_control.self_modulate == Color.WHITE, "%s should restore %s to full self-modulate" % [context, settled_control.name], failures)
+
+func _contrast_ratio(foreground: Color, background: Color) -> float:
+	var foreground_luminance: float = _relative_luminance(foreground)
+	var background_luminance: float = _relative_luminance(background)
+	var lighter: float = maxf(foreground_luminance, background_luminance)
+	var darker: float = minf(foreground_luminance, background_luminance)
+	return (lighter + 0.05) / (darker + 0.05)
+
+func _relative_luminance(color: Color) -> float:
+	return 0.2126 * _linear_channel(color.r) + 0.7152 * _linear_channel(color.g) + 0.0722 * _linear_channel(color.b)
+
+func _linear_channel(channel: float) -> float:
+	return channel / 12.92 if channel <= 0.04045 else pow((channel + 0.055) / 1.055, 2.4)
 
 func _expect_content_panels_generated(title_menu: Control, message: String, failures: Array[String]) -> void:
 	var body: Control = null
