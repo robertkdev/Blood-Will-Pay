@@ -3,6 +3,7 @@ extends Control
 const GothicUITheme := preload("res://scripts/ui/combat/gothic_ui_theme.gd")
 const UIBars := preload("res://scripts/ui/combat/ui_bars.gd")
 const StageProgressTopBarScene: GDScript = preload("res://scripts/ui/combat/stage_progress_top_bar.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 var _controller_script: Script = null
 
@@ -374,11 +375,21 @@ func _apply_responsive_layout() -> void:
 	if not is_inside_tree():
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
-	var window: Window = get_window()
-	var ui_scale: float = window.content_scale_factor if window != null else 1.0
-	var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0 or (viewport_size.y <= 760.0 and ui_scale >= 1.5)
+	var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
+	var effective_size: Vector2 = _effective_ui_viewport_size(viewport_size)
+	# 1080p is the normal shipping planning target. Its desktop stack is taller
+	# than the available field once the live shop and decision controls exist,
+	# so it uses the compact (still fully legible) tier.
+	var compact: bool = effective_size.y <= 1080.0 or effective_size.x <= 1400.0
+	var tight_compact: bool = (
+		effective_size.y <= 520.0
+		or effective_size.x <= 1100.0
+		or (ui_scale >= 1.25 and effective_size.y <= 720.0)
+	)
+	set_meta("compact_layout", compact)
 	set_meta("tight_scale_layout", tight_compact)
+	set_meta("persisted_ui_scale", ui_scale)
+	set_meta("effective_ui_size", effective_size)
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
 	if stage_progress_top_bar != null and stage_progress_top_bar.has_method("set_compact_layout"):
 		stage_progress_top_bar.call("set_compact_layout", compact)
@@ -386,9 +397,13 @@ func _apply_responsive_layout() -> void:
 		margin.add_theme_constant_override("margin_left", 6 if tight_compact else 10 if compact else 20)
 		margin.add_theme_constant_override("margin_top", 4 if tight_compact else 8 if compact else 14)
 		margin.add_theme_constant_override("margin_right", 6 if tight_compact else 10 if compact else 20)
-		margin.add_theme_constant_override("margin_bottom", 4 if tight_compact else 8 if compact else 18)
+		margin.add_theme_constant_override("margin_bottom", 0 if tight_compact else 8 if compact else 18)
 	stage_label.visible = not compact
 	stage_label.custom_minimum_size = Vector2.ZERO if compact else Vector2(0.0, 64.0)
+	if planning_timer_label != null:
+		# The live stage bar owns phase/timer status. Keep the retired VBox label
+		# out of the vertical planning budget even if an older fixture reveals it.
+		planning_timer_label.visible = false
 	_set_minimum_size("MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
 	var battle_height: float = 192.0 if tight_compact else 330.0 if compact else 604.0
 	var board_half_height: float = 92.0 if tight_compact else 160.0 if compact else 264.0
@@ -402,15 +417,15 @@ func _apply_responsive_layout() -> void:
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", Vector2(0.0, board_half_height))
 	_apply_board_tile_size(compact, tight_compact)
 	_set_minimum_size("MarginContainer/VBoxContainer/BenchArea/BenchGrid", Vector2(0.0, 38.0 if tight_compact else 46.0 if compact else 88.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea", Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 104.0 if tight_compact else 94.0 if compact else 152.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea", Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 96.0 if tight_compact else 94.0 if compact else 152.0))
 	var opening_shop: bool = shop_grid != null and bool(shop_grid.get_meta("opening_fight_empty", false))
 	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 54.0) if opening_shop and tight_compact else Vector2(520.0, 88.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(640.0 if tight_compact else 900.0 if compact else 1120.0, 56.0 if tight_compact else 86.0 if compact else 108.0))
 	if shop_grid != null:
 		shop_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if opening_shop else Control.SIZE_EXPAND_FILL
 	var planning_actions_row: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
 	if planning_actions_row != null:
-		planning_actions_row.visible = not tight_compact
-		planning_actions_row.custom_minimum_size = Vector2.ZERO if tight_compact else Vector2(900.0 if compact else 1120.0, 36.0 if compact else 56.0)
+		planning_actions_row.visible = _is_planning_phase()
+		planning_actions_row.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 38.0 if tight_compact else 36.0 if compact else 56.0)
 	_set_minimum_size("MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(254.0 if tight_compact else 334.0 if compact else 392.0, 36.0 if tight_compact else 44.0 if compact else 50.0))
 	wager_summary.add_theme_font_size_override("font_size", 14 if tight_compact else 18 if compact else 22)
 	wager_summary.custom_minimum_size = Vector2(0.0, 22.0 if tight_compact else 0.0)
@@ -439,8 +454,7 @@ func _apply_responsive_layout() -> void:
 func _finalize_responsive_layout() -> void:
 	if not is_inside_tree():
 		return
-	var viewport_size: Vector2 = get_viewport_rect().size
-	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
+	var compact: bool = bool(get_meta("compact_layout", false))
 	var tight_compact: bool = bool(get_meta("tight_scale_layout", false))
 	_apply_shop_action_bar_layout(compact, tight_compact)
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
@@ -451,6 +465,18 @@ func _finalize_responsive_layout() -> void:
 		margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		margin.queue_sort()
 	call_deferred("_update_external_backplates")
+
+func _effective_ui_viewport_size(viewport_size: Vector2) -> Vector2:
+	# Godot's viewport rect already reports logical UI coordinates after
+	# content_scale_factor is applied. Dividing Window.size again makes natural
+	# persisted 125/150 percent launches enter an unnecessarily tiny tier.
+	return viewport_size
+
+func _is_planning_phase() -> bool:
+	var game_state: Node = _get_gs()
+	if game_state == null:
+		return true
+	return int(game_state.get("phase")) == int(GameState.GamePhase.PREVIEW)
 
 func _set_minimum_size(path: String, minimum_size: Vector2) -> void:
 	var control: Control = get_node_or_null(path) as Control
@@ -571,7 +597,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_title.clip_text = false
 
 func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
-	var card_size: Vector2 = Vector2(120.0, 56.0) if tight_compact else Vector2(118.0, 86.0) if compact else Vector2(144.0, 124.0)
+	var card_size: Vector2 = Vector2(120.0, 56.0) if tight_compact else Vector2(132.0, 86.0) if compact else Vector2(144.0, 124.0)
 	if shop_grid != null:
 		shop_grid.add_theme_constant_override("h_separation", 6 if tight_compact else 10 if compact else 16)
 		shop_grid.add_theme_constant_override("v_separation", 4 if tight_compact else 6 if compact else 10)
@@ -588,7 +614,7 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 					control.custom_minimum_size = card_size
 					control.clip_contents = tight_compact
 					if control.has_method("set_compact_presentation"):
-						control.call("set_compact_presentation", tight_compact)
+						control.call("set_compact_presentation", compact, tight_compact)
 					elif tight_compact:
 						_apply_tight_shop_placeholder(control)
 					var name_label: Label = control.find_child("Name", true, false) as Label
@@ -652,7 +678,7 @@ func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
 		var action_bar: HBoxContainer = child as HBoxContainer
 		if action_bar == null:
 			continue
-		action_bar.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 38.0 if tight_compact else 40.0 if compact else 54.0)
+		action_bar.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 34.0 if tight_compact else 40.0 if compact else 54.0)
 		action_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		action_bar.add_theme_constant_override("separation", 6 if tight_compact else 8 if compact else 16)
 		for action_child: Node in action_bar.get_children():
@@ -823,7 +849,7 @@ func _ensure_compact_resource_strip() -> Label:
 		return _compact_resource_strip
 	_compact_resource_strip = Label.new()
 	_compact_resource_strip.name = "CompactResourceStrip"
-	_compact_resource_strip.custom_minimum_size = Vector2(0.0, 24.0)
+	_compact_resource_strip.custom_minimum_size = Vector2(0.0, 20.0)
 	_compact_resource_strip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_compact_resource_strip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_compact_resource_strip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

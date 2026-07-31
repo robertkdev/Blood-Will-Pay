@@ -784,6 +784,7 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	player_zone.add_theme_stylebox_override("panel", _arena_zone_style(true))
 	_ensure_arena_woodland_backdrop(arena)
 	_ensure_arena_woodland_silhouettes(arena)
+	_ensure_arena_war_aftermath_geometry(arena)
 	_ensure_arena_weather_banks(arena)
 	_ensure_arena_wet_ground_reflection(arena)
 	_ensure_arena_threat_veil(arena)
@@ -1117,6 +1118,95 @@ static func _ensure_hostile_fortification(silhouettes: Control) -> void:
 	watch_crossbar.offset_bottom = 10.0
 	watch_crossbar.rotation = 0.02
 	watch_crossbar.color = Color(0.008, 0.004, 0.007, 0.90)
+
+static func _ensure_arena_war_aftermath_geometry(arena: Control) -> void:
+	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
+	if aftermath == null:
+		aftermath = Control.new()
+		aftermath.name = "ArenaWarAftermath"
+		aftermath.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		aftermath.z_index = -2
+		arena.add_child(aftermath)
+		aftermath.set_anchors_preset(Control.PRESET_FULL_RECT)
+		aftermath.offset_left = 0.0
+		aftermath.offset_top = 0.0
+		aftermath.offset_right = 0.0
+		aftermath.offset_bottom = 0.0
+	aftermath.set_meta("visual_role", "non_unit_physical_war_aftermath")
+
+	var onset: Control = _ensure_arena_state_group(aftermath, "OnsetAftermathGeometry")
+	var onset_specs: Array[Dictionary] = [
+		{"name": "BurntCartAxle", "left": 0.08, "right": 0.35, "top": 0.76, "height": 12.0, "rotation": -0.055, "color": Color(0.025, 0.017, 0.014, 0.86)},
+		{"name": "BurntCartShaft", "left": 0.18, "right": 0.48, "top": 0.70, "height": 7.0, "rotation": 0.21, "color": Color(0.018, 0.012, 0.011, 0.82)},
+		{"name": "CollapsedTrenchLip", "left": 0.58, "right": 1.02, "top": 0.82, "height": 18.0, "rotation": -0.025, "color": Color(0.030, 0.020, 0.018, 0.76)},
+		{"name": "TornStandardPole", "left": 0.77, "right": 0.785, "top": 0.19, "bottom": 0.63, "rotation": 0.075, "color": Color(0.012, 0.008, 0.009, 0.92)},
+		{"name": "TornStandardCloth", "left": 0.77, "right": 0.90, "top": 0.23, "height": 22.0, "rotation": -0.04, "color": Color(0.30, 0.016, 0.025, 0.60)},
+	]
+	_populate_arena_war_geometry(onset, onset_specs)
+
+	var midfight: Control = _ensure_arena_state_group(aftermath, "MidfightAftermathGeometry")
+	var midfight_specs: Array[Dictionary] = [
+		{"name": "ShatteredBarricadeWest", "left": -0.03, "right": 0.25, "top": 0.55, "height": 30.0, "rotation": 0.16, "color": Color(0.012, 0.008, 0.008, 0.92)},
+		{"name": "ShatteredBarricadeEast", "left": 0.76, "right": 1.04, "top": 0.50, "height": 34.0, "rotation": -0.14, "color": Color(0.012, 0.008, 0.008, 0.94)},
+		{"name": "BlastScarNorth", "left": 0.23, "right": 0.74, "top": 0.22, "height": 16.0, "rotation": -0.035, "color": Color(0.16, 0.018, 0.013, 0.48)},
+		{"name": "BlastScarSouth", "left": 0.30, "right": 0.83, "top": 0.68, "height": 13.0, "rotation": 0.048, "color": Color(0.19, 0.020, 0.014, 0.44)},
+		{"name": "SplinterStakeWest", "left": 0.10, "right": 0.12, "top": 0.29, "bottom": 0.72, "rotation": -0.18, "color": Color(0.010, 0.007, 0.007, 0.96)},
+		{"name": "SplinterStakeEast", "left": 0.88, "right": 0.90, "top": 0.25, "bottom": 0.74, "rotation": 0.20, "color": Color(0.010, 0.007, 0.007, 0.96)},
+	]
+	_populate_arena_war_geometry(midfight, midfight_specs)
+
+	var collapse: Control = _ensure_arena_state_group(aftermath, "CollapseAftermathGeometry")
+	var collapse_specs: Array[Dictionary] = [
+		{"name": "CanopyCollapseWest", "left": -0.08, "right": 0.40, "top": 0.06, "height": 42.0, "rotation": 0.19, "color": Color(0.004, 0.003, 0.004, 0.98)},
+		{"name": "CanopyCollapseEast", "left": 0.60, "right": 1.08, "top": 0.04, "height": 46.0, "rotation": -0.18, "color": Color(0.004, 0.003, 0.004, 0.98)},
+		{"name": "OcclusionJawWest", "left": -0.04, "right": 0.14, "top": 0.08, "bottom": 0.96, "rotation": -0.025, "color": Color(0.002, 0.002, 0.003, 0.88)},
+		{"name": "OcclusionJawEast", "left": 0.86, "right": 1.04, "top": 0.05, "bottom": 0.94, "rotation": 0.030, "color": Color(0.002, 0.002, 0.003, 0.90)},
+		{"name": "RupturedGroundMouth", "left": 0.16, "right": 0.88, "top": 0.86, "height": 34.0, "rotation": -0.012, "color": Color(0.085, 0.006, 0.009, 0.78)},
+	]
+	_populate_arena_war_geometry(collapse, collapse_specs)
+
+	var reduced_lock: Control = _ensure_arena_state_group(aftermath, "ReducedMotionGrimeLock")
+	var reduced_specs: Array[Dictionary] = [
+		{"name": "StillAshBraceWest", "left": 0.02, "right": 0.37, "top": 0.39, "height": 9.0, "rotation": 0.08, "color": Color(0.22, 0.035, 0.025, 0.50)},
+		{"name": "StillAshBraceEast", "left": 0.63, "right": 0.98, "top": 0.61, "height": 9.0, "rotation": -0.08, "color": Color(0.22, 0.035, 0.025, 0.50)},
+		{"name": "StillTrenchLock", "left": 0.20, "right": 0.80, "top": 0.49, "height": 7.0, "rotation": 0.0, "color": Color(0.62, 0.09, 0.045, 0.34)},
+	]
+	_populate_arena_war_geometry(reduced_lock, reduced_specs)
+	if not aftermath.has_meta("state_groups_initialized"):
+		onset.visible = true
+		midfight.visible = false
+		collapse.visible = false
+		reduced_lock.visible = false
+		aftermath.set_meta("state_groups_initialized", true)
+
+static func _ensure_arena_state_group(parent_control: Control, node_name: String) -> Control:
+	var group: Control = parent_control.get_node_or_null(node_name) as Control
+	if group == null:
+		group = Control.new()
+		group.name = node_name
+		group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent_control.add_child(group)
+		group.set_anchors_preset(Control.PRESET_FULL_RECT)
+		group.offset_left = 0.0
+		group.offset_top = 0.0
+		group.offset_right = 0.0
+		group.offset_bottom = 0.0
+	return group
+
+static func _populate_arena_war_geometry(group: Control, specs: Array[Dictionary]) -> void:
+	for spec: Dictionary in specs:
+		var rect: ColorRect = _ensure_arena_rect(group, String(spec.get("name", "WarDebris")))
+		rect.anchor_left = float(spec.get("left", 0.0))
+		rect.anchor_right = float(spec.get("right", rect.anchor_left))
+		rect.anchor_top = float(spec.get("top", 0.0))
+		rect.anchor_bottom = float(spec.get("bottom", rect.anchor_top))
+		rect.offset_left = 0.0
+		rect.offset_right = 0.0
+		rect.offset_top = 0.0
+		rect.offset_bottom = float(spec.get("height", 0.0))
+		rect.rotation = float(spec.get("rotation", 0.0))
+		var geometry_color: Color = spec.get("color", Color(0.01, 0.008, 0.009, 0.90))
+		rect.color = geometry_color
 
 static func _ensure_arena_weather_banks(arena: Control) -> void:
 	var fog: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaGroundFog", -3)

@@ -41,22 +41,36 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	if window != null:
 		window.size = viewport_size
 		window.content_scale_size = viewport_size
-	UserSettingsScript.set_ui_scale(ui_scale, window)
-	UserSettingsScript.set_reduced_motion(true)
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	var scale_save_error: Error = UserSettingsScript.set_ui_scale(ui_scale, window)
+	var motion_save_error: Error = UserSettingsScript.set_reduced_motion(true)
+	_expect(scale_save_error == OK, "%dx%d @ %d%% scale fixture should persist" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+	_expect(motion_save_error == OK, "%dx%d @ %d%% motion fixture should persist" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	_main = MAIN_SCENE.instantiate() as Control
 	get_tree().root.add_child(_main)
 	await _settle_frames(5)
+	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%dx%d @ %d%% Main should load the persisted UI scale" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+	if window != null:
+		_expect(is_equal_approx(window.content_scale_factor, ui_scale), "%dx%d @ %d%% Main should apply the persisted UI scale to its window" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
 	var enter_button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
 	if enter_button != null:
 		enter_button.pressed.emit()
 	await _settle_frames(3)
 	var title_menu: Control = _main.get_node_or_null("TitleMenu") as Control
+	var label: String = "%dx%d @ %d%%" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
+	if viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.5):
+		var natural_manifest: VBoxContainer = title_menu.find_child("HomeRouteManifest", true, false) as VBoxContainer if title_menu != null else null
+		_expect(title_menu != null and is_equal_approx(float(title_menu.get_meta("effective_ui_scale", 0.0)), 1.5), "%s Natural Main should publish the persisted 150 percent layout scale" % label)
+		_expect(natural_manifest != null, "%s Natural Main should open with its Available Records manifest" % label)
+		if natural_manifest != null:
+			_expect_manifest_rows_readable(natural_manifest, "%s Natural Main" % label)
+		_expect(_save_capture("1920x1080_150_percent_natural_home_manifest.png"), "%s Natural Main persisted-scale manifest capture was not produced" % label)
 	if title_menu != null:
 		title_menu.call("_select_section", "settings", false)
 		title_menu.call_deferred("_refresh_scaled_layout")
 	await _settle_frames(4)
 	var viewport_rect: Rect2 = title_menu.get_viewport().get_visible_rect() if title_menu != null else Rect2()
-	var label: String = "%dx%d @ %d%%" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
 	_expect(title_menu != null and title_menu.visible, "%s title menu missing" % label)
 	var title_panel: Panel = title_menu.get_node_or_null("TitlePanel") as Panel if title_menu != null else null
 	_expect(title_panel != null, "%s TitlePanel missing" % label)
@@ -141,19 +155,17 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		title_menu.call("_select_section", "home", true)
 	await _settle_frames(3)
 	var route_manifest: VBoxContainer = title_menu.find_child("HomeRouteManifest", true, false) as VBoxContainer if title_menu != null else null
-	_expect(route_manifest != null and _rect_inside(route_manifest.get_global_rect(), viewport_rect.grow(2.0)), "%s Available Records manifest escaped the viewport" % label)
+	var content_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer if title_menu != null else null
+	_expect(route_manifest != null and content_scroll != null, "%s Available Records manifest or scroll surface missing" % label)
+	_expect(
+		route_manifest != null and content_scroll != null
+		and route_manifest.get_global_rect().position.x >= content_scroll.get_global_rect().position.x - 2.0
+		and route_manifest.get_global_rect().end.x <= content_scroll.get_global_rect().end.x + 2.0,
+		"%s Available Records manifest escaped the horizontal scroll bounds" % label
+	)
+	_expect(content_scroll != null and content_scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED, "%s Available Records must remain vertically scrollable when scaled" % label)
 	if route_manifest != null:
-		for record_number: String in ["01", "02", "03", "04"]:
-			var route: Button = route_manifest.get_node_or_null("ManifestRoute%s" % record_number) as Button
-			var serial: Label = route.get_node_or_null("BoundCopy/Serial") as Label if route != null else null
-			var record_title: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordTitle") as Label if route != null else null
-			var record_description: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordDescription") as Label if route != null else null
-			_expect(route != null and route.size.x >= route_manifest.size.x - 2.0, "%s Record %s should fill the joined manifest width" % [label, record_number])
-			_expect(serial != null and record_title != null and record_description != null, "%s Record %s should bind serial, title, and description" % [label, record_number])
-			_expect(record_description != null and record_description.get_theme_font_size("font_size") >= 18, "%s Record %s description should remain functional-size copy" % [label, record_number])
-			var route_focus: StyleBoxFlat = route.get_theme_stylebox("focus") as StyleBoxFlat if route != null else null
-			var route_pressed: StyleBoxFlat = route.get_theme_stylebox("pressed") as StyleBoxFlat if route != null else null
-			_expect(route_focus != null and route_pressed != null and route_focus.border_color != route_pressed.border_color, "%s Record %s focus should remain distinct from pressed blood" % [label, record_number])
+		_expect_manifest_rows_readable(route_manifest, label)
 	if _main != null:
 		_main.call("open_black_ledger", TEST_ACCOUNT_PROFILE_PATH)
 	await _settle_frames(3)
@@ -187,9 +199,32 @@ func _should_capture(viewport_size: Vector2i, ui_scale: float) -> bool:
 	return (
 		(viewport_size == Vector2i(1280, 720) and (is_equal_approx(ui_scale, 1.0) or is_equal_approx(ui_scale, 1.5)))
 		or (viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.0))
+		or (viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.5))
 		or (viewport_size == Vector2i(2560, 1080) and is_equal_approx(ui_scale, 1.25))
 		or (viewport_size == Vector2i(3840, 2160) and is_equal_approx(ui_scale, 1.0))
 	)
+
+func _expect_manifest_rows_readable(route_manifest: VBoxContainer, label: String) -> void:
+	var previous_route_bottom: float = -1.0
+	for record_number: String in ["01", "02", "03", "04"]:
+		var route: Button = route_manifest.get_node_or_null("ManifestRoute%s" % record_number) as Button
+		var serial: Label = route.get_node_or_null("BoundCopy/Serial") as Label if route != null else null
+		var record_title: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordTitle") as Label if route != null else null
+		var record_description: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordDescription") as Label if route != null else null
+		_expect(route != null and route.size.x >= route_manifest.size.x - 2.0, "%s Record %s should fill the joined manifest width" % [label, record_number])
+		_expect(serial != null and record_title != null and record_description != null, "%s Record %s should bind serial, title, and description" % [label, record_number])
+		_expect(record_description != null and record_description.get_theme_font_size("font_size") >= 18, "%s Record %s description should remain functional-size copy" % [label, record_number])
+		if route != null and record_title != null and record_description != null:
+			var route_rect: Rect2 = route.get_global_rect()
+			var title_rect: Rect2 = record_title.get_global_rect()
+			var description_rect: Rect2 = record_description.get_global_rect()
+			_expect(title_rect.end.y <= description_rect.position.y + 1.0, "%s Record %s title and description overlap title=%s description=%s" % [label, record_number, str(title_rect), str(description_rect)])
+			_expect(description_rect.end.y <= route_rect.end.y - 4.0, "%s Record %s description escaped its row description=%s row=%s" % [label, record_number, str(description_rect), str(route_rect)])
+			_expect(previous_route_bottom < 0.0 or route_rect.position.y >= previous_route_bottom - 1.0, "%s Record %s overlaps the preceding record row" % [label, record_number])
+			previous_route_bottom = route_rect.end.y
+		var route_focus: StyleBoxFlat = route.get_theme_stylebox("focus") as StyleBoxFlat if route != null else null
+		var route_pressed: StyleBoxFlat = route.get_theme_stylebox("pressed") as StyleBoxFlat if route != null else null
+		_expect(route_focus != null and route_pressed != null and route_focus.border_color != route_pressed.border_color, "%s Record %s focus should remain distinct from pressed blood" % [label, record_number])
 
 func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
 	return outer.has_point(inner.position) and outer.has_point(inner.end)
@@ -267,7 +302,7 @@ func _finish() -> void:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	if _framebuffer_capture_available():
-		_expect(_capture_count == 10, "expected 10 non-empty settings/Ledger proof images, produced %d" % _capture_count)
+		_expect(_capture_count == 13, "expected 13 non-empty settings/Ledger/home-manifest proof images, produced %d" % _capture_count)
 	if _failures.is_empty():
 		print(SMOKE_NAME + ": OK matrix=4x3")
 		get_tree().quit(0)

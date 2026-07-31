@@ -65,6 +65,10 @@ const BOSS_PREP_MIN_CHAPTER: int = 3
 const BOSS_PREP_ROUND: int = 4
 const RESULT_MINIMUM_DWELL_SECONDS: float = 6.0
 const RESULT_SKIP_GUARD_SECONDS: float = 0.45
+const COMBAT_PRESSURE_MIDFIGHT_SECONDS: float = 0.60
+const COMBAT_PRESSURE_COLLAPSE_SECONDS: float = 4.50
+const COMBAT_PRESSURE_MIDFIGHT_CASUALTIES: float = 0.18
+const COMBAT_PRESSURE_COLLAPSE_CASUALTIES: float = 0.55
 const BOSS_PREP_MIN_GOLD: int = 4
 const EARLY_RETRY_RECOVERY_MAX_CHAPTER: int = 2
 const EARLY_RETRY_RECOVERY_MIN_GOLD: int = 4
@@ -184,6 +188,8 @@ var _active_run_restore_in_progress: bool = false
 var _encounter_escalations_seen: int = 0
 var _tactical_phase_visual_state: int = -1
 var _combat_pressure_elapsed: float = 0.0
+var _environmental_pressure_phase: int = -1
+var _environmental_reduced_motion_state: bool = false
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -3011,7 +3017,11 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 		board_phase_label.text = "/// FIGHT // SURVIVE" if in_combat else "/// PLAN // COMMIT"
 	if in_combat:
 		_combat_pressure_elapsed = 0.0
+		_environmental_pressure_phase = -1
+		_environmental_reduced_motion_state = _reduced_motion_enabled()
 	_update_tactical_shell_layout(in_combat)
+	if in_combat:
+		_update_environmental_pressure(0.0)
 	_protect_persistent_hud_chrome()
 
 func _update_tactical_shell_layout(in_combat: bool) -> void:
@@ -3052,31 +3062,98 @@ func _update_environmental_pressure(delta: float) -> void:
 		return
 	_combat_pressure_elapsed += maxf(0.0, delta)
 	var reduced_motion: bool = _reduced_motion_enabled()
+	var casualty_pressure: float = 0.0
+	if arena_bridge != null:
+		casualty_pressure = arena_bridge.get_battlefield_casualty_pressure()
+	var pressure_phase: int = _resolve_environmental_pressure_phase(casualty_pressure)
+	if pressure_phase != _environmental_pressure_phase or reduced_motion != _environmental_reduced_motion_state:
+		_environmental_pressure_phase = pressure_phase
+		_environmental_reduced_motion_state = reduced_motion
+		_apply_environmental_pressure_composition(pressure_phase, reduced_motion, casualty_pressure)
 	var pulse: float = 0.0 if reduced_motion else sin(_combat_pressure_elapsed * 2.35)
 	var slow_pulse: float = 0.0 if reduced_motion else sin(_combat_pressure_elapsed * 0.82 + 1.1)
+	var phase_weight: float = float(pressure_phase) * 0.08
 	var veil: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaAshThreatVeil") as CanvasItem
 	if veil != null:
-		veil.modulate.a = 0.88 if reduced_motion else 0.82 + pulse * 0.08
+		veil.modulate.a = 0.90 + phase_weight if reduced_motion else clampf(0.76 + phase_weight + pulse * 0.07, 0.68, 1.0)
 	var enemy_pressure: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaEnemyPressureLight") as CanvasItem
 	if enemy_pressure != null:
-		enemy_pressure.modulate.a = 0.94 if reduced_motion else 0.86 + slow_pulse * 0.10
+		enemy_pressure.modulate.a = 0.96 if reduced_motion else clampf(0.78 + phase_weight + slow_pulse * 0.09, 0.68, 1.0)
 	var incursions: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaThreatIncursions") as CanvasItem
 	if incursions != null:
-		incursions.modulate.a = 0.92 if reduced_motion else 0.76 + pulse * 0.16
+		incursions.modulate.a = 0.94 if reduced_motion else clampf(0.68 + phase_weight + pulse * 0.14, 0.54, 1.0)
 	var rupture_glow: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/TerritoryRuptureGlow") as Control
 	if rupture_glow != null:
 		rupture_glow.pivot_offset = rupture_glow.size * 0.5
-		rupture_glow.scale = Vector2.ONE if reduced_motion else Vector2(1.0, 1.0 + pulse * 0.18)
-		rupture_glow.modulate.a = 0.88 if reduced_motion else 0.74 + pulse * 0.14
+		rupture_glow.scale = Vector2.ONE if reduced_motion else Vector2(1.0, 1.0 + pulse * (0.09 + float(pressure_phase) * 0.035))
+		rupture_glow.modulate.a = 0.90 if reduced_motion else clampf(0.68 + phase_weight + pulse * 0.12, 0.56, 1.0)
 	var boundary: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary") as CanvasItem
 	if boundary != null:
-		boundary.modulate.a = 0.96 if reduced_motion else 0.84 + slow_pulse * 0.12
+		boundary.modulate.a = 0.98 if reduced_motion else clampf(0.82 + phase_weight + slow_pulse * 0.10, 0.72, 1.0)
+	var aftermath: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath") as Control
+	if aftermath != null:
+		aftermath.pivot_offset = aftermath.size * 0.5
+		aftermath.scale = Vector2.ONE if reduced_motion else Vector2(1.0 + slow_pulse * 0.003, 1.0 + pulse * 0.004)
+
+func _resolve_environmental_pressure_phase(casualty_pressure: float) -> int:
+	if casualty_pressure >= COMBAT_PRESSURE_COLLAPSE_CASUALTIES or _combat_pressure_elapsed >= COMBAT_PRESSURE_COLLAPSE_SECONDS:
+		return 2
+	if casualty_pressure >= COMBAT_PRESSURE_MIDFIGHT_CASUALTIES or _combat_pressure_elapsed >= COMBAT_PRESSURE_MIDFIGHT_SECONDS:
+		return 1
+	return 0
+
+func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool, casualty_pressure: float) -> void:
+	if parent == null:
+		return
+	var arena: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	if arena == null:
+		return
+	var effective_phase: int = maxi(1, phase) if reduced_motion else phase
+	var phase_name: String = "onset" if effective_phase == 0 else "midfight" if effective_phase == 1 else "collapse"
+	var semantic_state: String = "reduced_motion_static_%s" % phase_name if reduced_motion else phase_name
+	arena.set_meta("battlefield_pressure_phase", semantic_state)
+	arena.set_meta("battlefield_pressure_index", effective_phase)
+	arena.set_meta("battlefield_reduced_motion", reduced_motion)
+	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
+	arena.set_meta("battlefield_environment_signature", "war_aftermath/%s/%s" % [phase_name, "static" if reduced_motion else "kinetic"])
+	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
+	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
+	var onset: Control = arena.get_node_or_null("ArenaWarAftermath/OnsetAftermathGeometry") as Control
+	var midfight: Control = arena.get_node_or_null("ArenaWarAftermath/MidfightAftermathGeometry") as Control
+	var collapse: Control = arena.get_node_or_null("ArenaWarAftermath/CollapseAftermathGeometry") as Control
+	var reduced_lock: Control = arena.get_node_or_null("ArenaWarAftermath/ReducedMotionGrimeLock") as Control
+	if aftermath != null:
+		aftermath.visible = true
+		aftermath.modulate = Color(0.86, 0.77, 0.70, 0.86) if effective_phase == 0 else Color(0.98, 0.72, 0.66, 0.96) if effective_phase == 1 else Color(0.88, 0.48, 0.46, 1.0)
+	if onset != null:
+		onset.visible = true
+	if midfight != null:
+		midfight.visible = effective_phase >= 1
+	if collapse != null:
+		collapse.visible = effective_phase >= 2
+	if reduced_lock != null:
+		reduced_lock.visible = reduced_motion
+	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
+	if woodland != null:
+		woodland.modulate = Color(1.04, 0.96, 0.86, 1.0) if effective_phase == 0 else Color(0.88, 0.72, 0.66, 1.0) if effective_phase == 1 else Color(0.64, 0.46, 0.48, 1.0)
+	var silhouettes: Control = arena.get_node_or_null("ArenaWoodlandSilhouettes") as Control
+	if silhouettes != null:
+		silhouettes.modulate.a = 0.86 if effective_phase == 0 else 0.94 if effective_phase == 1 else 1.0
+	var hostile_smoke: TextureRect = arena.get_node_or_null("ArenaHostileSmoke") as TextureRect
+	if hostile_smoke != null:
+		hostile_smoke.modulate.a = 0.58 if effective_phase == 0 else 0.82 if effective_phase == 1 else 1.0
+		hostile_smoke.scale = Vector2.ONE
+	var fog: TextureRect = arena.get_node_or_null("ArenaGroundFog") as TextureRect
+	if fog != null:
+		fog.modulate.a = 0.64 if effective_phase == 0 else 0.82 if effective_phase == 1 else 0.96
+		fog.scale = Vector2.ONE
 
 func _protect_persistent_hud_chrome() -> void:
 	if parent == null or not parent.visible:
 		return
 	var result_visible: bool = _result_banner != null and is_instance_valid(_result_banner) and _result_banner.visible
-	if _tactical_phase_visual_state != 1 and not result_visible:
+	var combat_context_visible: bool = _tactical_phase_visual_state == 1 or result_visible
+	if not combat_context_visible:
 		return
 	var stage_bar: Control = parent.find_child("StageProgressTopBar", true, false) as Control
 	if stage_bar != null:
@@ -3091,23 +3168,40 @@ func _protect_persistent_hud_chrome() -> void:
 		if stage_bar.has_method("update_progress"):
 			stage_bar.call("update_progress", chapter, stage, total)
 		if stage_bar.has_method("set_combat_state"):
-			stage_bar.call("set_combat_state", _tactical_phase_visual_state == 1)
+			stage_bar.call("set_combat_state", combat_context_visible)
 		var chapter_label: Label = stage_bar.find_child("ChapterLabel", true, false) as Label
 		var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label
 		if chapter_label != null:
 			chapter_label.visible = true
 			chapter_label.modulate = Color.WHITE
 			chapter_label.self_modulate = Color.WHITE
+			if chapter_label.text.strip_edges().is_empty():
+				chapter_label.text = ChapterCatalog.display_name_for(chapter)
 		if phase_label != null:
 			phase_label.visible = true
 			phase_label.modulate = Color.WHITE
 			phase_label.self_modulate = Color.WHITE
+			if phase_label.text.strip_edges().is_empty():
+				phase_label.text = "/// FIGHT"
 		for token_index: int in range(1, 6):
 			var token: Control = stage_bar.find_child("StageToken%d" % token_index, true, false) as Control
 			if token != null and token_index <= total:
 				token.visible = true
 				token.modulate = Color.WHITE
 				token.self_modulate = Color.WHITE
+		stage_bar.set_meta("persistent_combat_hierarchy", true)
+	var boundary: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary") as Control
+	if boundary != null:
+		boundary.visible = true
+	var instruction_ribbon: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
+	if instruction_ribbon != null:
+		instruction_ribbon.visible = true
+		instruction_ribbon.z_as_relative = false
+		instruction_ribbon.z_index = 218
+		instruction_ribbon.modulate = Color.WHITE
+		instruction_ribbon.self_modulate = Color.WHITE
+		instruction_ribbon.text = "FIELD ORDER // CONSEQUENCE RECORDED // ENTER / SPACE TO ADVANCE" if result_visible else "FIELD ORDER // FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
+		instruction_ribbon.set_meta("persistent_combat_hierarchy", true)
 	var tree: SceneTree = parent.get_tree()
 	var system_menu: Button = tree.root.find_child("SystemMenuButton", true, false) as Button if tree != null else null
 	if system_menu != null:
@@ -3179,6 +3273,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	banner.add_theme_stylebox_override("panel", _make_result_scrim_style(title))
 	banner.visible = true
 	banner.modulate = Color.WHITE
+	_protect_persistent_hud_chrome()
 	_result_hold_elapsed = 0.0
 	_result_hold_active = true
 	_result_hold_finishing = false
@@ -3252,6 +3347,8 @@ func _configure_result_outcome(
 		impact_stamp.text = stamp_copy
 		impact_stamp.add_theme_color_override("font_color", title_color)
 		impact_stamp.rotation = -0.018 if title == "VICTORY" else 0.025 if title == "STALEMATE" else -0.038
+	if card != null:
+		_apply_result_card_geometry(card, title)
 
 func refresh_result_banner_layout() -> void:
 	if _result_banner == null or not is_instance_valid(_result_banner):
@@ -3261,9 +3358,11 @@ func refresh_result_banner_layout() -> void:
 		return
 	var variant: String = String(card.get_meta("result_variant", "victory")).to_upper()
 	_apply_result_card_geometry(card, variant)
+	_protect_persistent_hud_chrome()
 
 func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
+	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
 	var ideal_size: Vector2 = Vector2(940.0, 382.0)
 	var card_rotation: float = -0.007
 	if title == "STALEMATE":
@@ -3274,10 +3373,88 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 		card_rotation = -0.014
 	else:
 		ideal_size = Vector2(940.0, 436.0)
-	var maximum_size: Vector2 = Vector2(max(620.0, viewport_size.x - 72.0), max(310.0, viewport_size.y - 110.0))
+	if compact_layout:
+		ideal_size = Vector2(700.0, 296.0) if title == "STALEMATE" else Vector2(740.0, 326.0) if title == "DEFEAT" else Vector2(760.0, 306.0)
+		card_rotation = 0.0
+	var top_reservation: float = 70.0 if compact_layout else 82.0
+	var horizontal_gutter: float = 32.0 if compact_layout else 72.0
+	var bottom_gutter: float = 18.0 if compact_layout else 28.0
+	var maximum_size: Vector2 = Vector2(
+		maxf(320.0, viewport_size.x - horizontal_gutter),
+		maxf(230.0, viewport_size.y - top_reservation - bottom_gutter)
+	)
 	card.custom_minimum_size = Vector2(min(ideal_size.x, maximum_size.x), min(ideal_size.y, maximum_size.y))
 	card.rotation = card_rotation
 	card.pivot_offset = card.custom_minimum_size * 0.5
+	card.set_meta("responsive_result_layout", "compact_safe" if compact_layout else "authored_desktop")
+	card.set_meta("logical_viewport_size", viewport_size)
+	card.set_meta("logical_safe_maximum", maximum_size)
+	_apply_result_content_layout(card, title, compact_layout)
+	if _result_banner != null and is_instance_valid(_result_banner):
+		_result_banner.offset_top = top_reservation
+		var center: CenterContainer = _result_banner.get_node_or_null("Center") as CenterContainer
+		if center != null:
+			center.offset_top = 0.0 if compact_layout else -34.0
+			center.offset_bottom = 0.0 if compact_layout else -34.0
+
+func _result_uses_compact_layout(viewport_size: Vector2) -> bool:
+	var ui_scale: float = float(UserSettingsScript.get_ui_scale())
+	var tight_layout: bool = parent != null and bool(parent.get_meta("tight_scale_layout", false))
+	return tight_layout or viewport_size.x <= 1100.0 or viewport_size.y <= 560.0 or (ui_scale >= 1.45 and viewport_size.x <= 1366.0 and viewport_size.y <= 768.0)
+
+func _apply_result_content_layout(card: PanelContainer, title: String, compact_layout: bool) -> void:
+	var margin: MarginContainer = card.get_node_or_null("CardMargin") as MarginContainer
+	var content: VBoxContainer = card.get_node_or_null("CardMargin/Content") as VBoxContainer
+	var record_row: HBoxContainer = card.get_node_or_null("CardMargin/Content/RecordRow") as HBoxContainer
+	var record_label: Label = card.get_node_or_null("CardMargin/Content/RecordRow/RecordLabel") as Label
+	var settlement_label: Label = card.get_node_or_null("CardMargin/Content/RecordRow/SettlementLabel") as Label
+	var kicker_label: Label = card.get_node_or_null("CardMargin/Content/KickerLabel") as Label
+	var title_label: Label = card.get_node_or_null("CardMargin/Content/OutcomeLabel") as Label
+	var detail_label: Label = card.get_node_or_null("CardMargin/Content/DetailLabel") as Label
+	var accent_rule: ColorRect = card.get_node_or_null("CardMargin/Content/AccentRule") as ColorRect
+	var outcome_signal: Label = card.get_node_or_null("CardMargin/Content/OutcomeSignal") as Label
+	var hold_progress: ProgressBar = card.get_node_or_null("CardMargin/Content/ResultHoldProgress") as ProgressBar
+	var hold_row: HBoxContainer = card.get_node_or_null("CardMargin/Content/ResultHoldRow") as HBoxContainer
+	var hold_label: Label = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label
+	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
+	var impact_stamp: Label = card.get_node_or_null("CardMargin/Content/ImpactStamp") as Label
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 12 if compact_layout else 34)
+		margin.add_theme_constant_override("margin_top", 10 if compact_layout else 24)
+		margin.add_theme_constant_override("margin_right", 12 if compact_layout else 34)
+		margin.add_theme_constant_override("margin_bottom", 10 if compact_layout else 24)
+	if content != null:
+		content.add_theme_constant_override("separation", 3 if compact_layout else 7)
+	if record_row != null:
+		record_row.add_theme_constant_override("separation", 6 if compact_layout else 12)
+	if record_label != null:
+		record_label.add_theme_font_size_override("font_size", 11 if compact_layout else 18)
+	if settlement_label != null:
+		settlement_label.add_theme_font_size_override("font_size", 11 if compact_layout else 18)
+	if kicker_label != null:
+		kicker_label.add_theme_font_size_override("font_size", 12 if compact_layout else 18)
+	if title_label != null:
+		title_label.custom_minimum_size.y = (48.0 if title == "DEFEAT" else 44.0) if compact_layout else (76.0 if title == "STALEMATE" else 94.0 if title == "DEFEAT" else 88.0)
+		title_label.add_theme_font_size_override("font_size", (48 if title == "DEFEAT" else 43) if compact_layout else (66 if title == "STALEMATE" else 80 if title == "DEFEAT" else 74))
+	if accent_rule != null:
+		accent_rule.custom_minimum_size.y = 3.0 if compact_layout else 5.0
+	if detail_label != null:
+		detail_label.custom_minimum_size.y = (44.0 if title == "STALEMATE" else 50.0) if compact_layout else (64.0 if title == "STALEMATE" else 78.0)
+		detail_label.add_theme_font_size_override("font_size", 16 if compact_layout else 24)
+	if outcome_signal != null:
+		outcome_signal.custom_minimum_size.y = 17.0 if compact_layout else 24.0
+		outcome_signal.add_theme_font_size_override("font_size", 13 if compact_layout else 19)
+	if hold_progress != null:
+		hold_progress.custom_minimum_size.y = 7.0 if compact_layout else 10.0
+	if hold_row != null:
+		hold_row.add_theme_constant_override("separation", 8 if compact_layout else 16)
+	if hold_label != null:
+		hold_label.add_theme_font_size_override("font_size", 12 if compact_layout else 18)
+	if skip_button != null:
+		skip_button.custom_minimum_size = Vector2(186.0, 30.0) if compact_layout else Vector2(250.0, 38.0)
+		skip_button.add_theme_font_size_override("font_size", 12 if compact_layout else 18)
+	if impact_stamp != null:
+		impact_stamp.add_theme_font_size_override("font_size", 12 if compact_layout else 20)
 
 func _color_result_damage_marks(card: PanelContainer, title: String, accent_color: Color) -> void:
 	var marks: Control = card.get_node_or_null("DamageMarks") as Control
@@ -3457,9 +3634,34 @@ func _ensure_result_banner() -> PanelContainer:
 		rupture.offset_bottom = float(rupture_spec.get("height", 6.0))
 		rupture.rotation = float(rupture_spec.get("rotation", 0.0))
 		rupture_layer.add_child(rupture)
+	var victory_geometry: Array[Dictionary] = [
+		{"name": "SurvivorBankWest", "left": -0.03, "right": 0.36, "top": 0.66, "height": 58.0, "rotation": -0.09, "color": Color(0.045, 0.025, 0.021, 0.92)},
+		{"name": "SurvivorBankEast", "left": 0.64, "right": 1.03, "top": 0.64, "height": 62.0, "rotation": 0.08, "color": Color(0.045, 0.025, 0.021, 0.92)},
+		{"name": "OpenedEscapeLane", "left": 0.42, "right": 0.58, "top": 0.16, "bottom": 0.94, "rotation": 0.0, "color": Color(0.82, 0.43, 0.17, 0.12)},
+		{"name": "RisingFieldStandard", "left": 0.17, "right": 0.19, "top": 0.23, "bottom": 0.82, "rotation": -0.04, "color": Color(0.12, 0.045, 0.035, 0.88)},
+	]
+	_ensure_result_outcome_geometry(aftermath, "VictoryAftermathGeometry", victory_geometry)
+	var stalemate_geometry: Array[Dictionary] = [
+		{"name": "DeadlockBeamNorth", "left": -0.02, "right": 1.02, "top": 0.38, "height": 26.0, "rotation": 0.018, "color": Color(0.045, 0.038, 0.046, 0.92)},
+		{"name": "DeadlockBeamSouth", "left": -0.02, "right": 1.02, "top": 0.61, "height": 22.0, "rotation": -0.015, "color": Color(0.045, 0.038, 0.046, 0.92)},
+		{"name": "SuspendedStakeWest", "left": 0.18, "right": 0.20, "top": 0.20, "bottom": 0.82, "rotation": -0.06, "color": Color(0.12, 0.08, 0.07, 0.82)},
+		{"name": "SuspendedStakeCenter", "left": 0.49, "right": 0.51, "top": 0.14, "bottom": 0.86, "rotation": 0.02, "color": Color(0.12, 0.08, 0.07, 0.86)},
+		{"name": "SuspendedStakeEast", "left": 0.80, "right": 0.82, "top": 0.18, "bottom": 0.84, "rotation": 0.055, "color": Color(0.12, 0.08, 0.07, 0.82)},
+	]
+	_ensure_result_outcome_geometry(aftermath, "StalemateAftermathGeometry", stalemate_geometry)
+	var defeat_geometry: Array[Dictionary] = [
+		{"name": "CanopyFallWest", "left": -0.08, "right": 0.48, "top": 0.07, "height": 74.0, "rotation": 0.17, "color": Color(0.004, 0.003, 0.004, 0.98)},
+		{"name": "CanopyFallEast", "left": 0.52, "right": 1.08, "top": 0.05, "height": 78.0, "rotation": -0.16, "color": Color(0.004, 0.003, 0.004, 0.98)},
+		{"name": "DebtJawWest", "left": -0.03, "right": 0.18, "top": 0.10, "bottom": 0.98, "rotation": -0.02, "color": Color(0.008, 0.004, 0.006, 0.92)},
+		{"name": "DebtJawEast", "left": 0.82, "right": 1.03, "top": 0.08, "bottom": 0.98, "rotation": 0.025, "color": Color(0.008, 0.004, 0.006, 0.94)},
+		{"name": "ConsecratedGraveMouth", "left": 0.12, "right": 0.90, "top": 0.82, "height": 82.0, "rotation": -0.012, "color": Color(0.19, 0.005, 0.018, 0.78)},
+		{"name": "FallenExecutionBeam", "left": 0.22, "right": 0.84, "top": 0.48, "height": 30.0, "rotation": 0.13, "color": Color(0.015, 0.008, 0.009, 0.96)},
+	]
+	_ensure_result_outcome_geometry(aftermath, "DefeatAftermathGeometry", defeat_geometry)
 	var aftermath_stamp: Label = Label.new()
 	aftermath_stamp.name = "AftermathStamp"
 	aftermath_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	aftermath_stamp.z_index = 2
 	aftermath_stamp.anchor_left = 0.72
 	aftermath_stamp.anchor_right = 0.97
 	aftermath_stamp.anchor_top = 0.70
@@ -3628,6 +3830,42 @@ func _ensure_result_banner() -> PanelContainer:
 	parent.add_child(_result_banner)
 	return _result_banner
 
+func _ensure_result_outcome_geometry(parent_control: Control, group_name: String, specs: Array[Dictionary]) -> Control:
+	var group: Control = parent_control.get_node_or_null(group_name) as Control
+	if group == null:
+		group = Control.new()
+		group.name = group_name
+		group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		group.z_index = 1
+		parent_control.add_child(group)
+		group.set_anchors_preset(Control.PRESET_FULL_RECT)
+		group.offset_left = 0.0
+		group.offset_top = 0.0
+		group.offset_right = 0.0
+		group.offset_bottom = 0.0
+	group.set_meta("physical_outcome_geometry", true)
+	for spec: Dictionary in specs:
+		var geometry_name: String = String(spec.get("name", "AftermathGeometry"))
+		var rect: ColorRect = group.get_node_or_null(geometry_name) as ColorRect
+		if rect == null:
+			rect = ColorRect.new()
+			rect.name = geometry_name
+			rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			group.add_child(rect)
+		rect.anchor_left = float(spec.get("left", 0.0))
+		rect.anchor_right = float(spec.get("right", rect.anchor_left))
+		rect.anchor_top = float(spec.get("top", 0.0))
+		rect.anchor_bottom = float(spec.get("bottom", rect.anchor_top))
+		rect.offset_left = 0.0
+		rect.offset_right = 0.0
+		rect.offset_top = 0.0
+		rect.offset_bottom = float(spec.get("height", 0.0))
+		rect.rotation = float(spec.get("rotation", 0.0))
+		var physical_color: Color = spec.get("color", Color(0.01, 0.008, 0.009, 0.90))
+		rect.color = physical_color
+	group.visible = false
+	return group
+
 func _configure_result_aftermath(banner: PanelContainer, title: String, accent_color: Color, title_color: Color) -> void:
 	if banner == null:
 		return
@@ -3636,11 +3874,24 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	var blood_wash: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathBloodWash") as TextureRect
 	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control
 	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label
+	var victory_geometry: Control = banner.get_node_or_null("BattleResultAftermath/VictoryAftermathGeometry") as Control
+	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
+	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
 	if aftermath != null:
 		aftermath.visible = true
 		aftermath.set_meta("outcome_variant", title.to_lower())
+		aftermath.set_meta("physical_geometry_signature", "opened_survivor_lane" if title == "VICTORY" else "crosswise_deadlock" if title == "STALEMATE" else "collapsed_canopy_grave")
+		aftermath.set_meta("physical_geometry_child_count", 4 if title == "VICTORY" else 5 if title == "STALEMATE" else 6)
+	if victory_geometry != null:
+		victory_geometry.visible = title == "VICTORY"
+	if stalemate_geometry != null:
+		stalemate_geometry.visible = title == "STALEMATE"
+	if defeat_geometry != null:
+		defeat_geometry.visible = title == "DEFEAT"
 	if field_art != null:
 		field_art.modulate = Color(1.10, 0.88, 0.80, 0.74) if title == "VICTORY" else Color(0.70, 0.66, 0.74, 0.70) if title == "STALEMATE" else Color(1.12, 0.56, 0.52, 0.80)
+		field_art.pivot_offset = field_art.size * 0.5
+		field_art.scale = Vector2(1.0, 0.98) if title == "VICTORY" else Vector2(0.98, 1.0) if title == "STALEMATE" else Vector2(1.05, 1.06)
 	if blood_wash != null:
 		var gradient: Gradient = Gradient.new()
 		gradient.offsets = PackedFloat32Array([0.0, 0.30, 0.66, 1.0])
@@ -3666,6 +3917,12 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	if aftermath_stamp != null:
 		aftermath_stamp.text = "THE FIELD\nSTILL BREATHES" if title == "VICTORY" else "NOTHING LEFT.\nNOTHING RELEASED." if title == "STALEMATE" else "THE WOODS\nTOOK THEIR DUE"
 		aftermath_stamp.add_theme_color_override("font_color", Color(title_color.r, title_color.g, title_color.b, 0.74))
+		aftermath_stamp.anchor_left = 0.72 if title == "VICTORY" else 0.36 if title == "STALEMATE" else 0.03
+		aftermath_stamp.anchor_right = 0.97 if title == "VICTORY" else 0.64 if title == "STALEMATE" else 0.31
+		aftermath_stamp.anchor_top = 0.70 if title == "VICTORY" else 0.05 if title == "STALEMATE" else 0.68
+		aftermath_stamp.anchor_bottom = 0.90 if title == "VICTORY" else 0.24 if title == "STALEMATE" else 0.91
+		aftermath_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_LEFT
+		aftermath_stamp.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if title != "STALEMATE" else VERTICAL_ALIGNMENT_TOP
 
 func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

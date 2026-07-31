@@ -37,10 +37,16 @@ manifest path.
 The generated schema-version-2 `captures.json` records the seat and run
 identity, exact project path, process ID, Godot runtime, display server,
 rendering driver, state, viewport, timestamp, byte count, absolute image paths,
-and review order. A dummy/headless renderer, an undersized framebuffer, a
-missing image, or an incomplete packet is a hard failure. Headless runs still
-write a unique manifest with `status: "blocked"` and exit nonzero; they never
-fall back to software mockups.
+review order, and a per-image `visual_contract`. Combat contracts record the
+physical battlefield signature, onset/midfight/reduced-motion pressure state,
+casualty pressure, reduced-motion flag, persistent stage/phase copy, and the
+instruction ribbon. Result contracts record the outcome-specific physical
+aftermath signature, responsive layout mode, logical card/skip bounds, and
+whether those bounds are enclosed. A dummy/headless renderer, an undersized
+framebuffer, a missing image, repeated/incorrect combat phase, disappearing
+combat hierarchy, overflowing 150% result frame, or an incomplete packet is a
+hard failure. Headless runs still write a unique manifest with
+`status: "blocked"` and exit nonzero; they never fall back to software mockups.
 
 The packet covers 26 independently captured runtime states:
 
@@ -53,9 +59,10 @@ The packet covers 26 independently captured runtime states:
 - Planning board at compact and desktop sizes
 - Planning board at real 125% and 150% UI scale
 - Compact in-game system menu
-- Active-combat onset, midfight, and reduced-motion states
-- Victory entry and hold, plus stalemate and defeat hold states
-- Defeat hold and loss record at compact 150% scale
+- Active-combat onset, materially denser midfight, and static reduced-motion states
+- Victory entry and hold, plus physically distinct stalemate and defeat aftermath states
+- Defeat hold at compact 150% scale with the complete lower frame and skip control in bounds
+- Loss record at compact 150% scale
 - Loss record at desktop size
 
 Unit art is present only because these are authentic player-facing runtime

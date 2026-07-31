@@ -489,14 +489,63 @@ func _build_title_page() -> void:
 	enter_button.flat = true
 	enter_button.focus_mode = Control.FOCUS_ALL
 	enter_button.mouse_default_cursor_shape = Control.CURSOR_ARROW
-	enter_button.accessibility_name = "Continue to Blood Will Pay main menu"
-	enter_button.accessibility_description = "Press any key or controller button, or click anywhere, to continue."
+	enter_button.accessibility_name = "Enter the Blood Will Pay command menu"
+	enter_button.accessibility_description = "Activate this focused entry surface, or click anywhere, to enter the field record."
 	enter_button.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var empty_style: StyleBoxEmpty = StyleBoxEmpty.new()
 	for state_name: String in ["normal", "hover", "pressed", "focus", "disabled"]:
 		enter_button.add_theme_stylebox_override(state_name, empty_style)
 	enter_button.pressed.connect(_dismiss_title_page)
 	stack.add_child(enter_button)
+	var entry_affordance: PanelContainer = PanelContainer.new()
+	entry_affordance.name = "EntryAffordance"
+	entry_affordance.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	entry_affordance.z_index = 3
+	entry_affordance.anchor_left = 0.325
+	entry_affordance.anchor_top = 0.790
+	entry_affordance.anchor_right = 0.675
+	entry_affordance.anchor_bottom = 0.930
+	var entry_style: StyleBoxFlat = StyleBoxFlat.new()
+	entry_style.bg_color = Color(0.018, 0.012, 0.016, 0.94)
+	entry_style.border_color = Color(0.78, 0.075, 0.095, 0.98)
+	entry_style.border_width_left = 8
+	entry_style.border_width_top = 1
+	entry_style.border_width_right = 1
+	entry_style.border_width_bottom = 2
+	entry_style.content_margin_left = 18.0
+	entry_style.content_margin_top = 10.0
+	entry_style.content_margin_right = 18.0
+	entry_style.content_margin_bottom = 10.0
+	entry_style.shadow_color = Color(0.0, 0.0, 0.0, 0.72)
+	entry_style.shadow_size = 14
+	entry_affordance.add_theme_stylebox_override("panel", entry_style)
+	stack.add_child(entry_affordance)
+	var entry_copy: VBoxContainer = VBoxContainer.new()
+	entry_copy.name = "EntryCopy"
+	entry_copy.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	entry_copy.alignment = BoxContainer.ALIGNMENT_CENTER
+	entry_copy.add_theme_constant_override("separation", 2)
+	entry_affordance.add_child(entry_copy)
+	var entry_order: Label = Label.new()
+	entry_order.name = "EntryOrder"
+	entry_order.text = "ENTRY ORDER // SEAL UNBROKEN"
+	entry_order.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	entry_order.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	entry_order.add_theme_font_size_override("font_size", 16)
+	entry_order.add_theme_color_override("font_color", Color(0.94, 0.73, 0.48, 1.0))
+	VisualTypeSystem.set_utility_bold(entry_order)
+	entry_copy.add_child(entry_order)
+	var entry_action: Label = Label.new()
+	entry_action.name = "EntryAction"
+	entry_action.text = "ENTER THE BLOOD DEBT"
+	entry_action.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	entry_action.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	entry_action.add_theme_font_size_override("font_size", 25)
+	entry_action.add_theme_color_override("font_color", Color(0.96, 0.90, 0.80, 1.0))
+	entry_action.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+	entry_action.add_theme_constant_override("outline_size", 2)
+	VisualTypeSystem.set_action(entry_action)
+	entry_copy.add_child(entry_action)
 	_title_page.gui_input.connect(_on_title_page_gui_input)
 
 func _add_title_distress_mark(parent: Control, mark_name: String, normalized_rect: Rect2, color: Color) -> void:

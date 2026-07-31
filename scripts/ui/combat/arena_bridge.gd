@@ -23,6 +23,8 @@ var _hidden_nodes: Array[Dictionary] = []
 var _position_signal_manager: CombatManager = null
 var _has_container_bounds: bool = false
 var _last_container_bounds: Rect2 = Rect2()
+var _initial_combatant_count: int = 0
+var _living_combatant_count: int = 0
 
 func configure(_arena_container: Control, _arena_units: Control, _planning_area: Control, _arena_background: Control, _player_grid_helper: BoardGrid, _enemy_grid_helper: BoardGrid, _unit_actor_class: Script, _tile_size: int) -> void:
     arena_container = _arena_container
@@ -112,6 +114,9 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
     _sync_container_to_planning_rect()
     arena.configure(arena_container, arena_units, player_grid_helper, enemy_grid_helper, unit_actor_class, tile_size)
     arena.enter_arena(player_views, enemy_views)
+    _initial_combatant_count = _count_living_views(player_views) + _count_living_views(enemy_views)
+    _living_combatant_count = _initial_combatant_count
+    _publish_battlefield_pressure()
     if arena_container:
         arena_container.visible = true
     # Fade planning board areas (TopArea/BottomArea) but keep bench/shop visible and interactive
@@ -136,6 +141,8 @@ func sync(manager: CombatManager, player_views: Array[UnitSlotView], enemy_views
     if arena == null or arena_container == null or not arena_container.visible:
         return
     _sync_container_to_planning_rect()
+    _living_combatant_count = _count_living_views(player_views) + _count_living_views(enemy_views)
+    _publish_battlefield_pressure()
     if manager:
         _sync_engine_bounds(manager)
         var engine: Variant = manager.get_engine()
@@ -155,6 +162,8 @@ func exit_arena() -> void:
     _disconnect_position_signal()
     _has_container_bounds = false
     _last_container_bounds = Rect2()
+    _initial_combatant_count = 0
+    _living_combatant_count = 0
     if arena:
         arena.exit_arena()
     if arena_container:
@@ -188,6 +197,35 @@ func teardown() -> void:
     unit_actor_class = null
     _hidden_nodes.clear()
     _position_signal_manager = null
+    _initial_combatant_count = 0
+    _living_combatant_count = 0
+
+func get_battlefield_casualty_pressure() -> float:
+    if _initial_combatant_count <= 0:
+        return 0.0
+    var removed_count: int = maxi(0, _initial_combatant_count - _living_combatant_count)
+    return clampf(float(removed_count) / float(_initial_combatant_count), 0.0, 1.0)
+
+func get_battlefield_pressure_snapshot() -> Dictionary[String, Variant]:
+    return {
+        "initial_combatants": _initial_combatant_count,
+        "living_combatants": _living_combatant_count,
+        "casualty_pressure": get_battlefield_casualty_pressure(),
+    }
+
+func _count_living_views(views: Array[UnitSlotView]) -> int:
+    var living_count: int = 0
+    for view: UnitSlotView in views:
+        if view != null and view.unit != null and view.unit.is_alive():
+            living_count += 1
+    return living_count
+
+func _publish_battlefield_pressure() -> void:
+    if arena_container == null or not is_instance_valid(arena_container):
+        return
+    arena_container.set_meta("battlefield_initial_combatants", _initial_combatant_count)
+    arena_container.set_meta("battlefield_living_combatants", _living_combatant_count)
+    arena_container.set_meta("battlefield_casualty_pressure", get_battlefield_casualty_pressure())
 
 func get_player_actor(index: int) -> UnitActor:
     if arena:

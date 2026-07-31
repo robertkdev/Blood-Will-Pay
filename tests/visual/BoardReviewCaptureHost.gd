@@ -218,6 +218,7 @@ func _run() -> void:
 	if _main.has_method("_sync_system_menu_button"):
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(14)
+	var controller: Variant = combat.get("controller") if combat != null else null
 	var manager: CombatManager = combat.get("manager") as CombatManager if combat != null else null
 	_expect(manager != null, "combat manager missing from planning surface")
 	if manager != null:
@@ -231,19 +232,29 @@ func _run() -> void:
 		var battle_result: Dictionary[String, Variant] = manager.start_custom_battle(["bonko"], ["brute"], options)
 		_expect(bool(battle_result.get("ok", false)), "deterministic capture battle failed: %s" % String(battle_result.get("reason", "unknown")))
 	Engine.time_scale = 0.0
+	if controller != null and controller.has_method("_update_environmental_pressure"):
+		controller.set("_combat_pressure_elapsed", 0.0)
+		controller.call("_update_environmental_pressure", 0.0)
 	await _settle_frames(4)
+	_assert_combat_environment_contract(combat, "onset", false)
 	await _capture("14_active_combat_onset_1920x1080.png", "active_combat_onset", DESKTOP_SIZE)
 	Engine.time_scale = 1.0
 	await get_tree().create_timer(0.75, true, false, true).timeout
 	Engine.time_scale = 0.0
+	if controller != null and controller.has_method("_update_environmental_pressure"):
+		controller.set("_combat_pressure_elapsed", 1.0)
+		controller.call("_update_environmental_pressure", 0.0)
 	await _settle_frames(4)
+	_assert_combat_environment_contract(combat, "midfight", false)
 	await _capture("15_active_combat_midfight_1920x1080.png", "active_combat_midfight", DESKTOP_SIZE)
 	USER_SETTINGS_SCRIPT.set_reduced_motion(true)
+	if controller != null and controller.has_method("_update_environmental_pressure"):
+		controller.call("_update_environmental_pressure", 0.0)
 	await _settle_frames(8)
+	_assert_combat_environment_contract(combat, "reduced_motion_static_midfight", true)
 	await _capture("16_active_combat_reduced_motion_1920x1080.png", "active_combat_reduced_motion", DESKTOP_SIZE)
 	USER_SETTINGS_SCRIPT.set_reduced_motion(false)
 
-	var controller: Variant = combat.get("controller") if combat != null else null
 	_expect(controller != null and controller.has_method("_show_result_banner"), "combat result presenter missing")
 	if controller != null and controller.has_method("_show_result_banner"):
 		await _capture_result_entry_and_hold(
@@ -277,6 +288,8 @@ func _run() -> void:
 		if controller.has_method("refresh_result_banner_layout"):
 			controller.call("refresh_result_banner_layout")
 		await _settle_frames(12)
+		_assert_result_outcome_contract("DEFEAT")
+		_assert_compact_result_contract()
 		await _capture("25_defeat_hold_1280x720_150pct.png", "defeat_150_percent", COMPACT_SIZE)
 
 	Engine.time_scale = 1.0
@@ -372,6 +385,7 @@ func _capture_result_variant(
 		var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer
 		if card != null:
 			card.scale = Vector2.ONE
+	_assert_result_outcome_contract(title)
 	await _capture(filename, outcome, DESKTOP_SIZE)
 
 
@@ -388,6 +402,7 @@ func _capture_result_entry_and_hold(
 	Engine.time_scale = 1.0
 	controller.call("_show_result_banner", title, detail, accent, title_color)
 	await _settle_frames(1)
+	_assert_result_outcome_contract(title)
 	await _capture(entry_filename, "%s_entry" % outcome, DESKTOP_SIZE)
 	await _settle_frames(30)
 	Engine.time_scale = 0.0
@@ -450,6 +465,120 @@ func _build_loss_surface() -> void:
 		screen.configure(_loss_tracker)
 		_loss_layer.add_child(screen)
 
+func _assert_combat_environment_contract(combat: Control, expected_phase: String, reduced_motion: bool) -> void:
+	_expect(combat != null, "%s combat contract missing CombatView" % expected_phase)
+	if combat == null:
+		return
+	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	var aftermath: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath") as Control
+	var onset: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/OnsetAftermathGeometry") as Control
+	var midfight: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/MidfightAftermathGeometry") as Control
+	var collapse: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/CollapseAftermathGeometry") as Control
+	var reduced_lock: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
+	_expect(arena != null and String(arena.get_meta("battlefield_pressure_phase", "")) == expected_phase, "%s capture did not reach the requested environment phase" % expected_phase)
+	_expect(arena != null and bool(arena.get_meta("battlefield_reduced_motion", not reduced_motion)) == reduced_motion, "%s capture reduced-motion metadata is wrong" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("war_aftermath/"), "%s capture lacks a physical battlefield signature" % expected_phase)
+	_expect(aftermath != null and aftermath.visible and String(aftermath.get_meta("visual_role", "")) == "non_unit_physical_war_aftermath", "%s capture lacks the physical war-aftermath root" % expected_phase)
+	_expect(onset != null and onset.visible and onset.get_child_count() >= 5, "%s capture lost practical onset wreckage" % expected_phase)
+	_expect(midfight != null and midfight.visible == (expected_phase != "onset"), "%s capture has the wrong shattered-barricade state" % expected_phase)
+	_expect(collapse != null and not collapse.visible, "%s capture prematurely exposed the collapse composition" % expected_phase)
+	_expect(reduced_lock != null and reduced_lock.visible == reduced_motion, "%s capture has the wrong reduced-motion grime lock" % expected_phase)
+	if aftermath != null and reduced_motion:
+		_expect(aftermath.scale == Vector2.ONE, "%s reduced-motion capture retained an animated environment transform" % expected_phase)
+	_assert_persistent_combat_hierarchy(expected_phase)
+
+func _assert_result_outcome_contract(outcome: String) -> void:
+	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
+	_expect(banner != null and banner.visible, "%s result contract missing visible banner" % outcome)
+	if banner == null:
+		return
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer
+	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control
+	var victory_geometry: Control = banner.get_node_or_null("BattleResultAftermath/VictoryAftermathGeometry") as Control
+	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
+	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
+	var expected_signature: String = "opened_survivor_lane" if outcome == "VICTORY" else "crosswise_deadlock" if outcome == "STALEMATE" else "collapsed_canopy_grave"
+	_expect(card != null and String(card.get_meta("result_variant", "")) == outcome.to_lower(), "%s result card variant metadata is wrong" % outcome)
+	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its physical aftermath signature" % outcome)
+	_expect(victory_geometry != null and victory_geometry.visible == (outcome == "VICTORY") and victory_geometry.get_child_count() >= 4, "%s has the wrong survivor-lane geometry state" % outcome)
+	_expect(stalemate_geometry != null and stalemate_geometry.visible == (outcome == "STALEMATE") and stalemate_geometry.get_child_count() >= 5, "%s has the wrong deadlock geometry state" % outcome)
+	_expect(defeat_geometry != null and defeat_geometry.visible == (outcome == "DEFEAT") and defeat_geometry.get_child_count() >= 6, "%s has the wrong collapse geometry state" % outcome)
+	_assert_persistent_combat_hierarchy("%s_result" % outcome.to_lower())
+
+func _assert_persistent_combat_hierarchy(context: String) -> void:
+	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
+	var chapter_label: Label = stage_bar.find_child("ChapterLabel", true, false) as Label if stage_bar != null else null
+	var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label if stage_bar != null else null
+	var instruction: Label = _main.find_child("CombatObjectiveSignal", true, false) as Label if _main != null else null
+	_expect(stage_bar != null and stage_bar.is_visible_in_tree() and stage_bar.z_index >= 200, "%s lost the protected stage/chapter strip" % context)
+	_expect(chapter_label != null and chapter_label.is_visible_in_tree() and not chapter_label.text.strip_edges().is_empty(), "%s lost or emptied chapter context" % context)
+	_expect(phase_label != null and phase_label.is_visible_in_tree() and not phase_label.text.strip_edges().is_empty(), "%s lost or emptied combat phase context" % context)
+	_expect(instruction != null and instruction.is_visible_in_tree() and not instruction.text.strip_edges().is_empty(), "%s lost or emptied the instruction ribbon" % context)
+	_expect(instruction != null and not instruction.z_as_relative and instruction.z_index >= 200, "%s instruction ribbon is below combat/result pressure" % context)
+
+func _assert_compact_result_contract() -> void:
+	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
+	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
+	_expect(card != null and String(card.get_meta("responsive_result_layout", "")) == "compact_safe", "150% defeat did not select the compact result layout")
+	if card == null or skip_button == null:
+		_expect(false, "150% defeat is missing its card or skip control")
+		return
+	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	var card_rect: Rect2 = card.get_global_rect()
+	var skip_rect: Rect2 = skip_button.get_global_rect()
+	_expect(viewport_rect.encloses(card_rect), "150%% defeat frame exceeds the logical viewport: viewport=%s card=%s" % [str(viewport_rect), str(card_rect)])
+	_expect(card_rect.encloses(skip_rect), "150%% defeat skip control exceeds the lower frame: card=%s skip=%s" % [str(card_rect), str(skip_rect)])
+	_expect(skip_rect.end.y <= viewport_rect.end.y - 2.0, "150% defeat skip control is clipped by the lower viewport edge")
+
+func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
+	var contract: Dictionary[String, Variant] = {"state": state}
+	if _main == null:
+		return contract
+	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control
+	var chapter_label: Label = stage_bar.find_child("ChapterLabel", true, false) as Label if stage_bar != null else null
+	var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label if stage_bar != null else null
+	var instruction: Label = _main.find_child("CombatObjectiveSignal", true, false) as Label
+	contract["stage_context_visible"] = stage_bar != null and stage_bar.is_visible_in_tree()
+	contract["stage_context_text"] = chapter_label.text if chapter_label != null else ""
+	contract["phase_context_text"] = phase_label.text if phase_label != null else ""
+	contract["instruction_visible"] = instruction != null and instruction.is_visible_in_tree()
+	contract["instruction_text"] = instruction.text if instruction != null else ""
+	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control if combat != null else null
+	if arena != null:
+		contract["battlefield_pressure_phase"] = String(arena.get_meta("battlefield_pressure_phase", ""))
+		contract["battlefield_environment_signature"] = String(arena.get_meta("battlefield_environment_signature", ""))
+		contract["battlefield_casualty_pressure"] = float(arena.get_meta("battlefield_casualty_pressure", 0.0))
+		contract["battlefield_reduced_motion"] = bool(arena.get_meta("battlefield_reduced_motion", false))
+	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
+	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control if banner != null else null
+	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
+	if card != null and card.visible:
+		var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+		var card_rect: Rect2 = card.get_global_rect()
+		contract["result_variant"] = String(card.get_meta("result_variant", ""))
+		contract["result_layout"] = String(card.get_meta("responsive_result_layout", ""))
+		contract["result_geometry_signature"] = String(aftermath.get_meta("physical_geometry_signature", "")) if aftermath != null else ""
+		contract["card_bounds"] = _rect_contract(card_rect)
+		contract["card_inside_logical_viewport"] = viewport_rect.encloses(card_rect)
+		if skip_button != null:
+			var skip_rect: Rect2 = skip_button.get_global_rect()
+			contract["skip_bounds"] = _rect_contract(skip_rect)
+			contract["skip_inside_card"] = card_rect.encloses(skip_rect)
+	return contract
+
+func _rect_contract(rect: Rect2) -> Dictionary[String, float]:
+	return {
+		"x": rect.position.x,
+		"y": rect.position.y,
+		"width": rect.size.x,
+		"height": rect.size.y,
+		"right": rect.end.x,
+		"bottom": rect.end.y,
+	}
+
 
 func _capture(filename: String, state: String, expected_size: Vector2i) -> void:
 	await _settle_frames(2)
@@ -499,6 +628,7 @@ func _capture(filename: String, state: String, expected_size: Vector2i) -> void:
 		"runtime": "Godot %s" % Engine.get_version_info().get("string", "unknown"),
 		"path": absolute_path,
 		"bytes": byte_count,
+		"visual_contract": _build_visual_contract(state),
 	}
 	_captures.append(capture_record)
 	print("%s: CAPTURE %s" % [CAPTURE_NAME, absolute_path])

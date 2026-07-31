@@ -3,21 +3,29 @@ extends Node
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const UNIT_SELECT_SCENE: PackedScene = preload("res://scenes/UnitSelect.tscn")
 const VisionSnapshot := preload("res://scripts/util/vision_snapshot.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const SMOKE_NAME: String = "CompactViewportVisualAuditSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/compact_viewport_audit"
+const TEST_SETTINGS_PATH: String = "user://compact_viewport_visual_audit_settings.cfg"
 const VIEWPORT_SIZE: Vector2i = Vector2i(1280, 720)
-const LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1024, 576)
-const LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(853, 480)
+const STANDARD_VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
+const COMPACT_LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1024, 576)
+const COMPACT_LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(853, 480)
+const STANDARD_LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1536, 864)
+const STANDARD_LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(1280, 720)
 
 var _main: Control = null
 var _unit_select: UnitSelect = null
 var _failures: Array[String] = []
 var _saved_captures: int = 0
+var _original_scale: float = 1.0
+var _original_window_size: Vector2i = Vector2i.ZERO
 
 func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	_configure_isolated_settings()
 	_set_window_size(VIEWPORT_SIZE)
 	await _settle_frames(12)
 	_set_window_size(VIEWPORT_SIZE)
@@ -127,31 +135,67 @@ func _run() -> void:
 	_expect_no_button_text_overflow(combat, "post-shop combat")
 	_save_capture("05_post_shop_planning_1280x720.png", _main)
 
-	_set_physical_window_with_logical_size(VIEWPORT_SIZE, LOGICAL_125_PERCENT_SIZE)
+	_set_persisted_scaled_window(VIEWPORT_SIZE, 1.25, COMPACT_LOGICAL_125_PERCENT_SIZE)
 	await _settle_frames(12)
 	if combat != null:
 		combat.call("_apply_responsive_layout")
 	if _main != null and _main.has_method("_sync_system_menu_button"):
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(12)
-	_expect_planning_action_hierarchy("125-percent planning", true)
-	_expect_scaled_tactical_surface_containment("125-percent", LOGICAL_125_PERCENT_SIZE)
+	_expect_standard_planning_containment("compact 125-percent planning", COMPACT_LOGICAL_125_PERCENT_SIZE, 1.25, true)
+	_expect_scaled_tactical_surface_containment("compact 125-percent", COMPACT_LOGICAL_125_PERCENT_SIZE)
+	_expect_no_button_text_overflow(combat, "compact 125-percent post-shop combat")
+	_save_capture("05a_post_shop_planning_1280x720_125pct.png", _main)
+
+	_set_persisted_scaled_window(VIEWPORT_SIZE, 1.5, COMPACT_LOGICAL_150_PERCENT_SIZE)
+	await _settle_frames(12)
+	if combat != null:
+		combat.call("_apply_responsive_layout")
+	if _main != null and _main.has_method("_sync_system_menu_button"):
+		_main.call("_sync_system_menu_button")
+	await _settle_frames(12)
+	_expect_standard_planning_containment("compact 150-percent planning", COMPACT_LOGICAL_150_PERCENT_SIZE, 1.5, true)
+	_expect_scaled_tactical_surface_containment("compact 150-percent", COMPACT_LOGICAL_150_PERCENT_SIZE)
+	_expect_no_button_text_overflow(combat, "compact 150-percent post-shop combat")
+	_save_capture("05b_post_shop_planning_1280x720_150pct.png", _main)
+
+	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.0, STANDARD_VIEWPORT_SIZE)
+	await _settle_frames(12)
+	if combat != null:
+		combat.call("_apply_responsive_layout")
+	if _main != null and _main.has_method("_sync_system_menu_button"):
+		_main.call("_sync_system_menu_button")
+	await _settle_frames(12)
+	_expect_standard_planning_containment("1080p planning", STANDARD_VIEWPORT_SIZE, 1.0, false)
+	_expect_compact_battlefield_dominance()
+	_expect_no_button_text_overflow(combat, "1080p post-shop combat")
+	_save_capture("05c_post_shop_planning_1920x1080.png", _main)
+
+	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.25, STANDARD_LOGICAL_125_PERCENT_SIZE)
+	await _settle_frames(12)
+	if combat != null:
+		combat.call("_apply_responsive_layout")
+	if _main != null and _main.has_method("_sync_system_menu_button"):
+		_main.call("_sync_system_menu_button")
+	await _settle_frames(12)
+	_expect_standard_planning_containment("125-percent planning", STANDARD_LOGICAL_125_PERCENT_SIZE, 1.25, false)
 	_expect_compact_battlefield_dominance()
 	_expect_no_button_text_overflow(combat, "125-percent post-shop combat")
-	_save_capture("05b_post_shop_planning_1280x720_125pct.png", _main)
+	_save_capture("05d_post_shop_planning_1920x1080_125pct.png", _main)
 
-	_set_physical_window_with_logical_size(VIEWPORT_SIZE, LOGICAL_150_PERCENT_SIZE)
+	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.5, STANDARD_LOGICAL_150_PERCENT_SIZE)
 	await _settle_frames(12)
 	if combat != null:
 		combat.call("_apply_responsive_layout")
 	if _main != null and _main.has_method("_sync_system_menu_button"):
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(12)
-	_expect_scaled_tactical_surface_containment("150-percent", LOGICAL_150_PERCENT_SIZE)
+	_expect_standard_planning_containment("150-percent planning", STANDARD_LOGICAL_150_PERCENT_SIZE, 1.5, true)
+	_expect_scaled_tactical_surface_containment("150-percent", STANDARD_LOGICAL_150_PERCENT_SIZE)
 	_expect_planning_action_hierarchy("150-percent planning", true)
 	_expect_compact_battlefield_dominance()
 	_expect_no_button_text_overflow(combat, "150-percent post-shop combat")
-	_save_capture("06_post_shop_planning_1280x720_150pct.png", _main)
+	_save_capture("06_post_shop_planning_1920x1080_150pct.png", _main)
 	await _finish()
 
 func _build_post_shop_state() -> void:
@@ -368,17 +412,41 @@ func _set_window_size(size: Vector2i) -> void:
 	if window != null:
 		window.size = size
 		window.content_scale_size = size
-		window.content_scale_factor = 1.0
+	var save_error: Error = UserSettingsScript.set_ui_scale(1.0, window)
+	_expect(save_error == OK, "failed to persist the 100-percent UI scale fixture")
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
 
-func _set_physical_window_with_logical_size(physical_size: Vector2i, logical_size: Vector2i) -> void:
+func _set_persisted_scaled_window(physical_size: Vector2i, ui_scale: float, expected_logical_size: Vector2i) -> void:
 	var framebuffer_unavailable: bool = _is_framebuffer_unavailable()
-	var applied_window_size: Vector2i = logical_size if framebuffer_unavailable else physical_size
+	var applied_window_size: Vector2i = expected_logical_size if framebuffer_unavailable else physical_size
 	DisplayServer.window_set_size(applied_window_size)
 	var window: Window = get_window()
 	if window != null:
 		window.size = applied_window_size
 		window.content_scale_size = applied_window_size
-		window.content_scale_factor = 1.0 if framebuffer_unavailable else float(physical_size.x) / float(logical_size.x)
+	var save_error: Error = UserSettingsScript.set_ui_scale(ui_scale, window)
+	_expect(save_error == OK, "failed to persist the %d-percent UI scale fixture" % roundi(ui_scale * 100.0))
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%d-percent UI scale did not survive settings reload" % roundi(ui_scale * 100.0))
+	if framebuffer_unavailable and window != null:
+		# Headless display backends do not consistently expose content-scaled
+		# visible rects. Keep the persisted setting authoritative and provide
+		# its expected logical window directly.
+		window.content_scale_factor = 1.0
+
+func _configure_isolated_settings() -> void:
+	var window: Window = get_window()
+	_original_scale = window.content_scale_factor if window != null else 1.0
+	_original_window_size = window.size if window != null else Vector2i.ZERO
+	_remove_test_settings()
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+
+func _remove_test_settings() -> void:
+	if FileAccess.file_exists(TEST_SETTINGS_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SETTINGS_PATH))
 
 func _expect_control_inside(control: Control, label: String) -> void:
 	_expect(control != null, "%s missing" % label)
@@ -545,6 +613,51 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	var tactical_record: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	_expect(tactical_record != null and not tactical_record.visible, "%s decorative tactical-record caption can still overlay gameplay" % context)
 
+func _expect_standard_planning_containment(context: String, expected_logical_size: Vector2i, expected_scale: float, expected_tight: bool) -> void:
+	var viewport_rect: Rect2 = _viewport_rect()
+	_expect(absf(viewport_rect.size.x - float(expected_logical_size.x)) <= 2.0, "%s logical width is wrong: %s" % [context, str(viewport_rect)])
+	_expect(absf(viewport_rect.size.y - float(expected_logical_size.y)) <= 2.0, "%s logical height is wrong: %s" % [context, str(viewport_rect)])
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	_expect(combat != null, "%s combat view missing" % context)
+	if combat == null:
+		return
+	_expect(is_equal_approx(float(combat.get_meta("persisted_ui_scale", 0.0)), expected_scale), "%s did not consume the persisted %.0f-percent UI scale" % [context, expected_scale * 100.0])
+	_expect(bool(combat.get_meta("compact_layout", false)), "%s did not enter the 1080p-fit compact layout" % context)
+	_expect(bool(combat.get_meta("tight_scale_layout", false)) == expected_tight, "%s tight-layout state is wrong" % context)
+	var required_paths: PackedStringArray = PackedStringArray([
+		"MarginContainer/VBoxContainer/StageProgressTopBar",
+		"MarginContainer/VBoxContainer/BattleArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel",
+		"MarginContainer/VBoxContainer/BenchArea",
+		"MarginContainer/VBoxContainer/ActionsRow",
+		"MarginContainer/VBoxContainer/WagerSummary",
+		"MarginContainer/VBoxContainer/BottomStorageArea",
+		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
+	])
+	for path: String in required_paths:
+		var surface: Control = combat.get_node_or_null(path) as Control
+		_expect(surface != null and surface.is_visible_in_tree(), "%s hid required planning surface %s" % [context, path])
+		if surface != null and surface.is_visible_in_tree():
+			_expect_control_inside(surface, "%s surface %s" % [context, path])
+	var gold_source: Label = combat.find_child("GoldLabel", true, false) as Label
+	var progress_source: Label = _find_progress_source()
+	_expect(gold_source != null, "%s lost live gold" % context)
+	_expect(progress_source != null, "%s lost live level/XP progress" % context)
+	if gold_source != null and gold_source.is_visible_in_tree():
+		_expect_control_inside(gold_source, "%s live gold" % context)
+	if progress_source != null and progress_source.is_visible_in_tree():
+		_expect_control_inside(progress_source, "%s live level/XP progress" % context)
+	var shop_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
+	if shop_grid != null:
+		for child: Node in shop_grid.get_children():
+			var card: Control = child as Control
+			if card != null and card.is_visible_in_tree():
+				_expect_control_inside(card, "%s shop card %s" % [context, String(card.name)])
+				_expect_shop_card_contents_inside(card)
+	_expect_planning_action_hierarchy(context, expected_tight)
+	_expect_scaled_surface_separation(context)
+
 func _expect_scaled_decision_data(context: String) -> void:
 	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
 	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
@@ -657,12 +770,14 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	_expect(continue_button != null, "%s primary Start Battle action missing" % context)
 	_expect(bet_row != null and all_in_button != null and wager_label != null, "%s wager utility group missing" % context)
 	if continue_button != null:
+		_expect(continue_button.is_visible_in_tree(), "%s primary Start Battle action is hidden" % context)
 		_expect(String(continue_button.get_meta("visual_role", "")) == "primary_commit", "%s Start Battle lacks primary commitment semantics" % context)
 		_expect(continue_button.custom_minimum_size.x >= (176.0 if tight else 236.0), "%s Start Battle is not wide enough to dominate" % context)
 		_expect(continue_button.custom_minimum_size.y >= (38.0 if tight else 46.0), "%s Start Battle lacks dominant action height" % context)
 		_expect(continue_button.get_theme_font_size("font_size") >= (20 if tight else 23), "%s Start Battle type is too small" % context)
 		_expect_control_inside(continue_button, "%s Start Battle" % context)
 	if bet_row != null:
+		_expect(bet_row.is_visible_in_tree(), "%s wager controls are hidden" % context)
 		_expect(String(bet_row.get_meta("visual_role", "")) == "planning_utility_group", "%s wager controls are not grouped as utilities" % context)
 		_expect(bet_row.custom_minimum_size.x >= (254.0 if tight else 334.0), "%s wager controls are too compressed" % context)
 		_expect_control_inside(bet_row, "%s wager controls" % context)
@@ -682,6 +797,11 @@ func _expect_shop_card_contents_inside(card: Control) -> void:
 	if not (card is ShopCard):
 		return
 	var card_rect: Rect2 = card.get_global_rect()
+	_expect(card is Button and card.mouse_filter == Control.MOUSE_FILTER_STOP, "shop card %s lost its purchase affordance" % String(card.name))
+	var icon: TextureRect = card.find_child("Icon", true, false) as TextureRect
+	_expect(icon != null and icon.is_visible_in_tree(), "shop card %s missing its unit portrait" % String(card.name))
+	if icon != null and icon.is_visible_in_tree():
+		_expect(card_rect.encloses(icon.get_global_rect()), "shop card %s clips its unit portrait" % String(card.name))
 	for label_name: String in ["Name", "Price"]:
 		var label: Label = card.find_child(label_name, true, false) as Label
 		_expect(label != null, "shop card %s missing %s" % [String(card.name), label_name])
@@ -690,6 +810,9 @@ func _expect_shop_card_contents_inside(card: Control) -> void:
 		_expect(card_rect.encloses(label.get_global_rect()), "shop card %s clips %s" % [String(card.name), label_name])
 		var minimum_font_size: int = 14 if label_name == "Name" else 16
 		_expect(label.get_theme_font_size("font_size") >= minimum_font_size, "shop card %s %s should remain at least %dpx" % [String(card.name), label_name, minimum_font_size])
+		var label_font: Font = label.get_theme_font("font")
+		var label_text_width: float = label_font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.get_theme_font_size("font_size")).x if label_font != null else 0.0
+		_expect(label_text_width <= label.size.x + 1.0, "shop card %s clips %s copy: text=%.1f width=%.1f" % [String(card.name), label_name, label_text_width, label.size.x])
 
 func _viewport_rect() -> Rect2:
 	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
@@ -756,5 +879,13 @@ func _finish() -> void:
 		_main.free()
 		_main = null
 	_unit_select = null
+	var window: Window = get_window()
+	if window != null:
+		window.content_scale_factor = _original_scale
+		if _original_window_size != Vector2i.ZERO:
+			window.size = _original_window_size
+			window.content_scale_size = _original_window_size
+	UserSettingsScript.configure_storage_path(UserSettingsScript.DEFAULT_SETTINGS_PATH)
+	_remove_test_settings()
 	await _settle_frames(4)
 	get_tree().quit(exit_code)

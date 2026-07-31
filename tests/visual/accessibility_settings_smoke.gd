@@ -110,6 +110,17 @@ func _run() -> void:
 			"150 percent title control %s should remain inside the %dx%d viewport rect=%s viewport=%s"
 			% [control_name, viewport_size.x, viewport_size.y, str(navigation_control.get_global_rect() if navigation_control != null else Rect2()), str(viewport_rect)]
 		)
+	if title_menu != null:
+		title_menu.call("_select_section", "home", true)
+	await _settle_frames(4)
+	_expect(
+		title_menu != null and is_equal_approx(float(title_menu.call("_actual_ui_scale")), 1.5),
+		"command menu should detect the persisted/window 150 percent scale"
+	)
+	var route_manifest: VBoxContainer = title_menu.find_child("HomeRouteManifest", true, false) as VBoxContainer if title_menu != null else null
+	_expect(route_manifest != null, "150 percent command menu should expose the Available Records manifest")
+	if route_manifest != null:
+		_expect_manifest_rows_readable(route_manifest, "150 percent command menu")
 	if _main != null:
 		_main.call("open_black_ledger", TEST_ACCOUNT_PROFILE_PATH)
 	await _settle_frames(3)
@@ -299,6 +310,24 @@ func _make_key(keycode: Key) -> InputEventKey:
 
 func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
 	return outer.has_point(inner.position) and outer.has_point(inner.end)
+
+func _expect_manifest_rows_readable(route_manifest: VBoxContainer, context: String) -> void:
+	var previous_route_bottom: float = -1.0
+	for record_number: String in ["01", "02", "03", "04"]:
+		var route: Button = route_manifest.get_node_or_null("ManifestRoute%s" % record_number) as Button
+		var record_title: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordTitle") as Label if route != null else null
+		var record_description: Label = route.get_node_or_null("BoundCopy/RecordCopy/RecordDescription") as Label if route != null else null
+		_expect(route != null, "%s Record %s missing" % [context, record_number])
+		_expect(record_title != null and record_description != null, "%s Record %s copy missing" % [context, record_number])
+		if route == null or record_title == null or record_description == null:
+			continue
+		var route_rect: Rect2 = route.get_global_rect()
+		var title_rect: Rect2 = record_title.get_global_rect()
+		var description_rect: Rect2 = record_description.get_global_rect()
+		_expect(title_rect.end.y <= description_rect.position.y + 1.0, "%s Record %s title overlaps its description" % [context, record_number])
+		_expect(description_rect.end.y <= route_rect.end.y - 4.0, "%s Record %s description escapes its command row" % [context, record_number])
+		_expect(previous_route_bottom < 0.0 or route_rect.position.y >= previous_route_bottom - 1.0, "%s Record %s overlaps the preceding command row" % [context, record_number])
+		previous_route_bottom = route_rect.end.y
 
 func _remove_test_settings() -> void:
 	var absolute_path: String = ProjectSettings.globalize_path(TEST_SETTINGS_PATH)

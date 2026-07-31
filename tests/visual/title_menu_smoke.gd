@@ -39,8 +39,16 @@ func _run() -> void:
 		var enter_button: Button = main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
 		_expect(enter_button != null, "TitlePage EnterButton missing", failures)
 		var continue_prompt: Label = main.get_node_or_null("TitlePage/Center/Stack/ContinuePrompt") as Label
-		_expect(continue_prompt == null, "TitlePage should preserve the accepted prompt-free composition", failures)
-		_expect(_find_visible_label(title_page) == null, "TitlePage should not add visible instructions or copy over the authored artwork", failures)
+		_expect(continue_prompt == null, "TitlePage must not restore the generic ContinuePrompt", failures)
+		var entry_affordance: PanelContainer = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
+		var entry_order: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
+		var entry_action: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryAction") as Label
+		_expect(entry_affordance != null and entry_affordance.is_visible_in_tree() and entry_affordance.modulate.a >= 0.90, "TitlePage should expose a visible entry affordance", failures)
+		_expect(entry_affordance != null and _rect_inside(entry_affordance.get_global_rect(), title_page.get_global_rect().grow(1.0)), "TitlePage entry affordance should remain inside the authored composition", failures)
+		_expect(entry_order != null and entry_order.is_visible_in_tree() and entry_order.text.contains("ENTRY ORDER"), "TitlePage entry affordance should use authored field-order language", failures)
+		_expect(entry_action != null and entry_action.is_visible_in_tree() and entry_action.text.contains("ENTER"), "TitlePage entry affordance should clearly communicate entry", failures)
+		var visible_entry_copy: String = "%s %s" % [entry_order.text if entry_order != null else "", entry_action.text if entry_action != null else ""]
+		_expect(not visible_entry_copy.to_upper().contains("PRESS ANY KEY") and not visible_entry_copy.to_upper().contains("CLICK OR PRESS"), "TitlePage must not restore the forbidden generic input prompt", failures)
 		var title_distress: Control = main.get_node_or_null("TitlePage/TitleMarkDistress") as Control
 		_expect(title_distress != null and title_distress.visible, "TitlePage should carry a restrained non-text registration treatment", failures)
 		if title_distress != null:
@@ -420,6 +428,9 @@ func _find_label_containing_text(root: Node, needle: String) -> Label:
 		if found != null:
 			return found
 	return null
+
+func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
+	return outer.has_point(inner.position) and outer.has_point(inner.end)
 
 func _find_visible_label(root: Node) -> Label:
 	if root == null:

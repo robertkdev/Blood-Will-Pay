@@ -128,6 +128,7 @@ func _assert_result_card() -> void:
 	_expect(aftermath_wash != null and aftermath_wash.texture is GradientTexture2D, "victory aftermath should carry a state-specific blood/ash wash")
 	_expect(rupture_field != null and rupture_field.get_child_count() >= 5, "victory aftermath should physically rupture the field around the record")
 	_expect(aftermath_stamp != null and aftermath_stamp.text.contains("FIELD") and aftermath_stamp.text.contains("BREATHES"), "victory aftermath should communicate that the horror survives the outcome")
+	_assert_outcome_aftermath_geometry(banner, "VICTORY")
 	if card == null:
 		return
 	var title_label: Label = card.get_node_or_null("CardMargin/Content/OutcomeLabel") as Label
@@ -152,6 +153,7 @@ func _assert_result_card() -> void:
 	_expect(hold_label != null and hold_label.text.begins_with("AUTO-ADVANCE IN"), "result card should name its automatic advance countdown")
 	_expect(skip_button != null and skip_button.text.contains("SKIP"), "result card should expose a visible keyboard skip affordance")
 	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, "VICTORY")
+	_assert_result_frame_inside_viewport(card, skip_button, "VICTORY")
 	_assert_persistent_combat_chrome("VICTORY result")
 	var record_wash: TextureRect = card.get_node_or_null("RecordWash") as TextureRect
 	_expect(record_wash != null and record_wash.texture != null, "result card should carry a restrained war-record texture pass")
@@ -231,6 +233,7 @@ func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
 	_assert_result_detail_bounds(card, detail_label, expected_title)
 	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, expected_title)
+	_assert_result_frame_inside_viewport(card, skip_button, expected_title)
 	_assert_persistent_combat_chrome("%s result" % expected_title)
 	_expect(impact_stamp != null and impact_stamp.text != "FIELD RECORD CLOSED", "%s should carry an authored result-specific settlement stamp" % expected_title)
 	_expect(card != null and String(card.get_meta("result_variant", "")) == expected_title.to_lower(), "%s should expose a semantic visual variant" % expected_title)
@@ -239,6 +242,7 @@ func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 	_expect(aftermath_wash != null and aftermath_wash.texture is GradientTexture2D, "%s should carry a material outcome wash" % expected_title)
 	_expect(rupture_field != null and rupture_field.get_child_count() >= 5, "%s should rupture the surrounding field rather than presenting only a clean card" % expected_title)
 	_expect(aftermath_stamp != null and not aftermath_stamp.text.strip_edges().is_empty(), "%s should state its environmental consequence outside the data card" % expected_title)
+	_assert_outcome_aftermath_geometry(banner, expected_title)
 	if expected_title == "DEFEAT":
 		_expect(card != null and card.custom_minimum_size == Vector2(920.0, 462.0), "defeat should use a taller, heavier consequence silhouette")
 		_expect(card != null and String(card.get_meta("tear_direction", "")) == "downward_collapse", "defeat should collapse downward")
@@ -269,6 +273,11 @@ func _assert_active_combat_shell() -> void:
 	var fog: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaGroundFog") as TextureRect
 	var smoke: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaHostileSmoke") as TextureRect
 	var wet_reflection: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWetGroundReflection") as TextureRect
+	var war_aftermath: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath") as Control
+	var onset_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/OnsetAftermathGeometry") as Control
+	var midfight_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/MidfightAftermathGeometry") as Control
+	var collapse_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/CollapseAftermathGeometry") as Control
+	var reduced_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	var battle_area: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	var arena_container: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	var planning_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry") as Control
@@ -282,6 +291,14 @@ func _assert_active_combat_shell() -> void:
 	_expect(palisade != null and watch_post != null, "combat shell lacks ruined fortification and distant hostile structure silhouettes")
 	_expect(fog != null and fog.texture != null and smoke != null and smoke.texture != null, "combat shell lacks bounded fog/smoke weather layers")
 	_expect(wet_reflection != null and wet_reflection.texture is GradientTexture2D, "combat shell lacks the wet-ground reflection that makes the woodland feel physical")
+	_expect(war_aftermath != null and String(war_aftermath.get_meta("visual_role", "")) == "non_unit_physical_war_aftermath", "combat shell lacks a semantic non-unit physical war-aftermath layer")
+	_expect(onset_geometry != null and onset_geometry.get_child_count() >= 5, "combat onset lacks practical wreckage and trench geometry")
+	_expect(midfight_geometry != null and midfight_geometry.get_child_count() >= 6, "combat midfight lacks a materially denser shattered-barricade composition")
+	_expect(collapse_geometry != null and collapse_geometry.get_child_count() >= 5, "combat casualty pressure lacks a collapsed-canopy/occlusion composition")
+	_expect(reduced_geometry != null and reduced_geometry.get_child_count() >= 3, "reduced motion lacks an equally legible static grime-lock composition")
+	var pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "")) if arena_container != null else ""
+	_expect(not pressure_phase.is_empty(), "combat environment did not publish its evolving pressure phase")
+	_expect(arena_container != null and String(arena_container.get_meta("battlefield_environment_signature", "")).begins_with("war_aftermath/"), "combat environment lacks a measurable physical-composition signature")
 	var viewport_height: float = get_viewport().get_visible_rect().size.y
 	_expect(battle_area != null and battle_area.get_global_rect().size.y >= viewport_height * 0.78, "combat field remained a narrow middle band instead of occupying the survival surface")
 	_expect(arena_container != null and bool(arena_container.get_meta("use_full_combat_bounds", false)), "combat actors were not promoted from the planning strip into full-field bounds")
@@ -298,12 +315,14 @@ func _assert_persistent_combat_chrome(context: String) -> void:
 	var chapter_label: Label = _main.find_child("ChapterLabel", true, false) as Label if _main != null else null
 	var phase_label: Label = _main.find_child("PhaseLabel", true, false) as Label if _main != null else null
 	var system_menu: Button = _main.find_child("SystemMenuButton", true, false) as Button if _main != null else null
+	var instruction_ribbon: Label = _main.find_child("CombatObjectiveSignal", true, false) as Label if _main != null else null
 	_expect(stage_bar != null and stage_bar.is_visible_in_tree(), "%s lost the stage/chapter strip" % context)
 	_expect(chapter_label != null and chapter_label.is_visible_in_tree() and chapter_label.modulate.a >= 0.99, "%s lost persistent chapter copy" % context)
 	_expect(phase_label != null and phase_label.is_visible_in_tree() and phase_label.modulate.a >= 0.99, "%s lost persistent phase copy" % context)
 	_expect(system_menu != null and system_menu.is_visible_in_tree() and system_menu.text == "Menu" and system_menu.modulate.a >= 0.99, "%s lost the persistent Menu action" % context)
 	_expect(chapter_label != null and not chapter_label.text.strip_edges().is_empty(), "%s left the stage strip visibly blank" % context)
 	_expect(phase_label != null and not phase_label.text.strip_edges().is_empty(), "%s left the phase strip visibly blank" % context)
+	_expect(instruction_ribbon != null and instruction_ribbon.is_visible_in_tree() and not instruction_ribbon.text.strip_edges().is_empty(), "%s lost or emptied the persistent instruction ribbon" % context)
 	var visible_stage_tokens: int = 0
 	if stage_bar != null:
 		for token_index: int in range(1, 6):
@@ -315,6 +334,37 @@ func _assert_persistent_combat_chrome(context: String) -> void:
 		_expect(stage_bar.z_index >= 200, "%s stage strip is not protected above combat/result pressure layers" % context)
 	if system_menu != null:
 		_expect(system_menu.z_index >= 200, "%s Menu is not protected above combat/result pressure layers" % context)
+	if instruction_ribbon != null:
+		_expect(not instruction_ribbon.z_as_relative and instruction_ribbon.z_index >= 200, "%s instruction ribbon is not protected above combat/result pressure layers" % context)
+
+func _assert_outcome_aftermath_geometry(banner: PanelContainer, outcome: String) -> void:
+	_expect(banner != null, "%s outcome geometry cannot be checked without a result banner" % outcome)
+	if banner == null:
+		return
+	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control
+	var victory_geometry: Control = banner.get_node_or_null("BattleResultAftermath/VictoryAftermathGeometry") as Control
+	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
+	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
+	var expected_signature: String = "opened_survivor_lane" if outcome == "VICTORY" else "crosswise_deadlock" if outcome == "STALEMATE" else "collapsed_canopy_grave"
+	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its distinct physical aftermath signature" % outcome)
+	_expect(victory_geometry != null and victory_geometry.get_child_count() >= 4, "victory aftermath lacks its opened survivor-lane geometry")
+	_expect(stalemate_geometry != null and stalemate_geometry.get_child_count() >= 5, "stalemate aftermath lacks its crosswise deadlock geometry")
+	_expect(defeat_geometry != null and defeat_geometry.get_child_count() >= 6, "defeat aftermath lacks its collapsed canopy and grave geometry")
+	if victory_geometry != null:
+		_expect(victory_geometry.visible == (outcome == "VICTORY"), "%s leaked the victory survivor-lane composition" % outcome)
+	if stalemate_geometry != null:
+		_expect(stalemate_geometry.visible == (outcome == "STALEMATE"), "%s leaked the stalemate deadlock composition" % outcome)
+	if defeat_geometry != null:
+		_expect(defeat_geometry.visible == (outcome == "DEFEAT"), "%s leaked the defeat collapse composition" % outcome)
+
+func _assert_result_frame_inside_viewport(card: PanelContainer, skip_button: Button, outcome: String) -> void:
+	if card == null or skip_button == null:
+		return
+	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	var card_rect: Rect2 = card.get_global_rect()
+	var skip_rect: Rect2 = skip_button.get_global_rect()
+	_expect(viewport_rect.encloses(card_rect), "%s result frame escaped the logical viewport: viewport=%s card=%s" % [outcome, str(viewport_rect), str(card_rect)])
+	_expect(card_rect.encloses(skip_rect), "%s skip control escaped the lower result frame: card=%s skip=%s" % [outcome, str(card_rect), str(skip_rect)])
 
 func _assert_result_hold_copy_unobstructed(
 	card: PanelContainer,

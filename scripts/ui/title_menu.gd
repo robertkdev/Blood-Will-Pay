@@ -78,6 +78,8 @@ var _rail_fit_queued: bool = false
 
 func _ready() -> void:
 	UserSettingsScript.initialize(get_window())
+	set_meta("effective_ui_scale", _actual_ui_scale())
+	set_meta("effective_layout_size", _effective_layout_size())
 	_motion_enabled = not UserSettingsScript.get_reduced_motion()
 	_load_content_data()
 	_apply_gothic_layout()
@@ -881,8 +883,18 @@ func _add_manifest_route(parent: VBoxContainer, number: String, title: String, b
 	route.tooltip_text = "Open %s" % title.to_lower()
 	route.focus_mode = Control.FOCUS_ALL
 	route.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	route.custom_minimum_size = Vector2(0.0, 66.0 if _is_short_compact_layout() else (74.0 if _is_compact_layout() else 80.0))
+	var scale_factor: float = _actual_ui_scale()
+	var route_height: float = 92.0
+	if _is_short_compact_layout():
+		route_height = 116.0
+	elif _is_compact_layout():
+		route_height = 104.0
+	if scale_factor >= 1.49:
+		route_height = maxf(route_height, 116.0)
+	route.custom_minimum_size = Vector2(0.0, route_height)
 	route.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	route.clip_contents = true
+	route.set_meta("layout_ui_scale", scale_factor)
 	route.set_meta("record_serial", number)
 	route.set_meta("record_section", section)
 	_style_manifest_route(route)
@@ -918,8 +930,10 @@ func _add_manifest_route(parent: VBoxContainer, number: String, title: String, b
 	title_copy.name = "RecordTitle"
 	VisualTypeSystem.set_action(title_copy)
 	copy.add_child(title_copy)
-	var body_copy: Label = _make_label(body, 17, Color(0.84, 0.80, 0.72, 1.0), true)
+	var body_copy: Label = _make_label(body, 18, Color(0.84, 0.80, 0.72, 1.0), true)
 	body_copy.name = "RecordDescription"
+	body_copy.custom_minimum_size.y = 58.0 if _is_short_compact_layout() or scale_factor >= 1.49 else 52.0
+	body_copy.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	VisualTypeSystem.set_utility(body_copy)
 	copy.add_child(body_copy)
 
@@ -1559,25 +1573,34 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 	button.set_meta("visual_role", visual_role)
 
 func _is_compact_layout() -> bool:
-	var viewport_size: Vector2 = get_viewport_rect().size
-	var ui_scale: float = maxf(UserSettingsScript.get_ui_scale(), 1.0)
-	var effective_size: Vector2 = viewport_size / ui_scale
+	var effective_size: Vector2 = _effective_layout_size()
 	return effective_size.x < 1360.0 or effective_size.y < 900.0
 
 func _is_short_compact_layout() -> bool:
-	var ui_scale: float = maxf(UserSettingsScript.get_ui_scale(), 1.0)
-	var viewport_height: float = get_viewport_rect().size.y
-	var effective_height: float = viewport_height / ui_scale
+	var ui_scale: float = _actual_ui_scale()
+	var effective_height: float = _effective_layout_size().y
 	var compact_short: bool = _is_compact_layout() and effective_height < 760.0
 	var maximum_scale_short: bool = ui_scale >= 1.49 and effective_height < 800.0
 	return compact_short or maximum_scale_short
 
 func _is_extreme_compact_layout() -> bool:
-	var ui_scale: float = maxf(UserSettingsScript.get_ui_scale(), 1.0)
-	var window: Window = get_window()
-	var physical_size: Vector2 = Vector2(window.size) if window != null else get_viewport_rect().size
-	var effective_size: Vector2 = physical_size / ui_scale
+	var effective_size: Vector2 = _effective_layout_size()
 	return effective_size.x < 760.0 or effective_size.y < 440.0
+
+func _actual_ui_scale() -> float:
+	var persisted_scale: float = clampf(UserSettingsScript.get_ui_scale(), 1.0, 1.5)
+	var window: Window = get_window()
+	var window_scale: float = window.content_scale_factor if window != null else 1.0
+	return maxf(persisted_scale, clampf(window_scale, 1.0, 1.5))
+
+func _effective_layout_size() -> Vector2:
+	var physical_size: Vector2 = get_viewport_rect().size
+	var window: Window = get_window()
+	# Window size stays physical while a persisted content scale can make the
+	# viewport's logical dimensions an unreliable breakpoint source.
+	if window != null and window.size.x > 0 and window.size.y > 0:
+		physical_size = Vector2(window.size)
+	return physical_size / _actual_ui_scale()
 
 func _update_nav_state() -> void:
 	for nav_button: Button in _nav_buttons:
@@ -1860,6 +1883,8 @@ func _on_ui_scale_selected(index: int, option: OptionButton) -> void:
 
 func _refresh_scaled_layout() -> void:
 	_resize_refresh_queued = false
+	set_meta("effective_ui_scale", _actual_ui_scale())
+	set_meta("effective_layout_size", _effective_layout_size())
 	_apply_gothic_layout()
 	_build_navigation()
 	_ensure_content_panel()

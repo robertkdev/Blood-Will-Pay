@@ -10,6 +10,7 @@ const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.g
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
 const COLOR_MUTED: Color = Color(0.66, 0.60, 0.52, 1.0)
@@ -39,6 +40,7 @@ var slot_index: int = -1
 var _hover_tween: Tween = null
 var _hovered: bool = false
 var _compact_presentation: bool = false
+var _tight_presentation: bool = false
 var _has_identity_content: bool = false
 var _tooltip: PanelContainer = null
 var _tooltip_layer: CanvasLayer = null
@@ -171,16 +173,16 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 		_has_identity_content = has_identity
 		_identity_panel.visible = _has_identity_content and not _compact_presentation
 
-func set_compact_presentation(enabled: bool) -> void:
+func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	_compact_presentation = enabled
-	if enabled:
-		custom_minimum_size = Vector2(120.0, 56.0)
+	_tight_presentation = enabled and tight
+	custom_minimum_size = Vector2(120.0, 56.0) if _tight_presentation else Vector2(132.0, 86.0) if enabled else Vector2(150.0, 138.0)
 	if _icon != null:
 		_icon.custom_minimum_size = Vector2.ZERO if enabled else Vector2(112.0, 112.0)
-		_icon.anchor_left = 0.10 if enabled else 0.12
-		_icon.anchor_top = 0.04 if enabled else 0.21
-		_icon.anchor_right = 0.90 if enabled else 0.88
-		_icon.anchor_bottom = 0.61 if enabled else 0.78
+		_icon.anchor_left = 0.10 if _tight_presentation else 0.08 if enabled else 0.12
+		_icon.anchor_top = 0.04 if _tight_presentation else 0.05 if enabled else 0.21
+		_icon.anchor_right = 0.90 if _tight_presentation else 0.92 if enabled else 0.88
+		_icon.anchor_bottom = 0.61 if _tight_presentation else 0.66 if enabled else 0.78
 	if _traits_box != null:
 		_traits_box.visible = false
 		_traits_box.custom_minimum_size = Vector2.ZERO if enabled else Vector2(0.0, 48.0)
@@ -189,8 +191,8 @@ func set_compact_presentation(enabled: bool) -> void:
 		_identity_panel.custom_minimum_size = Vector2.ZERO
 	if _name_label != null:
 		_name_label.anchor_left = 0.0
-		_name_label.anchor_top = 0.61 if enabled else 1.0
-		_name_label.anchor_right = 0.80 if enabled else 0.76
+		_name_label.anchor_top = 0.61 if _tight_presentation else 0.66 if enabled else 1.0
+		_name_label.anchor_right = 0.72 if enabled else 0.76
 		_name_label.anchor_bottom = 1.0
 		_name_label.offset_left = 4.0 if enabled else 8.0
 		_name_label.offset_top = 0.0 if enabled else -23.0
@@ -199,10 +201,10 @@ func set_compact_presentation(enabled: bool) -> void:
 		_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_name_label.clip_text = enabled
 		_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if enabled else TextServer.OVERRUN_NO_TRIMMING
-		_name_label.add_theme_font_size_override("font_size", 14 if enabled else 20)
+		_name_label.add_theme_font_size_override("font_size", 14 if _tight_presentation else 16 if enabled else 20)
 	if _price_label != null:
-		_price_label.anchor_left = 0.80 if enabled else 0.76
-		_price_label.anchor_top = 0.61 if enabled else 1.0
+		_price_label.anchor_left = 0.72 if enabled else 0.76
+		_price_label.anchor_top = 0.61 if _tight_presentation else 0.66 if enabled else 1.0
 		_price_label.anchor_right = 1.0
 		_price_label.anchor_bottom = 1.0
 		_price_label.offset_left = 0.0
@@ -212,8 +214,9 @@ func set_compact_presentation(enabled: bool) -> void:
 		_price_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_price_label.clip_text = enabled
 		_price_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if enabled else TextServer.OVERRUN_NO_TRIMMING
-		_price_label.add_theme_font_size_override("font_size", 16 if enabled else 20)
+		_price_label.add_theme_font_size_override("font_size", 16 if _tight_presentation else 17 if enabled else 20)
 	set_meta("compact_presentation", enabled)
+	set_meta("tight_presentation", _tight_presentation)
 
 func set_affordable(affordable: bool) -> void:
 	var ok: bool = bool(affordable)
@@ -375,9 +378,11 @@ func _apply_static_style() -> void:
 	pivot_offset = size * 0.5
 	tooltip_text = ""
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
-	var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0
-	custom_minimum_size = Vector2(120.0, 56.0) if tight_compact else Vector2(120.0, 94.0) if compact else Vector2(150.0, 138.0)
+	var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
+	var effective_size: Vector2 = _effective_ui_viewport_size(viewport_size)
+	var compact: bool = effective_size.y <= 1080.0 or effective_size.x <= 1400.0
+	var tight_compact: bool = effective_size.y <= 520.0 or effective_size.x <= 1100.0 or (ui_scale >= 1.25 and effective_size.y <= 720.0)
+	custom_minimum_size = Vector2(120.0, 56.0) if tight_compact else Vector2(132.0, 86.0) if compact else Vector2(150.0, 138.0)
 	add_theme_stylebox_override("normal", _make_card_style(false, false))
 	add_theme_stylebox_override("hover", _make_card_style(false, true))
 	add_theme_stylebox_override("pressed", _make_card_style(true, true))
@@ -437,7 +442,10 @@ func _apply_static_style() -> void:
 		_price_label.add_theme_color_override("font_color", COLOR_GOLD)
 		_price_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_price_label.add_theme_constant_override("outline_size", 1)
-	set_compact_presentation(tight_compact)
+	set_compact_presentation(compact, tight_compact)
+
+func _effective_ui_viewport_size(viewport_size: Vector2) -> Vector2:
+	return viewport_size
 
 func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
