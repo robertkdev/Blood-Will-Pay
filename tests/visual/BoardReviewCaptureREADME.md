@@ -39,8 +39,9 @@ identity, exact project path, process ID, Godot runtime, display server,
 rendering driver, state, viewport, timestamp, byte count, absolute image paths,
 review order, and a per-image `visual_contract`. Combat contracts record the
 physical battlefield signature, onset/midfight/reduced-motion pressure state,
-casualty pressure, reduced-motion flag, persistent stage/phase copy, and the
-instruction ribbon. Result contracts record the outcome-specific physical
+event-driven casualty residue index, bounded edge-pressure layer, reduced-motion
+flag, persistent stage/phase copy, and the instruction ribbon. Result contracts
+record the outcome-specific physical
 aftermath signature, responsive layout mode, logical card/skip bounds, and
 whether those bounds are enclosed. A dummy/headless renderer, an undersized
 framebuffer, a missing image, repeated/incorrect combat phase, disappearing
@@ -63,8 +64,8 @@ The packet covers 26 independently captured runtime states:
 - Planning board at compact and desktop sizes
 - Planning board at real 125% and 150% UI scale
 - Compact in-game system menu
-- Active-combat onset wreckage, materially denser impact/smoke midfight, and sparse static reduced-motion evidence
-- Victory entry and hold, plus physically distinct stalemate and defeat aftermath states
+- Active-combat onset smoke/debris pressure, materially denser impact scars and casualty residue at midfight, and a sparse static reduced-motion threat substitute
+- Victory entry and hold, plus grayscale-distinct stalemate and defeat silhouettes with different reading paths and player-facing integer hold copy
 - Defeat hold at compact 150% scale with the complete lower frame and skip control in bounds
 - Loss record at compact 150% scale
 - Loss record at desktop size

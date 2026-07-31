@@ -547,6 +547,56 @@ func _expect_connected_planning_composition(context: String, expect_large_tiles:
 	if expect_large_tiles and player_board != null and player_board.get_child_count() > 0:
 		var first_tile: Control = player_board.get_child(0) as Control
 		_expect(first_tile != null and first_tile.custom_minimum_size.x >= 55.0, "%s did not enlarge the full-HD deployment grid" % context)
+	_expect_item_cache_contract(context)
+	_expect_planning_landmark_contract(context, board_column, enemy_board, player_board)
+
+func _expect_item_cache_contract(context: String) -> void:
+	var left_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
+	var header: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
+	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
+	_expect(left_panel != null, "%s item-cache rail missing" % context)
+	_expect(header != null and header.is_visible_in_tree(), "%s item-cache label missing" % context)
+	_expect(item_grid != null and item_grid.is_visible_in_tree(), "%s item-cache grid missing" % context)
+	if left_panel == null or header == null or item_grid == null:
+		return
+	_expect(left_panel.get_global_rect().grow(1.0).encloses(header.get_global_rect()), "%s item-cache label escaped its rail" % context)
+	_expect(header.text.contains("CACHE") or header.text.contains("ITEMS"), "%s item-cache label does not explain the upper-left surface" % context)
+	_expect(header.text.contains("EMPTY") or header.text.contains("/"), "%s item-cache label lacks an intentional inventory state" % context)
+	_expect(header.get_theme_font_size("font_size") >= 11, "%s item-cache label is too small" % context)
+	for item_node: Node in item_grid.get_children():
+		var item_card: Control = item_node as Control
+		if item_card == null or not item_card.is_visible_in_tree():
+			continue
+		var background: Panel = item_card.get_node_or_null("Background") as Panel
+		var frame: Panel = item_card.get_node_or_null("Frame") as Panel
+		_expect(background != null and frame != null, "%s item slot %s lacks its complete two-rail frame" % [context, String(item_card.name)])
+		if background == null or frame == null:
+			continue
+		var outer_style: StyleBoxFlat = background.get_theme_stylebox("panel") as StyleBoxFlat
+		var inner_style: StyleBoxFlat = frame.get_theme_stylebox("panel") as StyleBoxFlat
+		_expect(outer_style != null and inner_style != null, "%s item slot %s fell back to sliced corner fragments" % [context, String(item_card.name)])
+		if outer_style != null:
+			_expect(outer_style.border_width_left > 0 and outer_style.border_width_top > 0 and outer_style.border_width_right > 0 and outer_style.border_width_bottom > 0, "%s item slot %s outer perimeter is incomplete" % [context, String(item_card.name)])
+		if inner_style != null:
+			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "%s item slot %s inner perimeter is incomplete" % [context, String(item_card.name)])
+		_expect(item_card.size.x >= 18.0 and item_card.size.y >= 18.0, "%s item slot %s collapsed below a recognizable frame: %s" % [context, String(item_card.name), str(item_card.size)])
+
+func _expect_planning_landmark_contract(context: String, board_column: Control, enemy_board: GridContainer, player_board: GridContainer) -> void:
+	if board_column == null or enemy_board == null or player_board == null:
+		return
+	var enemy_area: Control = enemy_board.get_parent() as Control
+	var player_area: Control = player_board.get_parent() as Control
+	var hostile_label: Label = enemy_area.get_node_or_null("HostileFieldOrderLabel") as Label if enemy_area != null else null
+	var survival_label: Label = player_area.get_node_or_null("SurvivalFieldOrderLabel") as Label if player_area != null else null
+	var hostile_band: ColorRect = enemy_area.get_node_or_null("HostileFieldOrderBand") as ColorRect if enemy_area != null else null
+	var survival_band: ColorRect = player_area.get_node_or_null("SurvivalFieldOrderBand") as ColorRect if player_area != null else null
+	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text.contains("HOSTILE LINE"), "%s hostile battlefield landmark is missing" % context)
+	_expect(survival_label != null and survival_label.is_visible_in_tree() and (survival_label.text.contains("SURVIVAL LINE") or survival_label.text.contains("HOLD LINE")), "%s survival battlefield landmark is missing" % context)
+	_expect(hostile_band != null and hostile_band.is_visible_in_tree() and bool(hostile_band.get_meta("planning_landmark", false)), "%s hostile battlefield lane is missing" % context)
+	_expect(survival_band != null and survival_band.is_visible_in_tree() and bool(survival_band.get_meta("planning_landmark", false)), "%s survival battlefield lane is missing" % context)
+	var minimum_grid_width: float = board_column.size.x * 0.42
+	_expect(enemy_board.size.x >= minimum_grid_width, "%s enemy deployment footprint still reads as a small island: grid=%.1f board=%.1f" % [context, enemy_board.size.x, board_column.size.x])
+	_expect(player_board.size.x >= minimum_grid_width, "%s player deployment footprint still reads as a small island: grid=%.1f board=%.1f" % [context, player_board.size.x, board_column.size.x])
 
 func _expect_scaled_tactical_surface_containment(context: String, expected_logical_size: Vector2i) -> void:
 	var viewport_rect: Rect2 = _viewport_rect()
@@ -578,6 +628,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		"MarginContainer/VBoxContainer/BattleArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn",

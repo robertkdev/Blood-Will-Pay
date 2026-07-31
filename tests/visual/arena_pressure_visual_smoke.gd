@@ -5,6 +5,7 @@ const OUTPUT_DIR: String = "res://outputs/visual_iter/arena_pressure_pass"
 const TEST_SETTINGS_PATH: String = "user://arena_pressure_visual_smoke.cfg"
 const CombatVfxBridgeScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_bridge.gd")
 const CombatControllerScript: GDScript = preload("res://scripts/ui/combat/controller/combat_controller.gd")
+const GothicUIThemeScript: GDScript = preload("res://scripts/ui/combat/gothic_ui_theme.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 var _failures: Array[String] = []
@@ -62,6 +63,15 @@ func _run() -> void:
 		_expect(event_banner.scale.is_equal_approx(Vector2.ONE), "Reduced Motion event banner should not scale in")
 		_expect(is_equal_approx(event_banner.modulate.a, 1.0), "Reduced Motion event banner should not fade in")
 	_save_capture("04_pressure_reduced_motion.png")
+	var pressure_painter: Control = _arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
+	_expect(pressure_painter != null, "arena pressure layer should install a bounded kinetic painter")
+	if pressure_painter != null:
+		pressure_painter.call("configure", 1, true, 0.5, 2)
+		_expect(bool(pressure_painter.get_meta("bounded_edge_pressure", false)), "kinetic painter must identify its bounded edge-pressure contract")
+		_expect(int(pressure_painter.get_meta("casualty_event_index", 0)) == 2, "kinetic painter did not receive the event-driven casualty residue index")
+		_expect(int(pressure_painter.get_meta("kinetic_mark_budget", 99)) <= 4, "reduced motion did not replace kinetic pressure with a lower-density static urgent state")
+		_expect(pressure_painter.has_meta("protected_center_rect"), "kinetic painter does not publish a protected actor-clarity center")
+	_save_capture("05_bounded_reduced_motion_field.png")
 
 	_bridge.call("_on_arena_pressure_changed", 1.0, 0)
 	await _settle_frames(1)
@@ -88,6 +98,7 @@ func _build_surface() -> void:
 	arena_style.set_border_width_all(2)
 	_arena.add_theme_stylebox_override("panel", arena_style)
 	_host.add_child(_arena)
+	GothicUIThemeScript.call("_ensure_arena_war_aftermath_geometry", _arena)
 	var battlefield: TextureRect = TextureRect.new()
 	battlefield.name = "BattlefieldSurface"
 	battlefield.texture = load("res://assets/ui/gothic/battlefield_surface.png") as Texture2D

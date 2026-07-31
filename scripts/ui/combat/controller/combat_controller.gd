@@ -190,6 +190,7 @@ var _tactical_phase_visual_state: int = -1
 var _combat_pressure_elapsed: float = 0.0
 var _environmental_pressure_phase: int = -1
 var _environmental_reduced_motion_state: bool = false
+var _environmental_casualty_event_index: int = -1
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -3019,6 +3020,7 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 		_combat_pressure_elapsed = 0.0
 		_environmental_pressure_phase = -1
 		_environmental_reduced_motion_state = _reduced_motion_enabled()
+		_environmental_casualty_event_index = -1
 	_update_tactical_shell_layout(in_combat)
 	if in_combat:
 		_update_environmental_pressure(0.0)
@@ -3065,11 +3067,14 @@ func _update_environmental_pressure(delta: float) -> void:
 	var casualty_pressure: float = 0.0
 	if arena_bridge != null:
 		casualty_pressure = arena_bridge.get_battlefield_casualty_pressure()
+	var arena: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	var casualty_event_index: int = int(arena.get_meta("battlefield_casualty_event_index", 0)) if arena != null else 0
 	var pressure_phase: int = _resolve_environmental_pressure_phase(casualty_pressure)
-	if pressure_phase != _environmental_pressure_phase or reduced_motion != _environmental_reduced_motion_state:
+	if pressure_phase != _environmental_pressure_phase or reduced_motion != _environmental_reduced_motion_state or casualty_event_index != _environmental_casualty_event_index:
 		_environmental_pressure_phase = pressure_phase
 		_environmental_reduced_motion_state = reduced_motion
-		_apply_environmental_pressure_composition(pressure_phase, reduced_motion, casualty_pressure)
+		_environmental_casualty_event_index = casualty_event_index
+		_apply_environmental_pressure_composition(pressure_phase, reduced_motion, casualty_pressure, casualty_event_index)
 	var pulse: float = 0.0 if reduced_motion else sin(_combat_pressure_elapsed * 2.35)
 	var slow_pulse: float = 0.0 if reduced_motion else sin(_combat_pressure_elapsed * 0.82 + 1.1)
 	var phase_weight: float = float(pressure_phase) * 0.08
@@ -3102,7 +3107,7 @@ func _resolve_environmental_pressure_phase(casualty_pressure: float) -> int:
 		return 1
 	return 0
 
-func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool, casualty_pressure: float) -> void:
+func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool, casualty_pressure: float, casualty_event_index: int = 0) -> void:
 	if parent == null:
 		return
 	var arena: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
@@ -3115,6 +3120,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("battlefield_pressure_index", effective_phase)
 	arena.set_meta("battlefield_reduced_motion", reduced_motion)
 	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
+	arena.set_meta("battlefield_casualty_event_index", casualty_event_index)
 	arena.set_meta("battlefield_environment_signature", "physical_warfield/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
 	arena.set_meta("battlefield_overlay_density", 0.18 if reduced_motion else 0.34 if effective_phase == 0 else 0.52 if effective_phase == 1 else 0.68)
 	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
@@ -3124,6 +3130,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var midfight: Control = arena.get_node_or_null("ArenaWarAftermath/MidfightAftermathGeometry") as Control
 	var collapse: Control = arena.get_node_or_null("ArenaWarAftermath/CollapseAftermathGeometry") as Control
 	var reduced_lock: Control = arena.get_node_or_null("ArenaWarAftermath/ReducedMotionGrimeLock") as Control
+	var pressure_painter: Control = arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
 	if aftermath != null:
 		aftermath.visible = true
 		aftermath.modulate = Color(0.92, 0.88, 0.80, 0.70) if reduced_motion else Color(0.98, 0.90, 0.80, 0.84) if effective_phase == 0 else Color(1.0, 0.84, 0.74, 0.94) if effective_phase == 1 else Color(0.92, 0.64, 0.60, 1.0)
@@ -3139,6 +3146,8 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	if reduced_lock != null:
 		reduced_lock.visible = reduced_motion
 		reduced_lock.modulate = Color(0.82, 0.78, 0.68, 0.82)
+	if pressure_painter != null and pressure_painter.has_method("configure"):
+		pressure_painter.call("configure", effective_phase, reduced_motion, casualty_pressure, casualty_event_index)
 	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
 	if woodland != null:
 		woodland.modulate = Color(1.04, 0.96, 0.86, 1.0) if effective_phase == 0 else Color(0.88, 0.72, 0.66, 1.0) if effective_phase == 1 else Color(0.64, 0.46, 0.48, 1.0)
@@ -3147,11 +3156,11 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		silhouettes.modulate.a = 0.86 if effective_phase == 0 else 0.94 if effective_phase == 1 else 1.0
 	var hostile_smoke: TextureRect = arena.get_node_or_null("ArenaHostileSmoke") as TextureRect
 	if hostile_smoke != null:
-		hostile_smoke.modulate.a = 0.20 if reduced_motion else 0.48 if effective_phase == 0 else 0.68 if effective_phase == 1 else 0.86
+		hostile_smoke.modulate.a = 0.20 if reduced_motion else 0.58 if effective_phase == 0 else 0.82 if effective_phase == 1 else 0.94
 		hostile_smoke.scale = Vector2.ONE
 	var fog: TextureRect = arena.get_node_or_null("ArenaGroundFog") as TextureRect
 	if fog != null:
-		fog.modulate.a = 0.26 if reduced_motion else 0.54 if effective_phase == 0 else 0.70 if effective_phase == 1 else 0.84
+		fog.modulate.a = 0.26 if reduced_motion else 0.62 if effective_phase == 0 else 0.82 if effective_phase == 1 else 0.94
 		fog.scale = Vector2.ONE
 
 func _protect_persistent_hud_chrome() -> void:
@@ -3271,9 +3280,9 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	if hold_progress != null:
 		hold_progress.value = 0.0
 	if hold_label != null:
-		hold_label.text = "AUTO-ADVANCE IN 6.0s"
+		hold_label.text = "AUTO-ADVANCE IN 6"
 	if skip_button != null:
-		skip_button.text = "ENTER / SPACE // SKIP"
+		skip_button.text = "HOLD // ENTER / SPACE"
 		skip_button.disabled = true
 	_configure_result_aftermath(banner, title, accent_color, title_color)
 	banner.add_theme_stylebox_override("panel", _make_result_scrim_style(title))
@@ -3317,17 +3326,17 @@ func _configure_result_outcome(
 	outcome_signal: Label,
 	impact_stamp: Label
 ) -> void:
-	var settlement_copy: String = "ESCROW BROKEN OPEN // 6.0 SEC HOLD"
+	var settlement_copy: String = "ESCROW BROKEN OPEN // HOLD"
 	var kicker_copy: String = "/// SURVIVAL HAS A PRICE ///"
 	var signal_copy: String = "YOU CAME BACK. THE WOODS REMEMBER."
 	var stamp_copy: String = "PAID IN BLOOD // WALKING"
 	if title == "STALEMATE":
-		settlement_copy = "ESCROW RETURNED // 6.0 SEC HOLD"
+		settlement_copy = "ESCROW RETURNED // HOLD"
 		kicker_copy = "/// THE DEBT WAITS ///"
 		signal_copy = "NOTHING DIED. NOTHING LET YOU LEAVE."
 		stamp_copy = "NO BLOOD // NO ESCAPE"
 	elif title == "DEFEAT":
-		settlement_copy = "ESCROW FORFEITED // 6.0 SEC HOLD"
+		settlement_copy = "ESCROW FORFEITED // HOLD"
 		kicker_copy = "/// THE WOODS COLLECT ///"
 		signal_copy = "THE DARK KEEPS WHAT YOU PAID."
 		stamp_copy = "BLOOD TAKEN // DEBT REMAINS"
@@ -3339,21 +3348,28 @@ func _configure_result_outcome(
 	if title_label != null:
 		title_label.custom_minimum_size.y = 76.0 if title == "STALEMATE" else 94.0 if title == "DEFEAT" else 88.0
 		title_label.add_theme_font_size_override("font_size", 66 if title == "STALEMATE" else 80 if title == "DEFEAT" else 74)
+		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if detail_label != null:
 		detail_label.custom_minimum_size.y = 64.0 if title == "STALEMATE" else 78.0
+		detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if settlement_label != null:
 		settlement_label.text = settlement_copy
 	if kicker_label != null:
 		kicker_label.text = kicker_copy
 		kicker_label.add_theme_color_override("font_color", title_color)
+		kicker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if outcome_signal != null:
 		outcome_signal.text = signal_copy
 		outcome_signal.add_theme_color_override("font_color", title_color.darkened(0.06))
+		outcome_signal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if impact_stamp != null:
 		impact_stamp.text = stamp_copy
 		impact_stamp.add_theme_color_override("font_color", title_color)
+		impact_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_LEFT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_RIGHT
 		impact_stamp.rotation = -0.018 if title == "VICTORY" else 0.025 if title == "STALEMATE" else -0.038
 	if card != null:
+		card.set_meta("grayscale_silhouette", "rising_open_lane" if title == "VICTORY" else "locked_vertical_deadlock" if title == "STALEMATE" else "descending_grave_jaw")
+		card.set_meta("reading_path", "left_to_right_escape" if title == "VICTORY" else "centered_suspension" if title == "STALEMATE" else "right_to_left_collapse")
 		_apply_result_card_geometry(card, title)
 
 func refresh_result_banner_layout() -> void:
@@ -3369,18 +3385,16 @@ func refresh_result_banner_layout() -> void:
 func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
 	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
-	var ideal_size: Vector2 = Vector2(940.0, 382.0)
-	var card_rotation: float = -0.007
+	var ideal_size: Vector2 = Vector2(1040.0, 388.0)
+	var card_rotation: float = -0.012
 	if title == "STALEMATE":
-		ideal_size = Vector2(840.0, 402.0)
-		card_rotation = 0.010
+		ideal_size = Vector2(800.0, 456.0)
+		card_rotation = 0.0
 	elif title == "DEFEAT":
-		ideal_size = Vector2(920.0, 462.0)
-		card_rotation = -0.014
-	else:
-		ideal_size = Vector2(940.0, 436.0)
+		ideal_size = Vector2(980.0, 520.0)
+		card_rotation = 0.012
 	if compact_layout:
-		ideal_size = Vector2(700.0, 296.0) if title == "STALEMATE" else Vector2(740.0, 326.0) if title == "DEFEAT" else Vector2(760.0, 306.0)
+		ideal_size = Vector2(650.0, 352.0) if title == "STALEMATE" else Vector2(790.0, 330.0) if title == "DEFEAT" else Vector2(780.0, 306.0)
 		card_rotation = 0.0
 	var top_reservation: float = 70.0 if compact_layout else 82.0
 	var horizontal_gutter: float = 32.0 if compact_layout else 72.0
@@ -3557,10 +3571,10 @@ func _update_result_hold(delta: float) -> void:
 		progress.value = clampf(_result_hold_elapsed / RESULT_MINIMUM_DWELL_SECONDS, 0.0, 1.0)
 	var remaining: float = maxf(0.0, RESULT_MINIMUM_DWELL_SECONDS - _result_hold_elapsed)
 	if hold_label != null:
-		hold_label.text = "AUTO-ADVANCE IN %.1fs" % remaining
+		hold_label.text = "AUTO-ADVANCE IN %d" % ceili(remaining)
 	if skip_button != null:
 		skip_button.disabled = _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS
-		skip_button.text = "ENTER / SPACE // SKIP (%.1fs)" % maxf(0.0, RESULT_SKIP_GUARD_SECONDS - _result_hold_elapsed) if skip_button.disabled else "ENTER / SPACE // SKIP"
+		skip_button.text = "HOLD // ENTER / SPACE" if skip_button.disabled else "ENTER / SPACE // ADVANCE"
 
 func _skip_result_hold() -> void:
 	if not _result_hold_active or _result_hold_finishing or _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS:
@@ -3641,27 +3655,31 @@ func _ensure_result_banner() -> PanelContainer:
 		rupture.rotation = float(rupture_spec.get("rotation", 0.0))
 		rupture_layer.add_child(rupture)
 	var victory_geometry: Array[Dictionary] = [
-		{"name": "SurvivorBankWest", "left": -0.03, "right": 0.36, "top": 0.66, "height": 58.0, "rotation": -0.09, "color": Color(0.045, 0.025, 0.021, 0.92)},
-		{"name": "SurvivorBankEast", "left": 0.64, "right": 1.03, "top": 0.64, "height": 62.0, "rotation": 0.08, "color": Color(0.045, 0.025, 0.021, 0.92)},
-		{"name": "OpenedEscapeLane", "left": 0.42, "right": 0.58, "top": 0.16, "bottom": 0.94, "rotation": 0.0, "color": Color(0.82, 0.43, 0.17, 0.12)},
-		{"name": "RisingFieldStandard", "left": 0.17, "right": 0.19, "top": 0.23, "bottom": 0.82, "rotation": -0.04, "color": Color(0.12, 0.045, 0.035, 0.88)},
+		{"name": "SurvivorBankWest", "left": -0.03, "right": 0.38, "top": 0.72, "height": 84.0, "rotation": -0.11, "color": Color(0.025, 0.018, 0.016, 0.96)},
+		{"name": "SurvivorBankEast", "left": 0.62, "right": 1.03, "top": 0.70, "height": 88.0, "rotation": 0.10, "color": Color(0.025, 0.018, 0.016, 0.96)},
+		{"name": "OpenedEscapeLane", "left": 0.425, "right": 0.575, "top": 0.08, "bottom": 1.0, "rotation": 0.0, "color": Color(0.86, 0.62, 0.29, 0.18)},
+		{"name": "EscapeLaneWestEdge", "left": 0.405, "right": 0.425, "top": 0.16, "bottom": 0.98, "rotation": 0.022, "color": Color(0.09, 0.045, 0.026, 0.88)},
+		{"name": "EscapeLaneEastEdge", "left": 0.575, "right": 0.595, "top": 0.14, "bottom": 0.98, "rotation": -0.020, "color": Color(0.09, 0.045, 0.026, 0.88)},
+		{"name": "RisingFieldStandard", "left": 0.17, "right": 0.19, "top": 0.20, "bottom": 0.84, "rotation": -0.04, "color": Color(0.12, 0.045, 0.035, 0.88)},
 	]
 	_ensure_result_outcome_geometry(aftermath, "VictoryAftermathGeometry", victory_geometry)
 	var stalemate_geometry: Array[Dictionary] = [
-		{"name": "DeadlockBeamNorth", "left": -0.02, "right": 1.02, "top": 0.38, "height": 26.0, "rotation": 0.018, "color": Color(0.045, 0.038, 0.046, 0.92)},
-		{"name": "DeadlockBeamSouth", "left": -0.02, "right": 1.02, "top": 0.61, "height": 22.0, "rotation": -0.015, "color": Color(0.045, 0.038, 0.046, 0.92)},
-		{"name": "SuspendedStakeWest", "left": 0.18, "right": 0.20, "top": 0.20, "bottom": 0.82, "rotation": -0.06, "color": Color(0.12, 0.08, 0.07, 0.82)},
-		{"name": "SuspendedStakeCenter", "left": 0.49, "right": 0.51, "top": 0.14, "bottom": 0.86, "rotation": 0.02, "color": Color(0.12, 0.08, 0.07, 0.86)},
-		{"name": "SuspendedStakeEast", "left": 0.80, "right": 0.82, "top": 0.18, "bottom": 0.84, "rotation": 0.055, "color": Color(0.12, 0.08, 0.07, 0.82)},
+		{"name": "DeadlockBeamNorth", "left": -0.02, "right": 1.02, "top": 0.34, "height": 42.0, "rotation": 0.014, "color": Color(0.028, 0.026, 0.030, 0.96)},
+		{"name": "DeadlockBeamSouth", "left": -0.02, "right": 1.02, "top": 0.64, "height": 38.0, "rotation": -0.012, "color": Color(0.028, 0.026, 0.030, 0.96)},
+		{"name": "SuspendedStakeWest", "left": 0.16, "right": 0.19, "top": 0.14, "bottom": 0.88, "rotation": -0.04, "color": Color(0.07, 0.055, 0.052, 0.92)},
+		{"name": "SuspendedStakeCenter", "left": 0.485, "right": 0.515, "top": 0.08, "bottom": 0.92, "rotation": 0.0, "color": Color(0.07, 0.055, 0.052, 0.94)},
+		{"name": "SuspendedStakeEast", "left": 0.81, "right": 0.84, "top": 0.14, "bottom": 0.88, "rotation": 0.04, "color": Color(0.07, 0.055, 0.052, 0.92)},
+		{"name": "DeadlockLatch", "left": 0.38, "right": 0.62, "top": 0.47, "height": 62.0, "rotation": 0.0, "color": Color(0.015, 0.013, 0.016, 0.98)},
 	]
 	_ensure_result_outcome_geometry(aftermath, "StalemateAftermathGeometry", stalemate_geometry)
 	var defeat_geometry: Array[Dictionary] = [
-		{"name": "CanopyFallWest", "left": -0.08, "right": 0.48, "top": 0.07, "height": 74.0, "rotation": 0.17, "color": Color(0.004, 0.003, 0.004, 0.98)},
-		{"name": "CanopyFallEast", "left": 0.52, "right": 1.08, "top": 0.05, "height": 78.0, "rotation": -0.16, "color": Color(0.004, 0.003, 0.004, 0.98)},
-		{"name": "DebtJawWest", "left": -0.03, "right": 0.18, "top": 0.10, "bottom": 0.98, "rotation": -0.02, "color": Color(0.008, 0.004, 0.006, 0.92)},
-		{"name": "DebtJawEast", "left": 0.82, "right": 1.03, "top": 0.08, "bottom": 0.98, "rotation": 0.025, "color": Color(0.008, 0.004, 0.006, 0.94)},
-		{"name": "ConsecratedGraveMouth", "left": 0.12, "right": 0.90, "top": 0.82, "height": 82.0, "rotation": -0.012, "color": Color(0.19, 0.005, 0.018, 0.78)},
-		{"name": "FallenExecutionBeam", "left": 0.22, "right": 0.84, "top": 0.48, "height": 30.0, "rotation": 0.13, "color": Color(0.015, 0.008, 0.009, 0.96)},
+		{"name": "CanopyFallWest", "left": -0.10, "right": 0.51, "top": 0.02, "height": 112.0, "rotation": 0.20, "color": Color(0.003, 0.002, 0.003, 0.99)},
+		{"name": "CanopyFallEast", "left": 0.49, "right": 1.10, "top": 0.01, "height": 118.0, "rotation": -0.19, "color": Color(0.003, 0.002, 0.003, 0.99)},
+		{"name": "DebtJawWest", "left": -0.04, "right": 0.22, "top": 0.06, "bottom": 1.02, "rotation": 0.025, "color": Color(0.005, 0.003, 0.004, 0.96)},
+		{"name": "DebtJawEast", "left": 0.78, "right": 1.04, "top": 0.05, "bottom": 1.02, "rotation": -0.028, "color": Color(0.005, 0.003, 0.004, 0.97)},
+		{"name": "ConsecratedGraveMouth", "left": 0.06, "right": 0.94, "top": 0.78, "height": 126.0, "rotation": 0.0, "color": Color(0.15, 0.002, 0.010, 0.88)},
+		{"name": "FallenExecutionBeam", "left": 0.16, "right": 0.88, "top": 0.43, "height": 48.0, "rotation": 0.16, "color": Color(0.009, 0.005, 0.006, 0.98)},
+		{"name": "GraveSpine", "left": 0.49, "right": 0.53, "top": 0.38, "bottom": 1.02, "rotation": 0.025, "color": Color(0.025, 0.006, 0.008, 0.96)},
 	]
 	_ensure_result_outcome_geometry(aftermath, "DefeatAftermathGeometry", defeat_geometry)
 	var aftermath_stamp: Label = Label.new()
@@ -3726,7 +3744,7 @@ func _ensure_result_banner() -> PanelContainer:
 	record_row.add_child(record_label)
 	var settlement_label: Label = Label.new()
 	settlement_label.name = "SettlementLabel"
-	settlement_label.text = "ESCROW SETTLED // 6.0 SEC HOLD"
+	settlement_label.text = "ESCROW SETTLED // HOLD"
 	settlement_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	settlement_label.add_theme_font_size_override("font_size", 18)
 	settlement_label.add_theme_color_override("font_color", Color(0.73, 0.69, 0.62, 0.94))
@@ -3802,7 +3820,7 @@ func _ensure_result_banner() -> PanelContainer:
 	content.add_child(hold_row)
 	var hold_label: Label = Label.new()
 	hold_label.name = "ResultHoldLabel"
-	hold_label.text = "AUTO-ADVANCE IN 6.0s"
+	hold_label.text = "AUTO-ADVANCE IN 6"
 	hold_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hold_label.add_theme_font_size_override("font_size", 18)

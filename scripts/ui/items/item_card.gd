@@ -15,6 +15,7 @@ var count_label: Label
 var background: Panel
 var frame: Panel
 var patina: ColorRect
+var empty_mark: Label
 
 var slot_index: int = -1
 var item_id: String = ""
@@ -101,6 +102,22 @@ func _ensure_children() -> void:
 		patina.visible = false
 		patina.color = Color(0.060, 0.026, 0.018, 0.30)
 		add_child(patina)
+	if empty_mark == null:
+		empty_mark = Label.new()
+		empty_mark.name = "EmptyMark"
+		empty_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		empty_mark.set_anchors_preset(Control.PRESET_FULL_RECT)
+		empty_mark.offset_left = 0.0
+		empty_mark.offset_top = 0.0
+		empty_mark.offset_right = 0.0
+		empty_mark.offset_bottom = 0.0
+		empty_mark.text = "+"
+		empty_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		empty_mark.add_theme_font_size_override("font_size", 11)
+		empty_mark.add_theme_color_override("font_color", Color(0.66, 0.59, 0.52, 0.54))
+		empty_mark.z_index = 2
+		add_child(empty_mark)
 	if frame == null:
 		frame = Panel.new()
 		frame.name = "Frame"
@@ -153,11 +170,13 @@ func _refresh() -> void:
 		# Empty placeholder slot: no icon, subtle tooltip
 		icon.texture = null
 		icon.visible = false
+		empty_mark.visible = true
 		tooltip_text = ""
 		mouse_default_cursor_shape = Control.CURSOR_ARROW
 		focus_mode = Control.FOCUS_NONE
 		_apply_card_style(false)
 		return
+	empty_mark.visible = false
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	focus_mode = Control.FOCUS_ALL
 	if def != null:
@@ -175,31 +194,10 @@ func _refresh() -> void:
 	tooltip_text = ""
 
 func _apply_card_style(filled: bool) -> void:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
 	var hover_filled: bool = _hovered and filled
 	var hover_empty: bool = _hovered and not filled
-	var modulate: Color = Color(0.62, 0.60, 0.58, 0.84)
-	style.bg_color = Color(0.070, 0.048, 0.052, 0.97) if hover_filled else Color(0.038, 0.033, 0.040, 0.91) if filled else Color(0.032, 0.026, 0.034, 0.88) if hover_empty else Color(0.022, 0.019, 0.026, 0.78)
-	style.border_color = Color(0.86, 0.66, 0.38, 0.96) if hover_filled else Color(0.50, 0.42, 0.38, 0.95) if hover_empty else Color(0.44, 0.36, 0.30, 0.84) if filled else Color(0.27, 0.24, 0.27, 0.78)
-	if hover_filled:
-		modulate = Color(0.98, 0.90, 0.72, 0.96)
-	elif hover_empty:
-		modulate = Color(0.90, 0.84, 0.74, 0.90)
-	elif filled:
-		modulate = Color(0.64, 0.58, 0.50, 0.78)
-	var border_width: int = 2 if _hovered else 1
-	style.border_width_left = border_width
-	style.border_width_top = border_width
-	style.border_width_right = border_width
-	style.border_width_bottom = border_width
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.shadow_size = 12 if _hovered else 5
-	style.shadow_color = Color(0.62, 0.19, 0.060, 0.36) if _hovered else Color(0.0, 0.0, 0.0, 0.40)
 	if background != null:
-		background.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.item_icon_frame_style(modulate), style))
+		background.add_theme_stylebox_override("panel", GothicUIAssets.complete_item_slot_style(filled, _hovered))
 	if icon != null:
 		icon.offset_left = 8.0 if filled else 6.0
 		icon.offset_top = 8.0 if filled else 6.0
@@ -215,7 +213,14 @@ func _apply_card_style(filled: bool) -> void:
 		patina.color = Color(0.10, 0.040, 0.026, 0.36) if hover_filled else Color(0.026, 0.020, 0.018, 0.56)
 	if frame != null:
 		frame.visible = true
-		frame.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(GothicUIAssets.item_icon_frame_style(Color(0.70, 0.64, 0.54, 0.78) if filled else Color(0.58, 0.54, 0.50, 0.72)), style))
+		frame.offset_left = 3.0
+		frame.offset_top = 3.0
+		frame.offset_right = -3.0
+		frame.offset_bottom = -3.0
+		frame.add_theme_stylebox_override("panel", GothicUIAssets.complete_item_slot_inner_style(filled, _hovered))
+	if empty_mark != null:
+		empty_mark.visible = not filled
+		empty_mark.modulate = Color(1.0, 0.78, 0.68, 0.92) if hover_empty else Color.WHITE
 	if count_label != null:
 		count_label.modulate = Color(1.0, 0.84, 0.42, 1.0) if _hovered else Color(0.96, 0.74, 0.38, 0.98)
 

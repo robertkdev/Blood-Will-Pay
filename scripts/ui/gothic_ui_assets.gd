@@ -53,6 +53,54 @@ static func bench_slot_style(modulate: Color = Color.WHITE) -> StyleBoxTexture:
 static func item_icon_frame_style(modulate: Color = Color.WHITE) -> StyleBoxTexture:
 	return texture_style(ITEM_ICON_FRAME, Vector4(22.0, 22.0, 22.0, 22.0), Vector4(4.0, 4.0, 4.0, 4.0), modulate)
 
+static func complete_item_slot_style(filled: bool, hovered: bool) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.074, 0.047, 0.050, 0.98) if filled else Color(0.018, 0.016, 0.021, 0.96)
+	style.border_color = (
+		Color(0.92, 0.70, 0.40, 1.0)
+		if hovered
+		else Color(0.58, 0.46, 0.34, 0.96)
+		if filled
+		else Color(0.46, 0.41, 0.38, 0.90)
+	)
+	var border_width: int = 2 if hovered or filled else 1
+	style.border_width_left = border_width
+	style.border_width_top = border_width
+	style.border_width_right = border_width
+	style.border_width_bottom = border_width
+	style.corner_radius_top_left = 2
+	style.corner_radius_top_right = 2
+	style.corner_radius_bottom_right = 2
+	style.corner_radius_bottom_left = 2
+	style.content_margin_left = 3.0
+	style.content_margin_top = 3.0
+	style.content_margin_right = 3.0
+	style.content_margin_bottom = 3.0
+	style.shadow_size = 4 if hovered else 2
+	style.shadow_color = Color(0.64, 0.08, 0.06, 0.34) if hovered else Color(0.0, 0.0, 0.0, 0.52)
+	return style
+
+static func complete_item_slot_inner_style(filled: bool, hovered: bool) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	style.border_color = (
+		Color(0.98, 0.80, 0.52, 0.80)
+		if hovered
+		else Color(0.74, 0.22, 0.16, 0.66)
+		if filled
+		else Color(0.68, 0.62, 0.54, 0.42)
+	)
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 1
+	style.corner_radius_top_right = 1
+	style.corner_radius_bottom_right = 1
+	style.corner_radius_bottom_left = 1
+	style.draw_center = false
+	return style
+
 static func unit_base_style(is_player: bool, modulate: Color = Color.WHITE) -> StyleBoxTexture:
 	var path: String = UNIT_BASE_PLAYER if is_player else UNIT_BASE_ENEMY
 	return texture_style(path, Vector4(36.0, 24.0, 36.0, 24.0), Vector4(0.0, 0.0, 0.0, 0.0), modulate)

@@ -83,6 +83,13 @@ size_flags_horizontal = 0
 size_flags_vertical = 6
 theme_override_constants/separation = 10
 
+[node name="ItemStorageHeader" type="Label" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+text = "ITEM CACHE // EMPTY"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="ItemStorageGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
 custom_minimum_size = Vector2(320, 164)
 layout_mode = 2
@@ -93,6 +100,7 @@ theme_override_constants/v_separation = 6
 columns = 6
 
 [node name="LeftSpacer" type="Control" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
+visible = false
 layout_mode = 2
 size_flags_vertical = 0
 

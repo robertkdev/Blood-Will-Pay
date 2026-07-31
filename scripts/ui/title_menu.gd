@@ -75,6 +75,7 @@ var _logo_tween: Tween = null
 var _poster_border: TextureRect = null
 var _resize_refresh_queued: bool = false
 var _rail_fit_queued: bool = false
+var _scaled_focus_target_name: String = ""
 
 func _ready() -> void:
 	UserSettingsScript.initialize(get_window())
@@ -1735,7 +1736,7 @@ func _style_selector(option: OptionButton) -> void:
 	option.add_theme_stylebox_override("normal", _selector_box(Color(0.035, 0.029, 0.034, 0.98), Color(0.69, 0.61, 0.49, 0.92), 2))
 	option.add_theme_stylebox_override("hover", _selector_box(Color(0.075, 0.050, 0.050, 1.0), Color(0.94, 0.72, 0.39, 1.0), 3))
 	option.add_theme_stylebox_override("pressed", _selector_box(Color(0.12, 0.030, 0.040, 1.0), Color(0.88, 0.075, 0.10, 1.0), 4))
-	option.add_theme_stylebox_override("focus", _selector_box(Color(0.055, 0.035, 0.040, 1.0), Color(0.88, 0.075, 0.10, 1.0), 4))
+	option.add_theme_stylebox_override("focus", _selector_box(Color(0.035, 0.055, 0.068, 1.0), Color(0.50, 0.78, 0.94, 1.0), 4))
 
 func _selector_box(background_color: Color, border_color: Color, left_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -1902,6 +1903,10 @@ func _clear_search() -> void:
 func _on_ui_scale_selected(index: int, option: OptionButton) -> void:
 	if option == null or index < 0 or index >= option.item_count:
 		return
+	# The scale change rebuilds the active Settings controls. Remember the
+	# intentional keyboard target before the focused selector is queued for
+	# deletion so focus cannot fall through to the full-screen title chrome.
+	_scaled_focus_target_name = String(option.name)
 	var scale_value: float = float(option.get_item_metadata(index))
 	var save_error: Error = UserSettingsScript.set_ui_scale(scale_value, get_window())
 	if save_error != OK:
@@ -1919,6 +1924,22 @@ func _refresh_scaled_layout() -> void:
 	_update_nav_state()
 	_sync_action_hierarchy()
 	_queue_title_panel_fit()
+	if _scaled_focus_target_name != "":
+		call_deferred("_restore_scaled_settings_focus")
+
+func _restore_scaled_settings_focus() -> void:
+	if _scaled_focus_target_name == "" or _active_section != SECTION_SETTINGS:
+		return
+	var target: Control = find_child(_scaled_focus_target_name, true, false) as Control
+	if target == null or not is_instance_valid(target) or not target.is_visible_in_tree():
+		return
+	if target.focus_mode == Control.FOCUS_NONE:
+		return
+	target.grab_focus()
+	target.set_meta("scale_rebuild_focus_target", true)
+	if _content_scroll != null and is_instance_valid(_content_scroll):
+		_content_scroll.ensure_control_visible(target)
+	_scaled_focus_target_name = ""
 
 func _on_layout_resized() -> void:
 	if _resize_refresh_queued or not is_inside_tree():

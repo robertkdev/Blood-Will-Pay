@@ -25,6 +25,8 @@ var _has_container_bounds: bool = false
 var _last_container_bounds: Rect2 = Rect2()
 var _initial_combatant_count: int = 0
 var _living_combatant_count: int = 0
+var _last_removed_combatant_count: int = 0
+var _casualty_event_index: int = 0
 
 func configure(_arena_container: Control, _arena_units: Control, _planning_area: Control, _arena_background: Control, _player_grid_helper: BoardGrid, _enemy_grid_helper: BoardGrid, _unit_actor_class: Script, _tile_size: int) -> void:
     arena_container = _arena_container
@@ -116,6 +118,8 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
     arena.enter_arena(player_views, enemy_views)
     _initial_combatant_count = _count_living_views(player_views) + _count_living_views(enemy_views)
     _living_combatant_count = _initial_combatant_count
+    _last_removed_combatant_count = 0
+    _casualty_event_index = 0
     _publish_battlefield_pressure()
     if arena_container:
         arena_container.visible = true
@@ -164,6 +168,8 @@ func exit_arena() -> void:
     _last_container_bounds = Rect2()
     _initial_combatant_count = 0
     _living_combatant_count = 0
+    _last_removed_combatant_count = 0
+    _casualty_event_index = 0
     if arena:
         arena.exit_arena()
     if arena_container:
@@ -199,6 +205,8 @@ func teardown() -> void:
     _position_signal_manager = null
     _initial_combatant_count = 0
     _living_combatant_count = 0
+    _last_removed_combatant_count = 0
+    _casualty_event_index = 0
 
 func get_battlefield_casualty_pressure() -> float:
     if _initial_combatant_count <= 0:
@@ -211,6 +219,7 @@ func get_battlefield_pressure_snapshot() -> Dictionary[String, Variant]:
         "initial_combatants": _initial_combatant_count,
         "living_combatants": _living_combatant_count,
         "casualty_pressure": get_battlefield_casualty_pressure(),
+        "casualty_event_index": _casualty_event_index,
     }
 
 func _count_living_views(views: Array[UnitSlotView]) -> int:
@@ -223,9 +232,15 @@ func _count_living_views(views: Array[UnitSlotView]) -> int:
 func _publish_battlefield_pressure() -> void:
     if arena_container == null or not is_instance_valid(arena_container):
         return
+    var removed_count: int = maxi(0, _initial_combatant_count - _living_combatant_count)
+    if removed_count > _last_removed_combatant_count:
+        _casualty_event_index += removed_count - _last_removed_combatant_count
+    _last_removed_combatant_count = removed_count
     arena_container.set_meta("battlefield_initial_combatants", _initial_combatant_count)
     arena_container.set_meta("battlefield_living_combatants", _living_combatant_count)
     arena_container.set_meta("battlefield_casualty_pressure", get_battlefield_casualty_pressure())
+    arena_container.set_meta("battlefield_removed_combatants", removed_count)
+    arena_container.set_meta("battlefield_casualty_event_index", _casualty_event_index)
 
 func get_player_actor(index: int) -> UnitActor:
     if arena:

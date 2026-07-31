@@ -299,6 +299,7 @@ func _assert_tight_scale_hud_containment() -> void:
 	if left_panel != null and left_panel.visible:
 		_expect_inside(left_panel, viewport_rect, "150-percent tactical item/trait dock")
 		_expect(left_panel.size.x <= 136.0, "150-percent tactical item/trait dock did not release board width: %.1f" % left_panel.size.x)
+	_assert_tight_item_cache(left_panel)
 	var required_paths: PackedStringArray = PackedStringArray([
 		"MarginContainer",
 		"MarginContainer/VBoxContainer/StageProgressTopBar",
@@ -334,6 +335,30 @@ func _assert_tight_scale_hud_containment() -> void:
 		_expect(board_column.size.x > support_width, "150-percent battlefield is narrower than visible support docks combined")
 		_expect(board_column.size.x >= viewport_rect.size.x * 0.60, "150-percent battlefield does not retain 60%% of logical viewport width")
 	_assert_tight_surface_separation()
+
+func _assert_tight_item_cache(left_panel: Control) -> void:
+	var header: Label = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
+	var item_grid: GridContainer = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
+	_expect(header != null and header.is_visible_in_tree(), "150-percent item cache lost its stable label")
+	_expect(item_grid != null and item_grid.is_visible_in_tree(), "150-percent item cache lost its slot grid")
+	if header == null or item_grid == null:
+		return
+	_expect(left_panel.get_global_rect().grow(1.0).encloses(header.get_global_rect()), "150-percent item-cache label escaped the tactical rail")
+	_expect(header.text.contains("CACHE") and (header.text.contains("EMPTY") or header.text.contains("/")), "150-percent item-cache label does not expose its state")
+	for card_node: Node in item_grid.get_children():
+		var card: Control = card_node as Control
+		if card == null or not card.is_visible_in_tree():
+			continue
+		var background: Panel = card.get_node_or_null("Background") as Panel
+		var frame: Panel = card.get_node_or_null("Frame") as Panel
+		var outer_style: StyleBoxFlat = background.get_theme_stylebox("panel") as StyleBoxFlat if background != null else null
+		var inner_style: StyleBoxFlat = frame.get_theme_stylebox("panel") as StyleBoxFlat if frame != null else null
+		_expect(outer_style != null and inner_style != null, "150-percent item slot %s rendered as sliced corner fragments" % String(card.name))
+		if outer_style != null:
+			_expect(outer_style.border_width_left > 0 and outer_style.border_width_top > 0 and outer_style.border_width_right > 0 and outer_style.border_width_bottom > 0, "150-percent item slot %s lost its complete outer frame" % String(card.name))
+		if inner_style != null:
+			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "150-percent item slot %s lost its complete inner frame" % String(card.name))
+		_expect(card.size.x >= 18.0 and card.size.y >= 18.0, "150-percent item slot %s collapsed below a recognizable frame" % String(card.name))
 
 func _assert_compact_decision_record(viewport_rect: Rect2) -> void:
 	var resource_strip: Label = _view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label

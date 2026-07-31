@@ -475,6 +475,7 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	var midfight: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/MidfightAftermathGeometry") as Control
 	var collapse: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/CollapseAftermathGeometry") as Control
 	var reduced_lock: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
+	var pressure_painter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ArenaPressurePainter") as Control
 	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
 	_expect(arena != null and String(arena.get_meta("battlefield_pressure_phase", "")) == expected_phase, "%s capture did not reach the requested environment phase" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("battlefield_reduced_motion", not reduced_motion)) == reduced_motion, "%s capture reduced-motion metadata is wrong" % expected_phase)
@@ -486,12 +487,16 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(midfight != null and midfight.visible == (expected_phase != "onset"), "%s capture has the wrong shattered-barricade state" % expected_phase)
 	_expect(collapse != null and not collapse.visible, "%s capture prematurely exposed the collapse composition" % expected_phase)
 	_expect(reduced_lock != null and reduced_lock.visible == reduced_motion, "%s capture has the wrong reduced-motion grime lock" % expected_phase)
+	_expect(pressure_painter != null and bool(pressure_painter.get_meta("bounded_edge_pressure", false)), "%s capture lacks bounded kinetic edge pressure" % expected_phase)
+	_expect(pressure_painter != null and int(pressure_painter.get_meta("pressure_phase", -1)) == int(arena.get_meta("battlefield_pressure_index", -2)), "%s kinetic layer did not receive the environmental phase event" % expected_phase)
+	_expect(pressure_painter != null and pressure_painter.has_meta("protected_center_rect"), "%s kinetic pressure does not publish a protected actor-clarity center" % expected_phase)
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
 	if aftermath != null and arena != null and onset != null and midfight != null and reduced_lock != null and reduced_motion:
 		_expect(aftermath.scale == Vector2.ONE, "%s reduced-motion capture retained an animated environment transform" % expected_phase)
 		_expect(float(arena.get_meta("battlefield_overlay_density", 1.0)) <= 0.20, "%s reduced-motion capture retained excessive overlay density" % expected_phase)
 		_expect(onset.modulate.a <= 0.36 and midfight.modulate.a <= 0.22, "%s reduced-motion capture did not quiet the kinetic evidence layers" % expected_phase)
 		_expect(float(reduced_lock.get_meta("overlay_density", 1.0)) < float(onset.get_meta("overlay_density", 0.0)), "%s reduced-motion evidence is denser than onset" % expected_phase)
+		_expect(int(pressure_painter.get_meta("kinetic_mark_budget", 99)) <= 4, "%s reduced-motion capture retained the kinetic mark budget" % expected_phase)
 	_assert_persistent_combat_hierarchy(expected_phase)
 
 func _assert_result_outcome_contract(outcome: String) -> void:
@@ -504,12 +509,20 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 	var victory_geometry: Control = banner.get_node_or_null("BattleResultAftermath/VictoryAftermathGeometry") as Control
 	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
 	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
+	var hold_label: Label = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label if card != null else null
+	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
 	var expected_signature: String = "opened_survivor_lane" if outcome == "VICTORY" else "crosswise_deadlock" if outcome == "STALEMATE" else "collapsed_canopy_grave"
+	var expected_silhouette: String = "rising_open_lane" if outcome == "VICTORY" else "locked_vertical_deadlock" if outcome == "STALEMATE" else "descending_grave_jaw"
+	var expected_reading_path: String = "left_to_right_escape" if outcome == "VICTORY" else "centered_suspension" if outcome == "STALEMATE" else "right_to_left_collapse"
 	_expect(card != null and String(card.get_meta("result_variant", "")) == outcome.to_lower(), "%s result card variant metadata is wrong" % outcome)
+	_expect(card != null and String(card.get_meta("grayscale_silhouette", "")) == expected_silhouette, "%s result is not distinguishable by grayscale silhouette" % outcome)
+	_expect(card != null and String(card.get_meta("reading_path", "")) == expected_reading_path, "%s result did not receive its distinct reading path" % outcome)
+	_expect(hold_label != null and not hold_label.text.contains("."), "%s result leaked a decimal auto-advance telemetry readout" % outcome)
+	_expect(skip_button != null and not skip_button.text.contains("(") and skip_button.text.contains("ENTER / SPACE"), "%s result leaked its internal skip threshold" % outcome)
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its physical aftermath signature" % outcome)
-	_expect(victory_geometry != null and victory_geometry.visible == (outcome == "VICTORY") and victory_geometry.get_child_count() >= 4, "%s has the wrong survivor-lane geometry state" % outcome)
-	_expect(stalemate_geometry != null and stalemate_geometry.visible == (outcome == "STALEMATE") and stalemate_geometry.get_child_count() >= 5, "%s has the wrong deadlock geometry state" % outcome)
-	_expect(defeat_geometry != null and defeat_geometry.visible == (outcome == "DEFEAT") and defeat_geometry.get_child_count() >= 6, "%s has the wrong collapse geometry state" % outcome)
+	_expect(victory_geometry != null and victory_geometry.visible == (outcome == "VICTORY") and victory_geometry.get_child_count() >= 6, "%s has the wrong survivor-lane geometry state" % outcome)
+	_expect(stalemate_geometry != null and stalemate_geometry.visible == (outcome == "STALEMATE") and stalemate_geometry.get_child_count() >= 6, "%s has the wrong deadlock geometry state" % outcome)
+	_expect(defeat_geometry != null and defeat_geometry.visible == (outcome == "DEFEAT") and defeat_geometry.get_child_count() >= 7, "%s has the wrong collapse geometry state" % outcome)
 	_assert_persistent_combat_hierarchy("%s_result" % outcome.to_lower())
 
 func _assert_persistent_combat_hierarchy(context: String) -> void:
@@ -557,6 +570,7 @@ func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
 		contract["battlefield_pressure_phase"] = String(arena.get_meta("battlefield_pressure_phase", ""))
 		contract["battlefield_environment_signature"] = String(arena.get_meta("battlefield_environment_signature", ""))
 		contract["battlefield_casualty_pressure"] = float(arena.get_meta("battlefield_casualty_pressure", 0.0))
+		contract["battlefield_casualty_event_index"] = int(arena.get_meta("battlefield_casualty_event_index", 0))
 		contract["battlefield_reduced_motion"] = bool(arena.get_meta("battlefield_reduced_motion", false))
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
@@ -568,6 +582,8 @@ func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
 		contract["result_variant"] = String(card.get_meta("result_variant", ""))
 		contract["result_layout"] = String(card.get_meta("responsive_result_layout", ""))
 		contract["result_geometry_signature"] = String(aftermath.get_meta("physical_geometry_signature", "")) if aftermath != null else ""
+		contract["result_grayscale_silhouette"] = String(card.get_meta("grayscale_silhouette", ""))
+		contract["result_reading_path"] = String(card.get_meta("reading_path", ""))
 		contract["card_bounds"] = _rect_contract(card_rect)
 		contract["card_inside_logical_viewport"] = viewport_rect.encloses(card_rect)
 		if skip_button != null:

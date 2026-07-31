@@ -429,8 +429,9 @@ func _apply_responsive_layout() -> void:
 		planning_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 164.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 118.0 if tight_compact else 208.0 if compact else 398.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
 	_apply_side_panel_layout(compact, tight_compact)
 	for half_path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea",
@@ -441,6 +442,7 @@ func _apply_responsive_layout() -> void:
 			board_half.custom_minimum_size = Vector2(0.0, board_half_height)
 			board_half.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_apply_board_tile_size(compact, tight_compact, large_planning_field)
+	_apply_planning_landmarks(compact, tight_compact, large_planning_field)
 	_set_minimum_size("MarginContainer/VBoxContainer/BenchArea/BenchGrid", Vector2(0.0, 38.0 if tight_compact else 46.0 if compact else 88.0))
 	var bench_area: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as HBoxContainer
 	if bench_area != null:
@@ -526,7 +528,9 @@ func _set_grid_separation(grid: GridContainer, separation: int) -> void:
 		grid.add_theme_constant_override("v_separation", separation)
 
 func _apply_board_tile_size(compact: bool, tight_compact: bool, large_planning_field: bool) -> void:
-	var tile_size: Vector2 = Vector2(32.0, 32.0) if tight_compact else Vector2(56.0, 56.0) if large_planning_field else Vector2(46.0, 46.0) if compact else Vector2(72.0, 72.0)
+	var effective_size: Vector2 = get_meta("effective_ui_size", Vector2.ZERO) as Vector2
+	var wide_tight_field: bool = tight_compact and effective_size.x >= 1200.0
+	var tile_size: Vector2 = Vector2(58.0, 26.0) if wide_tight_field else Vector2(42.0, 26.0) if tight_compact else Vector2(92.0, 48.0) if large_planning_field else Vector2(62.0, 46.0) if compact else Vector2(88.0, 72.0)
 	var grid_separation: int = 4 if tight_compact else 6 if compact else 8
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		if grid == null:
@@ -579,8 +583,9 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		for child: Node in item_storage.get_children():
 			var item_control: Control = child as Control
 			if item_control != null:
-				item_control.custom_minimum_size = Vector2(19.0, 19.0) if tight_compact else Vector2(0.0, 0.0)
+				item_control.custom_minimum_size = Vector2(19.0, 19.0) if tight_compact else Vector2(23.0, 23.0) if compact else Vector2(42.0, 42.0)
 				item_control.clip_contents = tight_compact
+	_sync_item_storage_header()
 	var traits_title: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle") as Label
 	if traits_title != null:
 		traits_title.add_theme_font_size_override("font_size", 14 if tight_compact else 18 if compact else 20)
@@ -649,6 +654,110 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if tight_compact else HORIZONTAL_ALIGNMENT_LEFT
 		stats_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		stats_title.clip_text = false
+
+func _sync_item_storage_header() -> void:
+	var header: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
+	if header == null:
+		return
+	var tight_compact: bool = bool(get_meta("tight_scale_layout", false))
+	var compact: bool = bool(get_meta("compact_layout", false))
+	var occupied_slots: int = int(header.get_meta("occupied_slots", 0))
+	var total_slots: int = maxi(1, int(header.get_meta("total_slots", 18)))
+	header.add_theme_font_size_override("font_size", 11 if tight_compact else 14 if compact else 17)
+	header.add_theme_color_override("font_color", Color(0.94, 0.83, 0.68, 1.0))
+	header.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+	header.add_theme_constant_override("outline_size", 2)
+	header.clip_text = false
+	if occupied_slots <= 0:
+		header.text = "CACHE // EMPTY" if tight_compact else "ITEM CACHE // EMPTY" if compact else "ITEM CACHE // EMPTY — SALVAGE AWAITS"
+	else:
+		header.text = "ITEMS // %02d" % occupied_slots if tight_compact else "ITEM CACHE // %02d / %02d" % [occupied_slots, total_slots]
+
+func _apply_planning_landmarks(compact: bool, tight_compact: bool, large_planning_field: bool) -> void:
+	var geometry: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry") as Control
+	if geometry != null:
+		var lane_half_width: float = 24.0 if tight_compact else 44.0 if compact else 64.0
+		for lane_name: String in ["DeploymentLaneLeft", "DeploymentLaneCenter", "DeploymentLaneRight"]:
+			var lane: ColorRect = geometry.get_node_or_null(lane_name) as ColorRect
+			if lane == null:
+				continue
+			lane.offset_left = -lane_half_width
+			lane.offset_right = lane_half_width
+			lane.color = Color(0.22, 0.16, 0.15, 0.13 if tight_compact else 0.16)
+		var commit_rule: ColorRect = geometry.get_node_or_null("PlanningCommitBoundary") as ColorRect
+		if commit_rule != null:
+			commit_rule.offset_top = -2.0
+			commit_rule.offset_bottom = 2.0
+			commit_rule.color = Color(0.92, 0.10, 0.08, 0.48)
+	_apply_planning_landmark_to_half(
+		get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea") as Control,
+		true,
+		compact,
+		tight_compact,
+		large_planning_field
+	)
+	_apply_planning_landmark_to_half(
+		get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea") as Control,
+		false,
+		compact,
+		tight_compact,
+		large_planning_field
+	)
+
+func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: bool, tight_compact: bool, large_planning_field: bool) -> void:
+	if area == null:
+		return
+	var band_name: String = "HostileFieldOrderBand" if enemy_side else "SurvivalFieldOrderBand"
+	var band: ColorRect = area.get_node_or_null(band_name) as ColorRect
+	if band == null:
+		band = ColorRect.new()
+		band.name = band_name
+		band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		band.z_index = -1
+		area.add_child(band)
+	band.anchor_left = 0.02
+	band.anchor_right = 0.98
+	band.anchor_top = 0.08 if enemy_side else 0.76
+	band.anchor_bottom = 0.24 if enemy_side else 0.92
+	band.offset_left = 0.0
+	band.offset_top = 0.0
+	band.offset_right = 0.0
+	band.offset_bottom = 0.0
+	band.color = Color(0.40, 0.018, 0.028, 0.20) if enemy_side else Color(0.31, 0.27, 0.20, 0.18)
+	var label_name: String = "HostileFieldOrderLabel" if enemy_side else "SurvivalFieldOrderLabel"
+	var label: Label = area.get_node_or_null(label_name) as Label
+	if label == null:
+		label = Label.new()
+		label.name = label_name
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.z_index = 1
+		area.add_child(label)
+	label.anchor_left = 0.03
+	label.anchor_right = 0.97
+	label.anchor_top = 0.02 if enemy_side else 0.77
+	label.anchor_bottom = 0.23 if enemy_side else 0.98
+	label.offset_left = 0.0
+	label.offset_top = 0.0
+	label.offset_right = 0.0
+	label.offset_bottom = 0.0
+	label.text = (
+		"HOSTILE LINE // BREAK CONTACT"
+		if enemy_side
+		else "SURVIVAL LINE // HOLD / COMMIT"
+	)
+	if tight_compact:
+		label.text = "HOSTILE LINE" if enemy_side else "HOLD LINE"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if enemy_side else HORIZONTAL_ALIGNMENT_RIGHT
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 10 if tight_compact else 13 if compact else 16)
+	label.add_theme_color_override("font_color", Color(0.96, 0.52, 0.44, 0.74) if enemy_side else Color(0.89, 0.78, 0.60, 0.70))
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.94))
+	label.add_theme_constant_override("outline_size", 2)
+	label.visible = true
+	band.visible = true
+	band.set_meta("planning_landmark", true)
+	label.set_meta("planning_landmark", true)
+	area.set_meta("authored_landmark_density", 3 if large_planning_field else 2 if compact else 1)
 
 func _apply_compact_metric_badge(row: Control, compact: bool) -> void:
 	if row == null or not compact:

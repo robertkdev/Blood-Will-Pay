@@ -72,17 +72,19 @@ func _run() -> void:
 	_expect(readability_guidance != null and readability_guidance.get_theme_font_size("font_size") >= 18, "Readability guidance should use legible utility typography")
 
 	if scale_option != null:
+		scale_option.grab_focus()
 		scale_option.select(1)
 		scale_option.item_selected.emit(1)
-	await _settle_frames(2)
+	await _settle_frames(4)
 	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), 1.25), "UI scale should update to 125 percent")
 	if window != null:
 		_expect(is_equal_approx(window.content_scale_factor, 1.25), "window content scale should update immediately")
-	scale_option = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
-	if scale_option != null:
-		scale_option.select(2)
-		scale_option.item_selected.emit(2)
-	await _settle_frames(4)
+	_expect_scaled_focus(title_menu, "motion on at 125 percent")
+	_save_capture("00_focus_scale_125_motion_on.png")
+	await _keyboard_select_scale(title_menu, 0, 1.0, "motion on at 100 percent", "00_focus_scale_100_motion_on.png")
+	await _keyboard_select_scale(title_menu, 2, 1.5, "motion on at 150 percent", "00_focus_scale_150_motion_on.png")
+	await _keyboard_select_scale(title_menu, 0, 1.0, "motion on after returning to 100 percent", "00_focus_scale_100_return_motion_on.png")
+	await _keyboard_select_scale(title_menu, 2, 1.5, "motion on restored to 150 percent")
 	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), 1.5), "UI scale should update to the supported 150 percent maximum")
 	if window != null:
 		_expect(is_equal_approx(window.content_scale_factor, 1.5), "window content scale should apply the 150 percent maximum immediately")
@@ -168,6 +170,13 @@ func _run() -> void:
 		_main.call("_close_black_ledger")
 	await _settle_frames(2)
 	await _verify_stress_menu(title_menu, window)
+	DisplayServer.window_set_size(viewport_size)
+	if window != null:
+		window.size = viewport_size
+		window.content_scale_size = viewport_size
+	if title_menu != null:
+		title_menu.call_deferred("_refresh_scaled_layout")
+	await _settle_frames(5)
 	motion_check = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	reset_button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
 	if motion_check != null:
@@ -175,6 +184,11 @@ func _run() -> void:
 	await _settle_frames(2)
 	_expect(UserSettingsScript.get_reduced_motion(), "Reduced Motion should update immediately")
 	_expect(not bool(title_menu.get("_motion_enabled")), "Reduced Motion should stop title-menu animation")
+	await _keyboard_select_scale(title_menu, 0, 1.0, "motion reduced at 100 percent", "00_focus_scale_100_motion_reduced.png", true)
+	await _keyboard_select_scale(title_menu, 2, 1.5, "motion reduced at 150 percent", "00_focus_scale_150_motion_reduced.png")
+	await _keyboard_select_scale(title_menu, 0, 1.0, "motion reduced after returning to 100 percent", "00_focus_scale_100_return_motion_reduced.png")
+	await _keyboard_select_scale(title_menu, 2, 1.5, "motion reduced restored to 150 percent")
+	reset_button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
 
 	var remap_key: InputEventKey = _make_key(KEY_F6)
 	var binding_status: Label = title_menu.find_child("BindingStatus", true, false) as Label if title_menu != null else null
@@ -319,6 +333,66 @@ func _send_joypad_button(button_index: JoyButton, pressed: bool) -> void:
 	var event: InputEventJoypadButton = InputEventJoypadButton.new()
 	event.device = 0
 	event.button_index = button_index
+	event.pressed = pressed
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+
+func _keyboard_select_scale(
+	title_menu: Control,
+	target_index: int,
+	expected_scale: float,
+	context: String,
+	capture_filename: String = "",
+	allow_focus_setup: bool = false
+) -> void:
+	var scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+	if scale_option == null:
+		return
+	if allow_focus_setup:
+		scale_option.grab_focus()
+		await _settle_frames(1)
+	_expect_scaled_focus(title_menu, "%s before keyboard selection" % context, not allow_focus_setup)
+	var current_index: int = scale_option.selected
+	_send_action(&"ui_accept", true)
+	_send_action(&"ui_accept", false)
+	await _settle_frames(1)
+	var direction: StringName = &"ui_down" if target_index > current_index else &"ui_up"
+	for _step_index: int in range(absi(target_index - current_index)):
+		_send_action(direction, true)
+		_send_action(direction, false)
+		await _settle_frames(1)
+	_send_action(&"ui_accept", true)
+	_send_action(&"ui_accept", false)
+	await _settle_frames(5)
+	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), expected_scale), "%s should reach %d percent by keyboard" % [context, roundi(expected_scale * 100.0)])
+	_expect_scaled_focus(title_menu, context)
+	if capture_filename != "":
+		_save_capture(capture_filename)
+
+func _expect_scaled_focus(title_menu: Control, context: String, require_rebuild_marker: bool = true) -> void:
+	var viewport: Viewport = title_menu.get_viewport() if title_menu != null else null
+	var focus_owner: Control = viewport.gui_get_focus_owner() if viewport != null else null
+	var scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+	var scale_card: PanelContainer = title_menu.find_child("UIScaleSetting", true, false) as PanelContainer if title_menu != null else null
+	var viewport_rect: Rect2 = viewport.get_visible_rect() if viewport != null else Rect2()
+	_expect(focus_owner == scale_option, "%s should transfer focus to the rebuilt UI Scale selector, got %s" % [context, str(focus_owner.get_path() if focus_owner != null else NodePath())])
+	if require_rebuild_marker:
+		_expect(scale_option != null and bool(scale_option.get_meta("scale_rebuild_focus_target", false)), "%s selector should identify the intentional post-rebuild focus handoff" % context)
+	if focus_owner == null or scale_option == null:
+		return
+	var focus_rect: Rect2 = focus_owner.get_global_rect()
+	_expect(scale_card != null and _rect_inside(focus_rect, scale_card.get_global_rect().grow(2.0)), "%s focus rectangle should remain inside the UI Scale card focus=%s card=%s" % [context, str(focus_rect), str(scale_card.get_global_rect() if scale_card != null else Rect2())])
+	_expect(_rect_inside(focus_rect, viewport_rect.grow(2.0)), "%s focus rectangle should remain inside the viewport focus=%s viewport=%s" % [context, str(focus_rect), str(viewport_rect)])
+	_expect(focus_rect.size.y <= 64.0, "%s focus rectangle should stay tightly bounded to one selector row, got %s" % [context, str(focus_rect)])
+	_expect(focus_rect.size.x <= viewport_rect.size.x * 0.70, "%s focus rectangle should never span the title/logo/backdrop, got %s" % [context, str(focus_rect)])
+	var focus_style: StyleBoxFlat = scale_option.get_theme_stylebox("focus") as StyleBoxFlat
+	var pressed_style: StyleBoxFlat = scale_option.get_theme_stylebox("pressed") as StyleBoxFlat
+	_expect(focus_style != null and pressed_style != null and focus_style.border_color != pressed_style.border_color, "%s focus and pressed selector states should remain visually distinct" % context)
+	_expect(focus_style != null and focus_style.border_color.b > focus_style.border_color.r, "%s selector focus should use the bounded signal-blue channel" % context)
+
+func _send_action(action: StringName, pressed: bool) -> void:
+	var event: InputEventAction = InputEventAction.new()
+	event.action = action
 	event.pressed = pressed
 	Input.parse_input_event(event)
 	Input.flush_buffered_events()

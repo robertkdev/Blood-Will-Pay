@@ -243,6 +243,237 @@ class ArenaEvidencePainter:
 			var finish: Vector2 = start + Vector2(5.0 + float(index % 3) * 3.0, -2.0 - float(index % 2) * 3.0)
 			draw_line(start, finish, Color(0.78, 0.68, 0.54, 0.26), 1.5, true)
 
+class ArenaPressurePainter:
+	extends Control
+
+	var pressure_phase: int = 0
+	var reduced_motion: bool = false
+	var casualty_pressure: float = 0.0
+	var casualty_event_index: int = 0
+	var elapsed_seconds: float = 0.0
+
+	func configure(next_phase: int, next_reduced_motion: bool, next_casualty_pressure: float, next_event_index: int) -> void:
+		pressure_phase = clampi(next_phase, 0, 2)
+		reduced_motion = next_reduced_motion
+		casualty_pressure = clampf(next_casualty_pressure, 0.0, 1.0)
+		casualty_event_index = maxi(0, next_event_index)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_process(not reduced_motion)
+		set_meta("pressure_phase", pressure_phase)
+		set_meta("reduced_motion", reduced_motion)
+		set_meta("casualty_event_index", casualty_event_index)
+		set_meta("bounded_edge_pressure", true)
+		set_meta("protected_center_rect", Rect2(0.28, 0.20, 0.44, 0.60))
+		set_meta("kinetic_mark_budget", 4 if reduced_motion else 11 if pressure_phase == 0 else 19 if pressure_phase == 1 else 24)
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		elapsed_seconds = fposmod(elapsed_seconds + maxf(0.0, delta), 12.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		var motion_clock: float = 0.0 if reduced_motion else elapsed_seconds
+		_draw_hostile_edge_light(motion_clock)
+		_draw_ground_ruts()
+		_draw_impact_scars()
+		_draw_casualty_residue()
+		if reduced_motion:
+			_draw_static_urgent_substitute()
+			return
+		_draw_smoke_banks(motion_clock)
+		_draw_debris_streaks(motion_clock)
+
+	func _draw_hostile_edge_light(motion_clock: float) -> void:
+		var phase_weight: float = float(pressure_phase) * 0.045
+		var breathing: float = 0.0 if reduced_motion else sin(motion_clock * 2.1) * 0.012
+		var inset: float = 0.145 + phase_weight + breathing
+		var west_jaw: PackedVector2Array = PackedVector2Array([
+			Vector2.ZERO,
+			Vector2(size.x * inset, 0.0),
+			Vector2(size.x * (inset * 0.58), size.y * 0.48),
+			Vector2(size.x * (inset * 0.92), size.y),
+			Vector2(0.0, size.y),
+		])
+		var east_jaw: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x, 0.0),
+			Vector2(size.x * (1.0 - inset), 0.0),
+			Vector2(size.x * (1.0 - inset * 0.56), size.y * 0.50),
+			Vector2(size.x * (1.0 - inset * 0.94), size.y),
+			Vector2(size.x, size.y),
+		])
+		var jaw_alpha: float = 0.32 if reduced_motion else 0.30 + float(pressure_phase) * 0.09
+		draw_colored_polygon(west_jaw, Color(0.012, 0.006, 0.008, jaw_alpha))
+		draw_colored_polygon(east_jaw, Color(0.075, 0.006, 0.008, jaw_alpha + 0.05))
+		var enemy_glare: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x * 0.68, 0.0),
+			Vector2(size.x, 0.0),
+			Vector2(size.x, size.y * 0.42),
+			Vector2(size.x * 0.79, size.y * 0.31),
+		])
+		draw_colored_polygon(enemy_glare, Color(0.78, 0.035, 0.018, 0.13 if reduced_motion else 0.18 + float(pressure_phase) * 0.055))
+		var survival_glare: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, size.y * 0.70),
+			Vector2(size.x * 0.22, size.y * 0.78),
+			Vector2(size.x * 0.32, size.y),
+			Vector2(0.0, size.y),
+		])
+		draw_colored_polygon(survival_glare, Color(0.74, 0.38, 0.08, 0.08 if reduced_motion else 0.12))
+		if pressure_phase >= 1 and not reduced_motion:
+			_draw_midfight_edge_breach(motion_clock)
+
+	func _draw_midfight_edge_breach(motion_clock: float) -> void:
+		var drift: float = sin(motion_clock * 1.7) * 0.012
+		var west_dust_high: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, size.y * 0.14),
+			Vector2(size.x * (0.21 + drift), size.y * 0.24),
+			Vector2(size.x * (0.16 + drift), size.y * 0.37),
+			Vector2(0.0, size.y * 0.32),
+		])
+		var west_dust_low: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, size.y * 0.60),
+			Vector2(size.x * (0.24 - drift), size.y * 0.70),
+			Vector2(size.x * (0.18 - drift), size.y * 0.86),
+			Vector2(0.0, size.y * 0.80),
+		])
+		var east_smoke_high: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x, size.y * 0.16),
+			Vector2(size.x * (0.77 - drift), size.y * 0.27),
+			Vector2(size.x * (0.84 - drift), size.y * 0.42),
+			Vector2(size.x, size.y * 0.34),
+		])
+		var east_smoke_low: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x, size.y * 0.61),
+			Vector2(size.x * (0.75 + drift), size.y * 0.73),
+			Vector2(size.x * (0.82 + drift), size.y * 0.88),
+			Vector2(size.x, size.y * 0.81),
+		])
+		var density_bonus: float = float(pressure_phase - 1) * 0.07
+		draw_colored_polygon(west_dust_high, Color(0.34, 0.18, 0.09, 0.20 + density_bonus))
+		draw_colored_polygon(west_dust_low, Color(0.44, 0.21, 0.07, 0.22 + density_bonus))
+		draw_colored_polygon(east_smoke_high, Color(0.42, 0.015, 0.018, 0.24 + density_bonus))
+		draw_colored_polygon(east_smoke_low, Color(0.54, 0.018, 0.012, 0.26 + density_bonus))
+		var breach_color: Color = Color(0.94, 0.20, 0.055, 0.52 + density_bonus)
+		var west_breach: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, size.y * 0.42),
+			Vector2(size.x * 0.11, size.y * 0.45),
+			Vector2(size.x * 0.20, size.y * 0.50),
+			Vector2(size.x * 0.09, size.y * 0.54),
+			Vector2(0.0, size.y * 0.58),
+		])
+		var east_breach: PackedVector2Array = PackedVector2Array()
+		for point: Vector2 in west_breach:
+			east_breach.append(Vector2(size.x - point.x, size.y - point.y))
+		draw_polyline(west_breach, breach_color, 5.0, true)
+		draw_polyline(east_breach, breach_color, 5.0, true)
+		for bank_index: int in range(3):
+			var west_center: Vector2 = Vector2(size.x * (0.025 + float(bank_index) * 0.045), size.y * (0.20 + float(bank_index) * 0.27))
+			var east_center: Vector2 = Vector2(size.x - west_center.x, size.y - west_center.y)
+			var bank_radius: float = minf(size.x, size.y) * (0.075 + float(bank_index) * 0.014)
+			draw_circle(west_center, bank_radius, Color(0.14, 0.11, 0.09, 0.18 + density_bonus), true)
+			draw_circle(east_center, bank_radius, Color(0.22, 0.035, 0.025, 0.20 + density_bonus), true)
+
+	func _draw_ground_ruts() -> void:
+		var rut_count: int = 3 if reduced_motion else 4 + pressure_phase * 2
+		for index: int in range(rut_count):
+			var side_sign: float = -1.0 if index % 2 == 0 else 1.0
+			var y_ratio: float = 0.70 + float(index % 3) * 0.075
+			var start_x: float = size.x * (0.04 if side_sign < 0.0 else 0.96)
+			var finish_x: float = size.x * (0.23 if side_sign < 0.0 else 0.77)
+			var start: Vector2 = Vector2(start_x, size.y * y_ratio)
+			var finish: Vector2 = Vector2(finish_x, size.y * (y_ratio - 0.055 + float(index % 2) * 0.02))
+			draw_line(start, finish, Color(0.018, 0.010, 0.009, 0.74), 8.0, true)
+			draw_line(start + Vector2(0.0, 4.0), finish + Vector2(0.0, 4.0), Color(0.48, 0.19, 0.07, 0.20), 2.0, true)
+
+	func _draw_impact_scars() -> void:
+		var scar_centers: Array[Vector2] = [
+			Vector2(size.x * 0.17, size.y * 0.29),
+			Vector2(size.x * 0.83, size.y * 0.67),
+			Vector2(size.x * 0.11, size.y * 0.76),
+			Vector2(size.x * 0.90, size.y * 0.23),
+		]
+		var scar_count: int = 2 if reduced_motion else 2 + pressure_phase
+		for scar_index: int in range(scar_count):
+			var center: Vector2 = scar_centers[scar_index]
+			var radius: float = minf(size.x, size.y) * (0.035 + float(scar_index % 2) * 0.012)
+			draw_circle(center, radius, Color(0.012, 0.006, 0.006, 0.68), true)
+			draw_circle(center, radius, Color(0.78, 0.16, 0.045, 0.42), false, 4.0, true)
+			for ray_index: int in range(7):
+				var angle: float = TAU * float(ray_index) / 7.0 + float(scar_index) * 0.43
+				var start: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * 0.84
+				var finish: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * (1.45 + float(ray_index % 3) * 0.18)
+				draw_line(start, finish, Color(0.65, 0.18, 0.06, 0.42), 2.0, true)
+
+	func _draw_casualty_residue() -> void:
+		var residue_count: int = mini(4, maxi(casualty_event_index, ceili(casualty_pressure * 4.0)))
+		for index: int in range(residue_count):
+			var left_side: bool = index % 2 == 0
+			var center: Vector2 = Vector2(
+				size.x * (0.21 - float(index) * 0.018 if left_side else 0.79 + float(index) * 0.012),
+				size.y * (0.54 + float((index * 3) % 4) * 0.075)
+			)
+			var radii: Vector2 = Vector2(size.x * (0.030 + float(index % 2) * 0.012), size.y * 0.014)
+			var residue_points: PackedVector2Array = PackedVector2Array()
+			for point_index: int in range(12):
+				var angle: float = TAU * float(point_index) / 12.0
+				var wobble: float = 0.86 + float((point_index * 5 + index) % 4) * 0.075
+				residue_points.append(center + Vector2(cos(angle) * radii.x * wobble, sin(angle) * radii.y * wobble))
+			draw_colored_polygon(residue_points, Color(0.17, 0.003, 0.008, 0.50))
+			draw_polyline(residue_points, Color(0.62, 0.035, 0.018, 0.30), 2.0, true)
+			draw_circle(center + Vector2(radii.x * 0.14, -radii.y * 0.12), maxf(2.0, radii.y * 0.26), Color(0.88, 0.16, 0.06, 0.16), true)
+
+	func _draw_smoke_banks(motion_clock: float) -> void:
+		var bank_count: int = 4 if pressure_phase == 0 else 7 if pressure_phase == 1 else 9
+		for index: int in range(bank_count):
+			var left_side: bool = index % 2 == 0
+			var cycle: float = fposmod(motion_clock * (0.18 + float(index % 3) * 0.035) + float(index) * 0.17, 1.0)
+			var x_ratio: float = 0.025 + float(index % 3) * 0.048 if left_side else 0.975 - float(index % 3) * 0.048
+			var y_ratio: float = 0.10 + fposmod(float(index) * 0.19 + cycle * 0.16, 0.78)
+			var center: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
+			var radius: float = minf(size.x, size.y) * (0.046 + float(index % 3) * 0.012 + float(pressure_phase) * 0.006)
+			var color: Color = Color(0.055, 0.045, 0.042, 0.25 + float(pressure_phase) * 0.045)
+			if not left_side:
+				color = Color(0.17, 0.030, 0.022, 0.25 + float(pressure_phase) * 0.055)
+			for puff_index: int in range(4):
+				var puff_angle: float = float(puff_index) * 1.71 + cycle * 0.8
+				var puff_center: Vector2 = center + Vector2(cos(puff_angle), sin(puff_angle)) * radius * 0.34
+				draw_circle(puff_center, radius * (0.54 + float(puff_index % 2) * 0.14), color, true)
+
+	func _draw_debris_streaks(motion_clock: float) -> void:
+		var streak_count: int = 5 if pressure_phase == 0 else 10 if pressure_phase == 1 else 13
+		for index: int in range(streak_count):
+			var left_to_right: bool = index % 2 == 0
+			var travel: float = fposmod(motion_clock * (0.42 + float(index % 4) * 0.065) + float(index) * 0.137, 1.0)
+			var edge_span: float = 0.24
+			var x_ratio: float = travel * edge_span if left_to_right else 1.0 - travel * edge_span
+			var y_ratio: float = 0.08 + fposmod(float(index) * 0.137, 0.82)
+			var direction: Vector2 = Vector2(1.0, -0.16) if left_to_right else Vector2(-1.0, 0.14)
+			var start: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
+			var streak_length: float = 42.0 + float(index % 5) * 13.0 + float(pressure_phase) * 14.0
+			var finish: Vector2 = start + direction * streak_length
+			draw_line(start, finish, Color(0.96, 0.52, 0.19, 0.62), 3.5 + float(index % 2), true)
+			draw_line(finish, finish + direction * 12.0, Color(0.18, 0.07, 0.035, 0.78), 5.0, true)
+
+	func _draw_static_urgent_substitute() -> void:
+		var warning_color: Color = Color(0.82, 0.10, 0.045, 0.50)
+		var west_teeth: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, size.y * 0.18),
+			Vector2(size.x * 0.17, size.y * 0.28),
+			Vector2(size.x * 0.08, size.y * 0.40),
+			Vector2(size.x * 0.19, size.y * 0.50),
+			Vector2(size.x * 0.07, size.y * 0.62),
+			Vector2(size.x * 0.16, size.y * 0.73),
+			Vector2(0.0, size.y * 0.82),
+		])
+		var east_teeth: PackedVector2Array = PackedVector2Array()
+		for point: Vector2 in west_teeth:
+			east_teeth.append(Vector2(size.x - point.x, size.y - point.y))
+		draw_polyline(west_teeth, warning_color, 7.0, true)
+		draw_polyline(east_teeth, warning_color, 7.0, true)
+		draw_line(Vector2(size.x * 0.06, size.y * 0.93), Vector2(size.x * 0.25, size.y * 0.84), Color(0.92, 0.48, 0.14, 0.46), 5.0, true)
+		draw_line(Vector2(size.x * 0.94, size.y * 0.07), Vector2(size.x * 0.75, size.y * 0.16), Color(0.92, 0.16, 0.06, 0.50), 5.0, true)
+
 static var _theme: Theme = null
 
 static func apply(root: Control) -> void:
@@ -1363,6 +1594,18 @@ static func _ensure_arena_war_aftermath_geometry(arena: Control) -> void:
 		aftermath.offset_right = 0.0
 		aftermath.offset_bottom = 0.0
 	aftermath.set_meta("visual_role", "non_unit_physical_war_aftermath")
+	var pressure_painter: ArenaPressurePainter = aftermath.get_node_or_null("ArenaPressurePainter") as ArenaPressurePainter
+	if pressure_painter == null:
+		pressure_painter = ArenaPressurePainter.new()
+		pressure_painter.name = "ArenaPressurePainter"
+		pressure_painter.z_index = -1
+		aftermath.add_child(pressure_painter)
+		pressure_painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		pressure_painter.offset_left = 0.0
+		pressure_painter.offset_top = 0.0
+		pressure_painter.offset_right = 0.0
+		pressure_painter.offset_bottom = 0.0
+	pressure_painter.configure(0, false, 0.0, 0)
 
 	var onset: Control = _ensure_arena_state_group(aftermath, "OnsetAftermathGeometry")
 	_populate_arena_war_geometry(onset, "onset", 6, 0.24)

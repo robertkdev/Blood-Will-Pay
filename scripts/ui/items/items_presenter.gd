@@ -10,6 +10,7 @@ const DEFAULT_MIN_ROWS := 3
 var view: Control
 var left_area: Control
 var grid: GridContainer
+var header: Label
 var router
 var _item_grid_helper
 var _rebuild_queued: bool = false
@@ -25,6 +26,7 @@ func configure(_view: Control) -> void:
 	if view:
 		left_area = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
 		grid = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid")
+		header = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
 
 func initialize() -> void:
 	_bind_items_signal()
@@ -41,6 +43,7 @@ func teardown() -> void:
 	_item_grid_helper = null
 	router = null
 	grid = null
+	header = null
 	left_area = null
 	view = null
 
@@ -78,6 +81,7 @@ func rebuild() -> void:
 	var min_slots: int = cols * DEFAULT_MIN_ROWS
 	while layout.size() < min_slots:
 		layout.append("")
+	_sync_storage_header(layout)
 	var item_card_scene: PackedScene = _get_item_card_scene()
 	if item_card_scene == null:
 		_rebuilding = false
@@ -109,6 +113,21 @@ func rebuild() -> void:
 			if router.has_method("attach_card"):
 				router.attach_card(c)
 	_rebuilding = false
+	if view != null and view.has_method("_apply_responsive_layout"):
+		view.call_deferred("_apply_responsive_layout")
+
+func _sync_storage_header(layout: Array[String]) -> void:
+	if header == null:
+		return
+	var occupied_slots: int = 0
+	for item_id: String in layout:
+		if item_id.strip_edges() != "":
+			occupied_slots += 1
+	header.set_meta("occupied_slots", occupied_slots)
+	header.set_meta("total_slots", layout.size())
+	header.text = "ITEM CACHE // EMPTY" if occupied_slots == 0 else "ITEM CACHE // %02d / %02d" % [occupied_slots, layout.size()]
+	if view != null and view.has_method("_sync_item_storage_header"):
+		view.call_deferred("_sync_item_storage_header")
 
 func _get_item_card_scene() -> PackedScene:
 	if _item_card_scene == null:
