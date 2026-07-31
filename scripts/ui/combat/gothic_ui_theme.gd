@@ -326,6 +326,9 @@ class ArenaPressurePainter:
 		set_meta("full_field_warning_chevrons", false)
 		set_meta("pressure_visual_language", "physical_smoke_and_event_residue")
 		set_meta("debug_primitives_suppressed", true)
+		set_meta("player_scale_evidence_count", 9 if reduced_motion else 4 + pressure_phase * 3)
+		set_meta("terrain_floor_lift", 0.22 if reduced_motion else 0.16 + float(pressure_phase) * 0.07)
+		set_meta("physical_lane_encroachment", "static_casualty_barricades" if reduced_motion else "breach_debris_then_collision")
 		queue_redraw()
 
 	func _process(delta: float) -> void:
@@ -336,12 +339,17 @@ class ArenaPressurePainter:
 		if size.x <= 1.0 or size.y <= 1.0:
 			return
 		var motion_clock: float = 0.0 if reduced_motion else elapsed_seconds
+		# The authored raster is intentionally hostile and dark; this quiet warm lift
+		# makes its mud, stone, and bodies readable at a real 1080p player distance.
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.22, 0.095, 0.050, 0.16 + float(pressure_phase) * 0.045), true)
 		# The terrain texture and authored evidence painter carry the battlefield
 		# structure. Pressure adds only soft edge atmosphere and event-grounded
 		# residue; outline craters, rays, streaks, and ruler-straight fences made
 		# the field read as a debug overlay rather than a physical killing ground.
 		_draw_casualty_residue()
 		_draw_smoke_banks(motion_clock)
+		_draw_perimeter_consequence()
+		_draw_lane_barricades()
 		if pressure_phase >= 1:
 			# Escalation must change the ground itself, not merely tint the HUD.
 			# Keep the readable center clear while the perimeter caves inward with
@@ -350,6 +358,72 @@ class ArenaPressurePainter:
 			_draw_ground_ruts()
 			if reduced_motion:
 				_draw_static_urgent_substitute()
+
+	func _draw_perimeter_consequence() -> void:
+		# These are deliberately broad, physical silhouettes at player scale: broken
+		# wagon ribs, slagged bodies, and torn standards communicate a killing ground
+		# without consuming the board's central targeting lanes.
+		var evidence_count: int = 2 + pressure_phase * 2
+		if reduced_motion:
+			evidence_count = maxi(evidence_count, 5)
+		var anchors: Array[Vector2] = [
+			Vector2(size.x * 0.105, size.y * 0.18), Vector2(size.x * 0.895, size.y * 0.80),
+			Vector2(size.x * 0.085, size.y * 0.72), Vector2(size.x * 0.92, size.y * 0.28),
+			Vector2(size.x * 0.19, size.y * 0.88), Vector2(size.x * 0.81, size.y * 0.10),
+		]
+		for evidence_index: int in range(mini(evidence_count, anchors.size())):
+			var anchor: Vector2 = anchors[evidence_index]
+			var scale_factor: float = minf(size.x, size.y) * (0.030 + float(evidence_index % 2) * 0.008)
+			_draw_body_heap(anchor, scale_factor, evidence_index)
+			if evidence_index % 2 == 0:
+				_draw_shattered_stake(anchor + Vector2(scale_factor * 0.45, -scale_factor * 0.55), scale_factor, evidence_index)
+
+	func _draw_lane_barricades() -> void:
+		var barricade_count: int = 2 if pressure_phase == 0 else 4 if pressure_phase == 1 else 6
+		if reduced_motion:
+			barricade_count = 6
+		var anchors: Array[Vector2] = [
+			Vector2(size.x * 0.075, size.y * 0.33), Vector2(size.x * 0.925, size.y * 0.66),
+			Vector2(size.x * 0.14, size.y * 0.54), Vector2(size.x * 0.86, size.y * 0.44),
+			Vector2(size.x * 0.21, size.y * 0.80), Vector2(size.x * 0.79, size.y * 0.18),
+		]
+		for barricade_index: int in range(barricade_count):
+			var from_left: bool = barricade_index % 2 == 0
+			_draw_crushed_barricade(anchors[barricade_index], from_left, barricade_index)
+
+	func _draw_crushed_barricade(anchor: Vector2, from_left: bool, variant: int) -> void:
+		var direction: float = 1.0 if from_left else -1.0
+		var span: float = minf(size.x, size.y) * (0.105 if variant < 2 else 0.080)
+		var thickness: float = minf(size.x, size.y) * 0.026
+		var root: Vector2 = anchor + Vector2(-direction * span * 0.78, thickness * 0.44)
+		var tip: Vector2 = anchor + Vector2(direction * span * 0.72, -thickness * 0.20)
+		draw_line(root, tip, Color(0.090, 0.035, 0.018, 0.94), thickness * 1.65, true)
+		draw_line(root + Vector2(0.0, -thickness * 0.18), tip + Vector2(0.0, -thickness * 0.18), Color(0.56, 0.22, 0.075, 0.76), maxf(3.0, thickness * 0.28), true)
+		for spar_index: int in range(3):
+			var fraction: float = 0.18 + float(spar_index) * 0.30
+			var spar_base: Vector2 = root.lerp(tip, fraction)
+			var spar_tip: Vector2 = spar_base + Vector2(direction * span * 0.12, -thickness * (2.6 + float(spar_index % 2)))
+			draw_line(spar_base, spar_tip, Color(0.13, 0.052, 0.025, 0.96), maxf(4.0, thickness * 0.38), true)
+			if spar_index == 1:
+				draw_circle(spar_tip + Vector2(direction * thickness * 0.35, thickness * 0.22), thickness * 0.56, Color(0.34, 0.035, 0.020, 0.78), true)
+
+	func _draw_body_heap(center: Vector2, radius: float, variant: int) -> void:
+		var heap: PackedVector2Array = PackedVector2Array()
+		for point_index: int in range(11):
+			var angle: float = TAU * float(point_index) / 11.0
+			var wobble: float = 0.72 + float((point_index * 3 + variant) % 5) * 0.09
+			heap.append(center + Vector2(cos(angle) * radius * wobble, sin(angle) * radius * 0.48 * wobble))
+		draw_colored_polygon(heap, Color(0.075, 0.030, 0.022, 0.88))
+		draw_circle(center + Vector2(radius * 0.14, -radius * 0.12), radius * 0.28, Color(0.20, 0.075, 0.045, 0.72), true)
+		draw_line(center - Vector2(radius * 0.62, radius * 0.10), center + Vector2(radius * 0.72, radius * 0.18), Color(0.48, 0.12, 0.050, 0.48), maxf(2.0, radius * 0.12), true)
+
+	func _draw_shattered_stake(origin: Vector2, length: float, variant: int) -> void:
+		var tilt: float = -0.32 if variant % 2 == 0 else 0.28
+		var top: Vector2 = origin + Vector2(length * tilt, -length * 1.35)
+		draw_line(origin, top, Color(0.11, 0.050, 0.026, 0.92), maxf(3.0, length * 0.18), true)
+		draw_line(origin + Vector2(0.0, length * 0.10), top + Vector2(length * 0.08, length * 0.18), Color(0.52, 0.20, 0.075, 0.44), maxf(1.0, length * 0.05), true)
+		var cloth: PackedVector2Array = PackedVector2Array([top, top + Vector2(length * 0.54, length * 0.22), top + Vector2(length * 0.22, length * 0.66), top + Vector2(-length * 0.08, length * 0.42)])
+		draw_colored_polygon(cloth, Color(0.34, 0.016, 0.020, 0.74))
 
 	func _draw_hostile_edge_light(motion_clock: float) -> void:
 		var phase_weight: float = float(pressure_phase) * 0.022
@@ -1704,13 +1778,16 @@ static func _ensure_arena_war_aftermath_geometry(arena: Control) -> void:
 	if pressure_painter == null:
 		pressure_painter = ArenaPressurePainter.new()
 		pressure_painter.name = "ArenaPressurePainter"
-		pressure_painter.z_index = -1
+		# The evidence is above the raster ground but still below actor/status layers.
+		pressure_painter.z_index = 1
 		aftermath.add_child(pressure_painter)
 		pressure_painter.set_anchors_preset(Control.PRESET_FULL_RECT)
 		pressure_painter.offset_left = 0.0
 		pressure_painter.offset_top = 0.0
 		pressure_painter.offset_right = 0.0
 		pressure_painter.offset_bottom = 0.0
+	# Repair already-instantiated boards as well as newly-created ones.
+	pressure_painter.z_index = 1
 	pressure_painter.configure(0, false, 0.0, 0)
 
 	var onset: Control = _ensure_arena_state_group(aftermath, "OnsetAftermathGeometry")

@@ -158,6 +158,7 @@ func _run() -> void:
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(12)
 	_expect_standard_planning_containment("compact 150-percent planning", COMPACT_LOGICAL_150_PERCENT_SIZE, 1.5, true)
+	_expect_maximum_scale_hierarchy("compact 150-percent planning")
 	_expect_scaled_tactical_surface_containment("compact 150-percent", COMPACT_LOGICAL_150_PERCENT_SIZE)
 	_expect_connected_planning_composition("compact 150-percent planning", false)
 	_expect_no_button_text_overflow(combat, "compact 150-percent post-shop combat")
@@ -579,7 +580,13 @@ func _expect_item_cache_contract(context: String) -> void:
 	var left_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
 	var header: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var maximum_scale_layout: bool = combat != null and bool(combat.get_meta("maximum_scale_layout", false))
 	_expect(left_panel != null, "%s item-cache rail missing" % context)
+	if maximum_scale_layout:
+		_expect(header != null and not header.is_visible_in_tree() and String(header.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s maximum-scale policy did not stage out the empty cache header" % context)
+		_expect(item_grid != null and not item_grid.is_visible_in_tree() and String(item_grid.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s maximum-scale policy did not stage out empty cache pockets" % context)
+		return
 	_expect(header != null and header.is_visible_in_tree(), "%s item-cache label missing" % context)
 	_expect(item_grid != null and item_grid.is_visible_in_tree(), "%s item-cache grid missing" % context)
 	if left_panel == null or header == null or item_grid == null:
@@ -597,7 +604,6 @@ func _expect_item_cache_contract(context: String) -> void:
 	_expect(bool(item_grid.get_meta("physical_compartment_shell", false)) and int(item_grid.get_meta("ready_slot_contract", 0)) == 3, "%s item cache lacks its three-pocket physical shell contract" % context)
 	var shell: Panel = _main.get_node_or_null("CombatView/GothicItemsPlate") as Panel if _main != null else null
 	_expect(shell != null and bool(shell.get_meta("physical_reliquary_shell", false)), "%s item-cache backplate is not a physical reliquary shell" % context)
-	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
 	var tight_layout: bool = bool(combat.get_meta("tight_scale_layout", false)) if combat != null else false
 	var compact_layout: bool = bool(combat.get_meta("compact_layout", false)) if combat != null else false
 	var viewport_size: Vector2 = combat.get_viewport_rect().size if combat != null else Vector2.ZERO
@@ -733,7 +739,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		_expect(system_menu_button.text == "SYS // MENU", "%s system escape hatch reverted to generic Menu copy" % context)
 		_expect(bool(system_menu_button.get_meta("authored_system_command", false)), "%s system escape hatch lacks authored command styling" % context)
 	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
-	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 136.0, "%s Team Metrics rail did not release enough battlefield width" % context)
+	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 164.0, "%s Team Metrics rail did not preserve enough board width" % context)
 	_expect_text_children_horizontally_inside(left_panel, "%s item/trait rail" % context)
 	_expect_text_children_horizontally_inside(stats_area, "%s Team Metrics rail" % context)
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
@@ -774,6 +780,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	_expect_scaled_decision_data(context)
 	_expect_scaled_team_metrics(context)
 	_expect_scaled_surface_separation(context)
+
 	var bench_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BenchArea/BenchGrid") as GridContainer
 	if bench_grid != null:
 		for bench_node: Node in bench_grid.get_children():
@@ -803,6 +810,29 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 				_expect(card.get_global_rect().end.y <= _viewport_rect().end.y - safe_gutter + 1.0, "%s shop card %s lacks a visible framebuffer gutter" % [context, String(card.name)])
 	var tactical_record: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	_expect(tactical_record != null and not tactical_record.visible, "%s decorative tactical-record caption can still overlay gameplay" % context)
+
+func _expect_maximum_scale_hierarchy(context: String) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	_expect(combat != null and bool(combat.get_meta("maximum_scale_layout", false)), "%s did not enter the maximum-scale priority reflow" % context)
+	if combat == null:
+		return
+	var board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
+	var left_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
+	var metrics_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
+	var metrics_title: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Header/Title") as Label
+	var scoreboard_header: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Body/Scoreboard/Header")
+	var empty_cache_header: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
+	var empty_cache_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
+	var planning_directive: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
+	_expect(board_column != null and left_rail != null and metrics_rail != null, "%s priority surfaces are missing" % context)
+	if board_column != null and left_rail != null and metrics_rail != null:
+		_expect(board_column.size.x >= left_rail.size.x * 3.5, "%s board lost planning priority over support information" % context)
+		_expect(metrics_rail.size.x >= 160.0, "%s Team Metrics rail is too narrow for readable identities" % context)
+	_expect(metrics_title != null and metrics_title.text == "TEAM METRICS" and metrics_title.get_theme_font_size("font_size") >= 14, "%s Team Metrics label is not a readable maximum-scale heading" % context)
+	_expect(scoreboard_header != null and scoreboard_header.is_visible_in_tree(), "%s maximum-scale Team Metrics lost its compact navigation header" % context)
+	_expect(empty_cache_header != null and not empty_cache_header.is_visible_in_tree() and String(empty_cache_header.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s empty cache header was not staged out" % context)
+	_expect(empty_cache_grid != null and not empty_cache_grid.is_visible_in_tree() and String(empty_cache_grid.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s empty cache placeholders were not staged out" % context)
+	_expect(planning_directive != null and not planning_directive.is_visible_in_tree() and String(planning_directive.get_meta("maximum_scale_disclosure", "")) == "hidden_redundant_instruction", "%s duplicate deployment instruction was not staged out" % context)
 
 func _expect_standard_planning_containment(context: String, expected_logical_size: Vector2i, expected_scale: float, expected_tight: bool) -> void:
 	var viewport_rect: Rect2 = _viewport_rect()
@@ -982,6 +1012,7 @@ func _expect_text_children_horizontally_inside(surface: Control, context: String
 
 func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var maximum_scale_layout: bool = combat != null and bool(combat.get_meta("maximum_scale_layout", false))
 	var continue_button: Button = combat.find_child("ContinueButton", true, false) as Button if combat != null else null
 	var bet_row: Control = combat.find_child("BetRow", true, false) as Control if combat != null else null
 	var all_in_button: Button = bet_row.find_child("AllInButton", true, false) as Button if bet_row != null else null
@@ -1013,7 +1044,10 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 			_expect(wager_summary.text.contains(required_copy), "%s wager outcome metadata omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
-	_expect(directive != null and directive.text.contains("COMMIT") and directive.get_theme_font_size("font_size") >= 18, "%s planning directive missing or unreadable" % context)
+	if maximum_scale_layout:
+		_expect(directive != null and not directive.is_visible_in_tree() and String(directive.get_meta("maximum_scale_disclosure", "")) == "hidden_redundant_instruction", "%s duplicate planning directive was not staged out" % context)
+	else:
+		_expect(directive != null and directive.text.contains("COMMIT") and directive.get_theme_font_size("font_size") >= 18, "%s planning directive missing or unreadable" % context)
 
 func _expect_shop_card_contents_inside(card: Control) -> void:
 	if not (card is ShopCard):

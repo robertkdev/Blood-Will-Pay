@@ -8,6 +8,7 @@ const CombatControllerScript: GDScript = preload("res://scripts/ui/combat/contro
 const GothicUIThemeScript: GDScript = preload("res://scripts/ui/combat/gothic_ui_theme.gd")
 const GothicUIAssetsScript: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const VisionSnapshot: GDScript = preload("res://scripts/util/vision_snapshot.gd")
 
 var _failures: Array[String] = []
 var _host: Control = null
@@ -47,12 +48,29 @@ func _run() -> void:
 	_expect(_pressure_banner_count() == 1, "critical pressure should replace rather than stack")
 	_save_capture("03_pressure_critical.png")
 
-	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
-	UserSettingsScript.initialize(window)
-	UserSettingsScript.set_reduced_motion(true)
 	var controller: CombatController = CombatControllerScript.new() as CombatController
 	controller.parent = _host
 	controller.arena_container = _arena
+	controller.call("_apply_environmental_pressure_composition", 0, false, 0.0, 0)
+	await _settle_frames(2)
+	_expect(String(_arena.get_meta("battlefield_escalation_read", "")) == "breached_perimeter", "onset did not publish a distinct physical field state")
+	var onset_painter: Control = _arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
+	_expect(onset_painter != null and int(onset_painter.get_meta("player_scale_evidence_count", 0)) >= 4 and float(onset_painter.get_meta("terrain_floor_lift", 0.0)) >= 0.16, "onset field is too sparse or dark at player scale")
+	_save_capture("04_field_onset.png")
+	controller.call("_apply_environmental_pressure_composition", 1, false, 0.45, 2)
+	await _settle_frames(2)
+	_expect(String(_arena.get_meta("battlefield_escalation_read", "")) == "collision_field_and_casualty_residue", "midfight did not publish collision and residue escalation")
+	_expect(onset_painter != null and int(onset_painter.get_meta("player_scale_evidence_count", 0)) >= 7 and float(onset_painter.get_meta("terrain_floor_lift", 0.0)) >= 0.23, "midfight did not add enough visible debris and floor contrast")
+	_save_capture("05_field_midfight.png")
+	controller.call("_apply_environmental_pressure_composition", 2, false, 0.82, 4)
+	await _settle_frames(2)
+	_expect(String(_arena.get_meta("battlefield_escalation_read", "")) == "collapsed_killing_ground", "collapse did not publish a distinct physical field state")
+	_expect(onset_painter != null and int(onset_painter.get_meta("player_scale_evidence_count", 0)) >= 10 and float(onset_painter.get_meta("terrain_floor_lift", 0.0)) >= 0.30, "collapse did not become materially denser than onset")
+	_save_capture("06_field_collapse.png")
+
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	UserSettingsScript.set_reduced_motion(true)
 	controller.call("_apply_environmental_pressure_composition", 1, true, 0.35, 1)
 	controller.call("_flash_contract_hazard", Color(0.90, 0.18, 0.10, 1.0), 3)
 	controller.call("_show_combat_event_banner", "PRESSURE BREAK\nSUSTAIN COLLAPSING", Color(0.90, 0.18, 0.10, 1.0), 3)
@@ -64,7 +82,7 @@ func _run() -> void:
 	if event_banner != null:
 		_expect(event_banner.scale.is_equal_approx(Vector2.ONE), "Reduced Motion event banner should not scale in")
 		_expect(is_equal_approx(event_banner.modulate.a, 1.0), "Reduced Motion event banner should not fade in")
-	_save_capture("04_pressure_reduced_motion.png")
+		_save_capture("07_pressure_reduced_motion.png")
 	var retired_aftermath: Control = _arena.get_node_or_null("ArenaWarAftermath") as Control
 	var battlefield: TextureRect = _arena.get_node_or_null("GothicArenaSurface") as TextureRect
 	var pressure_surface: TextureRect = _arena.get_node_or_null("GothicArenaPressureSurface") as TextureRect
@@ -72,6 +90,10 @@ func _run() -> void:
 	var midfight_texture: Texture2D = GothicUIAssetsScript.call("battlefield_midfight_texture") as Texture2D
 	var reduced_texture: Texture2D = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
 	_expect(retired_aftermath != null and retired_aftermath.visible, "Reduced Motion did not expose its static physical evidence painter")
+	var pressure_painter: Control = _arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
+	_expect(pressure_painter != null and pressure_painter.z_index == 1 and String(pressure_painter.get_meta("reduced_motion_scene_parity", "")) == "same_physical_field_static", "Reduced Motion did not retain foreground static physical evidence")
+	_expect(pressure_painter != null and int(pressure_painter.get_meta("player_scale_evidence_count", 0)) >= 9 and float(pressure_painter.get_meta("terrain_floor_lift", 0.0)) >= 0.22 and String(pressure_painter.get_meta("physical_lane_encroachment", "")) == "static_casualty_barricades", "Reduced Motion regressed to an underlit or empty field")
+	_expect(battlefield != null and float(battlefield.get_meta("player_scale_terrain_lift", 0.0)) >= 0.18, "combat floor lacks its player-scale readability lift")
 	_expect(bool(_arena.get_meta("procedural_environment_geometry_suppressed", false)), "arena does not publish procedural-overlay suppression")
 	_expect(onset_texture != null and midfight_texture != null and reduced_texture != null, "arena phase-specific authored textures failed to load")
 	_expect(onset_texture != midfight_texture and midfight_texture != reduced_texture, "arena phase textures are not independently authored resources")
@@ -90,7 +112,7 @@ func _run() -> void:
 	_expect(survival_label != null and survival_label.text.begins_with("■") and survival_label.text.contains("SURVIVE"), "survival territory lacks its square/survive non-color cue")
 	_expect(hostile_label != null and bool(hostile_label.get_meta("persistent_copy_uses_utility_face", false)), "persistent hostile instruction must use the readable utility face")
 	_expect(survival_label != null and bool(survival_label.get_meta("persistent_copy_uses_utility_face", false)), "persistent survival instruction must use the readable utility face")
-	_save_capture("05_bounded_reduced_motion_field.png")
+	_save_capture("08_bounded_reduced_motion_field.png")
 
 	_bridge.call("_on_arena_pressure_changed", 1.0, 0)
 	await _settle_frames(1)
@@ -179,6 +201,8 @@ func _save_capture(filename: String) -> void:
 	var display_name: String = DisplayServer.get_name().to_lower()
 	var driver_name: String = RenderingServer.get_current_rendering_driver_name().to_lower()
 	if display_name == "headless" or display_name == "server" or display_name == "dummy" or driver_name.contains("dummy"):
+		var snapshot: Dictionary[String, Variant] = VisionSnapshot.capture(_host, filename.get_basename(), OUTPUT_DIR)
+		_expect(bool(snapshot.get("ok", false)), "vision fallback capture failed for %s" % filename)
 		return
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
 	var image: Image = get_viewport().get_texture().get_image()

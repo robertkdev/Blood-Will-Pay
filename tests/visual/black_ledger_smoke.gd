@@ -114,6 +114,7 @@ func _validate_layout(state: String) -> void:
 	if print_scars != null and footer_band != null:
 		_expect(not print_scars.get_global_rect().intersects(footer_band.get_global_rect()), "%s Ledger print scars intersect the live footer" % state)
 	var styled_close_button: Button = _ledger.find_child("CloseFileButton", true, false) as Button
+	var close_gutter: Control = _ledger.find_child("HeaderActionFocusGutter", true, false) as Control
 	if styled_close_button != null:
 		var close_pressed: StyleBoxFlat = styled_close_button.get_theme_stylebox("pressed") as StyleBoxFlat
 		var close_focus: StyleBoxFlat = styled_close_button.get_theme_stylebox("focus") as StyleBoxFlat
@@ -121,6 +122,8 @@ func _validate_layout(state: String) -> void:
 		_expect(close_pressed != null and close_focus != null and close_pressed.border_color != close_focus.border_color, "%s Ledger close focus must remain distinct from pressed" % state)
 		_expect(close_focus != null and close_focus.border_color.b > close_focus.border_color.r, "%s Ledger close focus should use signal blue" % state)
 		_expect(close_disabled != null and close_disabled.border_width_left >= 10 and close_disabled.border_width_bottom >= 5, "%s Ledger disabled action should use a blocked shape, not only dimming" % state)
+		_expect(close_gutter != null and close_gutter.custom_minimum_size.x >= 6.0, "%s Ledger close action needs a retained focus-safe gutter" % state)
+		_expect(panel != null and styled_close_button.get_global_rect().end.x <= panel.get_global_rect().end.x - close_gutter.custom_minimum_size.x + 1.0, "%s Ledger close action reaches the clipped right frame edge" % state)
 	var sparse_expected: bool = state != "veteran"
 	_expect(bool(_ledger.get("_sparse_content_record")) == sparse_expected, "%s content-density classification was not %s" % [state, "sparse" if sparse_expected else "populated"])
 	var displayable_starter_rows: int = int(_ledger.get("_displayable_starter_row_count"))

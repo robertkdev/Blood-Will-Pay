@@ -3364,8 +3364,9 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("battlefield_reduced_motion", reduced_motion)
 	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
 	arena.set_meta("battlefield_casualty_event_index", casualty_event_index)
-	arena.set_meta("battlefield_environment_signature", "persistent_killing_ground/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
-	arena.set_meta("battlefield_overlay_density", 0.0 if effective_phase == 0 else 0.18 if effective_phase == 1 else 0.28)
+	arena.set_meta("battlefield_environment_signature", "persistent_killing_ground/%s/%s" % [phase_name, "static_physical_lock" if reduced_motion else "escalating_physical_pressure"])
+	arena.set_meta("battlefield_overlay_density", 0.16 if effective_phase == 0 else 0.38 if effective_phase == 1 else 0.58)
+	arena.set_meta("battlefield_escalation_read", "breached_perimeter" if effective_phase == 0 else "collision_field_and_casualty_residue" if effective_phase == 1 else "collapsed_killing_ground")
 	arena.set_meta("battlefield_material_source", "persistent_base_plus_aligned_raster_and_physical_evidence")
 	arena.set_meta("stable_base_location", true)
 	arena.set_meta("landmark_continuity_source", "onset_base_persistent")
@@ -3403,8 +3404,10 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var arena_surface: TextureRect = arena.get_node_or_null("GothicArenaSurface") as TextureRect
 	if arena_surface != null:
 		arena_surface.texture = GothicUIAssets.battlefield_onset_texture()
-		arena_surface.modulate = Color(1.0, 1.0, 1.0, 0.96)
+		# The physical field must remain readable beneath units at actual gameplay scale.
+		arena_surface.modulate = Color(1.24, 1.12, 1.04, 1.0)
 		arena_surface.set_meta("active_material_phase", "persistent_onset_base")
+		arena_surface.set_meta("player_scale_terrain_lift", 0.18)
 	var pressure_surface: TextureRect = arena.get_node_or_null("GothicArenaPressureSurface") as TextureRect
 	if pressure_surface != null:
 		pressure_surface.texture = GothicUIAssets.battlefield_reduced_motion_texture() if reduced_motion else GothicUIAssets.battlefield_midfight_texture()

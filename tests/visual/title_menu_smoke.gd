@@ -132,7 +132,7 @@ func _run() -> void:
 		_expect(threat_signal != null and threat_signal.text.contains("CONTACT MOVING"), "Command menu should expose an immediate authored danger signal", failures)
 		var action_docket: Label = title_menu.get_node_or_null("Center/VBox/ActionDocket") as Label
 		_expect(action_docket != null and action_docket.visible and action_docket.text.contains("ENTER THE INTAKE"), "Desktop command rail should expose an authored active-order docket", failures)
-		_expect(action_docket != null and action_docket.get_theme_font_size("font_size") >= 16, "Command-rail action docket should use readable utility type", failures)
+		_expect(action_docket != null and action_docket.get_theme_font_size("font_size") >= 19, "Command-rail action docket should use readable utility type", failures)
 		var hero: TextureRect = title_menu.get_node_or_null("TitleHero") as TextureRect
 		_expect(hero == null, "TitleHero should not render a background unit over the menu", failures)
 		var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer
@@ -329,7 +329,7 @@ func _run() -> void:
 				_expect(String(ui_scale_option.get_meta("disabled_non_color_cue", "")) != "", "UIScaleOption should publish its disabled non-color cue", failures)
 			_expect(readability_setting != null, "Settings should expose a visible readability and contrast record", failures)
 			_expect(readability_status != null and readability_status.text.contains("HIGH CONTRAST"), "Settings should state the enforced high-contrast default", failures)
-			_expect(readability_status != null and readability_status.get_theme_font_size("font_size") >= 18, "Readability status should remain functional-size copy", failures)
+			_expect(readability_status != null and readability_status.get_theme_font_size("font_size") >= 19, "Readability status should remain functional-size copy", failures)
 			_expect(scale_guidance != null and not scale_guidance.text.contains("every supported scale"), "UI scale guidance should avoid an unbounded responsiveness claim", failures)
 			_expect(accept_binding != null, "Settings should expose Confirm remapping", failures)
 			_expect(cancel_binding != null, "Settings should expose Menu / Back remapping", failures)

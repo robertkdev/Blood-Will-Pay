@@ -35,6 +35,7 @@ var _starter_nav_button: Button = null
 var _bounty_nav_button: Button = null
 var _footer_band: PanelContainer = null
 var _footer_stamp_label: Label = null
+var _header_action_gutter: Control = null
 var _columns: GridContainer = null
 var _unlock_column: VBoxContainer = null
 var _bounty_column: VBoxContainer = null
@@ -113,6 +114,11 @@ func _sync_to_viewport() -> void:
 		var header: HBoxContainer = _close_button.get_parent() as HBoxContainer
 		if header != null:
 			header.add_theme_constant_override("separation", 9 if compact else 18)
+	if _header_action_gutter != null:
+		# Focus plates expand beyond their button rect. Reserve that space inside
+		# this clipped document frame at scaled compact resolutions.
+		_header_action_gutter.custom_minimum_size.x = 8.0 if compact else 6.0
+		_header_action_gutter.set_meta("focus_safe_margin_px", _header_action_gutter.custom_minimum_size.x)
 	if _footer_band != null:
 		_footer_band.custom_minimum_size = Vector2(0.0, 44.0 if compact else 50.0)
 	if _footer_stamp_label != null:
@@ -334,6 +340,12 @@ func _build_ui() -> void:
 	_style_button(_close_button, false)
 	_close_button.pressed.connect(func() -> void: closed.emit())
 	header.add_child(_close_button)
+	_header_action_gutter = Control.new()
+	_header_action_gutter.name = "HeaderActionFocusGutter"
+	_header_action_gutter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_header_action_gutter.custom_minimum_size = Vector2(6.0, 0.0)
+	_header_action_gutter.set_meta("focus_safe_margin_px", 6.0)
+	header.add_child(_header_action_gutter)
 	var rule: HSeparator = HSeparator.new()
 	rule.add_theme_stylebox_override("separator", _rule_style(COLOR_BLOOD.darkened(0.06), 2))
 	_record_root.add_child(rule)

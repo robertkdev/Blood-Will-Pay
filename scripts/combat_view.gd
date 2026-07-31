@@ -389,8 +389,14 @@ func _apply_responsive_layout() -> void:
 		or effective_size.x <= 1100.0
 		or (ui_scale >= 1.25 and effective_size.y <= 720.0)
 	)
+	# At the maximum supported scale, do not simply shrink every planning
+	# surface equally. The board and the commitment decision remain the reading
+	# spine; support rails become quieter, while Team Metrics receives enough
+	# width to keep its labels honest.
+	var maximum_scale_layout: bool = ui_scale >= 1.5 and effective_size.x <= 900.0 and effective_size.y <= 500.0
 	set_meta("compact_layout", compact)
 	set_meta("tight_scale_layout", tight_compact)
+	set_meta("maximum_scale_layout", maximum_scale_layout)
 	set_meta("persisted_ui_scale", ui_scale)
 	set_meta("effective_ui_size", effective_size)
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
@@ -429,11 +435,11 @@ func _apply_responsive_layout() -> void:
 		board_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if planning_area != null:
 		planning_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
 	_apply_side_panel_layout(compact, tight_compact)
 	for half_path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea",
@@ -572,6 +578,7 @@ func _center_planning_grid(grid: GridContainer, tile_size: Vector2, separation: 
 	grid.offset_bottom = grid_size.y * 0.5
 
 func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
+	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var left_item_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
 	if left_item_area != null:
 		# Tight scale retains both tactical support rails. Their internals reflow
@@ -580,6 +587,8 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		left_item_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		left_item_area.clip_contents = true if tight_compact else false
 	var item_storage: GridContainer = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
+	var item_storage_header: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
+	var empty_item_cache: bool = item_storage_header != null and int(item_storage_header.get_meta("occupied_slots", 0)) <= 0
 	if item_storage != null:
 		var visible_slot_count: int = maxi(1, item_storage.get_child_count())
 		item_storage.columns = mini(3, visible_slot_count)
@@ -592,7 +601,15 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			if item_control != null:
 				item_control.custom_minimum_size = Vector2(34.0, 34.0) if tight_compact else Vector2(42.0, 42.0) if compact else Vector2(58.0, 58.0)
 				item_control.clip_contents = tight_compact
+		# An empty cache is not planning information. At the maximum supported
+		# scale its label and placeholder slots are staged out, leaving trait
+		# checkpoints available without asking the board to share attention.
+		item_storage.visible = not (maximum_scale_layout and empty_item_cache)
+		item_storage.set_meta("maximum_scale_disclosure", "hidden_empty_cache" if maximum_scale_layout and empty_item_cache else "shown")
 	_sync_item_storage_header()
+	if item_storage_header != null:
+		item_storage_header.visible = not (maximum_scale_layout and empty_item_cache)
+		item_storage_header.set_meta("maximum_scale_disclosure", "hidden_empty_cache" if maximum_scale_layout and empty_item_cache else "shown")
 	var traits_title: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle") as Label
 	if traits_title != null:
 		traits_title.add_theme_font_size_override("font_size", 14 if tight_compact else 18 if compact else 20)
@@ -616,12 +633,12 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		)
 	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	if stats_area != null:
-		stats_area.custom_minimum_size.x = 136.0 if tight_compact else 184.0 if compact else 310.0
+		stats_area.custom_minimum_size.x = 164.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0
 		stats_area.size_flags_horizontal = Control.SIZE_SHRINK_END
 		stats_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 	var stats_panel: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel") as Control
 	if stats_panel != null:
-		stats_panel.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
+		stats_panel.custom_minimum_size = Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
 		stats_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_panel.clip_contents = false
 		var stats_vbox: VBoxContainer = stats_panel.get_node_or_null("VBox") as VBoxContainer
@@ -635,12 +652,12 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			recent_button.visible = not compact
 	var scoreboard: Control = find_child("Scoreboard", true, false) as Control
 	if scoreboard != null:
-		scoreboard.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 294.0, 142.0 if tight_compact else 156.0 if compact else 430.0)
+		scoreboard.custom_minimum_size = Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 142.0 if tight_compact else 156.0 if compact else 430.0)
 		var scoreboard_header: Control = scoreboard.get_node_or_null("Header") as Control
 		if scoreboard_header != null:
 			# "TEAM METRICS" already supplies the surface label. Removing the
 			# duplicate scoreboard header at tight scale preserves the rows.
-			scoreboard_header.visible = not tight_compact
+			scoreboard_header.visible = maximum_scale_layout or not tight_compact
 		for row_node: Node in scoreboard.find_children("*", "Control", true, false):
 			var row_control: Control = row_node as Control
 			if row_control != null and row_control.has_method("set_compact_layout"):
@@ -648,7 +665,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 				_apply_compact_metric_badge(row_control, compact)
 	var metric_tabs: Control = find_child("MetricTabs", true, false) as Control
 	if metric_tabs != null:
-		metric_tabs.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
+		metric_tabs.custom_minimum_size = Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
 		# The eight-column desktop metric selector cannot remain legible inside
 		# a 178px rail. Compact keeps the default Total scoreboard and removes
 		# the selector row instead of squeezing its controls into noise.
@@ -656,7 +673,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 	var stats_title: Label = stats_panel.find_child("Title", true, false) as Label if stats_panel != null else null
 	if stats_title != null:
 		stats_title.text = "TEAM METRICS" if compact else "Team Metrics"
-		stats_title.add_theme_font_size_override("font_size", 11 if tight_compact else 17 if compact else 22)
+		stats_title.add_theme_font_size_override("font_size", 14 if maximum_scale_layout else 11 if tight_compact else 17 if compact else 22)
 		stats_title.custom_minimum_size.y = 24.0 if tight_compact else 0.0
 		stats_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if tight_compact else HORIZONTAL_ALIGNMENT_LEFT
 		stats_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1006,6 +1023,7 @@ func _apply_functional_typography(compact: bool, tight_compact: bool) -> void:
 			VisualTypeSystem.set_utility_bold(control_button)
 
 func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> void:
+	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var board_status_row: HBoxContainer = find_child("BoardStatusRow", true, false) as HBoxContainer
 	if board_status_row != null:
 		board_status_row.custom_minimum_size = Vector2(468.0 if tight_compact else 540.0, 34.0)
@@ -1030,8 +1048,15 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 	if planning_directive != null:
 		planning_directive.text = "DEPLOY // WAGER // COMMIT" if tight_compact else "DEPLOYMENT GRID // SET WAGER // COMMIT"
 		planning_directive.add_theme_font_size_override("font_size", 18)
-		planning_directive.offset_left = -200.0
-		planning_directive.offset_right = 200.0
+		# Keep the directive as a concise board annotation at maximum scale so it
+		# cannot compete with the player-side survival landmark.
+		planning_directive.offset_left = -150.0 if maximum_scale_layout else -200.0
+		planning_directive.offset_right = 150.0 if maximum_scale_layout else 200.0
+		# The explicit Start Battle action and board status already teach the
+		# planning sequence. Remove this duplicate instruction at the maximum
+		# scale instead of making every surface smaller.
+		planning_directive.visible = not maximum_scale_layout
+		planning_directive.set_meta("maximum_scale_disclosure", "hidden_redundant_instruction" if maximum_scale_layout else "shown")
 	if continue_button != null:
 		continue_button.set_meta("visual_role", "primary_commit")
 		continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -109,7 +109,10 @@ func _update_identity() -> void:
 	name_label.tooltip_text = "%s team — %s" % ["Enemy" if team == "enemy" else "Your", unit_name]
 
 func _apply_visual_style() -> void:
-	custom_minimum_size.y = 40.0 if _compact_layout else 94.0 if _record_emphasis else 54.0
+	# A compact metric is a record, not decorative microcopy. Keep the row and
+	# its identity at an accessibility-safe baseline when the parent rail is
+	# widened for maximum-scale planning.
+	custom_minimum_size.y = 42.0 if _compact_layout else 94.0 if _record_emphasis else 54.0
 	var player_side: bool = team != "enemy"
 	var fill_color: Color = Color(0.66, 0.055, 0.070, 0.92) if player_side else Color(0.42, 0.030, 0.045, 0.90)
 	var bg_color: Color = Color(0.016, 0.014, 0.018, 0.42)
@@ -148,18 +151,18 @@ func _compact_identity_for_width(unit_name: String, team_prefix: String, availab
 		return "%s %s" % [team_prefix.left(1), _compact_identity_name(clean_name)]
 	var full_badge: String = "%s %s" % [team_prefix, clean_name]
 	_compact_identity_font_size = 14
-	while _compact_identity_font_size > 10 and _compact_text_width(full_badge, font, _compact_identity_font_size) > available_width:
+	while _compact_identity_font_size > 14 and _compact_text_width(full_badge, font, _compact_identity_font_size) > available_width:
 		_compact_identity_font_size -= 1
 	if _compact_text_width(full_badge, font, _compact_identity_font_size) <= available_width:
 		_compact_identity_mode = "full_badge"
 		return full_badge
-	_compact_identity_font_size = 13
-	while _compact_identity_font_size > 9 and _compact_text_width(clean_name, font, _compact_identity_font_size) > available_width:
+	_compact_identity_font_size = 14
+	while _compact_identity_font_size > 14 and _compact_text_width(clean_name, font, _compact_identity_font_size) > available_width:
 		_compact_identity_font_size -= 1
 	if _compact_text_width(clean_name, font, _compact_identity_font_size) <= available_width:
 		_compact_identity_mode = "name_only_team_in_chrome"
 		return clean_name
-	_compact_identity_font_size = 10
+	_compact_identity_font_size = 14
 	_compact_identity_mode = "coded_name_team_in_chrome"
 	return _compact_identity_name(clean_name)
 

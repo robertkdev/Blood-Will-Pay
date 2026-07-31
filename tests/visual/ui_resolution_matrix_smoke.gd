@@ -221,7 +221,10 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	var ledger: Control = _main.find_child("BlackLedger", true, false) as Control if _main != null else null
 	var ledger_panel: PanelContainer = ledger.find_child("LedgerPanel", true, false) as PanelContainer if ledger != null else null
 	var ledger_progress: Label = ledger.find_child("ProgressMetadata", true, false) as Label if ledger != null else null
+	var ledger_close: Button = ledger.find_child("CloseFileButton", true, false) as Button if ledger != null else null
+	var ledger_close_gutter: Control = ledger.find_child("HeaderActionFocusGutter", true, false) as Control if ledger != null else null
 	_expect(ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), viewport_rect.grow(2.0)), "%s Black Ledger escaped viewport panel=%s viewport=%s" % [label, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(viewport_rect)])
+	_expect(ledger_close != null and ledger_close_gutter != null and ledger_close.get_global_rect().end.x <= ledger_panel.get_global_rect().end.x - ledger_close_gutter.custom_minimum_size.x + 1.0, "%s Black Ledger Close action needs a visible focus-safe right margin" % label)
 	var effective_width: float = float(viewport_size.x) / ui_scale
 	if effective_width < 1440.0:
 		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "compressed_single_row", "%s compact Black Ledger progress metadata should use its compressed filing line" % label)

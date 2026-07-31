@@ -28,7 +28,7 @@ const COLOR_PANEL_SOFT: Color = Color(0.050, 0.040, 0.048, 0.90)
 const COLOR_PANEL_RICH: Color = Color(0.070, 0.038, 0.044, 0.92)
 const COLOR_PANEL_EDGE: Color = Color(0.42, 0.31, 0.24, 0.88)
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
-const COLOR_MUTED: Color = Color(0.76, 0.72, 0.65, 1.0)
+const COLOR_MUTED: Color = Color(0.84, 0.80, 0.72, 1.0)
 const COLOR_BLOOD: Color = Color(0.48, 0.035, 0.070, 1.0)
 const COLOR_BLOOD_HOT: Color = Color(0.78, 0.060, 0.105, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
@@ -615,7 +615,7 @@ func _ensure_action_docket() -> void:
 	_action_docket.custom_minimum_size = Vector2(0.0, 30.0)
 	_action_docket.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_action_docket.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_action_docket.add_theme_font_size_override("font_size", 17)
+	_action_docket.add_theme_font_size_override("font_size", 19)
 	_action_docket.add_theme_color_override("font_color", Color(0.98, 0.47, 0.36, 1.0))
 	_action_docket.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
 	_action_docket.add_theme_constant_override("outline_size", 2)
@@ -805,7 +805,7 @@ func _ensure_content_panel() -> void:
 		_section_hint.name = "SectionHint"
 		header.add_child(_section_hint)
 	_section_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_section_hint.add_theme_font_size_override("font_size", 16 if short_compact else (17 if compact else 18))
+	_section_hint.add_theme_font_size_override("font_size", 18 if short_compact else (19 if compact else 20))
 	_section_hint.add_theme_color_override("font_color", Color(0.80, 0.77, 0.72, 1.0))
 	VisualTypeSystem.set_utility(_section_hint)
 	_ensure_content_construction_cues(header, compact, short_compact)
@@ -1696,7 +1696,7 @@ func _make_card_container(node_name: String, bg: Color, border: Color, border_wi
 func _make_label(text: String, font_size: int, color: Color, wrap: bool) -> Label:
 	var label: Label = Label.new()
 	label.text = text
-	var resolved_size: int = 16 if font_size <= 12 else max(18, font_size)
+	var resolved_size: int = 16 if font_size <= 12 else max(19, font_size)
 	label.add_theme_font_size_override("font_size", resolved_size)
 	label.add_theme_color_override("font_color", color)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wrap else TextServer.AUTOWRAP_OFF
