@@ -147,7 +147,7 @@ func _run() -> void:
 	_expect_scaled_tactical_surface_containment("compact 125-percent", COMPACT_LOGICAL_125_PERCENT_SIZE)
 	_expect_connected_planning_composition("compact 125-percent planning", false)
 	_expect_no_button_text_overflow(combat, "compact 125-percent post-shop combat")
-	_expect_compact_shop_tooltip_suppressed("compact 125-percent planning")
+	_expect_compact_shop_detail_band("compact 125-percent planning")
 	_save_capture("05a_post_shop_planning_1280x720_125pct.png", _main)
 
 	_set_persisted_scaled_window(VIEWPORT_SIZE, 1.5, COMPACT_LOGICAL_150_PERCENT_SIZE)
@@ -161,7 +161,7 @@ func _run() -> void:
 	_expect_scaled_tactical_surface_containment("compact 150-percent", COMPACT_LOGICAL_150_PERCENT_SIZE)
 	_expect_connected_planning_composition("compact 150-percent planning", false)
 	_expect_no_button_text_overflow(combat, "compact 150-percent post-shop combat")
-	_expect_compact_shop_tooltip_suppressed("compact 150-percent planning")
+	_expect_compact_shop_detail_band("compact 150-percent planning")
 	_save_capture("05b_post_shop_planning_1280x720_150pct.png", _main)
 
 	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.0, STANDARD_VIEWPORT_SIZE)
@@ -203,11 +203,11 @@ func _run() -> void:
 	_expect_compact_battlefield_dominance()
 	_expect_connected_planning_composition("150-percent planning", false)
 	_expect_no_button_text_overflow(combat, "150-percent post-shop combat")
-	_expect_compact_shop_tooltip_suppressed("150-percent planning")
+	_expect_compact_shop_detail_band("150-percent planning")
 	_save_capture("06_post_shop_planning_1920x1080_150pct.png", _main)
 	await _finish()
 
-func _expect_compact_shop_tooltip_suppressed(context: String) -> void:
+func _expect_compact_shop_detail_band(context: String) -> void:
 	var shop_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
 	var card: Control = null
 	if shop_grid != null:
@@ -220,9 +220,25 @@ func _expect_compact_shop_tooltip_suppressed(context: String) -> void:
 	if card == null:
 		return
 	card.call("_show_tooltip")
-	_expect(String(card.get_meta("compact_tooltip_policy", "")) == "suppress_hover", "%s did not select compact hover suppression" % context)
-	_expect(bool(card.get_meta("tooltip_suppressed_for_compact", false)), "%s did not report hover suppression" % context)
-	_expect(get_tree().root.find_child("ShopCardTooltipLayer", true, false) == null, "%s created an obstructive tooltip layer" % context)
+	var tooltip_layer: CanvasLayer = get_tree().root.find_child("ShopCardTooltipLayer", true, false) as CanvasLayer
+	var tooltip: PanelContainer = tooltip_layer.get_node_or_null("ShopCardTooltip") as PanelContainer if tooltip_layer != null else null
+	var detail_scroll: ScrollContainer = tooltip.get_node_or_null("DetailScroll") as ScrollContainer if tooltip != null else null
+	_expect(String(card.get_meta("compact_tooltip_policy", "")) == "pinned_shop_band_full_record", "%s did not select the compact shop-band detail policy" % context)
+	_expect(not bool(card.get_meta("tooltip_suppressed_for_compact", true)), "%s still suppresses access to shop details" % context)
+	_expect(tooltip != null and String(tooltip.get_meta("presentation_mode", "")) == "pinned_shop_band", "%s did not create the pinned shop detail drawer" % context)
+	_expect(tooltip != null and String(tooltip.get_meta("information_access", "")) == "vertical_scroll_complete", "%s shop drawer does not preserve the full detail record" % context)
+	_expect(detail_scroll != null and detail_scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO and detail_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s shop drawer is not vertically scroll-complete" % context)
+	_expect(tooltip != null and bool(tooltip.get_meta("source_card_remains_visible", false)) and bool(card.get_meta("tooltip_source_remains_visible", false)), "%s shop drawer obscures its hovered source card" % context)
+	if tooltip != null and shop_grid != null:
+		var shop_rect: Rect2 = shop_grid.get_global_rect()
+		var tooltip_rect: Rect2 = tooltip.get_global_rect()
+		var source_rect: Rect2 = card.get_global_rect()
+		var width_ratio: float = float(tooltip.get_meta("shop_band_width_ratio", 0.0))
+		_expect(shop_rect.grow(1.0).encloses(tooltip_rect), "%s shop drawer escaped into the board, metrics, or footer: shop=%s drawer=%s" % [context, str(shop_rect), str(tooltip_rect)])
+		_expect(not tooltip_rect.intersects(source_rect), "%s shop drawer overlaps its hovered source" % context)
+		_expect(width_ratio >= 0.40 and width_ratio <= 0.60, "%s shop drawer does not occupy the authored 40-60%% detail band: %.2f" % [context, width_ratio])
+	if card.has_method("_clear_tooltip"):
+		card.call("_clear_tooltip")
 
 func _build_post_shop_state() -> void:
 	var title_page: Control = _main.get_node_or_null("TitlePage") as Control
@@ -585,6 +601,8 @@ func _expect_item_cache_contract(context: String) -> void:
 	_expect(header.get_theme_font_size("font_size") >= 11, "%s item-cache label is too small" % context)
 	_expect(bool(header.get_meta("material_cache_hierarchy", false)), "%s item cache lacks its constructed docket hierarchy" % context)
 	_expect(bool(item_grid.get_meta("material_cache_layout", false)), "%s item cache reverted to a raw diagnostic slot grid" % context)
+	_expect(item_grid.columns <= 3 and int(item_grid.get_meta("responsive_inventory_columns", 0)) == item_grid.columns, "%s item cache reverted to a compressed six-column diagnostic strip" % context)
+	_expect(String(item_grid.get_meta("inspection_affordance", "")) == "large_centered_cache_slots", "%s item cache lacks its enlarged inspection affordance" % context)
 	var visible_item_slots: int = 0
 	for item_node: Node in item_grid.get_children():
 		var item_card: Control = item_node as Control
@@ -603,7 +621,7 @@ func _expect_item_cache_contract(context: String) -> void:
 			_expect(outer_style.border_width_left > 0 and outer_style.border_width_top > 0 and outer_style.border_width_right > 0 and outer_style.border_width_bottom > 0, "%s item slot %s outer perimeter is incomplete" % [context, String(item_card.name)])
 		if inner_style != null:
 			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "%s item slot %s inner perimeter is incomplete" % [context, String(item_card.name)])
-		_expect(item_card.size.x >= 18.0 and item_card.size.y >= 18.0, "%s item slot %s collapsed below a recognizable frame: %s" % [context, String(item_card.name), str(item_card.size)])
+		_expect(item_card.size.x >= 32.0 and item_card.size.y >= 32.0, "%s item slot %s collapsed below an inspectable frame: %s" % [context, String(item_card.name), str(item_card.size)])
 		var empty_mark: Label = item_card.get_node_or_null("EmptyMark") as Label
 		if empty_mark != null and empty_mark.visible:
 			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)) and empty_mark.text.contains("OPEN"), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])

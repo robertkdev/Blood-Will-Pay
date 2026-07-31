@@ -55,8 +55,16 @@ func _run() -> void:
 	await _settle_frames(10)
 	_validate_layout("veteran")
 	_expect(_save_capture("03_veteran_ledger_1920x1080.png"), "veteran Ledger proof image was not produced")
+	if window != null:
+		window.size = Vector2i(1280, 760)
+		window.content_scale_size = Vector2i(1280, 720)
+	await _settle_frames(10)
+	_ledger.call("_sync_to_viewport")
+	await _settle_frames(4)
+	await _validate_compact_navigation()
+	_expect(_save_capture("04_veteran_ledger_1280x720_compact.png"), "compact Ledger navigation proof image was not produced")
 	AccountProfileStoreScript.clear(PROFILE_PATH)
-	var expected_capture_count: int = 3 if _framebuffer_capture_available() else 0
+	var expected_capture_count: int = 4 if _framebuffer_capture_available() else 0
 	_expect(_capture_count == expected_capture_count, "expected %d non-empty Ledger proof images, produced %d" % [expected_capture_count, _capture_count])
 	if _failures.is_empty():
 		print("BLACK_LEDGER_VISUAL_SMOKE:PASS captures=%d" % _capture_count)
@@ -170,6 +178,23 @@ func _validate_layout(state: String) -> void:
 			continue
 		var text_width: float = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, button.get_theme_font_size("font_size")).x
 		_expect(text_width <= maxf(1.0, button.size.x - 8.0), "%s button text overflows: %s" % [state, button.text])
+
+func _validate_compact_navigation() -> void:
+	var navigator: PanelContainer = _ledger.find_child("LedgerSectionNavigator", true, false) as PanelContainer
+	var starter_button: Button = _ledger.find_child("StarterDebtsNavigation", true, false) as Button
+	var bounty_button: Button = _ledger.find_child("BountiesNavigation", true, false) as Button
+	var close_button: Button = _ledger.find_child("CloseFileButton", true, false) as Button
+	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
+	_expect(navigator != null and navigator.visible, "compact Ledger should pin a visible section navigator")
+	_expect(String(navigator.get_meta("compact_section_discoverability", "")) == "starter_debts_and_bounties", "compact Ledger should publish both section destinations")
+	_expect(starter_button != null and starter_button.text.contains("STARTER DEBTS"), "compact Ledger should expose Starter Debts navigation")
+	_expect(bounty_button != null and bounty_button.text.contains("BOUNTIES"), "compact Ledger should expose Bounties navigation")
+	_expect(close_button != null and close_button.text == "CLOSE" and close_button.custom_minimum_size.x <= 124.0, "compact Ledger close action should remain clean")
+	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "compact Ledger should not expose a horizontal scrollbar")
+	if bounty_button != null:
+		bounty_button.emit_signal("pressed")
+		await get_tree().process_frame
+		_expect(String(navigator.get_meta("active_section", "")) == "bounties", "compact Ledger Bounties navigation should update its active destination")
 
 func _save_capture(filename: String) -> bool:
 	if not _framebuffer_capture_available():

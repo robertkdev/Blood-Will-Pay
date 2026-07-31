@@ -56,6 +56,7 @@ func _ready() -> void:
 	if _pending_populate or _tracker != null:
 		_pending_populate = false
 		_populate()
+	call_deferred("_reassert_loss_scoreboard_typography")
 
 func _exit_tree() -> void:
 	teardown()
@@ -348,7 +349,7 @@ func _apply_styles() -> void:
 func _make_loss_frame_style(tight_compact: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.024, 0.006, 0.010, 0.72)
-	style.border_color = Color(0.63, 0.10, 0.11, 0.98)
+	style.border_color = Color(0.44, 0.075, 0.085, 0.94)
 	style.border_width_left = 8 if tight_compact else 13
 	style.border_width_top = 2
 	style.border_width_right = 2
@@ -358,7 +359,7 @@ func _make_loss_frame_style(tight_compact: bool = false) -> StyleBox:
 	style.content_margin_right = 22 if tight_compact else 52
 	style.content_margin_top = 12 if tight_compact else 38
 	style.content_margin_bottom = 16 if tight_compact else 54
-	style.shadow_color = Color(0.46, 0.0, 0.02, 0.42)
+	style.shadow_color = Color(0.24, 0.0, 0.015, 0.34)
 	style.shadow_size = 8 if tight_compact else 18
 	style.shadow_offset = Vector2(6.0, 5.0) if tight_compact else Vector2(12.0, 10.0)
 	return style
@@ -591,7 +592,8 @@ func _ensure_loss_art() -> void:
 	_loss_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_loss_art.visible = true
 	_loss_art.z_index = 1
-	_loss_art.modulate = Color(2.55, 1.82, 1.60, 1.0)
+	_loss_art.modulate = Color(1.55, 1.22, 1.12, 1.0)
+	_loss_art.set_meta("restrained_loss_grade", true)
 	if backdrop != null:
 		backdrop.z_index = 0
 	if panel != null:
@@ -617,9 +619,9 @@ func _ensure_pressure_layer() -> void:
 		tide_gradient.offsets = PackedFloat32Array([0.0, 0.48, 0.78, 1.0])
 		tide_gradient.colors = PackedColorArray([
 			Color(0.10, 0.0, 0.01, 0.0),
-			Color(0.18, 0.0, 0.015, 0.03),
-			Color(0.46, 0.0, 0.025, 0.23),
-			Color(0.72, 0.0, 0.025, 0.48),
+			Color(0.18, 0.0, 0.015, 0.02),
+			Color(0.38, 0.0, 0.025, 0.13),
+			Color(0.58, 0.0, 0.025, 0.28),
 		])
 		var tide_texture: GradientTexture2D = GradientTexture2D.new()
 		tide_texture.gradient = tide_gradient
@@ -632,7 +634,7 @@ func _ensure_pressure_layer() -> void:
 		var blood_fall: ColorRect = ColorRect.new()
 		blood_fall.name = "BloodFall"
 		blood_fall.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		blood_fall.color = Color(0.42, 0.0, 0.015, 0.20)
+		blood_fall.color = Color(0.38, 0.0, 0.015, 0.11)
 		blood_fall.anchor_left = 0.0
 		blood_fall.anchor_top = 0.0
 		blood_fall.anchor_right = 0.16
@@ -641,7 +643,7 @@ func _ensure_pressure_layer() -> void:
 		var wound_band: ColorRect = ColorRect.new()
 		wound_band.name = "WoundBand"
 		wound_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		wound_band.color = Color(0.62, 0.005, 0.018, 0.14)
+		wound_band.color = Color(0.52, 0.005, 0.018, 0.075)
 		wound_band.anchor_left = 0.0
 		wound_band.anchor_top = 0.14
 		wound_band.anchor_right = 1.0
@@ -653,11 +655,11 @@ func _ensure_pressure_layer() -> void:
 		rupture_field.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		rupture_field.set_anchors_preset(Control.PRESET_FULL_RECT)
 		_pressure_layer.add_child(rupture_field)
-		_add_woodland_rupture(rupture_field, "LeftSplinterA", Vector2(-38.0, 210.0), Vector2(390.0, 20.0), 17.0, Color(0.57, 0.018, 0.026, 0.62))
-		_add_woodland_rupture(rupture_field, "LeftSplinterB", Vector2(-80.0, 720.0), Vector2(420.0, 16.0), -13.0, Color(0.35, 0.012, 0.020, 0.74))
+		_add_woodland_rupture(rupture_field, "LeftSplinterA", Vector2(-38.0, 210.0), Vector2(390.0, 20.0), 17.0, Color(0.48, 0.018, 0.026, 0.34))
+		_add_woodland_rupture(rupture_field, "LeftSplinterB", Vector2(-80.0, 720.0), Vector2(420.0, 16.0), -13.0, Color(0.30, 0.012, 0.020, 0.40))
 		_add_woodland_rupture(rupture_field, "LeftBoneBreak", Vector2(22.0, 508.0), Vector2(310.0, 5.0), 32.0, Color(0.78, 0.60, 0.48, 0.42))
-		_add_woodland_rupture(rupture_field, "RightSplinterA", Vector2(1540.0, 170.0), Vector2(480.0, 22.0), -14.0, Color(0.58, 0.015, 0.028, 0.64))
-		_add_woodland_rupture(rupture_field, "RightSplinterB", Vector2(1580.0, 760.0), Vector2(420.0, 18.0), 11.0, Color(0.38, 0.008, 0.018, 0.76))
+		_add_woodland_rupture(rupture_field, "RightSplinterA", Vector2(1540.0, 170.0), Vector2(480.0, 22.0), -14.0, Color(0.48, 0.015, 0.028, 0.35))
+		_add_woodland_rupture(rupture_field, "RightSplinterB", Vector2(1580.0, 760.0), Vector2(420.0, 18.0), 11.0, Color(0.31, 0.008, 0.018, 0.42))
 		_add_woodland_rupture(rupture_field, "RightBoneBreak", Vector2(1608.0, 475.0), Vector2(300.0, 5.0), -29.0, Color(0.78, 0.60, 0.48, 0.38))
 		var aftermath_caption: Label = Label.new()
 		aftermath_caption.name = "AftermathCaption"
@@ -670,8 +672,8 @@ func _ensure_pressure_layer() -> void:
 		aftermath_caption.rotation_degrees = -3.0
 		aftermath_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		aftermath_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		aftermath_caption.add_theme_font_size_override("font_size", 42)
-		aftermath_caption.add_theme_color_override("font_color", Color(0.78, 0.055, 0.060, 0.74))
+		aftermath_caption.add_theme_font_size_override("font_size", 32)
+		aftermath_caption.add_theme_color_override("font_color", Color(0.74, 0.055, 0.060, 0.52))
 		aftermath_caption.add_theme_color_override("font_outline_color", Color(0.01, 0.004, 0.006, 0.96))
 		aftermath_caption.add_theme_constant_override("outline_size", 4)
 		VisualTypeSystem.set_impact(aftermath_caption)
@@ -759,13 +761,41 @@ func _sync_layout() -> void:
 		_casualty_ghost_label.position = Vector2(frame_origin.x + frame_width - 346.0, frame_origin.y + 45.0)
 		_casualty_ghost_label.size = Vector2(302.0, 62.0)
 	var aftermath_caption: Label = _pressure_layer.get_node_or_null("AftermathCaption") as Label if _pressure_layer != null else null
+	var woodland_rupture: Control = _pressure_layer.get_node_or_null("WoodlandRupture") as Control if _pressure_layer != null else null
+	var blood_fall: ColorRect = _pressure_layer.get_node_or_null("BloodFall") as ColorRect if _pressure_layer != null else null
+	var wound_band: ColorRect = _pressure_layer.get_node_or_null("WoundBand") as ColorRect if _pressure_layer != null else null
+	if woodland_rupture != null:
+		woodland_rupture.visible = not tight_compact
+		woodland_rupture.set_meta("compact_decorative_suppressed", tight_compact)
+	if blood_fall != null:
+		blood_fall.visible = not tight_compact
+		blood_fall.set_meta("compact_decorative_suppressed", tight_compact)
+	if wound_band != null:
+		wound_band.visible = not tight_compact
+		wound_band.set_meta("compact_decorative_suppressed", tight_compact)
 	if aftermath_caption != null:
 		var compact: bool = viewport_size.x < 1500.0 or viewport_size.y < 900.0
+		aftermath_caption.visible = not tight_compact
+		aftermath_caption.set_meta("compact_decorative_suppressed", tight_compact)
 		aftermath_caption.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		aftermath_caption.position = Vector2(20.0, 14.0) if compact else Vector2(30.0, 20.0)
 		aftermath_caption.size = Vector2(300.0, 92.0) if compact else Vector2(390.0, 118.0)
 		aftermath_caption.rotation_degrees = -1.5
-		aftermath_caption.add_theme_font_size_override("font_size", 26 if compact else 42)
+		aftermath_caption.add_theme_font_size_override("font_size", 24 if compact else 32)
+	if _pressure_layer != null:
+		_pressure_layer.set_meta("compact_fragment_suppression", tight_compact)
+		_pressure_layer.set_meta("loss_pressure_density", 0.16 if tight_compact else 0.34)
+	call_deferred("_reassert_loss_scoreboard_typography")
+
+func _reassert_loss_scoreboard_typography() -> void:
+	await get_tree().process_frame
+	if scoreboard_holder == null or not is_instance_valid(scoreboard_holder):
+		return
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var tight_compact: bool = viewport_size.x <= 1000.0 or viewport_size.y <= 520.0
+	var scoreboard_title: Label = scoreboard_holder.find_child("Title", true, false) as Label
+	if scoreboard_title != null:
+		scoreboard_title.add_theme_font_size_override("font_size", 14 if tight_compact else 21)
 
 func _wire_new_game_hover() -> void:
 	if new_game_button == null:

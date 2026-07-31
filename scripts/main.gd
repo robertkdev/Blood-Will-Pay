@@ -269,6 +269,8 @@ func _build_system_menu() -> void:
 	var panel: PanelContainer = PanelContainer.new()
 	panel.name = "Panel"
 	panel.custom_minimum_size = Vector2(500.0, 452.0)
+	panel.clip_contents = true
+	panel.set_meta("decoration_containment", "calm_panel_interior")
 	panel.add_theme_stylebox_override("panel", _make_panel_style())
 	center.add_child(panel)
 	var panel_scars: Label = Label.new()
@@ -279,6 +281,7 @@ func _build_system_menu() -> void:
 	panel_scars.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	panel_scars.add_theme_font_size_override("font_size", 14)
 	panel_scars.add_theme_color_override("font_color", Color(0.72, 0.09, 0.10, 0.28))
+	panel_scars.set_meta("contained_by_panel", true)
 	VisualTypeSystem.set_utility(panel_scars)
 	panel.add_child(panel_scars)
 	_build_system_assembly_layer(panel)
@@ -358,6 +361,8 @@ func _build_system_assembly_layer(panel: PanelContainer) -> void:
 	var assembly_layer: Control = Control.new()
 	assembly_layer.name = "SystemAssemblyLayer"
 	assembly_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	assembly_layer.clip_contents = true
+	assembly_layer.set_meta("decoration_containment", "panel_rect")
 	panel.add_child(assembly_layer)
 	panel.move_child(assembly_layer, 1)
 	assembly_layer.set_anchors_preset(Control.PRESET_FULL_RECT)

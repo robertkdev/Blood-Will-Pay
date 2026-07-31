@@ -370,14 +370,21 @@ func _expect_command_chrome_visible(title_menu: Control, context: String, failur
 	var title_panel: Panel = title_menu.get_node_or_null("TitlePanel") as Panel
 	var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer
 	var title_label: Label = title_menu.get_node_or_null("Center/VBox/GameTitle") as Label
+	var title_center: Control = title_menu.get_node_or_null("Center") as Control
+	var title_rail: Control = title_menu.get_node_or_null("Center/VBox") as Control
+	var content_stack: Control = title_menu.get_node_or_null("ContentPanel/Margin/Stack") as Control
 	var section_title: Label = title_menu.find_child("SectionTitle", true, false) as Label
 	var settings_button: Button = title_menu.get_node_or_null("Center/VBox/SettingsButton") as Button
 	_expect(title_panel != null and title_panel.visible and title_panel.modulate.a >= 0.99, "%s should keep the command rail visible" % context, failures)
 	_expect(content_panel != null and content_panel.visible and content_panel.modulate.a >= 0.99, "%s should keep the command record visible" % context, failures)
 	_expect(title_label != null and title_label.visible and title_label.modulate.a >= 0.99 and title_label.text.strip_edges() != "", "%s should keep the title label visible" % context, failures)
+	_expect(title_label != null and String(title_label.get_meta("persistent_masthead", "")) == "blood_will_pay", "%s should mark BLOOD WILL PAY as persistent masthead chrome" % context, failures)
+	_expect(title_center != null and title_center.visible and title_center.modulate.a >= 0.99, "%s should keep the masthead center host visible" % context, failures)
+	_expect(title_rail != null and title_rail.visible and title_rail.modulate.a >= 0.99, "%s should keep the masthead rail host visible" % context, failures)
+	_expect(content_stack != null and content_stack.visible and content_stack.modulate.a >= 0.99, "%s should keep the Settings record host visible" % context, failures)
 	_expect(section_title != null and section_title.visible and section_title.modulate.a >= 0.99 and section_title.text.strip_edges() != "", "%s should keep the active record label visible" % context, failures)
 	_expect(settings_button != null and settings_button.visible and settings_button.modulate.a >= 0.99 and settings_button.text.strip_edges() != "", "%s should keep the Settings route visible" % context, failures)
-	var settled_controls: Array[Control] = [title_panel, content_panel, title_label, section_title, settings_button]
+	var settled_controls: Array[Control] = [title_panel, content_panel, title_center, title_rail, content_stack, title_label, section_title, settings_button]
 	for settled_control: Control in settled_controls:
 		if settled_control == null:
 			continue

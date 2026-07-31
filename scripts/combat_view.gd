@@ -408,8 +408,8 @@ func _apply_responsive_layout() -> void:
 		# out of the vertical planning budget even if an older fixture reveals it.
 		planning_timer_label.visible = false
 	_set_minimum_size("MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
-	var battle_height: float = 192.0 if tight_compact else 330.0 if compact else 604.0
-	var board_half_height: float = 92.0 if tight_compact else 160.0 if compact else 264.0
+	var battle_height: float = 212.0 if tight_compact else 330.0 if compact else 604.0
+	var board_half_height: float = 102.0 if tight_compact else 160.0 if compact else 264.0
 	var large_planning_field: bool = not tight_compact and effective_size.x >= 1500.0 and effective_size.y >= 800.0
 	var battle_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	if battle_area != null:
@@ -581,13 +581,16 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		left_item_area.clip_contents = true if tight_compact else false
 	var item_storage: GridContainer = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
 	if item_storage != null:
-		item_storage.columns = 6
-		item_storage.add_theme_constant_override("h_separation", 2 if tight_compact else 6)
-		item_storage.add_theme_constant_override("v_separation", 1 if tight_compact else 6)
+		var visible_slot_count: int = maxi(1, item_storage.get_child_count())
+		item_storage.columns = mini(3, visible_slot_count)
+		item_storage.add_theme_constant_override("h_separation", 5 if tight_compact else 8)
+		item_storage.add_theme_constant_override("v_separation", 4 if tight_compact else 8)
+		item_storage.set_meta("responsive_inventory_columns", item_storage.columns)
+		item_storage.set_meta("inspection_affordance", "large_centered_cache_slots")
 		for child: Node in item_storage.get_children():
 			var item_control: Control = child as Control
 			if item_control != null:
-				item_control.custom_minimum_size = Vector2(19.0, 19.0) if tight_compact else Vector2(23.0, 23.0) if compact else Vector2(42.0, 42.0)
+				item_control.custom_minimum_size = Vector2(34.0, 34.0) if tight_compact else Vector2(42.0, 42.0) if compact else Vector2(58.0, 58.0)
 				item_control.clip_contents = tight_compact
 	_sync_item_storage_header()
 	var traits_title: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle") as Label

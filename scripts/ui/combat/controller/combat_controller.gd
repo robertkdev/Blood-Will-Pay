@@ -151,46 +151,46 @@ class ResultAftermathPainter:
 		_draw_earth(open_lane, Color(0.66, 0.44, 0.21, 0.12), Color(0.84, 0.64, 0.34, 0.18))
 
 	func _draw_stalemate_field() -> void:
-		for stake_index: int in range(3):
-			var x_ratio: float = 0.20 + float(stake_index) * 0.30
-			var lean: float = -18.0 if stake_index == 0 else 0.0 if stake_index == 1 else 16.0
-			_draw_log(
-				Vector2(size.x * x_ratio + lean, size.y * 0.16),
-				Vector2(size.x * x_ratio - lean, size.y * 0.88),
-				18.0 if stake_index == 1 else 14.0
-			)
-		_draw_log(Vector2(size.x * 0.10, size.y * 0.37), Vector2(size.x * 0.90, size.y * 0.43), 24.0)
-		_draw_log(Vector2(size.x * 0.12, size.y * 0.66), Vector2(size.x * 0.88, size.y * 0.60), 21.0)
-		_draw_crater(Vector2(size.x * 0.50, size.y * 0.51), Vector2(size.x * 0.11, size.y * 0.055), 0.88)
-		var deadlock_mud: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.52), Vector2(size.x * 0.19, size.y * 0.11), 30, 1.2)
+		# A deadlock is expressed by two collapsed, edge-grounded barricades and
+		# a churned center. Long cross-screen beams looked like raw rectangles.
+		_draw_log(Vector2(size.x * 0.03, size.y * 0.32), Vector2(size.x * 0.27, size.y * 0.47), 13.0)
+		_draw_log(Vector2(size.x * 0.08, size.y * 0.58), Vector2(size.x * 0.30, size.y * 0.50), 10.0)
+		_draw_log(Vector2(size.x * 0.97, size.y * 0.34), Vector2(size.x * 0.73, size.y * 0.48), 13.0)
+		_draw_log(Vector2(size.x * 0.92, size.y * 0.61), Vector2(size.x * 0.70, size.y * 0.52), 10.0)
+		_draw_crater(Vector2(size.x * 0.50, size.y * 0.54), Vector2(size.x * 0.085, size.y * 0.042), 0.88)
+		var deadlock_mud: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.54), Vector2(size.x * 0.14, size.y * 0.075), 30, 1.2)
 		_draw_earth(deadlock_mud, Color(0.022, 0.019, 0.022, 0.78), Color(0.32, 0.26, 0.25, 0.24))
+		_draw_broken_wheel(Vector2(size.x * 0.18, size.y * 0.72), minf(size.x, size.y) * 0.036)
 
 	func _draw_defeat_field() -> void:
-		var collapsed_canopy: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, 0.0),
-			Vector2(size.x, 0.0),
-			Vector2(size.x * 0.90, size.y * 0.12),
-			Vector2(size.x * 0.76, size.y * 0.08),
-			Vector2(size.x * 0.66, size.y * 0.19),
-			Vector2(size.x * 0.53, size.y * 0.13),
-			Vector2(size.x * 0.42, size.y * 0.24),
-			Vector2(size.x * 0.29, size.y * 0.12),
-			Vector2(size.x * 0.16, size.y * 0.20),
-			Vector2(size.x * 0.05, size.y * 0.10),
+		# Keep the generated battlefield visible. Defeat now leaves smaller,
+		# textured wreckage at the perimeter and a grounded grave scar instead
+		# of a solid black canopy/jaw swallowing most of the viewport.
+		var west_collapse: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, size.y * 0.08),
+			Vector2(size.x * 0.10, size.y * 0.12),
+			Vector2(size.x * 0.17, size.y * 0.24),
+			Vector2(size.x * 0.13, size.y * 0.39),
+			Vector2(0.0, size.y * 0.34),
 		])
-		_draw_earth(collapsed_canopy, Color(0.004, 0.003, 0.004, 0.91), Color(0.28, 0.08, 0.055, 0.34))
-		var grave_mouth: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.89), Vector2(size.x * 0.32, size.y * 0.14), 34, 2.4)
-		_draw_earth(grave_mouth, Color(0.025, 0.006, 0.009, 0.92), Color(0.58, 0.045, 0.035, 0.40))
-		var grave_inner: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.90), Vector2(size.x * 0.23, size.y * 0.085), 30, 0.7)
-		_draw_earth(grave_inner, Color(0.002, 0.002, 0.003, 0.96), Color(0.16, 0.035, 0.036, 0.44))
-		_draw_log(Vector2(size.x * 0.13, size.y * 0.36), Vector2(size.x * 0.87, size.y * 0.58), 28.0)
-		_draw_log(Vector2(size.x * 0.37, size.y * 0.26), Vector2(size.x * 0.52, size.y * 0.78), 17.0)
-		_draw_log(Vector2(size.x * 0.62, size.y * 0.24), Vector2(size.x * 0.55, size.y * 0.76), 13.0)
-		for stake_index: int in range(4):
-			var x_ratio: float = 0.08 + float(stake_index) * 0.28
-			var top: Vector2 = Vector2(size.x * x_ratio, size.y * (0.12 + float(stake_index % 2) * 0.08))
-			var bottom: Vector2 = Vector2(size.x * (x_ratio + 0.035), size.y * 0.42)
-			_draw_log(top, bottom, 10.0)
+		var east_collapse: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x, size.y * 0.10),
+			Vector2(size.x * 0.90, size.y * 0.14),
+			Vector2(size.x * 0.83, size.y * 0.27),
+			Vector2(size.x * 0.88, size.y * 0.40),
+			Vector2(size.x, size.y * 0.35),
+		])
+		_draw_earth(west_collapse, Color(0.020, 0.010, 0.010, 0.82), Color(0.34, 0.075, 0.050, 0.32))
+		_draw_earth(east_collapse, Color(0.020, 0.010, 0.010, 0.82), Color(0.34, 0.075, 0.050, 0.32))
+		_draw_log(Vector2(size.x * 0.02, size.y * 0.20), Vector2(size.x * 0.22, size.y * 0.38), 12.0)
+		_draw_log(Vector2(size.x * 0.98, size.y * 0.22), Vector2(size.x * 0.78, size.y * 0.40), 12.0)
+		_draw_log(Vector2(size.x * 0.06, size.y * 0.72), Vector2(size.x * 0.26, size.y * 0.66), 10.0)
+		_draw_log(Vector2(size.x * 0.94, size.y * 0.73), Vector2(size.x * 0.74, size.y * 0.67), 10.0)
+		var grave_mouth: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.90), Vector2(size.x * 0.18, size.y * 0.072), 34, 2.4)
+		_draw_earth(grave_mouth, Color(0.025, 0.006, 0.009, 0.88), Color(0.58, 0.045, 0.035, 0.32))
+		var grave_inner: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.91), Vector2(size.x * 0.115, size.y * 0.040), 30, 0.7)
+		_draw_earth(grave_inner, Color(0.002, 0.002, 0.003, 0.92), Color(0.16, 0.035, 0.036, 0.32))
+		_draw_broken_wheel(Vector2(size.x * 0.82, size.y * 0.74), minf(size.x, size.y) * 0.038)
 
 	func _draw_earth(points: PackedVector2Array, fill: Color, edge: Color) -> void:
 		draw_colored_polygon(points, fill)
@@ -3542,7 +3542,38 @@ func refresh_result_banner_layout() -> void:
 		return
 	var variant: String = String(card.get_meta("result_variant", "victory")).to_upper()
 	_apply_result_card_geometry(card, variant)
+	_refresh_result_aftermath_layout(_result_banner, variant)
 	_protect_persistent_hud_chrome()
+
+func _refresh_result_aftermath_layout(banner: PanelContainer, title: String) -> void:
+	if banner == null:
+		return
+	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
+	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
+	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control
+	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control
+	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label
+	var geometry_path: String = "BattleResultAftermath/VictoryAftermathGeometry"
+	if title == "STALEMATE":
+		geometry_path = "BattleResultAftermath/StalemateAftermathGeometry"
+	elif title == "DEFEAT":
+		geometry_path = "BattleResultAftermath/DefeatAftermathGeometry"
+	var active_geometry: Control = banner.get_node_or_null(geometry_path) as Control
+	if aftermath != null:
+		aftermath.set_meta("compact_aftermath_layout", compact_layout)
+		aftermath.set_meta("terrain_visibility_preserved", true)
+	if rupture_field != null:
+		# Straight color bars duplicated the physical painter and read as
+		# unfinished scaffolding. Keep the semantic layer available to tests,
+		# but let the textured field and irregular painter own the visible scene.
+		rupture_field.visible = false
+		rupture_field.set_meta("debug_splinters_suppressed", true)
+	if aftermath_stamp != null:
+		aftermath_stamp.visible = not compact_layout
+		aftermath_stamp.set_meta("compact_stamp_suppressed", compact_layout)
+	if active_geometry != null:
+		active_geometry.modulate.a = 0.68 if compact_layout else 0.84
+		active_geometry.set_meta("compact_painter_alpha", active_geometry.modulate.a)
 
 func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
@@ -4014,6 +4045,9 @@ func _ensure_result_banner() -> PanelContainer:
 	skip_button.add_theme_stylebox_override("normal", _make_result_skip_style(false))
 	skip_button.add_theme_stylebox_override("hover", _make_result_skip_style(true))
 	skip_button.add_theme_stylebox_override("pressed", _make_result_skip_style(true))
+	skip_button.add_theme_stylebox_override("disabled", _make_result_skip_style(false))
+	skip_button.add_theme_color_override("font_disabled_color", Color(0.92, 0.84, 0.72, 1.0))
+	skip_button.add_theme_color_override("font_color", Color(0.96, 0.90, 0.82, 1.0))
 	skip_button.pressed.connect(_skip_result_hold)
 	hold_row.add_child(skip_button)
 	var impact_stamp: Label = Label.new()
@@ -4112,6 +4146,8 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 		gradient_texture.gradient = gradient
 		blood_wash.texture = gradient_texture
 	if rupture_field != null:
+		rupture_field.visible = false
+		rupture_field.set_meta("debug_splinters_suppressed", true)
 		for child: Node in rupture_field.get_children():
 			if child is ColorRect:
 				var rupture: ColorRect = child as ColorRect
@@ -4137,6 +4173,7 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 			aftermath_stamp.anchor_bottom = 0.90 if title == "VICTORY" else 0.24 if title == "STALEMATE" else 0.91
 			aftermath_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_LEFT
 			aftermath_stamp.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if title != "STALEMATE" else VERTICAL_ALIGNMENT_TOP
+	_refresh_result_aftermath_layout(banner, title)
 
 func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

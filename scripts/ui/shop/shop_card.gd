@@ -21,6 +21,7 @@ const COLOR_IRON: Color = Color(0.40, 0.34, 0.32, 0.94)
 const TOOLTIP_WIDTH: float = 400.0
 const TOOLTIP_CURSOR_OFFSET: Vector2 = Vector2(18.0, -14.0)
 const TOOLTIP_EDGE_PADDING: float = 12.0
+const COMPACT_TOOLTIP_MIN_HEIGHT: float = 76.0
 
 @onready var _icon: TextureRect = $Icon
 @onready var _name_label: Label = $Name
@@ -44,6 +45,7 @@ var _tight_presentation: bool = false
 var _has_identity_content: bool = false
 var _tooltip: PanelContainer = null
 var _tooltip_layer: CanvasLayer = null
+var _tooltip_scroll: ScrollContainer = null
 var _tooltip_title: String = ""
 var _tooltip_subtitle: String = ""
 var _tooltip_lines: Array[String] = []
@@ -176,9 +178,9 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	_compact_presentation = enabled
 	_tight_presentation = enabled and tight
-	set_meta("compact_tooltip_policy", "suppress_hover" if _tight_presentation else "full_detail")
+	set_meta("compact_tooltip_policy", "pinned_shop_band_full_record" if enabled else "full_detail")
 	set_meta("tooltip_suppressed_for_compact", false)
-	if _tight_presentation:
+	if _tooltip != null and is_instance_valid(_tooltip):
 		_clear_tooltip()
 	custom_minimum_size = Vector2(120.0, 54.0) if _tight_presentation else Vector2(132.0, 80.0) if enabled else Vector2(150.0, 122.0)
 	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -544,9 +546,6 @@ func _apply_hover_motion(active: bool) -> void:
 
 func _show_tooltip() -> void:
 	_clear_tooltip()
-	if _tight_presentation:
-		set_meta("tooltip_suppressed_for_compact", true)
-		return
 	set_meta("tooltip_suppressed_for_compact", false)
 	if not is_inside_tree():
 		return
@@ -560,16 +559,45 @@ func _show_tooltip() -> void:
 	tooltip.name = "ShopCardTooltip"
 	tooltip.top_level = true
 	tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tooltip.clip_contents = _compact_presentation
 	tooltip.z_index = 950
 	tooltip.set_meta("source_card_instance_id", get_instance_id())
 	tooltip.set_meta("source_offer_id", offer_id)
-	tooltip.custom_minimum_size.x = TOOLTIP_WIDTH
+	tooltip.set_meta("presentation_mode", "pinned_shop_band" if _compact_presentation else "cursor_detail")
+	tooltip.set_meta("non_obstructive_region", "shop_grid_band" if _compact_presentation else "viewport_edge")
+	tooltip.set_meta("information_access", "vertical_scroll_complete" if _compact_presentation else "fully_expanded")
+	tooltip.set_meta("detail_line_count", lines.size() + 2)
+	if _compact_presentation:
+		var detail_rect: Rect2 = _shop_band_rect()
+		var source_rect: Rect2 = get_global_rect()
+		var source_remains_visible: bool = not detail_rect.intersects(source_rect)
+		var opposite_side_anchor: String = "right_of_source" if detail_rect.position.x >= source_rect.end.x else "left_of_source"
+		tooltip.set_meta("source_card_remains_visible", source_remains_visible)
+		tooltip.set_meta("opposite_side_anchor", opposite_side_anchor)
+		tooltip.set_meta("shop_band_width_ratio", detail_rect.size.x / maxf(1.0, _shop_grid_rect().size.x))
+		set_meta("tooltip_source_remains_visible", source_remains_visible)
+		set_meta("tooltip_opposite_side_anchor", opposite_side_anchor)
+	tooltip.custom_minimum_size.x = _tooltip_panel_width()
 	tooltip.add_theme_stylebox_override("panel", _make_tooltip_style())
 	var box: VBoxContainer = VBoxContainer.new()
 	box.name = "Rows"
-	box.add_theme_constant_override("separation", 5)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 2 if _compact_presentation else 5)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tooltip.add_child(box)
+	if _compact_presentation:
+		var scroll: ScrollContainer = ScrollContainer.new()
+		scroll.name = "DetailScroll"
+		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tooltip.add_child(scroll)
+		scroll.add_child(box)
+		_tooltip_scroll = scroll
+		_add_tooltip_label(box, "SHOP DETAIL // WHEEL FOR FULL RECORD", 14, Color(0.96, 0.54, 0.28, 1.0))
+	else:
+		tooltip.add_child(box)
 	if _tooltip_title.strip_edges() != "":
 		_add_tooltip_label(box, _tooltip_title, 22, COLOR_GOLD)
 	if _tooltip_subtitle.strip_edges() != "":
@@ -602,9 +630,11 @@ func _add_tooltip_label(parent: VBoxContainer, text: String, font_size: int, col
 	var label: Label = Label.new()
 	label.text = String(text)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.custom_minimum_size.x = TOOLTIP_WIDTH - 24.0
-	label.add_theme_font_size_override("font_size", font_size)
-	if font_size >= 22:
+	label.custom_minimum_size.x = 0.0 if _compact_presentation else TOOLTIP_WIDTH - 24.0
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var presentation_font_size: int = mini(font_size, 15) if _compact_presentation else font_size
+	label.add_theme_font_size_override("font_size", presentation_font_size)
+	if presentation_font_size >= 22:
 		VisualTypeSystem.set_action(label)
 	else:
 		VisualTypeSystem.set_utility(label)
@@ -618,13 +648,65 @@ func _move_tooltip(viewport_pos: Vector2) -> void:
 	if _tooltip == null or not is_instance_valid(_tooltip):
 		return
 	_sync_tooltip_size()
+	if _compact_presentation:
+		_tooltip.global_position = _shop_band_rect().position
+		return
 	_tooltip.global_position = _clamped_tooltip_position(viewport_pos + TOOLTIP_CURSOR_OFFSET)
 
 func _sync_tooltip_size() -> void:
 	if _tooltip == null or not is_instance_valid(_tooltip):
 		return
+	if _compact_presentation:
+		var band_rect: Rect2 = _shop_band_rect()
+		var pinned_height: float = band_rect.size.y
+		_tooltip.custom_minimum_size = Vector2(band_rect.size.x, pinned_height)
+		_tooltip.size = Vector2(band_rect.size.x, pinned_height)
+		if _tooltip_scroll != null and is_instance_valid(_tooltip_scroll):
+			var scroll_height: float = maxf(24.0, pinned_height - 34.0)
+			_tooltip_scroll.custom_minimum_size = Vector2(0.0, scroll_height)
+			_tooltip_scroll.size = Vector2(band_rect.size.x, scroll_height)
+		return
 	_tooltip.size.x = TOOLTIP_WIDTH
 	_tooltip.size.y = max(84.0, _tooltip.get_combined_minimum_size().y)
+
+func _tooltip_panel_width() -> float:
+	if not _compact_presentation:
+		return TOOLTIP_WIDTH
+	return _shop_band_rect().size.x
+
+func _shop_band_rect() -> Rect2:
+	var shop_rect: Rect2 = _shop_grid_rect()
+	var source_rect: Rect2 = get_global_rect()
+	var gap: float = 8.0
+	var source_on_left: bool = source_rect.get_center().x <= shop_rect.get_center().x
+	var target_width: float = shop_rect.size.x * 0.58
+	var available_width: float = shop_rect.end.x - source_rect.end.x - gap if source_on_left else source_rect.position.x - shop_rect.position.x - gap
+	var drawer_width: float = minf(target_width, maxf(shop_rect.size.x * 0.42, available_width))
+	var drawer_x: float = shop_rect.end.x - drawer_width if source_on_left else shop_rect.position.x
+	var drawer_rect: Rect2 = Rect2(Vector2(drawer_x, shop_rect.position.y), Vector2(drawer_width, shop_rect.size.y))
+	if drawer_rect.intersects(source_rect):
+		if source_on_left:
+			drawer_rect.position.x = source_rect.end.x + gap
+			drawer_rect.size.x = maxf(1.0, shop_rect.end.x - drawer_rect.position.x)
+		else:
+			drawer_rect.size.x = maxf(1.0, source_rect.position.x - gap - shop_rect.position.x)
+	return drawer_rect
+
+func _shop_grid_rect() -> Rect2:
+	var context_control: Control = self
+	while context_control != null:
+		if String(context_control.name) == "ShopGrid":
+			var shop_rect: Rect2 = context_control.get_global_rect()
+			if shop_rect.size.x > 1.0 and shop_rect.size.y > 1.0:
+				return shop_rect
+		context_control = context_control.get_parent() as Control
+	var viewport: Viewport = get_viewport()
+	var viewport_rect: Rect2 = viewport.get_visible_rect() if viewport != null else Rect2(Vector2.ZERO, Vector2(1280.0, 720.0))
+	var card_rect: Rect2 = get_global_rect()
+	return Rect2(
+		Vector2(TOOLTIP_EDGE_PADDING, card_rect.position.y),
+		Vector2(maxf(320.0, viewport_rect.size.x - TOOLTIP_EDGE_PADDING * 2.0), maxf(COMPACT_TOOLTIP_MIN_HEIGHT, card_rect.size.y))
+	)
 
 func _clamped_tooltip_position(raw_position: Vector2) -> Vector2:
 	if _tooltip == null or not is_instance_valid(_tooltip):
@@ -695,6 +777,7 @@ func _clear_tooltip() -> void:
 			tooltip_parent.remove_child(_tooltip)
 		_tooltip.free()
 	_tooltip = null
+	_tooltip_scroll = null
 	if _tooltip_layer != null and is_instance_valid(_tooltip_layer):
 		var layer_parent: Node = _tooltip_layer.get_parent()
 		if layer_parent != null:

@@ -19,6 +19,9 @@ func _run() -> void:
 		window.content_scale_size = Vector2i(1920, 1080)
 	await _verify_duplicate_rows()
 	_verify_unique_rows()
+	await _verify_lossless_compact_identity("player", "Berebell", "YOU BEREBELL")
+	await _verify_lossless_compact_identity("player", "Bonko", "YOU BONKO")
+	await _verify_lossless_compact_identity("enemy", "Berebell", "FOE BEREBELL")
 	_finish()
 
 func _verify_duplicate_rows() -> void:
@@ -56,6 +59,22 @@ func _verify_rendered_label(row: Dictionary) -> void:
 	var expected: String = String(row.get("display_name", ""))
 	var actual: String = name_label.text if name_label != null else ""
 	_expect(actual == expected, "rendered label expected %s got %s" % [expected, actual])
+	remove_child(row_node)
+	row_node.free()
+
+func _verify_lossless_compact_identity(team: String, unit_name: String, expected: String) -> void:
+	var row_node: ScoreboardRow = SCOREBOARD_ROW_SCENE.instantiate() as ScoreboardRow
+	row_node.custom_minimum_size = Vector2(132.0, 40.0)
+	row_node.size = Vector2(132.0, 40.0)
+	add_child(row_node)
+	row_node.set_compact_layout(true)
+	row_node.set_row_data(_make_source_row(team, 0, unit_name, 900.0))
+	await get_tree().process_frame
+	var name_label: Label = row_node.get_node_or_null("HBox/Content/Name") as Label
+	var actual: String = name_label.text if name_label != null else ""
+	_expect(actual == expected, "compact identity expected %s got %s" % [expected, actual])
+	_expect(name_label != null and bool(name_label.get_meta("compact_identity_lossless", false)), "compact identity should report lossless authored copy for %s" % expected)
+	_expect(name_label != null and String(name_label.get_meta("compact_team_marker", "")) == expected.get_slice(" ", 0), "compact identity lost authored team marker for %s" % expected)
 	remove_child(row_node)
 	row_node.free()
 

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/visual/compact_system_menu_smoke.gd" id="1"]
+
+[node name="CompactSystemMenuSmoke" type="Node"]
+script = ExtResource("1")

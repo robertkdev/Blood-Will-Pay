@@ -908,6 +908,7 @@ func _select_section(section: String, clear_search: bool = true) -> void:
 	_render_active_section()
 	_update_nav_state()
 	_stabilize_command_chrome()
+	call_deferred("_stabilize_command_chrome")
 	call_deferred("_reset_content_scroll")
 
 func _reset_content_scroll() -> void:
@@ -2398,11 +2399,26 @@ func _play_intro() -> void:
 func _stabilize_command_chrome() -> void:
 	modulate = Color.WHITE
 	self_modulate = Color.WHITE
+	var persistent_hosts: Array[Control] = [
+		center,
+		center_vbox,
+		_content_stack,
+		_content_scroll,
+		_content_body,
+	]
+	for persistent_host: Control in persistent_hosts:
+		if persistent_host != null:
+			persistent_host.visible = true
+			_set_control_settled_color(persistent_host)
 	if _title_panel != null:
+		_title_panel.visible = true
 		_set_control_settled_color(_title_panel)
 	if _content_panel != null:
+		_content_panel.visible = true
 		_set_control_settled_color(_content_panel)
 	if title_label != null:
+		title_label.visible = true
+		title_label.set_meta("persistent_masthead", "blood_will_pay")
 		_set_control_settled_color(title_label)
 	if _subtitle != null:
 		_set_control_settled_color(_subtitle)

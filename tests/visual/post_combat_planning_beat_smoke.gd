@@ -411,9 +411,12 @@ func _assert_outcome_aftermath_geometry(banner: PanelContainer, outcome: String)
 	var victory_geometry: Control = banner.get_node_or_null("BattleResultAftermath/VictoryAftermathGeometry") as Control
 	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
 	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
+	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control
 	var expected_signature: String = "opened_survivor_lane" if outcome == "VICTORY" else "crosswise_deadlock" if outcome == "STALEMATE" else "collapsed_canopy_grave"
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its distinct physical aftermath signature" % outcome)
 	_expect(aftermath != null and int(aftermath.get_meta("flat_rectangle_count", -1)) == 0, "%s aftermath regressed to giant flat rectangle construction" % outcome)
+	_expect(aftermath != null and bool(aftermath.get_meta("terrain_visibility_preserved", false)), "%s aftermath no longer preserves the physical battlefield around the record" % outcome)
+	_expect(rupture_field != null and not rupture_field.visible and bool(rupture_field.get_meta("debug_splinters_suppressed", false)), "%s aftermath retained straight procedural splinter bars" % outcome)
 	_assert_physical_aftermath_painter(victory_geometry, "victory", 6)
 	_assert_physical_aftermath_painter(stalemate_geometry, "stalemate", 6)
 	_assert_physical_aftermath_painter(defeat_geometry, "defeat", 7)

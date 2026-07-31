@@ -28,6 +28,9 @@ var _panel: PanelContainer = null
 var _ledger_margin: MarginContainer = null
 var _ledger_frame: VBoxContainer = null
 var _page_scroll: ScrollContainer = null
+var _section_navigator: PanelContainer = null
+var _starter_nav_button: Button = null
+var _bounty_nav_button: Button = null
 var _footer_band: PanelContainer = null
 var _footer_stamp_label: Label = null
 var _columns: GridContainer = null
@@ -83,6 +86,10 @@ func _sync_to_viewport() -> void:
 		_page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		_page_scroll.get_v_scroll_bar().custom_minimum_size.x = 12.0 if compact else 8.0
 		_page_scroll.set_meta("compact_scroll_finish", "wide_vertical_track_no_horizontal_escape" if compact else "record_track")
+	if _section_navigator != null:
+		_section_navigator.visible = compact
+		_section_navigator.custom_minimum_size = Vector2(0.0, 38.0 if compact else 0.0)
+		_section_navigator.set_meta("compact_section_discoverability", "starter_debts_and_bounties" if compact else "desktop_two_column")
 	if _witness_stamp_label != null:
 		_witness_stamp_label.visible = not compact
 		_witness_stamp_label.set_meta("compact_status_folded_into_metadata", compact)
@@ -184,6 +191,7 @@ func _build_ui() -> void:
 	_ledger_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_ledger_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_ledger_margin.add_child(_ledger_frame)
+	_build_section_navigator()
 	_page_scroll = ScrollContainer.new()
 	_page_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_page_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -281,6 +289,55 @@ func _build_ui() -> void:
 	_bounty_scroll.add_child(_bounty_list)
 	_build_footer_band()
 	_sync_to_viewport()
+
+func _build_section_navigator() -> void:
+	if _ledger_frame == null:
+		return
+	_section_navigator = PanelContainer.new()
+	_section_navigator.name = "LedgerSectionNavigator"
+	_section_navigator.visible = false
+	_section_navigator.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_section_navigator.add_theme_stylebox_override("panel", _footer_style())
+	_ledger_frame.add_child(_section_navigator)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.name = "SectionNavigationRow"
+	row.add_theme_constant_override("separation", 8)
+	_section_navigator.add_child(row)
+	_starter_nav_button = Button.new()
+	_starter_nav_button.name = "StarterDebtsNavigation"
+	_starter_nav_button.text = "↑  STARTER DEBTS"
+	_starter_nav_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_starter_nav_button.focus_mode = Control.FOCUS_ALL
+	_starter_nav_button.set_meta("navigation_target", "starter_debts")
+	_style_button(_starter_nav_button, true)
+	_starter_nav_button.pressed.connect(_jump_to_starter_debts)
+	row.add_child(_starter_nav_button)
+	_bounty_nav_button = Button.new()
+	_bounty_nav_button.name = "BountiesNavigation"
+	_bounty_nav_button.text = "BOUNTIES  ↓"
+	_bounty_nav_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bounty_nav_button.focus_mode = Control.FOCUS_ALL
+	_bounty_nav_button.set_meta("navigation_target", "bounties")
+	_style_button(_bounty_nav_button, true)
+	_bounty_nav_button.pressed.connect(_jump_to_bounties)
+	row.add_child(_bounty_nav_button)
+
+func _jump_to_starter_debts() -> void:
+	_scroll_to_ledger_section(_unlock_column, "starter_debts")
+
+func _jump_to_bounties() -> void:
+	_scroll_to_ledger_section(_bounty_column, "bounties")
+
+func _scroll_to_ledger_section(target: Control, section_id: String) -> void:
+	if _page_scroll == null or target == null:
+		return
+	_section_navigator.set_meta("active_section", section_id)
+	_page_scroll.ensure_control_visible(target)
+	call_deferred("_ensure_ledger_section_visible", target)
+
+func _ensure_ledger_section_visible(target: Control) -> void:
+	if _page_scroll != null and target != null and is_instance_valid(target):
+		_page_scroll.ensure_control_visible(target)
 
 func _build_assembly_layer() -> void:
 	if _panel == null:

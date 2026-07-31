@@ -23,6 +23,7 @@ var _value_well: Panel = null
 var _hovered: bool = false
 var _record_emphasis: bool = false
 var _compact_layout: bool = false
+var _compact_identity_font_size: int = 14
 
 func set_compact_layout(enabled: bool) -> void:
 	_compact_layout = enabled
@@ -90,7 +91,9 @@ func _update_identity() -> void:
 		var compact_identity: String = _compact_identity_for_width(unit_name, team_prefix, _compact_identity_available_width())
 		name_label.text = compact_identity
 		name_label.set_meta("compact_identity_source", unit_name.to_upper())
-		name_label.set_meta("compact_identity_lossless", compact_identity.contains(unit_name.to_upper()))
+		name_label.set_meta("compact_identity_lossless", compact_identity == "%s %s" % [team_prefix, unit_name.to_upper()])
+		name_label.set_meta("compact_team_marker", team_prefix)
+		name_label.set_meta("compact_identity_font_size", _compact_identity_font_size)
 	else:
 		name_label.text = unit_name
 	name_label.set_meta("compact_identity_complete", _compact_layout)
@@ -108,7 +111,7 @@ func _apply_visual_style() -> void:
 	if bar_fill != null:
 		bar_fill.color = Color(fill_color.r + 0.06, fill_color.g + 0.05, fill_color.b + 0.04, 1.0) if _hovered else fill_color
 	if name_label != null:
-		name_label.add_theme_font_size_override("font_size", 14 if _compact_layout else 22 if _record_emphasis else 17)
+		name_label.add_theme_font_size_override("font_size", _compact_identity_font_size if _compact_layout else 22 if _record_emphasis else 17)
 		name_label.add_theme_color_override("font_color", Color(0.96, 0.90, 0.78, 1.0) if _hovered else Color(0.88, 0.84, 0.76, 1.0))
 		name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		name_label.add_theme_constant_override("outline_size", 1)
@@ -125,20 +128,11 @@ func _compact_identity_for_width(unit_name: String, team_prefix: String, availab
 	if clean_name == "":
 		clean_name = "UNIT"
 	var font: Font = name_label.get_theme_font("font") if name_label != null else null
-	var font_size: int = 14
 	var full_badge: String = "%s %s" % [team_prefix, clean_name]
-	if _compact_text_width(full_badge, font, font_size) <= available_width:
-		return full_badge
-	var distinctive_name: String = _compact_identity_name(clean_name)
-	var distinctive_full_badge: String = "%s %s" % [team_prefix, distinctive_name]
-	if _compact_text_width(distinctive_full_badge, font, font_size) <= available_width:
-		return distinctive_full_badge
-	var short_team: String = "F" if team_prefix == "FOE" else "Y"
-	var short_badge: String = "%s %s" % [short_team, clean_name]
-	if _compact_text_width(short_badge, font, font_size) <= available_width:
-		return short_badge
-	var distinctive_badge: String = "%s %s" % [short_team, distinctive_name]
-	return distinctive_badge
+	_compact_identity_font_size = 14
+	while _compact_identity_font_size > 10 and _compact_text_width(full_badge, font, _compact_identity_font_size) > available_width:
+		_compact_identity_font_size -= 1
+	return full_badge
 
 func _compact_identity_available_width() -> float:
 	if name_label == null:
@@ -204,14 +198,14 @@ func _ensure_layout() -> void:
 		name_label.anchor_top = 0.0
 		name_label.anchor_bottom = 1.0
 		name_label.offset_left = 4.0 if _compact_layout else 16.0 if _record_emphasis else 10.0
-		name_label.offset_right = -40.0 if _compact_layout else -126.0 if _record_emphasis else -84.0
+		name_label.offset_right = -22.0 if _compact_layout else -126.0 if _record_emphasis else -84.0
 		name_label.clip_text = true
 	if value_label != null:
 		value_label.anchor_left = 1.0
 		value_label.anchor_right = 1.0
 		value_label.anchor_top = 0.0
 		value_label.anchor_bottom = 1.0
-		value_label.offset_left = -36.0 if _compact_layout else -116.0 if _record_emphasis else -76.0
+		value_label.offset_left = -20.0 if _compact_layout else -116.0 if _record_emphasis else -76.0
 		value_label.offset_right = -4.0 if _compact_layout else -14.0 if _record_emphasis else -10.0
 
 func _make_row_style(player_side: bool, hovered: bool = false) -> StyleBox:
@@ -238,7 +232,7 @@ func _ensure_value_well() -> void:
 	_value_well.anchor_right = 1.0
 	_value_well.anchor_top = 0.0
 	_value_well.anchor_bottom = 1.0
-	_value_well.offset_left = -40.0 if _compact_layout else -122.0 if _record_emphasis else -82.0
+	_value_well.offset_left = -22.0 if _compact_layout else -122.0 if _record_emphasis else -82.0
 	_value_well.offset_right = 0.0
 	_value_well.offset_top = 3.0
 	_value_well.offset_bottom = -3.0

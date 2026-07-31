@@ -264,9 +264,11 @@ class ArenaPressurePainter:
 		set_meta("casualty_event_index", casualty_event_index)
 		set_meta("bounded_edge_pressure", true)
 		set_meta("protected_center_rect", Rect2(0.28, 0.20, 0.44, 0.60))
-		set_meta("kinetic_mark_budget", 4 if reduced_motion else 11 if pressure_phase == 0 else 19 if pressure_phase == 1 else 24)
+		set_meta("kinetic_mark_budget", 0)
 		set_meta("reduced_motion_scene_parity", "same_physical_field_static")
 		set_meta("full_field_warning_chevrons", false)
+		set_meta("pressure_visual_language", "physical_smoke_and_event_residue")
+		set_meta("debug_primitives_suppressed", true)
 		queue_redraw()
 
 	func _process(delta: float) -> void:
@@ -277,16 +279,12 @@ class ArenaPressurePainter:
 		if size.x <= 1.0 or size.y <= 1.0:
 			return
 		var motion_clock: float = 0.0 if reduced_motion else elapsed_seconds
-		_draw_hostile_edge_light(motion_clock)
-		_draw_ground_ruts()
-		_draw_impact_scars()
+		# The terrain texture and authored evidence painter carry the battlefield
+		# structure. Pressure adds only soft edge atmosphere and event-grounded
+		# residue; outline craters, rays, streaks, and ruler-straight fences made
+		# the field read as a debug overlay rather than a physical killing ground.
 		_draw_casualty_residue()
-		if reduced_motion:
-			_draw_static_urgent_substitute()
-			_draw_smoke_banks(0.0)
-			return
 		_draw_smoke_banks(motion_clock)
-		_draw_debris_streaks(motion_clock)
 
 	func _draw_hostile_edge_light(motion_clock: float) -> void:
 		var phase_weight: float = float(pressure_phase) * 0.022
@@ -1929,13 +1927,15 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 			var row_index: int = floori(float(cell_index) / 8.0)
 			var column_index: int = cell_index % 8
 			var major_seam: bool = row_index == 2 or column_index == 3
-			seam_style.border_color = Color(0.92, 0.84, 0.70, 0.46 if major_seam else 0.31)
+			seam_style.border_color = Color(0.72, 0.64, 0.52, 0.17 if major_seam else 0.055)
 			seam_style.border_width_right = 3 if column_index == 3 else 1
 			seam_style.border_width_bottom = 3 if row_index == 2 else 1
 			cell.add_theme_stylebox_override("panel", seam_style)
 			seams.add_child(cell)
 	seams.set_meta("major_seam_non_color_weight", 3)
 	seams.set_meta("minor_seam_non_color_weight", 1)
+	seams.set_meta("terrain_seam_alpha", 0.055)
+	seams.set_meta("debug_graph_grid_suppressed", true)
 
 static func _ensure_arena_field_label(arena: Control, node_name: String, copy: String, enemy_side: bool) -> void:
 	var label: Label = arena.get_node_or_null(node_name) as Label

@@ -501,6 +501,8 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(pressure_painter != null and int(pressure_painter.get_meta("pressure_phase", -1)) == int(arena.get_meta("battlefield_pressure_index", -2)), "%s kinetic layer did not receive the environmental phase event" % expected_phase)
 	_expect(pressure_painter != null and pressure_painter.has_meta("protected_center_rect"), "%s kinetic pressure does not publish a protected actor-clarity center" % expected_phase)
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
+	_expect(pressure_painter != null and bool(pressure_painter.get_meta("debug_primitives_suppressed", false)) and int(pressure_painter.get_meta("kinetic_mark_budget", 99)) == 0, "%s capture retained non-semantic circles, rays, or streaks" % expected_phase)
+	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.06, "%s capture reverted to a full-strength graph overlay" % expected_phase)
 	_expect(arena_surface != null and String(arena_surface.get_meta("battlefield_foundation", "")) == "muddy_rural_killing_ground_v1", "%s capture lacks the physical rural horror foundation" % expected_phase)
 	_expect(arena_surface != null and arena_surface.modulate.a >= 0.75, "%s capture washes the physical battlefield back into a flat texture" % expected_phase)
 	if aftermath != null and arena != null and onset != null and midfight != null and reduced_lock != null and reduced_motion:
@@ -727,6 +729,7 @@ func _assert_compact_result_contract() -> void:
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
 	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
 	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label if banner != null else null
+	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control if banner != null else null
 	_expect(card != null and String(card.get_meta("responsive_result_layout", "")) == "compact_safe", "150% defeat did not select the compact result layout")
 	if card == null or skip_button == null:
 		_expect(false, "150% defeat is missing its card or skip control")
@@ -738,6 +741,7 @@ func _assert_compact_result_contract() -> void:
 	_expect(card_rect.encloses(skip_rect), "150%% defeat skip control exceeds the lower frame: card=%s skip=%s" % [str(card_rect), str(skip_rect)])
 	_expect(skip_rect.end.y <= viewport_rect.end.y - 2.0, "150% defeat skip control is clipped by the lower viewport edge")
 	_expect(aftermath_stamp != null and not aftermath_stamp.visible and bool(aftermath_stamp.get_meta("compact_stamp_suppressed", false)), "150% defeat retained the colliding environmental stamp")
+	_expect(rupture_field != null and not rupture_field.visible and bool(rupture_field.get_meta("debug_splinters_suppressed", false)), "150% defeat retained straight procedural aftermath bars")
 
 func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
 	var contract: Dictionary[String, Variant] = {"state": state}
