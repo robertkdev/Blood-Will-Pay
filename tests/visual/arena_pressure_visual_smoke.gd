@@ -71,6 +71,15 @@ func _run() -> void:
 		_expect(int(pressure_painter.get_meta("casualty_event_index", 0)) == 2, "kinetic painter did not receive the event-driven casualty residue index")
 		_expect(int(pressure_painter.get_meta("kinetic_mark_budget", 99)) <= 4, "reduced motion did not replace kinetic pressure with a lower-density static urgent state")
 		_expect(pressure_painter.has_meta("protected_center_rect"), "kinetic painter does not publish a protected actor-clarity center")
+		_expect(String(pressure_painter.get_meta("reduced_motion_scene_parity", "")) == "same_physical_field_static", "reduced motion does not preserve the same physical battlefield")
+		_expect(not bool(pressure_painter.get_meta("full_field_warning_chevrons", true)), "reduced motion regressed to giant edge-to-edge warning chevrons")
+	var seams: GridContainer = _arena.get_node_or_null("ArenaCellSeams") as GridContainer
+	var hostile_label: Label = _arena.get_node_or_null("EnemyFieldLabel") as Label
+	var survival_label: Label = _arena.get_node_or_null("PlayerFieldLabel") as Label
+	_expect(seams != null and seams.get_child_count() == 48, "battlefield lost its 8x6 cell-seam readability layer")
+	_expect(seams != null and int(seams.get_meta("major_seam_non_color_weight", 0)) >= 3, "battlefield major seams lack a non-color weight cue")
+	_expect(hostile_label != null and hostile_label.text.begins_with("▲") and hostile_label.text.contains("BREACH"), "hostile territory lacks its triangle/breach non-color cue")
+	_expect(survival_label != null and survival_label.text.begins_with("■") and survival_label.text.contains("SURVIVE"), "survival territory lacks its square/survive non-color cue")
 	_save_capture("05_bounded_reduced_motion_field.png")
 
 	_bridge.call("_on_arena_pressure_changed", 1.0, 0)
@@ -99,6 +108,9 @@ func _build_surface() -> void:
 	_arena.add_theme_stylebox_override("panel", arena_style)
 	_host.add_child(_arena)
 	GothicUIThemeScript.call("_ensure_arena_war_aftermath_geometry", _arena)
+	GothicUIThemeScript.call("_ensure_arena_cell_seams", _arena)
+	GothicUIThemeScript.call("_ensure_arena_field_label", _arena, "EnemyFieldLabel", "HOSTILE GROUND", true)
+	GothicUIThemeScript.call("_ensure_arena_field_label", _arena, "PlayerFieldLabel", "HOLD THE LINE", false)
 	var battlefield: TextureRect = TextureRect.new()
 	battlefield.name = "BattlefieldSurface"
 	battlefield.texture = load("res://assets/ui/gothic/battlefield_surface.png") as Texture2D
@@ -106,6 +118,7 @@ func _build_surface() -> void:
 	battlefield.stretch_mode = TextureRect.STRETCH_SCALE
 	battlefield.set_anchors_preset(Control.PRESET_FULL_RECT)
 	battlefield.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	battlefield.z_index = -7
 	_arena.add_child(battlefield)
 	var arena_frame: TextureRect = TextureRect.new()
 	arena_frame.name = "ArenaFrame"

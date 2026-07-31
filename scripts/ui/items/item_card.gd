@@ -24,6 +24,8 @@ var _hovered: bool = false
 var _hover_token: int = 0
 var _tooltip: Control = null
 var _hover_tween: Tween = null
+var _material_slot_size: Vector2 = Vector2(48.0, 48.0)
+var _material_shell_enforcement_queued: bool = false
 
 func _ready() -> void:
 	super._ready()
@@ -55,6 +57,8 @@ func _ready() -> void:
 		ended_drag.connect(_on_ended_drag)
 	if not is_connected("resized", Callable(self, "_sync_pivot")):
 		resized.connect(_sync_pivot)
+	if not is_connected("resized", Callable(self, "_queue_material_shell_enforcement")):
+		resized.connect(_queue_material_shell_enforcement)
 	_sync_pivot()
 
 func _can_drag_extra() -> bool:
@@ -154,6 +158,15 @@ func set_item_id(id: String) -> void:
 
 func set_slot_index(idx: int) -> void:
 	slot_index = int(idx)
+	_sync_empty_slot_label()
+
+func set_material_slot_presentation(slot_size: Vector2) -> void:
+	_material_slot_size = slot_size
+	custom_minimum_size = slot_size
+	drag_size = Vector2(maxf(36.0, slot_size.x), maxf(36.0, slot_size.y))
+	pivot_offset = slot_size * 0.5
+	_sync_empty_slot_label()
+	_apply_card_style(item_id.strip_edges() != "")
 
 func get_slot_index() -> int:
 	return slot_index
@@ -223,6 +236,17 @@ func _apply_card_style(filled: bool) -> void:
 		empty_mark.modulate = Color(1.0, 0.78, 0.68, 0.92) if hover_empty else Color.WHITE
 	if count_label != null:
 		count_label.modulate = Color(1.0, 0.84, 0.42, 1.0) if _hovered else Color(0.96, 0.74, 0.38, 0.98)
+
+func _sync_empty_slot_label() -> void:
+	if empty_mark == null:
+		return
+	var slot_number: int = maxi(1, slot_index + 1)
+	empty_mark.text = "OPEN\n%02d" % slot_number
+	empty_mark.add_theme_font_size_override("font_size", 8 if _material_slot_size.x < 40.0 else 10 if _material_slot_size.x < 60.0 else 12)
+	empty_mark.add_theme_color_override("font_color", Color(0.78, 0.68, 0.54, 0.76))
+	empty_mark.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+	empty_mark.add_theme_constant_override("outline_size", 1)
+	empty_mark.set_meta("purposeful_empty_slot", true)
 
 func _on_mouse_entered() -> void:
 	_hovered = true
@@ -322,3 +346,26 @@ func _apply_hover_motion(active: bool, _filled: bool) -> void:
 
 func _sync_pivot() -> void:
 	pivot_offset = size * 0.5 if size != Vector2.ZERO else custom_minimum_size * 0.5
+
+func _queue_material_shell_enforcement() -> void:
+	if slot_index != 0 or _material_shell_enforcement_queued:
+		return
+	_material_shell_enforcement_queued = true
+	call_deferred("_enforce_material_cache_shell")
+
+func _enforce_material_cache_shell() -> void:
+	_material_shell_enforcement_queued = false
+	var parent_grid: GridContainer = get_parent() as GridContainer
+	if parent_grid == null or not bool(parent_grid.get_meta("material_cache_layout", false)):
+		return
+	var visible_ready_slots: int = int(parent_grid.get_meta("visible_ready_slots", 3))
+	parent_grid.columns = 3 if visible_ready_slots <= 6 else 6
+	var slot_size: Vector2 = parent_grid.get_meta("material_slot_size", _material_slot_size) as Vector2
+	for card_node: Node in parent_grid.get_children():
+		var cache_card: Control = card_node as Control
+		if cache_card != null and cache_card.has_method("set_material_slot_presentation"):
+			cache_card.call("set_material_slot_presentation", slot_size)
+	var cache_header: Label = parent_grid.get_parent().get_node_or_null("ItemStorageHeader") as Label if parent_grid.get_parent() != null else null
+	if cache_header != null:
+		cache_header.text = String(parent_grid.get_meta("material_header_text", cache_header.text))
+	parent_grid.queue_sort()

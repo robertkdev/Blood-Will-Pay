@@ -78,12 +78,23 @@ func _validate_layout(state: String) -> void:
 		var panel_style: StyleBoxFlat = panel.get_theme_stylebox("panel") as StyleBoxFlat
 		_expect(panel_style != null and panel_style.border_width_left >= 10 and panel_style.border_width_bottom >= 8, "%s LedgerPanel should retain an asymmetrically repaired binding" % state)
 	var assembly_layer: Control = _ledger.find_child("AssemblyLayer", true, false) as Control
-	_expect(assembly_layer != null and assembly_layer.get_child_count() >= 4, "%s Ledger should expose assembled repair strips and a carbon stamp" % state)
-	_expect(_ledger.find_child("CarbonStamp", true, false) != null, "%s Ledger carbon-copy stamp missing" % state)
+	_expect(assembly_layer != null and assembly_layer.get_child_count() >= 3, "%s Ledger should expose assembled repair strips" % state)
+	var footer_band: PanelContainer = _ledger.find_child("LedgerFooter", true, false) as PanelContainer
+	var footer_stamp: Label = _ledger.find_child("CarbonStamp", true, false) as Label
+	var footer_status: Label = _ledger.find_child("LedgerStatus", true, false) as Label
+	_expect(footer_band != null, "%s Ledger dedicated footer missing" % state)
+	_expect(footer_stamp != null and footer_stamp.get_parent() != assembly_layer, "%s Ledger carbon-copy stamp must live in the dedicated footer, not over the page" % state)
+	_expect(footer_status != null and footer_status.get_parent() == footer_stamp.get_parent(), "%s Ledger status and stamp should share one non-overlapping footer row" % state)
 	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
 	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s Ledger page must never escape horizontally" % state)
 	if page_scroll != null and panel != null:
 		_expect(_rect_inside(page_scroll.get_global_rect(), panel.get_global_rect().grow(1.0)), "%s Ledger page scroll escaped its record frame" % state)
+	if page_scroll != null and footer_band != null:
+		var page_rect: Rect2 = page_scroll.get_global_rect()
+		var footer_rect: Rect2 = footer_band.get_global_rect()
+		_expect(page_rect.end.y <= footer_rect.position.y + 1.0, "%s Ledger footer masks scroll content instead of following it" % state)
+		_expect(absf(page_rect.position.x - footer_rect.position.x) <= 1.0 and absf(page_rect.end.x - footer_rect.end.x) <= 1.0, "%s Ledger footer should align to the page record width" % state)
+		_expect(footer_rect.size.y >= 48.0, "%s Ledger footer should reserve its own material strip" % state)
 	var sparse_expected: bool = state != "veteran"
 	_expect(bool(_ledger.get("_sparse_content_record")) == sparse_expected, "%s content-density classification was not %s" % [state, "sparse" if sparse_expected else "populated"])
 	var displayable_starter_rows: int = int(_ledger.get("_displayable_starter_row_count"))

@@ -292,7 +292,7 @@ func _apply_gothic_layout() -> void:
 		center.offset_bottom = 0.0
 	if center_vbox != null:
 		center_vbox.custom_minimum_size = Vector2(156.0 if extreme_compact else (176.0 if short_compact else (200.0 if compact else 350.0)), 0.0)
-		center_vbox.add_theme_constant_override("separation", 0 if extreme_compact else (2 if short_compact else (9 if compact else 13)))
+		center_vbox.add_theme_constant_override("separation", 0 if extreme_compact else (2 if short_compact else (6 if compact else 13)))
 		center_vbox.alignment = BoxContainer.ALIGNMENT_BEGIN if extreme_compact else BoxContainer.ALIGNMENT_CENTER
 	if title_label != null:
 		title_label.text = "BLOOD WILL PAY" if extreme_compact else "BLOOD\nWILL PAY"
@@ -483,12 +483,28 @@ func _ensure_subtitle() -> void:
 	consequence_mark.add_theme_font_size_override("font_size", 16 if compact else 17)
 	consequence_mark.add_theme_color_override("font_color", Color(0.88, 0.80, 0.66, 0.96))
 	VisualTypeSystem.set_utility_bold(consequence_mark)
+	var incident_mark: Label = center_vbox.get_node_or_null("IncidentRecord") as Label
+	if incident_mark == null:
+		incident_mark = Label.new()
+		incident_mark.name = "IncidentRecord"
+		center_vbox.add_child(incident_mark)
+		center_vbox.move_child(incident_mark, min(4, center_vbox.get_child_count() - 1))
+	incident_mark.text = "MERCY HOUSE // EAST WARD // INCIDENT 04\nDOORS WIRED SHUT // 17 MISSING // ONE WITNESS RECOVERED FROM ASH CELLAR"
+	incident_mark.visible = not short_compact
+	incident_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	incident_mark.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	incident_mark.add_theme_font_size_override("font_size", 15 if compact else 16)
+	incident_mark.add_theme_constant_override("line_spacing", 2)
+	incident_mark.add_theme_color_override("font_color", Color(0.93, 0.53, 0.40, 0.98))
+	incident_mark.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.84))
+	incident_mark.add_theme_constant_override("outline_size", 2)
+	VisualTypeSystem.set_utility_bold(incident_mark)
 	_rule = center_vbox.get_node_or_null("TitleRule") as ColorRect
 	if _rule == null:
 		_rule = ColorRect.new()
 		_rule.name = "TitleRule"
 		center_vbox.add_child(_rule)
-		center_vbox.move_child(_rule, min(4, center_vbox.get_child_count() - 1))
+		center_vbox.move_child(_rule, min(5, center_vbox.get_child_count() - 1))
 	_rule.custom_minimum_size = Vector2(0.0, 3.0)
 	_rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rule.color = Color(0.70, 0.045, 0.070, 0.94)

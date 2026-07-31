@@ -45,8 +45,9 @@ func _run() -> void:
 		var entry_action: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryAction") as Label
 		_expect(entry_affordance != null and entry_affordance.is_visible_in_tree() and entry_affordance.modulate.a >= 0.90, "TitlePage should expose a visible entry affordance", failures)
 		_expect(entry_affordance != null and _rect_inside(entry_affordance.get_global_rect(), title_page.get_global_rect().grow(1.0)), "TitlePage entry affordance should remain inside the authored composition", failures)
-		_expect(entry_order != null and entry_order.is_visible_in_tree() and entry_order.text.contains("ENTRY ORDER"), "TitlePage entry affordance should use authored field-order language", failures)
-		_expect(entry_action != null and entry_action.is_visible_in_tree() and entry_action.text.contains("ENTER"), "TitlePage entry affordance should clearly communicate entry", failures)
+		_expect(entry_order != null and entry_order.is_visible_in_tree() and entry_order.text.contains("CLICK ANYWHERE") and entry_order.text.contains("FIELD RECORD"), "TitlePage entry affordance should communicate entry through restrained field-record language", failures)
+		_expect(entry_action != null and not entry_action.visible, "TitlePage should not duplicate the restrained entry instruction with a poster-sized action label", failures)
+		_expect(entry_affordance != null and bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "TitlePage entry affordance should publish its restrained CTA contract", failures)
 		var visible_entry_copy: String = "%s %s" % [entry_order.text if entry_order != null else "", entry_action.text if entry_action != null else ""]
 		_expect(not visible_entry_copy.to_upper().contains("PRESS ANY KEY") and not visible_entry_copy.to_upper().contains("CLICK OR PRESS"), "TitlePage must not restore the forbidden generic input prompt", failures)
 		var title_distress: Control = main.get_node_or_null("TitlePage/TitleMarkDistress") as Control
@@ -105,6 +106,14 @@ func _run() -> void:
 		_expect(title_record_mark != null and title_record_mark.get_theme_font_size("font_size") >= 17, "Title record mark should remain functional-size copy", failures)
 		var consequence_mark: Label = title_menu.get_node_or_null("Center/VBox/WarDebtConsequenceMark") as Label
 		_expect(consequence_mark != null and consequence_mark.text.contains("BWP CASUALTY OFFICE"), "Title rail should name the Blood Will Pay casualty institution", failures)
+		var incident_record: Label = title_menu.get_node_or_null("Center/VBox/IncidentRecord") as Label
+		_expect(incident_record != null and incident_record.visible, "Desktop title rail should expose a specific witnessed incident", failures)
+		if incident_record != null:
+			var incident_copy: String = incident_record.text.to_upper()
+			_expect(incident_copy.contains("MERCY HOUSE") and incident_copy.contains("EAST WARD") and incident_copy.contains("INCIDENT 04"), "Title incident should name one bounded location and record", failures)
+			_expect(incident_copy.contains("DOORS WIRED SHUT") and incident_copy.contains("17 MISSING"), "Title incident should expose organized cruelty and its consequence", failures)
+			_expect(incident_copy.contains("ONE WITNESS") and incident_copy.contains("ASH CELLAR"), "Title incident should retain concrete survivor evidence", failures)
+			_expect(incident_record.get_theme_font_size("font_size") >= 16, "Title incident record should remain functional-size copy", failures)
 		var misregister: Label = title_menu.get_node_or_null("Center/VBox/GameTitle/Misregister") as Label
 		var strike_band: ColorRect = title_menu.get_node_or_null("Center/VBox/GameTitle/StrikeBand") as ColorRect
 		_expect(misregister != null and misregister.text == title_label.text, "GameTitle should expose a misregistered duplicate impression", failures)

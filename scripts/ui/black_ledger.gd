@@ -26,7 +26,10 @@ var _status_label: Label = null
 var _close_button: Button = null
 var _panel: PanelContainer = null
 var _ledger_margin: MarginContainer = null
+var _ledger_frame: VBoxContainer = null
 var _page_scroll: ScrollContainer = null
+var _footer_band: PanelContainer = null
+var _footer_stamp_label: Label = null
 var _columns: GridContainer = null
 var _unlock_column: VBoxContainer = null
 var _bounty_column: VBoxContainer = null
@@ -72,9 +75,15 @@ func _sync_to_viewport() -> void:
 		_ledger_margin.add_theme_constant_override("margin_left", 18 if compact else 42)
 		_ledger_margin.add_theme_constant_override("margin_top", 16 if compact else (26 if wide_sparse_record else 32))
 		_ledger_margin.add_theme_constant_override("margin_right", 18 if compact else 42)
-		_ledger_margin.add_theme_constant_override("margin_bottom", 48 if compact else 58)
+		_ledger_margin.add_theme_constant_override("margin_bottom", 18 if compact else 24)
+	if _ledger_frame != null:
+		_ledger_frame.add_theme_constant_override("separation", 10 if compact else 14)
 	if _page_scroll != null:
 		_page_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if compact or _sparse_content_record else ScrollContainer.SCROLL_MODE_DISABLED
+	if _footer_band != null:
+		_footer_band.custom_minimum_size = Vector2(0.0, 44.0 if compact else 50.0)
+	if _footer_stamp_label != null:
+		_footer_stamp_label.visible = not compact
 	if _columns != null:
 		_columns.columns = 1 if compact else 2
 	if _unlock_column != null:
@@ -157,11 +166,16 @@ func _build_ui() -> void:
 	_panel.add_child(print_scars)
 	_ledger_margin = MarginContainer.new()
 	_panel.add_child(_ledger_margin)
+	_ledger_frame = VBoxContainer.new()
+	_ledger_frame.name = "LedgerFrame"
+	_ledger_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ledger_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_ledger_margin.add_child(_ledger_frame)
 	_page_scroll = ScrollContainer.new()
 	_page_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_page_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_ledger_margin.add_child(_page_scroll)
+	_ledger_frame.add_child(_page_scroll)
 	_style_scroll_container(_page_scroll)
 	var root: VBoxContainer = VBoxContainer.new()
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -252,13 +266,7 @@ func _build_ui() -> void:
 	_bounty_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_bounty_list.add_theme_constant_override("separation", 14)
 	_bounty_scroll.add_child(_bounty_list)
-	_status_label = Label.new()
-	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status_label.add_theme_font_size_override("font_size", 18)
-	VisualTypeSystem.set_action(_status_label)
-	_status_label.add_theme_color_override("font_color", COLOR_GOLD)
-	_status_label.add_theme_stylebox_override("normal", _stamp_style())
-	root.add_child(_status_label)
+	_build_footer_band()
 	_sync_to_viewport()
 
 func _build_assembly_layer() -> void:
@@ -302,26 +310,47 @@ func _build_assembly_layer() -> void:
 	bottom_countermark.offset_bottom = -13.0
 	bottom_countermark.rotation_degrees = 0.6
 	_assembly_layer.add_child(bottom_countermark)
-	var carbon_stamp: Label = Label.new()
-	carbon_stamp.name = "CarbonStamp"
-	carbon_stamp.text = "CARBON COPY 04 // BLOOD WITNESS"
-	carbon_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	carbon_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	carbon_stamp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	carbon_stamp.anchor_left = 0.0
-	carbon_stamp.anchor_top = 1.0
-	carbon_stamp.anchor_right = 0.0
-	carbon_stamp.anchor_bottom = 1.0
-	carbon_stamp.offset_left = 54.0
-	carbon_stamp.offset_top = -47.0
-	carbon_stamp.offset_right = 390.0
-	carbon_stamp.offset_bottom = -16.0
-	carbon_stamp.rotation_degrees = -1.8
-	carbon_stamp.add_theme_font_size_override("font_size", 14)
-	carbon_stamp.add_theme_color_override("font_color", Color(0.86, 0.18, 0.16, 0.68))
-	carbon_stamp.add_theme_stylebox_override("normal", _stamp_style())
-	VisualTypeSystem.set_action(carbon_stamp)
-	_assembly_layer.add_child(carbon_stamp)
+
+func _build_footer_band() -> void:
+	if _ledger_frame == null:
+		return
+	_footer_band = PanelContainer.new()
+	_footer_band.name = "LedgerFooter"
+	_footer_band.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_footer_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_footer_band.add_theme_stylebox_override("panel", _footer_style())
+	_ledger_frame.add_child(_footer_band)
+	var footer_margin: MarginContainer = MarginContainer.new()
+	footer_margin.add_theme_constant_override("margin_left", 12)
+	footer_margin.add_theme_constant_override("margin_top", 6)
+	footer_margin.add_theme_constant_override("margin_right", 12)
+	footer_margin.add_theme_constant_override("margin_bottom", 6)
+	_footer_band.add_child(footer_margin)
+	var footer_row: HBoxContainer = HBoxContainer.new()
+	footer_row.name = "FooterRow"
+	footer_row.add_theme_constant_override("separation", 14)
+	footer_margin.add_child(footer_row)
+	_footer_stamp_label = Label.new()
+	_footer_stamp_label.name = "CarbonStamp"
+	_footer_stamp_label.text = "CARBON COPY 04 // BLOOD WITNESS"
+	_footer_stamp_label.custom_minimum_size = Vector2(310.0, 30.0)
+	_footer_stamp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_footer_stamp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_footer_stamp_label.rotation_degrees = -1.0
+	_footer_stamp_label.add_theme_font_size_override("font_size", 14)
+	_footer_stamp_label.add_theme_color_override("font_color", Color(0.86, 0.18, 0.16, 0.76))
+	_footer_stamp_label.add_theme_stylebox_override("normal", _stamp_style())
+	VisualTypeSystem.set_action(_footer_stamp_label)
+	footer_row.add_child(_footer_stamp_label)
+	_status_label = Label.new()
+	_status_label.name = "LedgerStatus"
+	_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_status_label.add_theme_font_size_override("font_size", 17)
+	VisualTypeSystem.set_action(_status_label)
+	_status_label.add_theme_color_override("font_color", COLOR_GOLD)
+	footer_row.add_child(_status_label)
 
 func _make_column(title_text: String, detail_text: String) -> VBoxContainer:
 	var column: VBoxContainer = VBoxContainer.new()
@@ -611,6 +640,17 @@ func _stamp_style() -> StyleBoxFlat:
 	style.content_margin_right = 7.0
 	style.content_margin_top = 4.0
 	style.content_margin_bottom = 4.0
+	return style
+
+func _footer_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.024, 0.019, 0.022, 0.98)
+	style.border_color = Color(0.49, 0.29, 0.14, 0.90)
+	style.border_width_left = 0
+	style.border_width_top = 2
+	style.border_width_right = 0
+	style.border_width_bottom = 0
+	style.set_corner_radius_all(0)
 	return style
 
 func _passive_status_style(complete: bool) -> StyleBoxFlat:

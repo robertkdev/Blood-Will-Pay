@@ -213,6 +213,8 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 	var shop_grid: GridContainer = _view.get("shop_grid") as GridContainer
 	_expect_inside(shop_grid, viewport_rect, "shop grid")
 	var first_card_top: float = INF
+	var safe_gutter: float = float(shop_grid.get_meta("safe_bottom_gutter", 0.0)) if shop_grid != null else 0.0
+	_expect(safe_gutter >= 8.0, "compact shop grid lacks its authored bottom safe gutter")
 	if shop_grid != null:
 		for child: Node in shop_grid.get_children():
 			var card: Control = child as Control
@@ -224,6 +226,7 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 			_expect(card.size.y <= maximum_card_height, "compact shop card exceeded height budget: %s" % str(card.get_global_rect()))
 			_expect(card.size.y >= minimum_card_height, "compact shop card is too compressed to show its complete visual hierarchy: %s" % str(card.get_global_rect()))
 			_assert_shop_card_contents_inside(card)
+			_expect(card.get_global_rect().end.y <= viewport_rect.end.y - safe_gutter + 1.0, "compact shop card lacks a visible framebuffer gutter: %s" % str(card.get_global_rect()))
 			first_card_top = min(first_card_top, card.get_global_rect().position.y)
 	var bet_slider: HSlider = _view.get("bet_slider") as HSlider
 	var bet_value: Label = _view.get("bet_value") as Label

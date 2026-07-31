@@ -21,6 +21,18 @@ const SYSTEM_LAYER_NAME := "SystemMenuLayer"
 const LOSS_OVERLAY_LAYER_NAME := "LossOverlayLayer"
 const SYSTEM_LAYER_INDEX := 220
 const SYSTEM_MENU_BACKDROP_COLOR: Color = Color(0.015, 0.01, 0.012, 0.54)
+const TITLE_INCIDENT_DESKTOP_COPY: String = (
+	"RECOVERY TAG // OLD MILL ROAD\n"
+	+ "ROADBLOCK SET // FIRE TRENCH CUT\n"
+	+ "NINE CHAIRS // EIGHT DRAG MARKS\n"
+	+ "ONE WITNESS RETURNED // HANDS BOUND"
+)
+const TITLE_INCIDENT_COMPACT_COPY: String = (
+	"RECOVERY TAG // OLD MILL ROAD\n"
+	+ "FIRE TRENCH // NINE CHAIRS\n"
+	+ "EIGHT DRAG MARKS // ONE WITNESS\n"
+	+ "HANDS BOUND // ROADBLOCK SET"
+)
 
 var _system_layer: CanvasLayer
 var _system_menu_button: Button
@@ -63,6 +75,8 @@ func _ready() -> void:
 	_build_system_menu()
 	if not get_viewport().size_changed.is_connected(_layout_system_menu_button):
 		get_viewport().size_changed.connect(_layout_system_menu_button)
+	if not get_viewport().size_changed.is_connected(_layout_title_gateway):
+		get_viewport().size_changed.connect(_layout_title_gateway)
 	_disable_embedded_menu_buttons()
 	_build_title_page()
 	_show_title_page()
@@ -217,9 +231,10 @@ func _build_system_menu() -> void:
 
 	_system_menu_button = Button.new()
 	_system_menu_button.name = "SystemMenuButton"
-	_system_menu_button.text = "Menu"
+	_system_menu_button.text = "SYS // MENU"
+	_system_menu_button.tooltip_text = "Open system command menu"
 	_system_menu_button.focus_mode = Control.FOCUS_ALL
-	_system_menu_button.custom_minimum_size = Vector2(132.0, 38.0)
+	_system_menu_button.custom_minimum_size = Vector2(144.0, 40.0)
 	_system_menu_button.anchor_left = 1.0
 	_system_menu_button.anchor_right = 1.0
 	_system_menu_button.offset_left = -154.0
@@ -473,6 +488,7 @@ func _build_title_page() -> void:
 		Rect2(0.046, 0.287, 0.078, 0.002),
 		Color(0.83, 0.69, 0.50, 0.62)
 	)
+	_build_title_incident_docket(_title_page)
 	var center: Control = Control.new()
 	center.name = "Center"
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -501,24 +517,23 @@ func _build_title_page() -> void:
 	entry_affordance.name = "EntryAffordance"
 	entry_affordance.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	entry_affordance.z_index = 3
-	entry_affordance.anchor_left = 0.325
-	entry_affordance.anchor_top = 0.790
-	entry_affordance.anchor_right = 0.675
-	entry_affordance.anchor_bottom = 0.930
+	entry_affordance.anchor_left = 0.395
+	entry_affordance.anchor_top = 0.910
+	entry_affordance.anchor_right = 0.605
+	entry_affordance.anchor_bottom = 0.954
 	var entry_style: StyleBoxFlat = StyleBoxFlat.new()
-	entry_style.bg_color = Color(0.018, 0.012, 0.016, 0.94)
-	entry_style.border_color = Color(0.78, 0.075, 0.095, 0.98)
-	entry_style.border_width_left = 8
+	entry_style.bg_color = Color(0.010, 0.008, 0.011, 0.62)
+	entry_style.border_color = Color(0.72, 0.070, 0.082, 0.88)
+	entry_style.border_width_left = 0
 	entry_style.border_width_top = 1
-	entry_style.border_width_right = 1
-	entry_style.border_width_bottom = 2
-	entry_style.content_margin_left = 18.0
-	entry_style.content_margin_top = 10.0
-	entry_style.content_margin_right = 18.0
-	entry_style.content_margin_bottom = 10.0
-	entry_style.shadow_color = Color(0.0, 0.0, 0.0, 0.72)
-	entry_style.shadow_size = 14
+	entry_style.border_width_right = 0
+	entry_style.border_width_bottom = 0
+	entry_style.content_margin_left = 10.0
+	entry_style.content_margin_top = 5.0
+	entry_style.content_margin_right = 10.0
+	entry_style.content_margin_bottom = 4.0
 	entry_affordance.add_theme_stylebox_override("panel", entry_style)
+	entry_affordance.set_meta("restrained_click_anywhere_cue", true)
 	stack.add_child(entry_affordance)
 	var entry_copy: VBoxContainer = VBoxContainer.new()
 	entry_copy.name = "EntryCopy"
@@ -528,16 +543,17 @@ func _build_title_page() -> void:
 	entry_affordance.add_child(entry_copy)
 	var entry_order: Label = Label.new()
 	entry_order.name = "EntryOrder"
-	entry_order.text = "ENTRY ORDER // SEAL UNBROKEN"
+	entry_order.text = "CLICK ANYWHERE // OPEN FIELD RECORD"
 	entry_order.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	entry_order.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	entry_order.add_theme_font_size_override("font_size", 16)
-	entry_order.add_theme_color_override("font_color", Color(0.94, 0.73, 0.48, 1.0))
+	entry_order.add_theme_font_size_override("font_size", 13)
+	entry_order.add_theme_color_override("font_color", Color(0.84, 0.70, 0.52, 0.94))
 	VisualTypeSystem.set_utility_bold(entry_order)
 	entry_copy.add_child(entry_order)
 	var entry_action: Label = Label.new()
 	entry_action.name = "EntryAction"
-	entry_action.text = "ENTER THE BLOOD DEBT"
+	entry_action.text = ""
+	entry_action.visible = false
 	entry_action.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	entry_action.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	entry_action.add_theme_font_size_override("font_size", 25)
@@ -547,6 +563,71 @@ func _build_title_page() -> void:
 	VisualTypeSystem.set_action(entry_action)
 	entry_copy.add_child(entry_action)
 	_title_page.gui_input.connect(_on_title_page_gui_input)
+	_layout_title_gateway()
+
+func _build_title_incident_docket(title_page: Control) -> void:
+	if title_page == null:
+		return
+	var docket: PanelContainer = PanelContainer.new()
+	docket.name = "IncidentEvidenceDocket"
+	docket.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	docket.z_index = 2
+	docket.anchor_left = 0.715
+	docket.anchor_top = 0.680
+	docket.anchor_right = 0.955
+	docket.anchor_bottom = 0.825
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.008, 0.007, 0.009, 0.68)
+	style.border_color = Color(0.62, 0.052, 0.064, 0.82)
+	style.border_width_left = 5
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 1
+	style.content_margin_left = 12.0
+	style.content_margin_top = 8.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 7.0
+	docket.add_theme_stylebox_override("panel", style)
+	title_page.add_child(docket)
+	var incident: Label = Label.new()
+	incident.name = "IncidentEvidence"
+	incident.text = TITLE_INCIDENT_DESKTOP_COPY
+	incident.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	incident.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	incident.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	incident.add_theme_font_size_override("font_size", 14)
+	incident.add_theme_color_override("font_color", Color(0.84, 0.78, 0.68, 0.92))
+	incident.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+	incident.add_theme_constant_override("outline_size", 2)
+	VisualTypeSystem.set_utility_bold(incident)
+	incident.set_meta("organized_cruelty_evidence", true)
+	incident.set_meta("survivor_consequence_evidence", true)
+	docket.add_child(incident)
+
+func _layout_title_gateway() -> void:
+	if _title_page == null or not is_instance_valid(_title_page):
+		return
+	var logical_size: Vector2 = get_viewport_rect().size
+	var compact: bool = logical_size.x <= 1000.0 or logical_size.y <= 560.0
+	var docket: PanelContainer = _title_page.get_node_or_null("IncidentEvidenceDocket") as PanelContainer
+	var incident: Label = docket.get_node_or_null("IncidentEvidence") as Label if docket != null else null
+	var entry_affordance: PanelContainer = _title_page.get_node_or_null("Center/Stack/EntryAffordance") as PanelContainer
+	if docket != null:
+		docket.anchor_left = 0.535 if compact else 0.715
+		docket.anchor_top = 0.655 if compact else 0.680
+		docket.anchor_right = 0.955
+		docket.anchor_bottom = 0.855 if compact else 0.825
+		docket.set_meta("compact_gateway_layout", compact)
+	if incident != null:
+		incident.text = TITLE_INCIDENT_COMPACT_COPY if compact else TITLE_INCIDENT_DESKTOP_COPY
+		incident.add_theme_font_size_override("font_size", 11 if compact else 14)
+		incident.clip_text = false
+		incident.set_meta("compact_copy", compact)
+	if entry_affordance != null:
+		entry_affordance.anchor_left = 0.34 if compact else 0.395
+		entry_affordance.anchor_top = 0.895 if compact else 0.910
+		entry_affordance.anchor_right = 0.66 if compact else 0.605
+		entry_affordance.anchor_bottom = 0.950 if compact else 0.954
 
 func _add_title_distress_mark(parent: Control, mark_name: String, normalized_rect: Rect2, color: Color) -> void:
 	var mark: ColorRect = ColorRect.new()
@@ -680,6 +761,7 @@ func _apply_system_control_style(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_stylebox_override("hover_pressed", pressed)
 	button.add_theme_stylebox_override("disabled", disabled)
+	button.set_meta("authored_system_command", true)
 
 func _system_control_box(background: Color, border: Color, left_rule_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -688,11 +770,14 @@ func _system_control_box(background: Color, border: Color, left_rule_width: int)
 	style.border_width_left = left_rule_width
 	style.border_width_top = 1
 	style.border_width_right = 1
-	style.border_width_bottom = 1
+	style.border_width_bottom = 2
 	style.content_margin_left = 12.0
 	style.content_margin_right = 12.0
 	style.content_margin_top = 7.0
 	style.content_margin_bottom = 7.0
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.62)
+	style.shadow_size = 4
+	style.shadow_offset = Vector2(2.0, 2.0)
 	return style
 
 func _make_panel_style() -> StyleBox:
@@ -830,19 +915,19 @@ func _layout_system_menu_button() -> void:
 		_system_menu_button.anchor_right = 0.0
 		_system_menu_button.offset_left = 14.0
 		_system_menu_button.offset_top = 12.0
-		_system_menu_button.offset_right = 118.0
-		_system_menu_button.offset_bottom = 46.0
-		_system_menu_button.custom_minimum_size = Vector2(104.0, 34.0)
-		_system_menu_button.add_theme_font_size_override("font_size", 17)
+		_system_menu_button.offset_right = 132.0
+		_system_menu_button.offset_bottom = 48.0
+		_system_menu_button.custom_minimum_size = Vector2(118.0, 36.0)
+		_system_menu_button.add_theme_font_size_override("font_size", 15)
 	else:
 		_system_menu_button.anchor_left = 1.0
 		_system_menu_button.anchor_right = 1.0
-		_system_menu_button.offset_left = -154.0
+		_system_menu_button.offset_left = -166.0
 		_system_menu_button.offset_top = 18.0
 		_system_menu_button.offset_right = -18.0
-		_system_menu_button.offset_bottom = 56.0
-		_system_menu_button.custom_minimum_size = Vector2(132.0, 38.0)
-		_system_menu_button.add_theme_font_size_override("font_size", 18)
+		_system_menu_button.offset_bottom = 58.0
+		_system_menu_button.custom_minimum_size = Vector2(144.0, 40.0)
+		_system_menu_button.add_theme_font_size_override("font_size", 16)
 
 func _wire_system_button_hover(button: Button, compact: bool) -> void:
 	if button == null:

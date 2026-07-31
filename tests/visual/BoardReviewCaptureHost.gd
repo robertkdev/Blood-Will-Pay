@@ -90,9 +90,11 @@ func _run() -> void:
 	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
 	get_tree().root.add_child(_main)
 	await _settle_frames(10)
+	_assert_title_gateway_contract("desktop title", false)
 	await _capture("01_title_1920x1080.png", "title", DESKTOP_SIZE)
 	_configure_scaled_window(COMPACT_SIZE, 1.5)
 	await _settle_frames(12)
+	_assert_title_gateway_contract("150% compact title", true)
 	await _capture("22_title_1280x720_150pct.png", "title_150_percent", COMPACT_SIZE)
 	_configure_window(DESKTOP_SIZE)
 	await _settle_frames(8)
@@ -494,10 +496,38 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	if aftermath != null and arena != null and onset != null and midfight != null and reduced_lock != null and reduced_motion:
 		_expect(aftermath.scale == Vector2.ONE, "%s reduced-motion capture retained an animated environment transform" % expected_phase)
 		_expect(float(arena.get_meta("battlefield_overlay_density", 1.0)) <= 0.20, "%s reduced-motion capture retained excessive overlay density" % expected_phase)
-		_expect(onset.modulate.a <= 0.36 and midfight.modulate.a <= 0.22, "%s reduced-motion capture did not quiet the kinetic evidence layers" % expected_phase)
+		_expect(onset.modulate.a >= 0.50 and midfight.modulate.a >= 0.50, "%s reduced-motion capture removed the physical battlefield instead of freezing it" % expected_phase)
 		_expect(float(reduced_lock.get_meta("overlay_density", 1.0)) < float(onset.get_meta("overlay_density", 0.0)), "%s reduced-motion evidence is denser than onset" % expected_phase)
 		_expect(int(pressure_painter.get_meta("kinetic_mark_budget", 99)) <= 4, "%s reduced-motion capture retained the kinetic mark budget" % expected_phase)
+		_expect(String(pressure_painter.get_meta("reduced_motion_scene_parity", "")) == "same_physical_field_static", "%s reduced motion did not preserve the same physical battlefield" % expected_phase)
+		_expect(not bool(pressure_painter.get_meta("full_field_warning_chevrons", true)), "%s reduced motion regressed to full-field warning chevrons" % expected_phase)
 	_assert_persistent_combat_hierarchy(expected_phase)
+
+func _assert_title_gateway_contract(context: String, compact: bool) -> void:
+	var title_page: Control = _main.get_node_or_null("TitlePage") as Control if _main != null else null
+	var docket: PanelContainer = title_page.get_node_or_null("IncidentEvidenceDocket") as PanelContainer if title_page != null else null
+	var incident: Label = docket.get_node_or_null("IncidentEvidence") as Label if docket != null else null
+	var entry_affordance: PanelContainer = title_page.get_node_or_null("Center/Stack/EntryAffordance") as PanelContainer if title_page != null else null
+	_expect(title_page != null and title_page.is_visible_in_tree(), "%s gateway is not visible" % context)
+	_expect(docket != null and docket.is_visible_in_tree(), "%s incident docket is missing" % context)
+	_expect(incident != null and incident.is_visible_in_tree(), "%s incident evidence is missing" % context)
+	_expect(entry_affordance != null and entry_affordance.is_visible_in_tree(), "%s entry affordance is missing" % context)
+	if docket == null or incident == null or entry_affordance == null:
+		return
+	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	var docket_rect: Rect2 = docket.get_global_rect()
+	var incident_rect: Rect2 = incident.get_global_rect()
+	var entry_rect: Rect2 = entry_affordance.get_global_rect()
+	_expect(viewport_rect.encloses(docket_rect), "%s incident docket exceeds the logical viewport: %s" % [context, str(docket_rect)])
+	_expect(docket_rect.encloses(incident_rect), "%s incident evidence exceeds its docket: docket=%s evidence=%s" % [context, str(docket_rect), str(incident_rect)])
+	_expect(viewport_rect.encloses(entry_rect), "%s entry affordance exceeds the logical viewport: %s" % [context, str(entry_rect)])
+	_expect(not incident.clip_text, "%s incident evidence enables text clipping" % context)
+	_expect(incident.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART, "%s incident evidence lost authored wrapping" % context)
+	_expect(bool(docket.get_meta("compact_gateway_layout", not compact)) == compact, "%s uses the wrong responsive docket layout" % context)
+	_expect(bool(incident.get_meta("compact_copy", not compact)) == compact, "%s uses the wrong incident copy density" % context)
+	_expect(incident.text.contains("OLD MILL ROAD") and incident.text.contains("HANDS BOUND"), "%s lost its specific atrocity evidence" % context)
+	_expect(bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "%s entry affordance lost its restrained CTA contract" % context)
+
 
 func _assert_result_outcome_contract(outcome: String) -> void:
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
@@ -513,17 +543,37 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
 	var expected_signature: String = "opened_survivor_lane" if outcome == "VICTORY" else "crosswise_deadlock" if outcome == "STALEMATE" else "collapsed_canopy_grave"
 	var expected_silhouette: String = "rising_open_lane" if outcome == "VICTORY" else "locked_vertical_deadlock" if outcome == "STALEMATE" else "descending_grave_jaw"
-	var expected_reading_path: String = "left_to_right_escape" if outcome == "VICTORY" else "centered_suspension" if outcome == "STALEMATE" else "right_to_left_collapse"
+	var expected_reading_path: String = "left_to_right_escape" if outcome == "VICTORY" else "centered_suspension" if outcome == "STALEMATE" else "centered_grave_descent"
 	_expect(card != null and String(card.get_meta("result_variant", "")) == outcome.to_lower(), "%s result card variant metadata is wrong" % outcome)
 	_expect(card != null and String(card.get_meta("grayscale_silhouette", "")) == expected_silhouette, "%s result is not distinguishable by grayscale silhouette" % outcome)
 	_expect(card != null and String(card.get_meta("reading_path", "")) == expected_reading_path, "%s result did not receive its distinct reading path" % outcome)
 	_expect(hold_label != null and not hold_label.text.contains("."), "%s result leaked a decimal auto-advance telemetry readout" % outcome)
 	_expect(skip_button != null and not skip_button.text.contains("(") and skip_button.text.contains("ENTER / SPACE"), "%s result leaked its internal skip threshold" % outcome)
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its physical aftermath signature" % outcome)
-	_expect(victory_geometry != null and victory_geometry.visible == (outcome == "VICTORY") and victory_geometry.get_child_count() >= 6, "%s has the wrong survivor-lane geometry state" % outcome)
-	_expect(stalemate_geometry != null and stalemate_geometry.visible == (outcome == "STALEMATE") and stalemate_geometry.get_child_count() >= 6, "%s has the wrong deadlock geometry state" % outcome)
-	_expect(defeat_geometry != null and defeat_geometry.visible == (outcome == "DEFEAT") and defeat_geometry.get_child_count() >= 7, "%s has the wrong collapse geometry state" % outcome)
+	_assert_physical_result_geometry(victory_geometry, "victory", outcome == "VICTORY", 6, outcome)
+	_assert_physical_result_geometry(stalemate_geometry, "stalemate", outcome == "STALEMATE", 6, outcome)
+	_assert_physical_result_geometry(defeat_geometry, "defeat", outcome == "DEFEAT", 7, outcome)
 	_assert_persistent_combat_hierarchy("%s_result" % outcome.to_lower())
+
+func _assert_physical_result_geometry(
+	geometry: Control,
+	expected_variant: String,
+	expected_visible: bool,
+	minimum_evidence: int,
+	outcome: String
+) -> void:
+	_expect(geometry != null, "%s is missing the %s physical aftermath group" % [outcome, expected_variant])
+	if geometry == null:
+		return
+	var painter: Control = geometry.get_node_or_null("PhysicalAftermathPainter") as Control
+	_expect(geometry.visible == expected_visible, "%s has the wrong %s aftermath visibility" % [outcome, expected_variant])
+	_expect(int(geometry.get_meta("flat_rectangle_count", -1)) == 0, "%s %s aftermath regressed to flat rectangle construction" % [outcome, expected_variant])
+	_expect(int(geometry.get_meta("authored_evidence_spec_count", 0)) >= minimum_evidence, "%s %s aftermath lost authored physical evidence density" % [outcome, expected_variant])
+	_expect(painter != null, "%s %s aftermath lacks its irregular physical-scene painter" % [outcome, expected_variant])
+	if painter != null:
+		_expect(String(painter.get_meta("outcome_variant", "")) == expected_variant, "%s %s aftermath painter exposes the wrong variant" % [outcome, expected_variant])
+		_expect(String(painter.get_meta("physical_material_language", "")).contains("mud_crater_broken_timber"), "%s %s aftermath lost the mud/timber/crater material language" % [outcome, expected_variant])
+		_expect(int(painter.get_meta("flat_rectangle_count", -1)) == 0, "%s %s painter regressed to flat rectangle construction" % [outcome, expected_variant])
 
 func _assert_persistent_combat_hierarchy(context: String) -> void:
 	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null

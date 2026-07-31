@@ -45,7 +45,7 @@ func _run() -> void:
 		view.call("_update_external_backplates")
 		await get_tree().process_frame
 	var rendered_viewport_size: Vector2 = view.get_viewport_rect().size
-	var compact_layout: bool = rendered_viewport_size.y <= 760.0 or rendered_viewport_size.x <= 1400.0
+	var compact_layout: bool = rendered_viewport_size.y <= 1080.0 or rendered_viewport_size.x <= 1400.0
 	var tight_layout: bool = bool(view.get_meta("tight_scale_layout", false))
 	var failures: Array[String] = []
 	_expect(view.theme != null, "CombatView theme is missing", failures)
@@ -93,7 +93,7 @@ func _run() -> void:
 	var wager_summary: Label = view.find_child("WagerSummary", true, false) as Label
 	_expect(planning_timer != null and planning_timer.get_theme_font("font") == VisualTypeSystemLib.FONT_UTILITY_BOLD, "Planning timer should use the legibility face", failures)
 	_expect(wager_summary != null and wager_summary.get_theme_font("font") == VisualTypeSystemLib.FONT_UTILITY_BOLD, "Wager strip should use the legibility face", failures)
-	_expect(wager_summary != null and wager_summary.get_theme_font_size("font_size") >= 20, "Wager strip is too small for functional scanning", failures)
+	_expect(wager_summary != null and wager_summary.get_theme_font_size("font_size") >= (18 if compact_layout else 20), "Wager strip is too small for functional scanning", failures)
 	var shop_grid: GridContainer = view.find_child("ShopGrid", true, false) as GridContainer
 	_expect(shop_grid != null, "ShopGrid missing", failures)
 	if shop_grid != null and shop_grid.get_child_count() > 0:
@@ -101,6 +101,8 @@ func _run() -> void:
 		_expect(first_slot != null and first_slot.custom_minimum_size.x >= 140.0, "Shop slots are too small", failures)
 		_expect(first_slot != null and first_slot.custom_minimum_size.y <= 150.0, "Shop slots are too tall for 1080p layout", failures)
 		_expect(shop_grid.get_theme_constant("h_separation") >= 12, "Shop card gutters are too tight for pointer clarity", failures)
+		_expect(float(shop_grid.get_meta("safe_bottom_gutter", 0.0)) >= 6.0, "Shop cards lack a safe bottom gutter", failures)
+		_expect(first_slot != null and float(first_slot.get_meta("shop_safe_bottom_gutter", 0.0)) >= 6.0, "First shop card was not reflowed above the viewport edge", failures)
 	var bottom_storage: VBoxContainer = view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 	_expect(bottom_storage != null, "BottomStorageArea missing", failures)
 	_expect(view.get_node_or_null("GothicActionsRowPlate") == null, "Obsolete ActionsRow generated plate should not render over the arena header", failures)
@@ -134,7 +136,7 @@ func _run() -> void:
 		var player_style: StyleBoxFlat = player_tile.get_theme_stylebox("disabled") as StyleBoxFlat
 		_expect(player_style != null, "Player tiles should use the flat tactical board style", failures)
 		if player_style != null:
-			_expect(player_style.border_width_right <= 1 and player_style.border_color.a <= 0.50, "Player grid should recede into the battlefield material", failures)
+			_expect(player_style.border_width_right >= 1 and player_style.border_color.a >= 0.55, "Player grid should retain weighted survival-line seams", failures)
 			var adjacent_player_tile: Button = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid/TileP_01") as Button
 			var adjacent_player_style: StyleBoxFlat = adjacent_player_tile.get_theme_stylebox("disabled") as StyleBoxFlat if adjacent_player_tile != null else null
 			_expect(adjacent_player_style != null and adjacent_player_style.border_width_top != player_style.border_width_top, "Planning cells should use irregular seam emphasis rather than a uniform developer grid", failures)
@@ -144,7 +146,7 @@ func _run() -> void:
 		var enemy_style: StyleBoxFlat = enemy_tile.get_theme_stylebox("disabled") as StyleBoxFlat
 		_expect(enemy_style != null, "Enemy tiles should use the flat tactical board style", failures)
 		if enemy_style != null:
-			_expect(enemy_style.border_width_right <= 1 and enemy_style.border_color.a <= 0.52, "Enemy grid should recede into the battlefield material", failures)
+			_expect(enemy_style.border_width_right >= 1 and enemy_style.border_color.a >= 0.60, "Enemy grid should retain weighted hostile-line seams", failures)
 			var player_style_for_color: StyleBoxFlat = player_tile.get_theme_stylebox("disabled") as StyleBoxFlat if player_tile != null else null
 			_expect(player_style_for_color == null or enemy_style.border_color != player_style_for_color.border_color, "Player and enemy tile borders should carry distinct zone colors", failures)
 	_verify_board_surfaces(view, failures)
@@ -158,13 +160,24 @@ func _run() -> void:
 	if items_plate != null:
 		var item_style: StyleBox = items_plate.get_theme_stylebox("panel")
 		_expect(item_style is StyleBoxFlat, "Item storage should use a calm flat support panel", failures)
-		_expect(items_plate.size.y > 100.0, "Item storage backplate collapsed", failures)
+		_expect(items_plate.size.y >= (80.0 if compact_layout else 100.0), "Item storage backplate collapsed below the active responsive cache", failures)
+	var item_header: Label = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
+	var item_grid: GridContainer = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
+	_expect(item_header != null and bool(item_header.get_meta("material_cache_hierarchy", false)), "Item cache lacks its constructed docket hierarchy", failures)
+	_expect(item_grid != null and bool(item_grid.get_meta("material_cache_layout", false)), "Item cache reverted to a raw plus-slot matrix", failures)
+	if item_grid != null and item_header != null and int(item_header.get_meta("occupied_slots", 0)) == 0:
+		var visible_empty_slots: int = 0
+		for item_node: Node in item_grid.get_children():
+			var item_control: Control = item_node as Control
+			if item_control != null and item_control.visible:
+				visible_empty_slots += 1
+		_expect(visible_empty_slots == 3, "Empty item cache should focus three ready slots, found %d" % visible_empty_slots, failures)
 	var wager_plate: Panel = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Panel
 	_expect(wager_plate != null, "Wager summary should have a quiet backplate over the battlefield texture", failures)
 	var traits_panel: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
 	_expect(traits_panel != null, "Traits panel should live inside the left storage dock", failures)
 	if traits_panel != null:
-		_expect(traits_panel.custom_minimum_size.x >= 280.0, "Traits panel is too narrow for readable rows", failures)
+		_expect(traits_panel.custom_minimum_size.x >= (170.0 if compact_layout else 280.0), "Traits panel is too narrow for readable rows", failures)
 		var traits_title: Label = traits_panel.find_child("TraitsTitle", true, false) as Label
 		_expect(traits_title != null and traits_title.get_theme_font("font") == VisualTypeSystemLib.FONT_UTILITY_BOLD, "Trait metadata shell should use the legibility face", failures)
 		_verify_trait_activation_checkpoint_sort(failures)
@@ -173,6 +186,11 @@ func _run() -> void:
 	await get_tree().process_frame
 	_expect(scoreboard_row.get_node_or_null("HBox/Content/Name") != null, "Scoreboard row name label missing", failures)
 	_expect(scoreboard_row.custom_minimum_size.y >= 48.0, "Scoreboard row is too compressed", failures)
+	scoreboard_row.set_compact_layout(true)
+	scoreboard_row.set_row_data({"team": "player", "display_name": "Morrak", "value": 17.0, "share": 1.0, "metric": "damage"})
+	var compact_identity: Label = scoreboard_row.get_node_or_null("HBox/Content/Name") as Label
+	_expect(compact_identity != null and compact_identity.text == "YOU MOAK", "Compact scoreboard should preserve a stable name code instead of an ordinal", failures)
+	_expect(compact_identity != null and bool(compact_identity.get_meta("compact_identity_complete", false)), "Compact scoreboard identity lacks its completeness contract", failures)
 	scoreboard_row.queue_free()
 	if failures.size() > 0:
 		for failure: String in failures:
@@ -240,7 +258,7 @@ func _verify_board_surfaces(view: Control, failures: Array[String]) -> void:
 	_expect(rupture_branches != null and rupture_branches.get_child_count() >= 4, "Center rupture should fracture into the battlefield rather than read as a clean divider", failures)
 	_expect(rupture_segments != null and rupture_segments.get_child_count() >= 6, "Center rupture should use broken high-energy segments rather than one dashboard rule", failures)
 	_expect(threat_incursions != null and threat_incursions.get_child_count() >= 3, "Combat arena should carry asymmetric hostile incursions behind the readable grid", failures)
-	_expect(cell_seams != null and cell_seams.get_child_count() == 48, "Active combat should preserve a faint 8x6 world-native cell seam field", failures)
+	_expect(cell_seams != null and cell_seams.get_child_count() == 48, "Active combat should preserve a readable 8x6 world-native cell seam field", failures)
 	if rupture_glow != null:
 		_expect(rupture_glow.color.a <= 0.20, "Rupture illumination should remain restrained and not obscure cells", failures)
 	if rupture != null:
@@ -248,7 +266,9 @@ func _verify_board_surfaces(view: Control, failures: Array[String]) -> void:
 	if cell_seams != null and cell_seams.get_child_count() > 0:
 		var seam_panel: Panel = cell_seams.get_child(0) as Panel
 		var seam_style: StyleBoxFlat = seam_panel.get_theme_stylebox("panel") as StyleBoxFlat if seam_panel != null else null
-		_expect(seam_style != null and seam_style.border_color.a <= 0.15, "World-native cell seams should remain faint", failures)
+		_expect(seam_style != null and seam_style.border_color.a >= 0.30, "World-native cell seams should retain readable contrast", failures)
+		_expect(int(cell_seams.get_meta("major_seam_non_color_weight", 0)) >= 3, "World-native cell seams lack a weighted non-color major-line cue", failures)
+		_expect(int(cell_seams.get_meta("minor_seam_non_color_weight", 0)) == 1, "World-native cell seams lack a restrained minor-line cue", failures)
 	var arena_background: ColorRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground") as ColorRect
 	_expect(arena_background != null, "ArenaBackground missing", failures)
 	if arena_background != null:
@@ -273,6 +293,7 @@ func _verify_tactical_phase_switch(view: Control, failures: Array[String]) -> vo
 	controller.call("process", 0.40)
 	await get_tree().process_frame
 	var actions: Control = view.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as Control
+	var continue_action: Button = view.find_child("ContinueButton", true, false) as Button
 	var stats_area: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	var item_area: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
 	var threat_veil: CanvasItem = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaAshThreatVeil") as CanvasItem
@@ -288,7 +309,8 @@ func _verify_tactical_phase_switch(view: Control, failures: Array[String]) -> vo
 	await get_tree().process_frame
 	_expect(String(view.get_meta("tactical_phase_visual", "")) == "planning", "Planning phase should restore its semantic visual state", failures)
 	_expect(planning_geometry != null and planning_geometry.visible, "Planning diagram did not restore after combat", failures)
-	_expect(actions != null and actions.visible, "Planning action strip did not restore after combat", failures)
+	_expect(continue_action != null and continue_action.is_visible_in_tree(), "Relocated planning command strip did not restore after combat", failures)
+	_expect(actions == null or not actions.visible or continue_action.get_parent() == actions, "Empty legacy planning action strip consumes layout space after combat", failures)
 	_expect(stats_area != null and stats_area.visible, "Planning metrics rail did not restore after combat", failures)
 
 func _verify_trait_activation_checkpoint_sort(failures: Array[String]) -> void:

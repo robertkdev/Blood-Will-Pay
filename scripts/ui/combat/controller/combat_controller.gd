@@ -73,6 +73,161 @@ const BOSS_PREP_MIN_GOLD: int = 4
 const EARLY_RETRY_RECOVERY_MAX_CHAPTER: int = 2
 const EARLY_RETRY_RECOVERY_MIN_GOLD: int = 4
 
+class ResultAftermathPainter:
+	extends Control
+
+	var outcome_variant: String = "victory"
+
+	func configure(next_variant: String) -> void:
+		outcome_variant = next_variant.to_lower()
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_meta("outcome_variant", outcome_variant)
+		set_meta("physical_material_language", "mud_crater_broken_timber_ash")
+		set_meta("flat_rectangle_count", 0)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		_draw_common_field()
+		match outcome_variant:
+			"victory":
+				_draw_victory_field()
+			"stalemate":
+				_draw_stalemate_field()
+			_:
+				_draw_defeat_field()
+
+	func _draw_common_field() -> void:
+		var fog_centers: Array[Vector2] = [
+			Vector2(size.x * 0.06, size.y * 0.18),
+			Vector2(size.x * 0.92, size.y * 0.22),
+			Vector2(size.x * 0.14, size.y * 0.77),
+			Vector2(size.x * 0.88, size.y * 0.74),
+		]
+		for index: int in range(fog_centers.size()):
+			var radius: float = minf(size.x, size.y) * (0.12 + float(index % 2) * 0.025)
+			var fog_color: Color = Color(0.055, 0.048, 0.044, 0.30) if index % 2 == 0 else Color(0.12, 0.035, 0.030, 0.26)
+			for puff_index: int in range(4):
+				var puff_offset: Vector2 = Vector2(radius * (-0.42 + float(puff_index) * 0.27), radius * (0.12 - float(puff_index % 2) * 0.28))
+				draw_circle(fog_centers[index] + puff_offset, radius * (0.62 + float(puff_index % 2) * 0.12), fog_color, true)
+		_draw_crater(Vector2(size.x * 0.14, size.y * 0.70), Vector2(size.x * 0.075, size.y * 0.038), 0.18)
+		_draw_crater(Vector2(size.x * 0.86, size.y * 0.31), Vector2(size.x * 0.065, size.y * 0.034), 0.40)
+		for ash_index: int in range(18):
+			var side: float = -1.0 if ash_index % 2 == 0 else 1.0
+			var x_ratio: float = 0.08 + float(ash_index % 5) * 0.035 if side < 0.0 else 0.92 - float(ash_index % 5) * 0.035
+			var y_ratio: float = 0.12 + float((ash_index * 7) % 13) * 0.06
+			var ash_start: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
+			draw_line(ash_start, ash_start + Vector2(side * 8.0, -4.0), Color(0.76, 0.68, 0.56, 0.30), 1.5, true)
+
+	func _draw_victory_field() -> void:
+		var west_bank: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, size.y * 0.74),
+			Vector2(size.x * 0.16, size.y * 0.66),
+			Vector2(size.x * 0.34, size.y * 0.73),
+			Vector2(size.x * 0.40, size.y),
+			Vector2(0.0, size.y),
+		])
+		var east_bank: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x, size.y * 0.72),
+			Vector2(size.x * 0.84, size.y * 0.65),
+			Vector2(size.x * 0.65, size.y * 0.72),
+			Vector2(size.x * 0.60, size.y),
+			Vector2(size.x, size.y),
+		])
+		_draw_earth(west_bank, Color(0.045, 0.030, 0.022, 0.82), Color(0.44, 0.24, 0.11, 0.32))
+		_draw_earth(east_bank, Color(0.045, 0.030, 0.022, 0.82), Color(0.44, 0.24, 0.11, 0.32))
+		_draw_log(Vector2(size.x * 0.05, size.y * 0.68), Vector2(size.x * 0.31, size.y * 0.76), 18.0)
+		_draw_log(Vector2(size.x * 0.69, size.y * 0.75), Vector2(size.x * 0.95, size.y * 0.66), 16.0)
+		_draw_broken_wheel(Vector2(size.x * 0.20, size.y * 0.78), minf(size.x, size.y) * 0.055)
+		var open_lane: PackedVector2Array = PackedVector2Array([
+			Vector2(size.x * 0.45, size.y),
+			Vector2(size.x * 0.47, size.y * 0.48),
+			Vector2(size.x * 0.49, size.y * 0.12),
+			Vector2(size.x * 0.54, size.y * 0.12),
+			Vector2(size.x * 0.56, size.y * 0.48),
+			Vector2(size.x * 0.59, size.y),
+		])
+		_draw_earth(open_lane, Color(0.66, 0.44, 0.21, 0.12), Color(0.84, 0.64, 0.34, 0.18))
+
+	func _draw_stalemate_field() -> void:
+		for stake_index: int in range(3):
+			var x_ratio: float = 0.20 + float(stake_index) * 0.30
+			var lean: float = -18.0 if stake_index == 0 else 0.0 if stake_index == 1 else 16.0
+			_draw_log(
+				Vector2(size.x * x_ratio + lean, size.y * 0.16),
+				Vector2(size.x * x_ratio - lean, size.y * 0.88),
+				18.0 if stake_index == 1 else 14.0
+			)
+		_draw_log(Vector2(size.x * 0.10, size.y * 0.37), Vector2(size.x * 0.90, size.y * 0.43), 24.0)
+		_draw_log(Vector2(size.x * 0.12, size.y * 0.66), Vector2(size.x * 0.88, size.y * 0.60), 21.0)
+		_draw_crater(Vector2(size.x * 0.50, size.y * 0.51), Vector2(size.x * 0.11, size.y * 0.055), 0.88)
+		var deadlock_mud: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.52), Vector2(size.x * 0.19, size.y * 0.11), 30, 1.2)
+		_draw_earth(deadlock_mud, Color(0.022, 0.019, 0.022, 0.78), Color(0.32, 0.26, 0.25, 0.24))
+
+	func _draw_defeat_field() -> void:
+		var collapsed_canopy: PackedVector2Array = PackedVector2Array([
+			Vector2(0.0, 0.0),
+			Vector2(size.x, 0.0),
+			Vector2(size.x * 0.90, size.y * 0.12),
+			Vector2(size.x * 0.76, size.y * 0.08),
+			Vector2(size.x * 0.66, size.y * 0.19),
+			Vector2(size.x * 0.53, size.y * 0.13),
+			Vector2(size.x * 0.42, size.y * 0.24),
+			Vector2(size.x * 0.29, size.y * 0.12),
+			Vector2(size.x * 0.16, size.y * 0.20),
+			Vector2(size.x * 0.05, size.y * 0.10),
+		])
+		_draw_earth(collapsed_canopy, Color(0.004, 0.003, 0.004, 0.91), Color(0.28, 0.08, 0.055, 0.34))
+		var grave_mouth: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.89), Vector2(size.x * 0.32, size.y * 0.14), 34, 2.4)
+		_draw_earth(grave_mouth, Color(0.025, 0.006, 0.009, 0.92), Color(0.58, 0.045, 0.035, 0.40))
+		var grave_inner: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.90), Vector2(size.x * 0.23, size.y * 0.085), 30, 0.7)
+		_draw_earth(grave_inner, Color(0.002, 0.002, 0.003, 0.96), Color(0.16, 0.035, 0.036, 0.44))
+		_draw_log(Vector2(size.x * 0.13, size.y * 0.36), Vector2(size.x * 0.87, size.y * 0.58), 28.0)
+		_draw_log(Vector2(size.x * 0.37, size.y * 0.26), Vector2(size.x * 0.52, size.y * 0.78), 17.0)
+		_draw_log(Vector2(size.x * 0.62, size.y * 0.24), Vector2(size.x * 0.55, size.y * 0.76), 13.0)
+		for stake_index: int in range(4):
+			var x_ratio: float = 0.08 + float(stake_index) * 0.28
+			var top: Vector2 = Vector2(size.x * x_ratio, size.y * (0.12 + float(stake_index % 2) * 0.08))
+			var bottom: Vector2 = Vector2(size.x * (x_ratio + 0.035), size.y * 0.42)
+			_draw_log(top, bottom, 10.0)
+
+	func _draw_earth(points: PackedVector2Array, fill: Color, edge: Color) -> void:
+		draw_colored_polygon(points, fill)
+		var closed_points: PackedVector2Array = points.duplicate()
+		if not closed_points.is_empty():
+			closed_points.append(closed_points[0])
+		draw_polyline(closed_points, edge, 3.0, true)
+
+	func _draw_log(from: Vector2, to: Vector2, width: float) -> void:
+		draw_line(from, to, Color(0.006, 0.004, 0.004, 0.92), width + 8.0, true)
+		draw_line(from, to, Color(0.075, 0.035, 0.022, 0.96), width, true)
+		var direction: Vector2 = (to - from).normalized()
+		var normal: Vector2 = Vector2(-direction.y, direction.x)
+		draw_line(from + normal * width * 0.22, to + normal * width * 0.22, Color(0.42, 0.16, 0.070, 0.42), 2.0, true)
+		draw_line(to, to + direction * 18.0 + normal * 8.0, Color(0.02, 0.009, 0.007, 0.92), maxf(3.0, width * 0.28), true)
+
+	func _draw_crater(center: Vector2, radii: Vector2, phase: float) -> void:
+		var outer: PackedVector2Array = _irregular_ellipse(center, radii, 28, phase)
+		var inner: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.05, radii.y * 0.08), radii * 0.58, 24, phase + 1.4)
+		_draw_earth(outer, Color(0.07, 0.025, 0.018, 0.72), Color(0.44, 0.16, 0.060, 0.34))
+		_draw_earth(inner, Color(0.004, 0.003, 0.004, 0.90), Color(0.24, 0.045, 0.035, 0.28))
+
+	func _draw_broken_wheel(center: Vector2, radius: float) -> void:
+		draw_circle(center, radius, Color(0.012, 0.008, 0.006, 0.76), true)
+		draw_arc(center, radius, -2.8, 1.5, 30, Color(0.10, 0.050, 0.028, 0.94), 9.0, true)
+		for spoke_index: int in range(6):
+			var angle: float = TAU * float(spoke_index) / 6.0
+			draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius * 0.82, Color(0.16, 0.075, 0.036, 0.76), 4.0, true)
+
+	func _irregular_ellipse(center: Vector2, radii: Vector2, steps: int, phase: float) -> PackedVector2Array:
+		var points: PackedVector2Array = PackedVector2Array()
+		for point_index: int in range(steps):
+			var angle: float = TAU * float(point_index) / float(steps)
+			var wobble: float = 1.0 + sin(float(point_index) * 2.17 + phase) * 0.10 + cos(float(point_index) * 1.31 + phase) * 0.045
+			points.append(center + Vector2(cos(angle) * radii.x * wobble, sin(angle) * radii.y * wobble))
+		return points
+
 # Parent scene (CombatView)
 var parent: Control
 
@@ -3001,7 +3156,9 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 	var planning_visible: bool = not in_combat
 	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", planning_visible)
 	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", planning_visible)
-	_set_control_visible("MarginContainer/VBoxContainer/ActionsRow", planning_visible)
+	var actions_row: HBoxContainer = parent.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
+	var actions_embedded: bool = actions_row != null and continue_button != null and continue_button.get_parent() == actions_row
+	_set_control_visible("MarginContainer/VBoxContainer/ActionsRow", planning_visible and actions_embedded)
 	_set_control_visible("MarginContainer/VBoxContainer/WagerSummary", planning_visible)
 	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry", planning_visible)
 	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary", in_combat)
@@ -3136,16 +3293,16 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		aftermath.modulate = Color(0.92, 0.88, 0.80, 0.70) if reduced_motion else Color(0.98, 0.90, 0.80, 0.84) if effective_phase == 0 else Color(1.0, 0.84, 0.74, 0.94) if effective_phase == 1 else Color(0.92, 0.64, 0.60, 1.0)
 	if onset != null:
 		onset.visible = true
-		onset.modulate = Color(1.0, 1.0, 1.0, 0.34 if reduced_motion else 1.0)
+		onset.modulate = Color(1.0, 1.0, 1.0, 0.76 if reduced_motion else 1.0)
 	if midfight != null:
 		midfight.visible = effective_phase >= 1
-		midfight.modulate = Color(1.0, 1.0, 1.0, 0.20 if reduced_motion else 1.0)
+		midfight.modulate = Color(1.0, 1.0, 1.0, 0.68 if reduced_motion else 1.0)
 	if collapse != null:
 		collapse.visible = effective_phase >= 2
-		collapse.modulate = Color(1.0, 1.0, 1.0, 0.0 if reduced_motion else 1.0)
+		collapse.modulate = Color(1.0, 1.0, 1.0, 0.62 if reduced_motion else 1.0)
 	if reduced_lock != null:
 		reduced_lock.visible = reduced_motion
-		reduced_lock.modulate = Color(0.82, 0.78, 0.68, 0.82)
+		reduced_lock.modulate = Color(0.82, 0.78, 0.68, 0.34)
 	if pressure_painter != null and pressure_painter.has_method("configure"):
 		pressure_painter.call("configure", effective_phase, reduced_motion, casualty_pressure, casualty_event_index)
 	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
@@ -3348,28 +3505,28 @@ func _configure_result_outcome(
 	if title_label != null:
 		title_label.custom_minimum_size.y = 76.0 if title == "STALEMATE" else 94.0 if title == "DEFEAT" else 88.0
 		title_label.add_theme_font_size_override("font_size", 66 if title == "STALEMATE" else 80 if title == "DEFEAT" else 74)
-		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
+		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" or title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if detail_label != null:
 		detail_label.custom_minimum_size.y = 64.0 if title == "STALEMATE" else 78.0
-		detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
+		detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" or title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if settlement_label != null:
 		settlement_label.text = settlement_copy
 	if kicker_label != null:
 		kicker_label.text = kicker_copy
 		kicker_label.add_theme_color_override("font_color", title_color)
-		kicker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
+		kicker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" or title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if outcome_signal != null:
 		outcome_signal.text = signal_copy
 		outcome_signal.add_theme_color_override("font_color", title_color.darkened(0.06))
-		outcome_signal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
+		outcome_signal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" or title == "DEFEAT" else HORIZONTAL_ALIGNMENT_LEFT
 	if impact_stamp != null:
 		impact_stamp.text = stamp_copy
 		impact_stamp.add_theme_color_override("font_color", title_color)
-		impact_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_LEFT if title == "DEFEAT" else HORIZONTAL_ALIGNMENT_RIGHT
+		impact_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" or title == "DEFEAT" else HORIZONTAL_ALIGNMENT_RIGHT
 		impact_stamp.rotation = -0.018 if title == "VICTORY" else 0.025 if title == "STALEMATE" else -0.038
 	if card != null:
 		card.set_meta("grayscale_silhouette", "rising_open_lane" if title == "VICTORY" else "locked_vertical_deadlock" if title == "STALEMATE" else "descending_grave_jaw")
-		card.set_meta("reading_path", "left_to_right_escape" if title == "VICTORY" else "centered_suspension" if title == "STALEMATE" else "right_to_left_collapse")
+		card.set_meta("reading_path", "left_to_right_escape" if title == "VICTORY" else "centered_suspension" if title == "STALEMATE" else "centered_grave_descent")
 		_apply_result_card_geometry(card, title)
 
 func refresh_result_banner_layout() -> void:
@@ -3391,17 +3548,20 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 		ideal_size = Vector2(800.0, 456.0)
 		card_rotation = 0.0
 	elif title == "DEFEAT":
-		ideal_size = Vector2(980.0, 520.0)
-		card_rotation = 0.012
+		ideal_size = Vector2(820.0, 448.0)
+		card_rotation = 0.006
 	if compact_layout:
-		ideal_size = Vector2(650.0, 352.0) if title == "STALEMATE" else Vector2(790.0, 330.0) if title == "DEFEAT" else Vector2(780.0, 306.0)
+		ideal_size = Vector2(650.0, 352.0) if title == "STALEMATE" else Vector2(700.0, 334.0) if title == "DEFEAT" else Vector2(780.0, 306.0)
 		card_rotation = 0.0
 	var top_reservation: float = 70.0 if compact_layout else 82.0
 	var horizontal_gutter: float = 32.0 if compact_layout else 72.0
 	var bottom_gutter: float = 18.0 if compact_layout else 28.0
+	var ui_scale: float = maxf(1.0, float(UserSettingsScript.get_ui_scale()))
+	var layout_scale_compensation: float = ui_scale if compact_layout else 1.0
+	ideal_size /= layout_scale_compensation
 	var maximum_size: Vector2 = Vector2(
-		maxf(320.0, viewport_size.x - horizontal_gutter),
-		maxf(230.0, viewport_size.y - top_reservation - bottom_gutter)
+		maxf(320.0, (viewport_size.x - horizontal_gutter) / layout_scale_compensation),
+		maxf(230.0, (viewport_size.y - top_reservation - bottom_gutter) / layout_scale_compensation)
 	)
 	card.custom_minimum_size = Vector2(min(ideal_size.x, maximum_size.x), min(ideal_size.y, maximum_size.y))
 	card.rotation = card_rotation
@@ -3409,6 +3569,8 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	card.set_meta("responsive_result_layout", "compact_safe" if compact_layout else "authored_desktop")
 	card.set_meta("logical_viewport_size", viewport_size)
 	card.set_meta("logical_safe_maximum", maximum_size)
+	card.set_meta("ui_scale_compensation", layout_scale_compensation)
+	card.set_meta("compact_centered_stack", compact_layout)
 	_apply_result_content_layout(card, title, compact_layout)
 	if _result_banner != null and is_instance_valid(_result_banner):
 		_result_banner.offset_top = top_reservation
@@ -3868,25 +4030,24 @@ func _ensure_result_outcome_geometry(parent_control: Control, group_name: String
 		group.offset_right = 0.0
 		group.offset_bottom = 0.0
 	group.set_meta("physical_outcome_geometry", true)
-	for spec: Dictionary in specs:
-		var geometry_name: String = String(spec.get("name", "AftermathGeometry"))
-		var rect: ColorRect = group.get_node_or_null(geometry_name) as ColorRect
-		if rect == null:
-			rect = ColorRect.new()
-			rect.name = geometry_name
-			rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			group.add_child(rect)
-		rect.anchor_left = float(spec.get("left", 0.0))
-		rect.anchor_right = float(spec.get("right", rect.anchor_left))
-		rect.anchor_top = float(spec.get("top", 0.0))
-		rect.anchor_bottom = float(spec.get("bottom", rect.anchor_top))
-		rect.offset_left = 0.0
-		rect.offset_right = 0.0
-		rect.offset_top = 0.0
-		rect.offset_bottom = float(spec.get("height", 0.0))
-		rect.rotation = float(spec.get("rotation", 0.0))
-		var physical_color: Color = spec.get("color", Color(0.01, 0.008, 0.009, 0.90))
-		rect.color = physical_color
+	group.set_meta("authored_evidence_spec_count", specs.size())
+	group.set_meta("flat_rectangle_count", 0)
+	var variant: String = "victory" if group_name.begins_with("Victory") else "stalemate" if group_name.begins_with("Stalemate") else "defeat"
+	for child: Node in group.get_children():
+		if child is ColorRect:
+			child.queue_free()
+	var painter: ResultAftermathPainter = group.get_node_or_null("PhysicalAftermathPainter") as ResultAftermathPainter
+	if painter == null:
+		painter = ResultAftermathPainter.new()
+		painter.name = "PhysicalAftermathPainter"
+		painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		group.add_child(painter)
+		painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		painter.offset_left = 0.0
+		painter.offset_top = 0.0
+		painter.offset_right = 0.0
+		painter.offset_bottom = 0.0
+	painter.configure(variant)
 	group.visible = false
 	return group
 
@@ -3901,11 +4062,15 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	var victory_geometry: Control = banner.get_node_or_null("BattleResultAftermath/VictoryAftermathGeometry") as Control
 	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
 	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
+	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
+	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
 	if aftermath != null:
 		aftermath.visible = true
 		aftermath.set_meta("outcome_variant", title.to_lower())
 		aftermath.set_meta("physical_geometry_signature", "opened_survivor_lane" if title == "VICTORY" else "crosswise_deadlock" if title == "STALEMATE" else "collapsed_canopy_grave")
-		aftermath.set_meta("physical_geometry_child_count", 4 if title == "VICTORY" else 5 if title == "STALEMATE" else 6)
+		aftermath.set_meta("physical_geometry_child_count", 6 if title != "DEFEAT" else 7)
+		aftermath.set_meta("grayscale_reading", "open_center" if title == "VICTORY" else "cross_locked" if title == "STALEMATE" else "closed_canopy_grave")
+		aftermath.set_meta("flat_rectangle_count", 0)
 	if victory_geometry != null:
 		victory_geometry.visible = title == "VICTORY"
 	if stalemate_geometry != null:
@@ -3941,12 +4106,21 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	if aftermath_stamp != null:
 		aftermath_stamp.text = "THE FIELD\nSTILL BREATHES" if title == "VICTORY" else "NOTHING LEFT.\nNOTHING RELEASED." if title == "STALEMATE" else "THE WOODS\nTOOK THEIR DUE"
 		aftermath_stamp.add_theme_color_override("font_color", Color(title_color.r, title_color.g, title_color.b, 0.74))
-		aftermath_stamp.anchor_left = 0.72 if title == "VICTORY" else 0.36 if title == "STALEMATE" else 0.03
-		aftermath_stamp.anchor_right = 0.97 if title == "VICTORY" else 0.64 if title == "STALEMATE" else 0.31
-		aftermath_stamp.anchor_top = 0.70 if title == "VICTORY" else 0.05 if title == "STALEMATE" else 0.68
-		aftermath_stamp.anchor_bottom = 0.90 if title == "VICTORY" else 0.24 if title == "STALEMATE" else 0.91
-		aftermath_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_LEFT
-		aftermath_stamp.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if title != "STALEMATE" else VERTICAL_ALIGNMENT_TOP
+		aftermath_stamp.add_theme_font_size_override("font_size", 20 if compact_layout else 34)
+		if compact_layout:
+			aftermath_stamp.anchor_left = 0.34
+			aftermath_stamp.anchor_right = 0.66
+			aftermath_stamp.anchor_top = 0.80
+			aftermath_stamp.anchor_bottom = 0.96
+			aftermath_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			aftermath_stamp.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		else:
+			aftermath_stamp.anchor_left = 0.72 if title == "VICTORY" else 0.36 if title == "STALEMATE" else 0.03
+			aftermath_stamp.anchor_right = 0.97 if title == "VICTORY" else 0.64 if title == "STALEMATE" else 0.31
+			aftermath_stamp.anchor_top = 0.70 if title == "VICTORY" else 0.05 if title == "STALEMATE" else 0.68
+			aftermath_stamp.anchor_bottom = 0.90 if title == "VICTORY" else 0.24 if title == "STALEMATE" else 0.91
+			aftermath_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_LEFT
+			aftermath_stamp.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if title != "STALEMATE" else VERTICAL_ALIGNMENT_TOP
 
 func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

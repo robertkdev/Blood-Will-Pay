@@ -50,8 +50,8 @@ hard failure. Headless runs still write a unique manifest with
 `status: "blocked"` and exit nonzero; they never fall back to software mockups.
 Combat capture contracts also require the 8x6 cell seams to render above the
 environment, the playable center to remain protected from opaque scenic bars,
-and reduced motion to publish a lower overlay-density budget than kinetic
-onset.
+and reduced motion to preserve the same physical battlefield while removing
+drift, shake, flash, flying debris, and full-field warning chevrons.
 
 The packet covers 26 independently captured runtime states:
 
@@ -65,7 +65,7 @@ The packet covers 26 independently captured runtime states:
 - Planning board at real 125% and 150% UI scale
 - Compact in-game system menu
 - Active-combat onset smoke/debris pressure, materially denser impact scars and casualty residue at midfight, and a sparse static reduced-motion threat substitute
-- Victory entry and hold, plus grayscale-distinct stalemate and defeat silhouettes with different reading paths and player-facing integer hold copy
+- Victory entry and hold, plus grayscale-distinct stalemate and defeat physical-scene painters with different reading paths, zero flat rectangle slabs, and player-facing integer hold copy
 - Defeat hold at compact 150% scale with the complete lower frame and skip control in bounds
 - Loss record at compact 150% scale
 - Loss record at desktop size

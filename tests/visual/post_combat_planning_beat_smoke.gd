@@ -199,7 +199,36 @@ func _assert_shared_result_variants() -> void:
 	await _settle_result_variant()
 	_expect_result_copy("STALEMATE", "RETURNED")
 	_save_capture("result_stalemate.png")
+	await _assert_compact_defeat_result(controller, defeat_detail)
 	Engine.time_scale = accelerated_scale
+
+func _assert_compact_defeat_result(controller: Variant, defeat_detail: String) -> void:
+	var window: Window = get_window()
+	if window == null:
+		return
+	DisplayServer.window_set_size(Vector2i(1280, 720))
+	window.size = Vector2i(1280, 720)
+	window.content_scale_size = Vector2i(1280, 720)
+	UserSettingsScript.set_ui_scale(1.5, window)
+	await _settle_frames(3)
+	controller.call("_show_result_banner", "DEFEAT", defeat_detail, Color(0.72, 0.18, 0.16, 1.0), Color(1.0, 0.66, 0.60, 1.0))
+	_pin_result_variant_visible()
+	await _settle_frames(3)
+	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
+	var title_label: Label = card.get_node_or_null("CardMargin/Content/OutcomeLabel") as Label if card != null else null
+	_expect(card != null and bool(card.get_meta("compact_centered_stack", false)), "150% defeat result did not enter its centered compact stack")
+	_expect(card != null and is_equal_approx(float(card.get_meta("ui_scale_compensation", 0.0)), 1.5), "150% defeat result did not compensate its logical frame for UI scale")
+	_expect(card != null and card.custom_minimum_size.x <= 470.0, "150% defeat logical width stayed too large for the 1280px safe area")
+	_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER, "150% defeat headline drifted back to the right edge")
+	if banner != null and card != null:
+		_assert_result_frame_inside_viewport(card, card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button, "DEFEAT 1280x720 150%")
+	_save_capture("result_defeat_1280x720_150pct.png")
+	UserSettingsScript.set_ui_scale(1.0, window)
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	window.size = Vector2i(1920, 1080)
+	window.content_scale_size = Vector2i(1920, 1080)
+	await _settle_frames(3)
 
 func _settle_result_variant() -> void:
 	# The real victory intermission remains active while the shared variants are
@@ -254,10 +283,10 @@ func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 	_expect(aftermath_stamp != null and not aftermath_stamp.text.strip_edges().is_empty(), "%s should state its environmental consequence outside the data card" % expected_title)
 	_assert_outcome_aftermath_geometry(banner, expected_title)
 	if expected_title == "DEFEAT":
-		_expect(card != null and card.custom_minimum_size == Vector2(980.0, 520.0), "defeat should use a taller, heavier consequence silhouette")
+		_expect(card != null and card.custom_minimum_size == Vector2(820.0, 448.0), "defeat should use a centered consequence silhouette without a dead right-side rail")
 		_expect(card != null and String(card.get_meta("grayscale_silhouette", "")) == "descending_grave_jaw", "defeat should remain recognizable as a closing grave-jaw silhouette in grayscale")
-		_expect(card != null and String(card.get_meta("reading_path", "")) == "right_to_left_collapse", "defeat should reverse the result reading path into collapse")
-		_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT, "defeat headline should anchor to the closing side of its composition")
+		_expect(card != null and String(card.get_meta("reading_path", "")) == "centered_grave_descent", "defeat should drive a centered downward reading path")
+		_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER, "defeat headline should center instead of clustering against the right edge")
 		_expect(card != null and String(card.get_meta("tear_direction", "")) == "downward_collapse", "defeat should collapse downward")
 		_expect(kicker_label != null and kicker_label.text.contains("WOODS COLLECT"), "defeat should name the environmental threat")
 		_expect(outcome_signal != null and outcome_signal.text.contains("DARK KEEPS"), "defeat should communicate a visceral horror consequence")
@@ -340,7 +369,8 @@ func _assert_persistent_combat_chrome(context: String) -> void:
 	_expect(stage_bar != null and stage_bar.is_visible_in_tree(), "%s lost the stage/chapter strip" % context)
 	_expect(chapter_label != null and chapter_label.is_visible_in_tree() and chapter_label.modulate.a >= 0.99, "%s lost persistent chapter copy" % context)
 	_expect(phase_label != null and phase_label.is_visible_in_tree() and phase_label.modulate.a >= 0.99, "%s lost persistent phase copy" % context)
-	_expect(system_menu != null and system_menu.is_visible_in_tree() and system_menu.text == "Menu" and system_menu.modulate.a >= 0.99, "%s lost the persistent Menu action" % context)
+	_expect(system_menu != null and system_menu.is_visible_in_tree() and system_menu.text == "SYS // MENU" and system_menu.modulate.a >= 0.99, "%s lost the authored persistent system-menu action" % context)
+	_expect(system_menu != null and bool(system_menu.get_meta("authored_system_command", false)), "%s system-menu action regressed to a generic fallback button" % context)
 	_expect(chapter_label != null and not chapter_label.text.strip_edges().is_empty(), "%s left the stage strip visibly blank" % context)
 	_expect(phase_label != null and not phase_label.text.strip_edges().is_empty(), "%s left the phase strip visibly blank" % context)
 	_expect(instruction_ribbon != null and instruction_ribbon.is_visible_in_tree() and not instruction_ribbon.text.strip_edges().is_empty(), "%s lost or emptied the persistent instruction ribbon" % context)
@@ -368,15 +398,29 @@ func _assert_outcome_aftermath_geometry(banner: PanelContainer, outcome: String)
 	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
 	var expected_signature: String = "opened_survivor_lane" if outcome == "VICTORY" else "crosswise_deadlock" if outcome == "STALEMATE" else "collapsed_canopy_grave"
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its distinct physical aftermath signature" % outcome)
-	_expect(victory_geometry != null and victory_geometry.get_child_count() >= 6, "victory aftermath lacks its opened survivor-lane geometry")
-	_expect(stalemate_geometry != null and stalemate_geometry.get_child_count() >= 6, "stalemate aftermath lacks its crosswise deadlock geometry")
-	_expect(defeat_geometry != null and defeat_geometry.get_child_count() >= 7, "defeat aftermath lacks its collapsed canopy and grave geometry")
+	_expect(aftermath != null and int(aftermath.get_meta("flat_rectangle_count", -1)) == 0, "%s aftermath regressed to giant flat rectangle construction" % outcome)
+	_assert_physical_aftermath_painter(victory_geometry, "victory", 6)
+	_assert_physical_aftermath_painter(stalemate_geometry, "stalemate", 6)
+	_assert_physical_aftermath_painter(defeat_geometry, "defeat", 7)
 	if victory_geometry != null:
 		_expect(victory_geometry.visible == (outcome == "VICTORY"), "%s leaked the victory survivor-lane composition" % outcome)
 	if stalemate_geometry != null:
 		_expect(stalemate_geometry.visible == (outcome == "STALEMATE"), "%s leaked the stalemate deadlock composition" % outcome)
 	if defeat_geometry != null:
 		_expect(defeat_geometry.visible == (outcome == "DEFEAT"), "%s leaked the defeat collapse composition" % outcome)
+
+func _assert_physical_aftermath_painter(group: Control, expected_variant: String, minimum_authored_evidence: int) -> void:
+	_expect(group != null, "%s aftermath geometry group is missing" % expected_variant)
+	if group == null:
+		return
+	var painter: Control = group.get_node_or_null("PhysicalAftermathPainter") as Control
+	_expect(painter != null, "%s aftermath lacks the irregular physical-scene painter" % expected_variant)
+	_expect(int(group.get_meta("flat_rectangle_count", -1)) == 0, "%s aftermath uses flat rectangle geometry" % expected_variant)
+	_expect(int(group.get_meta("authored_evidence_spec_count", 0)) >= minimum_authored_evidence, "%s aftermath lost authored physical evidence density" % expected_variant)
+	if painter != null:
+		_expect(String(painter.get_meta("outcome_variant", "")) == expected_variant, "%s painter exposes the wrong outcome variant" % expected_variant)
+		_expect(String(painter.get_meta("physical_material_language", "")).contains("mud_crater_broken_timber"), "%s painter does not publish physical mud/timber/crater material language" % expected_variant)
+		_expect(int(painter.get_meta("flat_rectangle_count", -1)) == 0, "%s painter regressed to flat rectangle construction" % expected_variant)
 
 func _assert_result_frame_inside_viewport(card: PanelContainer, skip_button: Button, outcome: String) -> void:
 	if card == null or skip_button == null:

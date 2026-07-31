@@ -563,10 +563,14 @@ func _expect_item_cache_contract(context: String) -> void:
 	_expect(header.text.contains("CACHE") or header.text.contains("ITEMS"), "%s item-cache label does not explain the upper-left surface" % context)
 	_expect(header.text.contains("EMPTY") or header.text.contains("/"), "%s item-cache label lacks an intentional inventory state" % context)
 	_expect(header.get_theme_font_size("font_size") >= 11, "%s item-cache label is too small" % context)
+	_expect(bool(header.get_meta("material_cache_hierarchy", false)), "%s item cache lacks its constructed docket hierarchy" % context)
+	_expect(bool(item_grid.get_meta("material_cache_layout", false)), "%s item cache reverted to a raw diagnostic slot grid" % context)
+	var visible_item_slots: int = 0
 	for item_node: Node in item_grid.get_children():
 		var item_card: Control = item_node as Control
 		if item_card == null or not item_card.is_visible_in_tree():
 			continue
+		visible_item_slots += 1
 		var background: Panel = item_card.get_node_or_null("Background") as Panel
 		var frame: Panel = item_card.get_node_or_null("Frame") as Panel
 		_expect(background != null and frame != null, "%s item slot %s lacks its complete two-rail frame" % [context, String(item_card.name)])
@@ -580,6 +584,12 @@ func _expect_item_cache_contract(context: String) -> void:
 		if inner_style != null:
 			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "%s item slot %s inner perimeter is incomplete" % [context, String(item_card.name)])
 		_expect(item_card.size.x >= 18.0 and item_card.size.y >= 18.0, "%s item slot %s collapsed below a recognizable frame: %s" % [context, String(item_card.name), str(item_card.size)])
+		var empty_mark: Label = item_card.get_node_or_null("EmptyMark") as Label
+		if empty_mark != null and empty_mark.visible:
+			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)) and empty_mark.text.contains("OPEN"), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
+	_expect(visible_item_slots >= 3, "%s item cache must expose at least three purposeful ready slots" % context)
+	if int(header.get_meta("occupied_slots", 0)) == 0:
+		_expect(visible_item_slots == 3, "%s empty item cache should focus three ready slots instead of exposing the full reserve grid" % context)
 
 func _expect_planning_landmark_contract(context: String, board_column: Control, enemy_board: GridContainer, player_board: GridContainer) -> void:
 	if board_column == null or enemy_board == null or player_board == null:
@@ -652,12 +662,14 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	var system_menu_button: Button = _main.find_child("SystemMenuButton", true, false) as Button
 	if system_menu_button != null and system_menu_button.visible:
 		_expect_control_inside(system_menu_button, "%s system Menu" % context)
+		_expect(system_menu_button.text == "SYS // MENU", "%s system escape hatch reverted to generic Menu copy" % context)
+		_expect(bool(system_menu_button.get_meta("authored_system_command", false)), "%s system escape hatch lacks authored command styling" % context)
 	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
 	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 136.0, "%s Team Metrics rail did not release enough battlefield width" % context)
 	_expect_text_children_horizontally_inside(left_panel, "%s item/trait rail" % context)
 	_expect_text_children_horizontally_inside(stats_area, "%s Team Metrics rail" % context)
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
-	_expect(item_grid != null and item_grid.columns == 6, "%s item inventory did not reflow into its bounded three-row grid" % context)
+	_expect(item_grid != null and item_grid.columns == 3, "%s empty item inventory did not reflow into its deliberate three-slot cache" % context)
 	if item_grid != null:
 		for item_node: Node in item_grid.get_children():
 			var item_control: Control = item_node as Control
@@ -708,11 +720,14 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 				_expect_control_inside(action_control, "%s action/footer %s" % [context, String(action_control.name)])
 	var shop_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
 	if shop_grid != null:
+		var safe_gutter: float = float(shop_grid.get_meta("safe_bottom_gutter", 0.0))
+		_expect(safe_gutter >= 8.0, "%s shop grid lacks its authored bottom safe gutter" % context)
 		for child: Node in shop_grid.get_children():
 			var card: Control = child as Control
 			if card != null and card.is_visible_in_tree():
 				_expect_control_inside(card, "%s shop card %s" % [context, String(card.name)])
 				_expect_shop_card_contents_inside(card)
+				_expect(card.get_global_rect().end.y <= _viewport_rect().end.y - safe_gutter + 1.0, "%s shop card %s lacks a visible framebuffer gutter" % [context, String(card.name)])
 	var tactical_record: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	_expect(tactical_record != null and not tactical_record.visible, "%s decorative tactical-record caption can still overlay gameplay" % context)
 
@@ -733,7 +748,6 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel",
 		"MarginContainer/VBoxContainer/BenchArea",
-		"MarginContainer/VBoxContainer/ActionsRow",
 		"MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
@@ -804,6 +818,18 @@ func _expect_scaled_team_metrics(context: String) -> void:
 	_expect(scoreboard != null and scoreboard.is_visible_in_tree(), "%s Team Metrics scoreboard disappeared" % context)
 	if scoreboard == null:
 		return
+	var scoreboard_header: HBoxContainer = scoreboard.get_node_or_null("Header") as HBoxContainer
+	var scoreboard_title: Label = scoreboard.get_node_or_null("Header/Title") as Label
+	var scoreboard_navigation: Button = scoreboard.get_node_or_null("Header/ExpandButton") as Button
+	_expect(scoreboard_header != null and scoreboard_header.is_visible_in_tree(), "%s compact Team Metrics navigation disappeared" % context)
+	_expect(scoreboard_header != null and bool(scoreboard_header.get_meta("compact_navigation_visible", false)), "%s compact Team Metrics header lacks its navigation contract" % context)
+	_expect(scoreboard_title != null and bool(scoreboard_title.get_meta("compact_metric_identity", false)), "%s compact Team Metrics header does not identify the selected metric/window" % context)
+	_expect(scoreboard_navigation != null and scoreboard_navigation.text.contains("FOE"), "%s compact Team Metrics header does not expose enemy-record navigation" % context)
+	var stats_title: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Header/Title") as Label
+	if stats_title != null:
+		var stats_font: Font = stats_title.get_theme_font("font")
+		var stats_text_width: float = stats_font.get_multiline_string_size(stats_title.text, HORIZONTAL_ALIGNMENT_LEFT, stats_title.size.x, stats_title.get_theme_font_size("font_size")).x if stats_font != null else 0.0
+		_expect(stats_text_width <= stats_title.size.x + 1.0, "%s Team Metrics title overflows its rail: text=%.1f width=%.1f" % [context, stats_text_width, stats_title.size.x])
 	var compact_rows: int = 0
 	for row_node: Node in scoreboard.find_children("*", "ScoreboardRow", true, false):
 		var row: Control = row_node as Control
@@ -818,6 +844,8 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		if name_label != null:
 			_expect(bool(name_label.get_meta("compact_identity_complete", false)), "%s metric row reverted to raw unit-name truncation" % context)
 			_expect(not name_label.text.contains("//"), "%s metric row still exposes accidental identifier truncation" % context)
+			var identity_copy: String = name_label.text.trim_prefix("YOU ").trim_prefix("FOE ").strip_edges()
+			_expect(not identity_copy.is_valid_int(), "%s metric row exposes only an ambiguous ordinal instead of its identity" % context)
 			_expect(name_label.get_theme_font_size("font_size") >= 14, "%s team metric identity type is too small" % context)
 			var name_font: Font = name_label.get_theme_font("font")
 			var name_text_width: float = name_font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, name_label.get_theme_font_size("font_size")).x if name_font != null else 0.0

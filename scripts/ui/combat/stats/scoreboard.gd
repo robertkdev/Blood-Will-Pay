@@ -30,6 +30,7 @@ var enemy_rows_enabled: bool = true
 
 var refresh_interval: float = 0.3
 var _accum: float = 0.0
+var _authored_title: String = "Scoreboard"
 
 func _ready() -> void:
 	set_process(true)
@@ -40,6 +41,7 @@ func _ready() -> void:
 	# Ensure in-panel enemy column never forces layout
 	if enemy_col:
 		enemy_col.visible = false
+	_sync_responsive_header()
 
 func _exit_tree() -> void:
 	teardown()
@@ -68,14 +70,17 @@ func set_metric(m: String) -> void: metric = m
 func set_window(w: String) -> void: window = w
 func set_norm_mode(n: int) -> void: norm_mode = n
 func set_title(text: String) -> void:
+	_authored_title = text
 	if title_label != null:
 		title_label.text = text
+	_sync_responsive_header()
 
 func set_expand_enabled(flag: bool) -> void:
 	expand_enabled = flag
 	if not expand_enabled:
 		set_expanded(false)
 	_sync_expand_button()
+	_sync_responsive_header()
 
 func set_enemy_rows_enabled(flag: bool) -> void:
 	enemy_rows_enabled = flag
@@ -106,6 +111,8 @@ func _on_toggle_expand() -> void:
 
 func _process(delta: float) -> void:
 	_accum += max(0.0, float(delta))
+	_sync_responsive_header()
+	_restore_compact_row_identities()
 	if _accum >= refresh_interval:
 		_accum = 0.0
 		_rebuild_now()
@@ -249,5 +256,74 @@ func _sync_expand_button() -> void:
 		return
 	expand_button.visible = expand_enabled and enemy_rows_enabled
 	expand_button.disabled = not expand_enabled or not enemy_rows_enabled
-	expand_button.text = (">>" if expanded else "<<")
+	var compact_header: bool = _uses_compact_header()
+	expand_button.text = ("< YOU" if expanded else "FOE >") if compact_header else (">>" if expanded else "<<")
 	expand_button.tooltip_text = "Hide enemy ledger" if expanded else "Show enemy ledger"
+
+func _sync_responsive_header() -> void:
+	var header: HBoxContainer = get_node_or_null("Header") as HBoxContainer
+	if header == null or title_label == null:
+		return
+	var compact_header: bool = _uses_compact_header()
+	header.visible = true
+	title_label.clip_text = false
+	if not compact_header:
+		title_label.text = _authored_title
+		title_label.size_flags_horizontal = Control.SIZE_SHRINK_END
+		title_label.add_theme_font_size_override("font_size", 16)
+		var desktop_spacer: Control = header.get_node_or_null("Spacer") as Control
+		if desktop_spacer != null:
+			desktop_spacer.visible = true
+			desktop_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_sync_expand_button()
+		return
+	var tight_header: bool = size.x <= 150.0 or custom_minimum_size.x <= 150.0
+	header.custom_minimum_size.y = 26.0 if tight_header else 30.0
+	header.add_theme_constant_override("separation", 4)
+	var spacer: Control = header.get_node_or_null("Spacer") as Control
+	if spacer != null:
+		spacer.visible = false
+		spacer.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	if expand_button != null:
+		expand_button.custom_minimum_size = Vector2(46.0 if tight_header else 54.0, 24.0)
+		expand_button.add_theme_font_size_override("font_size", 10 if tight_header else 12)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 10 if tight_header else 12)
+	title_label.text = "%s // %s" % [_metric_header_label(), _window_header_label()]
+	title_label.tooltip_text = "Current metric: %s, window: %s" % [metric.capitalize(), window]
+	title_label.set_meta("compact_metric_identity", true)
+	header.set_meta("compact_navigation_visible", true)
+	_sync_expand_button()
+
+func _uses_compact_header() -> bool:
+	var resolved_width: float = size.x
+	if resolved_width <= 0.0:
+		resolved_width = custom_minimum_size.x
+	return resolved_width > 0.0 and resolved_width <= 310.0
+
+func _metric_header_label() -> String:
+	match metric.to_lower():
+		"damage":
+			return "DMG"
+		"dps":
+			return "DPS"
+		"casts":
+			return "CAST"
+		"healing":
+			return "HEAL"
+		_:
+			return metric.left(4).to_upper()
+
+func _window_header_label() -> String:
+	var normalized_window: String = window.strip_edges().to_upper()
+	return "ALL" if normalized_window == "" else normalized_window.left(4)
+
+func _restore_compact_row_identities() -> void:
+	if not _uses_compact_header():
+		return
+	for row_node: Node in find_children("*", "ScoreboardRow", true, false):
+		var row: ScoreboardRow = row_node as ScoreboardRow
+		if row != null and bool(row.get_meta("compact_layout", false)):
+			row.refresh_compact_identity()

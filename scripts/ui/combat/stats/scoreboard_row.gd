@@ -33,6 +33,10 @@ func set_record_emphasis(enabled: bool) -> void:
 	_record_emphasis = enabled
 	_refresh()
 
+func refresh_compact_identity() -> void:
+	if _compact_layout:
+		_update_identity()
+
 func set_row_data(row: Dictionary) -> void:
 	team = String(row.get("team", team))
 	index = int(row.get("index", index))
@@ -82,7 +86,8 @@ func _update_identity() -> void:
 	elif unit_ref != null and String(unit_ref.name).strip_edges() != "":
 		unit_name = String(unit_ref.name)
 	var team_prefix: String = "FOE" if team == "enemy" else "YOU"
-	name_label.text = "%s // %s" % [team_prefix, unit_name.left(2).to_upper()] if _compact_layout else unit_name
+	name_label.text = "%s %s" % [team_prefix, _compact_identity_name(unit_name)] if _compact_layout else unit_name
+	name_label.set_meta("compact_identity_complete", _compact_layout)
 	name_label.tooltip_text = "%s team — %s" % ["Enemy" if team == "enemy" else "Your", unit_name]
 
 func _apply_visual_style() -> void:
@@ -108,6 +113,24 @@ func _apply_visual_style() -> void:
 		value_label.add_theme_constant_override("outline_size", 1)
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		value_label.clip_text = true
+
+func _compact_identity_name(unit_name: String) -> String:
+	var clean_name: String = unit_name.strip_edges()
+	if clean_name == "":
+		return "UNIT"
+	if clean_name.length() <= 4:
+		return clean_name.to_upper()
+	var duplicate_marker: int = clean_name.rfind("#")
+	if duplicate_marker > 0:
+		var suffix: String = clean_name.substr(duplicate_marker).strip_edges()
+		var base_budget: int = maxi(1, 4 - suffix.length())
+		return "%s%s" % [clean_name.left(base_budget).to_upper(), suffix]
+	var words: PackedStringArray = clean_name.split(" ", false)
+	if words.size() > 1:
+		var first_code: String = words[0].left(2).to_upper()
+		var final_code: String = words[words.size() - 1].left(1).to_upper()
+		return "%s%s" % [first_code, final_code]
+	return "%s%s" % [clean_name.left(2).to_upper(), clean_name.right(2).to_upper()]
 
 func _ensure_layout() -> void:
 	if _frame == null:

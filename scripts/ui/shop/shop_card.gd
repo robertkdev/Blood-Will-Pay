@@ -176,7 +176,9 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	_compact_presentation = enabled
 	_tight_presentation = enabled and tight
-	custom_minimum_size = Vector2(120.0, 56.0) if _tight_presentation else Vector2(132.0, 86.0) if enabled else Vector2(150.0, 138.0)
+	custom_minimum_size = Vector2(120.0, 54.0) if _tight_presentation else Vector2(132.0, 80.0) if enabled else Vector2(150.0, 122.0)
+	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	set_meta("shop_safe_bottom_gutter", 2.0 if _tight_presentation else 6.0 if enabled else 16.0)
 	if _icon != null:
 		_icon.custom_minimum_size = Vector2.ZERO if enabled else Vector2(112.0, 112.0)
 		_icon.anchor_left = 0.10 if _tight_presentation else 0.08 if enabled else 0.12
@@ -382,7 +384,9 @@ func _apply_static_style() -> void:
 	var effective_size: Vector2 = _effective_ui_viewport_size(viewport_size)
 	var compact: bool = effective_size.y <= 1080.0 or effective_size.x <= 1400.0
 	var tight_compact: bool = effective_size.y <= 520.0 or effective_size.x <= 1100.0 or (ui_scale >= 1.25 and effective_size.y <= 720.0)
-	custom_minimum_size = Vector2(120.0, 56.0) if tight_compact else Vector2(132.0, 86.0) if compact else Vector2(150.0, 138.0)
+	custom_minimum_size = Vector2(120.0, 54.0) if tight_compact else Vector2(132.0, 80.0) if compact else Vector2(150.0, 122.0)
+	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	set_meta("shop_safe_bottom_gutter", 2.0 if tight_compact else 6.0 if compact else 16.0)
 	add_theme_stylebox_override("normal", _make_card_style(false, false))
 	add_theme_stylebox_override("hover", _make_card_style(false, true))
 	add_theme_stylebox_override("pressed", _make_card_style(true, true))

@@ -35,11 +35,25 @@ func _run() -> void:
 	var hover_style: StyleBoxFlat = _button.get_theme_stylebox("hover") as StyleBoxFlat
 	_expect(routine_style != null and _is_hard_rectangle(routine_style), "fixed SystemMenuButton normal state must be hard rectangular routine furniture")
 	_expect(hover_style != null and _is_hard_rectangle(hover_style), "fixed SystemMenuButton hover state must remain hard rectangular")
+	_expect(bool(_button.get_meta("authored_system_command", false)), "fixed SystemMenuButton should carry authored command metadata")
 	if routine_style != null and hover_style != null:
 		_expect(routine_style.bg_color != hover_style.bg_color or routine_style.border_color != hover_style.border_color, "fixed SystemMenuButton must retain a distinct hover state")
+		_expect(routine_style.border_width_left >= 3 and routine_style.border_width_bottom >= 2, "fixed SystemMenuButton should use the authored filing-rule construction")
 	var main: Control = MAIN_SCENE.instantiate() as Control
 	get_tree().root.add_child(main)
 	await _settle_frames(5)
+	var live_system_button: Button = main.get_node_or_null("SystemMenuLayer/SystemMenuButton") as Button
+	_expect(live_system_button != null and live_system_button.text == "SYS // MENU", "live system escape hatch reverted to generic Menu copy")
+	_expect(live_system_button != null and bool(live_system_button.get_meta("authored_system_command", false)), "live system escape hatch lacks authored command styling")
+	var incident_docket: PanelContainer = main.get_node_or_null("TitlePage/IncidentEvidenceDocket") as PanelContainer
+	var incident_evidence: Label = main.get_node_or_null("TitlePage/IncidentEvidenceDocket/IncidentEvidence") as Label
+	var entry_affordance: PanelContainer = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
+	var entry_order: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
+	_expect(incident_docket != null and incident_evidence != null, "title gateway lacks its specific incident evidence docket")
+	_expect(incident_evidence != null and bool(incident_evidence.get_meta("organized_cruelty_evidence", false)), "title gateway does not establish organized cruelty")
+	_expect(incident_evidence != null and bool(incident_evidence.get_meta("survivor_consequence_evidence", false)), "title gateway does not establish survivor consequence")
+	_expect(entry_affordance != null and bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "title gateway entry prompt reverted to a dominant CTA slab")
+	_expect(entry_order != null and entry_order.text == "CLICK ANYWHERE // OPEN FIELD RECORD", "title gateway entry prompt does not advertise the click-anywhere interaction")
 	var overlay: Control = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay") as Control
 	if overlay != null:
 		overlay.visible = true

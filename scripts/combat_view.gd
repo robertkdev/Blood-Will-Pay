@@ -452,12 +452,13 @@ func _apply_responsive_layout() -> void:
 		bottom_storage.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 96.0 if tight_compact else 94.0 if compact else 152.0)
 		bottom_storage.size_flags_vertical = Control.SIZE_SHRINK_END
 	var opening_shop: bool = shop_grid != null and bool(shop_grid.get_meta("opening_fight_empty", false))
-	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 54.0) if opening_shop and tight_compact else Vector2(520.0, 88.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(640.0 if tight_compact else 900.0 if compact else 1120.0, 56.0 if tight_compact else 86.0 if compact else 108.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 62.0) if opening_shop and tight_compact else Vector2(520.0, 92.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(640.0 if tight_compact else 900.0 if compact else 1120.0, 62.0 if tight_compact else 92.0 if compact else 108.0))
 	if shop_grid != null:
 		shop_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if opening_shop else Control.SIZE_EXPAND_FILL
 	var planning_actions_row: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
 	if planning_actions_row != null:
-		planning_actions_row.visible = _is_planning_phase()
+		var actions_embedded: bool = continue_button != null and continue_button.get_parent() == planning_actions_row
+		planning_actions_row.visible = _is_planning_phase() and actions_embedded
 		planning_actions_row.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 38.0 if tight_compact else 36.0 if compact else 56.0)
 		planning_actions_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_set_minimum_size("MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(254.0 if tight_compact else 334.0 if compact else 392.0, 36.0 if tight_compact else 44.0 if compact else 50.0))
@@ -1181,9 +1182,9 @@ func _update_external_backplates() -> void:
 		var authored_pad: float = float(plate.get_meta("pad", 0.0))
 		var pad: float = minf(authored_pad, 3.0) if tight_scale_layout else minf(authored_pad, 4.0) if compact_layout else authored_pad
 		if plate_name == "GothicShopPlate" and target.get_global_rect().end.y >= get_viewport_rect().end.y - 1.0:
-			# The shop intentionally terminates at the viewport edge. Its
-			# exterior frame must become flush there instead of drawing below
-			# the framebuffer.
+			# The grid can terminate at the framebuffer, but its compact cards
+			# retain an authored internal gutter. Keep the exterior plate inside
+			# the visible frame while the card silhouettes end above it.
 			pad = 0.0
 		plate.global_position = target.global_position - Vector2(pad, pad)
 		plate.size = target.size + Vector2(pad * 2.0, pad * 2.0)

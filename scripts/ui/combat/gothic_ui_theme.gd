@@ -265,6 +265,8 @@ class ArenaPressurePainter:
 		set_meta("bounded_edge_pressure", true)
 		set_meta("protected_center_rect", Rect2(0.28, 0.20, 0.44, 0.60))
 		set_meta("kinetic_mark_budget", 4 if reduced_motion else 11 if pressure_phase == 0 else 19 if pressure_phase == 1 else 24)
+		set_meta("reduced_motion_scene_parity", "same_physical_field_static")
+		set_meta("full_field_warning_chevrons", false)
 		queue_redraw()
 
 	func _process(delta: float) -> void:
@@ -281,98 +283,55 @@ class ArenaPressurePainter:
 		_draw_casualty_residue()
 		if reduced_motion:
 			_draw_static_urgent_substitute()
+			_draw_smoke_banks(0.0)
 			return
 		_draw_smoke_banks(motion_clock)
 		_draw_debris_streaks(motion_clock)
 
 	func _draw_hostile_edge_light(motion_clock: float) -> void:
-		var phase_weight: float = float(pressure_phase) * 0.045
+		var phase_weight: float = float(pressure_phase) * 0.022
 		var breathing: float = 0.0 if reduced_motion else sin(motion_clock * 2.1) * 0.012
-		var inset: float = 0.145 + phase_weight + breathing
-		var west_jaw: PackedVector2Array = PackedVector2Array([
-			Vector2.ZERO,
-			Vector2(size.x * inset, 0.0),
-			Vector2(size.x * (inset * 0.58), size.y * 0.48),
-			Vector2(size.x * (inset * 0.92), size.y),
-			Vector2(0.0, size.y),
-		])
-		var east_jaw: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x, 0.0),
-			Vector2(size.x * (1.0 - inset), 0.0),
-			Vector2(size.x * (1.0 - inset * 0.56), size.y * 0.50),
-			Vector2(size.x * (1.0 - inset * 0.94), size.y),
-			Vector2(size.x, size.y),
-		])
-		var jaw_alpha: float = 0.32 if reduced_motion else 0.30 + float(pressure_phase) * 0.09
-		draw_colored_polygon(west_jaw, Color(0.012, 0.006, 0.008, jaw_alpha))
-		draw_colored_polygon(east_jaw, Color(0.075, 0.006, 0.008, jaw_alpha + 0.05))
-		var enemy_glare: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x * 0.68, 0.0),
-			Vector2(size.x, 0.0),
-			Vector2(size.x, size.y * 0.42),
-			Vector2(size.x * 0.79, size.y * 0.31),
-		])
-		draw_colored_polygon(enemy_glare, Color(0.78, 0.035, 0.018, 0.13 if reduced_motion else 0.18 + float(pressure_phase) * 0.055))
-		var survival_glare: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, size.y * 0.70),
-			Vector2(size.x * 0.22, size.y * 0.78),
-			Vector2(size.x * 0.32, size.y),
-			Vector2(0.0, size.y),
-		])
-		draw_colored_polygon(survival_glare, Color(0.74, 0.38, 0.08, 0.08 if reduced_motion else 0.12))
-		if pressure_phase >= 1 and not reduced_motion:
+		var inset: float = 0.095 + phase_weight + breathing
+		var edge_alpha: float = 0.22 if reduced_motion else 0.24 + float(pressure_phase) * 0.055
+		var west_bank_center: Vector2 = Vector2(size.x * (inset * 0.32), size.y * 0.46)
+		var east_bank_center: Vector2 = Vector2(size.x * (1.0 - inset * 0.30), size.y * 0.48)
+		for puff_index: int in range(5):
+			var y_offset: float = size.y * (-0.34 + float(puff_index) * 0.17)
+			var radius: float = minf(size.x, size.y) * (0.105 + float(puff_index % 2) * 0.025)
+			draw_circle(west_bank_center + Vector2(0.0, y_offset), radius, Color(0.025, 0.017, 0.016, edge_alpha), true)
+			draw_circle(east_bank_center + Vector2(0.0, -y_offset * 0.82), radius, Color(0.16, 0.018, 0.015, edge_alpha + 0.035), true)
+		_draw_broken_pressure_fence(Vector2(size.x * 0.018, size.y * 0.22), Vector2(size.x * 0.13, size.y * 0.30), true)
+		_draw_broken_pressure_fence(Vector2(size.x * 0.852, size.y * 0.53), Vector2(size.x * 0.13, size.y * 0.30), false)
+		if pressure_phase >= 1:
 			_draw_midfight_edge_breach(motion_clock)
 
 	func _draw_midfight_edge_breach(motion_clock: float) -> void:
-		var drift: float = sin(motion_clock * 1.7) * 0.012
-		var west_dust_high: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, size.y * 0.14),
-			Vector2(size.x * (0.21 + drift), size.y * 0.24),
-			Vector2(size.x * (0.16 + drift), size.y * 0.37),
-			Vector2(0.0, size.y * 0.32),
-		])
-		var west_dust_low: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, size.y * 0.60),
-			Vector2(size.x * (0.24 - drift), size.y * 0.70),
-			Vector2(size.x * (0.18 - drift), size.y * 0.86),
-			Vector2(0.0, size.y * 0.80),
-		])
-		var east_smoke_high: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x, size.y * 0.16),
-			Vector2(size.x * (0.77 - drift), size.y * 0.27),
-			Vector2(size.x * (0.84 - drift), size.y * 0.42),
-			Vector2(size.x, size.y * 0.34),
-		])
-		var east_smoke_low: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x, size.y * 0.61),
-			Vector2(size.x * (0.75 + drift), size.y * 0.73),
-			Vector2(size.x * (0.82 + drift), size.y * 0.88),
-			Vector2(size.x, size.y * 0.81),
-		])
-		var density_bonus: float = float(pressure_phase - 1) * 0.07
-		draw_colored_polygon(west_dust_high, Color(0.34, 0.18, 0.09, 0.20 + density_bonus))
-		draw_colored_polygon(west_dust_low, Color(0.44, 0.21, 0.07, 0.22 + density_bonus))
-		draw_colored_polygon(east_smoke_high, Color(0.42, 0.015, 0.018, 0.24 + density_bonus))
-		draw_colored_polygon(east_smoke_low, Color(0.54, 0.018, 0.012, 0.26 + density_bonus))
-		var breach_color: Color = Color(0.94, 0.20, 0.055, 0.52 + density_bonus)
-		var west_breach: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, size.y * 0.42),
-			Vector2(size.x * 0.11, size.y * 0.45),
-			Vector2(size.x * 0.20, size.y * 0.50),
-			Vector2(size.x * 0.09, size.y * 0.54),
-			Vector2(0.0, size.y * 0.58),
-		])
-		var east_breach: PackedVector2Array = PackedVector2Array()
-		for point: Vector2 in west_breach:
-			east_breach.append(Vector2(size.x - point.x, size.y - point.y))
-		draw_polyline(west_breach, breach_color, 5.0, true)
-		draw_polyline(east_breach, breach_color, 5.0, true)
+		var drift: float = 0.0 if reduced_motion else sin(motion_clock * 1.7) * 0.012
+		var density_bonus: float = float(pressure_phase - 1) * 0.05
 		for bank_index: int in range(3):
-			var west_center: Vector2 = Vector2(size.x * (0.025 + float(bank_index) * 0.045), size.y * (0.20 + float(bank_index) * 0.27))
+			var west_center: Vector2 = Vector2(size.x * (0.018 + float(bank_index) * 0.036 + drift), size.y * (0.20 + float(bank_index) * 0.27))
 			var east_center: Vector2 = Vector2(size.x - west_center.x, size.y - west_center.y)
-			var bank_radius: float = minf(size.x, size.y) * (0.075 + float(bank_index) * 0.014)
-			draw_circle(west_center, bank_radius, Color(0.14, 0.11, 0.09, 0.18 + density_bonus), true)
-			draw_circle(east_center, bank_radius, Color(0.22, 0.035, 0.025, 0.20 + density_bonus), true)
+			var bank_radius: float = minf(size.x, size.y) * (0.065 + float(bank_index) * 0.012)
+			draw_circle(west_center, bank_radius, Color(0.14, 0.11, 0.09, 0.20 + density_bonus), true)
+			draw_circle(east_center, bank_radius, Color(0.22, 0.035, 0.025, 0.22 + density_bonus), true)
+		var trench_color: Color = Color(0.025, 0.013, 0.010, 0.84)
+		draw_line(Vector2(0.0, size.y * 0.44), Vector2(size.x * 0.17, size.y * 0.50), trench_color, 18.0, true)
+		draw_line(Vector2(size.x, size.y * 0.56), Vector2(size.x * 0.83, size.y * 0.50), trench_color, 18.0, true)
+		draw_line(Vector2(0.0, size.y * 0.44), Vector2(size.x * 0.17, size.y * 0.50), Color(0.52, 0.16, 0.060, 0.32), 3.0, true)
+		draw_line(Vector2(size.x, size.y * 0.56), Vector2(size.x * 0.83, size.y * 0.50), Color(0.62, 0.12, 0.050, 0.34), 3.0, true)
+
+	func _draw_broken_pressure_fence(origin: Vector2, extent: Vector2, lean_left: bool) -> void:
+		var lean: float = -1.0 if lean_left else 1.0
+		var timber: Color = Color(0.055, 0.026, 0.018, 0.90)
+		var edge: Color = Color(0.40, 0.16, 0.070, 0.36)
+		for post_index: int in range(3):
+			var x_value: float = origin.x + extent.x * (0.14 + float(post_index) * 0.36)
+			var top: Vector2 = Vector2(x_value + lean * extent.x * 0.06, origin.y + extent.y * (0.08 * float(post_index % 2)))
+			var bottom: Vector2 = Vector2(x_value - lean * extent.x * 0.03, origin.y + extent.y)
+			draw_line(top, bottom, timber, 12.0 if post_index == 1 else 8.0, true)
+			draw_line(top, bottom, edge, 2.0, true)
+		draw_line(origin + Vector2(0.0, extent.y * 0.42), origin + Vector2(extent.x, extent.y * 0.60), timber, 10.0, true)
+		draw_line(origin + Vector2(extent.x * 0.12, extent.y * 0.78), origin + Vector2(extent.x * 0.86, extent.y * 0.20), timber, 7.0, true)
 
 	func _draw_ground_ruts() -> void:
 		var rut_count: int = 3 if reduced_motion else 4 + pressure_phase * 2
@@ -456,23 +415,17 @@ class ArenaPressurePainter:
 			draw_line(finish, finish + direction * 12.0, Color(0.18, 0.07, 0.035, 0.78), 5.0, true)
 
 	func _draw_static_urgent_substitute() -> void:
-		var warning_color: Color = Color(0.82, 0.10, 0.045, 0.50)
-		var west_teeth: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, size.y * 0.18),
-			Vector2(size.x * 0.17, size.y * 0.28),
-			Vector2(size.x * 0.08, size.y * 0.40),
-			Vector2(size.x * 0.19, size.y * 0.50),
-			Vector2(size.x * 0.07, size.y * 0.62),
-			Vector2(size.x * 0.16, size.y * 0.73),
-			Vector2(0.0, size.y * 0.82),
-		])
-		var east_teeth: PackedVector2Array = PackedVector2Array()
-		for point: Vector2 in west_teeth:
-			east_teeth.append(Vector2(size.x - point.x, size.y - point.y))
-		draw_polyline(west_teeth, warning_color, 7.0, true)
-		draw_polyline(east_teeth, warning_color, 7.0, true)
-		draw_line(Vector2(size.x * 0.06, size.y * 0.93), Vector2(size.x * 0.25, size.y * 0.84), Color(0.92, 0.48, 0.14, 0.46), 5.0, true)
-		draw_line(Vector2(size.x * 0.94, size.y * 0.07), Vector2(size.x * 0.75, size.y * 0.16), Color(0.92, 0.16, 0.06, 0.50), 5.0, true)
+		# Reduced Motion keeps the same breached field and consequence evidence.
+		# Only time-based drift, flash, shake, and flying debris are removed.
+		_draw_broken_pressure_fence(Vector2(size.x * 0.025, size.y * 0.56), Vector2(size.x * 0.12, size.y * 0.25), true)
+		_draw_broken_pressure_fence(Vector2(size.x * 0.855, size.y * 0.18), Vector2(size.x * 0.12, size.y * 0.25), false)
+		var west_crater: Vector2 = Vector2(size.x * 0.13, size.y * 0.29)
+		var east_crater: Vector2 = Vector2(size.x * 0.87, size.y * 0.73)
+		var crater_centers: Array[Vector2] = [west_crater, east_crater]
+		for crater_center: Vector2 in crater_centers:
+			var crater_radius: float = minf(size.x, size.y) * 0.045
+			draw_circle(crater_center, crater_radius, Color(0.018, 0.010, 0.009, 0.72), true)
+			draw_circle(crater_center, crater_radius, Color(0.56, 0.18, 0.070, 0.36), false, 3.0, true)
 
 static var _theme: Theme = null
 
@@ -797,8 +750,8 @@ static func _apply_tile(button: Button, is_player: bool) -> void:
 	var bg_color: Color = COLOR_TILE_PLAYER if is_player else COLOR_TILE_ENEMY
 	var cell_index: int = int(String(button.name).get_slice("_", 1))
 	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
-	bg_color.a = 0.44 if strong_seam else 0.31
-	var border_color: Color = Color(0.76, 0.72, 0.58, 0.44 if strong_seam else 0.24) if is_player else Color(0.82, 0.13, 0.12, 0.48 if strong_seam else 0.27)
+	bg_color.a = 0.48 if strong_seam else 0.36
+	var border_color: Color = Color(0.84, 0.80, 0.67, 0.64 if strong_seam else 0.38) if is_player else Color(0.92, 0.22, 0.16, 0.68 if strong_seam else 0.42)
 	var hover_color: Color = Color(0.060, 0.078, 0.070, 0.92) if is_player else Color(0.120, 0.044, 0.040, 0.92)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
 	if not strong_seam:
@@ -1971,11 +1924,13 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 			var row_index: int = floori(float(cell_index) / 8.0)
 			var column_index: int = cell_index % 8
 			var major_seam: bool = row_index == 2 or column_index == 3
-			seam_style.border_color = Color(0.88, 0.79, 0.64, 0.27 if major_seam else 0.20)
-			seam_style.border_width_right = 2 if column_index == 3 else 1
-			seam_style.border_width_bottom = 2 if row_index == 2 else 1
+			seam_style.border_color = Color(0.92, 0.84, 0.70, 0.46 if major_seam else 0.31)
+			seam_style.border_width_right = 3 if column_index == 3 else 1
+			seam_style.border_width_bottom = 3 if row_index == 2 else 1
 			cell.add_theme_stylebox_override("panel", seam_style)
 			seams.add_child(cell)
+	seams.set_meta("major_seam_non_color_weight", 3)
+	seams.set_meta("minor_seam_non_color_weight", 1)
 
 static func _ensure_arena_field_label(arena: Control, node_name: String, copy: String, enemy_side: bool) -> void:
 	var label: Label = arena.get_node_or_null(node_name) as Label
@@ -1990,12 +1945,15 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 	label.anchor_top = 0.0 if enemy_side else 1.0
 	label.anchor_bottom = 0.0 if enemy_side else 1.0
 	label.offset_left = 12.0
-	label.offset_right = 190.0
-	label.offset_top = 10.0 if enemy_side else -34.0
-	label.offset_bottom = 34.0 if enemy_side else -10.0
-	label.text = copy
-	label.add_theme_font_size_override("font_size", 18)
-	label.add_theme_color_override("font_color", Color(0.94, 0.42, 0.34, 0.76) if enemy_side else Color(0.90, 0.82, 0.66, 0.68))
+	label.offset_right = 360.0
+	label.offset_top = 10.0 if enemy_side else -40.0
+	label.offset_bottom = 40.0 if enemy_side else -10.0
+	label.text = "▲ %s // BREACH" % copy if enemy_side else "■ %s // SURVIVE" % copy
+	label.add_theme_font_size_override("font_size", 21)
+	label.add_theme_color_override("font_color", Color(1.0, 0.52, 0.42, 0.96) if enemy_side else Color(0.96, 0.88, 0.70, 0.94))
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
+	label.add_theme_constant_override("outline_size", 4)
+	label.set_meta("non_color_zone_cue", "triangle_breach" if enemy_side else "square_survival")
 	VisualTypeSystem.set_action(label)
 
 static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
