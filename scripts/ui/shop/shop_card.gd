@@ -178,10 +178,12 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	_compact_presentation = enabled
 	_tight_presentation = enabled and tight
-	set_meta("compact_tooltip_policy", "pinned_shop_band_full_record" if enabled else "full_detail")
-	set_meta("tooltip_suppressed_for_compact", false)
+	set_meta("compact_tooltip_policy", "suppress_hover" if enabled else "full_detail")
+	set_meta("tooltip_suppressed_for_compact", enabled)
 	if _tooltip != null and is_instance_valid(_tooltip):
 		_clear_tooltip()
+	if enabled:
+		_clear_global_tooltip_layers()
 	custom_minimum_size = Vector2(120.0, 54.0) if _tight_presentation else Vector2(132.0, 80.0) if enabled else Vector2(150.0, 122.0)
 	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	set_meta("shop_safe_bottom_gutter", 2.0 if _tight_presentation else 6.0 if enabled else 16.0)
@@ -549,6 +551,11 @@ func _show_tooltip() -> void:
 	set_meta("tooltip_suppressed_for_compact", false)
 	if not is_inside_tree():
 		return
+	_clear_global_tooltip_layers()
+	if _compact_presentation:
+		set_meta("tooltip_suppressed_for_compact", true)
+		set_meta("compact_information_access", "card_summary_and_deliberate_purchase")
+		return
 	var lines: Array[String] = _current_tooltip_lines()
 	if _tooltip_title.strip_edges() == "" and lines.is_empty():
 		return
@@ -616,6 +623,18 @@ func _show_tooltip() -> void:
 	var viewport: Viewport = get_viewport()
 	if viewport != null:
 		_move_tooltip(viewport.get_mouse_position())
+
+func _clear_global_tooltip_layers() -> void:
+	if not is_inside_tree():
+		return
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return
+	for raw_child: Node in tree.root.get_children():
+		if String(raw_child.name) != "ShopCardTooltipLayer":
+			continue
+		tree.root.remove_child(raw_child)
+		raw_child.free()
 
 func _current_tooltip_lines() -> Array[String]:
 	var lines: Array[String] = []

@@ -170,6 +170,26 @@ func _ready() -> void:
 	_expect(pressure_layer != null and bool(pressure_layer.get_meta("compact_fragment_suppression", false)) and float(pressure_layer.get_meta("loss_pressure_density", 1.0)) <= 0.16, "Compact loss retained excessive red-pressure density", failures)
 	_expect(new_game_button != null and new_game_button.visible and _rect_inside(new_game_button.get_global_rect(), compact_viewport.grow(2.0)), "Compact START NEW RUN should retain independent visible bounds", failures)
 	_expect(frame_panel != null and new_game_button != null and _rect_inside(new_game_button.get_global_rect(), frame_panel.get_global_rect().grow(2.0)), "Compact START NEW RUN should remain contained by the casualty record", failures)
+	var compact_scoreboard_row: Control = scoreboard.find_child("ScoreboardRow", true, false) as Control if scoreboard != null else null
+	if compact_scoreboard_row != null:
+		compact_scoreboard_row.call("set_row_data", {
+			"team": "player",
+			"index": 0,
+			"display_name": "Axiom",
+			"value": 9143.0,
+			"share": 1.0,
+			"metric": "damage",
+		})
+	await _settle_frames(2)
+	var compact_value_label: Label = scoreboard.find_child("Value", true, false) as Label if scoreboard != null else null
+	var compact_value_well: Panel = scoreboard.find_child("ValueWell", true, false) as Panel if scoreboard != null else null
+	_expect(compact_value_label != null and compact_value_label.text == "9143", "Compact loss must render an exact four-digit damage value", failures)
+	_expect(compact_value_well != null and compact_value_well.size.x >= 76.0, "Compact loss numeric well is too narrow for four digits", failures)
+	if compact_value_label != null:
+		var compact_value_font: Font = compact_value_label.get_theme_font("font")
+		var compact_value_font_size: int = compact_value_label.get_theme_font_size("font_size")
+		var compact_value_text_width: float = compact_value_font.get_string_size(compact_value_label.text, HORIZONTAL_ALIGNMENT_RIGHT, -1.0, compact_value_font_size).x if compact_value_font != null else compact_value_label.get_combined_minimum_size().x
+		_expect(compact_value_label.size.x >= compact_value_text_width + 2.0, "Compact loss numeric content width clips the four-digit value", failures)
 	_expect(_save_capture("02_loss_overlay_compact_1280x720_150.png"), "compact 150 percent loss capture failed", failures)
 	if window != null:
 		window.content_scale_factor = 1.0

@@ -182,12 +182,15 @@ func _populate() -> void:
 func _style_loss_scoreboard(scoreboard: Node) -> void:
 	if scoreboard == null:
 		return
+	# The loss record is a frozen final tally. Stop the reusable live-combat
+	# scoreboard from reapplying its utility header size every process frame.
+	scoreboard.set_process(false)
 	var scoreboard_title: Label = scoreboard.get_node_or_null("Header/Title") as Label
 	if scoreboard_title != null:
 		scoreboard_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		VisualTypeSystem.set_utility_bold(scoreboard_title)
 		scoreboard_title.add_theme_font_size_override("font_size", 21)
 		scoreboard_title.add_theme_color_override("font_color", Color(0.94, 0.84, 0.69, 1.0))
-		VisualTypeSystem.set_utility_bold(scoreboard_title)
 	for raw_row: Node in scoreboard.find_children("*", "ScoreboardRow", true, false):
 		if raw_row.has_method("set_record_emphasis"):
 			raw_row.call("set_record_emphasis", true)
@@ -735,7 +738,9 @@ func _sync_layout() -> void:
 				raw_row.call("set_record_emphasis", not tight_compact)
 			if raw_row.has_method("set_compact_layout"):
 				raw_row.call("set_compact_layout", tight_compact)
-		var scoreboard_title: Label = scoreboard_holder.find_child("Title", true, false) as Label
+			if raw_row.has_method("set_exact_compact_values"):
+				raw_row.call("set_exact_compact_values", tight_compact)
+		var scoreboard_title: Label = scoreboard_holder.get_node_or_null("Scoreboard/Header/Title") as Label
 		if scoreboard_title != null:
 			scoreboard_title.add_theme_font_size_override("font_size", 14 if tight_compact else 21)
 	if new_game_button != null:
@@ -793,7 +798,7 @@ func _reassert_loss_scoreboard_typography() -> void:
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var tight_compact: bool = viewport_size.x <= 1000.0 or viewport_size.y <= 520.0
-	var scoreboard_title: Label = scoreboard_holder.find_child("Title", true, false) as Label
+	var scoreboard_title: Label = scoreboard_holder.get_node_or_null("Scoreboard/Header/Title") as Label
 	if scoreboard_title != null:
 		scoreboard_title.add_theme_font_size_override("font_size", 14 if tight_compact else 21)
 

@@ -353,6 +353,11 @@ func _assert_active_combat_shell() -> void:
 	_expect(onset_geometry != null and bool(onset_geometry.get_meta("protected_center_clear", false)), "combat onset evidence does not preserve the playable center")
 	_expect(reduced_geometry != null and onset_geometry != null and float(reduced_geometry.get_meta("overlay_density", 1.0)) < float(onset_geometry.get_meta("overlay_density", 0.0)), "reduced motion is not lower-density than the kinetic onset")
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "combat grid seams do not stay above the environment")
+	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.09 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.14, "combat seams must remain readable without becoming a graph overlay")
+	_assert_material_battlefield_painter(onset_geometry, "breached_edges")
+	_assert_material_battlefield_painter(midfight_geometry, "contaminated_crossfire")
+	_assert_material_battlefield_painter(collapse_geometry, "collapsed_perimeter")
+	_assert_material_battlefield_painter(reduced_geometry, "static_threat_lock")
 	var pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "")) if arena_container != null else ""
 	_expect(not pressure_phase.is_empty(), "combat environment did not publish its evolving pressure phase")
 	_expect(arena_container != null and String(arena_container.get_meta("battlefield_environment_signature", "")).begins_with("physical_warfield/"), "combat environment lacks a measurable physical-composition signature")
@@ -395,6 +400,7 @@ func _assert_persistent_combat_chrome(context: String) -> void:
 		_expect(system_menu.z_index >= 200, "%s Menu is not protected above combat/result pressure layers" % context)
 	if instruction_ribbon != null:
 		_expect(not instruction_ribbon.z_as_relative and instruction_ribbon.z_index >= 200, "%s instruction ribbon is not protected above combat/result pressure layers" % context)
+		_expect(bool(instruction_ribbon.get_meta("persistent_copy_uses_utility_face", false)), "%s persistent instruction ribbon regressed to condensed display type" % context)
 
 func _assert_resolved_stage_phase(outcome: String) -> void:
 	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
@@ -437,8 +443,22 @@ func _assert_physical_aftermath_painter(group: Control, expected_variant: String
 	_expect(int(group.get_meta("authored_evidence_spec_count", 0)) >= minimum_authored_evidence, "%s aftermath lost authored physical evidence density" % expected_variant)
 	if painter != null:
 		_expect(String(painter.get_meta("outcome_variant", "")) == expected_variant, "%s painter exposes the wrong outcome variant" % expected_variant)
-		_expect(String(painter.get_meta("physical_material_language", "")).contains("mud_crater_broken_timber"), "%s painter does not publish physical mud/timber/crater material language" % expected_variant)
+		_expect(String(painter.get_meta("physical_material_language", "")).contains("wet_mud_pooled_crater_splintered_timber"), "%s painter does not publish physical wet-mud/splintered-timber material language" % expected_variant)
 		_expect(int(painter.get_meta("flat_rectangle_count", -1)) == 0, "%s painter regressed to flat rectangle construction" % expected_variant)
+		_expect(int(painter.get_meta("outlined_primitive_count", -1)) == 0, "%s painter regressed to hollow outlined primitives" % expected_variant)
+
+func _assert_material_battlefield_painter(group: Control, expected_signature: String) -> void:
+	_expect(group != null, "%s battlefield group is missing" % expected_signature)
+	if group == null:
+		return
+	var painter: Control = group.get_node_or_null("PhysicalEvidencePainter") as Control
+	_expect(painter != null, "%s battlefield group lost its material painter" % expected_signature)
+	if painter == null:
+		return
+	_expect(String(painter.get_meta("phase_evidence_signature", "")) == expected_signature, "%s battlefield state is not visibly differentiated" % expected_signature)
+	_expect(String(painter.get_meta("physical_material_language", "")).contains("wet_mud_pooled_crater_splintered_timber"), "%s battlefield state lacks wet-earth and splintered-timber material language" % expected_signature)
+	_expect(int(painter.get_meta("outlined_primitive_count", -1)) == 0, "%s battlefield state reverted to hollow outlined primitives" % expected_signature)
+	_expect(int(painter.get_meta("straight_bar_count", -1)) == 0, "%s battlefield state reverted to flat straight bars" % expected_signature)
 
 func _assert_result_frame_inside_viewport(card: PanelContainer, skip_button: Button, outcome: String) -> void:
 	if card == null or skip_button == null:

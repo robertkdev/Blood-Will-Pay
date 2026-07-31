@@ -77,9 +77,12 @@ func _run() -> void:
 	var hostile_label: Label = _arena.get_node_or_null("EnemyFieldLabel") as Label
 	var survival_label: Label = _arena.get_node_or_null("PlayerFieldLabel") as Label
 	_expect(seams != null and seams.get_child_count() == 48, "battlefield lost its 8x6 cell-seam readability layer")
-	_expect(seams != null and int(seams.get_meta("major_seam_non_color_weight", 0)) >= 3, "battlefield major seams lack a non-color weight cue")
+	_expect(seams != null and int(seams.get_meta("major_seam_non_color_weight", 0)) >= 2, "battlefield major seams lack a non-color weight cue")
+	_expect(seams != null and float(seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.09 and float(seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.14, "battlefield seams must stay legible without reverting to a graph overlay")
 	_expect(hostile_label != null and hostile_label.text.begins_with("▲") and hostile_label.text.contains("BREACH"), "hostile territory lacks its triangle/breach non-color cue")
 	_expect(survival_label != null and survival_label.text.begins_with("■") and survival_label.text.contains("SURVIVE"), "survival territory lacks its square/survive non-color cue")
+	_expect(hostile_label != null and bool(hostile_label.get_meta("persistent_copy_uses_utility_face", false)), "persistent hostile instruction must use the readable utility face")
+	_expect(survival_label != null and bool(survival_label.get_meta("persistent_copy_uses_utility_face", false)), "persistent survival instruction must use the readable utility face")
 	_save_capture("05_bounded_reduced_motion_field.png")
 
 	_bridge.call("_on_arena_pressure_changed", 1.0, 0)

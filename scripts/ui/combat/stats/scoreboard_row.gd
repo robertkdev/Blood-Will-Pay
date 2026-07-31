@@ -24,10 +24,16 @@ var _hovered: bool = false
 var _record_emphasis: bool = false
 var _compact_layout: bool = false
 var _compact_identity_font_size: int = 14
+var _exact_compact_values: bool = false
 
 func set_compact_layout(enabled: bool) -> void:
 	_compact_layout = enabled
 	set_meta("compact_layout", enabled)
+	_refresh()
+
+func set_exact_compact_values(enabled: bool) -> void:
+	_exact_compact_values = enabled
+	set_meta("exact_compact_values", enabled)
 	_refresh()
 
 func set_record_emphasis(enabled: bool) -> void:
@@ -122,6 +128,7 @@ func _apply_visual_style() -> void:
 		value_label.add_theme_constant_override("outline_size", 1)
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		value_label.clip_text = true
+		value_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 
 func _compact_identity_for_width(unit_name: String, team_prefix: String, available_width: float) -> String:
 	var clean_name: String = unit_name.strip_edges().to_upper()
@@ -193,20 +200,24 @@ func _ensure_layout() -> void:
 		content_box.custom_minimum_size = Vector2(0.0, 34.0) if _compact_layout else Vector2(0.0, 78.0) if _record_emphasis else Vector2(0.0, 42.0)
 		_ensure_value_well()
 	if name_label != null:
+		var compact_value_width: float = _compact_numeric_well_width()
 		name_label.anchor_left = 0.0
 		name_label.anchor_right = 1.0
 		name_label.anchor_top = 0.0
 		name_label.anchor_bottom = 1.0
 		name_label.offset_left = 4.0 if _compact_layout else 16.0 if _record_emphasis else 10.0
-		name_label.offset_right = -22.0 if _compact_layout else -126.0 if _record_emphasis else -84.0
+		name_label.offset_right = -compact_value_width if _compact_layout else -126.0 if _record_emphasis else -84.0
 		name_label.clip_text = true
 	if value_label != null:
+		var compact_content_width: float = _compact_numeric_content_width()
+		var compact_right_inset: float = _compact_numeric_right_inset()
 		value_label.anchor_left = 1.0
 		value_label.anchor_right = 1.0
 		value_label.anchor_top = 0.0
 		value_label.anchor_bottom = 1.0
-		value_label.offset_left = -20.0 if _compact_layout else -116.0 if _record_emphasis else -76.0
-		value_label.offset_right = -4.0 if _compact_layout else -14.0 if _record_emphasis else -10.0
+		value_label.offset_left = -compact_content_width - compact_right_inset if _compact_layout else -116.0 if _record_emphasis else -76.0
+		value_label.offset_right = -compact_right_inset if _compact_layout else -14.0 if _record_emphasis else -10.0
+		value_label.set_meta("compact_numeric_content_width", compact_content_width if _compact_layout else 0.0)
 
 func _make_row_style(player_side: bool, hovered: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -232,11 +243,13 @@ func _ensure_value_well() -> void:
 	_value_well.anchor_right = 1.0
 	_value_well.anchor_top = 0.0
 	_value_well.anchor_bottom = 1.0
-	_value_well.offset_left = -22.0 if _compact_layout else -122.0 if _record_emphasis else -82.0
+	var compact_well_width: float = _compact_numeric_well_width()
+	_value_well.offset_left = -compact_well_width if _compact_layout else -122.0 if _record_emphasis else -82.0
 	_value_well.offset_right = 0.0
 	_value_well.offset_top = 3.0
 	_value_well.offset_bottom = -3.0
 	_value_well.add_theme_stylebox_override("panel", _make_value_well_style())
+	_value_well.set_meta("compact_numeric_well_width", compact_well_width if _compact_layout else 0.0)
 	if name_label != null:
 		content_box.move_child(name_label, content_box.get_child_count() - 1)
 	if value_label != null:
@@ -254,12 +267,23 @@ func _make_value_well_style() -> StyleBox:
 	style.content_margin_right = 8
 	return style
 
+func _compact_numeric_well_width() -> float:
+	return 78.0 if _exact_compact_values else 22.0
+
+func _compact_numeric_content_width() -> float:
+	return 64.0 if _exact_compact_values else 16.0
+
+func _compact_numeric_right_inset() -> float:
+	return 8.0 if _exact_compact_values else 4.0
+
 func _format_value(v: float) -> String:
 	if metric_key == "dps":
 		if v >= 1000.0:
 			return String.num(v/1000.0, 1) + "k"
 		return String.num(v, 1)
 	if metric_key == "casts":
+		return str(int(round(v)))
+	if _compact_layout and _exact_compact_values and absi(int(round(v))) < 10000:
 		return str(int(round(v)))
 	if v >= 1000000.0:
 		return String.num(v/1000000.0, 1) + "m"

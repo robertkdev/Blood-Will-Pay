@@ -232,7 +232,11 @@ func _build_system_menu() -> void:
 	_system_menu_button = Button.new()
 	_system_menu_button.name = "SystemMenuButton"
 	_system_menu_button.text = "SYS // MENU"
-	_system_menu_button.tooltip_text = "Open system command menu"
+	# Native delayed tooltips can remain onscreen while automated scale changes
+	# and result transitions move the button, obscuring unrelated tactical UI.
+	# The visible SYS // MENU label is already self-describing.
+	_system_menu_button.tooltip_text = ""
+	_system_menu_button.set_meta("native_tooltip_suppressed", true)
 	_system_menu_button.focus_mode = Control.FOCUS_ALL
 	_system_menu_button.custom_minimum_size = Vector2(144.0, 40.0)
 	_system_menu_button.anchor_left = 1.0

@@ -379,6 +379,13 @@ func _expect_command_chrome_visible(title_menu: Control, context: String, failur
 	_expect(content_panel != null and content_panel.visible and content_panel.modulate.a >= 0.99, "%s should keep the command record visible" % context, failures)
 	_expect(title_label != null and title_label.visible and title_label.modulate.a >= 0.99 and title_label.text.strip_edges() != "", "%s should keep the title label visible" % context, failures)
 	_expect(title_label != null and String(title_label.get_meta("persistent_masthead", "")) == "blood_will_pay", "%s should mark BLOOD WILL PAY as persistent masthead chrome" % context, failures)
+	var masthead_foreground: Color = title_label.get_meta("masthead_foreground_color", Color.TRANSPARENT) as Color if title_label != null else Color.TRANSPARENT
+	var masthead_background: Color = title_label.get_meta("masthead_background_color", Color.TRANSPARENT) as Color if title_label != null else Color.TRANSPARENT
+	var masthead_minimum_contrast: float = float(title_label.get_meta("masthead_minimum_contrast_ratio", 0.0)) if title_label != null else 0.0
+	_expect(title_label != null and int(title_label.get_meta("settings_masthead_persistence_revision", 0)) >= 3, "%s should retain the strengthened Settings masthead contract" % context, failures)
+	_expect(title_label != null and title_label.get_theme_constant("outline_size") >= 2, "%s should keyline the masthead against the desktop poster field" % context, failures)
+	_expect(title_label != null and title_label.get_theme_color("font_shadow_color").a >= 0.90, "%s should preserve the masthead's dark registration shadow" % context, failures)
+	_expect(masthead_minimum_contrast >= 7.0 and _contrast_ratio(masthead_foreground, masthead_background) >= masthead_minimum_contrast, "%s masthead does not meet its published contrast floor" % context, failures)
 	_expect(title_center != null and title_center.visible and title_center.modulate.a >= 0.99, "%s should keep the masthead center host visible" % context, failures)
 	_expect(title_rail != null and title_rail.visible and title_rail.modulate.a >= 0.99, "%s should keep the masthead rail host visible" % context, failures)
 	_expect(content_stack != null and content_stack.visible and content_stack.modulate.a >= 0.99, "%s should keep the Settings record host visible" % context, failures)

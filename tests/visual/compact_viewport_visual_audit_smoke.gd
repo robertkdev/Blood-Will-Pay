@@ -222,21 +222,10 @@ func _expect_compact_shop_detail_band(context: String) -> void:
 	card.call("_show_tooltip")
 	var tooltip_layer: CanvasLayer = get_tree().root.find_child("ShopCardTooltipLayer", true, false) as CanvasLayer
 	var tooltip: PanelContainer = tooltip_layer.get_node_or_null("ShopCardTooltip") as PanelContainer if tooltip_layer != null else null
-	var detail_scroll: ScrollContainer = tooltip.get_node_or_null("DetailScroll") as ScrollContainer if tooltip != null else null
-	_expect(String(card.get_meta("compact_tooltip_policy", "")) == "pinned_shop_band_full_record", "%s did not select the compact shop-band detail policy" % context)
-	_expect(not bool(card.get_meta("tooltip_suppressed_for_compact", true)), "%s still suppresses access to shop details" % context)
-	_expect(tooltip != null and String(tooltip.get_meta("presentation_mode", "")) == "pinned_shop_band", "%s did not create the pinned shop detail drawer" % context)
-	_expect(tooltip != null and String(tooltip.get_meta("information_access", "")) == "vertical_scroll_complete", "%s shop drawer does not preserve the full detail record" % context)
-	_expect(detail_scroll != null and detail_scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO and detail_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s shop drawer is not vertically scroll-complete" % context)
-	_expect(tooltip != null and bool(tooltip.get_meta("source_card_remains_visible", false)) and bool(card.get_meta("tooltip_source_remains_visible", false)), "%s shop drawer obscures its hovered source card" % context)
-	if tooltip != null and shop_grid != null:
-		var shop_rect: Rect2 = shop_grid.get_global_rect()
-		var tooltip_rect: Rect2 = tooltip.get_global_rect()
-		var source_rect: Rect2 = card.get_global_rect()
-		var width_ratio: float = float(tooltip.get_meta("shop_band_width_ratio", 0.0))
-		_expect(shop_rect.grow(1.0).encloses(tooltip_rect), "%s shop drawer escaped into the board, metrics, or footer: shop=%s drawer=%s" % [context, str(shop_rect), str(tooltip_rect)])
-		_expect(not tooltip_rect.intersects(source_rect), "%s shop drawer overlaps its hovered source" % context)
-		_expect(width_ratio >= 0.40 and width_ratio <= 0.60, "%s shop drawer does not occupy the authored 40-60%% detail band: %.2f" % [context, width_ratio])
+	_expect(String(card.get_meta("compact_tooltip_policy", "")) == "suppress_hover", "%s did not select compact hover suppression" % context)
+	_expect(bool(card.get_meta("tooltip_suppressed_for_compact", false)), "%s did not suppress its obstructive automatic detail plate" % context)
+	_expect(String(card.get_meta("compact_information_access", "")) == "card_summary_and_deliberate_purchase", "%s did not preserve its compact deliberate-interaction information contract" % context)
+	_expect(tooltip_layer == null and tooltip == null, "%s opened an automatic shop detail layer over tactical controls" % context)
 	if card.has_method("_clear_tooltip"):
 		card.call("_clear_tooltip")
 

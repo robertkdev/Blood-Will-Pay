@@ -59,6 +59,7 @@ func _verify_compact_shop_detail_contract() -> void:
 	shop_grid.custom_minimum_size = shop_grid.size
 	add_child(shop_grid)
 	var source_card: Button = null
+	var second_source_card: Button = null
 	for card_index: int in range(5):
 		var card: Button = SHOP_CARD_SCENE.instantiate() as Button
 		card.custom_minimum_size = Vector2(216.0, 62.0)
@@ -67,23 +68,43 @@ func _verify_compact_shop_detail_contract() -> void:
 		card.call("set_data", {"id": "bonko", "name": "Offer %d" % card_index, "price": 1})
 		if card_index == 4:
 			source_card = card
+		elif card_index == 3:
+			second_source_card = card
 	await _settle_frames(3)
+	if second_source_card != null:
+		second_source_card.call("_show_tooltip")
 	if source_card != null:
 		source_card.call("_show_tooltip")
 	await _settle_frames(2)
 	var tooltip: PanelContainer = get_tree().root.find_child("ShopCardTooltip", true, false) as PanelContainer
-	_expect(tooltip != null, "compact shop hover should expose a pinned detail treatment")
-	if tooltip != null and source_card != null:
-		_expect(bool(tooltip.get_meta("source_card_remains_visible", false)), "compact shop detail should keep its source card visible")
-		_expect(String(tooltip.get_meta("opposite_side_anchor", "")) == "left_of_source", "rightmost compact shop source should anchor detail on the opposite side")
-		_expect(String(tooltip.get_meta("information_access", "")) == "vertical_scroll_complete", "compact shop detail should keep the full record scroll-accessible")
-		var width_ratio: float = float(tooltip.get_meta("shop_band_width_ratio", 0.0))
-		_expect(width_ratio >= 0.40 and width_ratio <= 0.60, "compact shop detail should occupy roughly half of ShopGrid, got %.2f" % width_ratio)
-		_expect(shop_grid.get_global_rect().grow(1.0).encloses(tooltip.get_global_rect()), "compact shop detail should remain inside ShopGrid")
+	_expect(tooltip == null, "compact shop hover should not open an automatic detail plate")
+	_expect(_count_root_nodes_named("ShopCardTooltipLayer") == 0, "two sequential compact hovers retained a tooltip layer")
+	_expect(second_source_card != null and String(second_source_card.get_meta("compact_tooltip_policy", "")) == "suppress_hover", "compact shop card did not publish hover suppression")
+	_expect(source_card != null and bool(source_card.get_meta("tooltip_suppressed_for_compact", false)), "compact shop card did not record hover suppression")
+	_expect(source_card != null and String(source_card.get_meta("compact_information_access", "")) == "card_summary_and_deliberate_purchase", "compact shop card did not preserve its deliberate-interaction information contract")
+	for raw_card: Node in shop_grid.get_children():
+		var card: Button = raw_card as Button
+		if card != null:
+			card.call("set_compact_presentation", false, false)
+	if second_source_card != null:
+		second_source_card.call("_show_tooltip")
+	if source_card != null:
+		source_card.call("_show_tooltip")
+	await _settle_frames(2)
+	_expect(_count_root_nodes_named("ShopCardTooltipLayer") == 1, "sequential desktop shop hovers must leave exactly one global tooltip layer")
+	var desktop_tooltip: PanelContainer = get_tree().root.find_child("ShopCardTooltip", true, false) as PanelContainer
+	_expect(desktop_tooltip != null and source_card != null and int(desktop_tooltip.get_meta("source_card_instance_id", 0)) == source_card.get_instance_id(), "global tooltip singleton did not belong to the newest source card")
 	if source_card != null:
 		source_card.call("_clear_tooltip")
 	remove_child(shop_grid)
 	shop_grid.free()
+
+func _count_root_nodes_named(node_name: String) -> int:
+	var count: int = 0
+	for raw_child: Node in get_tree().root.get_children():
+		if String(raw_child.name) == node_name:
+			count += 1
+	return count
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

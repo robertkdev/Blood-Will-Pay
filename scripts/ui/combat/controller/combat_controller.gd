@@ -82,8 +82,9 @@ class ResultAftermathPainter:
 		outcome_variant = next_variant.to_lower()
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		set_meta("outcome_variant", outcome_variant)
-		set_meta("physical_material_language", "mud_crater_broken_timber_ash")
+		set_meta("physical_material_language", "wet_mud_pooled_crater_splintered_timber_ash")
 		set_meta("flat_rectangle_count", 0)
+		set_meta("outlined_primitive_count", 0)
 		queue_redraw()
 
 	func _draw() -> void:
@@ -122,103 +123,178 @@ class ResultAftermathPainter:
 
 	func _draw_victory_field() -> void:
 		var west_bank: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, size.y * 0.74),
-			Vector2(size.x * 0.16, size.y * 0.66),
-			Vector2(size.x * 0.34, size.y * 0.73),
-			Vector2(size.x * 0.40, size.y),
+			Vector2(0.0, size.y * 0.84),
+			Vector2(size.x * 0.12, size.y * 0.79),
+			Vector2(size.x * 0.25, size.y * 0.83),
+			Vector2(size.x * 0.29, size.y),
 			Vector2(0.0, size.y),
 		])
 		var east_bank: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x, size.y * 0.72),
-			Vector2(size.x * 0.84, size.y * 0.65),
-			Vector2(size.x * 0.65, size.y * 0.72),
-			Vector2(size.x * 0.60, size.y),
+			Vector2(size.x, size.y * 0.83),
+			Vector2(size.x * 0.88, size.y * 0.78),
+			Vector2(size.x * 0.74, size.y * 0.84),
+			Vector2(size.x * 0.70, size.y),
 			Vector2(size.x, size.y),
 		])
-		_draw_earth(west_bank, Color(0.045, 0.030, 0.022, 0.82), Color(0.44, 0.24, 0.11, 0.32))
-		_draw_earth(east_bank, Color(0.045, 0.030, 0.022, 0.82), Color(0.44, 0.24, 0.11, 0.32))
-		_draw_log(Vector2(size.x * 0.05, size.y * 0.68), Vector2(size.x * 0.31, size.y * 0.76), 18.0)
-		_draw_log(Vector2(size.x * 0.69, size.y * 0.75), Vector2(size.x * 0.95, size.y * 0.66), 16.0)
+		_draw_earth(west_bank, Color(0.045, 0.030, 0.022, 0.60), Color(0.44, 0.24, 0.11, 0.24))
+		_draw_earth(east_bank, Color(0.045, 0.030, 0.022, 0.60), Color(0.44, 0.24, 0.11, 0.24))
+		_draw_log(Vector2(size.x * 0.03, size.y * 0.78), Vector2(size.x * 0.20, size.y * 0.83), 12.0)
+		_draw_log(Vector2(size.x * 0.80, size.y * 0.83), Vector2(size.x * 0.97, size.y * 0.77), 11.0)
 		_draw_broken_wheel(Vector2(size.x * 0.20, size.y * 0.78), minf(size.x, size.y) * 0.055)
-		var open_lane: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x * 0.45, size.y),
-			Vector2(size.x * 0.47, size.y * 0.48),
-			Vector2(size.x * 0.49, size.y * 0.12),
-			Vector2(size.x * 0.54, size.y * 0.12),
-			Vector2(size.x * 0.56, size.y * 0.48),
-			Vector2(size.x * 0.59, size.y),
-		])
-		_draw_earth(open_lane, Color(0.66, 0.44, 0.21, 0.12), Color(0.84, 0.64, 0.34, 0.18))
+		_draw_abandoned_pack(Vector2(size.x * 0.77, size.y * 0.79), Vector2(size.x * 0.035, size.y * 0.040), 0.3)
+		var opening_steps: Array[Vector2] = [
+			Vector2(size.x * 0.48, size.y * 0.80),
+			Vector2(size.x * 0.52, size.y * 0.63),
+			Vector2(size.x * 0.50, size.y * 0.47),
+		]
+		for step_index: int in range(opening_steps.size()):
+			var step_radii: Vector2 = Vector2(size.x * (0.026 - float(step_index) * 0.004), size.y * 0.018)
+			var step_patch: PackedVector2Array = _irregular_ellipse(opening_steps[step_index], step_radii, 14, float(step_index) * 0.8)
+			draw_colored_polygon(step_patch, Color(0.62, 0.42, 0.22, 0.13))
+		_draw_blood_path(PackedVector2Array([
+			Vector2(size.x * 0.42, size.y * 0.76),
+			Vector2(size.x * 0.47, size.y * 0.60),
+			Vector2(size.x * 0.51, size.y * 0.46),
+		]), minf(size.x, size.y) * 0.012, Color(0.28, 0.012, 0.014, 0.30))
 
 	func _draw_stalemate_field() -> void:
 		# A deadlock is expressed by two collapsed, edge-grounded barricades and
 		# a churned center. Long cross-screen beams looked like raw rectangles.
-		_draw_log(Vector2(size.x * 0.03, size.y * 0.32), Vector2(size.x * 0.27, size.y * 0.47), 13.0)
-		_draw_log(Vector2(size.x * 0.08, size.y * 0.58), Vector2(size.x * 0.30, size.y * 0.50), 10.0)
-		_draw_log(Vector2(size.x * 0.97, size.y * 0.34), Vector2(size.x * 0.73, size.y * 0.48), 13.0)
-		_draw_log(Vector2(size.x * 0.92, size.y * 0.61), Vector2(size.x * 0.70, size.y * 0.52), 10.0)
+		_draw_log(Vector2(size.x * 0.02, size.y * 0.38), Vector2(size.x * 0.16, size.y * 0.45), 9.0)
+		_draw_log(Vector2(size.x * 0.05, size.y * 0.57), Vector2(size.x * 0.19, size.y * 0.52), 7.0)
+		_draw_log(Vector2(size.x * 0.98, size.y * 0.39), Vector2(size.x * 0.84, size.y * 0.46), 9.0)
+		_draw_log(Vector2(size.x * 0.95, size.y * 0.59), Vector2(size.x * 0.81, size.y * 0.53), 7.0)
 		_draw_crater(Vector2(size.x * 0.50, size.y * 0.54), Vector2(size.x * 0.085, size.y * 0.042), 0.88)
 		var deadlock_mud: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.54), Vector2(size.x * 0.14, size.y * 0.075), 30, 1.2)
 		_draw_earth(deadlock_mud, Color(0.022, 0.019, 0.022, 0.78), Color(0.32, 0.26, 0.25, 0.24))
 		_draw_broken_wheel(Vector2(size.x * 0.18, size.y * 0.72), minf(size.x, size.y) * 0.036)
+		_draw_abandoned_pack(Vector2(size.x * 0.81, size.y * 0.73), Vector2(size.x * 0.032, size.y * 0.038), 1.6)
+		_draw_blood_path(PackedVector2Array([
+			Vector2(size.x * 0.43, size.y * 0.48),
+			Vector2(size.x * 0.50, size.y * 0.54),
+			Vector2(size.x * 0.57, size.y * 0.49),
+		]), minf(size.x, size.y) * 0.014, Color(0.22, 0.014, 0.018, 0.28))
 
 	func _draw_defeat_field() -> void:
 		# Keep the generated battlefield visible. Defeat now leaves smaller,
 		# textured wreckage at the perimeter and a grounded grave scar instead
 		# of a solid black canopy/jaw swallowing most of the viewport.
 		var west_collapse: PackedVector2Array = PackedVector2Array([
-			Vector2(0.0, size.y * 0.08),
-			Vector2(size.x * 0.10, size.y * 0.12),
-			Vector2(size.x * 0.17, size.y * 0.24),
-			Vector2(size.x * 0.13, size.y * 0.39),
+			Vector2(0.0, size.y * 0.20),
+			Vector2(size.x * 0.055, size.y * 0.22),
+			Vector2(size.x * 0.105, size.y * 0.29),
+			Vector2(size.x * 0.075, size.y * 0.37),
 			Vector2(0.0, size.y * 0.34),
 		])
 		var east_collapse: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x, size.y * 0.10),
-			Vector2(size.x * 0.90, size.y * 0.14),
-			Vector2(size.x * 0.83, size.y * 0.27),
-			Vector2(size.x * 0.88, size.y * 0.40),
+			Vector2(size.x, size.y * 0.21),
+			Vector2(size.x * 0.945, size.y * 0.23),
+			Vector2(size.x * 0.895, size.y * 0.30),
+			Vector2(size.x * 0.925, size.y * 0.38),
 			Vector2(size.x, size.y * 0.35),
 		])
-		_draw_earth(west_collapse, Color(0.020, 0.010, 0.010, 0.82), Color(0.34, 0.075, 0.050, 0.32))
-		_draw_earth(east_collapse, Color(0.020, 0.010, 0.010, 0.82), Color(0.34, 0.075, 0.050, 0.32))
-		_draw_log(Vector2(size.x * 0.02, size.y * 0.20), Vector2(size.x * 0.22, size.y * 0.38), 12.0)
-		_draw_log(Vector2(size.x * 0.98, size.y * 0.22), Vector2(size.x * 0.78, size.y * 0.40), 12.0)
-		_draw_log(Vector2(size.x * 0.06, size.y * 0.72), Vector2(size.x * 0.26, size.y * 0.66), 10.0)
-		_draw_log(Vector2(size.x * 0.94, size.y * 0.73), Vector2(size.x * 0.74, size.y * 0.67), 10.0)
-		var grave_mouth: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.90), Vector2(size.x * 0.18, size.y * 0.072), 34, 2.4)
+		_draw_earth(west_collapse, Color(0.020, 0.010, 0.010, 0.60), Color(0.34, 0.075, 0.050, 0.24))
+		_draw_earth(east_collapse, Color(0.020, 0.010, 0.010, 0.60), Color(0.34, 0.075, 0.050, 0.24))
+		_draw_log(Vector2(size.x * 0.01, size.y * 0.28), Vector2(size.x * 0.14, size.y * 0.37), 9.0)
+		_draw_log(Vector2(size.x * 0.99, size.y * 0.29), Vector2(size.x * 0.86, size.y * 0.38), 9.0)
+		_draw_log(Vector2(size.x * 0.04, size.y * 0.73), Vector2(size.x * 0.18, size.y * 0.69), 7.0)
+		_draw_log(Vector2(size.x * 0.96, size.y * 0.74), Vector2(size.x * 0.82, size.y * 0.70), 7.0)
+		var grave_mouth: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.91), Vector2(size.x * 0.13, size.y * 0.052), 34, 2.4)
 		_draw_earth(grave_mouth, Color(0.025, 0.006, 0.009, 0.88), Color(0.58, 0.045, 0.035, 0.32))
-		var grave_inner: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.91), Vector2(size.x * 0.115, size.y * 0.040), 30, 0.7)
-		_draw_earth(grave_inner, Color(0.002, 0.002, 0.003, 0.92), Color(0.16, 0.035, 0.036, 0.32))
+		var grave_inner: PackedVector2Array = _irregular_ellipse(Vector2(size.x * 0.50, size.y * 0.915), Vector2(size.x * 0.078, size.y * 0.028), 30, 0.7)
+		_draw_earth(grave_inner, Color(0.008, 0.006, 0.008, 0.84), Color(0.16, 0.035, 0.036, 0.28))
 		_draw_broken_wheel(Vector2(size.x * 0.82, size.y * 0.74), minf(size.x, size.y) * 0.038)
+		_draw_abandoned_pack(Vector2(size.x * 0.20, size.y * 0.72), Vector2(size.x * 0.038, size.y * 0.046), 2.1)
+		_draw_blood_path(PackedVector2Array([
+			Vector2(size.x * 0.31, size.y * 0.55),
+			Vector2(size.x * 0.40, size.y * 0.67),
+			Vector2(size.x * 0.48, size.y * 0.80),
+			Vector2(size.x * 0.51, size.y * 0.91),
+		]), minf(size.x, size.y) * 0.020, Color(0.34, 0.006, 0.012, 0.42))
 
 	func _draw_earth(points: PackedVector2Array, fill: Color, edge: Color) -> void:
 		draw_colored_polygon(points, fill)
-		var closed_points: PackedVector2Array = points.duplicate()
-		if not closed_points.is_empty():
-			closed_points.append(closed_points[0])
-		draw_polyline(closed_points, edge, 3.0, true)
+		if points.size() >= 3:
+			var center: Vector2 = Vector2.ZERO
+			for point: Vector2 in points:
+				center += point
+			center /= float(points.size())
+			var wet_center: PackedVector2Array = PackedVector2Array()
+			for point: Vector2 in points:
+				wet_center.append(center.lerp(point, 0.72) + Vector2(2.0, 3.0))
+			draw_colored_polygon(wet_center, Color(edge.r, edge.g, edge.b, edge.a * 0.34))
 
 	func _draw_log(from: Vector2, to: Vector2, width: float) -> void:
-		draw_line(from, to, Color(0.006, 0.004, 0.004, 0.92), width + 8.0, true)
-		draw_line(from, to, Color(0.075, 0.035, 0.022, 0.96), width, true)
-		var direction: Vector2 = (to - from).normalized()
+		var length: float = from.distance_to(to)
+		if length <= 1.0:
+			return
+		var direction: Vector2 = (to - from) / length
 		var normal: Vector2 = Vector2(-direction.y, direction.x)
-		draw_line(from + normal * width * 0.22, to + normal * width * 0.22, Color(0.42, 0.16, 0.070, 0.42), 2.0, true)
-		draw_line(to, to + direction * 18.0 + normal * 8.0, Color(0.02, 0.009, 0.007, 0.92), maxf(3.0, width * 0.28), true)
+		var shadow: PackedVector2Array = PackedVector2Array([
+			from - normal * width * 0.72 - direction * width * 0.34,
+			from + normal * width * 0.62,
+			to + normal * width * 0.48 + direction * width * 0.58,
+			to - normal * width * 0.68 + direction * width * 0.22,
+		])
+		draw_colored_polygon(shadow, Color(0.004, 0.003, 0.003, 0.86))
+		var timber: PackedVector2Array = PackedVector2Array([
+			from - normal * width * 0.42,
+			from + normal * width * 0.38,
+			from + direction * length * 0.40 + normal * width * 0.53,
+			to + normal * width * 0.28,
+			to + direction * width * 0.70,
+			to - normal * width * 0.48,
+			from + direction * length * 0.58 - normal * width * 0.56,
+		])
+		draw_colored_polygon(timber, Color(0.075, 0.035, 0.022, 0.94))
+		draw_line(from + direction * length * 0.10 + normal * width * 0.08, to - direction * length * 0.12 + normal * width * 0.02, Color(0.42, 0.16, 0.070, 0.32), 1.5, true)
+		draw_line(to - direction * width * 0.18, to + direction * width * 0.90 + normal * width * 0.72, Color(0.018, 0.008, 0.006, 0.94), maxf(3.0, width * 0.24), true)
 
 	func _draw_crater(center: Vector2, radii: Vector2, phase: float) -> void:
 		var outer: PackedVector2Array = _irregular_ellipse(center, radii, 28, phase)
 		var inner: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.05, radii.y * 0.08), radii * 0.58, 24, phase + 1.4)
-		_draw_earth(outer, Color(0.07, 0.025, 0.018, 0.72), Color(0.44, 0.16, 0.060, 0.34))
-		_draw_earth(inner, Color(0.004, 0.003, 0.004, 0.90), Color(0.24, 0.045, 0.035, 0.28))
+		draw_colored_polygon(outer, Color(0.10, 0.050, 0.028, 0.66))
+		draw_colored_polygon(inner, Color(0.014, 0.011, 0.013, 0.76))
+		var pooled_water: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.10, radii.y * 0.16), radii * Vector2(0.38, 0.24), 18, phase + 2.1)
+		draw_colored_polygon(pooled_water, Color(0.20, 0.17, 0.15, 0.16))
+		for clod_index: int in range(6):
+			var angle: float = TAU * float(clod_index) / 6.0 + phase
+			var clod_center: Vector2 = center + Vector2(cos(angle) * radii.x * 0.92, sin(angle) * radii.y * 0.92)
+			var clod: PackedVector2Array = _irregular_ellipse(clod_center, Vector2(radii.x * 0.10, radii.y * 0.15), 8, angle)
+			draw_colored_polygon(clod, Color(0.24, 0.12, 0.060, 0.30))
 
 	func _draw_broken_wheel(center: Vector2, radius: float) -> void:
-		draw_circle(center, radius, Color(0.012, 0.008, 0.006, 0.76), true)
-		draw_arc(center, radius, -2.8, 1.5, 30, Color(0.10, 0.050, 0.028, 0.94), 9.0, true)
-		for spoke_index: int in range(6):
+		var wheel_shadow: PackedVector2Array = _irregular_ellipse(center, Vector2(radius, radius * 0.82), 17, 0.5)
+		var hub: PackedVector2Array = _irregular_ellipse(center + Vector2(radius * 0.08, radius * 0.04), Vector2(radius * 0.18, radius * 0.14), 9, 1.7)
+		draw_colored_polygon(wheel_shadow, Color(0.012, 0.008, 0.006, 0.70))
+		draw_colored_polygon(hub, Color(0.10, 0.050, 0.028, 0.88))
+		for spoke_index: int in [0, 1, 3, 5]:
 			var angle: float = TAU * float(spoke_index) / 6.0
-			draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius * 0.82, Color(0.16, 0.075, 0.036, 0.76), 4.0, true)
+			draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius * 0.78, Color(0.16, 0.075, 0.036, 0.68), 3.0, true)
+
+	func _draw_abandoned_pack(center: Vector2, extent: Vector2, phase: float) -> void:
+		var body: PackedVector2Array = PackedVector2Array([
+			center + Vector2(-extent.x, -extent.y * 0.56),
+			center + Vector2(-extent.x * 0.42, -extent.y),
+			center + Vector2(extent.x * 0.64, -extent.y * 0.78),
+			center + Vector2(extent.x, extent.y * 0.34),
+			center + Vector2(extent.x * 0.30, extent.y),
+			center + Vector2(-extent.x * 0.82, extent.y * 0.62),
+		])
+		draw_colored_polygon(body, Color(0.16, 0.105, 0.068, 0.72))
+		draw_line(body[0], body[3], Color(0.50, 0.34, 0.18, 0.30), 2.0, true)
+		var strap_end: Vector2 = center + Vector2(cos(phase) * extent.x * 1.8, extent.y * 1.5)
+		draw_line(center + Vector2(extent.x * 0.34, extent.y * 0.20), strap_end, Color(0.055, 0.034, 0.026, 0.84), 4.0, true)
+
+	func _draw_blood_path(points: PackedVector2Array, width: float, color: Color) -> void:
+		if points.size() < 2:
+			return
+		for point_index: int in range(points.size()):
+			var radius_scale: float = 0.72 + float(point_index % 3) * 0.18
+			var pool: PackedVector2Array = _irregular_ellipse(points[point_index], Vector2(width * radius_scale, width * 0.58 * radius_scale), 12, float(point_index) * 0.9)
+			draw_colored_polygon(pool, color)
+			if point_index < points.size() - 1:
+				draw_line(points[point_index], points[point_index + 1], Color(color.r, color.g, color.b, color.a * 0.64), maxf(2.0, width * 0.32), true)
 
 	func _irregular_ellipse(center: Vector2, radii: Vector2, steps: int, phase: float) -> PackedVector2Array:
 		var points: PackedVector2Array = PackedVector2Array()
@@ -3327,6 +3403,10 @@ func _protect_persistent_hud_chrome() -> void:
 	var combat_context_visible: bool = _tactical_phase_visual_state == 1 or result_visible
 	if not combat_context_visible:
 		return
+	if result_visible:
+		# Responsive relayouts can re-enable planning rails after the result
+		# opens. Reassert the clean consequence-reading field every frame.
+		_set_result_underlay_visibility(false)
 	var stage_bar: Control = parent.find_child("StageProgressTopBar", true, false) as Control
 	if stage_bar != null:
 		stage_bar.visible = true
@@ -3377,7 +3457,8 @@ func _protect_persistent_hud_chrome() -> void:
 		instruction_ribbon.z_index = 218
 		instruction_ribbon.modulate = Color.WHITE
 		instruction_ribbon.self_modulate = Color.WHITE
-		instruction_ribbon.text = "FIELD ORDER // CONSEQUENCE RECORDED // ENTER / SPACE TO ADVANCE" if result_visible else "FIELD ORDER // FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
+		var compact_instruction: bool = parent.get_viewport_rect().size.x <= 1000.0
+		instruction_ribbon.text = "FIELD ORDER // RECORDED // ENTER / SPACE" if result_visible and compact_instruction else "FIELD ORDER // CONSEQUENCE RECORDED // ENTER / SPACE TO ADVANCE" if result_visible else "FIELD ORDER // FIGHT // SURVIVE" if compact_instruction else "FIELD ORDER // FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
 		instruction_ribbon.set_meta("persistent_combat_hierarchy", true)
 	var tree: SceneTree = parent.get_tree()
 	var system_menu: Button = tree.root.find_child("SystemMenuButton", true, false) as Button if tree != null else null
@@ -3448,6 +3529,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 		skip_button.disabled = true
 	_configure_result_aftermath(banner, title, accent_color, title_color)
 	banner.add_theme_stylebox_override("panel", _make_result_scrim_style(title))
+	_set_result_underlay_visibility(false)
 	banner.visible = true
 	banner.modulate = Color.WHITE
 	_protect_persistent_hud_chrome()
@@ -3740,6 +3822,9 @@ func _apply_result_damage_geometry(card: PanelContainer, title: String) -> void:
 func _hide_result_banner() -> void:
 	if _result_banner != null and is_instance_valid(_result_banner):
 		_result_banner.visible = false
+	_set_result_underlay_visibility(true)
+	sync_tactical_phase_visuals(true)
+	_sync_bottom_combat_visibility(true)
 	var stage_bar: Control = parent.find_child("StageProgressTopBar", true, false) as Control if parent != null else null
 	if stage_bar != null:
 		if stage_bar.has_method("set_result_state"):
@@ -3752,6 +3837,33 @@ func _hide_result_banner() -> void:
 	_result_hold_active = false
 	_result_hold_finishing = false
 	_result_hold_elapsed = 0.0
+
+func _set_result_underlay_visibility(restore_phase_visibility: bool) -> void:
+	if parent == null:
+		return
+	var hidden_during_result: PackedStringArray = PackedStringArray([
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
+		"MarginContainer/VBoxContainer/ActionsRow",
+		"MarginContainer/VBoxContainer/WagerSummary",
+		"MarginContainer/VBoxContainer/BenchArea",
+		"MarginContainer/VBoxContainer/BottomStorageArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry",
+	])
+	if restore_phase_visibility:
+		for field_label_name: String in ["EnemyFieldLabel", "PlayerFieldLabel"]:
+			var restored_field_label: Control = parent.find_child(field_label_name, true, false) as Control
+			if restored_field_label != null:
+				restored_field_label.visible = true
+				restored_field_label.set_meta("suppressed_for_result_reading", false)
+		return
+	for path: String in hidden_during_result:
+		_set_control_visible(path, false)
+	for hidden_field_name: String in ["EnemyFieldLabel", "PlayerFieldLabel"]:
+		var field_label: Control = parent.find_child(hidden_field_name, true, false) as Control
+		if field_label != null:
+			field_label.visible = false
+			field_label.set_meta("suppressed_for_result_reading", true)
 
 func handle_result_input(event: InputEvent) -> bool:
 	if not _result_hold_active or _result_banner == null or not is_instance_valid(_result_banner) or not _result_banner.visible:
@@ -3999,7 +4111,8 @@ func _ensure_result_banner() -> PanelContainer:
 	outcome_signal.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	outcome_signal.add_theme_font_size_override("font_size", 19)
 	outcome_signal.add_theme_color_override("font_color", Color(0.90, 0.80, 0.64, 1.0))
-	VisualTypeSystem.set_action(outcome_signal)
+	outcome_signal.set_meta("persistent_copy_uses_utility_face", true)
+	VisualTypeSystem.set_utility_bold(outcome_signal)
 	content.add_child(outcome_signal)
 	var hold_progress: ProgressBar = ProgressBar.new()
 	hold_progress.name = "ResultHoldProgress"
@@ -4126,17 +4239,19 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	if defeat_geometry != null:
 		defeat_geometry.visible = title == "DEFEAT"
 	if field_art != null:
-		field_art.modulate = Color(1.10, 0.88, 0.80, 0.74) if title == "VICTORY" else Color(0.70, 0.66, 0.74, 0.70) if title == "STALEMATE" else Color(1.12, 0.56, 0.52, 0.80)
+		field_art.modulate = Color(1.02, 0.92, 0.86, 0.82) if title == "VICTORY" else Color(0.78, 0.75, 0.78, 0.80) if title == "STALEMATE" else Color(0.90, 0.68, 0.64, 0.84)
 		field_art.pivot_offset = field_art.size * 0.5
 		field_art.scale = Vector2(1.0, 0.98) if title == "VICTORY" else Vector2(0.98, 1.0) if title == "STALEMATE" else Vector2(1.05, 1.06)
 	if blood_wash != null:
+		var opening_wash_alpha: float = 0.10 if title == "VICTORY" else 0.11 if title == "STALEMATE" else 0.16
+		var closing_wash_alpha: float = 0.12 if title == "VICTORY" else 0.13 if title == "STALEMATE" else 0.20
 		var gradient: Gradient = Gradient.new()
 		gradient.offsets = PackedFloat32Array([0.0, 0.30, 0.66, 1.0])
 		gradient.colors = PackedColorArray([
-			Color(accent_color.r, accent_color.g, accent_color.b, 0.44),
+			Color(accent_color.r, accent_color.g, accent_color.b, opening_wash_alpha),
 			Color(0.02, 0.01, 0.015, 0.05),
-			Color(0.14, 0.0, 0.015, 0.14),
-			Color(accent_color.r, accent_color.g, accent_color.b, 0.54),
+			Color(0.14, 0.0, 0.015, 0.05),
+			Color(accent_color.r, accent_color.g, accent_color.b, closing_wash_alpha),
 		])
 		var gradient_texture: GradientTexture2D = GradientTexture2D.new()
 		gradient_texture.width = 512

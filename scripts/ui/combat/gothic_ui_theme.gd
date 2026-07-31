@@ -32,6 +32,10 @@ class ArenaEvidencePainter:
 	func configure(next_state: String) -> void:
 		evidence_state = next_state
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_meta("physical_material_language", "wet_mud_pooled_crater_splintered_timber_torn_cloth")
+		set_meta("outlined_primitive_count", 0)
+		set_meta("straight_bar_count", 0)
+		set_meta("phase_evidence_signature", "breached_edges" if evidence_state == "onset" else "contaminated_crossfire" if evidence_state == "midfight" else "collapsed_perimeter" if evidence_state == "collapse" else "static_threat_lock")
 		queue_redraw()
 
 	func _draw() -> void:
@@ -74,6 +78,7 @@ class ArenaEvidencePainter:
 			]),
 			Color(0.27, 0.020, 0.016, 0.24)
 		)
+		_draw_torn_cloth(Vector2(size.x * 0.90, size.y * 0.69), Vector2(size.x * 0.034, size.y * 0.026), Color(0.29, 0.025, 0.025, 0.54), 0.3)
 		_draw_ash(Vector2(size.x * 0.04, size.y * 0.23), 5, 18.0)
 		_draw_ash(Vector2(size.x * 0.91, size.y * 0.43), 4, 14.0)
 
@@ -97,6 +102,8 @@ class ArenaEvidencePainter:
 			]),
 			Color(0.29, 0.010, 0.012, 0.20)
 		)
+		_draw_torn_cloth(Vector2(size.x * 0.08, size.y * 0.72), Vector2(size.x * 0.046, size.y * 0.036), Color(0.34, 0.022, 0.022, 0.60), 1.1)
+		_draw_torn_cloth(Vector2(size.x * 0.91, size.y * 0.18), Vector2(size.x * 0.038, size.y * 0.030), Color(0.20, 0.055, 0.042, 0.52), 2.3)
 		_draw_timber(_point(0.17, 0.89), _point(0.34, 0.84), 9.0, Color(0.13, 0.070, 0.038, 0.82))
 		_draw_timber(_point(0.76, 0.13), _point(0.92, 0.10), 8.0, Color(0.12, 0.060, 0.034, 0.78))
 		_draw_smoke(Vector2(size.x * 0.075, size.y * 0.10), minf(size.x, size.y) * 0.060, Color(0.22, 0.19, 0.16, 0.18))
@@ -127,6 +134,7 @@ class ArenaEvidencePainter:
 		_draw_timber(_point(0.02, 0.21), _point(0.16, 0.30), 9.0, Color(0.11, 0.055, 0.030, 0.82))
 		_draw_timber(_point(0.84, 0.29), _point(0.98, 0.17), 10.0, Color(0.10, 0.050, 0.028, 0.84))
 		_draw_crater(Vector2(size.x * 0.50, size.y * 0.87), Vector2(size.x * 0.12, size.y * 0.065), Color(0.19, 0.015, 0.016, 0.50))
+		_draw_torn_cloth(Vector2(size.x * 0.76, size.y * 0.76), Vector2(size.x * 0.065, size.y * 0.045), Color(0.27, 0.018, 0.020, 0.66), 0.8)
 		_draw_smoke(Vector2(size.x * 0.11, size.y * 0.19), minf(size.x, size.y) * 0.090, Color(0.14, 0.12, 0.11, 0.18))
 		_draw_smoke(Vector2(size.x * 0.88, size.y * 0.18), minf(size.x, size.y) * 0.105, Color(0.15, 0.11, 0.11, 0.20))
 		_draw_ash(Vector2(size.x * 0.04, size.y * 0.48), 8, 28.0)
@@ -150,6 +158,7 @@ class ArenaEvidencePainter:
 		)
 		_draw_crater(Vector2(size.x * 0.84, size.y * 0.84), Vector2(size.x * 0.055, size.y * 0.030), Color(0.12, 0.080, 0.052, 0.28))
 		_draw_timber(_point(0.04, 0.87), _point(0.16, 0.82), 7.0, Color(0.20, 0.13, 0.075, 0.48))
+		_draw_torn_cloth(Vector2(size.x * 0.89, size.y * 0.70), Vector2(size.x * 0.038, size.y * 0.028), Color(0.24, 0.028, 0.028, 0.50), 1.7)
 		_draw_ash(Vector2(size.x * 0.02, size.y * 0.27), 3, 12.0)
 		_draw_ash(Vector2(size.x * 0.92, size.y * 0.51), 3, 12.0)
 
@@ -172,28 +181,63 @@ class ArenaEvidencePainter:
 
 	func _draw_earthwork(points: PackedVector2Array, fill: Color, edge: Color) -> void:
 		draw_colored_polygon(points, fill)
-		draw_polyline(_closed(points), edge, 3.0, true)
+		if points.size() >= 4:
+			var lower_edge: PackedVector2Array = PackedVector2Array()
+			for point_index: int in range(1, points.size()):
+				if points[point_index].y >= size.y * 0.72:
+					lower_edge.append(points[point_index])
+			if lower_edge.size() >= 2:
+				draw_polyline(lower_edge, Color(edge.r, edge.g, edge.b, edge.a * 0.46), 2.0, true)
 
 	func _draw_ground_stain(points: PackedVector2Array, fill: Color) -> void:
 		draw_colored_polygon(points, fill)
-		draw_polyline(_closed(points), Color(fill.r * 1.2, fill.g * 1.2, fill.b * 1.2, minf(0.42, fill.a + 0.08)), 2.0, true)
+		var pooled: PackedVector2Array = PackedVector2Array()
+		var center: Vector2 = Vector2.ZERO
+		for point: Vector2 in points:
+			center += point
+		if not points.is_empty():
+			center /= float(points.size())
+		for point: Vector2 in points:
+			pooled.append(center.lerp(point, 0.64) + Vector2(2.0, 2.0))
+		if pooled.size() >= 3:
+			draw_colored_polygon(pooled, Color(fill.r * 0.42, fill.g * 0.34, fill.b * 0.36, fill.a * 0.72))
 
 	func _draw_timber(from: Vector2, to: Vector2, width: float, color: Color) -> void:
-		draw_line(from, to, Color(0.018, 0.010, 0.008, minf(0.90, color.a + 0.08)), width + 4.0, true)
-		draw_line(from, to, color, width, true)
-		var direction: Vector2 = (to - from).normalized()
+		var length: float = from.distance_to(to)
+		if length <= 1.0:
+			return
+		var direction: Vector2 = (to - from) / length
 		var normal: Vector2 = Vector2(-direction.y, direction.x)
-		draw_line(from + normal * width * 0.30, to + normal * width * 0.30, Color(0.52, 0.28, 0.13, color.a * 0.32), 1.5, true)
+		var shadow: PackedVector2Array = PackedVector2Array([
+			from - normal * width * 0.74 - direction * width * 0.42,
+			from + normal * width * 0.62 - direction * width * 0.18,
+			to + normal * width * 0.48 + direction * width * 0.52,
+			to - normal * width * 0.66 + direction * width * 0.22,
+		])
+		draw_colored_polygon(shadow, Color(0.012, 0.007, 0.006, minf(0.88, color.a + 0.08)))
+		var body: PackedVector2Array = PackedVector2Array([
+			from - normal * width * 0.46,
+			from + normal * width * 0.42,
+			from + direction * length * 0.43 + normal * width * 0.56,
+			to + normal * width * 0.30,
+			to + direction * width * 0.68,
+			to - normal * width * 0.48,
+			from + direction * length * 0.57 - normal * width * 0.58,
+		])
+		draw_colored_polygon(body, color)
+		draw_line(from + direction * length * 0.12 + normal * width * 0.08, to - direction * length * 0.16 + normal * width * 0.02, Color(0.50, 0.25, 0.11, color.a * 0.34), 1.4, true)
+		draw_line(to - direction * width * 0.18, to + direction * width * 0.88 + normal * width * 0.72, Color(0.055, 0.024, 0.014, color.a), maxf(2.0, width * 0.25), true)
 
 	func _draw_cart(center: Vector2, radius: float) -> void:
 		var rim: Color = Color(0.22, 0.12, 0.060, 0.82)
 		var iron: Color = Color(0.10, 0.075, 0.060, 0.86)
-		draw_circle(center, radius, Color(0.025, 0.018, 0.014, 0.36), true)
-		draw_circle(center, radius, iron, false, 6.0, true)
-		draw_circle(center, radius * 0.18, rim, true)
-		for spoke_index: int in range(8):
+		var wheel: PackedVector2Array = _irregular_ellipse(center, Vector2(radius, radius * 0.86), 18, 1.4)
+		var hub: PackedVector2Array = _irregular_ellipse(center + Vector2(radius * 0.10, radius * 0.06), Vector2(radius * 0.20, radius * 0.16), 10, 0.2)
+		draw_colored_polygon(wheel, Color(0.025, 0.018, 0.014, 0.48))
+		draw_colored_polygon(hub, iron)
+		for spoke_index: int in [0, 1, 3, 5, 6]:
 			var angle: float = TAU * float(spoke_index) / 8.0
-			draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius * 0.88, rim, 3.0, true)
+			draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius * 0.78, rim, 2.5, true)
 		_draw_timber(center + Vector2(-radius * 1.4, -radius * 0.45), center + Vector2(radius * 2.35, -radius * 0.88), 10.0, Color(0.17, 0.085, 0.040, 0.82))
 		_draw_timber(center + Vector2(radius * 0.75, -radius * 0.68), center + Vector2(radius * 3.20, -radius * 1.55), 6.0, Color(0.14, 0.070, 0.036, 0.78))
 
@@ -214,14 +258,27 @@ class ArenaEvidencePainter:
 		var outer: PackedVector2Array = _irregular_ellipse(center, radii, 28, 0.35)
 		var inner: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.06, radii.y * 0.08), radii * 0.60, 24, 1.75)
 		draw_colored_polygon(outer, fill)
-		draw_polyline(_closed(outer), Color(0.44, 0.24, 0.12, minf(0.48, fill.a + 0.06)), 3.0, true)
-		draw_colored_polygon(inner, Color(0.018, 0.012, 0.012, fill.a * 0.74))
-		draw_polyline(_closed(inner), Color(0.58, 0.27, 0.11, fill.a * 0.42), 1.5, true)
+		draw_colored_polygon(inner, Color(0.014, 0.010, 0.011, fill.a * 0.86))
+		var water: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.12, radii.y * 0.16), radii * Vector2(0.40, 0.26), 18, 2.6)
+		draw_colored_polygon(water, Color(0.14, 0.13, 0.12, fill.a * 0.26))
 		for debris_index: int in range(7):
 			var angle: float = TAU * float(debris_index) / 7.0 + 0.31
-			var start: Vector2 = center + Vector2(cos(angle) * radii.x * 1.02, sin(angle) * radii.y * 1.02)
-			var finish: Vector2 = center + Vector2(cos(angle) * radii.x * (1.16 + float(debris_index % 3) * 0.05), sin(angle) * radii.y * (1.16 + float(debris_index % 3) * 0.05))
-			draw_line(start, finish, Color(0.48, 0.26, 0.13, fill.a * 0.48), 1.5, true)
+			var clod_center: Vector2 = center + Vector2(cos(angle) * radii.x * (0.92 + float(debris_index % 3) * 0.10), sin(angle) * radii.y * (0.92 + float(debris_index % 3) * 0.10))
+			var clod: PackedVector2Array = _irregular_ellipse(clod_center, Vector2(radii.x * 0.10, radii.y * 0.16), 9, angle)
+			draw_colored_polygon(clod, Color(0.20, 0.105, 0.052, fill.a * 0.40))
+
+	func _draw_torn_cloth(center: Vector2, extent: Vector2, color: Color, phase: float) -> void:
+		var points: PackedVector2Array = PackedVector2Array([
+			center + Vector2(-extent.x, -extent.y * 0.32),
+			center + Vector2(-extent.x * 0.42, -extent.y),
+			center + Vector2(extent.x * 0.18, -extent.y * (0.60 + sin(phase) * 0.12)),
+			center + Vector2(extent.x, -extent.y * 0.14),
+			center + Vector2(extent.x * 0.54, extent.y * 0.72),
+			center + Vector2(-extent.x * 0.08, extent.y * 0.46),
+			center + Vector2(-extent.x * 0.72, extent.y),
+		])
+		draw_colored_polygon(points, color)
+		draw_line(points[1], points[4], Color(0.72, 0.34, 0.22, color.a * 0.24), 1.5, true)
 
 	func _draw_smoke(center: Vector2, radius: float, color: Color) -> void:
 		var offsets: Array[Vector2] = [
@@ -1290,10 +1347,19 @@ static func _ensure_arena_threat_boundary(arena: Control) -> void:
 	objective.text = "FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
 	objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	objective.add_theme_font_size_override("font_size", 20)
-	objective.add_theme_color_override("font_color", Color(1.0, 0.70, 0.48, 0.88))
+	objective.add_theme_color_override("font_color", Color(0.98, 0.90, 0.78, 1.0))
 	objective.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.90))
-	objective.add_theme_constant_override("outline_size", 2)
-	VisualTypeSystem.set_action(objective)
+	objective.add_theme_constant_override("outline_size", 1)
+	var objective_backing: StyleBoxFlat = StyleBoxFlat.new()
+	objective_backing.bg_color = Color(0.012, 0.010, 0.014, 0.88)
+	objective_backing.border_color = Color(0.68, 0.08, 0.07, 0.90)
+	objective_backing.border_width_top = 2
+	objective_backing.border_width_bottom = 1
+	objective_backing.content_margin_left = 10.0
+	objective_backing.content_margin_right = 10.0
+	objective.add_theme_stylebox_override("normal", objective_backing)
+	objective.set_meta("persistent_copy_uses_utility_face", true)
+	VisualTypeSystem.set_utility_bold(objective)
 
 static func _ensure_tactical_shell_marks(root: Control) -> void:
 	var battle_area: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
@@ -1640,9 +1706,9 @@ static func _ensure_arena_weather_banks(arena: Control) -> void:
 		var smoke_gradient: Gradient = Gradient.new()
 		smoke_gradient.offsets = PackedFloat32Array([0.0, 0.26, 0.64, 1.0])
 		smoke_gradient.colors = PackedColorArray([
-			Color(0.32, 0.035, 0.025, 0.20),
-			Color(0.12, 0.07, 0.065, 0.14),
-			Color(0.18, 0.17, 0.15, 0.06),
+			Color(0.22, 0.030, 0.024, 0.10),
+			Color(0.10, 0.075, 0.070, 0.09),
+			Color(0.18, 0.17, 0.15, 0.04),
 			Color(0.0, 0.0, 0.0, 0.0),
 		])
 		var smoke_texture: GradientTexture2D = GradientTexture2D.new()
@@ -1663,7 +1729,7 @@ static func _ensure_arena_wet_ground_reflection(arena: Control) -> void:
 		Color(0.0, 0.0, 0.0, 0.0),
 		Color(0.0, 0.0, 0.0, 0.0),
 		Color(0.78, 0.66, 0.48, 0.06),
-		Color(0.92, 0.18, 0.10, 0.13),
+		Color(0.72, 0.14, 0.09, 0.06),
 		Color(0.22, 0.20, 0.17, 0.05),
 	])
 	var reflection_texture: GradientTexture2D = GradientTexture2D.new()
@@ -1927,14 +1993,14 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 			var row_index: int = floori(float(cell_index) / 8.0)
 			var column_index: int = cell_index % 8
 			var major_seam: bool = row_index == 2 or column_index == 3
-			seam_style.border_color = Color(0.72, 0.64, 0.52, 0.17 if major_seam else 0.055)
-			seam_style.border_width_right = 3 if column_index == 3 else 1
-			seam_style.border_width_bottom = 3 if row_index == 2 else 1
+			seam_style.border_color = Color(0.74, 0.68, 0.56, 0.25 if major_seam else 0.105)
+			seam_style.border_width_right = 2 if column_index == 3 else 1
+			seam_style.border_width_bottom = 2 if row_index == 2 else 1
 			cell.add_theme_stylebox_override("panel", seam_style)
 			seams.add_child(cell)
-	seams.set_meta("major_seam_non_color_weight", 3)
+	seams.set_meta("major_seam_non_color_weight", 2)
 	seams.set_meta("minor_seam_non_color_weight", 1)
-	seams.set_meta("terrain_seam_alpha", 0.055)
+	seams.set_meta("terrain_seam_alpha", 0.105)
 	seams.set_meta("debug_graph_grid_suppressed", true)
 
 static func _ensure_arena_field_label(arena: Control, node_name: String, copy: String, enemy_side: bool) -> void:
@@ -1957,18 +2023,26 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 	label.add_theme_font_size_override("font_size", 21)
 	label.add_theme_color_override("font_color", Color(1.0, 0.52, 0.42, 0.96) if enemy_side else Color(0.96, 0.88, 0.70, 0.94))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", 2)
+	var label_backing: StyleBoxFlat = StyleBoxFlat.new()
+	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.78)
+	label_backing.border_color = Color(0.66, 0.08, 0.07, 0.82) if enemy_side else Color(0.58, 0.48, 0.32, 0.74)
+	label_backing.border_width_left = 4
+	label_backing.content_margin_left = 8.0
+	label_backing.content_margin_right = 8.0
+	label.add_theme_stylebox_override("normal", label_backing)
 	label.set_meta("non_color_zone_cue", "triangle_breach" if enemy_side else "square_survival")
-	VisualTypeSystem.set_action(label)
+	label.set_meta("persistent_copy_uses_utility_face", true)
+	VisualTypeSystem.set_utility_bold(label)
 
 static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	if is_player:
-		style.bg_color = Color(0.055, 0.074, 0.072, 0.20)
+		style.bg_color = Color(0.055, 0.074, 0.072, 0.12)
 		style.border_color = Color(0.75, 0.70, 0.58, 0.78)
 		style.border_width_top = 3
 	else:
-		style.bg_color = Color(0.12, 0.025, 0.030, 0.22)
+		style.bg_color = Color(0.12, 0.025, 0.030, 0.12)
 		style.border_color = Color(0.80, 0.075, 0.09, 0.84)
 		style.border_width_bottom = 3
 	return style

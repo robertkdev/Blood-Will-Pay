@@ -376,7 +376,7 @@ func _ensure_title_panel() -> void:
 	_title_panel.offset_top = 0.0
 	_title_panel.offset_right = 0.0
 	_title_panel.offset_bottom = 0.0
-	var rail_style: StyleBoxFlat = _make_panel_style(Color(0.020, 0.018, 0.022, 0.80), Color(0.78, 0.70, 0.57, 0.92), 0, 0, 28)
+	var rail_style: StyleBoxFlat = _make_panel_style(Color(0.020, 0.018, 0.022, 0.93), Color(0.78, 0.70, 0.57, 0.92), 0, 0, 28)
 	rail_style.border_width_left = 7
 	rail_style.border_width_bottom = 1
 	rail_style.border_color = Color(0.72, 0.055, 0.085, 0.96)
@@ -550,7 +550,8 @@ func _ensure_wordmark_treatment() -> void:
 	if title_label == null:
 		return
 	title_label.set_meta("wordmark_identity_mark", "double_misregister_cut_stencil_pay_block")
-	title_label.set_meta("wordmark_custom_treatment_revision", 2)
+	title_label.set_meta("wordmark_custom_treatment_revision", 3)
+	_enforce_masthead_contrast()
 	var misregister: Label = title_label.get_node_or_null("Misregister") as Label
 	if misregister == null:
 		misregister = Label.new()
@@ -2420,6 +2421,7 @@ func _stabilize_command_chrome() -> void:
 		title_label.visible = true
 		title_label.set_meta("persistent_masthead", "blood_will_pay")
 		_set_control_settled_color(title_label)
+		_enforce_masthead_contrast()
 	if _subtitle != null:
 		_set_control_settled_color(_subtitle)
 	if _rule != null:
@@ -2437,6 +2439,26 @@ func _stabilize_command_chrome() -> void:
 		if runtime_button != null:
 			_set_control_settled_color(runtime_button)
 	set_meta("command_chrome_is_settled", true)
+
+func _enforce_masthead_contrast() -> void:
+	if title_label == null:
+		return
+	title_label.add_theme_color_override("font_color", COLOR_RAIL_TEXT)
+	title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.96))
+	title_label.add_theme_constant_override("outline_size", 2)
+	title_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.92))
+	title_label.add_theme_constant_override("shadow_offset_x", 2)
+	title_label.add_theme_constant_override("shadow_offset_y", 3)
+	title_label.set_meta("masthead_minimum_contrast_ratio", COMMAND_RAIL_MIN_CONTRAST_RATIO)
+	title_label.set_meta("masthead_foreground_color", COLOR_RAIL_TEXT)
+	title_label.set_meta("masthead_background_color", COLOR_RAIL_BACKGROUND)
+	title_label.set_meta("settings_masthead_persistence_revision", 3)
+	var misregister: Label = title_label.get_node_or_null("Misregister") as Label
+	if misregister != null:
+		misregister.add_theme_color_override("font_color", Color(0.78, 0.025, 0.050, 0.82))
+	var bone_ghost: Label = title_label.get_node_or_null("BoneGhost") as Label
+	if bone_ghost != null:
+		bone_ghost.add_theme_color_override("font_color", Color(0.98, 0.84, 0.64, 0.42))
 
 func _set_control_settled_color(control: Control) -> void:
 	if control == null:
