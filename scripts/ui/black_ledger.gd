@@ -29,6 +29,7 @@ var _panel: PanelContainer = null
 var _ledger_margin: MarginContainer = null
 var _ledger_frame: VBoxContainer = null
 var _page_scroll: ScrollContainer = null
+var _record_root: VBoxContainer = null
 var _section_navigator: PanelContainer = null
 var _starter_nav_button: Button = null
 var _bounty_nav_button: Button = null
@@ -75,6 +76,7 @@ func _sync_to_viewport() -> void:
 			clampf(viewport_size.x - 24.0, 320.0, maximum_width),
 			clampf(viewport_size.y - 16.0, 340.0, maximum_height)
 		)
+		_panel.set_meta("compact_viewport_use_ratio", _panel.custom_minimum_size.y / maxf(1.0, viewport_size.y) if compact else 0.0)
 	if _ledger_margin != null:
 		_ledger_margin.add_theme_constant_override("margin_left", 18 if compact else 42)
 		_ledger_margin.add_theme_constant_override("margin_top", 16 if compact else (26 if wide_sparse_record else 32))
@@ -87,6 +89,9 @@ func _sync_to_viewport() -> void:
 		_page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		_page_scroll.get_v_scroll_bar().custom_minimum_size.x = 12.0 if compact else 8.0
 		_page_scroll.set_meta("compact_scroll_finish", "wide_vertical_track_no_horizontal_escape" if compact else "record_track")
+	if _record_root != null:
+		_record_root.custom_minimum_size.y = maxf(420.0, viewport_size.y - 154.0) if compact else 0.0
+		_record_root.set_meta("compact_dossier_density", "viewport_filling_incident_record" if compact else "desktop_columns")
 	if _section_navigator != null:
 		_section_navigator.visible = compact
 		_section_navigator.custom_minimum_size = Vector2(0.0, 38.0 if compact else 0.0)
@@ -120,10 +125,10 @@ func _sync_to_viewport() -> void:
 	if _bounty_column != null:
 		_bounty_column.custom_minimum_size.x = 0.0
 	if _starter_scroll != null:
-		_starter_scroll.custom_minimum_size.y = 158.0 if _sparse_content_record else (96.0 if compact else 320.0)
+		_starter_scroll.custom_minimum_size.y = 282.0 if compact and _sparse_content_record else (158.0 if _sparse_content_record else (184.0 if compact else 320.0))
 		_starter_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if _sparse_content_record else ScrollContainer.SCROLL_MODE_AUTO
 	if _bounty_scroll != null:
-		_bounty_scroll.custom_minimum_size.y = 158.0 if _sparse_content_record else (96.0 if compact else 320.0)
+		_bounty_scroll.custom_minimum_size.y = 282.0 if compact and _sparse_content_record else (158.0 if _sparse_content_record else (184.0 if compact else 320.0))
 		_bounty_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if _sparse_content_record else ScrollContainer.SCROLL_MODE_AUTO
 	_sync_column_density(compact)
 	_sync_compact_section_visibility(compact)
@@ -206,6 +211,7 @@ func _sync_compact_section_visibility(compact: bool) -> void:
 	if _section_navigator != null:
 		_section_navigator.set_meta("active_section", active_section)
 		_section_navigator.set_meta("compact_entry_policy", "one_section_one_full_entry_above_persistent_footer")
+	_sync_compact_navigation_state(active_section)
 	if _page_scroll != null:
 		_page_scroll.scroll_vertical = 0
 
@@ -254,13 +260,14 @@ func _build_ui() -> void:
 	_page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_ledger_frame.add_child(_page_scroll)
 	_style_scroll_container(_page_scroll)
-	var root: VBoxContainer = VBoxContainer.new()
-	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.add_theme_constant_override("separation", 12)
-	_page_scroll.add_child(root)
+	_record_root = VBoxContainer.new()
+	_record_root.name = "LedgerRecordRoot"
+	_record_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_record_root.add_theme_constant_override("separation", 12)
+	_page_scroll.add_child(_record_root)
 	var header: HBoxContainer = HBoxContainer.new()
 	header.add_theme_constant_override("separation", 18)
-	root.add_child(header)
+	_record_root.add_child(header)
 	var title_box: VBoxContainer = VBoxContainer.new()
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title_box)
@@ -316,13 +323,13 @@ func _build_ui() -> void:
 	header.add_child(_close_button)
 	var rule: HSeparator = HSeparator.new()
 	rule.add_theme_stylebox_override("separator", _rule_style(COLOR_BLOOD.darkened(0.06), 2))
-	root.add_child(rule)
+	_record_root.add_child(rule)
 	_columns = GridContainer.new()
 	_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_columns.add_theme_constant_override("h_separation", 22)
 	_columns.add_theme_constant_override("v_separation", 14)
-	root.add_child(_columns)
+	_record_root.add_child(_columns)
 	_unlock_column = _make_column("STARTER DEBTS", "Spend Omens on any revealed starter. Shop and enemy appearances are never sealed.")
 	_unlock_column.name = "StarterDebtsColumn"
 	_columns.add_child(_unlock_column)
@@ -382,6 +389,36 @@ func _build_section_navigator() -> void:
 	_style_button(_bounty_nav_button, true)
 	_bounty_nav_button.pressed.connect(_jump_to_bounties)
 	row.add_child(_bounty_nav_button)
+	_sync_compact_navigation_state("starter_debts")
+
+func _sync_compact_navigation_state(active_section: String) -> void:
+	if _starter_nav_button == null or _bounty_nav_button == null:
+		return
+	var starter_active: bool = active_section == "starter_debts"
+	_starter_nav_button.text = "ACTIVE // STARTER DEBTS" if starter_active else "STARTER DEBTS"
+	_bounty_nav_button.text = "ACTIVE // BOUNTIES" if not starter_active else "BOUNTIES"
+	for button: Button in [_starter_nav_button, _bounty_nav_button]:
+		var is_active: bool = button == _starter_nav_button if starter_active else button == _bounty_nav_button
+		button.set_meta("active_ledger_tab", is_active)
+		button.set_meta("active_tab_indicator", "label_and_oxblood_edge" if is_active else "inactive")
+		button.add_theme_stylebox_override("normal", _active_navigation_style() if is_active else _navigation_style())
+		button.add_theme_color_override("font_color", COLOR_BONE if is_active else COLOR_MUTED)
+
+func _navigation_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = _footer_style()
+	style.border_width_left = 3
+	style.border_color = Color(0.34, 0.27, 0.20, 0.90)
+	return style
+
+func _active_navigation_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = _footer_style()
+	style.bg_color = Color(0.16, 0.022, 0.030, 0.98)
+	style.border_color = Color(0.82, 0.12, 0.11, 1.0)
+	style.border_width_left = 8
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 2
+	return style
 
 func _jump_to_starter_debts() -> void:
 	_scroll_to_ledger_section(_unlock_column, "starter_debts")
@@ -655,7 +692,7 @@ func _rebuild_bounties(current: Dictionary) -> void:
 func _add_locked_milestone_record() -> void:
 	var record: PanelContainer = PanelContainer.new()
 	record.name = "LockedMilestoneRecord"
-	record.custom_minimum_size.y = 132.0
+	record.custom_minimum_size.y = 258.0
 	record.add_theme_stylebox_override("panel", _locked_record_style())
 	_starter_list.add_child(record)
 	var copy: VBoxContainer = VBoxContainer.new()
@@ -681,15 +718,37 @@ func _add_locked_milestone_record() -> void:
 	detail.add_theme_color_override("font_color", COLOR_MUTED)
 	VisualTypeSystem.set_utility(detail)
 	copy.add_child(detail)
+	_add_compact_incident_record(copy)
+
+func _add_compact_incident_record(parent: VBoxContainer) -> void:
+	var incident: VBoxContainer = VBoxContainer.new()
+	incident.name = "DebtIncidentRecord"
+	incident.custom_minimum_size.y = 108.0
+	incident.add_theme_constant_override("separation", 4)
+	incident.set_meta("compact_density_material", "non_unit_debt_incident_trace")
+	parent.add_child(incident)
 	var ruling: HSeparator = HSeparator.new()
 	ruling.add_theme_stylebox_override("separator", _rule_style(Color(0.46, 0.08, 0.09, 0.88), 1))
-	copy.add_child(ruling)
+	incident.add_child(ruling)
+	var serial: Label = Label.new()
+	serial.text = "INCIDENT TRACE 04 // DEBT RECORD OPEN"
+	serial.add_theme_font_size_override("font_size", 15)
+	serial.add_theme_color_override("font_color", COLOR_GOLD)
+	VisualTypeSystem.set_utility_bold(serial)
+	incident.add_child(serial)
+	var evidence: Label = Label.new()
+	evidence.text = "OLD MILL ROAD // ENTRY SEALED\nOMENS OWED 006 // BALANCE UNPAID\nNEXT WITNESS MARKS THE PAGE"
+	evidence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	evidence.add_theme_font_size_override("font_size", 16)
+	evidence.add_theme_color_override("font_color", COLOR_MUTED)
+	VisualTypeSystem.set_utility(evidence)
+	incident.add_child(evidence)
 	var filing_note: Label = Label.new()
 	filing_note.text = "CLERK NOTE // SHOP AND ENEMY APPEARANCES REMAIN UNSEALED"
 	filing_note.add_theme_font_size_override("font_size", 16)
 	filing_note.add_theme_color_override("font_color", Color(0.62, 0.55, 0.48, 0.9))
 	VisualTypeSystem.set_utility_bold(filing_note)
-	copy.add_child(filing_note)
+	incident.add_child(filing_note)
 
 func _purchase_starter(starter_id: String) -> void:
 	var result: Dictionary = AccountProgressionScript.purchase_starter(starter_id, profile_path)

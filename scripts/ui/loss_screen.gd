@@ -33,6 +33,7 @@ var _tracker: StatsTracker = null
 var _ready_done: bool = false
 var _pending_populate: bool = false
 var _new_game_hover_tween: Tween = null
+var _return_title_button: Button = null
 var _loss_art: TextureRect = null
 var _record_header_label: Label = null
 var _record_chronology_label: Label = null
@@ -53,6 +54,7 @@ func _ready() -> void:
 		get_viewport().size_changed.connect(_sync_layout)
 	if new_game_button and not new_game_button.is_connected("pressed", Callable(self, "_on_new_game")):
 		new_game_button.pressed.connect(_on_new_game)
+	_ensure_return_title_route()
 	if _pending_populate or _tracker != null:
 		_pending_populate = false
 		_populate()
@@ -194,6 +196,15 @@ func _style_loss_scoreboard(scoreboard: Node) -> void:
 	for raw_row: Node in scoreboard.find_children("*", "ScoreboardRow", true, false):
 		if raw_row.has_method("set_record_emphasis"):
 			raw_row.call("set_record_emphasis", true)
+		var record_row: Control = raw_row as Control
+		if record_row != null:
+			record_row.tooltip_text = ""
+			record_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			record_row.set_meta("terminal_record_tooltip_suppressed", true)
+		var row_name: Label = raw_row.get_node_or_null("Frame/NameLabel") as Label
+		if row_name != null:
+			row_name.tooltip_text = ""
+			row_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _on_new_game() -> void:
 	# Reset run-related singletons and return to unit select flow
@@ -226,6 +237,38 @@ func _on_new_game() -> void:
 	queue_free()
 	if overlay_parent is CanvasLayer and not overlay_parent.is_queued_for_deletion():
 		overlay_parent.queue_free()
+
+func _on_return_to_title() -> void:
+	var overlay_parent: Node = get_parent()
+	var main: Node = _find_main()
+	if main != null and main.has_method("request_return_to_title"):
+		main.call("request_return_to_title")
+		queue_free()
+		if overlay_parent is CanvasLayer and not overlay_parent.is_queued_for_deletion():
+			overlay_parent.queue_free()
+
+func _ensure_return_title_route() -> void:
+	if content_box == null or new_game_button == null:
+		return
+	_return_title_button = content_box.get_node_or_null("ReturnTitleButton") as Button
+	if _return_title_button == null:
+		_return_title_button = Button.new()
+		_return_title_button.name = "ReturnTitleButton"
+		content_box.add_child(_return_title_button)
+	_return_title_button.text = "RETURN TO TITLE"
+	_return_title_button.custom_minimum_size = Vector2(264.0, 44.0)
+	_return_title_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_return_title_button.focus_mode = Control.FOCUS_ALL
+	_return_title_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_return_title_button.set_meta("visual_role", "secondary_recovery")
+	_return_title_button.set_meta("terminal_navigation_route", true)
+	VisualTypeSystem.set_utility_bold(_return_title_button)
+	HardcoreUIAssets.apply_button_family(_return_title_button, "compact")
+	_return_title_button.add_theme_font_size_override("font_size", 18)
+	_return_title_button.add_theme_color_override("font_color", Color(0.82, 0.76, 0.66, 1.0))
+	if not _return_title_button.is_connected("pressed", Callable(self, "_on_return_to_title")):
+		_return_title_button.pressed.connect(_on_return_to_title)
+	content_box.move_child(_return_title_button, new_game_button.get_index() + 1)
 
 func _get_autoload(autoload_name: String) -> Node:
 	if not is_inside_tree():
@@ -777,6 +820,10 @@ func _sync_layout() -> void:
 	if new_game_button != null:
 		new_game_button.custom_minimum_size = Vector2(280.0, 40.0) if tight_compact else Vector2(360.0, 64.0)
 		new_game_button.add_theme_font_size_override("font_size", 20 if tight_compact else 24)
+	if _return_title_button != null:
+		_return_title_button.custom_minimum_size = Vector2(220.0, 34.0) if tight_compact else Vector2(264.0, 44.0)
+		_return_title_button.add_theme_font_size_override("font_size", 15 if tight_compact else 18)
+		_return_title_button.set_meta("compact_secondary_recovery", tight_compact)
 	if _record_header_label != null:
 		_record_header_label.add_theme_font_size_override("font_size", 11 if tight_compact else 17)
 	if _record_chronology_label != null:

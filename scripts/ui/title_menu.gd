@@ -1,5 +1,7 @@
 extends Control
 
+signal runtime_settings_closed()
+
 const SIGIL_TEXTURE: Texture2D = preload("res://assets/ui/gold icon.png")
 const UnitCatalogScript: GDScript = preload("res://scripts/game/shop/unit_catalog.gd")
 const PrimaryRoleScript: GDScript = preload("res://scripts/game/identity/primary_role.gd")
@@ -81,6 +83,8 @@ var _poster_border: TextureRect = null
 var _resize_refresh_queued: bool = false
 var _rail_fit_queued: bool = false
 var _scaled_focus_target_name: String = ""
+var _runtime_settings_mode: bool = false
+var _runtime_return_button: Button = null
 
 func _ready() -> void:
 	UserSettingsScript.initialize(get_window())
@@ -113,6 +117,12 @@ func _ready() -> void:
 	_start_logo_float()
 
 func _input(event: InputEvent) -> void:
+	if _runtime_settings_mode:
+		var runtime_key_event: InputEventKey = event as InputEventKey
+		if runtime_key_event != null and runtime_key_event.pressed and not runtime_key_event.echo and (runtime_key_event.keycode == KEY_ESCAPE or runtime_key_event.physical_keycode == KEY_ESCAPE):
+			close_runtime_settings()
+			get_viewport().set_input_as_handled()
+			return
 	if _listening_action == StringName():
 		return
 	var key_event: InputEventKey = event as InputEventKey
@@ -137,6 +147,70 @@ func _input(event: InputEvent) -> void:
 	_listening_action = StringName()
 	_refresh_binding_buttons()
 	_set_binding_status("%s is now bound to %s." % [_action_label(completed_action), UserSettingsScript.binding_text(completed_action)], COLOR_GREEN)
+
+func open_runtime_settings() -> void:
+	_runtime_settings_mode = true
+	_ensure_runtime_return_button()
+	_select_section(SECTION_SETTINGS)
+	visible = true
+	_apply_runtime_settings_chrome()
+	set_meta("runtime_settings_preserves_run", true)
+	set_meta("runtime_settings_active", true)
+	if _runtime_return_button != null:
+		_runtime_return_button.grab_focus()
+
+func close_runtime_settings() -> void:
+	if not _runtime_settings_mode:
+		return
+	_runtime_settings_mode = false
+	set_meta("runtime_settings_active", false)
+	visible = false
+	_restore_title_chrome()
+	runtime_settings_closed.emit()
+
+func _ensure_runtime_return_button() -> void:
+	if center_vbox == null:
+		return
+	_runtime_return_button = center_vbox.get_node_or_null("ReturnToRunButton") as Button
+	if _runtime_return_button == null:
+		_runtime_return_button = Button.new()
+		_runtime_return_button.name = "ReturnToRunButton"
+		_runtime_return_button.text = "RETURN TO RUN"
+		_runtime_return_button.set_meta("visual_role", "runtime_return_primary")
+		_runtime_return_button.set_meta("preserves_active_run", true)
+		center_vbox.add_child(_runtime_return_button)
+		_style_menu_button(_runtime_return_button, true)
+		_wire_button_hover(_runtime_return_button)
+		_runtime_return_button.pressed.connect(close_runtime_settings)
+
+func _apply_runtime_settings_chrome() -> void:
+	for nav_button: Button in _nav_buttons:
+		nav_button.visible = nav_button.name == "SettingsButton"
+	for runtime_button: Button in _runtime_action_buttons:
+		if runtime_button != null:
+			runtime_button.visible = false
+	if start_button != null:
+		start_button.visible = false
+	if quit_button != null:
+		quit_button.visible = false
+	if _runtime_return_button != null:
+		_runtime_return_button.visible = true
+		_runtime_return_button.custom_minimum_size = Vector2(176.0 if _is_compact_layout() else 280.0, 42.0 if _is_compact_layout() else 52.0)
+	_queue_title_panel_fit()
+
+func _restore_title_chrome() -> void:
+	for nav_button: Button in _nav_buttons:
+		nav_button.visible = true
+	for runtime_button: Button in _runtime_action_buttons:
+		if runtime_button != null:
+			runtime_button.visible = true
+	if start_button != null:
+		start_button.visible = true
+	if quit_button != null:
+		quit_button.visible = true
+	if _runtime_return_button != null:
+		_runtime_return_button.visible = false
+	_sync_action_hierarchy()
 
 func _load_content_data() -> void:
 	_unit_catalog = UnitCatalogScript.new() as UnitCatalog
@@ -2042,6 +2116,8 @@ func _refresh_scaled_layout() -> void:
 	_render_active_section()
 	_update_nav_state()
 	_sync_action_hierarchy()
+	if _runtime_settings_mode:
+		_apply_runtime_settings_chrome()
 	_queue_title_panel_fit()
 	if _scaled_focus_target_name != "":
 		call_deferred("_restore_scaled_settings_focus")
@@ -2301,6 +2377,8 @@ func _on_visibility_changed() -> void:
 		_sync_action_hierarchy()
 		_stabilize_command_chrome()
 		_play_intro()
+		if _runtime_settings_mode:
+			_apply_runtime_settings_chrome()
 
 func register_runtime_action_button(button: Button, primary: bool) -> void:
 	if button == null:

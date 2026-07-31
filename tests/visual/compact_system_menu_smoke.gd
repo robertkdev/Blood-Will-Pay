@@ -29,14 +29,30 @@ func _run() -> void:
 	var panel: PanelContainer = overlay.find_child("Panel", true, false) as PanelContainer if overlay != null else null
 	var assembly: Control = panel.find_child("SystemAssemblyLayer", true, false) as Control if panel != null else null
 	var scars: Label = panel.find_child("PanelScars", true, false) as Label if panel != null else null
+	var settings_button: Button = overlay.find_child("SettingsButton", true, false) as Button if overlay != null else null
 	_expect(overlay != null and overlay.visible, "compact System menu did not open")
 	_expect(panel != null and panel.clip_contents, "compact System panel must clip decoration to its calm interior")
 	_expect(panel != null and String(panel.get_meta("decoration_containment", "")) == "calm_panel_interior", "compact System panel missing containment contract")
 	_expect(assembly != null and assembly.clip_contents, "compact System assembly marks must be clipped")
 	_expect(assembly != null and String(assembly.get_meta("decoration_containment", "")) == "panel_rect", "compact System assembly layer missing panel-bound contract")
 	_expect(scars != null and bool(scars.get_meta("contained_by_panel", false)), "compact System X marks must declare panel containment")
+	_expect(settings_button != null and settings_button.visible and settings_button.text.contains("SETTINGS"), "active System menu should expose a visible Settings route")
+	_expect(settings_button != null and bool(settings_button.get_meta("preserves_active_run", false)), "System Settings route should explicitly preserve the active run")
 	if panel != null:
 		_expect(get_viewport().get_visible_rect().grow(1.0).encloses(panel.get_global_rect()), "compact System panel escaped the viewport")
+	if settings_button != null:
+		settings_button.emit_signal("pressed")
+		await _settle_frames(6)
+		var return_to_run: Button = title_menu.find_child("ReturnToRunButton", true, false) as Button if title_menu != null else null
+		var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+		_expect(not overlay.visible and title_menu != null and title_menu.visible, "System Settings route did not open the existing Settings experience")
+		_expect(title_menu != null and bool(title_menu.get_meta("runtime_settings_preserves_run", false)), "runtime Settings did not publish its run-preservation contract")
+		_expect(return_to_run != null and return_to_run.visible and bool(return_to_run.get_meta("preserves_active_run", false)), "runtime Settings should provide a clear Return to Run route")
+		_expect(ui_scale_option != null and ui_scale_option.visible and ui_scale_option.item_count == 3, "System Settings route did not render the existing Settings controls")
+		if return_to_run != null:
+			return_to_run.emit_signal("pressed")
+			await _settle_frames(4)
+			_expect(not title_menu.visible and not get_tree().paused, "Return to Run did not safely close runtime Settings")
 	await _verify_compact_shop_detail_contract()
 	get_tree().paused = false
 	remove_child(main)

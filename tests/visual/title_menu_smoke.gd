@@ -40,6 +40,11 @@ func _run() -> void:
 		_expect(enter_button != null, "TitlePage EnterButton missing", failures)
 		var continue_prompt: Label = main.get_node_or_null("TitlePage/Center/Stack/ContinuePrompt") as Label
 		_expect(continue_prompt == null, "TitlePage must not restore the generic ContinuePrompt", failures)
+		var gateway_incident: Label = main.get_node_or_null("TitlePage/IncidentEvidenceDocket/IncidentEvidence") as Label
+		_expect(gateway_incident != null, "TitlePage incident evidence missing", failures)
+		if gateway_incident != null:
+			main.call("_layout_title_gateway")
+			_expect(not gateway_incident.text.contains("\nBOUND") and not gateway_incident.text.contains("HANDS BOUND"), "Title incident copy should not orphan BOUND at compact scale", failures)
 		var entry_affordance: PanelContainer = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
 		var entry_order: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
 		var entry_action: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryAction") as Label

@@ -196,6 +196,8 @@ func _validate_compact_navigation() -> void:
 	_expect(String(navigator.get_meta("compact_entry_policy", "")) == "one_section_one_full_entry_above_persistent_footer", "compact Ledger lacks the full-entry viewport contract")
 	_expect(starter_button != null and starter_button.text.contains("STARTER DEBTS"), "compact Ledger should expose Starter Debts navigation")
 	_expect(bounty_button != null and bounty_button.text.contains("BOUNTIES"), "compact Ledger should expose Bounties navigation")
+	_expect(starter_button != null and starter_button.text.begins_with("ACTIVE //") and bool(starter_button.get_meta("active_ledger_tab", false)), "compact Ledger should visibly identify Starter Debts as the active tab")
+	_expect(bounty_button != null and not bool(bounty_button.get_meta("active_ledger_tab", true)), "compact Ledger should distinguish inactive Bounties navigation")
 	_expect(close_button != null and close_button.text == "CLOSE" and close_button.custom_minimum_size.x <= 124.0, "compact Ledger close action should remain clean")
 	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "compact Ledger should not expose a horizontal scrollbar")
 	_expect(record_id != null and not record_id.visible and bool(record_id.get_meta("compact_duplicate_metadata_suppressed", false)), "compact Ledger should remove duplicate folio metadata from the entry viewport")
@@ -203,6 +205,15 @@ func _validate_compact_navigation() -> void:
 	_expect(starter_column != null and starter_column.visible and bounty_column != null and not bounty_column.visible, "compact Ledger should initially page only Starter Debts")
 	_expect(footer_band != null and footer_band.visible and footer_band.get_global_rect().size.y >= 44.0, "compact Ledger should preserve its dedicated footer")
 	var starter_list: VBoxContainer = _ledger.get("_starter_list") as VBoxContainer
+	var record_root: VBoxContainer = _ledger.get("_record_root") as VBoxContainer
+	var incident_record: Control = _ledger.find_child("DebtIncidentRecord", true, false) as Control
+	_expect(record_root != null and String(record_root.get_meta("compact_dossier_density", "")) == "viewport_filling_incident_record", "compact Ledger should publish its viewport-filling dossier contract")
+	var sparse_record: bool = bool(_ledger.get("_sparse_content_record"))
+	if sparse_record:
+		_expect(incident_record != null and String(incident_record.get_meta("compact_density_material", "")) == "non_unit_debt_incident_trace", "sparse compact Ledger should fill the dossier with a non-unit incident trace")
+	if sparse_record and page_scroll != null and incident_record != null:
+		var occupied_depth: float = incident_record.get_global_rect().end.y - page_scroll.get_global_rect().position.y
+		_expect(occupied_depth >= page_scroll.get_global_rect().size.y * 0.55, "compact Ledger dossier leaves most of the lower viewport vacant")
 	var first_starter_entry: Control = starter_list.get_child(0) as Control if starter_list != null and starter_list.get_child_count() > 0 else null
 	if page_scroll != null and first_starter_entry != null:
 		_expect(_rect_inside(first_starter_entry.get_global_rect(), page_scroll.get_global_rect().grow(1.0)), "compact Ledger shows only a partial first Starter Debt entry")
@@ -210,6 +221,8 @@ func _validate_compact_navigation() -> void:
 		bounty_button.emit_signal("pressed")
 		await _settle_frames(3)
 		_expect(String(navigator.get_meta("active_section", "")) == "bounties", "compact Ledger Bounties navigation should update its active destination")
+		_expect(bounty_button.text.begins_with("ACTIVE //") and bool(bounty_button.get_meta("active_ledger_tab", false)), "compact Ledger should visibly identify Bounties as the active tab")
+		_expect(not bool(starter_button.get_meta("active_ledger_tab", true)), "compact Ledger should clear the former Starter Debts active state")
 		_expect(starter_column != null and not starter_column.visible and bounty_column != null and bounty_column.visible, "compact Ledger Bounties navigation should page sections instead of stacking them")
 		var bounty_list: VBoxContainer = _ledger.get("_bounty_list") as VBoxContainer
 		var first_bounty_entry: Control = null

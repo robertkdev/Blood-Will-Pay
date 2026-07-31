@@ -66,6 +66,7 @@ func _run() -> void:
 	_save_capture("04_pressure_reduced_motion.png")
 	var retired_aftermath: Control = _arena.get_node_or_null("ArenaWarAftermath") as Control
 	var battlefield: TextureRect = _arena.get_node_or_null("GothicArenaSurface") as TextureRect
+	var pressure_surface: TextureRect = _arena.get_node_or_null("GothicArenaPressureSurface") as TextureRect
 	var onset_texture: Texture2D = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
 	var midfight_texture: Texture2D = GothicUIAssetsScript.call("battlefield_midfight_texture") as Texture2D
 	var reduced_texture: Texture2D = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
@@ -73,13 +74,17 @@ func _run() -> void:
 	_expect(bool(_arena.get_meta("procedural_environment_geometry_suppressed", false)), "arena does not publish procedural-overlay suppression")
 	_expect(onset_texture != null and midfight_texture != null and reduced_texture != null, "arena phase-specific authored textures failed to load")
 	_expect(onset_texture != midfight_texture and midfight_texture != reduced_texture, "arena phase textures are not independently authored resources")
-	_expect(battlefield != null and battlefield.texture == reduced_texture, "Reduced Motion surface did not switch to the authored static-threat material")
+	_expect(battlefield != null and battlefield.texture == onset_texture, "Reduced Motion replaced the persistent killing-ground base")
+	_expect(pressure_surface != null and pressure_surface.texture == reduced_texture and pressure_surface.visible, "Reduced Motion did not layer its authored static threat over the stable base")
 	var seams: GridContainer = _arena.get_node_or_null("ArenaCellSeams") as GridContainer
 	var hostile_label: Label = _arena.get_node_or_null("EnemyFieldLabel") as Label
 	var survival_label: Label = _arena.get_node_or_null("PlayerFieldLabel") as Label
 	_expect(seams != null and seams.get_child_count() == 48, "battlefield lost its 8x6 cell-seam readability layer")
 	_expect(seams != null and int(seams.get_meta("major_seam_non_color_weight", 0)) >= 2, "battlefield major seams lack a non-color weight cue")
-	_expect(seams != null and float(seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.09 and float(seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.14, "battlefield seams must stay legible without reverting to a graph overlay")
+	_expect(seams != null and float(seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.18 and float(seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.26, "battlefield seams must remain tactical over the authored terrain without reverting to an opaque graph overlay")
+	_expect(String(seams.get_meta("side_separation", "")).contains("enemy_oxblood_player_bone"), "battlefield seams must separate hostile and survival territory in color plus line weight")
+	_expect(bool(_arena.get_meta("stable_base_location", false)), "combat escalation must preserve one stable killing ground")
+	_expect(String(_arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_landmark_aligned_authored_overlay", "combat escalation must layer aligned damage over the persistent base")
 	_expect(hostile_label != null and hostile_label.text.begins_with("▲") and hostile_label.text.contains("BREACH"), "hostile territory lacks its triangle/breach non-color cue")
 	_expect(survival_label != null and survival_label.text.begins_with("■") and survival_label.text.contains("SURVIVE"), "survival territory lacks its square/survive non-color cue")
 	_expect(hostile_label != null and bool(hostile_label.get_meta("persistent_copy_uses_utility_face", false)), "persistent hostile instruction must use the readable utility face")
@@ -118,14 +123,28 @@ func _build_surface() -> void:
 	GothicUIThemeScript.call("_suppress_procedural_arena_overlays", _arena)
 	var battlefield: TextureRect = TextureRect.new()
 	battlefield.name = "GothicArenaSurface"
-	battlefield.texture = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
+	battlefield.texture = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
 	battlefield.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	battlefield.stretch_mode = TextureRect.STRETCH_SCALE
 	battlefield.set_anchors_preset(Control.PRESET_FULL_RECT)
 	battlefield.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	battlefield.z_index = -7
-	battlefield.set_meta("active_material_phase", "reduced_motion")
+	battlefield.set_meta("active_material_phase", "persistent_onset_base")
 	_arena.add_child(battlefield)
+	var pressure_surface: TextureRect = TextureRect.new()
+	pressure_surface.name = "GothicArenaPressureSurface"
+	pressure_surface.texture = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
+	pressure_surface.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pressure_surface.stretch_mode = TextureRect.STRETCH_SCALE
+	pressure_surface.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pressure_surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pressure_surface.z_index = -6
+	pressure_surface.visible = true
+	pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.86)
+	pressure_surface.set_meta("landmark_aligned_with_base", true)
+	_arena.add_child(pressure_surface)
+	_arena.set_meta("stable_base_location", true)
+	_arena.set_meta("battlefield_material_source", "persistent_base_plus_landmark_aligned_authored_overlay")
 	var arena_frame: TextureRect = TextureRect.new()
 	arena_frame.name = "ArenaFrame"
 	arena_frame.texture = load("res://assets/ui/gothic/arena_frame.png") as Texture2D

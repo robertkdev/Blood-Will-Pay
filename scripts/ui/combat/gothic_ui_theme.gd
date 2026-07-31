@@ -555,6 +555,13 @@ static func _apply_named_nodes(root: Control) -> void:
 		arena_surface.set_meta("physical_depth_language", "authored_raster_wet_mud_standing_water_embedded_splintered_wreckage")
 		arena_surface.set_meta("horror_lighting", "localized_practical_ember_cold_wet_field")
 		arena_surface.set_meta("active_material_phase", "onset")
+		arena_surface.set_meta("stable_landmark_base", true)
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaPressureSurface", GothicUIAssets.battlefield_midfight_texture(), -6, Color(1.0, 1.0, 1.0, 0.0))
+	var pressure_surface: TextureRect = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
+	if pressure_surface != null:
+		pressure_surface.visible = false
+		pressure_surface.set_meta("battlefield_escalation_layer", "landmark_aligned_authored_damage_and_smoke")
+		pressure_surface.set_meta("shares_camera_and_landmarks_with_base", true)
 	_ensure_arena_zone_guides(root)
 	_ensure_tactical_shell_marks(root)
 	_style_label(root, "MarginContainer/VBoxContainer/StageLabel", 42, COLOR_TEXT, true)
@@ -2024,19 +2031,28 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			var seam_style: StyleBoxFlat = StyleBoxFlat.new()
-			seam_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-			var row_index: int = floori(float(cell_index) / 8.0)
-			var column_index: int = cell_index % 8
-			var major_seam: bool = row_index == 2 or column_index == 3
-			seam_style.border_color = Color(0.74, 0.68, 0.56, 0.25 if major_seam else 0.105)
-			seam_style.border_width_right = 2 if column_index == 3 else 1
-			seam_style.border_width_bottom = 2 if row_index == 2 else 1
-			cell.add_theme_stylebox_override("panel", seam_style)
 			seams.add_child(cell)
-	seams.set_meta("major_seam_non_color_weight", 2)
+	for cell_index: int in range(mini(48, seams.get_child_count())):
+		var cell: Panel = seams.get_child(cell_index) as Panel
+		if cell == null:
+			continue
+		var seam_style: StyleBoxFlat = StyleBoxFlat.new()
+		var row_index: int = floori(float(cell_index) / 8.0)
+		var column_index: int = cell_index % 8
+		var enemy_side: bool = row_index <= 2
+		var major_seam: bool = row_index == 2 or column_index == 3
+		seam_style.bg_color = Color(0.09, 0.012, 0.018, 0.034) if enemy_side else Color(0.08, 0.072, 0.052, 0.028)
+		seam_style.border_color = Color(0.88, 0.18, 0.15, 0.50 if major_seam else 0.23) if enemy_side else Color(0.88, 0.80, 0.62, 0.46 if major_seam else 0.21)
+		seam_style.border_width_right = 3 if column_index == 3 else 1
+		seam_style.border_width_bottom = 3 if row_index == 2 else 1
+		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.48)
+		seam_style.shadow_size = 1
+		seam_style.shadow_offset = Vector2(1.0, 1.0)
+		cell.add_theme_stylebox_override("panel", seam_style)
+	seams.set_meta("major_seam_non_color_weight", 3)
 	seams.set_meta("minor_seam_non_color_weight", 1)
-	seams.set_meta("terrain_seam_alpha", 0.105)
+	seams.set_meta("terrain_seam_alpha", 0.23)
+	seams.set_meta("side_separation", "enemy_oxblood_player_bone_with_black_understroke")
 	seams.set_meta("debug_graph_grid_suppressed", true)
 
 static func _ensure_arena_field_label(arena: Control, node_name: String, copy: String, enemy_side: bool) -> void:
@@ -2074,11 +2090,11 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	if is_player:
-		style.bg_color = Color(0.055, 0.074, 0.072, 0.015)
+		style.bg_color = Color(0.055, 0.074, 0.072, 0.042)
 		style.border_color = Color(0.75, 0.70, 0.58, 0.78)
 		style.border_width_top = 3
 	else:
-		style.bg_color = Color(0.12, 0.025, 0.030, 0.015)
+		style.bg_color = Color(0.12, 0.025, 0.030, 0.050)
 		style.border_color = Color(0.80, 0.075, 0.09, 0.84)
 		style.border_width_bottom = 3
 	return style

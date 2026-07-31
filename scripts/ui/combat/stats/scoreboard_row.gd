@@ -25,6 +25,7 @@ var _record_emphasis: bool = false
 var _compact_layout: bool = false
 var _compact_identity_font_size: int = 14
 var _exact_compact_values: bool = false
+var _compact_identity_mode: String = "full_badge"
 
 func set_compact_layout(enabled: bool) -> void:
 	_compact_layout = enabled
@@ -100,6 +101,8 @@ func _update_identity() -> void:
 		name_label.set_meta("compact_identity_lossless", compact_identity == "%s %s" % [team_prefix, unit_name.to_upper()])
 		name_label.set_meta("compact_team_marker", team_prefix)
 		name_label.set_meta("compact_identity_font_size", _compact_identity_font_size)
+		name_label.set_meta("compact_identity_mode", _compact_identity_mode)
+		name_label.set_meta("compact_identity_preserves_unit_name", compact_identity.contains(unit_name.to_upper()))
 	else:
 		name_label.text = unit_name
 	name_label.set_meta("compact_identity_complete", _compact_layout)
@@ -139,7 +142,18 @@ func _compact_identity_for_width(unit_name: String, team_prefix: String, availab
 	_compact_identity_font_size = 14
 	while _compact_identity_font_size > 10 and _compact_text_width(full_badge, font, _compact_identity_font_size) > available_width:
 		_compact_identity_font_size -= 1
-	return full_badge
+	if _compact_text_width(full_badge, font, _compact_identity_font_size) <= available_width:
+		_compact_identity_mode = "full_badge"
+		return full_badge
+	_compact_identity_font_size = 13
+	while _compact_identity_font_size > 9 and _compact_text_width(clean_name, font, _compact_identity_font_size) > available_width:
+		_compact_identity_font_size -= 1
+	if _compact_text_width(clean_name, font, _compact_identity_font_size) <= available_width:
+		_compact_identity_mode = "name_only_team_in_chrome"
+		return clean_name
+	_compact_identity_font_size = 10
+	_compact_identity_mode = "coded_name_team_in_chrome"
+	return _compact_identity_name(clean_name)
 
 func _compact_identity_available_width() -> float:
 	if name_label == null:
@@ -206,8 +220,9 @@ func _ensure_layout() -> void:
 		name_label.anchor_top = 0.0
 		name_label.anchor_bottom = 1.0
 		name_label.offset_left = 4.0 if _compact_layout else 16.0 if _record_emphasis else 10.0
-		name_label.offset_right = -compact_value_width if _compact_layout else -126.0 if _record_emphasis else -84.0
+		name_label.offset_right = -(compact_value_width + 6.0) if _compact_layout else -126.0 if _record_emphasis else -84.0
 		name_label.clip_text = true
+		name_label.set_meta("compact_numeric_safety_gap", 6.0 if _compact_layout else 0.0)
 	if value_label != null:
 		var compact_content_width: float = _compact_numeric_content_width()
 		var compact_right_inset: float = _compact_numeric_right_inset()
@@ -268,10 +283,14 @@ func _make_value_well_style() -> StyleBox:
 	return style
 
 func _compact_numeric_well_width() -> float:
-	return 78.0 if _exact_compact_values else 22.0
+	if not _exact_compact_values:
+		return 22.0
+	return 62.0 if size.x < 180.0 else 78.0
 
 func _compact_numeric_content_width() -> float:
-	return 64.0 if _exact_compact_values else 16.0
+	if not _exact_compact_values:
+		return 16.0
+	return 50.0 if size.x < 180.0 else 64.0
 
 func _compact_numeric_right_inset() -> float:
 	return 8.0 if _exact_compact_values else 4.0

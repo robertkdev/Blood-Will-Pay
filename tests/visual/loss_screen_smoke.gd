@@ -95,11 +95,16 @@ func _ready() -> void:
 		var ghost_style: StyleBoxFlat = casualty_ghost.get_theme_stylebox("normal") as StyleBoxFlat
 		_expect(ghost_style != null and ghost_style.corner_radius_top_left == 0 and ghost_style.border_width_left >= 7, "DEBT COLLECTED stamp should use sharp stamped geometry", failures)
 	var new_game_button: Button = screen.get_node_or_null("Panel/Center/Frame/VBox/NewGameButton") as Button
+	var return_title_button: Button = screen.get_node_or_null("Panel/Center/Frame/VBox/ReturnTitleButton") as Button
 	_expect(new_game_button != null, "NewGameButton missing", failures)
+	_expect(return_title_button != null and return_title_button.visible and return_title_button.text == "RETURN TO TITLE", "terminal loss should expose a clear Return to Title route", failures)
+	_expect(return_title_button != null and String(return_title_button.get_meta("visual_role", "")) == "secondary_recovery", "Return to Title should remain visibly secondary to Start New Run", failures)
 	if new_game_button != null:
 		_expect(new_game_button.custom_minimum_size.x >= 360.0 and new_game_button.custom_minimum_size.y >= 64.0, "Start New Run should remain the dominant recovery action", failures)
 		for style_name: String in ["normal", "hover", "pressed", "focus"]:
 			_expect_hard_flat_style(new_game_button, style_name, "NewGameButton %s should use hard flat restart furniture" % style_name, failures)
+	if new_game_button != null and return_title_button != null:
+		_expect(new_game_button.custom_minimum_size.x > return_title_button.custom_minimum_size.x and new_game_button.custom_minimum_size.y > return_title_button.custom_minimum_size.y, "Start New Run should remain dominant over Return to Title", failures)
 	if stage_label != null:
 		_expect(stage_label.text == "TOTAL EARNED 8g  //  CHAPTER 1  //  STAGE 3", "StageLabel did not use live run score and GameState", failures)
 		_expect(bool(stage_label.get_meta("status_copy_uses_utility_face", false)), "Loss stage status regressed to condensed display type", failures)
@@ -145,6 +150,7 @@ func _ready() -> void:
 		_expect(row_frame != null and _is_hard_flat_panel(row_frame), "Loss scoreboard row should use severe flat chrome", failures)
 		_expect(value_well != null and _is_hard_flat_panel(value_well), "Loss scoreboard value well should use severe flat chrome", failures)
 		_expect(scoreboard_row != null and scoreboard_row.custom_minimum_size.y >= 90.0, "Loss damage visualization should be enlarged beyond a utility scoreboard row", failures)
+		_expect(scoreboard_row != null and scoreboard_row.tooltip_text.is_empty() and scoreboard_row.mouse_filter == Control.MOUSE_FILTER_IGNORE and bool(scoreboard_row.get_meta("terminal_record_tooltip_suppressed", false)), "Terminal loss scoreboard should suppress hover records that can cover recovery actions", failures)
 		_expect(portrait != null and portrait.custom_minimum_size.y >= 76.0, "Loss damage record should allocate a substantial identity marker", failures)
 		_expect(labels.has("Axiom"), "Loss scoreboard should show player row", failures)
 		_expect(not labels.has("Beegle"), "Loss scoreboard should not expose hidden enemy name", failures)
@@ -179,6 +185,9 @@ func _ready() -> void:
 	_expect(pressure_layer != null and bool(pressure_layer.get_meta("compact_fragment_suppression", false)) and float(pressure_layer.get_meta("loss_pressure_density", 1.0)) <= 0.16, "Compact loss retained excessive red-pressure density", failures)
 	_expect(new_game_button != null and new_game_button.visible and _rect_inside(new_game_button.get_global_rect(), compact_viewport.grow(2.0)), "Compact START NEW RUN should retain independent visible bounds", failures)
 	_expect(frame_panel != null and new_game_button != null and _rect_inside(new_game_button.get_global_rect(), frame_panel.get_global_rect().grow(2.0)), "Compact START NEW RUN should remain contained by the casualty record", failures)
+	_expect(return_title_button != null and return_title_button.visible and _rect_inside(return_title_button.get_global_rect(), compact_viewport.grow(2.0)), "Compact RETURN TO TITLE should retain independent visible bounds", failures)
+	_expect(frame_panel != null and return_title_button != null and _rect_inside(return_title_button.get_global_rect(), frame_panel.get_global_rect().grow(2.0)), "Compact RETURN TO TITLE should remain contained by the casualty record", failures)
+	_expect(new_game_button != null and return_title_button != null and not new_game_button.get_global_rect().intersects(return_title_button.get_global_rect()), "Compact loss recovery actions should not collide", failures)
 	var compact_scoreboard_row: Control = scoreboard.find_child("ScoreboardRow", true, false) as Control if scoreboard != null else null
 	if compact_scoreboard_row != null:
 		compact_scoreboard_row.call("set_row_data", {

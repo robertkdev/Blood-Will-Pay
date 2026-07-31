@@ -138,8 +138,10 @@ The UI can inherit metal's force without pretending to be music memorabilia:
 - No stage, crowd-as-audience, performer, venue, ticket, flyer, speaker,
   amplifier, or tour metaphor is visible.
 - The title and tagline remain readable at 3840x2160, 1920x1080, and 1280x720.
-- No visible button, prompt, cursor, instruction, or additional text competes
-  with the title image.
+- The title image remains the sole visual headline. A compact incident docket
+  and one minimal click/confirm prompt may support navigation, but neither may
+  resemble promotional copy, approach the title's scale, or compete with its
+  first-read dominance.
 - The composition feels like pressure before impact rather than a poster
   advertising impact.
 - Horror comes from place, consequence, scale, and implication—not Halloween

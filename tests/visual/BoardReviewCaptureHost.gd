@@ -12,6 +12,8 @@ const SEAT_ARGUMENT_PREFIX: String = "--board-review-seat="
 const SEAT_ENVIRONMENT_VARIABLE: String = "BOARD_REVIEW_SEAT_ID"
 const DESKTOP_SIZE: Vector2i = Vector2i(1920, 1080)
 const COMPACT_SIZE: Vector2i = Vector2i(1280, 720)
+const ULTRAWIDE_SIZE: Vector2i = Vector2i(2560, 1080)
+const FOUR_K_SIZE: Vector2i = Vector2i(3840, 2160)
 const WATCHDOG_SECONDS: float = 90.0
 const EXPECTED_FILES: Array[String] = [
 	"01_title_1920x1080.png",
@@ -40,6 +42,13 @@ const EXPECTED_FILES: Array[String] = [
 	"24_ledger_1280x720_150pct.png",
 	"25_defeat_hold_1280x720_150pct.png",
 	"26_loss_1280x720_150pct.png",
+	"27_title_ultrawide_2560x1080.png",
+	"28_title_4k_3840x2160.png",
+	"29_settings_focus_hover_1920x1080.png",
+	"30_settings_pressed_1920x1080.png",
+	"31_settings_disabled_1920x1080.png",
+	"32_planning_ultrawide_2560x1080.png",
+	"33_result_skip_focus_1920x1080.png",
 ]
 
 var _main: Control = null
@@ -92,6 +101,14 @@ func _run() -> void:
 	await _settle_frames(10)
 	_assert_title_gateway_contract("desktop title", false)
 	await _capture("01_title_1920x1080.png", "title", DESKTOP_SIZE)
+	_configure_window(ULTRAWIDE_SIZE)
+	await _settle_frames(12)
+	_assert_title_gateway_contract("ultrawide title", false)
+	await _capture("27_title_ultrawide_2560x1080.png", "title_ultrawide", ULTRAWIDE_SIZE)
+	_configure_window(FOUR_K_SIZE)
+	await _settle_frames(14)
+	_assert_title_gateway_contract("4K title", false)
+	await _capture("28_title_4k_3840x2160.png", "title_4k", FOUR_K_SIZE)
 	_configure_scaled_window(COMPACT_SIZE, 1.5)
 	await _settle_frames(12)
 	_assert_title_gateway_contract("150% compact title", true)
@@ -111,6 +128,25 @@ func _run() -> void:
 	await _settle_frames(8)
 	_assert_settings_rail_contract()
 	await _capture("03_settings_1920x1080.png", "settings", DESKTOP_SIZE)
+	var settings_state_button: Button = _first_visible_button(title_menu)
+	_expect(settings_state_button != null, "settings did not expose a reviewable interaction control")
+	if settings_state_button != null:
+		settings_state_button.grab_focus()
+		DisplayServer.warp_mouse(settings_state_button.get_global_rect().get_center())
+		await _settle_frames(4)
+		_expect(settings_state_button.has_focus(), "settings focus state did not become authoritative")
+		await _capture("29_settings_focus_hover_1920x1080.png", "settings_focus_hover", DESKTOP_SIZE)
+		var previous_toggle_mode: bool = settings_state_button.toggle_mode
+		settings_state_button.toggle_mode = true
+		settings_state_button.button_pressed = true
+		await _settle_frames(3)
+		await _capture("30_settings_pressed_1920x1080.png", "settings_pressed", DESKTOP_SIZE)
+		settings_state_button.button_pressed = false
+		settings_state_button.toggle_mode = previous_toggle_mode
+		settings_state_button.disabled = true
+		await _settle_frames(3)
+		await _capture("31_settings_disabled_1920x1080.png", "settings_disabled", DESKTOP_SIZE)
+		settings_state_button.disabled = false
 
 	_configure_window(COMPACT_SIZE)
 	if title_menu != null:
@@ -200,8 +236,17 @@ func _run() -> void:
 	_configure_window(DESKTOP_SIZE)
 	await _settle_frames(14)
 	await _capture("11_planning_1920x1080.png", "planning", DESKTOP_SIZE)
-
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	_configure_window(ULTRAWIDE_SIZE)
+	if combat != null and combat.has_method("_apply_responsive_layout"):
+		combat.call("_apply_responsive_layout")
+	await _settle_frames(14)
+	await _capture("32_planning_ultrawide_2560x1080.png", "planning_ultrawide", ULTRAWIDE_SIZE)
+	_configure_window(DESKTOP_SIZE)
+	if combat != null and combat.has_method("_apply_responsive_layout"):
+		combat.call("_apply_responsive_layout")
+	await _settle_frames(10)
+
 	_configure_scaled_window(COMPACT_SIZE, 1.25)
 	if combat != null and combat.has_method("_apply_responsive_layout"):
 		combat.call("_apply_responsive_layout")
@@ -291,6 +336,12 @@ func _run() -> void:
 			Color(1.0, 0.69, 0.60, 1.0),
 			"20_defeat_hold_1920x1080.png"
 		)
+		var result_skip: Button = _main.get_node_or_null("BattleResultBanner/Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
+		if result_skip != null:
+			result_skip.grab_focus()
+			await _settle_frames(3)
+			_expect(result_skip.has_focus(), "result skip focus state did not become authoritative")
+		await _capture("33_result_skip_focus_1920x1080.png", "defeat_skip_focus", DESKTOP_SIZE)
 		_configure_scaled_window(COMPACT_SIZE, 1.5)
 		if combat != null and combat.has_method("_apply_responsive_layout"):
 			combat.call("_apply_responsive_layout")
@@ -314,6 +365,17 @@ func _run() -> void:
 	await _settle_frames(12)
 	await _capture("26_loss_1280x720_150pct.png", "loss_150_percent", COMPACT_SIZE)
 	await _finish()
+
+
+func _first_visible_button(root: Node) -> Button:
+	if root == null:
+		return null
+	var candidates: Array[Node] = root.find_children("*", "Button", true, false)
+	for candidate_node: Node in candidates:
+		var candidate: Button = candidate_node as Button
+		if candidate != null and candidate.is_visible_in_tree() and not candidate.disabled:
+			return candidate
+	return null
 
 
 func _build_planning_surface() -> void:
@@ -487,21 +549,24 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	var pressure_painter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ArenaPressurePainter") as Control
 	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
 	var arena_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
-	var expected_material_phase: String = "reduced_motion" if reduced_motion else "midfight" if expected_phase != "onset" else "onset"
+	var pressure_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
 	_expect(arena != null and String(arena.get_meta("battlefield_pressure_phase", "")) == expected_phase, "%s capture did not reach the requested environment phase" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("battlefield_reduced_motion", not reduced_motion)) == reduced_motion, "%s capture reduced-motion metadata is wrong" % expected_phase)
-	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("authored_raster_warfield/"), "%s capture lacks an authored raster battlefield signature" % expected_phase)
-	_expect(arena != null and String(arena.get_meta("battlefield_material_source", "")) == "phase_specific_authored_raster", "%s capture is not sourced from authored phase material" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("persistent_killing_ground/"), "%s capture lacks the persistent battlefield signature" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_landmark_aligned_authored_overlay", "%s capture is not sourced from the stable field plus aligned threat layer" % expected_phase)
+	_expect(arena != null and bool(arena.get_meta("stable_base_location", false)), "%s capture does not preserve one tactical location" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("procedural_environment_geometry_suppressed", false)), "%s capture retained procedural environment geometry" % expected_phase)
 	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not prioritize cell readability" % expected_phase)
 	_expect(aftermath != null and not aftermath.visible, "%s capture exposed the retired procedural war-aftermath root" % expected_phase)
 	_expect(onset != null and not onset.visible and midfight != null and not midfight.visible and collapse != null and not collapse.visible and reduced_lock != null and not reduced_lock.visible, "%s capture leaked a procedural evidence group over the authored field" % expected_phase)
 	_expect(pressure_painter != null and not pressure_painter.is_visible_in_tree(), "%s capture leaked the retired procedural pressure painter" % expected_phase)
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
-	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.09 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.14, "%s capture lost the legible terrain-seam balance" % expected_phase)
+	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.18 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.26, "%s capture lost the legible terrain-seam balance" % expected_phase)
 	_expect(arena_surface != null and String(arena_surface.get_meta("battlefield_foundation", "")) == "muddy_rural_killing_ground_v1", "%s capture lacks the physical rural horror foundation" % expected_phase)
 	_expect(arena_surface != null and arena_surface.texture != null and arena_surface.modulate.a >= 0.90, "%s capture washes out or loses the authored battlefield texture" % expected_phase)
-	_expect(arena_surface != null and String(arena_surface.get_meta("active_material_phase", "")) == expected_material_phase, "%s capture uses the wrong authored material phase" % expected_phase)
+	_expect(arena_surface != null and String(arena_surface.get_meta("active_material_phase", "")) == "persistent_onset_base", "%s capture replaced the stable authored foundation" % expected_phase)
+	_expect(pressure_surface != null and pressure_surface.visible == (expected_phase != "onset"), "%s capture uses the wrong aligned pressure-layer visibility" % expected_phase)
+	_expect(pressure_surface != null and bool(pressure_surface.get_meta("landmark_aligned_with_base", false)), "%s capture pressure art is not registered as landmark-aligned" % expected_phase)
 	_expect(arena != null and is_equal_approx(float(arena.get_meta("battlefield_overlay_density", 1.0)), 0.0), "%s capture retained a procedural environment overlay density" % expected_phase)
 	_assert_persistent_combat_hierarchy(expected_phase)
 
@@ -527,7 +592,7 @@ func _assert_title_gateway_contract(context: String, compact: bool) -> void:
 	_expect(incident.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART, "%s incident evidence lost authored wrapping" % context)
 	_expect(bool(docket.get_meta("compact_gateway_layout", not compact)) == compact, "%s uses the wrong responsive docket layout" % context)
 	_expect(bool(incident.get_meta("compact_copy", not compact)) == compact, "%s uses the wrong incident copy density" % context)
-	_expect(incident.text.contains("OLD MILL ROAD") and incident.text.contains("HANDS BOUND"), "%s lost its specific atrocity evidence" % context)
+	_expect(incident.text.contains("OLD MILL ROAD") and incident.text.contains("RESTRAINT MARKS"), "%s lost its specific atrocity evidence" % context)
 	_expect(bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "%s entry affordance lost its restrained CTA contract" % context)
 
 
@@ -664,6 +729,7 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
 	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
 	var field_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathFieldArt") as TextureRect
+	var pressure_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathPressureArt") as TextureRect
 	var hold_label: Label = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label if card != null else null
 	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
 	var instruction_ribbon: Label = _main.find_child("CombatObjectiveSignal", true, false) as Label if _main != null else null
@@ -671,9 +737,9 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 	var hostile_field_label: Label = _main.find_child("EnemyFieldLabel", true, false) as Label if _main != null else null
 	var survival_field_label: Label = _main.find_child("PlayerFieldLabel", true, false) as Label if _main != null else null
 	var traits_underlay: Control = _main.get_node_or_null("CombatView/MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control if _main != null else null
-	var expected_signature: String = "authored_raster_survivor_field" if outcome == "VICTORY" else "authored_raster_deadlock_field" if outcome == "STALEMATE" else "authored_raster_collapsed_field"
+	var expected_signature: String = "persistent_field_open_escape" if outcome == "VICTORY" else "persistent_field_suspended_deadlock" if outcome == "STALEMATE" else "persistent_field_grave_descent"
 	var expected_silhouette: String = "rising_open_lane" if outcome == "VICTORY" else "locked_vertical_deadlock" if outcome == "STALEMATE" else "descending_grave_jaw"
-	var expected_reading_path: String = "left_to_right_escape" if outcome == "VICTORY" else "centered_suspension" if outcome == "STALEMATE" else "centered_grave_descent"
+	var expected_reading_path: String = "left_to_right_escape" if outcome == "VICTORY" else "centered_suspension" if outcome == "STALEMATE" else "right_edge_grave_descent"
 	_expect(card != null and String(card.get_meta("result_variant", "")) == outcome.to_lower(), "%s result card variant metadata is wrong" % outcome)
 	_expect(card != null and String(card.get_meta("grayscale_silhouette", "")) == expected_silhouette, "%s result is not distinguishable by grayscale silhouette" % outcome)
 	_expect(card != null and String(card.get_meta("reading_path", "")) == expected_reading_path, "%s result did not receive its distinct reading path" % outcome)
@@ -695,7 +761,8 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 		_expect(bool(instruction_ribbon.get_meta("persistent_copy_uses_utility_face", false)), "%s result instruction regressed to condensed display type" % outcome)
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its physical aftermath signature" % outcome)
 	_expect(aftermath != null and bool(aftermath.get_meta("procedural_outcome_geometry_suppressed", false)), "%s retained procedural outcome geometry" % outcome)
-	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "phase_specific_authored_raster", "%s lacks authored raster aftermath material" % outcome)
+	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "persistent_onset_landmark_base", "%s replaces the stable aftermath location" % outcome)
+	_expect(pressure_art != null and String(pressure_art.get_meta("result_material_source", "")) == "landmark_aligned_consequence_overlay", "%s lacks aligned consequence material" % outcome)
 	_expect(victory_geometry != null and not victory_geometry.visible and stalemate_geometry != null and not stalemate_geometry.visible and defeat_geometry != null and not defeat_geometry.visible, "%s exposes a retired procedural aftermath painter" % outcome)
 	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
 	var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label if stage_bar != null else null

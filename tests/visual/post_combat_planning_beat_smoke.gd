@@ -292,17 +292,17 @@ func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 	_expect(aftermath_stamp != null and not aftermath_stamp.text.strip_edges().is_empty(), "%s should state its environmental consequence outside the data card" % expected_title)
 	_assert_outcome_aftermath_geometry(banner, expected_title)
 	if expected_title == "DEFEAT":
-		_expect(card != null and card.custom_minimum_size == Vector2(820.0, 448.0), "defeat should use a centered consequence silhouette without a dead right-side rail")
+		_expect(card != null and card.custom_minimum_size == Vector2(720.0, 506.0), "defeat should use a tall grave-descent silhouette")
 		_expect(card != null and String(card.get_meta("grayscale_silhouette", "")) == "descending_grave_jaw", "defeat should remain recognizable as a closing grave-jaw silhouette in grayscale")
-		_expect(card != null and String(card.get_meta("reading_path", "")) == "centered_grave_descent", "defeat should drive a centered downward reading path")
-		_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER, "defeat headline should center instead of clustering against the right edge")
+		_expect(card != null and String(card.get_meta("reading_path", "")) == "right_edge_grave_descent", "defeat should drive a distinct right-edge downward reading path")
+		_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_RIGHT, "defeat headline should close against the hostile right edge")
 		_expect(card != null and String(card.get_meta("tear_direction", "")) == "downward_collapse", "defeat should collapse downward")
 		_expect(kicker_label != null and kicker_label.text.contains("WOODS COLLECT"), "defeat should name the environmental threat")
 		_expect(outcome_signal != null and outcome_signal.text.contains("DARK KEEPS"), "defeat should communicate a visceral horror consequence")
 		_expect(settlement_label != null and settlement_label.text.contains("FORFEITED"), "defeat should expose forfeiture rather than generic settlement")
 		_expect(impact_stamp != null and impact_stamp.text.contains("BLOOD TAKEN"), "defeat should carry a distinct blood-cost stamp")
 	elif expected_title == "STALEMATE":
-		_expect(card != null and card.custom_minimum_size == Vector2(800.0, 456.0), "stalemate should use a materially narrower suspended-record silhouette")
+		_expect(card != null and card.custom_minimum_size == Vector2(760.0, 456.0), "stalemate should use a materially narrower suspended-record silhouette")
 		_expect(card != null and String(card.get_meta("grayscale_silhouette", "")) == "locked_vertical_deadlock", "stalemate should remain recognizable as a locked vertical deadlock in grayscale")
 		_expect(card != null and String(card.get_meta("reading_path", "")) == "centered_suspension", "stalemate should suspend the reading path in the center")
 		_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER, "stalemate headline should be visibly trapped on the center axis")
@@ -355,7 +355,7 @@ func _assert_active_combat_shell() -> void:
 	_expect(war_aftermath != null and not war_aftermath.visible, "combat shell exposed the retired procedural war-aftermath layer")
 	_expect(onset_geometry != null and not onset_geometry.visible and midfight_geometry != null and not midfight_geometry.visible and collapse_geometry != null and not collapse_geometry.visible and reduced_geometry != null and not reduced_geometry.visible, "combat shell leaked a procedural evidence painter")
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "combat grid seams do not stay above the environment")
-	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.09 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.14, "combat seams must remain readable without becoming a graph overlay")
+	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.18 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.26, "combat seams must remain readable without becoming an opaque graph overlay")
 	var onset_texture: Texture2D = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
 	var midfight_texture: Texture2D = GothicUIAssetsScript.call("battlefield_midfight_texture") as Texture2D
 	var reduced_texture: Texture2D = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
@@ -365,7 +365,8 @@ func _assert_active_combat_shell() -> void:
 	_expect(arena_container != null and is_equal_approx(float(arena_container.get_meta("battlefield_overlay_density", 1.0)), 0.0), "combat environment retained procedural overlay density")
 	var pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "")) if arena_container != null else ""
 	_expect(not pressure_phase.is_empty(), "combat environment did not publish its evolving pressure phase")
-	_expect(arena_container != null and String(arena_container.get_meta("battlefield_environment_signature", "")).begins_with("authored_raster_warfield/"), "combat environment lacks an authored raster composition signature")
+	_expect(arena_container != null and String(arena_container.get_meta("battlefield_environment_signature", "")).begins_with("persistent_killing_ground/"), "combat environment lacks a stable authored composition signature")
+	_expect(arena_container != null and bool(arena_container.get_meta("stable_base_location", false)), "combat environment does not preserve one authored location")
 	_expect(arena_container != null and String(arena_container.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "combat environment does not publish grid-priority protection")
 	var viewport_height: float = get_viewport().get_visible_rect().size.y
 	_expect(battle_area != null and battle_area.get_global_rect().size.y >= viewport_height * 0.78, "combat field remained a narrow middle band instead of occupying the survival surface")
@@ -424,12 +425,15 @@ func _assert_outcome_aftermath_geometry(banner: PanelContainer, outcome: String)
 	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
 	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control
 	var field_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathFieldArt") as TextureRect
-	var expected_signature: String = "authored_raster_survivor_field" if outcome == "VICTORY" else "authored_raster_deadlock_field" if outcome == "STALEMATE" else "authored_raster_collapsed_field"
+	var pressure_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathPressureArt") as TextureRect
+	var expected_signature: String = "persistent_field_open_escape" if outcome == "VICTORY" else "persistent_field_suspended_deadlock" if outcome == "STALEMATE" else "persistent_field_grave_descent"
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its distinct physical aftermath signature" % outcome)
 	_expect(aftermath != null and int(aftermath.get_meta("flat_rectangle_count", -1)) == 0, "%s aftermath regressed to giant flat rectangle construction" % outcome)
 	_expect(aftermath != null and bool(aftermath.get_meta("terrain_visibility_preserved", false)), "%s aftermath no longer preserves the physical battlefield around the record" % outcome)
 	_expect(aftermath != null and bool(aftermath.get_meta("procedural_outcome_geometry_suppressed", false)), "%s aftermath retained procedural outcome geometry" % outcome)
-	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "phase_specific_authored_raster", "%s aftermath lacks authored raster material" % outcome)
+	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "persistent_onset_landmark_base", "%s aftermath replaced its stable battlefield foundation" % outcome)
+	_expect(pressure_art != null and String(pressure_art.get_meta("result_material_source", "")) == "landmark_aligned_consequence_overlay", "%s aftermath lacks its aligned consequence layer" % outcome)
+	_expect(pressure_art != null and pressure_art.visible == (outcome != "VICTORY"), "%s aftermath consequence overlay has the wrong visibility" % outcome)
 	_expect(rupture_field != null and not rupture_field.visible and bool(rupture_field.get_meta("debug_splinters_suppressed", false)), "%s aftermath retained straight procedural splinter bars" % outcome)
 	if victory_geometry != null:
 		_expect(not victory_geometry.visible, "%s leaked the retired victory survivor-lane painter" % outcome)

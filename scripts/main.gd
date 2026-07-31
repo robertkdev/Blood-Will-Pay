@@ -25,13 +25,13 @@ const TITLE_INCIDENT_DESKTOP_COPY: String = (
 	"RECOVERY TAG // OLD MILL ROAD\n"
 	+ "ROADBLOCK SET // FIRE TRENCH CUT\n"
 	+ "NINE CHAIRS // EIGHT DRAG MARKS\n"
-	+ "ONE WITNESS RETURNED // HANDS BOUND"
+	+ "ONE WITNESS RETURNED // RESTRAINT MARKS"
 )
 const TITLE_INCIDENT_COMPACT_COPY: String = (
 	"RECOVERY TAG // OLD MILL ROAD\n"
 	+ "FIRE TRENCH // NINE CHAIRS\n"
 	+ "EIGHT DRAG MARKS // ONE WITNESS\n"
-	+ "HANDS BOUND // ROADBLOCK SET"
+	+ "RESTRAINT MARKS // ROADBLOCK SET"
 )
 
 var _system_layer: CanvasLayer
@@ -40,7 +40,10 @@ var _system_overlay: Control
 var _resume_button: Button
 var _return_title_button: Button
 var _new_run_button: Button
+var _settings_button: Button
 var _quit_game_button: Button
+var _system_panel: PanelContainer
+var _system_stack: VBoxContainer
 var _audit_panel: CanvasLayer
 var _system_menu_open: bool = false
 var _new_run_confirmation_pending: bool = false
@@ -72,6 +75,8 @@ func _ready() -> void:
 		unit_select.process_mode = Node.PROCESS_MODE_PAUSABLE
 	if title_menu:
 		title_menu.process_mode = Node.PROCESS_MODE_PAUSABLE
+		if title_menu.has_signal("runtime_settings_closed") and not title_menu.is_connected("runtime_settings_closed", Callable(self, "_on_runtime_settings_closed")):
+			title_menu.connect("runtime_settings_closed", Callable(self, "_on_runtime_settings_closed"))
 	_build_system_menu()
 	if not get_viewport().size_changed.is_connected(_layout_system_menu_button):
 		get_viewport().size_changed.connect(_layout_system_menu_button)
@@ -270,13 +275,13 @@ func _build_system_menu() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_system_overlay.add_child(center)
 
-	var panel: PanelContainer = PanelContainer.new()
-	panel.name = "Panel"
-	panel.custom_minimum_size = Vector2(500.0, 452.0)
-	panel.clip_contents = true
-	panel.set_meta("decoration_containment", "calm_panel_interior")
-	panel.add_theme_stylebox_override("panel", _make_panel_style())
-	center.add_child(panel)
+	_system_panel = PanelContainer.new()
+	_system_panel.name = "Panel"
+	_system_panel.custom_minimum_size = Vector2(500.0, 516.0)
+	_system_panel.clip_contents = true
+	_system_panel.set_meta("decoration_containment", "calm_panel_interior")
+	_system_panel.add_theme_stylebox_override("panel", _make_panel_style())
+	center.add_child(_system_panel)
 	var panel_scars: Label = Label.new()
 	panel_scars.name = "PanelScars"
 	panel_scars.text = "////    X   //////////\n   ///////////   X\n///   X      //////"
@@ -287,8 +292,8 @@ func _build_system_menu() -> void:
 	panel_scars.add_theme_color_override("font_color", Color(0.72, 0.09, 0.10, 0.28))
 	panel_scars.set_meta("contained_by_panel", true)
 	VisualTypeSystem.set_utility(panel_scars)
-	panel.add_child(panel_scars)
-	_build_system_assembly_layer(panel)
+	_system_panel.add_child(panel_scars)
+	_build_system_assembly_layer(_system_panel)
 
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "Margin"
@@ -296,13 +301,13 @@ func _build_system_menu() -> void:
 	margin.add_theme_constant_override("margin_top", 22)
 	margin.add_theme_constant_override("margin_right", 24)
 	margin.add_theme_constant_override("margin_bottom", 22)
-	panel.add_child(margin)
+	_system_panel.add_child(margin)
 
-	var stack: VBoxContainer = VBoxContainer.new()
-	stack.name = "Stack"
-	stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack.add_theme_constant_override("separation", 11)
-	margin.add_child(stack)
+	_system_stack = VBoxContainer.new()
+	_system_stack.name = "Stack"
+	_system_stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	_system_stack.add_theme_constant_override("separation", 11)
+	margin.add_child(_system_stack)
 	var filing_mark: Label = Label.new()
 	filing_mark.name = "FilingMark"
 	filing_mark.text = "FIELD INTERRUPTION // SIGNAL CUT // INPUT HELD"
@@ -311,7 +316,7 @@ func _build_system_menu() -> void:
 	filing_mark.add_theme_font_size_override("font_size", 13)
 	filing_mark.add_theme_color_override("font_color", Color(0.80, 0.23, 0.19, 0.94))
 	VisualTypeSystem.set_action(filing_mark)
-	stack.add_child(filing_mark)
+	_system_stack.add_child(filing_mark)
 
 	var title: Label = Label.new()
 	title.name = "Title"
@@ -325,39 +330,62 @@ func _build_system_menu() -> void:
 	title.add_theme_font_size_override("font_size", 26)
 	VisualTypeSystem.set_impact(title)
 	title.add_theme_color_override("font_color", Color(0.94, 0.84, 0.66))
-	stack.add_child(title)
+	_system_stack.add_child(title)
 
 	var rule: HSeparator = HSeparator.new()
 	rule.name = "Rule"
 	rule.custom_minimum_size = Vector2(0.0, 3.0)
-	stack.add_child(rule)
+	_system_stack.add_child(rule)
 
 	_resume_button = _make_menu_button("ResumeButton", "Resume")
 	_resume_button.pressed.connect(_close_system_menu)
 	_apply_system_action_style(_resume_button, "safe")
-	stack.add_child(_resume_button)
+	_system_stack.add_child(_resume_button)
+
+	_settings_button = _make_menu_button("SettingsButton", "SETTINGS // LOCAL MACHINE")
+	_settings_button.pressed.connect(_open_runtime_settings)
+	_apply_system_action_style(_settings_button, "neutral")
+	_settings_button.set_meta("preserves_active_run", true)
+	_system_stack.add_child(_settings_button)
 
 	_new_run_button = _make_menu_button("NewRunButton", "BURN THIS RUN // NEW BLOOD")
 	_new_run_button.pressed.connect(_on_new_run_menu_pressed)
 	_apply_system_action_style(_new_run_button, "danger")
-	stack.add_child(_new_run_button)
+	_system_stack.add_child(_new_run_button)
 
 	_black_ledger_system_button = _make_menu_button("BlackLedgerButton", "OPEN THE BLACK LEDGER")
 	_black_ledger_system_button.pressed.connect(open_black_ledger)
 	_apply_system_action_style(_black_ledger_system_button, "neutral")
-	stack.add_child(_black_ledger_system_button)
+	_system_stack.add_child(_black_ledger_system_button)
 
 	_return_title_button = _make_menu_button("ReturnTitleButton", "RETURN TO TITLE // PRESERVE FILE")
 	_return_title_button.pressed.connect(request_return_to_title)
 	_apply_system_action_style(_return_title_button, "warning")
-	stack.add_child(_return_title_button)
+	_system_stack.add_child(_return_title_button)
 
 	_quit_game_button = _make_menu_button("QuitGameButton", "QUIT TO DESKTOP // PRESERVE FILE")
 	_quit_game_button.pressed.connect(_on_quit)
 	_apply_system_action_style(_quit_game_button, "danger_muted")
-	stack.add_child(_quit_game_button)
+	_system_stack.add_child(_quit_game_button)
 
 	_sync_system_menu_button()
+
+func _open_runtime_settings() -> void:
+	if title_menu == null or not title_menu.has_method("open_runtime_settings"):
+		return
+	_reset_new_run_confirmation()
+	_system_menu_open = false
+	if _system_overlay != null:
+		_system_overlay.visible = false
+	title_menu.call("open_runtime_settings")
+	get_tree().paused = true
+	_sync_system_menu_button()
+
+func _on_runtime_settings_closed() -> void:
+	get_tree().paused = false
+	_sync_system_menu_button()
+	if _system_menu_button != null and _system_menu_button.visible:
+		_system_menu_button.grab_focus()
 
 func _build_system_assembly_layer(panel: PanelContainer) -> void:
 	if panel == null:
@@ -730,6 +758,8 @@ func _make_menu_button(node_name: String, label: String) -> Button:
 			authored_width = 338.0
 		"NewRunButton":
 			authored_width = 326.0
+		"SettingsButton":
+			authored_width = 340.0
 		"BlackLedgerButton":
 			authored_width = 344.0
 		"ReturnTitleButton":
@@ -915,6 +945,20 @@ func _layout_system_menu_button() -> void:
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var compact: bool = viewport_size.x <= 1400.0 or viewport_size.y <= 760.0
+	if _system_panel != null:
+		_system_panel.custom_minimum_size = Vector2(
+			minf(500.0, maxf(320.0, viewport_size.x - 24.0)),
+			minf(516.0, maxf(400.0, viewport_size.y - 16.0))
+		)
+		_system_panel.set_meta("compact_settings_route_safe", compact)
+	if _system_stack != null:
+		_system_stack.add_theme_constant_override("separation", 6 if compact else 11)
+	for action_button: Button in [_resume_button, _settings_button, _new_run_button, _black_ledger_system_button, _return_title_button, _quit_game_button]:
+		if action_button == null:
+			continue
+		action_button.custom_minimum_size.y = 42.0 if compact else 52.0
+		action_button.custom_minimum_size.x = minf(action_button.custom_minimum_size.x, maxf(286.0, viewport_size.x - 84.0))
+		action_button.add_theme_font_size_override("font_size", 18 if compact else (21 if action_button == _return_title_button or action_button == _quit_game_button else 23))
 	_system_menu_button.set_meta("compact_safe_placement", compact)
 	VisualTypeSystem.set_utility_bold(_system_menu_button)
 	if compact:

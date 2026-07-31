@@ -3328,6 +3328,10 @@ func _update_environmental_pressure(delta: float) -> void:
 	var boundary: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary") as CanvasItem
 	if boundary != null:
 		boundary.modulate.a = 0.70 if reduced_motion else clampf(0.82 + phase_weight + slow_pulse * 0.10, 0.72, 1.0)
+	var pressure_surface: TextureRect = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
+	if pressure_surface != null and pressure_surface.visible:
+		var target_alpha: float = 0.90 if reduced_motion else 0.88 if pressure_phase == 1 else 0.96 if pressure_phase >= 2 else 0.0
+		pressure_surface.modulate.a = target_alpha if reduced_motion else clampf(target_alpha + slow_pulse * 0.030, 0.0, 0.98)
 	var aftermath: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath") as Control
 	if aftermath != null:
 		aftermath.pivot_offset = aftermath.size * 0.5
@@ -3354,9 +3358,11 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("battlefield_reduced_motion", reduced_motion)
 	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
 	arena.set_meta("battlefield_casualty_event_index", casualty_event_index)
-	arena.set_meta("battlefield_environment_signature", "authored_raster_warfield/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
+	arena.set_meta("battlefield_environment_signature", "persistent_killing_ground/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
 	arena.set_meta("battlefield_overlay_density", 0.0)
-	arena.set_meta("battlefield_material_source", "phase_specific_authored_raster")
+	arena.set_meta("battlefield_material_source", "persistent_base_plus_landmark_aligned_authored_overlay")
+	arena.set_meta("stable_base_location", true)
+	arena.set_meta("landmark_continuity_source", "onset_base_persistent")
 	arena.set_meta("procedural_environment_geometry_suppressed", true)
 	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
@@ -3389,15 +3395,16 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		pressure_painter.call("configure", effective_phase, reduced_motion, casualty_pressure, casualty_event_index)
 	var arena_surface: TextureRect = arena.get_node_or_null("GothicArenaSurface") as TextureRect
 	if arena_surface != null:
-		arena_surface.texture = (
-			GothicUIAssets.battlefield_reduced_motion_texture()
-			if reduced_motion
-			else GothicUIAssets.battlefield_onset_texture()
-			if effective_phase == 0
-			else GothicUIAssets.battlefield_midfight_texture()
-		)
+		arena_surface.texture = GothicUIAssets.battlefield_onset_texture()
 		arena_surface.modulate = Color(1.0, 1.0, 1.0, 0.96)
-		arena_surface.set_meta("active_material_phase", "reduced_motion" if reduced_motion else phase_name)
+		arena_surface.set_meta("active_material_phase", "persistent_onset_base")
+	var pressure_surface: TextureRect = arena.get_node_or_null("GothicArenaPressureSurface") as TextureRect
+	if pressure_surface != null:
+		pressure_surface.texture = GothicUIAssets.battlefield_reduced_motion_texture() if reduced_motion else GothicUIAssets.battlefield_midfight_texture()
+		pressure_surface.visible = reduced_motion or effective_phase >= 1
+		pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.90 if reduced_motion else 0.88 if effective_phase == 1 else 0.96)
+		pressure_surface.set_meta("active_material_phase", "reduced_motion_static" if reduced_motion else phase_name)
+		pressure_surface.set_meta("landmark_aligned_with_base", true)
 	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
 	if woodland != null:
 		woodland.visible = false
@@ -3643,7 +3650,7 @@ func _configure_result_outcome(
 		impact_stamp.rotation = -0.018 if title == "VICTORY" else 0.025 if title == "STALEMATE" else -0.038
 	if card != null:
 		card.set_meta("grayscale_silhouette", "rising_open_lane" if title == "VICTORY" else "locked_vertical_deadlock" if title == "STALEMATE" else "descending_grave_jaw")
-		card.set_meta("reading_path", "left_to_right_escape" if title == "VICTORY" else "centered_suspension" if title == "STALEMATE" else "centered_grave_descent")
+		card.set_meta("reading_path", "left_to_right_escape" if title == "VICTORY" else "centered_suspension" if title == "STALEMATE" else "right_edge_grave_descent")
 		_apply_result_card_geometry(card, title)
 
 func refresh_result_banner_layout() -> void:
@@ -3693,10 +3700,10 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	var ideal_size: Vector2 = Vector2(1040.0, 388.0)
 	var card_rotation: float = -0.012
 	if title == "STALEMATE":
-		ideal_size = Vector2(800.0, 456.0)
+		ideal_size = Vector2(760.0, 456.0)
 		card_rotation = 0.0
 	elif title == "DEFEAT":
-		ideal_size = Vector2(820.0, 448.0)
+		ideal_size = Vector2(720.0, 506.0)
 		card_rotation = 0.006
 	if compact_layout:
 		ideal_size = Vector2(650.0, 352.0) if title == "STALEMATE" else Vector2(700.0, 334.0) if title == "DEFEAT" else Vector2(780.0, 306.0)
@@ -3724,8 +3731,15 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 		_result_banner.offset_top = top_reservation
 		var center: CenterContainer = _result_banner.get_node_or_null("Center") as CenterContainer
 		if center != null:
+			center.anchor_left = 0.0 if compact_layout else 0.04 if title == "VICTORY" else 0.18 if title == "STALEMATE" else 0.36
+			center.anchor_right = 1.0 if compact_layout else 0.72 if title == "VICTORY" else 0.82 if title == "STALEMATE" else 0.96
+			center.anchor_top = 0.0
+			center.anchor_bottom = 1.0
+			center.offset_left = 0.0
+			center.offset_right = 0.0
 			center.offset_top = 0.0 if compact_layout else -34.0
 			center.offset_bottom = 0.0 if compact_layout else -34.0
+			center.set_meta("outcome_composition", "wide_escape_left" if title == "VICTORY" else "suspended_center" if title == "STALEMATE" else "grave_descent_right")
 
 func _result_uses_compact_layout(viewport_size: Vector2) -> bool:
 	var ui_scale: float = float(UserSettingsScript.get_ui_scale())
@@ -3763,17 +3777,21 @@ func _apply_result_content_layout(card: PanelContainer, title: String, compact_l
 		settlement_label.add_theme_font_size_override("font_size", 11 if compact_layout else 18)
 	if kicker_label != null:
 		kicker_label.add_theme_font_size_override("font_size", 12 if compact_layout else 18)
+		kicker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact_layout else HORIZONTAL_ALIGNMENT_LEFT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT
 	if title_label != null:
 		title_label.custom_minimum_size.y = (48.0 if title == "DEFEAT" else 44.0) if compact_layout else (76.0 if title == "STALEMATE" else 94.0 if title == "DEFEAT" else 88.0)
 		title_label.add_theme_font_size_override("font_size", (48 if title == "DEFEAT" else 43) if compact_layout else (66 if title == "STALEMATE" else 80 if title == "DEFEAT" else 74))
+		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact_layout else HORIZONTAL_ALIGNMENT_LEFT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT
 	if accent_rule != null:
 		accent_rule.custom_minimum_size.y = 3.0 if compact_layout else 5.0
 	if detail_label != null:
 		detail_label.custom_minimum_size.y = (44.0 if title == "STALEMATE" else 50.0) if compact_layout else (64.0 if title == "STALEMATE" else 78.0)
 		detail_label.add_theme_font_size_override("font_size", 16 if compact_layout else 24)
+		detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact_layout else HORIZONTAL_ALIGNMENT_LEFT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT
 	if outcome_signal != null:
 		outcome_signal.custom_minimum_size.y = 17.0 if compact_layout else 24.0
 		outcome_signal.add_theme_font_size_override("font_size", 13 if compact_layout else 19)
+		outcome_signal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if compact_layout else HORIZONTAL_ALIGNMENT_LEFT if title == "VICTORY" else HORIZONTAL_ALIGNMENT_CENTER if title == "STALEMATE" else HORIZONTAL_ALIGNMENT_RIGHT
 	if hold_progress != null:
 		hold_progress.custom_minimum_size.y = 7.0 if compact_layout else 10.0
 	if hold_row != null:
@@ -3973,6 +3991,15 @@ func _ensure_result_banner() -> PanelContainer:
 	field_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	field_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	aftermath.add_child(field_art)
+	var pressure_art: TextureRect = TextureRect.new()
+	pressure_art.name = "AftermathPressureArt"
+	pressure_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pressure_art.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pressure_art.texture = GothicUIAssets.battlefield_midfight_texture()
+	pressure_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pressure_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	pressure_art.visible = false
+	aftermath.add_child(pressure_art)
 	var blood_wash: TextureRect = TextureRect.new()
 	blood_wash.name = "AftermathBloodWash"
 	blood_wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4247,6 +4274,7 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 		return
 	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control
 	var field_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathFieldArt") as TextureRect
+	var pressure_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathPressureArt") as TextureRect
 	var blood_wash: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathBloodWash") as TextureRect
 	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control
 	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label
@@ -4258,7 +4286,7 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	if aftermath != null:
 		aftermath.visible = true
 		aftermath.set_meta("outcome_variant", title.to_lower())
-		aftermath.set_meta("physical_geometry_signature", "authored_raster_survivor_field" if title == "VICTORY" else "authored_raster_deadlock_field" if title == "STALEMATE" else "authored_raster_collapsed_field")
+		aftermath.set_meta("physical_geometry_signature", "persistent_field_open_escape" if title == "VICTORY" else "persistent_field_suspended_deadlock" if title == "STALEMATE" else "persistent_field_grave_descent")
 		aftermath.set_meta("physical_geometry_child_count", 0)
 		aftermath.set_meta("grayscale_reading", "open_center" if title == "VICTORY" else "contained_center" if title == "STALEMATE" else "enclosed_perimeter")
 		aftermath.set_meta("flat_rectangle_count", 0)
@@ -4270,17 +4298,16 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	if defeat_geometry != null:
 		defeat_geometry.visible = false
 	if field_art != null:
-		field_art.texture = (
-			GothicUIAssets.battlefield_onset_texture()
-			if title == "VICTORY"
-			else GothicUIAssets.battlefield_midfight_texture()
-			if title == "STALEMATE"
-			else GothicUIAssets.battlefield_reduced_motion_texture()
-		)
+		field_art.texture = GothicUIAssets.battlefield_onset_texture()
 		field_art.modulate = Color(1.0, 1.0, 1.0, 0.92)
 		field_art.pivot_offset = field_art.size * 0.5
 		field_art.scale = Vector2.ONE
-		field_art.set_meta("result_material_source", "phase_specific_authored_raster")
+		field_art.set_meta("result_material_source", "persistent_onset_landmark_base")
+	if pressure_art != null:
+		pressure_art.texture = GothicUIAssets.battlefield_reduced_motion_texture() if title == "DEFEAT" else GothicUIAssets.battlefield_midfight_texture()
+		pressure_art.visible = title != "VICTORY"
+		pressure_art.modulate = Color(1.0, 1.0, 1.0, 0.58 if title == "STALEMATE" else 0.88)
+		pressure_art.set_meta("result_material_source", "landmark_aligned_consequence_overlay")
 	if blood_wash != null:
 		var opening_wash_alpha: float = 0.015 if title == "VICTORY" else 0.020 if title == "STALEMATE" else 0.035
 		var closing_wash_alpha: float = 0.020 if title == "VICTORY" else 0.025 if title == "STALEMATE" else 0.045
