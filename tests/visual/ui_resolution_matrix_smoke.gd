@@ -130,7 +130,21 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		"%s Settings focus should use the non-red signal-blue channel" % label
 	)
 	var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer if title_menu != null else null
-	_expect(settings_docket != null and _rect_inside(settings_docket.get_global_rect(), viewport_rect.grow(2.0)), "%s Settings field-record docket escaped the viewport" % label)
+	var accessibility_priority: PanelContainer = title_menu.find_child("AccessibilityPriority", true, false) as PanelContainer if title_menu != null else null
+	var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+	var reduced_motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
+	var settings_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer if title_menu != null else null
+	var effective_height: float = float(viewport_size.y) / ui_scale
+	_expect(
+		(settings_docket != null and _rect_inside(settings_docket.get_global_rect(), viewport_rect.grow(2.0)))
+		or (accessibility_priority != null and bool(accessibility_priority.get_meta("pinned_settings_block", false))),
+		"%s Settings should expose either the full docket or the compact accessibility priority record" % label
+	)
+	if effective_height < 640.0:
+		var settings_visible_rect: Rect2 = settings_scroll.get_global_rect() if settings_scroll != null else Rect2()
+		_expect(accessibility_priority != null and _rect_inside(accessibility_priority.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact accessibility priority record should be visible without scrolling" % label)
+		_expect(ui_scale_option != null and _rect_inside(ui_scale_option.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact UI Scale should be visible without scrolling" % label)
+		_expect(reduced_motion_check != null and _rect_inside(reduced_motion_check.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact Reduced Motion should be visible without scrolling" % label)
 	_expect(ledger_button != null and String(ledger_button.get_meta("visual_role", "")) == "ledger", "%s Black Ledger should expose a distinct ledger hierarchy role" % label)
 	_expect(quit_button != null and String(quit_button.get_meta("visual_role", "")) == "quit", "%s Quit should expose a distinct destructive hierarchy role" % label)
 	_expect(
@@ -140,7 +154,6 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		and _style_texture_path(ledger_button) != _style_texture_path(quit_button),
 		"%s primary, selected, ledger, and Quit actions should use visibly distinct plate families" % label
 	)
-	var effective_height: float = float(viewport_size.y) / ui_scale
 	if effective_height < 640.0:
 		var compact_actions: Array[Button] = [start_button, settings_button, ledger_button, quit_button]
 		for compact_action: Button in compact_actions:
@@ -171,8 +184,14 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	await _settle_frames(3)
 	var ledger: Control = _main.find_child("BlackLedger", true, false) as Control if _main != null else null
 	var ledger_panel: PanelContainer = ledger.find_child("LedgerPanel", true, false) as PanelContainer if ledger != null else null
+	var ledger_progress: Label = ledger.find_child("ProgressMetadata", true, false) as Label if ledger != null else null
 	_expect(ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), viewport_rect.grow(2.0)), "%s Black Ledger escaped viewport panel=%s viewport=%s" % [label, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(viewport_rect)])
 	var effective_width: float = float(viewport_size.x) / ui_scale
+	if effective_width < 1440.0:
+		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "two_row", "%s compact Black Ledger progress metadata should use a deliberate two-row layout" % label)
+		_expect(ledger_progress != null and ledger_progress.text.split("\n").size() == 2, "%s compact Black Ledger should keep Lifetime Omens and Next Seal on independent rows" % label)
+	else:
+		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "single_row", "%s wide Black Ledger progress metadata should retain its single-row filing line" % label)
 	if effective_width >= 1440.0:
 		_expect(
 			ledger_panel != null and ledger_panel.size.y >= 630.0 and ledger_panel.size.y <= 670.0,

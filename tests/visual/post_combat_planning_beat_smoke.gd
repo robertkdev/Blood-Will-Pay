@@ -1,8 +1,10 @@
 extends "res://tests/visual/actual_run_loop_smoke.gd"
 
 const VisionSnapshot := preload("res://scripts/util/vision_snapshot.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const SMOKE_NAME: String = "PostCombatPlanningBeatSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/post_combat_planning_beat_pass"
+const TEST_SETTINGS_PATH: String = "user://post_combat_planning_beat_settings.cfg"
 const MIN_RESTORED_PLANNING_SECONDS: float = 55.0
 
 var _saved_captures: int = 0
@@ -11,8 +13,12 @@ func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	var window: Window = get_window()
 	if window != null:
+		window.content_scale_factor = 1.0
 		window.size = Vector2i(1920, 1080)
 		window.content_scale_size = Vector2i(1920, 1080)
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	UserSettingsScript.set_ui_scale(1.0, window)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -163,7 +169,7 @@ func _assert_result_card() -> void:
 	var viewport_size: Vector2 = viewport.get_visible_rect().size if viewport != null else Vector2.ZERO
 	_expect(is_equal_approx(card.custom_minimum_size.x, 940.0), "victory result should use its authored wide survival-record silhouette, got %.1f" % card.custom_minimum_size.x)
 	_expect(is_equal_approx(card.custom_minimum_size.y, 436.0), "victory result should use its authored survival-record height, got %.1f" % card.custom_minimum_size.y)
-	_expect(card_rect.size.x < viewport_size.x * 0.58, "result card should not read as a full-screen color panel")
+	_expect(card_rect.size.x < viewport_size.x * 0.58, "result card should not read as a full-screen color panel (card %.1f / viewport %.1f)" % [card_rect.size.x, viewport_size.x])
 	_expect(card.get_theme_stylebox("panel") is StyleBoxFlat, "result card should keep an accessible high-contrast field surface")
 	_expect(String(card.get_meta("result_variant", "")) == "victory", "victory card should expose a semantic visual variant")
 	_expect(String(card.get_meta("tear_direction", "")) == "rising_open", "victory result should open upward rather than sharing the defeat tear")
@@ -278,6 +284,7 @@ func _assert_active_combat_shell() -> void:
 	var midfight_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/MidfightAftermathGeometry") as Control
 	var collapse_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/CollapseAftermathGeometry") as Control
 	var reduced_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
+	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
 	var battle_area: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	var arena_container: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	var planning_geometry: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry") as Control
@@ -292,13 +299,17 @@ func _assert_active_combat_shell() -> void:
 	_expect(fog != null and fog.texture != null and smoke != null and smoke.texture != null, "combat shell lacks bounded fog/smoke weather layers")
 	_expect(wet_reflection != null and wet_reflection.texture is GradientTexture2D, "combat shell lacks the wet-ground reflection that makes the woodland feel physical")
 	_expect(war_aftermath != null and String(war_aftermath.get_meta("visual_role", "")) == "non_unit_physical_war_aftermath", "combat shell lacks a semantic non-unit physical war-aftermath layer")
-	_expect(onset_geometry != null and onset_geometry.get_child_count() >= 5, "combat onset lacks practical wreckage and trench geometry")
-	_expect(midfight_geometry != null and midfight_geometry.get_child_count() >= 6, "combat midfight lacks a materially denser shattered-barricade composition")
-	_expect(collapse_geometry != null and collapse_geometry.get_child_count() >= 5, "combat casualty pressure lacks a collapsed-canopy/occlusion composition")
-	_expect(reduced_geometry != null and reduced_geometry.get_child_count() >= 3, "reduced motion lacks an equally legible static grime-lock composition")
+	_expect(onset_geometry != null and int(onset_geometry.get_meta("physical_evidence_count", 0)) >= 6, "combat onset lacks practical cart, crater, barricade, and earthwork evidence")
+	_expect(midfight_geometry != null and int(midfight_geometry.get_meta("physical_evidence_count", 0)) >= 10, "combat midfight lacks a materially denser wreckage, impact, smoke, and contamination composition")
+	_expect(collapse_geometry != null and int(collapse_geometry.get_meta("physical_evidence_count", 0)) >= 9, "combat casualty pressure lacks a bounded collapse composition")
+	_expect(reduced_geometry != null and int(reduced_geometry.get_meta("physical_evidence_count", 0)) >= 4, "reduced motion lacks a sparse static battlefield-evidence composition")
+	_expect(onset_geometry != null and bool(onset_geometry.get_meta("protected_center_clear", false)), "combat onset evidence does not preserve the playable center")
+	_expect(reduced_geometry != null and onset_geometry != null and float(reduced_geometry.get_meta("overlay_density", 1.0)) < float(onset_geometry.get_meta("overlay_density", 0.0)), "reduced motion is not lower-density than the kinetic onset")
+	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "combat grid seams do not stay above the environment")
 	var pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "")) if arena_container != null else ""
 	_expect(not pressure_phase.is_empty(), "combat environment did not publish its evolving pressure phase")
-	_expect(arena_container != null and String(arena_container.get_meta("battlefield_environment_signature", "")).begins_with("war_aftermath/"), "combat environment lacks a measurable physical-composition signature")
+	_expect(arena_container != null and String(arena_container.get_meta("battlefield_environment_signature", "")).begins_with("physical_warfield/"), "combat environment lacks a measurable physical-composition signature")
+	_expect(arena_container != null and String(arena_container.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "combat environment does not publish grid-priority protection")
 	var viewport_height: float = get_viewport().get_visible_rect().size.y
 	_expect(battle_area != null and battle_area.get_global_rect().size.y >= viewport_height * 0.78, "combat field remained a narrow middle band instead of occupying the survival surface")
 	_expect(arena_container != null and bool(arena_container.get_meta("use_full_combat_bounds", false)), "combat actors were not promoted from the planning strip into full-field bounds")

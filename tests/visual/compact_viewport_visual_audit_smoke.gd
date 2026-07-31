@@ -116,6 +116,7 @@ func _run() -> void:
 	var stats_title: Label = stats_panel.find_child("Title", true, false) as Label if stats_panel != null else null
 	_expect_control_inside(stats_title, "team metrics side-panel header")
 	_expect_compact_battlefield_dominance()
+	_expect_connected_planning_composition("1280 planning", false)
 	_expect_planning_action_hierarchy("1280 planning", false)
 	if _is_framebuffer_unavailable():
 		print("%s: footer geometry delegated to CompactShopFooterSmoke in framebuffer-free runs" % SMOKE_NAME)
@@ -144,6 +145,7 @@ func _run() -> void:
 	await _settle_frames(12)
 	_expect_standard_planning_containment("compact 125-percent planning", COMPACT_LOGICAL_125_PERCENT_SIZE, 1.25, true)
 	_expect_scaled_tactical_surface_containment("compact 125-percent", COMPACT_LOGICAL_125_PERCENT_SIZE)
+	_expect_connected_planning_composition("compact 125-percent planning", false)
 	_expect_no_button_text_overflow(combat, "compact 125-percent post-shop combat")
 	_save_capture("05a_post_shop_planning_1280x720_125pct.png", _main)
 
@@ -156,6 +158,7 @@ func _run() -> void:
 	await _settle_frames(12)
 	_expect_standard_planning_containment("compact 150-percent planning", COMPACT_LOGICAL_150_PERCENT_SIZE, 1.5, true)
 	_expect_scaled_tactical_surface_containment("compact 150-percent", COMPACT_LOGICAL_150_PERCENT_SIZE)
+	_expect_connected_planning_composition("compact 150-percent planning", false)
 	_expect_no_button_text_overflow(combat, "compact 150-percent post-shop combat")
 	_save_capture("05b_post_shop_planning_1280x720_150pct.png", _main)
 
@@ -168,6 +171,7 @@ func _run() -> void:
 	await _settle_frames(12)
 	_expect_standard_planning_containment("1080p planning", STANDARD_VIEWPORT_SIZE, 1.0, false)
 	_expect_compact_battlefield_dominance()
+	_expect_connected_planning_composition("1080p planning", true)
 	_expect_no_button_text_overflow(combat, "1080p post-shop combat")
 	_save_capture("05c_post_shop_planning_1920x1080.png", _main)
 
@@ -180,6 +184,7 @@ func _run() -> void:
 	await _settle_frames(12)
 	_expect_standard_planning_containment("125-percent planning", STANDARD_LOGICAL_125_PERCENT_SIZE, 1.25, false)
 	_expect_compact_battlefield_dominance()
+	_expect_connected_planning_composition("125-percent planning", true)
 	_expect_no_button_text_overflow(combat, "125-percent post-shop combat")
 	_save_capture("05d_post_shop_planning_1920x1080_125pct.png", _main)
 
@@ -194,6 +199,7 @@ func _run() -> void:
 	_expect_scaled_tactical_surface_containment("150-percent", STANDARD_LOGICAL_150_PERCENT_SIZE)
 	_expect_planning_action_hierarchy("150-percent planning", true)
 	_expect_compact_battlefield_dominance()
+	_expect_connected_planning_composition("150-percent planning", false)
 	_expect_no_button_text_overflow(combat, "150-percent post-shop combat")
 	_save_capture("06_post_shop_planning_1920x1080_150pct.png", _main)
 	await _finish()
@@ -496,6 +502,52 @@ func _expect_compact_battlefield_dominance() -> void:
 	_expect(board_column.size.x > support_width, "compact battlefield should remain wider than all visible support docks combined")
 	_expect(board_column.size.x >= viewport_width * minimum_board_share, "compact battlefield should retain at least %.0f%% of logical viewport width: board=%.1f viewport=%.1f" % [minimum_board_share * 100.0, board_column.size.x, viewport_width])
 
+func _expect_connected_planning_composition(context: String, expect_large_tiles: bool) -> void:
+	var battle_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea")
+	var board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
+	var stats_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
+	var top_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea")
+	var bottom_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea")
+	var enemy_board: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/EnemyGrid") as GridContainer
+	var player_board: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid") as GridContainer
+	var bench_area: Control = _combat_node("MarginContainer/VBoxContainer/BenchArea")
+	var wager_summary: Control = _combat_node("MarginContainer/VBoxContainer/WagerSummary")
+	var directive: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective")
+	var board_status_row: Control = board_column.find_child("BoardStatusRow", true, false) as Control if board_column != null else null
+	var board_status_plate: Control = board_column.find_child("BoardStatusBackplate", true, false) as Control if board_column != null else null
+	var metrics_plate: Control = _main.get_node_or_null("CombatView/GothicStatsAreaPlate") as Control if _main != null else null
+	for required_surface: Control in [battle_area, board_column, stats_rail, top_area, bottom_area, enemy_board, player_board, bench_area, wager_summary, directive, board_status_row, board_status_plate]:
+		_expect(required_surface != null, "%s planning surface missing" % context)
+	if battle_area == null or board_column == null or stats_rail == null:
+		return
+	_expect(battle_area.size_flags_vertical == Control.SIZE_EXPAND_FILL, "%s battlefield does not own the surplus vertical budget" % context)
+	_expect(board_column.size_flags_horizontal == Control.SIZE_EXPAND_FILL, "%s board column no longer expands after reserving support rails" % context)
+	_expect(board_column.get_global_rect().end.x <= stats_rail.get_global_rect().position.x + 1.0, "%s board invades the reserved Team Metrics rail" % context)
+	if metrics_plate != null and metrics_plate.is_visible_in_tree():
+		_expect(not board_column.get_global_rect().intersects(metrics_plate.get_global_rect()), "%s board frame collides with the Team Metrics backplate" % context)
+	if bench_area != null:
+		var board_to_bench_gap: float = bench_area.get_global_rect().position.y - battle_area.get_global_rect().end.y
+		_expect(board_to_bench_gap >= -1.0 and board_to_bench_gap <= 12.0, "%s board and bench feel disconnected: gap=%.1f" % [context, board_to_bench_gap])
+	if bench_area != null and wager_summary != null:
+		var bench_to_wager_gap: float = wager_summary.get_global_rect().position.y - bench_area.get_global_rect().end.y
+		_expect(bench_to_wager_gap >= -1.0 and bench_to_wager_gap <= 52.0, "%s bench and decision footer retain an accidental void: gap=%.1f" % [context, bench_to_wager_gap])
+	if top_area != null and enemy_board != null:
+		_expect(absf(enemy_board.get_global_rect().get_center().y - top_area.get_global_rect().get_center().y) <= 3.0, "%s enemy grid is not vertically centered in its field" % context)
+	if bottom_area != null and player_board != null:
+		_expect(absf(player_board.get_global_rect().get_center().y - bottom_area.get_global_rect().get_center().y) <= 3.0, "%s player grid is not vertically centered in its field" % context)
+	if directive != null:
+		_expect(board_column.get_global_rect().grow(1.0).encloses(directive.get_global_rect()), "%s deployment directive escapes the reserved board frame" % context)
+		_expect(not directive.get_global_rect().intersects(stats_rail.get_global_rect()), "%s deployment directive collides with Team Metrics" % context)
+	if board_status_row != null:
+		_expect(board_column.get_global_rect().grow(1.0).encloses(board_status_row.get_global_rect()), "%s planning status frame escapes the reserved board column" % context)
+		_expect(not board_status_row.get_global_rect().intersects(stats_rail.get_global_rect()), "%s planning status frame collides with Team Metrics" % context)
+	if board_status_plate != null:
+		_expect(board_column.get_global_rect().grow(1.0).encloses(board_status_plate.get_global_rect()), "%s planning status backplate escapes the reserved board column" % context)
+		_expect(not board_status_plate.get_global_rect().intersects(stats_rail.get_global_rect()), "%s planning status backplate collides with Team Metrics" % context)
+	if expect_large_tiles and player_board != null and player_board.get_child_count() > 0:
+		var first_tile: Control = player_board.get_child(0) as Control
+		_expect(first_tile != null and first_tile.custom_minimum_size.x >= 55.0, "%s did not enlarge the full-HD deployment grid" % context)
+
 func _expect_scaled_tactical_surface_containment(context: String, expected_logical_size: Vector2i) -> void:
 	var viewport_rect: Rect2 = _viewport_rect()
 	_expect(absf(viewport_rect.size.x - float(expected_logical_size.x)) <= 2.0, "%s audit did not produce the expected logical width: %s" % [context, str(viewport_rect)])
@@ -710,9 +762,11 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		_expect(bool(row.get_meta("compact_layout", false)), "%s visible metric row did not enter its compact contract" % context)
 		var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label
 		var value_label: Label = row.get_node_or_null("HBox/Content/Value") as Label
-		_expect(name_label != null and (name_label.text.begins_with("YOU //") or name_label.text.begins_with("FOE //")), "%s metric row lost team attribution" % context)
+		_expect(name_label != null and (name_label.text.begins_with("YOU ") or name_label.text.begins_with("FOE ")), "%s metric row lost its intentional team badge" % context)
 		_expect(value_label != null and value_label.text.strip_edges() != "", "%s metric row lost its numeric value" % context)
 		if name_label != null:
+			_expect(bool(name_label.get_meta("compact_identity_complete", false)), "%s metric row reverted to raw unit-name truncation" % context)
+			_expect(not name_label.text.contains("//"), "%s metric row still exposes accidental identifier truncation" % context)
 			_expect(name_label.get_theme_font_size("font_size") >= 14, "%s team metric identity type is too small" % context)
 			var name_font: Font = name_label.get_theme_font("font")
 			var name_text_width: float = name_font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, name_label.get_theme_font_size("font_size")).x if name_font != null else 0.0

@@ -1034,13 +1034,14 @@ func _render_settings() -> void:
 	if _search_field != null:
 		_search_field.placeholder_text = "Search settings: readability, contrast, scale, motion, keys..."
 	var added: int = 0
-	if _search_query() == "":
+	if _search_query() == "" and not _is_short_compact_layout():
 		_add_settings_docket()
-	added += _add_volume_setting()
-	added += _add_fullscreen_setting()
-	added += _add_readability_setting()
+	_add_accessibility_priority_banner()
 	added += _add_ui_scale_setting()
 	added += _add_motion_setting()
+	added += _add_readability_setting()
+	added += _add_volume_setting()
+	added += _add_fullscreen_setting()
 	added += _add_input_settings()
 	if added == 0:
 		_add_empty_state("No settings match this search. Clear the search to see every available setting.", true)
@@ -1048,6 +1049,24 @@ func _render_settings() -> void:
 		var bottom_space: Control = Control.new()
 		bottom_space.custom_minimum_size.y = 16.0
 		_content_body.add_child(bottom_space)
+
+func _add_accessibility_priority_banner() -> void:
+	if not _matches_query("accessibility readable ui scale reduced motion comfort display"):
+		return
+	var banner: PanelContainer = _make_card_container("AccessibilityPriority", Color(0.11, 0.018, 0.026, 0.96), Color(0.88, 0.10, 0.12, 0.98), 2)
+	banner.custom_minimum_size.y = 38.0 if _is_short_compact_layout() else 48.0
+	banner.set_meta("pinned_settings_block", true)
+	_content_body.add_child(banner)
+	var margin: MarginContainer = banner.get_node("Margin") as MarginContainer
+	var copy: VBoxContainer = VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 1)
+	margin.add_child(copy)
+	var heading: Label = _make_label("ACCESSIBILITY // FIRST RESPONSE", 18 if _is_short_compact_layout() else 20, Color(1.0, 0.72, 0.50, 1.0), false)
+	heading.name = "AccessibilityPriorityTitle"
+	VisualTypeSystem.set_action(heading)
+	copy.add_child(heading)
+	if not _is_short_compact_layout():
+		copy.add_child(_make_label("Scale and motion controls stay first so the command record can be made usable before anything else.", 16, COLOR_MUTED, true))
 
 func _add_settings_docket() -> void:
 	var docket: PanelContainer = _make_field_order_container("SettingsDocket")
@@ -1303,16 +1322,19 @@ func _add_ui_scale_setting() -> int:
 	if not _matches_query("ui scale interface size text accessibility readable display"):
 		return 0
 	var card: PanelContainer = _make_card_container("UIScaleSetting", COLOR_PANEL_SOFT, Color(0.42, 0.31, 0.24, 0.88), 1)
+	card.set_meta("accessibility_priority", 1)
 	_content_body.add_child(card)
 	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
 	var stack: VBoxContainer = VBoxContainer.new()
-	stack.add_theme_constant_override("separation", 8)
+	stack.add_theme_constant_override("separation", 4 if _is_short_compact_layout() else 8)
 	margin.add_child(stack)
-	stack.add_child(_make_label("Readable UI Scale", 22, COLOR_TEXT, false))
+	var scale_heading: Label = _make_label("Readable UI Scale", 20 if _is_short_compact_layout() else 22, COLOR_TEXT, false)
+	scale_heading.name = "UIScaleHeading"
+	stack.add_child(scale_heading)
 	var option: OptionButton = OptionButton.new()
 	option.name = "UIScaleOption"
 	option.focus_mode = Control.FOCUS_ALL
-	option.custom_minimum_size = Vector2(220.0, 42.0)
+	option.custom_minimum_size = Vector2(220.0, 38.0 if _is_short_compact_layout() else 42.0)
 	var scale_values: Array[float] = [1.0, 1.25, 1.5]
 	var current_scale: float = UserSettingsScript.get_ui_scale()
 	for index: int in range(scale_values.size()):
@@ -1332,7 +1354,8 @@ func _add_ui_scale_setting() -> int:
 	popup.add_theme_stylebox_override("hover", HardcoreUIAssets.popup_highlight_style())
 	option.item_selected.connect(_on_ui_scale_selected.bind(option))
 	stack.add_child(option)
-	var scale_guidance: Label = _make_label("Enlarges interface text and controls. Smaller windows reflow this command record into a scrollable compact layout.", 18, COLOR_MUTED, true)
+	var guidance_text: String = "Enlarges interface text and controls." if _is_short_compact_layout() else "Enlarges interface text and controls. Smaller windows reflow this command record into a scrollable compact layout."
+	var scale_guidance: Label = _make_label(guidance_text, 16 if _is_short_compact_layout() else 18, COLOR_MUTED, true)
 	scale_guidance.name = "UIScaleGuidance"
 	stack.add_child(scale_guidance)
 	return 1
@@ -1357,7 +1380,7 @@ func _add_readability_setting() -> int:
 	status.set_meta("utility_type_floor_px", 15)
 	status.set_meta("functional_type_floor_px", 16)
 	heading.add_child(status)
-	var guidance: Label = _make_label("This command console uses the readable dossier face for utility copy, high-contrast paper and ink, and a 15px utility floor. Use Readable UI Scale below for larger controls.", 18, Color(0.86, 0.82, 0.74, 1.0), true)
+	var guidance: Label = _make_label("This command console uses the readable dossier face for utility copy, high-contrast paper and ink, and a 15px utility floor. Use Readable UI Scale at the top for larger controls.", 18, Color(0.86, 0.82, 0.74, 1.0), true)
 	guidance.name = "ReadabilityGuidance"
 	stack.add_child(guidance)
 	return 1
@@ -1412,13 +1435,17 @@ func _add_binding_row(parent: VBoxContainer, action: StringName, label_text: Str
 func _add_motion_setting() -> int:
 	if not _matches_query("reduced motion animation accessibility comfort"):
 		return 0
+	var motion_body: String = "Stops nonessential fades, scaling, and background drift." if _is_short_compact_layout() else "Stops menu fades, hover scaling, logo floating, and animated background drift."
 	var check: CheckBox = _add_checkbox_setting(
 		"Reduced Motion",
 		"ReducedMotionCheck",
 		UserSettingsScript.get_reduced_motion(),
-		"Stops menu fades, hover scaling, logo floating, and animated background drift.",
+		motion_body,
 		"reduced motion animation accessibility comfort"
 	)
+	var card: PanelContainer = check.get_parent().get_parent().get_parent() as PanelContainer if check != null and check.get_parent() != null and check.get_parent().get_parent() != null else null
+	if card != null:
+		card.set_meta("accessibility_priority", 2)
 	check.toggled.connect(_on_reduce_motion_toggled)
 	return 1
 

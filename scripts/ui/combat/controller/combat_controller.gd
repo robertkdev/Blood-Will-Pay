@@ -3075,21 +3075,21 @@ func _update_environmental_pressure(delta: float) -> void:
 	var phase_weight: float = float(pressure_phase) * 0.08
 	var veil: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaAshThreatVeil") as CanvasItem
 	if veil != null:
-		veil.modulate.a = 0.90 + phase_weight if reduced_motion else clampf(0.76 + phase_weight + pulse * 0.07, 0.68, 1.0)
+		veil.modulate.a = 0.44 if reduced_motion else clampf(0.76 + phase_weight + pulse * 0.07, 0.68, 1.0)
 	var enemy_pressure: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaEnemyPressureLight") as CanvasItem
 	if enemy_pressure != null:
-		enemy_pressure.modulate.a = 0.96 if reduced_motion else clampf(0.78 + phase_weight + slow_pulse * 0.09, 0.68, 1.0)
+		enemy_pressure.modulate.a = 0.40 if reduced_motion else clampf(0.78 + phase_weight + slow_pulse * 0.09, 0.68, 1.0)
 	var incursions: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaThreatIncursions") as CanvasItem
 	if incursions != null:
-		incursions.modulate.a = 0.94 if reduced_motion else clampf(0.68 + phase_weight + pulse * 0.14, 0.54, 1.0)
+		incursions.modulate.a = 0.32 if reduced_motion else clampf(0.68 + phase_weight + pulse * 0.14, 0.54, 1.0)
 	var rupture_glow: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/TerritoryRuptureGlow") as Control
 	if rupture_glow != null:
 		rupture_glow.pivot_offset = rupture_glow.size * 0.5
 		rupture_glow.scale = Vector2.ONE if reduced_motion else Vector2(1.0, 1.0 + pulse * (0.09 + float(pressure_phase) * 0.035))
-		rupture_glow.modulate.a = 0.90 if reduced_motion else clampf(0.68 + phase_weight + pulse * 0.12, 0.56, 1.0)
+		rupture_glow.modulate.a = 0.46 if reduced_motion else clampf(0.68 + phase_weight + pulse * 0.12, 0.56, 1.0)
 	var boundary: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary") as CanvasItem
 	if boundary != null:
-		boundary.modulate.a = 0.98 if reduced_motion else clampf(0.82 + phase_weight + slow_pulse * 0.10, 0.72, 1.0)
+		boundary.modulate.a = 0.70 if reduced_motion else clampf(0.82 + phase_weight + slow_pulse * 0.10, 0.72, 1.0)
 	var aftermath: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath") as Control
 	if aftermath != null:
 		aftermath.pivot_offset = aftermath.size * 0.5
@@ -3115,7 +3115,9 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("battlefield_pressure_index", effective_phase)
 	arena.set_meta("battlefield_reduced_motion", reduced_motion)
 	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
-	arena.set_meta("battlefield_environment_signature", "war_aftermath/%s/%s" % [phase_name, "static" if reduced_motion else "kinetic"])
+	arena.set_meta("battlefield_environment_signature", "physical_warfield/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
+	arena.set_meta("battlefield_overlay_density", 0.18 if reduced_motion else 0.34 if effective_phase == 0 else 0.52 if effective_phase == 1 else 0.68)
+	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
 	var onset: Control = arena.get_node_or_null("ArenaWarAftermath/OnsetAftermathGeometry") as Control
@@ -3124,15 +3126,19 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var reduced_lock: Control = arena.get_node_or_null("ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	if aftermath != null:
 		aftermath.visible = true
-		aftermath.modulate = Color(0.86, 0.77, 0.70, 0.86) if effective_phase == 0 else Color(0.98, 0.72, 0.66, 0.96) if effective_phase == 1 else Color(0.88, 0.48, 0.46, 1.0)
+		aftermath.modulate = Color(0.92, 0.88, 0.80, 0.70) if reduced_motion else Color(0.98, 0.90, 0.80, 0.84) if effective_phase == 0 else Color(1.0, 0.84, 0.74, 0.94) if effective_phase == 1 else Color(0.92, 0.64, 0.60, 1.0)
 	if onset != null:
 		onset.visible = true
+		onset.modulate = Color(1.0, 1.0, 1.0, 0.34 if reduced_motion else 1.0)
 	if midfight != null:
 		midfight.visible = effective_phase >= 1
+		midfight.modulate = Color(1.0, 1.0, 1.0, 0.20 if reduced_motion else 1.0)
 	if collapse != null:
 		collapse.visible = effective_phase >= 2
+		collapse.modulate = Color(1.0, 1.0, 1.0, 0.0 if reduced_motion else 1.0)
 	if reduced_lock != null:
 		reduced_lock.visible = reduced_motion
+		reduced_lock.modulate = Color(0.82, 0.78, 0.68, 0.82)
 	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
 	if woodland != null:
 		woodland.modulate = Color(1.04, 0.96, 0.86, 1.0) if effective_phase == 0 else Color(0.88, 0.72, 0.66, 1.0) if effective_phase == 1 else Color(0.64, 0.46, 0.48, 1.0)
@@ -3141,11 +3147,11 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		silhouettes.modulate.a = 0.86 if effective_phase == 0 else 0.94 if effective_phase == 1 else 1.0
 	var hostile_smoke: TextureRect = arena.get_node_or_null("ArenaHostileSmoke") as TextureRect
 	if hostile_smoke != null:
-		hostile_smoke.modulate.a = 0.58 if effective_phase == 0 else 0.82 if effective_phase == 1 else 1.0
+		hostile_smoke.modulate.a = 0.20 if reduced_motion else 0.48 if effective_phase == 0 else 0.68 if effective_phase == 1 else 0.86
 		hostile_smoke.scale = Vector2.ONE
 	var fog: TextureRect = arena.get_node_or_null("ArenaGroundFog") as TextureRect
 	if fog != null:
-		fog.modulate.a = 0.64 if effective_phase == 0 else 0.82 if effective_phase == 1 else 0.96
+		fog.modulate.a = 0.26 if reduced_motion else 0.54 if effective_phase == 0 else 0.70 if effective_phase == 1 else 0.84
 		fog.scale = Vector2.ONE
 
 func _protect_persistent_hud_chrome() -> void:

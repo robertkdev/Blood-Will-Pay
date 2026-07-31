@@ -24,6 +24,225 @@ const COLOR_PURPLE: Color = Color(0.32, 0.20, 0.42, 1.0)
 const COLOR_TILE_PLAYER: Color = Color(0.030, 0.040, 0.043, 0.90)
 const COLOR_TILE_ENEMY: Color = Color(0.080, 0.025, 0.034, 0.90)
 
+class ArenaEvidencePainter:
+	extends Control
+
+	var evidence_state: String = "onset"
+
+	func configure(next_state: String) -> void:
+		evidence_state = next_state
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		match evidence_state:
+			"onset":
+				_draw_onset()
+			"midfight":
+				_draw_midfight()
+			"collapse":
+				_draw_collapse()
+			"reduced":
+				_draw_reduced()
+
+	func _draw_onset() -> void:
+		_draw_earthwork(
+			PackedVector2Array([
+				_point(0.00, 0.91),
+				_point(0.08, 0.87),
+				_point(0.18, 0.90),
+				_point(0.31, 0.86),
+				_point(0.42, 0.91),
+				_point(0.42, 1.00),
+				_point(0.00, 1.00),
+			]),
+			Color(0.16, 0.10, 0.065, 0.44),
+			Color(0.58, 0.36, 0.18, 0.30)
+		)
+		_draw_cart(Vector2(size.x * 0.12, size.y * 0.81), minf(size.x, size.y) * 0.052)
+		_draw_barricade(Vector2(size.x * 0.835, size.y * 0.18), Vector2(size.x * 0.14, size.y * 0.18), false)
+		_draw_crater(Vector2(size.x * 0.82, size.y * 0.78), Vector2(size.x * 0.075, size.y * 0.043), Color(0.10, 0.052, 0.030, 0.38))
+		_draw_ground_stain(
+			PackedVector2Array([
+				_point(0.68, 0.87),
+				_point(0.73, 0.84),
+				_point(0.79, 0.88),
+				_point(0.76, 0.92),
+				_point(0.70, 0.93),
+			]),
+			Color(0.27, 0.020, 0.016, 0.24)
+		)
+		_draw_ash(Vector2(size.x * 0.04, size.y * 0.23), 5, 18.0)
+		_draw_ash(Vector2(size.x * 0.91, size.y * 0.43), 4, 14.0)
+
+	func _draw_midfight() -> void:
+		_draw_barricade(Vector2(size.x * 0.035, size.y * 0.34), Vector2(size.x * 0.13, size.y * 0.23), true)
+		_draw_barricade(Vector2(size.x * 0.835, size.y * 0.57), Vector2(size.x * 0.14, size.y * 0.23), false)
+		_draw_crater(Vector2(size.x * 0.24, size.y * 0.23), Vector2(size.x * 0.063, size.y * 0.040), Color(0.15, 0.055, 0.027, 0.42))
+		_draw_crater(Vector2(size.x * 0.71, size.y * 0.82), Vector2(size.x * 0.072, size.y * 0.045), Color(0.19, 0.035, 0.022, 0.44))
+		_draw_ground_stain(
+			PackedVector2Array([
+				_point(0.43, 0.74),
+				_point(0.455, 0.715),
+				_point(0.49, 0.723),
+				_point(0.515, 0.704),
+				_point(0.55, 0.731),
+				_point(0.575, 0.768),
+				_point(0.535, 0.782),
+				_point(0.505, 0.807),
+				_point(0.468, 0.787),
+				_point(0.442, 0.792),
+			]),
+			Color(0.29, 0.010, 0.012, 0.20)
+		)
+		_draw_timber(_point(0.17, 0.89), _point(0.34, 0.84), 9.0, Color(0.13, 0.070, 0.038, 0.82))
+		_draw_timber(_point(0.76, 0.13), _point(0.92, 0.10), 8.0, Color(0.12, 0.060, 0.034, 0.78))
+		_draw_smoke(Vector2(size.x * 0.075, size.y * 0.10), minf(size.x, size.y) * 0.060, Color(0.22, 0.19, 0.16, 0.18))
+		_draw_smoke(Vector2(size.x * 0.91, size.y * 0.30), minf(size.x, size.y) * 0.074, Color(0.19, 0.15, 0.14, 0.20))
+		_draw_ash(Vector2(size.x * 0.02, size.y * 0.63), 6, 22.0)
+		_draw_ash(Vector2(size.x * 0.88, size.y * 0.72), 7, 20.0)
+
+	func _draw_collapse() -> void:
+		_draw_earthwork(
+			PackedVector2Array([
+				_point(0.00, 0.84),
+				_point(0.10, 0.78),
+				_point(0.22, 0.82),
+				_point(0.32, 0.77),
+				_point(0.44, 0.85),
+				_point(0.56, 0.81),
+				_point(0.70, 0.87),
+				_point(0.84, 0.80),
+				_point(1.00, 0.85),
+				_point(1.00, 1.00),
+				_point(0.00, 1.00),
+			]),
+			Color(0.11, 0.060, 0.043, 0.55),
+			Color(0.62, 0.17, 0.07, 0.24)
+		)
+		_draw_timber(_point(0.00, 0.16), _point(0.22, 0.07), 16.0, Color(0.045, 0.026, 0.022, 0.90))
+		_draw_timber(_point(0.78, 0.08), _point(1.00, 0.20), 18.0, Color(0.040, 0.022, 0.020, 0.92))
+		_draw_timber(_point(0.02, 0.21), _point(0.16, 0.30), 9.0, Color(0.11, 0.055, 0.030, 0.82))
+		_draw_timber(_point(0.84, 0.29), _point(0.98, 0.17), 10.0, Color(0.10, 0.050, 0.028, 0.84))
+		_draw_crater(Vector2(size.x * 0.50, size.y * 0.87), Vector2(size.x * 0.12, size.y * 0.065), Color(0.19, 0.015, 0.016, 0.50))
+		_draw_smoke(Vector2(size.x * 0.11, size.y * 0.19), minf(size.x, size.y) * 0.090, Color(0.14, 0.12, 0.11, 0.18))
+		_draw_smoke(Vector2(size.x * 0.88, size.y * 0.18), minf(size.x, size.y) * 0.105, Color(0.15, 0.11, 0.11, 0.20))
+		_draw_ash(Vector2(size.x * 0.04, size.y * 0.48), 8, 28.0)
+		_draw_ash(Vector2(size.x * 0.88, size.y * 0.57), 8, 26.0)
+
+	func _draw_reduced() -> void:
+		_draw_earthwork(
+			PackedVector2Array([
+				_point(0.00, 0.94),
+				_point(0.16, 0.90),
+				_point(0.33, 0.94),
+				_point(0.50, 0.91),
+				_point(0.67, 0.95),
+				_point(0.84, 0.91),
+				_point(1.00, 0.94),
+				_point(1.00, 1.00),
+				_point(0.00, 1.00),
+			]),
+			Color(0.20, 0.16, 0.12, 0.28),
+			Color(0.68, 0.52, 0.32, 0.16)
+		)
+		_draw_crater(Vector2(size.x * 0.84, size.y * 0.84), Vector2(size.x * 0.055, size.y * 0.030), Color(0.12, 0.080, 0.052, 0.28))
+		_draw_timber(_point(0.04, 0.87), _point(0.16, 0.82), 7.0, Color(0.20, 0.13, 0.075, 0.48))
+		_draw_ash(Vector2(size.x * 0.02, size.y * 0.27), 3, 12.0)
+		_draw_ash(Vector2(size.x * 0.92, size.y * 0.51), 3, 12.0)
+
+	func _point(x_ratio: float, y_ratio: float) -> Vector2:
+		return Vector2(size.x * x_ratio, size.y * y_ratio)
+
+	func _irregular_ellipse(center: Vector2, radii: Vector2, steps: int, phase: float) -> PackedVector2Array:
+		var points: PackedVector2Array = PackedVector2Array()
+		for index: int in range(steps):
+			var angle: float = TAU * float(index) / float(steps)
+			var wobble: float = 1.0 + sin(float(index) * 2.37 + phase) * 0.10 + cos(float(index) * 1.21 + phase * 0.7) * 0.055
+			points.append(center + Vector2(cos(angle) * radii.x * wobble, sin(angle) * radii.y * wobble))
+		return points
+
+	func _closed(points: PackedVector2Array) -> PackedVector2Array:
+		var closed_points: PackedVector2Array = points.duplicate()
+		if not closed_points.is_empty():
+			closed_points.append(closed_points[0])
+		return closed_points
+
+	func _draw_earthwork(points: PackedVector2Array, fill: Color, edge: Color) -> void:
+		draw_colored_polygon(points, fill)
+		draw_polyline(_closed(points), edge, 3.0, true)
+
+	func _draw_ground_stain(points: PackedVector2Array, fill: Color) -> void:
+		draw_colored_polygon(points, fill)
+		draw_polyline(_closed(points), Color(fill.r * 1.2, fill.g * 1.2, fill.b * 1.2, minf(0.42, fill.a + 0.08)), 2.0, true)
+
+	func _draw_timber(from: Vector2, to: Vector2, width: float, color: Color) -> void:
+		draw_line(from, to, Color(0.018, 0.010, 0.008, minf(0.90, color.a + 0.08)), width + 4.0, true)
+		draw_line(from, to, color, width, true)
+		var direction: Vector2 = (to - from).normalized()
+		var normal: Vector2 = Vector2(-direction.y, direction.x)
+		draw_line(from + normal * width * 0.30, to + normal * width * 0.30, Color(0.52, 0.28, 0.13, color.a * 0.32), 1.5, true)
+
+	func _draw_cart(center: Vector2, radius: float) -> void:
+		var rim: Color = Color(0.22, 0.12, 0.060, 0.82)
+		var iron: Color = Color(0.10, 0.075, 0.060, 0.86)
+		draw_circle(center, radius, Color(0.025, 0.018, 0.014, 0.36), true)
+		draw_circle(center, radius, iron, false, 6.0, true)
+		draw_circle(center, radius * 0.18, rim, true)
+		for spoke_index: int in range(8):
+			var angle: float = TAU * float(spoke_index) / 8.0
+			draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius * 0.88, rim, 3.0, true)
+		_draw_timber(center + Vector2(-radius * 1.4, -radius * 0.45), center + Vector2(radius * 2.35, -radius * 0.88), 10.0, Color(0.17, 0.085, 0.040, 0.82))
+		_draw_timber(center + Vector2(radius * 0.75, -radius * 0.68), center + Vector2(radius * 3.20, -radius * 1.55), 6.0, Color(0.14, 0.070, 0.036, 0.78))
+
+	func _draw_barricade(origin: Vector2, extent: Vector2, lean_left: bool) -> void:
+		var timber: Color = Color(0.16, 0.082, 0.040, 0.82)
+		var shadow: Color = Color(0.040, 0.022, 0.018, 0.88)
+		var lean: float = -1.0 if lean_left else 1.0
+		for post_index: int in range(3):
+			var x_value: float = origin.x + extent.x * (0.18 + float(post_index) * 0.31)
+			var top: Vector2 = Vector2(x_value + lean * extent.x * 0.04, origin.y)
+			var bottom: Vector2 = Vector2(x_value - lean * extent.x * 0.03, origin.y + extent.y)
+			_draw_timber(top, bottom, 8.0 if post_index != 1 else 10.0, timber)
+			draw_line(top - Vector2(5.0, 0.0), top + Vector2(3.0, -12.0), shadow, 3.0, true)
+		_draw_timber(origin + Vector2(0.0, extent.y * 0.35), origin + Vector2(extent.x, extent.y * 0.58), 9.0, timber)
+		_draw_timber(origin + Vector2(extent.x * 0.12, extent.y * 0.76), origin + Vector2(extent.x * 0.83, extent.y * 0.18), 7.0, Color(0.13, 0.065, 0.034, 0.78))
+
+	func _draw_crater(center: Vector2, radii: Vector2, fill: Color) -> void:
+		var outer: PackedVector2Array = _irregular_ellipse(center, radii, 28, 0.35)
+		var inner: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.06, radii.y * 0.08), radii * 0.60, 24, 1.75)
+		draw_colored_polygon(outer, fill)
+		draw_polyline(_closed(outer), Color(0.44, 0.24, 0.12, minf(0.48, fill.a + 0.06)), 3.0, true)
+		draw_colored_polygon(inner, Color(0.018, 0.012, 0.012, fill.a * 0.74))
+		draw_polyline(_closed(inner), Color(0.58, 0.27, 0.11, fill.a * 0.42), 1.5, true)
+		for debris_index: int in range(7):
+			var angle: float = TAU * float(debris_index) / 7.0 + 0.31
+			var start: Vector2 = center + Vector2(cos(angle) * radii.x * 1.02, sin(angle) * radii.y * 1.02)
+			var finish: Vector2 = center + Vector2(cos(angle) * radii.x * (1.16 + float(debris_index % 3) * 0.05), sin(angle) * radii.y * (1.16 + float(debris_index % 3) * 0.05))
+			draw_line(start, finish, Color(0.48, 0.26, 0.13, fill.a * 0.48), 1.5, true)
+
+	func _draw_smoke(center: Vector2, radius: float, color: Color) -> void:
+		var offsets: Array[Vector2] = [
+			Vector2(-radius * 0.42, radius * 0.10),
+			Vector2(-radius * 0.16, -radius * 0.24),
+			Vector2(radius * 0.18, -radius * 0.40),
+			Vector2(radius * 0.42, -radius * 0.12),
+			Vector2(radius * 0.22, radius * 0.18),
+		]
+		for index: int in range(offsets.size()):
+			var puff_radius: float = radius * (0.42 + float(index % 3) * 0.08)
+			var puff_color: Color = Color(color.r, color.g, color.b, color.a * (0.78 + float(index % 2) * 0.16))
+			draw_circle(center + offsets[index], puff_radius, puff_color, true)
+
+	func _draw_ash(origin: Vector2, count: int, spread: float) -> void:
+		for index: int in range(count):
+			var offset: Vector2 = Vector2(float(index) * spread * 0.78, float((index * 7) % 5) * spread * 0.36)
+			var start: Vector2 = origin + offset
+			var finish: Vector2 = start + Vector2(5.0 + float(index % 3) * 3.0, -2.0 - float(index % 2) * 3.0)
+			draw_line(start, finish, Color(0.78, 0.68, 0.54, 0.26), 1.5, true)
+
 static var _theme: Theme = null
 
 static func apply(root: Control) -> void:
@@ -805,10 +1024,10 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	rupture.anchor_right = 1.0
 	rupture.anchor_bottom = 0.5
 	rupture.offset_left = 0.0
-	rupture.offset_top = -1.0
+	rupture.offset_top = -0.5
 	rupture.offset_right = 0.0
-	rupture.offset_bottom = 1.0
-	rupture.color = Color(0.98, 0.13, 0.075, 0.34)
+	rupture.offset_bottom = 0.5
+	rupture.color = Color(0.66, 0.15, 0.070, 0.12)
 	var rupture_glow: ColorRect = arena.get_node_or_null("TerritoryRuptureGlow") as ColorRect
 	if rupture_glow == null:
 		rupture_glow = ColorRect.new()
@@ -821,10 +1040,10 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	rupture_glow.anchor_right = 1.0
 	rupture_glow.anchor_bottom = 0.5
 	rupture_glow.offset_left = 0.0
-	rupture_glow.offset_top = -12.0
+	rupture_glow.offset_top = -4.0
 	rupture_glow.offset_right = 0.0
-	rupture_glow.offset_bottom = 12.0
-	rupture_glow.color = Color(0.72, 0.065, 0.025, 0.18)
+	rupture_glow.offset_bottom = 4.0
+	rupture_glow.color = Color(0.52, 0.090, 0.030, 0.07)
 	_ensure_arena_rupture_segments(arena)
 	_ensure_arena_rupture_branches(arena)
 	_ensure_arena_threat_boundary(arena)
@@ -845,9 +1064,9 @@ static func _ensure_arena_threat_boundary(arena: Control) -> void:
 		boundary.offset_right = 0.0
 		boundary.offset_bottom = 0.0
 	var bar_specs: Array[Dictionary] = [
-		{"name": "ThreatJawLeft", "left": 0.015, "right": 0.055, "top": 0.11, "bottom": 0.90, "rot": -0.035},
-		{"name": "ThreatJawRight", "left": 0.945, "right": 0.985, "top": 0.07, "bottom": 0.86, "rot": 0.042},
-		{"name": "ThreatCeiling", "left": 0.18, "right": 0.82, "top": 0.035, "bottom": 0.052, "rot": -0.008},
+		{"name": "ThreatJawLeft", "left": 0.003, "right": 0.012, "top": 0.18, "bottom": 0.82, "rot": -0.010},
+		{"name": "ThreatJawRight", "left": 0.988, "right": 0.997, "top": 0.17, "bottom": 0.81, "rot": 0.012},
+		{"name": "ThreatCeiling", "left": 0.31, "right": 0.69, "top": 0.018, "bottom": 0.024, "rot": -0.004},
 	]
 	for spec: Dictionary in bar_specs:
 		var bar_name: String = String(spec.get("name", "ThreatBoundary"))
@@ -866,7 +1085,7 @@ static func _ensure_arena_threat_boundary(arena: Control) -> void:
 		bar.offset_top = 0.0
 		bar.offset_bottom = 0.0
 		bar.rotation = float(spec.get("rot", 0.0))
-		bar.color = Color(0.92, 0.075, 0.045, 0.30)
+		bar.color = Color(0.72, 0.11, 0.055, 0.20)
 	var objective: Label = boundary.get_node_or_null("CombatObjectiveSignal") as Label
 	if objective == null:
 		objective = Label.new()
@@ -1066,22 +1285,33 @@ static func _ensure_arena_woodland_silhouettes(arena: Control) -> void:
 static func _ensure_hostile_fortification(silhouettes: Control) -> void:
 	var beam: ColorRect = _ensure_arena_rect(silhouettes, "RuinedPalisadeBeam")
 	beam.anchor_left = 0.17
-	beam.anchor_right = 0.83
-	beam.anchor_top = 0.31
-	beam.anchor_bottom = 0.31
+	beam.anchor_right = 0.35
+	beam.anchor_top = 0.27
+	beam.anchor_bottom = 0.27
 	beam.offset_left = 0.0
 	beam.offset_right = 0.0
 	beam.offset_top = 0.0
-	beam.offset_bottom = 12.0
-	beam.rotation = -0.012
-	beam.color = Color(0.018, 0.010, 0.012, 0.78)
+	beam.offset_bottom = 7.0
+	beam.rotation = 0.045
+	beam.color = Color(0.055, 0.028, 0.021, 0.58)
+	var east_beam: ColorRect = _ensure_arena_rect(silhouettes, "RuinedPalisadeBeamEast")
+	east_beam.anchor_left = 0.65
+	east_beam.anchor_right = 0.83
+	east_beam.anchor_top = 0.28
+	east_beam.anchor_bottom = 0.28
+	east_beam.offset_left = 0.0
+	east_beam.offset_right = 0.0
+	east_beam.offset_top = 0.0
+	east_beam.offset_bottom = 7.0
+	east_beam.rotation = -0.052
+	east_beam.color = Color(0.055, 0.028, 0.021, 0.58)
 	var post_specs: Array[Dictionary] = [
-		{"x": 0.18, "top": 0.16, "bottom": 0.45, "w": 0.018, "rot": -0.06},
-		{"x": 0.29, "top": 0.22, "bottom": 0.48, "w": 0.015, "rot": 0.035},
-		{"x": 0.43, "top": 0.13, "bottom": 0.46, "w": 0.020, "rot": -0.025},
-		{"x": 0.56, "top": 0.18, "bottom": 0.47, "w": 0.018, "rot": 0.040},
-		{"x": 0.69, "top": 0.20, "bottom": 0.49, "w": 0.015, "rot": -0.045},
-		{"x": 0.80, "top": 0.15, "bottom": 0.44, "w": 0.019, "rot": 0.055},
+		{"x": 0.18, "top": 0.12, "bottom": 0.31, "w": 0.010, "rot": -0.06},
+		{"x": 0.29, "top": 0.16, "bottom": 0.32, "w": 0.009, "rot": 0.035},
+		{"x": 0.43, "top": 0.10, "bottom": 0.27, "w": 0.011, "rot": -0.025},
+		{"x": 0.56, "top": 0.13, "bottom": 0.28, "w": 0.010, "rot": 0.040},
+		{"x": 0.69, "top": 0.15, "bottom": 0.32, "w": 0.009, "rot": -0.045},
+		{"x": 0.80, "top": 0.11, "bottom": 0.29, "w": 0.010, "rot": 0.055},
 	]
 	for index: int in range(post_specs.size()):
 		var spec: Dictionary = post_specs[index]
@@ -1096,17 +1326,17 @@ static func _ensure_hostile_fortification(silhouettes: Control) -> void:
 		post.offset_top = 0.0
 		post.offset_bottom = 0.0
 		post.rotation = float(spec.get("rot", 0.0))
-		post.color = Color(0.012, 0.007, 0.009, 0.84)
+		post.color = Color(0.035, 0.018, 0.015, 0.62)
 	var watch_post: ColorRect = _ensure_arena_rect(silhouettes, "HostileWatchPost")
 	watch_post.anchor_left = 0.485
 	watch_post.anchor_right = 0.515
 	watch_post.anchor_top = 0.04
-	watch_post.anchor_bottom = 0.32
+	watch_post.anchor_bottom = 0.23
 	watch_post.offset_left = 0.0
 	watch_post.offset_right = 0.0
 	watch_post.offset_top = 0.0
 	watch_post.offset_bottom = 0.0
-	watch_post.color = Color(0.008, 0.004, 0.007, 0.90)
+	watch_post.color = Color(0.028, 0.014, 0.013, 0.64)
 	var watch_crossbar: ColorRect = _ensure_arena_rect(silhouettes, "HostileWatchCrossbar")
 	watch_crossbar.anchor_left = 0.445
 	watch_crossbar.anchor_right = 0.555
@@ -1117,7 +1347,7 @@ static func _ensure_hostile_fortification(silhouettes: Control) -> void:
 	watch_crossbar.offset_top = 0.0
 	watch_crossbar.offset_bottom = 10.0
 	watch_crossbar.rotation = 0.02
-	watch_crossbar.color = Color(0.008, 0.004, 0.007, 0.90)
+	watch_crossbar.color = Color(0.028, 0.014, 0.013, 0.64)
 
 static func _ensure_arena_war_aftermath_geometry(arena: Control) -> void:
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
@@ -1135,43 +1365,16 @@ static func _ensure_arena_war_aftermath_geometry(arena: Control) -> void:
 	aftermath.set_meta("visual_role", "non_unit_physical_war_aftermath")
 
 	var onset: Control = _ensure_arena_state_group(aftermath, "OnsetAftermathGeometry")
-	var onset_specs: Array[Dictionary] = [
-		{"name": "BurntCartAxle", "left": 0.08, "right": 0.35, "top": 0.76, "height": 12.0, "rotation": -0.055, "color": Color(0.025, 0.017, 0.014, 0.86)},
-		{"name": "BurntCartShaft", "left": 0.18, "right": 0.48, "top": 0.70, "height": 7.0, "rotation": 0.21, "color": Color(0.018, 0.012, 0.011, 0.82)},
-		{"name": "CollapsedTrenchLip", "left": 0.58, "right": 1.02, "top": 0.82, "height": 18.0, "rotation": -0.025, "color": Color(0.030, 0.020, 0.018, 0.76)},
-		{"name": "TornStandardPole", "left": 0.77, "right": 0.785, "top": 0.19, "bottom": 0.63, "rotation": 0.075, "color": Color(0.012, 0.008, 0.009, 0.92)},
-		{"name": "TornStandardCloth", "left": 0.77, "right": 0.90, "top": 0.23, "height": 22.0, "rotation": -0.04, "color": Color(0.30, 0.016, 0.025, 0.60)},
-	]
-	_populate_arena_war_geometry(onset, onset_specs)
+	_populate_arena_war_geometry(onset, "onset", 6, 0.24)
 
 	var midfight: Control = _ensure_arena_state_group(aftermath, "MidfightAftermathGeometry")
-	var midfight_specs: Array[Dictionary] = [
-		{"name": "ShatteredBarricadeWest", "left": -0.03, "right": 0.25, "top": 0.55, "height": 30.0, "rotation": 0.16, "color": Color(0.012, 0.008, 0.008, 0.92)},
-		{"name": "ShatteredBarricadeEast", "left": 0.76, "right": 1.04, "top": 0.50, "height": 34.0, "rotation": -0.14, "color": Color(0.012, 0.008, 0.008, 0.94)},
-		{"name": "BlastScarNorth", "left": 0.23, "right": 0.74, "top": 0.22, "height": 16.0, "rotation": -0.035, "color": Color(0.16, 0.018, 0.013, 0.48)},
-		{"name": "BlastScarSouth", "left": 0.30, "right": 0.83, "top": 0.68, "height": 13.0, "rotation": 0.048, "color": Color(0.19, 0.020, 0.014, 0.44)},
-		{"name": "SplinterStakeWest", "left": 0.10, "right": 0.12, "top": 0.29, "bottom": 0.72, "rotation": -0.18, "color": Color(0.010, 0.007, 0.007, 0.96)},
-		{"name": "SplinterStakeEast", "left": 0.88, "right": 0.90, "top": 0.25, "bottom": 0.74, "rotation": 0.20, "color": Color(0.010, 0.007, 0.007, 0.96)},
-	]
-	_populate_arena_war_geometry(midfight, midfight_specs)
+	_populate_arena_war_geometry(midfight, "midfight", 10, 0.36)
 
 	var collapse: Control = _ensure_arena_state_group(aftermath, "CollapseAftermathGeometry")
-	var collapse_specs: Array[Dictionary] = [
-		{"name": "CanopyCollapseWest", "left": -0.08, "right": 0.40, "top": 0.06, "height": 42.0, "rotation": 0.19, "color": Color(0.004, 0.003, 0.004, 0.98)},
-		{"name": "CanopyCollapseEast", "left": 0.60, "right": 1.08, "top": 0.04, "height": 46.0, "rotation": -0.18, "color": Color(0.004, 0.003, 0.004, 0.98)},
-		{"name": "OcclusionJawWest", "left": -0.04, "right": 0.14, "top": 0.08, "bottom": 0.96, "rotation": -0.025, "color": Color(0.002, 0.002, 0.003, 0.88)},
-		{"name": "OcclusionJawEast", "left": 0.86, "right": 1.04, "top": 0.05, "bottom": 0.94, "rotation": 0.030, "color": Color(0.002, 0.002, 0.003, 0.90)},
-		{"name": "RupturedGroundMouth", "left": 0.16, "right": 0.88, "top": 0.86, "height": 34.0, "rotation": -0.012, "color": Color(0.085, 0.006, 0.009, 0.78)},
-	]
-	_populate_arena_war_geometry(collapse, collapse_specs)
+	_populate_arena_war_geometry(collapse, "collapse", 9, 0.46)
 
 	var reduced_lock: Control = _ensure_arena_state_group(aftermath, "ReducedMotionGrimeLock")
-	var reduced_specs: Array[Dictionary] = [
-		{"name": "StillAshBraceWest", "left": 0.02, "right": 0.37, "top": 0.39, "height": 9.0, "rotation": 0.08, "color": Color(0.22, 0.035, 0.025, 0.50)},
-		{"name": "StillAshBraceEast", "left": 0.63, "right": 0.98, "top": 0.61, "height": 9.0, "rotation": -0.08, "color": Color(0.22, 0.035, 0.025, 0.50)},
-		{"name": "StillTrenchLock", "left": 0.20, "right": 0.80, "top": 0.49, "height": 7.0, "rotation": 0.0, "color": Color(0.62, 0.09, 0.045, 0.34)},
-	]
-	_populate_arena_war_geometry(reduced_lock, reduced_specs)
+	_populate_arena_war_geometry(reduced_lock, "reduced", 4, 0.12)
 	if not aftermath.has_meta("state_groups_initialized"):
 		onset.visible = true
 		midfight.visible = false
@@ -1193,20 +1396,26 @@ static func _ensure_arena_state_group(parent_control: Control, node_name: String
 		group.offset_bottom = 0.0
 	return group
 
-static func _populate_arena_war_geometry(group: Control, specs: Array[Dictionary]) -> void:
-	for spec: Dictionary in specs:
-		var rect: ColorRect = _ensure_arena_rect(group, String(spec.get("name", "WarDebris")))
-		rect.anchor_left = float(spec.get("left", 0.0))
-		rect.anchor_right = float(spec.get("right", rect.anchor_left))
-		rect.anchor_top = float(spec.get("top", 0.0))
-		rect.anchor_bottom = float(spec.get("bottom", rect.anchor_top))
-		rect.offset_left = 0.0
-		rect.offset_right = 0.0
-		rect.offset_top = 0.0
-		rect.offset_bottom = float(spec.get("height", 0.0))
-		rect.rotation = float(spec.get("rotation", 0.0))
-		var geometry_color: Color = spec.get("color", Color(0.01, 0.008, 0.009, 0.90))
-		rect.color = geometry_color
+static func _populate_arena_war_geometry(group: Control, evidence_state: String, evidence_count: int, overlay_density: float) -> void:
+	for child: Node in group.get_children():
+		if child.name != "PhysicalEvidencePainter":
+			group.remove_child(child)
+			child.queue_free()
+	var painter: ArenaEvidencePainter = group.get_node_or_null("PhysicalEvidencePainter") as ArenaEvidencePainter
+	if painter == null:
+		painter = ArenaEvidencePainter.new()
+		painter.name = "PhysicalEvidencePainter"
+		group.add_child(painter)
+		painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		painter.offset_left = 0.0
+		painter.offset_top = 0.0
+		painter.offset_right = 0.0
+		painter.offset_bottom = 0.0
+	painter.configure(evidence_state)
+	group.set_meta("physical_evidence_state", evidence_state)
+	group.set_meta("physical_evidence_count", evidence_count)
+	group.set_meta("overlay_density", overlay_density)
+	group.set_meta("protected_center_clear", true)
 
 static func _ensure_arena_weather_banks(arena: Control) -> void:
 	var fog: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaGroundFog", -3)
@@ -1325,9 +1534,9 @@ static func _ensure_arena_threat_incursions(arena: Control) -> void:
 		incursions.offset_right = 0.0
 		incursions.offset_bottom = 0.0
 	var incursion_specs: Array[Dictionary] = [
-		{"name": "IncursionNorthWest", "left": -0.02, "top": 0.08, "right": 0.29, "h": 7.0, "rot": -0.12, "a": 0.36},
-		{"name": "IncursionNorthEast", "left": 0.67, "top": 0.22, "right": 1.04, "h": 4.0, "rot": 0.08, "a": 0.31},
-		{"name": "IncursionSouthEast", "left": 0.79, "top": 0.76, "right": 1.03, "h": 5.0, "rot": -0.19, "a": 0.27},
+		{"name": "IncursionNorthWest", "left": -0.01, "top": 0.08, "right": 0.10, "h": 4.0, "rot": -0.12, "a": 0.22},
+		{"name": "IncursionNorthEast", "left": 0.90, "top": 0.22, "right": 1.01, "h": 3.0, "rot": 0.08, "a": 0.20},
+		{"name": "IncursionSouthEast", "left": 0.91, "top": 0.76, "right": 1.01, "h": 3.0, "rot": -0.19, "a": 0.18},
 	]
 	for spec: Dictionary in incursion_specs:
 		var incursion_name: String = String(spec.get("name", "Incursion"))
@@ -1346,7 +1555,7 @@ static func _ensure_arena_threat_incursions(arena: Control) -> void:
 		incursion.offset_top = 0.0
 		incursion.offset_bottom = float(spec.get("h", 4.0))
 		incursion.rotation = float(spec.get("rot", 0.0))
-		incursion.color = Color(0.95, 0.10, 0.045, float(spec.get("a", 0.3)))
+		incursion.color = Color(0.72, 0.13, 0.060, float(spec.get("a", 0.2)))
 
 static func _ensure_arena_gradient_layer(arena: Control, node_name: String, z_value: int) -> TextureRect:
 	var layer: TextureRect = arena.get_node_or_null(node_name) as TextureRect
@@ -1465,12 +1674,12 @@ static func _ensure_arena_rupture_segments(arena: Control) -> void:
 		segments.offset_right = 0.0
 		segments.offset_bottom = 0.0
 	var segment_specs: Array[Dictionary] = [
-		{"left": 0.00, "right": 0.13, "y": 0.500, "h": 5.0, "rot": -0.025},
-		{"left": 0.15, "right": 0.31, "y": 0.492, "h": 3.0, "rot": 0.032},
-		{"left": 0.34, "right": 0.49, "y": 0.505, "h": 6.0, "rot": -0.018},
-		{"left": 0.53, "right": 0.67, "y": 0.496, "h": 3.0, "rot": 0.028},
-		{"left": 0.70, "right": 0.84, "y": 0.509, "h": 5.0, "rot": -0.036},
-		{"left": 0.87, "right": 1.00, "y": 0.498, "h": 4.0, "rot": 0.020},
+		{"left": 0.02, "right": 0.08, "y": 0.500, "h": 3.0, "rot": -0.025},
+		{"left": 0.18, "right": 0.25, "y": 0.494, "h": 2.0, "rot": 0.032},
+		{"left": 0.38, "right": 0.45, "y": 0.505, "h": 3.0, "rot": -0.018},
+		{"left": 0.55, "right": 0.62, "y": 0.496, "h": 2.0, "rot": 0.028},
+		{"left": 0.75, "right": 0.82, "y": 0.507, "h": 3.0, "rot": -0.036},
+		{"left": 0.92, "right": 0.98, "y": 0.498, "h": 2.0, "rot": 0.020},
 	]
 	for index: int in range(segment_specs.size()):
 		var segment_name: String = "RuptureSegment_%02d" % index
@@ -1490,7 +1699,7 @@ static func _ensure_arena_rupture_segments(arena: Control) -> void:
 		segment.offset_top = -1.0
 		segment.offset_bottom = float(spec.get("h", 4.0)) - 1.0
 		segment.rotation = float(spec.get("rot", 0.0))
-		segment.color = Color(1.0, 0.105, 0.045, 0.88)
+		segment.color = Color(0.82, 0.20, 0.080, 0.42)
 
 static func _ensure_arena_cell_seams(arena: Control) -> void:
 	var seams: GridContainer = arena.get_node_or_null("ArenaCellSeams") as GridContainer
@@ -1498,7 +1707,7 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		seams = GridContainer.new()
 		seams.name = "ArenaCellSeams"
 		seams.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		seams.z_index = -4
+		seams.z_index = -1
 		seams.columns = 8
 		seams.add_theme_constant_override("h_separation", 0)
 		seams.add_theme_constant_override("v_separation", 0)
@@ -1516,9 +1725,12 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 			cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			var seam_style: StyleBoxFlat = StyleBoxFlat.new()
 			seam_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-			seam_style.border_color = Color(0.82, 0.76, 0.66, 0.12)
-			seam_style.border_width_right = 1
-			seam_style.border_width_bottom = 1
+			var row_index: int = floori(float(cell_index) / 8.0)
+			var column_index: int = cell_index % 8
+			var major_seam: bool = row_index == 2 or column_index == 3
+			seam_style.border_color = Color(0.88, 0.79, 0.64, 0.27 if major_seam else 0.20)
+			seam_style.border_width_right = 2 if column_index == 3 else 1
+			seam_style.border_width_bottom = 2 if row_index == 2 else 1
 			cell.add_theme_stylebox_override("panel", seam_style)
 			seams.add_child(cell)
 

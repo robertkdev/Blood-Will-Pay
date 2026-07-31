@@ -475,16 +475,23 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	var midfight: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/MidfightAftermathGeometry") as Control
 	var collapse: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/CollapseAftermathGeometry") as Control
 	var reduced_lock: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
+	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
 	_expect(arena != null and String(arena.get_meta("battlefield_pressure_phase", "")) == expected_phase, "%s capture did not reach the requested environment phase" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("battlefield_reduced_motion", not reduced_motion)) == reduced_motion, "%s capture reduced-motion metadata is wrong" % expected_phase)
-	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("war_aftermath/"), "%s capture lacks a physical battlefield signature" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("physical_warfield/"), "%s capture lacks a physical battlefield signature" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not prioritize cell readability" % expected_phase)
 	_expect(aftermath != null and aftermath.visible and String(aftermath.get_meta("visual_role", "")) == "non_unit_physical_war_aftermath", "%s capture lacks the physical war-aftermath root" % expected_phase)
-	_expect(onset != null and onset.visible and onset.get_child_count() >= 5, "%s capture lost practical onset wreckage" % expected_phase)
+	_expect(onset != null and onset.visible and int(onset.get_meta("physical_evidence_count", 0)) >= 6, "%s capture lost practical onset wreckage" % expected_phase)
+	_expect(onset != null and bool(onset.get_meta("protected_center_clear", false)), "%s onset evidence does not protect the playable center" % expected_phase)
 	_expect(midfight != null and midfight.visible == (expected_phase != "onset"), "%s capture has the wrong shattered-barricade state" % expected_phase)
 	_expect(collapse != null and not collapse.visible, "%s capture prematurely exposed the collapse composition" % expected_phase)
 	_expect(reduced_lock != null and reduced_lock.visible == reduced_motion, "%s capture has the wrong reduced-motion grime lock" % expected_phase)
-	if aftermath != null and reduced_motion:
+	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
+	if aftermath != null and arena != null and onset != null and midfight != null and reduced_lock != null and reduced_motion:
 		_expect(aftermath.scale == Vector2.ONE, "%s reduced-motion capture retained an animated environment transform" % expected_phase)
+		_expect(float(arena.get_meta("battlefield_overlay_density", 1.0)) <= 0.20, "%s reduced-motion capture retained excessive overlay density" % expected_phase)
+		_expect(onset.modulate.a <= 0.36 and midfight.modulate.a <= 0.22, "%s reduced-motion capture did not quiet the kinetic evidence layers" % expected_phase)
+		_expect(float(reduced_lock.get_meta("overlay_density", 1.0)) < float(onset.get_meta("overlay_density", 0.0)), "%s reduced-motion evidence is denser than onset" % expected_phase)
 	_assert_persistent_combat_hierarchy(expected_phase)
 
 func _assert_result_outcome_contract(outcome: String) -> void:

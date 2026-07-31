@@ -36,6 +36,8 @@ var _displayable_starter_row_count: int = 0
 var _sparse_content_record: bool = true
 var _record_witnessed: bool = false
 var _assembly_layer: Control = null
+var _lifetime_omens: int = 0
+var _next_circle_requirement: int = 0
 var profile_path: String = "user://account_profile_v1.json"
 
 func configure(account_profile_path: String) -> void:
@@ -85,6 +87,7 @@ func _sync_to_viewport() -> void:
 	if _bounty_scroll != null:
 		_bounty_scroll.custom_minimum_size.y = 158.0 if _sparse_content_record else (180.0 if compact else 320.0)
 		_bounty_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if _sparse_content_record else ScrollContainer.SCROLL_MODE_AUTO
+	_sync_progress_metadata(compact)
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key_event: InputEventKey = event as InputEventKey
@@ -100,11 +103,11 @@ func refresh() -> void:
 	_displayable_starter_row_count = _count_displayable_starter_rows(current)
 	_sparse_content_record = _displayable_starter_row_count == 0
 	_record_witnessed = not completed.is_empty()
+	_lifetime_omens = lifetime
 	if _balance_label != null:
 		_balance_label.text = "%d OMENS" % balance
 	var next_requirement: int = BountyCatalogScript.next_circle_requirement(lifetime)
-	if _progress_label != null:
-		_progress_label.text = "LIFETIME OMENS %03d  ///  %s" % [lifetime, "ALL SEALS WITNESSED" if next_requirement == 0 else "NEXT SEAL %03d" % next_requirement]
+	_next_circle_requirement = next_requirement
 	if _record_id_label != null:
 		_record_id_label.text = "FOLIO GB-%03d  /  CIRCLE %02d  /  COPY 04" % [lifetime, BountyCatalogScript.revealed_circle(lifetime)]
 	if _witness_stamp_label != null:
@@ -114,6 +117,19 @@ func refresh() -> void:
 	if _status_label != null and _status_label.text == "":
 		_status_label.text = "NO NEW ENTRY  ///  RECORD REMAINS OPEN"
 	_sync_to_viewport()
+
+func _sync_progress_metadata(compact: bool) -> void:
+	if _progress_label == null:
+		return
+	var next_seal_copy: String = "ALL SEALS WITNESSED" if _next_circle_requirement == 0 else "NEXT SEAL %03d" % _next_circle_requirement
+	if compact:
+		_progress_label.text = "LIFETIME OMENS %03d\n%s" % [_lifetime_omens, next_seal_copy]
+		_progress_label.custom_minimum_size.y = 46.0
+		_progress_label.set_meta("responsive_layout", "two_row")
+	else:
+		_progress_label.text = "LIFETIME OMENS %03d  ///  %s" % [_lifetime_omens, next_seal_copy]
+		_progress_label.custom_minimum_size.y = 0.0
+		_progress_label.set_meta("responsive_layout", "single_row")
 
 func _build_ui() -> void:
 	var backdrop: ColorRect = ColorRect.new()
@@ -169,10 +185,12 @@ func _build_ui() -> void:
 	title.add_theme_color_override("font_color", COLOR_BONE)
 	title_box.add_child(title)
 	_progress_label = Label.new()
+	_progress_label.name = "ProgressMetadata"
 	_progress_label.custom_minimum_size.x = 0.0
 	_progress_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_progress_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_progress_label.add_theme_font_size_override("font_size", 18)
+	_progress_label.add_theme_constant_override("line_spacing", 3)
 	_progress_label.add_theme_color_override("font_color", Color(0.77, 0.73, 0.68, 1.0))
 	VisualTypeSystem.set_utility(_progress_label)
 	title_box.add_child(_progress_label)

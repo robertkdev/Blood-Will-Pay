@@ -47,6 +47,10 @@ framebuffer, a missing image, repeated/incorrect combat phase, disappearing
 combat hierarchy, overflowing 150% result frame, or an incomplete packet is a
 hard failure. Headless runs still write a unique manifest with
 `status: "blocked"` and exit nonzero; they never fall back to software mockups.
+Combat capture contracts also require the 8x6 cell seams to render above the
+environment, the playable center to remain protected from opaque scenic bars,
+and reduced motion to publish a lower overlay-density budget than kinetic
+onset.
 
 The packet covers 26 independently captured runtime states:
 
@@ -59,7 +63,7 @@ The packet covers 26 independently captured runtime states:
 - Planning board at compact and desktop sizes
 - Planning board at real 125% and 150% UI scale
 - Compact in-game system menu
-- Active-combat onset, materially denser midfight, and static reduced-motion states
+- Active-combat onset wreckage, materially denser impact/smoke midfight, and sparse static reduced-motion evidence
 - Victory entry and hold, plus physically distinct stalemate and defeat aftermath states
 - Defeat hold at compact 150% scale with the complete lower frame and skip control in bounds
 - Loss record at compact 150% scale

@@ -748,6 +748,12 @@ func _sync_layout() -> void:
 		_record_stamp_label.add_theme_font_size_override("font_size", 12 if tight_compact else 18)
 	if _record_footer_label != null:
 		_record_footer_label.add_theme_font_size_override("font_size", 11 if tight_compact else 16)
+		_record_footer_label.visible = not tight_compact
+		_record_footer_label.set_meta("compact_decorative_suppressed", tight_compact)
+	var forfeit_stamp: Label = frame_panel.get_node_or_null("FrameDamageLayer/ForfeitStamp") as Label
+	if forfeit_stamp != null:
+		forfeit_stamp.visible = not tight_compact
+		forfeit_stamp.set_meta("compact_decorative_suppressed", tight_compact)
 	if _casualty_ghost_label != null:
 		var frame_origin: Vector2 = (viewport_size - Vector2(frame_width, frame_height)) * 0.5
 		_casualty_ghost_label.position = Vector2(frame_origin.x + frame_width - 346.0, frame_origin.y + 45.0)

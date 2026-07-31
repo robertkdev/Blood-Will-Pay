@@ -86,13 +86,25 @@ func _run() -> void:
 	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), 1.5), "UI scale should update to the supported 150 percent maximum")
 	if window != null:
 		_expect(is_equal_approx(window.content_scale_factor, 1.5), "window content scale should apply the 150 percent maximum immediately")
+	scale_option = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+	motion_check = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	var content_panel: Control = title_menu.find_child("ContentPanel", true, false) as Control if title_menu != null else null
+	var content_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer if title_menu != null else null
+	var accessibility_priority: PanelContainer = title_menu.find_child("AccessibilityPriority", true, false) as PanelContainer if title_menu != null else null
+	var volume_setting: PanelContainer = title_menu.find_child("VolumeSetting", true, false) as PanelContainer if title_menu != null else null
 	var viewport_rect: Rect2 = title_menu.get_viewport().get_visible_rect() if title_menu != null else Rect2()
 	_expect(
 		content_panel != null and _rect_inside(content_panel.get_global_rect(), viewport_rect.grow(2.0)),
 		"150 percent settings panel should remain inside the %dx%d viewport panel=%s viewport=%s"
 		% [viewport_size.x, viewport_size.y, str(content_panel.get_global_rect() if content_panel != null else Rect2()), str(viewport_rect)]
 	)
+	var settings_visible_rect: Rect2 = content_scroll.get_global_rect() if content_scroll != null else Rect2()
+	_expect(accessibility_priority != null and bool(accessibility_priority.get_meta("pinned_settings_block", false)), "Settings should expose an intentional first-response accessibility block")
+	_expect(accessibility_priority != null and _rect_inside(accessibility_priority.get_global_rect(), settings_visible_rect.grow(2.0)), "150 percent accessibility priority banner should be visible without scrolling")
+	_expect(scale_option != null and _rect_inside(scale_option.get_global_rect(), settings_visible_rect.grow(2.0)), "150 percent UI Scale should be immediately discoverable without scrolling")
+	_expect(motion_check != null and _rect_inside(motion_check.get_global_rect(), settings_visible_rect.grow(2.0)), "150 percent Reduced Motion should be immediately discoverable without scrolling")
+	_expect(volume_setting != null and scale_option != null and scale_option.get_global_rect().position.y < volume_setting.get_global_rect().position.y, "Accessibility controls should precede secondary volume settings")
+	_save_capture("00_accessibility_first_1280x720_150.png")
 	for control_name: String in [
 		"GameTitle",
 		"StartButton",
@@ -126,11 +138,20 @@ func _run() -> void:
 	await _settle_frames(3)
 	var ledger: Control = _main.find_child("BlackLedger", true, false) as Control if _main != null else null
 	var ledger_panel: PanelContainer = ledger.find_child("LedgerPanel", true, false) as PanelContainer if ledger != null else null
+	var ledger_progress: Label = ledger.find_child("ProgressMetadata", true, false) as Label if ledger != null else null
 	var ledger_viewport: Rect2 = ledger.get_viewport().get_visible_rect() if ledger != null else Rect2()
 	_expect(
 		ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), ledger_viewport.grow(2.0)),
 		"150 percent Black Ledger should remain inside the %dx%d viewport panel=%s viewport=%s"
 		% [viewport_size.x, viewport_size.y, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(ledger_viewport)]
+	)
+	_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "two_row", "150 percent Black Ledger should deliberately recompose progress metadata into two rows")
+	var ledger_progress_rows: PackedStringArray = ledger_progress.text.split("\n") if ledger_progress != null else PackedStringArray()
+	_expect(
+		ledger_progress_rows.size() == 2
+		and ledger_progress_rows[0].begins_with("LIFETIME OMENS ")
+		and (ledger_progress_rows[1].begins_with("NEXT SEAL ") or ledger_progress_rows[1] == "ALL SEALS WITNESSED"),
+		"150 percent Black Ledger should keep Lifetime Omens and Next Seal as complete nonbreaking rows"
 	)
 	var ledger_close: Button = ledger.find_child("*", true, false) as Button if ledger != null else null
 	if ledger != null:
