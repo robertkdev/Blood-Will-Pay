@@ -14,6 +14,9 @@ const SCREEN_BACKDROP: String = "res://assets/ui/horror_v1/battlefield_thorn_rup
 const BATTLEFIELD_SURFACE: String = "res://assets/ui/gothic/battlefield_surface_horror_v1.png"
 const BATTLEFIELD_SURFACE_TOP: String = "res://assets/ui/gothic/battlefield_surface_horror_v1_top.png"
 const BATTLEFIELD_SURFACE_BOTTOM: String = "res://assets/ui/gothic/battlefield_surface_horror_v1_bottom.png"
+const BATTLEFIELD_SURFACE_ONSET: String = "res://assets/ui/gothic/battlefield_surface_horror_onset_v2.png"
+const BATTLEFIELD_SURFACE_MIDFIGHT: String = "res://assets/ui/gothic/battlefield_surface_horror_midfight_v2.png"
+const BATTLEFIELD_SURFACE_REDUCED_MOTION: String = "res://assets/ui/gothic/battlefield_surface_horror_reduced_motion_v2.png"
 const BOARD_TILE_PLAYER: String = "res://assets/ui/gothic/board_tile_player.png"
 const BOARD_TILE_ENEMY: String = "res://assets/ui/gothic/board_tile_enemy.png"
 const BENCH_SLOT_FRAME: String = "res://assets/ui/gothic/bench_slot_frame.png"
@@ -137,6 +140,15 @@ static func battlefield_top_texture() -> Texture2D:
 
 static func battlefield_bottom_texture() -> Texture2D:
 	return TextureUtils.try_load_texture(BATTLEFIELD_SURFACE_BOTTOM)
+
+static func battlefield_onset_texture() -> Texture2D:
+	return TextureUtils.try_load_texture(BATTLEFIELD_SURFACE_ONSET)
+
+static func battlefield_midfight_texture() -> Texture2D:
+	return TextureUtils.try_load_texture(BATTLEFIELD_SURFACE_MIDFIGHT)
+
+static func battlefield_reduced_motion_texture() -> Texture2D:
+	return TextureUtils.try_load_texture(BATTLEFIELD_SURFACE_REDUCED_MOTION)
 
 static func board_tile_style(is_player: bool, modulate: Color = Color.WHITE) -> StyleBoxTexture:
 	var path: String = BOARD_TILE_PLAYER if is_player else BOARD_TILE_ENEMY

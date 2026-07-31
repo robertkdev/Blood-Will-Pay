@@ -19,6 +19,7 @@ const COLOR_BLOOD: Color = Color(0.56, 0.08, 0.09, 1.0)
 var _balance_label: Label = null
 var _progress_label: Label = null
 var _record_id_label: Label = null
+var _title_label: Label = null
 var _witness_stamp_label: Label = null
 var _starter_list: VBoxContainer = null
 var _bounty_list: VBoxContainer = null
@@ -80,7 +81,7 @@ func _sync_to_viewport() -> void:
 		_ledger_margin.add_theme_constant_override("margin_right", 18 if compact else 42)
 		_ledger_margin.add_theme_constant_override("margin_bottom", 18 if compact else 24)
 	if _ledger_frame != null:
-		_ledger_frame.add_theme_constant_override("separation", 10 if compact else 14)
+		_ledger_frame.add_theme_constant_override("separation", 6 if compact else 14)
 	if _page_scroll != null:
 		_page_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if compact or _sparse_content_record else ScrollContainer.SCROLL_MODE_DISABLED
 		_page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -89,7 +90,14 @@ func _sync_to_viewport() -> void:
 	if _section_navigator != null:
 		_section_navigator.visible = compact
 		_section_navigator.custom_minimum_size = Vector2(0.0, 38.0 if compact else 0.0)
-		_section_navigator.set_meta("compact_section_discoverability", "starter_debts_and_bounties" if compact else "desktop_two_column")
+		_section_navigator.set_meta("compact_section_discoverability", "paged_full_entry_starter_debts_and_bounties" if compact else "desktop_two_column")
+	if _record_id_label != null:
+		_record_id_label.visible = not compact
+		_record_id_label.set_meta("compact_duplicate_metadata_suppressed", compact)
+	if _title_label != null:
+		_title_label.add_theme_font_size_override("font_size", 27 if compact else 34)
+	if _balance_label != null:
+		_balance_label.add_theme_font_size_override("font_size", 22 if compact else 28)
 	if _witness_stamp_label != null:
 		_witness_stamp_label.visible = not compact
 		_witness_stamp_label.set_meta("compact_status_folded_into_metadata", compact)
@@ -106,16 +114,20 @@ func _sync_to_viewport() -> void:
 		_footer_stamp_label.visible = not compact
 	if _columns != null:
 		_columns.columns = 1 if compact else 2
+		_columns.add_theme_constant_override("v_separation", 8 if compact else 14)
 	if _unlock_column != null:
 		_unlock_column.custom_minimum_size.x = 0.0 if compact else minf(455.0, maxf(360.0, viewport_size.x * 0.48))
 	if _bounty_column != null:
 		_bounty_column.custom_minimum_size.x = 0.0
 	if _starter_scroll != null:
-		_starter_scroll.custom_minimum_size.y = 158.0 if _sparse_content_record else (180.0 if compact else 320.0)
+		_starter_scroll.custom_minimum_size.y = 158.0 if _sparse_content_record else (96.0 if compact else 320.0)
 		_starter_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if _sparse_content_record else ScrollContainer.SCROLL_MODE_AUTO
 	if _bounty_scroll != null:
-		_bounty_scroll.custom_minimum_size.y = 158.0 if _sparse_content_record else (180.0 if compact else 320.0)
+		_bounty_scroll.custom_minimum_size.y = 158.0 if _sparse_content_record else (96.0 if compact else 320.0)
 		_bounty_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if _sparse_content_record else ScrollContainer.SCROLL_MODE_AUTO
+	_sync_column_density(compact)
+	_sync_compact_section_visibility(compact)
+	_sync_footer_status_copy(compact)
 	_sync_progress_metadata(compact)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -152,13 +164,57 @@ func _sync_progress_metadata(compact: bool) -> void:
 		return
 	var next_seal_copy: String = "ALL SEALS WITNESSED" if _next_circle_requirement == 0 else "NEXT SEAL %03d" % _next_circle_requirement
 	if compact:
-		_progress_label.text = "LIFETIME OMENS %03d\n%s" % [_lifetime_omens, next_seal_copy]
-		_progress_label.custom_minimum_size.y = 46.0
-		_progress_label.set_meta("responsive_layout", "two_row")
+		_progress_label.text = "LIFETIME %03d  //  %s" % [_lifetime_omens, next_seal_copy]
+		_progress_label.custom_minimum_size.y = 24.0
+		_progress_label.add_theme_font_size_override("font_size", 15)
+		_progress_label.set_meta("responsive_layout", "compressed_single_row")
 	else:
 		_progress_label.text = "LIFETIME OMENS %03d  ///  %s" % [_lifetime_omens, next_seal_copy]
 		_progress_label.custom_minimum_size.y = 0.0
+		_progress_label.add_theme_font_size_override("font_size", 18)
 		_progress_label.set_meta("responsive_layout", "single_row")
+
+func _sync_column_density(compact: bool) -> void:
+	var columns: Array[VBoxContainer] = [_unlock_column, _bounty_column]
+	for column: VBoxContainer in columns:
+		if column == null:
+			continue
+		var filing_mark: Label = column.get_node_or_null("ColumnFilingMark") as Label
+		var section_title: Label = column.get_node_or_null("ColumnTitle") as Label
+		var section_detail: Label = column.get_node_or_null("ColumnDetail") as Label
+		if filing_mark != null:
+			filing_mark.visible = not compact
+			filing_mark.set_meta("compact_duplicate_evidence_suppressed", compact)
+		if section_title != null:
+			section_title.add_theme_font_size_override("font_size", 19 if compact else 23)
+		if section_detail != null:
+			section_detail.visible = not compact
+			section_detail.set_meta("compact_instruction_available_in_full_record", compact)
+
+func _sync_compact_section_visibility(compact: bool) -> void:
+	if _unlock_column == null or _bounty_column == null:
+		return
+	if not compact:
+		_unlock_column.visible = true
+		_bounty_column.visible = true
+		return
+	var active_section: String = String(_section_navigator.get_meta("active_section", "starter_debts")) if _section_navigator != null else "starter_debts"
+	if active_section != "bounties":
+		active_section = "starter_debts"
+	_unlock_column.visible = active_section == "starter_debts"
+	_bounty_column.visible = active_section == "bounties"
+	if _section_navigator != null:
+		_section_navigator.set_meta("active_section", active_section)
+		_section_navigator.set_meta("compact_entry_policy", "one_section_one_full_entry_above_persistent_footer")
+	if _page_scroll != null:
+		_page_scroll.scroll_vertical = 0
+
+func _sync_footer_status_copy(compact: bool) -> void:
+	if _status_label == null:
+		return
+	if _status_label.text.is_empty() or _status_label.text.begins_with("NO NEW ENTRY"):
+		_status_label.text = "NO NEW ENTRY  //  RECORD OPEN" if compact else "NO NEW ENTRY  ///  RECORD REMAINS OPEN"
+	_status_label.set_meta("persistent_status_uses_utility_face", true)
 
 func _build_ui() -> void:
 	var backdrop: ColorRect = ColorRect.new()
@@ -213,12 +269,13 @@ func _build_ui() -> void:
 	_record_id_label.add_theme_color_override("font_color", Color(0.59, 0.50, 0.39, 0.92))
 	VisualTypeSystem.set_utility_bold(_record_id_label)
 	title_box.add_child(_record_id_label)
-	var title: Label = Label.new()
-	title.text = "THE BLACK LEDGER"
-	title.add_theme_font_size_override("font_size", 34)
-	VisualTypeSystem.set_impact(title)
-	title.add_theme_color_override("font_color", COLOR_BONE)
-	title_box.add_child(title)
+	_title_label = Label.new()
+	_title_label.name = "LedgerTitle"
+	_title_label.text = "THE BLACK LEDGER"
+	_title_label.add_theme_font_size_override("font_size", 34)
+	VisualTypeSystem.set_impact(_title_label)
+	_title_label.add_theme_color_override("font_color", COLOR_BONE)
+	title_box.add_child(_title_label)
 	_progress_label = Label.new()
 	_progress_label.name = "ProgressMetadata"
 	_progress_label.custom_minimum_size.x = 0.0
@@ -232,7 +289,8 @@ func _build_ui() -> void:
 	_balance_label = Label.new()
 	_balance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_balance_label.add_theme_font_size_override("font_size", 28)
-	VisualTypeSystem.set_action(_balance_label)
+	VisualTypeSystem.set_utility_bold(_balance_label)
+	_balance_label.set_meta("status_copy_uses_utility_face", true)
 	_balance_label.add_theme_color_override("font_color", COLOR_GOLD)
 	header.add_child(_balance_label)
 	_witness_stamp_label = Label.new()
@@ -245,7 +303,8 @@ func _build_ui() -> void:
 	_witness_stamp_label.add_theme_font_size_override("font_size", 16)
 	_witness_stamp_label.add_theme_color_override("font_color", Color(0.81, 0.20, 0.18, 0.96))
 	_witness_stamp_label.add_theme_stylebox_override("normal", _stamp_style())
-	VisualTypeSystem.set_action(_witness_stamp_label)
+	VisualTypeSystem.set_utility_bold(_witness_stamp_label)
+	_witness_stamp_label.set_meta("status_copy_uses_utility_face", true)
 	header.add_child(_witness_stamp_label)
 	_close_button = Button.new()
 	_close_button.name = "CloseFileButton"
@@ -265,6 +324,7 @@ func _build_ui() -> void:
 	_columns.add_theme_constant_override("v_separation", 14)
 	root.add_child(_columns)
 	_unlock_column = _make_column("STARTER DEBTS", "Spend Omens on any revealed starter. Shop and enemy appearances are never sealed.")
+	_unlock_column.name = "StarterDebtsColumn"
 	_columns.add_child(_unlock_column)
 	_starter_scroll = ScrollContainer.new()
 	_starter_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -276,6 +336,7 @@ func _build_ui() -> void:
 	_starter_list.add_theme_constant_override("separation", 8)
 	_starter_scroll.add_child(_starter_list)
 	_bounty_column = _make_column("BOUNTIES", "Every revealed unfinished Bounty is active. Each pays once, immediately after the victory that proves it.")
+	_bounty_column.name = "BountiesColumn"
 	_bounty_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_columns.add_child(_bounty_column)
 	_bounty_scroll = ScrollContainer.new()
@@ -305,7 +366,7 @@ func _build_section_navigator() -> void:
 	_section_navigator.add_child(row)
 	_starter_nav_button = Button.new()
 	_starter_nav_button.name = "StarterDebtsNavigation"
-	_starter_nav_button.text = "↑  STARTER DEBTS"
+	_starter_nav_button.text = "STARTER DEBTS"
 	_starter_nav_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_starter_nav_button.focus_mode = Control.FOCUS_ALL
 	_starter_nav_button.set_meta("navigation_target", "starter_debts")
@@ -314,7 +375,7 @@ func _build_section_navigator() -> void:
 	row.add_child(_starter_nav_button)
 	_bounty_nav_button = Button.new()
 	_bounty_nav_button.name = "BountiesNavigation"
-	_bounty_nav_button.text = "BOUNTIES  ↓"
+	_bounty_nav_button.text = "BOUNTIES"
 	_bounty_nav_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_bounty_nav_button.focus_mode = Control.FOCUS_ALL
 	_bounty_nav_button.set_meta("navigation_target", "bounties")
@@ -332,8 +393,17 @@ func _scroll_to_ledger_section(target: Control, section_id: String) -> void:
 	if _page_scroll == null or target == null:
 		return
 	_section_navigator.set_meta("active_section", section_id)
+	if get_viewport_rect().size.x < 1440.0:
+		_sync_compact_section_visibility(true)
+		_page_scroll.scroll_vertical = 0
+		call_deferred("_reset_compact_page_origin")
+		return
 	_page_scroll.ensure_control_visible(target)
 	call_deferred("_ensure_ledger_section_visible", target)
+
+func _reset_compact_page_origin() -> void:
+	if _page_scroll != null:
+		_page_scroll.scroll_vertical = 0
 
 func _ensure_ledger_section_visible(target: Control) -> void:
 	if _page_scroll != null and target != null and is_instance_valid(target):
@@ -418,7 +488,8 @@ func _build_footer_band() -> void:
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_status_label.add_theme_font_size_override("font_size", 17)
-	VisualTypeSystem.set_action(_status_label)
+	VisualTypeSystem.set_utility_bold(_status_label)
+	_status_label.set_meta("persistent_status_uses_utility_face", true)
 	_status_label.add_theme_color_override("font_color", COLOR_GOLD)
 	footer_row.add_child(_status_label)
 
@@ -428,18 +499,21 @@ func _make_column(title_text: String, detail_text: String) -> VBoxContainer:
 	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_theme_constant_override("separation", 7)
 	var filing_mark: Label = Label.new()
+	filing_mark.name = "ColumnFilingMark"
 	filing_mark.text = "RESTRICTED ENTRY  ///  DAMAGE MARKS RETAINED"
 	filing_mark.add_theme_font_size_override("font_size", 16)
 	filing_mark.add_theme_color_override("font_color", Color(0.56, 0.47, 0.38, 0.82))
 	VisualTypeSystem.set_utility_bold(filing_mark)
 	column.add_child(filing_mark)
 	var title: Label = Label.new()
+	title.name = "ColumnTitle"
 	title.text = title_text
 	title.add_theme_font_size_override("font_size", 23)
 	VisualTypeSystem.set_action(title)
 	title.add_theme_color_override("font_color", COLOR_GOLD)
 	column.add_child(title)
 	var detail: Label = Label.new()
+	detail.name = "ColumnDetail"
 	detail.text = detail_text
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail.custom_minimum_size = Vector2(0.0, 42.0)
@@ -504,7 +578,8 @@ func _rebuild_starters(current: Dictionary) -> void:
 			status_chip.add_theme_font_size_override("font_size", 16)
 			status_chip.add_theme_color_override("font_color", Color(0.61, 0.66, 0.55, 0.94) if owned else Color(0.62, 0.42, 0.40, 0.90))
 			status_chip.add_theme_stylebox_override("normal", _passive_status_style(owned))
-			VisualTypeSystem.set_action(status_chip)
+			VisualTypeSystem.set_utility_bold(status_chip)
+			status_chip.set_meta("status_copy_uses_utility_face", true)
 			content.add_child(status_chip)
 		else:
 			var action: Button = Button.new()
@@ -546,7 +621,8 @@ func _rebuild_bounties(current: Dictionary) -> void:
 		title.text = "ENTRY %02d  ///  %s  ///  %s%d OMENS" % [record_index + 1, "COMPLETE" if done else "ACTIVE", "+" if not done else "PAID +", int(definition.get("reward", 0))]
 		title.add_theme_color_override("font_color", COLOR_GOLD if not done else COLOR_MUTED)
 		title.add_theme_font_size_override("font_size", 16)
-		VisualTypeSystem.set_action(title)
+		VisualTypeSystem.set_utility_bold(title)
+		title.set_meta("evidence_copy_uses_utility_face", true)
 		copy.add_child(title)
 		var name_label: Label = Label.new()
 		name_label.text = String(definition.get("title", bounty_id))
@@ -572,7 +648,8 @@ func _rebuild_bounties(current: Dictionary) -> void:
 		tease.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tease.add_theme_color_override("font_color", COLOR_BLOOD.lightened(0.28))
 		tease.add_theme_font_size_override("font_size", 16)
-		VisualTypeSystem.set_action(tease)
+		VisualTypeSystem.set_utility_bold(tease)
+		tease.set_meta("status_copy_uses_utility_face", true)
 		_bounty_list.add_child(tease)
 
 func _add_locked_milestone_record() -> void:
@@ -588,7 +665,8 @@ func _add_locked_milestone_record() -> void:
 	serial.text = "SEALED MILESTONE 006  ///  ENTRY NOT YET WITNESSED"
 	serial.add_theme_font_size_override("font_size", 16)
 	serial.add_theme_color_override("font_color", Color(0.82, 0.22, 0.20, 0.96))
-	VisualTypeSystem.set_action(serial)
+	VisualTypeSystem.set_utility_bold(serial)
+	serial.set_meta("evidence_copy_uses_utility_face", true)
 	copy.add_child(serial)
 	var heading: Label = Label.new()
 	heading.text = "NO STARTER DEBTS ENTERED"

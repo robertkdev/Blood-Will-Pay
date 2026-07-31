@@ -722,15 +722,15 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 		band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		band.z_index = -1
 		area.add_child(band)
-	band.anchor_left = 0.02
-	band.anchor_right = 0.98
-	band.anchor_top = 0.08 if enemy_side else 0.76
-	band.anchor_bottom = 0.24 if enemy_side else 0.92
+	band.anchor_left = 0.02 if enemy_side else 0.58
+	band.anchor_right = 0.42 if enemy_side else 0.98
+	band.anchor_top = 0.08 if enemy_side else 0.90
+	band.anchor_bottom = 0.10 if enemy_side else 0.92
 	band.offset_left = 0.0
 	band.offset_top = 0.0
 	band.offset_right = 0.0
 	band.offset_bottom = 0.0
-	band.color = Color(0.40, 0.018, 0.028, 0.20) if enemy_side else Color(0.31, 0.27, 0.20, 0.18)
+	band.color = Color(0.52, 0.025, 0.034, 0.18) if enemy_side else Color(0.42, 0.35, 0.24, 0.16)
 	var label_name: String = "HostileFieldOrderLabel" if enemy_side else "SurvivalFieldOrderLabel"
 	var label: Label = area.get_node_or_null(label_name) as Label
 	if label == null:
@@ -739,10 +739,10 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		label.z_index = 1
 		area.add_child(label)
-	label.anchor_left = 0.03
-	label.anchor_right = 0.97
-	label.anchor_top = 0.02 if enemy_side else 0.77
-	label.anchor_bottom = 0.23 if enemy_side else 0.98
+	label.anchor_left = 0.03 if enemy_side else 0.55
+	label.anchor_right = 0.46 if enemy_side else 0.97
+	label.anchor_top = 0.025 if enemy_side else 0.84
+	label.anchor_bottom = 0.14 if enemy_side else 0.97
 	label.offset_left = 0.0
 	label.offset_top = 0.0
 	label.offset_right = 0.0
@@ -754,16 +754,28 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	)
 	if tight_compact:
 		label.text = "HOSTILE LINE" if enemy_side else "HOLD LINE"
+	elif compact and not enemy_side:
+		label.text = "HOLD LINE // COMMIT"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if enemy_side else HORIZONTAL_ALIGNMENT_RIGHT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 10 if tight_compact else 13 if compact else 16)
 	label.add_theme_color_override("font_color", Color(0.96, 0.52, 0.44, 0.74) if enemy_side else Color(0.89, 0.78, 0.60, 0.70))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.94))
 	label.add_theme_constant_override("outline_size", 2)
+	var label_plate: StyleBoxFlat = StyleBoxFlat.new()
+	label_plate.bg_color = Color(0.012, 0.010, 0.013, 0.74)
+	label_plate.border_color = Color(0.64, 0.06, 0.08, 0.74) if enemy_side else Color(0.54, 0.45, 0.30, 0.68)
+	label_plate.border_width_left = 4 if enemy_side else 1
+	label_plate.border_width_right = 1 if enemy_side else 4
+	label_plate.content_margin_left = 8.0
+	label_plate.content_margin_right = 8.0
+	label.add_theme_stylebox_override("normal", label_plate)
 	label.visible = true
 	band.visible = true
+	band.set_meta("broad_landmark_wash_suppressed", true)
 	band.set_meta("planning_landmark", true)
 	label.set_meta("planning_landmark", true)
+	label.set_meta("deployment_badge_clearance", true)
 	area.set_meta("authored_landmark_density", 3 if large_planning_field else 2 if compact else 1)
 
 func _apply_compact_metric_badge(row: Control, compact: bool) -> void:

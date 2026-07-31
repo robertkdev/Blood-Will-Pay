@@ -627,10 +627,24 @@ func _expect_planning_landmark_contract(context: String, board_column: Control, 
 	var survival_label: Label = player_area.get_node_or_null("SurvivalFieldOrderLabel") as Label if player_area != null else null
 	var hostile_band: ColorRect = enemy_area.get_node_or_null("HostileFieldOrderBand") as ColorRect if enemy_area != null else null
 	var survival_band: ColorRect = player_area.get_node_or_null("SurvivalFieldOrderBand") as ColorRect if player_area != null else null
+	var planning_directive: Label = board_column.get_node_or_null("PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text.contains("HOSTILE LINE"), "%s hostile battlefield landmark is missing" % context)
 	_expect(survival_label != null and survival_label.is_visible_in_tree() and (survival_label.text.contains("SURVIVAL LINE") or survival_label.text.contains("HOLD LINE")), "%s survival battlefield landmark is missing" % context)
 	_expect(hostile_band != null and hostile_band.is_visible_in_tree() and bool(hostile_band.get_meta("planning_landmark", false)), "%s hostile battlefield lane is missing" % context)
 	_expect(survival_band != null and survival_band.is_visible_in_tree() and bool(survival_band.get_meta("planning_landmark", false)), "%s survival battlefield lane is missing" % context)
+	_expect(survival_label != null and bool(survival_label.get_meta("deployment_badge_clearance", false)), "%s survival landmark lacks deployment-badge clearance metadata" % context)
+	if survival_label != null and planning_directive != null and planning_directive.is_visible_in_tree():
+		var survival_font: Font = survival_label.get_theme_font("font")
+		var survival_font_size: int = survival_label.get_theme_font_size("font_size")
+		var survival_text_width: float = survival_font.get_string_size(survival_label.text, HORIZONTAL_ALIGNMENT_RIGHT, -1.0, survival_font_size).x if survival_font != null else survival_label.get_combined_minimum_size().x
+		var survival_ink_left: float = survival_label.get_global_rect().end.x - survival_text_width - 8.0
+		_expect(survival_ink_left >= planning_directive.get_global_rect().end.x - 12.0, "%s survival landmark is occluded by the deployment badge" % context)
+	_expect(hostile_band != null and bool(hostile_band.get_meta("broad_landmark_wash_suppressed", false)), "%s hostile landmark regressed to a broad battlefield wash" % context)
+	_expect(survival_band != null and bool(survival_band.get_meta("broad_landmark_wash_suppressed", false)), "%s survival landmark regressed to a broad battlefield wash" % context)
+	if hostile_band != null and enemy_area != null:
+		_expect(hostile_band.size.x <= enemy_area.size.x * 0.45, "%s hostile landmark should remain a narrow edge rail" % context)
+	if survival_band != null and player_area != null:
+		_expect(survival_band.size.x <= player_area.size.x * 0.45, "%s survival landmark should remain a narrow edge rail" % context)
 	var minimum_grid_width: float = board_column.size.x * 0.42
 	_expect(enemy_board.size.x >= minimum_grid_width, "%s enemy deployment footprint still reads as a small island: grid=%.1f board=%.1f" % [context, enemy_board.size.x, board_column.size.x])
 	_expect(player_board.size.x >= minimum_grid_width, "%s player deployment footprint still reads as a small island: grid=%.1f board=%.1f" % [context, player_board.size.x, board_column.size.x])

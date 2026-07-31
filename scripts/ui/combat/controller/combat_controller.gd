@@ -2448,7 +2448,7 @@ func _on_tie(_stage: int) -> void:
 		attack_button.disabled = true
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "tie"
-	_show_result_banner("STALEMATE", _build_result_economy_detail("tie"), Color(0.48, 0.38, 0.66, 1.0), Color(0.90, 0.84, 1.0, 1.0))
+	_show_result_banner("STALEMATE", _build_result_economy_detail("tie"), Color(0.50, 0.12, 0.10, 1.0), Color(0.92, 0.86, 0.74, 1.0))
 	_start_intermission(RESULT_MINIMUM_DWELL_SECONDS)
 	_auto_loop_running = false
 
@@ -3354,8 +3354,10 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("battlefield_reduced_motion", reduced_motion)
 	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
 	arena.set_meta("battlefield_casualty_event_index", casualty_event_index)
-	arena.set_meta("battlefield_environment_signature", "physical_warfield/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
-	arena.set_meta("battlefield_overlay_density", 0.18 if reduced_motion else 0.34 if effective_phase == 0 else 0.52 if effective_phase == 1 else 0.68)
+	arena.set_meta("battlefield_environment_signature", "authored_raster_warfield/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
+	arena.set_meta("battlefield_overlay_density", 0.0)
+	arena.set_meta("battlefield_material_source", "phase_specific_authored_raster")
+	arena.set_meta("procedural_environment_geometry_suppressed", true)
 	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
@@ -3365,8 +3367,8 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var reduced_lock: Control = arena.get_node_or_null("ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	var pressure_painter: Control = arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
 	if aftermath != null:
-		aftermath.visible = true
-		aftermath.modulate = Color(0.92, 0.88, 0.80, 0.70) if reduced_motion else Color(0.98, 0.90, 0.80, 0.84) if effective_phase == 0 else Color(1.0, 0.84, 0.74, 0.94) if effective_phase == 1 else Color(0.92, 0.64, 0.60, 1.0)
+		aftermath.visible = false
+		aftermath.modulate = Color.WHITE
 	if onset != null:
 		onset.visible = true
 		onset.modulate = Color(1.0, 1.0, 1.0, 0.76 if reduced_motion else 1.0)
@@ -3379,22 +3381,50 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	if reduced_lock != null:
 		reduced_lock.visible = reduced_motion
 		reduced_lock.modulate = Color(0.82, 0.78, 0.68, 0.34)
+	for retired_group: Control in [onset, midfight, collapse, reduced_lock]:
+		if retired_group != null:
+			retired_group.visible = false
+			retired_group.set_meta("retired_for_authored_raster_field", true)
 	if pressure_painter != null and pressure_painter.has_method("configure"):
 		pressure_painter.call("configure", effective_phase, reduced_motion, casualty_pressure, casualty_event_index)
+	var arena_surface: TextureRect = arena.get_node_or_null("GothicArenaSurface") as TextureRect
+	if arena_surface != null:
+		arena_surface.texture = (
+			GothicUIAssets.battlefield_reduced_motion_texture()
+			if reduced_motion
+			else GothicUIAssets.battlefield_onset_texture()
+			if effective_phase == 0
+			else GothicUIAssets.battlefield_midfight_texture()
+		)
+		arena_surface.modulate = Color(1.0, 1.0, 1.0, 0.96)
+		arena_surface.set_meta("active_material_phase", "reduced_motion" if reduced_motion else phase_name)
 	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
 	if woodland != null:
-		woodland.modulate = Color(1.04, 0.96, 0.86, 1.0) if effective_phase == 0 else Color(0.88, 0.72, 0.66, 1.0) if effective_phase == 1 else Color(0.64, 0.46, 0.48, 1.0)
+		woodland.visible = false
 	var silhouettes: Control = arena.get_node_or_null("ArenaWoodlandSilhouettes") as Control
 	if silhouettes != null:
-		silhouettes.modulate.a = 0.86 if effective_phase == 0 else 0.94 if effective_phase == 1 else 1.0
+		silhouettes.visible = false
 	var hostile_smoke: TextureRect = arena.get_node_or_null("ArenaHostileSmoke") as TextureRect
 	if hostile_smoke != null:
-		hostile_smoke.modulate.a = 0.20 if reduced_motion else 0.58 if effective_phase == 0 else 0.82 if effective_phase == 1 else 0.94
-		hostile_smoke.scale = Vector2.ONE
+		hostile_smoke.visible = false
 	var fog: TextureRect = arena.get_node_or_null("ArenaGroundFog") as TextureRect
 	if fog != null:
-		fog.modulate.a = 0.26 if reduced_motion else 0.62 if effective_phase == 0 else 0.82 if effective_phase == 1 else 0.94
-		fog.scale = Vector2.ONE
+		fog.visible = false
+	for suppressed_overlay_name: String in [
+		"ArenaAshThreatVeil",
+		"ArenaEnemyPressureLight",
+		"ArenaPlayerPressureLight",
+		"ArenaThreatIncursions",
+		"ArenaWetGroundReflection",
+		"ArenaAshMarks",
+		"ArenaRuptureBranches",
+		"ArenaRuptureSegments",
+		"TerritoryRupture",
+		"TerritoryRuptureGlow",
+	]:
+		var suppressed_overlay: CanvasItem = arena.get_node_or_null(suppressed_overlay_name) as CanvasItem
+		if suppressed_overlay != null:
+			suppressed_overlay.visible = false
 
 func _protect_persistent_hud_chrome() -> void:
 	if parent == null or not parent.visible:
@@ -4014,7 +4044,7 @@ func _ensure_result_banner() -> PanelContainer:
 	aftermath_stamp.add_theme_font_size_override("font_size", 34)
 	aftermath_stamp.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.96))
 	aftermath_stamp.add_theme_constant_override("outline_size", 4)
-	VisualTypeSystem.set_impact(aftermath_stamp)
+	VisualTypeSystem.set_utility_bold(aftermath_stamp)
 	aftermath.add_child(aftermath_stamp)
 	var center: CenterContainer = CenterContainer.new()
 	center.name = "Center"
@@ -4228,23 +4258,32 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	if aftermath != null:
 		aftermath.visible = true
 		aftermath.set_meta("outcome_variant", title.to_lower())
-		aftermath.set_meta("physical_geometry_signature", "opened_survivor_lane" if title == "VICTORY" else "crosswise_deadlock" if title == "STALEMATE" else "collapsed_canopy_grave")
-		aftermath.set_meta("physical_geometry_child_count", 6 if title != "DEFEAT" else 7)
-		aftermath.set_meta("grayscale_reading", "open_center" if title == "VICTORY" else "cross_locked" if title == "STALEMATE" else "closed_canopy_grave")
+		aftermath.set_meta("physical_geometry_signature", "authored_raster_survivor_field" if title == "VICTORY" else "authored_raster_deadlock_field" if title == "STALEMATE" else "authored_raster_collapsed_field")
+		aftermath.set_meta("physical_geometry_child_count", 0)
+		aftermath.set_meta("grayscale_reading", "open_center" if title == "VICTORY" else "contained_center" if title == "STALEMATE" else "enclosed_perimeter")
 		aftermath.set_meta("flat_rectangle_count", 0)
+		aftermath.set_meta("procedural_outcome_geometry_suppressed", true)
 	if victory_geometry != null:
-		victory_geometry.visible = title == "VICTORY"
+		victory_geometry.visible = false
 	if stalemate_geometry != null:
-		stalemate_geometry.visible = title == "STALEMATE"
+		stalemate_geometry.visible = false
 	if defeat_geometry != null:
-		defeat_geometry.visible = title == "DEFEAT"
+		defeat_geometry.visible = false
 	if field_art != null:
-		field_art.modulate = Color(1.02, 0.92, 0.86, 0.82) if title == "VICTORY" else Color(0.78, 0.75, 0.78, 0.80) if title == "STALEMATE" else Color(0.90, 0.68, 0.64, 0.84)
+		field_art.texture = (
+			GothicUIAssets.battlefield_onset_texture()
+			if title == "VICTORY"
+			else GothicUIAssets.battlefield_midfight_texture()
+			if title == "STALEMATE"
+			else GothicUIAssets.battlefield_reduced_motion_texture()
+		)
+		field_art.modulate = Color(1.0, 1.0, 1.0, 0.92)
 		field_art.pivot_offset = field_art.size * 0.5
-		field_art.scale = Vector2(1.0, 0.98) if title == "VICTORY" else Vector2(0.98, 1.0) if title == "STALEMATE" else Vector2(1.05, 1.06)
+		field_art.scale = Vector2.ONE
+		field_art.set_meta("result_material_source", "phase_specific_authored_raster")
 	if blood_wash != null:
-		var opening_wash_alpha: float = 0.10 if title == "VICTORY" else 0.11 if title == "STALEMATE" else 0.16
-		var closing_wash_alpha: float = 0.12 if title == "VICTORY" else 0.13 if title == "STALEMATE" else 0.20
+		var opening_wash_alpha: float = 0.015 if title == "VICTORY" else 0.020 if title == "STALEMATE" else 0.035
+		var closing_wash_alpha: float = 0.020 if title == "VICTORY" else 0.025 if title == "STALEMATE" else 0.045
 		var gradient: Gradient = Gradient.new()
 		gradient.offsets = PackedFloat32Array([0.0, 0.30, 0.66, 1.0])
 		gradient.colors = PackedColorArray([

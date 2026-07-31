@@ -6,6 +6,7 @@ const TEST_SETTINGS_PATH: String = "user://arena_pressure_visual_smoke.cfg"
 const CombatVfxBridgeScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_bridge.gd")
 const CombatControllerScript: GDScript = preload("res://scripts/ui/combat/controller/combat_controller.gd")
 const GothicUIThemeScript: GDScript = preload("res://scripts/ui/combat/gothic_ui_theme.gd")
+const GothicUIAssetsScript: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 var _failures: Array[String] = []
@@ -63,16 +64,16 @@ func _run() -> void:
 		_expect(event_banner.scale.is_equal_approx(Vector2.ONE), "Reduced Motion event banner should not scale in")
 		_expect(is_equal_approx(event_banner.modulate.a, 1.0), "Reduced Motion event banner should not fade in")
 	_save_capture("04_pressure_reduced_motion.png")
-	var pressure_painter: Control = _arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
-	_expect(pressure_painter != null, "arena pressure layer should install a bounded kinetic painter")
-	if pressure_painter != null:
-		pressure_painter.call("configure", 1, true, 0.5, 2)
-		_expect(bool(pressure_painter.get_meta("bounded_edge_pressure", false)), "kinetic painter must identify its bounded edge-pressure contract")
-		_expect(int(pressure_painter.get_meta("casualty_event_index", 0)) == 2, "kinetic painter did not receive the event-driven casualty residue index")
-		_expect(int(pressure_painter.get_meta("kinetic_mark_budget", 99)) <= 4, "reduced motion did not replace kinetic pressure with a lower-density static urgent state")
-		_expect(pressure_painter.has_meta("protected_center_rect"), "kinetic painter does not publish a protected actor-clarity center")
-		_expect(String(pressure_painter.get_meta("reduced_motion_scene_parity", "")) == "same_physical_field_static", "reduced motion does not preserve the same physical battlefield")
-		_expect(not bool(pressure_painter.get_meta("full_field_warning_chevrons", true)), "reduced motion regressed to giant edge-to-edge warning chevrons")
+	var retired_aftermath: Control = _arena.get_node_or_null("ArenaWarAftermath") as Control
+	var battlefield: TextureRect = _arena.get_node_or_null("GothicArenaSurface") as TextureRect
+	var onset_texture: Texture2D = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
+	var midfight_texture: Texture2D = GothicUIAssetsScript.call("battlefield_midfight_texture") as Texture2D
+	var reduced_texture: Texture2D = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
+	_expect(retired_aftermath != null and not retired_aftermath.visible, "arena exposed the retired procedural aftermath painter")
+	_expect(bool(_arena.get_meta("procedural_environment_geometry_suppressed", false)), "arena does not publish procedural-overlay suppression")
+	_expect(onset_texture != null and midfight_texture != null and reduced_texture != null, "arena phase-specific authored textures failed to load")
+	_expect(onset_texture != midfight_texture and midfight_texture != reduced_texture, "arena phase textures are not independently authored resources")
+	_expect(battlefield != null and battlefield.texture == reduced_texture, "Reduced Motion surface did not switch to the authored static-threat material")
 	var seams: GridContainer = _arena.get_node_or_null("ArenaCellSeams") as GridContainer
 	var hostile_label: Label = _arena.get_node_or_null("EnemyFieldLabel") as Label
 	var survival_label: Label = _arena.get_node_or_null("PlayerFieldLabel") as Label
@@ -114,14 +115,16 @@ func _build_surface() -> void:
 	GothicUIThemeScript.call("_ensure_arena_cell_seams", _arena)
 	GothicUIThemeScript.call("_ensure_arena_field_label", _arena, "EnemyFieldLabel", "HOSTILE GROUND", true)
 	GothicUIThemeScript.call("_ensure_arena_field_label", _arena, "PlayerFieldLabel", "HOLD THE LINE", false)
+	GothicUIThemeScript.call("_suppress_procedural_arena_overlays", _arena)
 	var battlefield: TextureRect = TextureRect.new()
-	battlefield.name = "BattlefieldSurface"
-	battlefield.texture = load("res://assets/ui/gothic/battlefield_surface.png") as Texture2D
+	battlefield.name = "GothicArenaSurface"
+	battlefield.texture = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
 	battlefield.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	battlefield.stretch_mode = TextureRect.STRETCH_SCALE
 	battlefield.set_anchors_preset(Control.PRESET_FULL_RECT)
 	battlefield.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	battlefield.z_index = -7
+	battlefield.set_meta("active_material_phase", "reduced_motion")
 	_arena.add_child(battlefield)
 	var arena_frame: TextureRect = TextureRect.new()
 	arena_frame.name = "ArenaFrame"

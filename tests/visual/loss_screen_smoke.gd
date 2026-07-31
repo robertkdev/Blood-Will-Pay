@@ -73,13 +73,21 @@ func _ready() -> void:
 	var woodland_rupture: Control = screen.get_node_or_null("LossPressureLayer/WoodlandRupture") as Control
 	var aftermath_caption: Label = screen.get_node_or_null("LossPressureLayer/AftermathCaption") as Label
 	_expect(loss_art != null and loss_art.texture != null, "Loss screen should preserve the authored forest-horror backdrop", failures)
-	_expect(loss_art != null and loss_art.visible and loss_art.modulate.r >= 1.4 and loss_art.modulate.g >= 1.1 and bool(loss_art.get_meta("restrained_loss_grade", false)), "Loss backdrop should stay visible without an overpowering red multiplier", failures)
+	_expect(loss_art != null and loss_art.visible and loss_art.modulate.r < loss_art.modulate.b and bool(loss_art.get_meta("restrained_loss_grade", false)) and bool(loss_art.get_meta("broad_red_grade_suppressed", false)), "Loss backdrop should stay visible under a restrained cool-neutral grade", failures)
 	_expect(loss_art != null and loss_art.z_index >= 0, "Loss backdrop should remain visible above the opaque canvas backdrop", failures)
 	_expect(pressure_layer != null and pressure_layer.get_child_count() >= 6, "Loss screen should carry a blood tide, branch rupture, aftermath text, and wound-pressure layers", failures)
 	_expect(pressure_layer != null and loss_art != null and pressure_layer.z_index > loss_art.z_index, "Loss pressure marks should remain visible over the forest backdrop", failures)
 	_expect(blood_tide != null and blood_tide.texture is GradientTexture2D, "Loss screen should culminate in a material blood-tide aftermath", failures)
 	_expect(woodland_rupture != null and woodland_rupture.get_child_count() >= 6, "Loss screen should expose multiple physical woodland rupture marks", failures)
-	_expect(aftermath_caption != null and aftermath_caption.text == "THE WOODS\nTOOK THE COMPANY" and aftermath_caption.get_theme_font_size("font_size") >= 30, "Loss screen should state the woodland consequence without overpowering the casualty record", failures)
+	_expect(blood_tide != null and not blood_tide.visible and bool(blood_tide.get_meta("broad_wash_suppressed", false)), "Loss screen should suppress the full-field blood wash", failures)
+	_expect(woodland_rupture != null and not woodland_rupture.visible and bool(woodland_rupture.get_meta("broad_diagonal_field_suppressed", false)), "Loss screen should suppress the full-field diagonal rupture overlay", failures)
+	_expect(aftermath_caption != null and aftermath_caption.text == "THE WOODS\nTOOK THE COMPANY" and aftermath_caption.get_theme_font_size("font_size") >= 26, "Loss screen should state the woodland consequence without overpowering the casualty record", failures)
+	if aftermath_caption != null and frame_panel != null:
+		var aftermath_style: StyleBoxFlat = aftermath_caption.get_theme_stylebox("normal") as StyleBoxFlat
+		_expect(bool(aftermath_caption.get_meta("desktop_readability_plate", false)), "Loss woodland consequence lacks its deliberate desktop readability plate", failures)
+		_expect(aftermath_style != null and aftermath_style.bg_color.a >= 0.80 and aftermath_style.border_width_left >= 6, "Loss woodland consequence should sit on a sharp high-contrast secondary plate", failures)
+		_expect(_luminance(aftermath_caption.get_theme_color("font_color")) >= 0.78, "Loss woodland consequence copy is not readable over the forest", failures)
+		_expect(not aftermath_caption.get_global_rect().intersects(frame_panel.get_global_rect()), "Loss woodland consequence plate competes spatially with the casualty record", failures)
 	_expect(casualty_ghost != null and casualty_ghost.text == "DEBT COLLECTED", "Loss screen should expose the full environmental consequence stamp", failures)
 	if casualty_ghost != null and frame_panel != null:
 		_expect(_rect_inside(casualty_ghost.get_global_rect(), frame_panel.get_global_rect().grow(2.0)), "DEBT COLLECTED stamp should be intentionally contained by the casualty record", failures)
@@ -94,6 +102,7 @@ func _ready() -> void:
 			_expect_hard_flat_style(new_game_button, style_name, "NewGameButton %s should use hard flat restart furniture" % style_name, failures)
 	if stage_label != null:
 		_expect(stage_label.text == "TOTAL EARNED 8g  //  CHAPTER 1  //  STAGE 3", "StageLabel did not use live run score and GameState", failures)
+		_expect(bool(stage_label.get_meta("status_copy_uses_utility_face", false)), "Loss stage status regressed to condensed display type", failures)
 	if stage_label != null:
 		_expect(_luminance(stage_label.get_theme_color("font_color")) >= 0.42, "Loss stage summary should use high-luminance ink over grunge", failures)
 		_expect(_luminance(stage_label.get_theme_color("font_outline_color")) <= 0.08, "Loss stage summary should use a dark keyline", failures)

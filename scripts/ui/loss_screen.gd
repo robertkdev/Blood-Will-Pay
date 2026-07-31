@@ -315,7 +315,8 @@ func _apply_styles() -> void:
 		title_label.add_theme_constant_override("shadow_offset_y", 3)
 	if stage_label != null:
 		stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		VisualTypeSystem.set_action(stage_label)
+		VisualTypeSystem.set_utility_bold(stage_label)
+		stage_label.set_meta("status_copy_uses_utility_face", true)
 		_apply_summary_ink(stage_label, SUMMARY_BLOOD_INK)
 	if high_label != null:
 		high_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -545,6 +546,24 @@ func _make_environment_stamp_style() -> StyleBoxFlat:
 	style.set_corner_radius_all(0)
 	return style
 
+func _make_aftermath_caption_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.012, 0.004, 0.007, 0.88)
+	style.border_color = Color(0.68, 0.045, 0.055, 0.94)
+	style.border_width_left = 7
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 3
+	style.content_margin_left = 12.0
+	style.content_margin_right = 10.0
+	style.content_margin_top = 6.0
+	style.content_margin_bottom = 6.0
+	style.set_corner_radius_all(0)
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.78)
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(4.0, 4.0)
+	return style
+
 func _make_restart_style(state: String) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	var normalized_state: String = state.strip_edges().to_lower()
@@ -595,8 +614,9 @@ func _ensure_loss_art() -> void:
 	_loss_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_loss_art.visible = true
 	_loss_art.z_index = 1
-	_loss_art.modulate = Color(1.55, 1.22, 1.12, 1.0)
+	_loss_art.modulate = Color(0.78, 0.88, 0.96, 1.0)
 	_loss_art.set_meta("restrained_loss_grade", true)
+	_loss_art.set_meta("broad_red_grade_suppressed", true)
 	if backdrop != null:
 		backdrop.z_index = 0
 	if panel != null:
@@ -633,6 +653,8 @@ func _ensure_pressure_layer() -> void:
 		tide_texture.fill_from = Vector2(0.5, 0.0)
 		tide_texture.fill_to = Vector2(0.5, 1.0)
 		blood_tide.texture = tide_texture
+		blood_tide.visible = false
+		blood_tide.set_meta("broad_wash_suppressed", true)
 		_pressure_layer.add_child(blood_tide)
 		var blood_fall: ColorRect = ColorRect.new()
 		blood_fall.name = "BloodFall"
@@ -642,6 +664,8 @@ func _ensure_pressure_layer() -> void:
 		blood_fall.anchor_top = 0.0
 		blood_fall.anchor_right = 0.16
 		blood_fall.anchor_bottom = 1.0
+		blood_fall.visible = false
+		blood_fall.set_meta("broad_wash_suppressed", true)
 		_pressure_layer.add_child(blood_fall)
 		var wound_band: ColorRect = ColorRect.new()
 		wound_band.name = "WoundBand"
@@ -652,11 +676,15 @@ func _ensure_pressure_layer() -> void:
 		wound_band.anchor_right = 1.0
 		wound_band.anchor_bottom = 0.18
 		wound_band.rotation_degrees = -2.0
+		wound_band.visible = false
+		wound_band.set_meta("broad_wash_suppressed", true)
 		_pressure_layer.add_child(wound_band)
 		var rupture_field: Control = Control.new()
 		rupture_field.name = "WoodlandRupture"
 		rupture_field.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		rupture_field.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rupture_field.visible = false
+		rupture_field.set_meta("broad_diagonal_field_suppressed", true)
 		_pressure_layer.add_child(rupture_field)
 		_add_woodland_rupture(rupture_field, "LeftSplinterA", Vector2(-38.0, 210.0), Vector2(390.0, 20.0), 17.0, Color(0.48, 0.018, 0.026, 0.34))
 		_add_woodland_rupture(rupture_field, "LeftSplinterB", Vector2(-80.0, 720.0), Vector2(420.0, 16.0), -13.0, Color(0.30, 0.012, 0.020, 0.40))
@@ -675,11 +703,14 @@ func _ensure_pressure_layer() -> void:
 		aftermath_caption.rotation_degrees = -3.0
 		aftermath_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		aftermath_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		aftermath_caption.add_theme_font_size_override("font_size", 32)
-		aftermath_caption.add_theme_color_override("font_color", Color(0.74, 0.055, 0.060, 0.52))
+		aftermath_caption.add_theme_font_size_override("font_size", 27)
+		aftermath_caption.add_theme_color_override("font_color", Color(0.96, 0.82, 0.70, 0.98))
 		aftermath_caption.add_theme_color_override("font_outline_color", Color(0.01, 0.004, 0.006, 0.96))
-		aftermath_caption.add_theme_constant_override("outline_size", 4)
+		aftermath_caption.add_theme_constant_override("outline_size", 2)
+		aftermath_caption.add_theme_stylebox_override("normal", _make_aftermath_caption_style())
 		VisualTypeSystem.set_impact(aftermath_caption)
+		aftermath_caption.set_meta("hierarchy_role", "secondary_environmental_heading")
+		aftermath_caption.set_meta("desktop_readability_plate", true)
 		_pressure_layer.add_child(aftermath_caption)
 		_casualty_ghost_label = Label.new()
 		_casualty_ghost_label.name = "CasualtyGhost"
@@ -766,27 +797,34 @@ func _sync_layout() -> void:
 		_casualty_ghost_label.position = Vector2(frame_origin.x + frame_width - 346.0, frame_origin.y + 45.0)
 		_casualty_ghost_label.size = Vector2(302.0, 62.0)
 	var aftermath_caption: Label = _pressure_layer.get_node_or_null("AftermathCaption") as Label if _pressure_layer != null else null
+	var blood_tide: TextureRect = _pressure_layer.get_node_or_null("BloodTide") as TextureRect if _pressure_layer != null else null
 	var woodland_rupture: Control = _pressure_layer.get_node_or_null("WoodlandRupture") as Control if _pressure_layer != null else null
 	var blood_fall: ColorRect = _pressure_layer.get_node_or_null("BloodFall") as ColorRect if _pressure_layer != null else null
 	var wound_band: ColorRect = _pressure_layer.get_node_or_null("WoundBand") as ColorRect if _pressure_layer != null else null
+	if blood_tide != null:
+		blood_tide.visible = false
+		blood_tide.set_meta("broad_wash_suppressed", true)
 	if woodland_rupture != null:
-		woodland_rupture.visible = not tight_compact
+		woodland_rupture.visible = false
+		woodland_rupture.set_meta("broad_diagonal_field_suppressed", true)
 		woodland_rupture.set_meta("compact_decorative_suppressed", tight_compact)
 	if blood_fall != null:
-		blood_fall.visible = not tight_compact
+		blood_fall.visible = false
+		blood_fall.set_meta("broad_wash_suppressed", true)
 		blood_fall.set_meta("compact_decorative_suppressed", tight_compact)
 	if wound_band != null:
-		wound_band.visible = not tight_compact
+		wound_band.visible = false
+		wound_band.set_meta("broad_wash_suppressed", true)
 		wound_band.set_meta("compact_decorative_suppressed", tight_compact)
 	if aftermath_caption != null:
 		var compact: bool = viewport_size.x < 1500.0 or viewport_size.y < 900.0
 		aftermath_caption.visible = not tight_compact
 		aftermath_caption.set_meta("compact_decorative_suppressed", tight_compact)
 		aftermath_caption.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		aftermath_caption.position = Vector2(20.0, 14.0) if compact else Vector2(30.0, 20.0)
-		aftermath_caption.size = Vector2(300.0, 92.0) if compact else Vector2(390.0, 118.0)
+		aftermath_caption.position = Vector2(20.0, 14.0) if compact else Vector2(30.0, 24.0)
+		aftermath_caption.size = Vector2(300.0, 82.0) if compact else Vector2(330.0, 86.0)
 		aftermath_caption.rotation_degrees = -1.5
-		aftermath_caption.add_theme_font_size_override("font_size", 24 if compact else 32)
+		aftermath_caption.add_theme_font_size_override("font_size", 23 if compact else 27)
 	if _pressure_layer != null:
 		_pressure_layer.set_meta("compact_fragment_suppression", tight_compact)
 		_pressure_layer.set_meta("loss_pressure_density", 0.16 if tight_compact else 0.34)

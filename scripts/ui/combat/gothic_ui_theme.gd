@@ -544,16 +544,17 @@ static func _apply_named_nodes(root: Control) -> void:
 	_configure_combat_layout(root)
 	_ensure_combat_vfx_installer(root)
 	_clear_battlefield_rect(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground")
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicPlanningTopSurface", GothicUIAssets.battlefield_top_texture(), -8, Color(0.86, 0.90, 0.84, 0.96))
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(1.0, 0.78, 0.68, 0.96))
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicPlanningTopSurface", GothicUIAssets.battlefield_top_texture(), -8, Color(0.98, 0.97, 0.94, 0.98))
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(0.98, 0.97, 0.94, 0.98))
 	_ensure_planning_pressure(root)
 	_ensure_planning_phase_geometry(root)
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaSurface", GothicUIAssets.battlefield_texture(), -7, Color(0.93, 0.86, 0.78, 0.78))
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaSurface", GothicUIAssets.battlefield_onset_texture(), -7, Color(1.0, 1.0, 1.0, 0.96))
 	var arena_surface: TextureRect = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
 	if arena_surface != null:
 		arena_surface.set_meta("battlefield_foundation", "muddy_rural_killing_ground_v1")
-		arena_surface.set_meta("physical_depth_language", "wet_mud_ditch_standing_water_broken_barricade_wagon_debris")
-		arena_surface.set_meta("horror_lighting", "hostile_red_upper_survival_pale_lower")
+		arena_surface.set_meta("physical_depth_language", "authored_raster_wet_mud_standing_water_embedded_splintered_wreckage")
+		arena_surface.set_meta("horror_lighting", "localized_practical_ember_cold_wet_field")
+		arena_surface.set_meta("active_material_phase", "onset")
 	_ensure_arena_zone_guides(root)
 	_ensure_tactical_shell_marks(root)
 	_style_label(root, "MarginContainer/VBoxContainer/StageLabel", 42, COLOR_TEXT, true)
@@ -601,8 +602,8 @@ static func _apply_named_nodes(root: Control) -> void:
 		wager_controls.set_meta("visual_role", "planning_utility_group")
 		_ensure_backplate_on_control(wager_controls, "PlanningUtilitiesPlate", _hard_panel_style(Color(0.032, 0.027, 0.032, 0.98), Color(0.54, 0.45, 0.32, 0.82), false), -5)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea", "GothicBattlePlate", _style(Color(0.016, 0.013, 0.018, 0.38), Color(0.23, 0.19, 0.18, 0.42), 1, 6), -20)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.095, 0.025, 0.030, 0.54), Color(0.72, 0.07, 0.09, 0.88), 2, 1), -5)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.040, 0.052, 0.052, 0.58), Color(0.72, 0.68, 0.58, 0.82), 2, 1), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.055, 0.018, 0.022, 0.08), Color(0.72, 0.07, 0.09, 0.88), 2, 1), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.032, 0.038, 0.036, 0.07), Color(0.72, 0.68, 0.58, 0.82), 2, 1), -5)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.42, 0.40, 0.38, 0.72), false), 0, 8.0)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.56, 0.52, 0.46, 0.62), false), 0, 8.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.42, 0.40, 0.38, 0.68), false), -2)
@@ -1041,6 +1042,8 @@ static func _ensure_planning_pressure(root: Control) -> void:
 		pressure.texture = gradient_texture
 		pressure.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		pressure.stretch_mode = TextureRect.STRETCH_SCALE
+		pressure.visible = false
+		pressure.set_meta("broad_faction_wash_suppressed", true)
 		var scars_name: String = "HostileFieldScars" if enemy_side else "SurvivalFieldScars"
 		var scars: Control = area.get_node_or_null(scars_name) as Control
 		if scars == null:
@@ -1054,6 +1057,8 @@ static func _ensure_planning_pressure(root: Control) -> void:
 			scars.offset_top = 0.0
 			scars.offset_right = 0.0
 			scars.offset_bottom = 0.0
+		scars.visible = false
+		scars.set_meta("procedural_field_scars_suppressed", true)
 		var scar_specs: Array[Dictionary] = [
 			{"x": 0.08, "y": 0.24, "w": 0.24, "r": -0.08, "a": 0.20},
 			{"x": 0.42, "y": 0.72, "w": 0.31, "r": 0.06, "a": 0.13},
@@ -1120,7 +1125,7 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 		lane.offset_right = 1.0
 		lane.offset_top = 0.0
 		lane.offset_bottom = 0.0
-		lane.color = Color(0.84, 0.79, 0.68, 0.16)
+		lane.color = Color(0.84, 0.79, 0.68, 0.10)
 	var commit_rule: ColorRect = geometry.get_node_or_null("PlanningCommitBoundary") as ColorRect
 	if commit_rule == null:
 		commit_rule = ColorRect.new()
@@ -1135,7 +1140,7 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	commit_rule.offset_right = 0.0
 	commit_rule.offset_top = -1.0
 	commit_rule.offset_bottom = 1.0
-	commit_rule.color = Color(0.92, 0.18, 0.12, 0.34)
+	commit_rule.color = Color(0.92, 0.18, 0.12, 0.22)
 	var directive: Label = geometry.get_node_or_null("PlanningDirective") as Label
 	if directive == null:
 		directive = Label.new()
@@ -1166,7 +1171,8 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	directive_style.content_margin_left = 8.0
 	directive_style.content_margin_right = 8.0
 	directive.add_theme_stylebox_override("normal", directive_style)
-	VisualTypeSystem.set_action(directive)
+	directive.set_meta("persistent_copy_uses_utility_face", true)
+	VisualTypeSystem.set_utility_bold(directive)
 
 static func _ensure_planning_breach_marks(area: Control, enemy_side: bool) -> void:
 	var cluster_name: String = "HostileBreachMarks" if enemy_side else "SurvivalBreachMarks"
@@ -1182,6 +1188,8 @@ static func _ensure_planning_breach_marks(area: Control, enemy_side: bool) -> vo
 		marks.offset_top = 0.0
 		marks.offset_right = 0.0
 		marks.offset_bottom = 0.0
+	marks.visible = false
+	marks.set_meta("procedural_breach_marks_suppressed", true)
 	var breach_specs: Array[Dictionary] = [
 		{"x": 0.015, "y": 0.10, "w": 0.19, "h": 4.0, "rot": -0.19, "a": 0.56},
 		{"x": 0.74, "y": 0.055, "w": 0.24, "h": 3.0, "rot": 0.12, "a": 0.42},
@@ -1293,6 +1301,34 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	_ensure_arena_threat_boundary(arena)
 	_ensure_arena_field_label(arena, "EnemyFieldLabel", "HOSTILE GROUND", true)
 	_ensure_arena_field_label(arena, "PlayerFieldLabel", "HOLD THE LINE", false)
+	_suppress_procedural_arena_overlays(arena)
+
+static func _suppress_procedural_arena_overlays(arena: Control) -> void:
+	if arena == null:
+		return
+	var suppressed_names: PackedStringArray = PackedStringArray([
+		"ArenaWoodlandHorizon",
+		"ArenaWoodlandSilhouettes",
+		"ArenaWarAftermath",
+		"ArenaGroundFog",
+		"ArenaHostileSmoke",
+		"ArenaWetGroundReflection",
+		"ArenaEnemyPressureLight",
+		"ArenaPlayerPressureLight",
+		"ArenaThreatIncursions",
+		"ArenaAshThreatVeil",
+		"ArenaAshMarks",
+		"ArenaRuptureBranches",
+		"ArenaRuptureSegments",
+		"TerritoryRupture",
+		"TerritoryRuptureGlow",
+	])
+	for node_name: String in suppressed_names:
+		var overlay: CanvasItem = arena.get_node_or_null(node_name) as CanvasItem
+		if overlay != null:
+			overlay.visible = false
+			overlay.set_meta("retired_for_authored_raster_field", true)
+	arena.set_meta("procedural_environment_geometry_suppressed", true)
 
 static func _ensure_arena_threat_boundary(arena: Control) -> void:
 	var boundary: Control = arena.get_node_or_null("CombatThreatBoundary") as Control
@@ -2038,11 +2074,11 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	if is_player:
-		style.bg_color = Color(0.055, 0.074, 0.072, 0.12)
+		style.bg_color = Color(0.055, 0.074, 0.072, 0.015)
 		style.border_color = Color(0.75, 0.70, 0.58, 0.78)
 		style.border_width_top = 3
 	else:
-		style.bg_color = Color(0.12, 0.025, 0.030, 0.12)
+		style.bg_color = Color(0.12, 0.025, 0.030, 0.015)
 		style.border_color = Color(0.80, 0.075, 0.09, 0.84)
 		style.border_width_bottom = 3
 	return style

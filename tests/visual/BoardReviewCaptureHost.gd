@@ -279,8 +279,8 @@ func _run() -> void:
 			controller,
 			"STALEMATE",
 			"tie",
-			Color(0.48, 0.38, 0.66, 1.0),
-			Color(0.90, 0.84, 1.0, 1.0),
+			Color(0.50, 0.12, 0.10, 1.0),
+			Color(0.92, 0.86, 0.74, 1.0),
 			"19_stalemate_hold_1920x1080.png"
 		)
 		await _capture_result_variant(
@@ -487,36 +487,22 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	var pressure_painter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ArenaPressurePainter") as Control
 	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
 	var arena_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
-	var active_evidence_group: Control = reduced_lock if reduced_motion else midfight if expected_phase != "onset" else onset
-	var active_evidence_painter: Control = active_evidence_group.get_node_or_null("PhysicalEvidencePainter") as Control if active_evidence_group != null else null
+	var expected_material_phase: String = "reduced_motion" if reduced_motion else "midfight" if expected_phase != "onset" else "onset"
 	_expect(arena != null and String(arena.get_meta("battlefield_pressure_phase", "")) == expected_phase, "%s capture did not reach the requested environment phase" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("battlefield_reduced_motion", not reduced_motion)) == reduced_motion, "%s capture reduced-motion metadata is wrong" % expected_phase)
-	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("physical_warfield/"), "%s capture lacks a physical battlefield signature" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("authored_raster_warfield/"), "%s capture lacks an authored raster battlefield signature" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_material_source", "")) == "phase_specific_authored_raster", "%s capture is not sourced from authored phase material" % expected_phase)
+	_expect(arena != null and bool(arena.get_meta("procedural_environment_geometry_suppressed", false)), "%s capture retained procedural environment geometry" % expected_phase)
 	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not prioritize cell readability" % expected_phase)
-	_expect(aftermath != null and aftermath.visible and String(aftermath.get_meta("visual_role", "")) == "non_unit_physical_war_aftermath", "%s capture lacks the physical war-aftermath root" % expected_phase)
-	_expect(onset != null and onset.visible and int(onset.get_meta("physical_evidence_count", 0)) >= 6, "%s capture lost practical onset wreckage" % expected_phase)
-	_expect(onset != null and bool(onset.get_meta("protected_center_clear", false)), "%s onset evidence does not protect the playable center" % expected_phase)
-	_expect(midfight != null and midfight.visible == (expected_phase != "onset"), "%s capture has the wrong shattered-barricade state" % expected_phase)
-	_expect(collapse != null and not collapse.visible, "%s capture prematurely exposed the collapse composition" % expected_phase)
-	_expect(reduced_lock != null and reduced_lock.visible == reduced_motion, "%s capture has the wrong reduced-motion grime lock" % expected_phase)
-	_expect(pressure_painter != null and bool(pressure_painter.get_meta("bounded_edge_pressure", false)), "%s capture lacks bounded kinetic edge pressure" % expected_phase)
-	_expect(pressure_painter != null and int(pressure_painter.get_meta("pressure_phase", -1)) == int(arena.get_meta("battlefield_pressure_index", -2)), "%s kinetic layer did not receive the environmental phase event" % expected_phase)
-	_expect(pressure_painter != null and pressure_painter.has_meta("protected_center_rect"), "%s kinetic pressure does not publish a protected actor-clarity center" % expected_phase)
+	_expect(aftermath != null and not aftermath.visible, "%s capture exposed the retired procedural war-aftermath root" % expected_phase)
+	_expect(onset != null and not onset.visible and midfight != null and not midfight.visible and collapse != null and not collapse.visible and reduced_lock != null and not reduced_lock.visible, "%s capture leaked a procedural evidence group over the authored field" % expected_phase)
+	_expect(pressure_painter != null and not pressure_painter.is_visible_in_tree(), "%s capture leaked the retired procedural pressure painter" % expected_phase)
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
-	_expect(pressure_painter != null and bool(pressure_painter.get_meta("debug_primitives_suppressed", false)) and int(pressure_painter.get_meta("kinetic_mark_budget", 99)) == 0, "%s capture retained non-semantic circles, rays, or streaks" % expected_phase)
 	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.09 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.14, "%s capture lost the legible terrain-seam balance" % expected_phase)
 	_expect(arena_surface != null and String(arena_surface.get_meta("battlefield_foundation", "")) == "muddy_rural_killing_ground_v1", "%s capture lacks the physical rural horror foundation" % expected_phase)
-	_expect(arena_surface != null and arena_surface.modulate.a >= 0.75, "%s capture washes the physical battlefield back into a flat texture" % expected_phase)
-	_expect(active_evidence_painter != null and String(active_evidence_painter.get_meta("physical_material_language", "")).contains("wet_mud_pooled_crater_splintered_timber"), "%s capture lacks physical wet-earth and splintered-timber evidence" % expected_phase)
-	_expect(active_evidence_painter != null and int(active_evidence_painter.get_meta("outlined_primitive_count", -1)) == 0 and int(active_evidence_painter.get_meta("straight_bar_count", -1)) == 0, "%s capture reverted to outlined primitives or straight bars" % expected_phase)
-	if aftermath != null and arena != null and onset != null and midfight != null and reduced_lock != null and reduced_motion:
-		_expect(aftermath.scale == Vector2.ONE, "%s reduced-motion capture retained an animated environment transform" % expected_phase)
-		_expect(float(arena.get_meta("battlefield_overlay_density", 1.0)) <= 0.20, "%s reduced-motion capture retained excessive overlay density" % expected_phase)
-		_expect(onset.modulate.a >= 0.50 and midfight.modulate.a >= 0.50, "%s reduced-motion capture removed the physical battlefield instead of freezing it" % expected_phase)
-		_expect(float(reduced_lock.get_meta("overlay_density", 1.0)) < float(onset.get_meta("overlay_density", 0.0)), "%s reduced-motion evidence is denser than onset" % expected_phase)
-		_expect(int(pressure_painter.get_meta("kinetic_mark_budget", 99)) <= 4, "%s reduced-motion capture retained the kinetic mark budget" % expected_phase)
-		_expect(String(pressure_painter.get_meta("reduced_motion_scene_parity", "")) == "same_physical_field_static", "%s reduced motion did not preserve the same physical battlefield" % expected_phase)
-		_expect(not bool(pressure_painter.get_meta("full_field_warning_chevrons", true)), "%s reduced motion regressed to full-field warning chevrons" % expected_phase)
+	_expect(arena_surface != null and arena_surface.texture != null and arena_surface.modulate.a >= 0.90, "%s capture washes out or loses the authored battlefield texture" % expected_phase)
+	_expect(arena_surface != null and String(arena_surface.get_meta("active_material_phase", "")) == expected_material_phase, "%s capture uses the wrong authored material phase" % expected_phase)
+	_expect(arena != null and is_equal_approx(float(arena.get_meta("battlefield_overlay_density", 1.0)), 0.0), "%s capture retained a procedural environment overlay density" % expected_phase)
 	_assert_persistent_combat_hierarchy(expected_phase)
 
 func _assert_title_gateway_contract(context: String, compact: bool) -> void:
@@ -672,10 +658,12 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 	if banner == null:
 		return
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer
+	var title_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/OutcomeLabel") as Label
 	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control
 	var victory_geometry: Control = banner.get_node_or_null("BattleResultAftermath/VictoryAftermathGeometry") as Control
 	var stalemate_geometry: Control = banner.get_node_or_null("BattleResultAftermath/StalemateAftermathGeometry") as Control
 	var defeat_geometry: Control = banner.get_node_or_null("BattleResultAftermath/DefeatAftermathGeometry") as Control
+	var field_art: TextureRect = banner.get_node_or_null("BattleResultAftermath/AftermathFieldArt") as TextureRect
 	var hold_label: Label = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label if card != null else null
 	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
 	var instruction_ribbon: Label = _main.find_child("CombatObjectiveSignal", true, false) as Label if _main != null else null
@@ -683,12 +671,17 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 	var hostile_field_label: Label = _main.find_child("EnemyFieldLabel", true, false) as Label if _main != null else null
 	var survival_field_label: Label = _main.find_child("PlayerFieldLabel", true, false) as Label if _main != null else null
 	var traits_underlay: Control = _main.get_node_or_null("CombatView/MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control if _main != null else null
-	var expected_signature: String = "opened_survivor_lane" if outcome == "VICTORY" else "crosswise_deadlock" if outcome == "STALEMATE" else "collapsed_canopy_grave"
+	var expected_signature: String = "authored_raster_survivor_field" if outcome == "VICTORY" else "authored_raster_deadlock_field" if outcome == "STALEMATE" else "authored_raster_collapsed_field"
 	var expected_silhouette: String = "rising_open_lane" if outcome == "VICTORY" else "locked_vertical_deadlock" if outcome == "STALEMATE" else "descending_grave_jaw"
 	var expected_reading_path: String = "left_to_right_escape" if outcome == "VICTORY" else "centered_suspension" if outcome == "STALEMATE" else "centered_grave_descent"
 	_expect(card != null and String(card.get_meta("result_variant", "")) == outcome.to_lower(), "%s result card variant metadata is wrong" % outcome)
 	_expect(card != null and String(card.get_meta("grayscale_silhouette", "")) == expected_silhouette, "%s result is not distinguishable by grayscale silhouette" % outcome)
 	_expect(card != null and String(card.get_meta("reading_path", "")) == expected_reading_path, "%s result did not receive its distinct reading path" % outcome)
+	if outcome == "STALEMATE" and card != null and title_label != null:
+		var stalemate_style: StyleBoxFlat = card.get_theme_stylebox("panel") as StyleBoxFlat
+		var stalemate_title_color: Color = title_label.get_theme_color("font_color")
+		_expect(stalemate_style != null and stalemate_style.border_color.r > stalemate_style.border_color.b * 2.0, "STALEMATE result regressed to a purple/lavender frame")
+		_expect(stalemate_title_color.r > 0.82 and stalemate_title_color.g > 0.76 and absf(stalemate_title_color.r - stalemate_title_color.b) < 0.24, "STALEMATE result regressed to a lavender headline")
 	_expect(hold_label != null and not hold_label.text.contains("."), "%s result leaked a decimal auto-advance telemetry readout" % outcome)
 	_expect(skip_button != null and not skip_button.text.contains("(") and skip_button.text.contains("ENTER / SPACE"), "%s result leaked its internal skip threshold" % outcome)
 	_expect(system_menu != null and system_menu.tooltip_text.is_empty() and bool(system_menu.get_meta("native_tooltip_suppressed", false)), "%s result can be obscured by the native system-menu tooltip" % outcome)
@@ -701,14 +694,14 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 		_expect(instruction_width <= instruction_ribbon.size.x + 1.0, "%s result instruction clips: text=%.1f width=%.1f" % [outcome, instruction_width, instruction_ribbon.size.x])
 		_expect(bool(instruction_ribbon.get_meta("persistent_copy_uses_utility_face", false)), "%s result instruction regressed to condensed display type" % outcome)
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its physical aftermath signature" % outcome)
+	_expect(aftermath != null and bool(aftermath.get_meta("procedural_outcome_geometry_suppressed", false)), "%s retained procedural outcome geometry" % outcome)
+	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "phase_specific_authored_raster", "%s lacks authored raster aftermath material" % outcome)
+	_expect(victory_geometry != null and not victory_geometry.visible and stalemate_geometry != null and not stalemate_geometry.visible and defeat_geometry != null and not defeat_geometry.visible, "%s exposes a retired procedural aftermath painter" % outcome)
 	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
 	var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label if stage_bar != null else null
 	_expect(phase_label != null and phase_label.text.contains("RECORDED") and not phase_label.text.contains("FIGHT"), "%s result leaves the stage strip in an active-fight state" % outcome)
 	_expect(stage_bar != null and bool(stage_bar.get_meta("result_state_active", false)), "%s result stage strip lacks resolved-state metadata" % outcome)
 	_expect(stage_bar != null and String(stage_bar.get_meta("result_outcome", "")) == outcome.to_lower(), "%s result stage strip exposes the wrong outcome metadata" % outcome)
-	_assert_physical_result_geometry(victory_geometry, "victory", outcome == "VICTORY", 6, outcome)
-	_assert_physical_result_geometry(stalemate_geometry, "stalemate", outcome == "STALEMATE", 6, outcome)
-	_assert_physical_result_geometry(defeat_geometry, "defeat", outcome == "DEFEAT", 7, outcome)
 	_assert_persistent_combat_hierarchy("%s_result" % outcome.to_lower())
 
 func _assert_physical_result_geometry(

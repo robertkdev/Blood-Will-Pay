@@ -93,6 +93,7 @@ func _validate_layout(state: String) -> void:
 	_expect(footer_band != null, "%s Ledger dedicated footer missing" % state)
 	_expect(footer_stamp != null and footer_stamp.get_parent() != assembly_layer, "%s Ledger carbon-copy stamp must live in the dedicated footer, not over the page" % state)
 	_expect(footer_status != null and footer_status.get_parent() == footer_stamp.get_parent(), "%s Ledger status and stamp should share one non-overlapping footer row" % state)
+	_expect(footer_status != null and bool(footer_status.get_meta("persistent_status_uses_utility_face", false)), "%s Ledger footer status regressed to condensed display type" % state)
 	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
 	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s Ledger page must never escape horizontally" % state)
 	if page_scroll != null and panel != null:
@@ -185,16 +186,40 @@ func _validate_compact_navigation() -> void:
 	var bounty_button: Button = _ledger.find_child("BountiesNavigation", true, false) as Button
 	var close_button: Button = _ledger.find_child("CloseFileButton", true, false) as Button
 	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
+	var footer_band: PanelContainer = _ledger.find_child("LedgerFooter", true, false) as PanelContainer
+	var record_id: Label = _ledger.get("_record_id_label") as Label
+	var progress: Label = _ledger.get("_progress_label") as Label
+	var starter_column: VBoxContainer = _ledger.get("_unlock_column") as VBoxContainer
+	var bounty_column: VBoxContainer = _ledger.get("_bounty_column") as VBoxContainer
 	_expect(navigator != null and navigator.visible, "compact Ledger should pin a visible section navigator")
-	_expect(String(navigator.get_meta("compact_section_discoverability", "")) == "starter_debts_and_bounties", "compact Ledger should publish both section destinations")
+	_expect(String(navigator.get_meta("compact_section_discoverability", "")) == "paged_full_entry_starter_debts_and_bounties", "compact Ledger should publish both section destinations and its full-entry paging policy")
+	_expect(String(navigator.get_meta("compact_entry_policy", "")) == "one_section_one_full_entry_above_persistent_footer", "compact Ledger lacks the full-entry viewport contract")
 	_expect(starter_button != null and starter_button.text.contains("STARTER DEBTS"), "compact Ledger should expose Starter Debts navigation")
 	_expect(bounty_button != null and bounty_button.text.contains("BOUNTIES"), "compact Ledger should expose Bounties navigation")
 	_expect(close_button != null and close_button.text == "CLOSE" and close_button.custom_minimum_size.x <= 124.0, "compact Ledger close action should remain clean")
 	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "compact Ledger should not expose a horizontal scrollbar")
+	_expect(record_id != null and not record_id.visible and bool(record_id.get_meta("compact_duplicate_metadata_suppressed", false)), "compact Ledger should remove duplicate folio metadata from the entry viewport")
+	_expect(progress != null and String(progress.get_meta("responsive_layout", "")) == "compressed_single_row" and progress.custom_minimum_size.y <= 24.0, "compact Ledger progress evidence should collapse to one readable row")
+	_expect(starter_column != null and starter_column.visible and bounty_column != null and not bounty_column.visible, "compact Ledger should initially page only Starter Debts")
+	_expect(footer_band != null and footer_band.visible and footer_band.get_global_rect().size.y >= 44.0, "compact Ledger should preserve its dedicated footer")
+	var starter_list: VBoxContainer = _ledger.get("_starter_list") as VBoxContainer
+	var first_starter_entry: Control = starter_list.get_child(0) as Control if starter_list != null and starter_list.get_child_count() > 0 else null
+	if page_scroll != null and first_starter_entry != null:
+		_expect(_rect_inside(first_starter_entry.get_global_rect(), page_scroll.get_global_rect().grow(1.0)), "compact Ledger shows only a partial first Starter Debt entry")
 	if bounty_button != null:
 		bounty_button.emit_signal("pressed")
-		await get_tree().process_frame
+		await _settle_frames(3)
 		_expect(String(navigator.get_meta("active_section", "")) == "bounties", "compact Ledger Bounties navigation should update its active destination")
+		_expect(starter_column != null and not starter_column.visible and bounty_column != null and bounty_column.visible, "compact Ledger Bounties navigation should page sections instead of stacking them")
+		var bounty_list: VBoxContainer = _ledger.get("_bounty_list") as VBoxContainer
+		var first_bounty_entry: Control = null
+		if bounty_list != null:
+			for child: Node in bounty_list.get_children():
+				if child is PanelContainer:
+					first_bounty_entry = child as Control
+					break
+		if page_scroll != null and first_bounty_entry != null:
+			_expect(_rect_inside(first_bounty_entry.get_global_rect(), page_scroll.get_global_rect().grow(1.0)), "compact Ledger shows only a partial first Bounty entry")
 
 func _save_capture(filename: String) -> bool:
 	if not _framebuffer_capture_available():
