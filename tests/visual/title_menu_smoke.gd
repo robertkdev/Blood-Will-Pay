@@ -222,6 +222,9 @@ func _run() -> void:
 		if rga_button != null and search_field != null:
 			rga_button.emit_signal("pressed")
 			await get_tree().process_frame
+			var combat_signs_header: Label = title_menu.find_child("SectionTitle", true, false) as Label
+			_expect(combat_signs_header != null and combat_signs_header.text == "COMBAT SIGNS", "Combat Signs navigation and content header should use one name", failures)
+			_expect(_find_label_containing_text(title_menu, "Combat Terms") == null, "Combat Signs page should not expose the retired Combat Terms alias", failures)
 			search_field.text = "threshold"
 			search_field.emit_signal("text_changed", "threshold")
 			await get_tree().process_frame
@@ -243,6 +246,9 @@ func _run() -> void:
 		if how_to_play_button != null and search_field != null:
 			how_to_play_button.emit_signal("pressed")
 			await get_tree().process_frame
+			var field_manual_header: Label = title_menu.find_child("SectionTitle", true, false) as Label
+			_expect(field_manual_header != null and field_manual_header.text == "FIELD MANUAL", "Field Manual navigation and content header should use one name", failures)
+			_expect(_find_label_containing_text(title_menu, "How to Play") == null, "Field Manual page should not expose the retired How to Play alias", failures)
 			search_field.text = "combine"
 			search_field.emit_signal("text_changed", "combine")
 			await get_tree().process_frame
@@ -297,6 +303,8 @@ func _run() -> void:
 			if volume_slider != null:
 				_expect_stylebox_flat(volume_slider, "slider", "MasterVolumeSlider track should use the authored hardcore styling", failures)
 				_expect_stylebox_flat(volume_slider, "grabber_area", "MasterVolumeSlider filled area should use the authored blood-fill styling", failures)
+				_expect(String(volume_slider.get_meta("focus_visual_cue", "")) == "signal_blue_track_and_grabber", "MasterVolumeSlider should publish its visible focus cue", failures)
+				_expect(String(volume_slider.get_meta("disabled_non_color_cue", "")) == "crossed_grabber_and_broken_track", "MasterVolumeSlider disabled state needs a non-color cue", failures)
 			var fullscreen_check: CheckBox = title_menu.find_child("FullscreenCheck", true, false) as CheckBox
 			var motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
 			var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton
@@ -309,6 +317,16 @@ func _run() -> void:
 			_expect(fullscreen_check != null, "FullscreenCheck missing", failures)
 			_expect(motion_check != null, "Settings should expose Reduced Motion", failures)
 			_expect(ui_scale_option != null and ui_scale_option.item_count == 3, "Settings should expose three supported UI scales", failures)
+			if ui_scale_option != null:
+				for option_state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+					_expect_stylebox_flat(ui_scale_option, option_state, "UIScaleOption %s should use an authored selector state" % option_state, failures)
+				var option_pressed: StyleBoxFlat = ui_scale_option.get_theme_stylebox("pressed") as StyleBoxFlat
+				var option_focus: StyleBoxFlat = ui_scale_option.get_theme_stylebox("focus") as StyleBoxFlat
+				var option_disabled: StyleBoxFlat = ui_scale_option.get_theme_stylebox("disabled") as StyleBoxFlat
+				_expect(option_pressed != null and option_focus != null and option_pressed.border_color != option_focus.border_color, "UIScaleOption focus must remain distinct from pressed", failures)
+				_expect(option_focus != null and option_focus.border_color.b > option_focus.border_color.r, "UIScaleOption focus should use signal blue", failures)
+				_expect(option_disabled != null and option_disabled.border_width_left >= 10 and option_disabled.border_width_bottom >= 4, "UIScaleOption disabled state should use a blocked shape, not only dimming", failures)
+				_expect(String(ui_scale_option.get_meta("disabled_non_color_cue", "")) != "", "UIScaleOption should publish its disabled non-color cue", failures)
 			_expect(readability_setting != null, "Settings should expose a visible readability and contrast record", failures)
 			_expect(readability_status != null and readability_status.text.contains("HIGH CONTRAST"), "Settings should state the enforced high-contrast default", failures)
 			_expect(readability_status != null and readability_status.get_theme_font_size("font_size") >= 18, "Readability status should remain functional-size copy", failures)
@@ -318,6 +336,14 @@ func _run() -> void:
 			_expect(reset_bindings != null, "Settings should expose binding reset", failures)
 			_expect_flat_button_states(fullscreen_check, "FullscreenCheck", failures)
 			_expect_flat_button_states(motion_check, "ReducedMotionCheck", failures)
+			if motion_check != null:
+				var motion_pressed: StyleBoxFlat = motion_check.get_theme_stylebox("pressed") as StyleBoxFlat
+				var motion_focus: StyleBoxFlat = motion_check.get_theme_stylebox("focus") as StyleBoxFlat
+				var motion_disabled: StyleBoxFlat = motion_check.get_theme_stylebox("disabled") as StyleBoxFlat
+				_expect(motion_pressed != null and motion_focus != null and motion_pressed.border_color != motion_focus.border_color, "ReducedMotionCheck focus must remain distinct from pressed", failures)
+				_expect(motion_focus != null and motion_focus.border_color.b > motion_focus.border_color.r, "ReducedMotionCheck focus should use signal blue", failures)
+				_expect(motion_disabled != null and motion_disabled.border_width_left >= 10 and motion_disabled.border_width_bottom >= 4, "ReducedMotionCheck disabled state should use a blocked shape, not only dimming", failures)
+				_expect(String(motion_check.get_meta("disabled_non_color_cue", "")) != "", "ReducedMotionCheck should publish its disabled non-color cue", failures)
 		var start_button: Button = title_menu.get_node_or_null("Center/VBox/StartButton") as Button
 		_expect(start_button != null, "StartButton missing", failures)
 		if start_button != null:
@@ -342,6 +368,12 @@ func _run() -> void:
 				_expect(start_button.custom_minimum_size.x >= 300.0, "StartButton is not visually prioritized without a resumable run", failures)
 			var start_style: StyleBox = start_button.get_theme_stylebox("normal")
 			_expect(start_style is StyleBoxTexture, "Title StartButton should use generated hierarchy styling", failures)
+			var run_focus_style: StyleBoxFlat = primary_run_button.get_theme_stylebox("focus") as StyleBoxFlat
+			var run_pressed_style: StyleBox = primary_run_button.get_theme_stylebox("pressed")
+			_expect(run_focus_style != null and run_focus_style.border_width_left >= 10 and run_focus_style.border_width_top >= 3, "Primary run action, including Continue Run, should expose an unmistakable full-frame focus cue", failures)
+			_expect(run_focus_style != null and run_focus_style.border_color.b > run_focus_style.border_color.r, "Primary run focus should use signal blue instead of pressed blood", failures)
+			_expect(run_pressed_style != null and run_pressed_style != run_focus_style, "Primary run focus and pressed surfaces should be independent authored states", failures)
+			_expect(String(primary_run_button.get_meta("focus_visual_cue", "")) == "signal_blue_full_frame", "Primary run action should publish its keyboard/controller focus cue", failures)
 			var ledger_button: Button = title_menu.find_child("BlackLedgerButton", true, false) as Button
 			var quit_button: Button = title_menu.find_child("QuitButton", true, false) as Button
 			_expect(ledger_button != null and String(ledger_button.get_meta("visual_role", "")) == "ledger", "Black Ledger should use a distinct ledger hierarchy role", failures)
@@ -436,7 +468,7 @@ func _expect_button_states(button: Button, label: String, failures: Array[String
 	_expect(button != null, "%s missing" % label, failures)
 	if button == null:
 		return
-	var states: Array[String] = ["normal", "hover", "pressed", "focus"]
+	var states: Array[String] = ["normal", "hover", "pressed", "focus", "disabled"]
 	for state: String in states:
 		_expect_stylebox_flat(button, state, "%s %s should use asymmetrical field-navigation styling" % [label, state], failures)
 
@@ -444,7 +476,7 @@ func _expect_flat_button_states(button: Button, label: String, failures: Array[S
 	_expect(button != null, "%s missing" % label, failures)
 	if button == null:
 		return
-	var states: Array[String] = ["normal", "hover", "pressed", "focus"]
+	var states: Array[String] = ["normal", "hover", "pressed", "focus", "disabled"]
 	for state: String in states:
 		_expect_stylebox_flat(button, state, "%s %s should use authored hardcore styling" % [label, state], failures)
 

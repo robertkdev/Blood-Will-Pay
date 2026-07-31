@@ -3330,8 +3330,12 @@ func _update_environmental_pressure(delta: float) -> void:
 		boundary.modulate.a = 0.70 if reduced_motion else clampf(0.82 + phase_weight + slow_pulse * 0.10, 0.72, 1.0)
 	var pressure_surface: TextureRect = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
 	if pressure_surface != null and pressure_surface.visible:
-		var target_alpha: float = 0.90 if reduced_motion else 0.88 if pressure_phase == 1 else 0.96 if pressure_phase >= 2 else 0.0
-		pressure_surface.modulate.a = target_alpha if reduced_motion else clampf(target_alpha + slow_pulse * 0.030, 0.0, 0.98)
+		var target_alpha: float = 0.70 if reduced_motion else 0.66 if pressure_phase == 1 else 0.78 if pressure_phase >= 2 else 0.0
+		pressure_surface.modulate.a = target_alpha if reduced_motion else clampf(target_alpha + slow_pulse * 0.025, 0.0, 0.84)
+	var exposure_lift: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaExposureLift") as CanvasItem
+	if exposure_lift != null:
+		var exposure_alpha: float = 0.86 if reduced_motion else 0.76 if pressure_phase == 0 else 0.92 if pressure_phase == 1 else 1.0
+		exposure_lift.modulate.a = exposure_alpha
 	var aftermath: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath") as Control
 	if aftermath != null:
 		aftermath.pivot_offset = aftermath.size * 0.5
@@ -3348,6 +3352,8 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	if parent == null:
 		return
 	var arena: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	if arena == null and arena_container != null:
+		arena = arena_container
 	if arena == null:
 		return
 	var effective_phase: int = maxi(1, phase) if reduced_motion else phase
@@ -3359,11 +3365,12 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
 	arena.set_meta("battlefield_casualty_event_index", casualty_event_index)
 	arena.set_meta("battlefield_environment_signature", "persistent_killing_ground/%s/%s" % [phase_name, "low_density_static" if reduced_motion else "kinetic"])
-	arena.set_meta("battlefield_overlay_density", 0.0)
-	arena.set_meta("battlefield_material_source", "persistent_base_plus_landmark_aligned_authored_overlay")
+	arena.set_meta("battlefield_overlay_density", 0.0 if effective_phase == 0 else 0.18 if effective_phase == 1 else 0.28)
+	arena.set_meta("battlefield_material_source", "persistent_base_plus_aligned_raster_and_physical_evidence")
 	arena.set_meta("stable_base_location", true)
 	arena.set_meta("landmark_continuity_source", "onset_base_persistent")
 	arena.set_meta("procedural_environment_geometry_suppressed", true)
+	arena.set_meta("authored_physical_evidence_visible", effective_phase >= 1 or reduced_motion)
 	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
@@ -3373,8 +3380,8 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var reduced_lock: Control = arena.get_node_or_null("ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	var pressure_painter: Control = arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
 	if aftermath != null:
-		aftermath.visible = false
-		aftermath.modulate = Color.WHITE
+		aftermath.visible = effective_phase >= 1 or reduced_motion
+		aftermath.modulate = Color(1.0, 1.0, 1.0, 0.78 if reduced_motion else 0.88 if effective_phase == 1 else 1.0)
 	if onset != null:
 		onset.visible = true
 		onset.modulate = Color(1.0, 1.0, 1.0, 0.76 if reduced_motion else 1.0)
@@ -3402,7 +3409,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	if pressure_surface != null:
 		pressure_surface.texture = GothicUIAssets.battlefield_reduced_motion_texture() if reduced_motion else GothicUIAssets.battlefield_midfight_texture()
 		pressure_surface.visible = reduced_motion or effective_phase >= 1
-		pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.90 if reduced_motion else 0.88 if effective_phase == 1 else 0.96)
+		pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.70 if reduced_motion else 0.66 if effective_phase == 1 else 0.78)
 		pressure_surface.set_meta("active_material_phase", "reduced_motion_static" if reduced_motion else phase_name)
 		pressure_surface.set_meta("landmark_aligned_with_base", true)
 	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
@@ -4216,8 +4223,26 @@ func _ensure_result_banner() -> PanelContainer:
 	skip_button.add_theme_stylebox_override("hover", _make_result_skip_style(true))
 	skip_button.add_theme_stylebox_override("pressed", _make_result_skip_style(true))
 	skip_button.add_theme_stylebox_override("disabled", _make_result_skip_style(false))
+	skip_button.add_theme_stylebox_override("focus", _make_result_skip_focus_style())
 	skip_button.add_theme_color_override("font_disabled_color", Color(0.92, 0.84, 0.72, 1.0))
 	skip_button.add_theme_color_override("font_color", Color(0.96, 0.90, 0.82, 1.0))
+	skip_button.add_theme_color_override("font_focus_color", Color(0.92, 0.97, 1.0, 1.0))
+	skip_button.set_meta("focus_visual_contract", "signal_blue_four_pixel_expanded_outline")
+	skip_button.set_meta("focused_state_visible", false)
+	var skip_focus_frame: Panel = Panel.new()
+	skip_focus_frame.name = "FocusFrame"
+	skip_button.add_child(skip_focus_frame)
+	skip_focus_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	skip_focus_frame.offset_left = -4.0
+	skip_focus_frame.offset_top = -4.0
+	skip_focus_frame.offset_right = 4.0
+	skip_focus_frame.offset_bottom = 4.0
+	skip_focus_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	skip_focus_frame.z_index = 8
+	skip_focus_frame.visible = false
+	skip_focus_frame.add_theme_stylebox_override("panel", _make_result_skip_focus_frame_style())
+	skip_button.focus_entered.connect(_on_result_skip_focus_entered.bind(skip_button))
+	skip_button.focus_exited.connect(_on_result_skip_focus_exited.bind(skip_button))
 	skip_button.pressed.connect(_skip_result_hold)
 	hold_row.add_child(skip_button)
 	var impact_stamp: Label = Label.new()
@@ -4287,16 +4312,17 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 		aftermath.visible = true
 		aftermath.set_meta("outcome_variant", title.to_lower())
 		aftermath.set_meta("physical_geometry_signature", "persistent_field_open_escape" if title == "VICTORY" else "persistent_field_suspended_deadlock" if title == "STALEMATE" else "persistent_field_grave_descent")
-		aftermath.set_meta("physical_geometry_child_count", 0)
+		aftermath.set_meta("physical_geometry_child_count", 1)
 		aftermath.set_meta("grayscale_reading", "open_center" if title == "VICTORY" else "contained_center" if title == "STALEMATE" else "enclosed_perimeter")
 		aftermath.set_meta("flat_rectangle_count", 0)
-		aftermath.set_meta("procedural_outcome_geometry_suppressed", true)
+		aftermath.set_meta("procedural_outcome_geometry_suppressed", false)
+		aftermath.set_meta("authored_physical_aftermath_visible", true)
 	if victory_geometry != null:
-		victory_geometry.visible = false
+		victory_geometry.visible = title == "VICTORY"
 	if stalemate_geometry != null:
-		stalemate_geometry.visible = false
+		stalemate_geometry.visible = title == "STALEMATE"
 	if defeat_geometry != null:
-		defeat_geometry.visible = false
+		defeat_geometry.visible = title == "DEFEAT"
 	if field_art != null:
 		field_art.texture = GothicUIAssets.battlefield_onset_texture()
 		field_art.modulate = Color(1.0, 1.0, 1.0, 0.92)
@@ -4306,7 +4332,7 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	if pressure_art != null:
 		pressure_art.texture = GothicUIAssets.battlefield_reduced_motion_texture() if title == "DEFEAT" else GothicUIAssets.battlefield_midfight_texture()
 		pressure_art.visible = title != "VICTORY"
-		pressure_art.modulate = Color(1.0, 1.0, 1.0, 0.58 if title == "STALEMATE" else 0.88)
+		pressure_art.modulate = Color(1.0, 1.0, 1.0, 0.54 if title == "STALEMATE" else 0.70)
 		pressure_art.set_meta("result_material_source", "landmark_aligned_consequence_overlay")
 	if blood_wash != null:
 		var opening_wash_alpha: float = 0.015 if title == "VICTORY" else 0.020 if title == "STALEMATE" else 0.035
@@ -4367,6 +4393,53 @@ func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 	style.shadow_size = 6
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.58)
 	return style
+
+func _make_result_skip_focus_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.028, 0.065, 0.085, 0.99)
+	style.border_color = Color(0.50, 0.82, 1.0, 1.0)
+	style.set_border_width_all(4)
+	style.expand_margin_left = 3.0
+	style.expand_margin_top = 3.0
+	style.expand_margin_right = 3.0
+	style.expand_margin_bottom = 3.0
+	style.shadow_color = Color(0.16, 0.52, 0.78, 0.48)
+	style.shadow_size = 10
+	return style
+
+func _make_result_skip_focus_frame_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	style.border_color = Color(0.50, 0.82, 1.0, 1.0)
+	style.set_border_width_all(4)
+	style.shadow_color = Color(0.16, 0.52, 0.78, 0.56)
+	style.shadow_size = 8
+	return style
+
+func _on_result_skip_focus_entered(skip_button: Button) -> void:
+	if skip_button == null or skip_button.disabled:
+		return
+	# Godot's separate focus StyleBox can be obscured by the normal button pass
+	# in some renderer/layout combinations. Mirror it into the base pass so
+	# keyboard focus remains unmistakable in the authoritative runtime.
+	skip_button.add_theme_stylebox_override("normal", _make_result_skip_focus_style())
+	skip_button.add_theme_color_override("font_color", Color(0.92, 0.97, 1.0, 1.0))
+	skip_button.self_modulate = Color(0.55, 0.86, 1.0, 1.0)
+	var focus_frame: Panel = skip_button.get_node_or_null("FocusFrame") as Panel
+	if focus_frame != null:
+		focus_frame.visible = true
+	skip_button.set_meta("focused_state_visible", true)
+
+func _on_result_skip_focus_exited(skip_button: Button) -> void:
+	if skip_button == null:
+		return
+	skip_button.add_theme_stylebox_override("normal", _make_result_skip_style(false))
+	skip_button.add_theme_color_override("font_color", Color(0.96, 0.90, 0.82, 1.0))
+	skip_button.self_modulate = Color.WHITE
+	var focus_frame: Panel = skip_button.get_node_or_null("FocusFrame") as Panel
+	if focus_frame != null:
+		focus_frame.visible = false
+	skip_button.set_meta("focused_state_visible", false)
 
 func _make_result_record_texture(outcome: String, accent_color: Color) -> Texture2D:
 	var gradient: Gradient = Gradient.new()

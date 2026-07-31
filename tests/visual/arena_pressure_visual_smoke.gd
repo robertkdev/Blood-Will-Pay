@@ -53,6 +53,7 @@ func _run() -> void:
 	var controller: CombatController = CombatControllerScript.new() as CombatController
 	controller.parent = _host
 	controller.arena_container = _arena
+	controller.call("_apply_environmental_pressure_composition", 1, true, 0.35, 1)
 	controller.call("_flash_contract_hazard", Color(0.90, 0.18, 0.10, 1.0), 3)
 	controller.call("_show_combat_event_banner", "PRESSURE BREAK\nSUSTAIN COLLAPSING", Color(0.90, 0.18, 0.10, 1.0), 3)
 	await _settle_frames(2)
@@ -70,7 +71,7 @@ func _run() -> void:
 	var onset_texture: Texture2D = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
 	var midfight_texture: Texture2D = GothicUIAssetsScript.call("battlefield_midfight_texture") as Texture2D
 	var reduced_texture: Texture2D = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
-	_expect(retired_aftermath != null and not retired_aftermath.visible, "arena exposed the retired procedural aftermath painter")
+	_expect(retired_aftermath != null and retired_aftermath.visible, "Reduced Motion did not expose its static physical evidence painter")
 	_expect(bool(_arena.get_meta("procedural_environment_geometry_suppressed", false)), "arena does not publish procedural-overlay suppression")
 	_expect(onset_texture != null and midfight_texture != null and reduced_texture != null, "arena phase-specific authored textures failed to load")
 	_expect(onset_texture != midfight_texture and midfight_texture != reduced_texture, "arena phase textures are not independently authored resources")
@@ -81,10 +82,10 @@ func _run() -> void:
 	var survival_label: Label = _arena.get_node_or_null("PlayerFieldLabel") as Label
 	_expect(seams != null and seams.get_child_count() == 48, "battlefield lost its 8x6 cell-seam readability layer")
 	_expect(seams != null and int(seams.get_meta("major_seam_non_color_weight", 0)) >= 2, "battlefield major seams lack a non-color weight cue")
-	_expect(seams != null and float(seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.18 and float(seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.26, "battlefield seams must remain tactical over the authored terrain without reverting to an opaque graph overlay")
+	_expect(seams != null and float(seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27 and float(seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.34, "battlefield seams must remain tactical over the authored terrain without reverting to an opaque graph overlay")
 	_expect(String(seams.get_meta("side_separation", "")).contains("enemy_oxblood_player_bone"), "battlefield seams must separate hostile and survival territory in color plus line weight")
 	_expect(bool(_arena.get_meta("stable_base_location", false)), "combat escalation must preserve one stable killing ground")
-	_expect(String(_arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_landmark_aligned_authored_overlay", "combat escalation must layer aligned damage over the persistent base")
+	_expect(String(_arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_aligned_raster_and_physical_evidence", "combat escalation must layer visible physical evidence over the persistent base")
 	_expect(hostile_label != null and hostile_label.text.begins_with("▲") and hostile_label.text.contains("BREACH"), "hostile territory lacks its triangle/breach non-color cue")
 	_expect(survival_label != null and survival_label.text.begins_with("■") and survival_label.text.contains("SURVIVE"), "survival territory lacks its square/survive non-color cue")
 	_expect(hostile_label != null and bool(hostile_label.get_meta("persistent_copy_uses_utility_face", false)), "persistent hostile instruction must use the readable utility face")
@@ -144,7 +145,7 @@ func _build_surface() -> void:
 	pressure_surface.set_meta("landmark_aligned_with_base", true)
 	_arena.add_child(pressure_surface)
 	_arena.set_meta("stable_base_location", true)
-	_arena.set_meta("battlefield_material_source", "persistent_base_plus_landmark_aligned_authored_overlay")
+	_arena.set_meta("battlefield_material_source", "persistent_base_plus_aligned_raster_and_physical_evidence")
 	var arena_frame: TextureRect = TextureRect.new()
 	arena_frame.name = "ArenaFrame"
 	arena_frame.texture = load("res://assets/ui/gothic/arena_frame.png") as Texture2D

@@ -342,6 +342,14 @@ class ArenaPressurePainter:
 		# the field read as a debug overlay rather than a physical killing ground.
 		_draw_casualty_residue()
 		_draw_smoke_banks(motion_clock)
+		if pressure_phase >= 1:
+			# Escalation must change the ground itself, not merely tint the HUD.
+			# Keep the readable center clear while the perimeter caves inward with
+			# smoke, broken timber, breached trenches, and churned mud.
+			_draw_hostile_edge_light(motion_clock)
+			_draw_ground_ruts()
+			if reduced_motion:
+				_draw_static_urgent_substitute()
 
 	func _draw_hostile_edge_light(motion_clock: float) -> void:
 		var phase_weight: float = float(pressure_phase) * 0.022
@@ -477,10 +485,17 @@ class ArenaPressurePainter:
 		var west_crater: Vector2 = Vector2(size.x * 0.13, size.y * 0.29)
 		var east_crater: Vector2 = Vector2(size.x * 0.87, size.y * 0.73)
 		var crater_centers: Array[Vector2] = [west_crater, east_crater]
-		for crater_center: Vector2 in crater_centers:
+		for crater_index: int in range(crater_centers.size()):
+			var crater_center: Vector2 = crater_centers[crater_index]
 			var crater_radius: float = minf(size.x, size.y) * 0.045
-			draw_circle(crater_center, crater_radius, Color(0.018, 0.010, 0.009, 0.72), true)
-			draw_circle(crater_center, crater_radius, Color(0.56, 0.18, 0.070, 0.36), false, 3.0, true)
+			var crater_points: PackedVector2Array = PackedVector2Array()
+			for point_index: int in range(14):
+				var angle: float = TAU * float(point_index) / 14.0
+				var wobble: float = 0.72 + float((point_index * 5 + crater_index * 3) % 6) * 0.065
+				crater_points.append(crater_center + Vector2(cos(angle), sin(angle) * 0.58) * crater_radius * wobble)
+			draw_colored_polygon(crater_points, Color(0.018, 0.010, 0.009, 0.72))
+			for edge_index: int in range(0, crater_points.size() - 1, 2):
+				draw_line(crater_points[edge_index], crater_points[edge_index + 1], Color(0.56, 0.18, 0.070, 0.34), 3.0, true)
 
 static var _theme: Theme = null
 
@@ -818,8 +833,8 @@ static func _apply_tile(button: Button, is_player: bool) -> void:
 	var bg_color: Color = COLOR_TILE_PLAYER if is_player else COLOR_TILE_ENEMY
 	var cell_index: int = int(String(button.name).get_slice("_", 1))
 	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
-	bg_color.a = 0.48 if strong_seam else 0.36
-	var border_color: Color = Color(0.84, 0.80, 0.67, 0.64 if strong_seam else 0.38) if is_player else Color(0.92, 0.22, 0.16, 0.68 if strong_seam else 0.42)
+	bg_color.a = 0.52 if strong_seam else 0.42
+	var border_color: Color = Color(0.96, 0.88, 0.68, 0.76 if strong_seam else 0.54) if is_player else Color(0.96, 0.27, 0.19, 0.78 if strong_seam else 0.56)
 	var hover_color: Color = Color(0.060, 0.078, 0.070, 0.92) if is_player else Color(0.120, 0.044, 0.040, 0.92)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
 	if not strong_seam:
@@ -1147,7 +1162,7 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	commit_rule.offset_right = 0.0
 	commit_rule.offset_top = -1.0
 	commit_rule.offset_bottom = 1.0
-	commit_rule.color = Color(0.92, 0.18, 0.12, 0.22)
+	commit_rule.color = Color(0.98, 0.24, 0.16, 0.42)
 	var directive: Label = geometry.get_node_or_null("PlanningDirective") as Label
 	if directive == null:
 		directive = Label.new()
@@ -1268,6 +1283,7 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	_ensure_arena_threat_veil(arena)
 	_ensure_arena_pressure_lighting(arena)
 	_ensure_arena_threat_incursions(arena)
+	_ensure_arena_exposure_lift(arena)
 	_ensure_arena_cell_seams(arena)
 	_ensure_arena_ash_marks(arena)
 	var rupture: ColorRect = arena.get_node_or_null("TerritoryRupture") as ColorRect
@@ -1309,6 +1325,31 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	_ensure_arena_field_label(arena, "EnemyFieldLabel", "HOSTILE GROUND", true)
 	_ensure_arena_field_label(arena, "PlayerFieldLabel", "HOLD THE LINE", false)
 	_suppress_procedural_arena_overlays(arena)
+
+static func _ensure_arena_exposure_lift(arena: Control) -> void:
+	var exposure: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaExposureLift", -5)
+	if exposure == null:
+		return
+	var gradient: Gradient = Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.20, 0.50, 0.78, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(0.36, 0.16, 0.10, 0.055),
+		Color(0.22, 0.19, 0.16, 0.075),
+		Color(0.44, 0.38, 0.30, 0.105),
+		Color(0.30, 0.25, 0.20, 0.080),
+		Color(0.28, 0.08, 0.055, 0.060),
+	])
+	var texture: GradientTexture2D = GradientTexture2D.new()
+	texture.width = 512
+	texture.height = 512
+	texture.fill_from = Vector2(0.08, 0.04)
+	texture.fill_to = Vector2(0.92, 0.96)
+	texture.gradient = gradient
+	exposure.texture = texture
+	exposure.visible = true
+	exposure.modulate = Color.WHITE
+	exposure.set_meta("visual_role", "battlefield_exposure_lift_for_material_readability")
+	exposure.set_meta("preserves_landmarks", true)
 
 static func _suppress_procedural_arena_overlays(arena: Control) -> void:
 	if arena == null:
@@ -2041,8 +2082,9 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		var column_index: int = cell_index % 8
 		var enemy_side: bool = row_index <= 2
 		var major_seam: bool = row_index == 2 or column_index == 3
-		seam_style.bg_color = Color(0.09, 0.012, 0.018, 0.034) if enemy_side else Color(0.08, 0.072, 0.052, 0.028)
-		seam_style.border_color = Color(0.88, 0.18, 0.15, 0.50 if major_seam else 0.23) if enemy_side else Color(0.88, 0.80, 0.62, 0.46 if major_seam else 0.21)
+		var alternating_cell: bool = (row_index + column_index) % 2 == 0
+		seam_style.bg_color = Color(0.09, 0.012, 0.018, 0.050 if alternating_cell else 0.024) if enemy_side else Color(0.12, 0.105, 0.075, 0.050 if alternating_cell else 0.024)
+		seam_style.border_color = Color(0.94, 0.24, 0.18, 0.50 if major_seam else 0.27) if enemy_side else Color(0.96, 0.88, 0.68, 0.54 if major_seam else 0.31)
 		seam_style.border_width_right = 3 if column_index == 3 else 1
 		seam_style.border_width_bottom = 3 if row_index == 2 else 1
 		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.48)
@@ -2051,7 +2093,8 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		cell.add_theme_stylebox_override("panel", seam_style)
 	seams.set_meta("major_seam_non_color_weight", 3)
 	seams.set_meta("minor_seam_non_color_weight", 1)
-	seams.set_meta("terrain_seam_alpha", 0.23)
+	seams.set_meta("terrain_seam_alpha", 0.31)
+	seams.set_meta("alternating_material_cell_wash", true)
 	seams.set_meta("side_separation", "enemy_oxblood_player_bone_with_black_understroke")
 	seams.set_meta("debug_graph_grid_suppressed", true)
 

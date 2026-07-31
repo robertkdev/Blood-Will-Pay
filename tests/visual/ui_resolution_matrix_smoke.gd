@@ -53,6 +53,20 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%dx%d @ %d%% Main should load the persisted UI scale" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
 	if window != null:
 		_expect(is_equal_approx(window.content_scale_factor, ui_scale), "%dx%d @ %d%% Main should apply the persisted UI scale to its window" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+	if viewport_size == Vector2i(3840, 2160):
+		var title_page: Control = _main.get_node_or_null("TitlePage") as Control
+		var incident_docket: PanelContainer = _main.get_node_or_null("TitlePage/IncidentEvidenceDocket") as PanelContainer
+		var incident_copy: Label = _main.get_node_or_null("TitlePage/IncidentEvidenceDocket/IncidentEvidence") as Label
+		var entry_affordance: PanelContainer = _main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
+		var entry_order: Label = _main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
+		_expect(title_page != null and title_page.visible, "3840x2160 title gateway should remain the initial player-facing surface")
+		_expect(incident_docket != null and String(incident_docket.get_meta("responsive_density", "")) == "4k_readable", "3840x2160 incident docket should use its authored 4K density")
+		_expect(incident_copy != null and incident_copy.get_theme_font_size("font_size") >= 20, "3840x2160 incident docket copy should scale above desktop size")
+		_expect(entry_affordance != null and String(entry_affordance.get_meta("responsive_density", "")) == "4k_readable", "3840x2160 click prompt should use its authored 4K density")
+		_expect(entry_order != null and entry_order.get_theme_font_size("font_size") >= 20, "3840x2160 click prompt should scale above desktop size")
+		if title_page != null and incident_docket != null and entry_affordance != null:
+			_expect(incident_docket.size.x >= title_page.size.x * 0.27, "3840x2160 incident docket should not remain disproportionately narrow")
+			_expect(entry_affordance.size.x >= title_page.size.x * 0.29, "3840x2160 click prompt should not remain disproportionately narrow")
 	var enter_button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
 	if enter_button != null:
 		enter_button.pressed.emit()
@@ -114,6 +128,11 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	var primary_action: Button = continue_button if continue_is_primary else start_button
 	_expect(primary_action != null and String(primary_action.get_meta("visual_role", "")) == "primary", "%s resumable or fresh-run entry should own the primary hierarchy role" % label)
 	_expect(start_button != null and String(start_button.get_meta("visual_role", "")) == ("secondary" if continue_is_primary else "primary"), "%s New Run should become secondary only while Continue Run is available" % label)
+	var primary_focus_style: StyleBoxFlat = primary_action.get_theme_stylebox("focus") as StyleBoxFlat if primary_action != null else null
+	var primary_pressed_style: StyleBox = primary_action.get_theme_stylebox("pressed") if primary_action != null else null
+	_expect(primary_focus_style != null and primary_focus_style.border_width_left >= 10 and primary_focus_style.border_width_top >= 3, "%s primary run action should expose an unmistakable full-frame focus cue" % label)
+	_expect(primary_focus_style != null and primary_focus_style.border_color.b > primary_focus_style.border_color.r, "%s primary run focus should use signal blue instead of pressed blood" % label)
+	_expect(primary_pressed_style != null and primary_pressed_style != primary_focus_style, "%s primary run focus and pressed surfaces should remain independent" % label)
 	if continue_is_primary:
 		_expect(title_panel != null and _rect_inside(continue_button.get_global_rect(), title_panel.get_global_rect().grow(2.0)), "%s Continue Run escaped TitlePanel" % label)
 	_expect(settings_button != null and String(settings_button.get_meta("visual_role", "")) == "selected_navigation", "%s Settings should expose the selected navigation hierarchy role" % label)
@@ -133,6 +152,7 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	var accessibility_priority: PanelContainer = title_menu.find_child("AccessibilityPriority", true, false) as PanelContainer if title_menu != null else null
 	var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
 	var reduced_motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
+	var volume_slider: HSlider = title_menu.find_child("MasterVolumeSlider", true, false) as HSlider if title_menu != null else null
 	var settings_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer if title_menu != null else null
 	var effective_height: float = float(viewport_size.y) / ui_scale
 	_expect(
@@ -145,6 +165,22 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		_expect(accessibility_priority != null and _rect_inside(accessibility_priority.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact accessibility priority record should be visible without scrolling" % label)
 		_expect(ui_scale_option != null and _rect_inside(ui_scale_option.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact UI Scale should be visible without scrolling" % label)
 		_expect(reduced_motion_check != null and _rect_inside(reduced_motion_check.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact Reduced Motion should be visible without scrolling" % label)
+	if ui_scale_option != null:
+		var option_pressed: StyleBoxFlat = ui_scale_option.get_theme_stylebox("pressed") as StyleBoxFlat
+		var option_focus: StyleBoxFlat = ui_scale_option.get_theme_stylebox("focus") as StyleBoxFlat
+		var option_disabled: StyleBoxFlat = ui_scale_option.get_theme_stylebox("disabled") as StyleBoxFlat
+		_expect(option_pressed != null and option_focus != null and option_pressed.border_color != option_focus.border_color, "%s UI Scale focus should remain distinct from pressed" % label)
+		_expect(option_focus != null and option_focus.border_color.b > option_focus.border_color.r, "%s UI Scale focus should use signal blue" % label)
+		_expect(option_disabled != null and option_disabled.border_width_left >= 10 and option_disabled.border_width_bottom >= 4, "%s UI Scale disabled state should use a blocked non-color cue" % label)
+	if reduced_motion_check != null:
+		var motion_pressed: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("pressed") as StyleBoxFlat
+		var motion_focus: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("focus") as StyleBoxFlat
+		var motion_disabled: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("disabled") as StyleBoxFlat
+		_expect(motion_pressed != null and motion_focus != null and motion_pressed.border_color != motion_focus.border_color, "%s Reduced Motion focus should remain distinct from pressed" % label)
+		_expect(motion_disabled != null and motion_disabled.border_width_left >= 10 and motion_disabled.border_width_bottom >= 4, "%s Reduced Motion disabled state should use a blocked non-color cue" % label)
+	if volume_slider != null:
+		_expect(String(volume_slider.get_meta("focus_visual_cue", "")) == "signal_blue_track_and_grabber", "%s Master Volume should publish its authored focus cue" % label)
+		_expect(String(volume_slider.get_meta("disabled_non_color_cue", "")) == "crossed_grabber_and_broken_track", "%s Master Volume should publish its disabled non-color cue" % label)
 	_expect(ledger_button != null and String(ledger_button.get_meta("visual_role", "")) == "ledger", "%s Black Ledger should expose a distinct ledger hierarchy role" % label)
 	_expect(quit_button != null and String(quit_button.get_meta("visual_role", "")) == "quit", "%s Quit should expose a distinct destructive hierarchy role" % label)
 	_expect(
@@ -188,8 +224,8 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	_expect(ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), viewport_rect.grow(2.0)), "%s Black Ledger escaped viewport panel=%s viewport=%s" % [label, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(viewport_rect)])
 	var effective_width: float = float(viewport_size.x) / ui_scale
 	if effective_width < 1440.0:
-		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "two_row", "%s compact Black Ledger progress metadata should use a deliberate two-row layout" % label)
-		_expect(ledger_progress != null and ledger_progress.text.split("\n").size() == 2, "%s compact Black Ledger should keep Lifetime Omens and Next Seal on independent rows" % label)
+		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "compressed_single_row", "%s compact Black Ledger progress metadata should use its compressed filing line" % label)
+		_expect(ledger_progress != null and ledger_progress.text.split("\n").size() == 1 and ledger_progress.custom_minimum_size.y <= 24.0, "%s compact Black Ledger should keep its progress evidence to one readable row" % label)
 	else:
 		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "single_row", "%s wide Black Ledger progress metadata should retain its single-row filing line" % label)
 	if effective_width >= 1440.0:

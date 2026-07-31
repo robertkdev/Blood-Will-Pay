@@ -352,17 +352,19 @@ func _assert_active_combat_shell() -> void:
 	_expect(palisade != null and watch_post != null, "combat shell lacks ruined fortification and distant hostile structure silhouettes")
 	_expect(fog != null and smoke != null and not fog.visible and not smoke.visible, "combat shell leaked retired gradient fog/smoke layers")
 	_expect(wet_reflection != null and not wet_reflection.visible, "combat shell leaked the synthetic wet-ground reflection")
-	_expect(war_aftermath != null and not war_aftermath.visible, "combat shell exposed the retired procedural war-aftermath layer")
+	var combat_pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "onset")) if arena_container != null else "onset"
+	var expects_physical_evidence: bool = combat_pressure_phase != "onset"
+	_expect(war_aftermath != null and war_aftermath.visible == expects_physical_evidence, "combat shell has the wrong authored physical-evidence visibility")
 	_expect(onset_geometry != null and not onset_geometry.visible and midfight_geometry != null and not midfight_geometry.visible and collapse_geometry != null and not collapse_geometry.visible and reduced_geometry != null and not reduced_geometry.visible, "combat shell leaked a procedural evidence painter")
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "combat grid seams do not stay above the environment")
-	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.18 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.26, "combat seams must remain readable without becoming an opaque graph overlay")
+	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.34, "combat seams must remain readable without becoming an opaque graph overlay")
 	var onset_texture: Texture2D = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
 	var midfight_texture: Texture2D = GothicUIAssetsScript.call("battlefield_midfight_texture") as Texture2D
 	var reduced_texture: Texture2D = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
 	_expect(arena_surface != null and arena_surface.texture != null and arena_surface.modulate.a >= 0.90, "combat shell lost the authored material field")
 	_expect(onset_texture != null and midfight_texture != null and reduced_texture != null and onset_texture != midfight_texture and midfight_texture != reduced_texture, "combat phases do not use three distinct authored raster resources")
 	_expect(arena_container != null and bool(arena_container.get_meta("procedural_environment_geometry_suppressed", false)), "combat environment does not suppress procedural overlays")
-	_expect(arena_container != null and is_equal_approx(float(arena_container.get_meta("battlefield_overlay_density", 1.0)), 0.0), "combat environment retained procedural overlay density")
+	_expect(arena_container != null and float(arena_container.get_meta("battlefield_overlay_density", -1.0)) >= (0.0 if combat_pressure_phase == "onset" else 0.16), "combat environment lacks visible phase evidence density")
 	var pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "")) if arena_container != null else ""
 	_expect(not pressure_phase.is_empty(), "combat environment did not publish its evolving pressure phase")
 	_expect(arena_container != null and String(arena_container.get_meta("battlefield_environment_signature", "")).begins_with("persistent_killing_ground/"), "combat environment lacks a stable authored composition signature")
@@ -430,17 +432,17 @@ func _assert_outcome_aftermath_geometry(banner: PanelContainer, outcome: String)
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its distinct physical aftermath signature" % outcome)
 	_expect(aftermath != null and int(aftermath.get_meta("flat_rectangle_count", -1)) == 0, "%s aftermath regressed to giant flat rectangle construction" % outcome)
 	_expect(aftermath != null and bool(aftermath.get_meta("terrain_visibility_preserved", false)), "%s aftermath no longer preserves the physical battlefield around the record" % outcome)
-	_expect(aftermath != null and bool(aftermath.get_meta("procedural_outcome_geometry_suppressed", false)), "%s aftermath retained procedural outcome geometry" % outcome)
+	_expect(aftermath != null and bool(aftermath.get_meta("authored_physical_aftermath_visible", false)), "%s aftermath lacks visible authored physical consequence" % outcome)
 	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "persistent_onset_landmark_base", "%s aftermath replaced its stable battlefield foundation" % outcome)
 	_expect(pressure_art != null and String(pressure_art.get_meta("result_material_source", "")) == "landmark_aligned_consequence_overlay", "%s aftermath lacks its aligned consequence layer" % outcome)
 	_expect(pressure_art != null and pressure_art.visible == (outcome != "VICTORY"), "%s aftermath consequence overlay has the wrong visibility" % outcome)
 	_expect(rupture_field != null and not rupture_field.visible and bool(rupture_field.get_meta("debug_splinters_suppressed", false)), "%s aftermath retained straight procedural splinter bars" % outcome)
 	if victory_geometry != null:
-		_expect(not victory_geometry.visible, "%s leaked the retired victory survivor-lane painter" % outcome)
+		_expect(victory_geometry.visible == (outcome == "VICTORY"), "%s has the wrong victory aftermath visibility" % outcome)
 	if stalemate_geometry != null:
-		_expect(not stalemate_geometry.visible, "%s leaked the retired stalemate deadlock painter" % outcome)
+		_expect(stalemate_geometry.visible == (outcome == "STALEMATE"), "%s has the wrong stalemate aftermath visibility" % outcome)
 	if defeat_geometry != null:
-		_expect(not defeat_geometry.visible, "%s leaked the retired defeat collapse painter" % outcome)
+		_expect(defeat_geometry.visible == (outcome == "DEFEAT"), "%s has the wrong defeat aftermath visibility" % outcome)
 
 func _assert_physical_aftermath_painter(group: Control, expected_variant: String, minimum_authored_evidence: int) -> void:
 	_expect(group != null, "%s aftermath geometry group is missing" % expected_variant)

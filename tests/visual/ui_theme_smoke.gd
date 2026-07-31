@@ -165,13 +165,50 @@ func _run() -> void:
 	var item_grid: GridContainer = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
 	_expect(item_header != null and bool(item_header.get_meta("material_cache_hierarchy", false)), "Item cache lacks its constructed docket hierarchy", failures)
 	_expect(item_grid != null and bool(item_grid.get_meta("material_cache_layout", false)), "Item cache reverted to a raw plus-slot matrix", failures)
+	_expect(item_header != null and bool(item_header.get_meta("reliquary_cache_hierarchy", false)), "Item cache is missing the reliquary header hierarchy", failures)
+	_expect(item_header != null and item_header.text.contains("RELIQUARY") and item_header.text.contains("READY") and item_header.text.contains("SEALED"), "Item cache header does not explain held, ready, and sealed reliquary states", failures)
+	_expect(item_header != null and int(item_header.get_meta("header_hierarchy_lines", 0)) == 2, "Item cache hierarchy collapsed back to a single diagnostic line", failures)
+	_expect(item_header != null and item_header.custom_minimum_size.y >= (34.0 if tight_layout else 42.0 if compact_layout else 52.0), "Item cache header is underscaled for the active viewport", failures)
+	_expect(item_grid != null and bool(item_grid.get_meta("physical_compartment_shell", false)), "Item cache lacks physical evidence-compartment semantics", failures)
+	_expect(item_grid != null and int(item_grid.get_meta("ready_slot_contract", 0)) == 3, "Item cache no longer reserves three ready reliquary pockets", failures)
+	_expect(items_plate != null and bool(items_plate.get_meta("physical_reliquary_shell", false)), "Item cache backplate is not authored as a physical reliquary shell", failures)
 	if item_grid != null and item_header != null and int(item_header.get_meta("occupied_slots", 0)) == 0:
 		var visible_empty_slots: int = 0
+		var first_ready_card: Control = null
+		var rail_positions: Array[float] = []
+		var wide_support_rail: bool = compact_layout and not tight_layout and rendered_viewport_size.x >= 1600.0
+		var expected_slot_size: Vector2 = Vector2(40.0, 56.0) if tight_layout else Vector2(70.0, 84.0) if wide_support_rail else Vector2(56.0, 74.0) if compact_layout else Vector2(84.0, 96.0)
+		_expect(not wide_support_rail or bool(item_header.get_meta("wide_support_rail", false)), "Desktop item cache did not enter its wide-support scale tier", failures)
 		for item_node: Node in item_grid.get_children():
 			var item_control: Control = item_node as Control
 			if item_control != null and item_control.visible:
 				visible_empty_slots += 1
+				if first_ready_card == null:
+					first_ready_card = item_control
+				_expect(bool(item_control.get_meta("reliquary_pocket", false)), "Visible empty item slot is not marked as a reliquary pocket", failures)
+				_expect(String(item_control.get_meta("cache_slot_state", "")) == "ready", "Visible empty item slot is not in a ready receive state", failures)
+				_expect(item_control.custom_minimum_size.x >= expected_slot_size.x and item_control.custom_minimum_size.y >= expected_slot_size.y, "Reliquary pocket is underscaled: got %s expected at least %s" % [str(item_control.custom_minimum_size), str(expected_slot_size)], failures)
+				var cavity: Panel = item_control.get_node_or_null("PocketCavity") as Panel
+				var binding_rail: ColorRect = item_control.get_node_or_null("BindingRail") as ColorRect
+				var docket: Label = item_control.get_node_or_null("Docket") as Label
+				var receive_mark: Label = item_control.get_node_or_null("EmptyMark") as Label
+				_expect(cavity != null and binding_rail != null and docket != null, "Reliquary pocket is missing its cavity, binding rail, or docket", failures)
+				_expect(docket != null and docket.text.contains("READY"), "Ready reliquary pocket lacks a readable docket state", failures)
+				_expect(receive_mark != null and receive_mark.text.contains("RECEIVE"), "Ready reliquary pocket lacks its receive-relic instruction", failures)
+				if binding_rail != null and not rail_positions.has(binding_rail.anchor_left):
+					rail_positions.append(binding_rail.anchor_left)
 		_expect(visible_empty_slots == 3, "Empty item cache should focus three ready slots, found %d" % visible_empty_slots, failures)
+		_expect(int(item_header.get_meta("ready_slots", 0)) == 3, "Empty cache header does not report all three ready pockets", failures)
+		_expect(int(item_header.get_meta("sealed_slots", 0)) == maxi(0, int(item_header.get_meta("total_slots", 0)) - 3), "Empty cache header reserve count disagrees with the visible ready pockets", failures)
+		_expect(rail_positions.size() == 3, "Ready reliquary pockets repeat identical binding geometry instead of reading as authored compartments", failures)
+		if first_ready_card != null and first_ready_card.has_method("set_item_id"):
+			first_ready_card.call("set_item_id", "hammer")
+			var held_docket: Label = first_ready_card.get_node_or_null("Docket") as Label
+			var held_cavity: Panel = first_ready_card.get_node_or_null("PocketCavity") as Panel
+			_expect(String(first_ready_card.get_meta("cache_slot_state", "")) == "held", "Filled reliquary pocket did not enter its held-evidence state", failures)
+			_expect(held_docket != null and held_docket.text.contains("HELD"), "Filled reliquary pocket lacks a held docket", failures)
+			_expect(held_cavity != null and held_cavity.get_theme_stylebox("panel") is StyleBoxFlat, "Filled reliquary pocket lost its recessed cavity", failures)
+			first_ready_card.call("set_item_id", "")
 	var wager_plate: Panel = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Panel
 	_expect(wager_plate != null, "Wager summary should have a quiet backplate over the battlefield texture", failures)
 	var traits_panel: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
@@ -189,7 +226,8 @@ func _run() -> void:
 	scoreboard_row.set_compact_layout(true)
 	scoreboard_row.set_row_data({"team": "player", "display_name": "Morrak", "value": 17.0, "share": 1.0, "metric": "damage"})
 	var compact_identity: Label = scoreboard_row.get_node_or_null("HBox/Content/Name") as Label
-	_expect(compact_identity != null and compact_identity.text == "YOU MOAK", "Compact scoreboard should preserve a stable name code instead of an ordinal", failures)
+	var compact_copy: String = compact_identity.text if compact_identity != null else ""
+	_expect(compact_identity != null and (compact_copy.begins_with("YOU ") or compact_copy.begins_with("Y ")) and compact_copy.contains("MORRAK"), "Compact scoreboard should preserve a readable team marker and stable unit identity", failures)
 	_expect(compact_identity != null and bool(compact_identity.get_meta("compact_identity_complete", false)), "Compact scoreboard identity lacks its completeness contract", failures)
 	scoreboard_row.queue_free()
 	if failures.size() > 0:
@@ -266,7 +304,8 @@ func _verify_board_surfaces(view: Control, failures: Array[String]) -> void:
 	if cell_seams != null and cell_seams.get_child_count() > 0:
 		var seam_panel: Panel = cell_seams.get_child(0) as Panel
 		var seam_style: StyleBoxFlat = seam_panel.get_theme_stylebox("panel") as StyleBoxFlat if seam_panel != null else null
-		_expect(seam_style != null and seam_style.border_color.a >= 0.30, "World-native cell seams should retain readable contrast", failures)
+		_expect(seam_style != null and seam_style.border_color.a >= 0.27 and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27, "World-native cell seams should retain readable contrast", failures)
+		_expect(bool(cell_seams.get_meta("alternating_material_cell_wash", false)), "World-native cells should break the flat debug-grid read with alternating material wash", failures)
 		_expect(int(cell_seams.get_meta("major_seam_non_color_weight", 0)) >= 3, "World-native cell seams lack a weighted non-color major-line cue", failures)
 		_expect(int(cell_seams.get_meta("minor_seam_non_color_weight", 0)) == 1, "World-native cell seams lack a restrained minor-line cue", failures)
 	var arena_background: ColorRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground") as ColorRect

@@ -7,6 +7,7 @@ const ItemDef := preload("res://scripts/game/items/item_def.gd")
 const ITEM_CARD_SCENE_PATH: String = "res://scenes/ui/items/ItemCard.tscn"
 const DEFAULT_MIN_ROWS: int = 3
 const EMPTY_READY_SLOTS: int = 3
+const CACHE_SHELL_NAME: String = "GothicItemsPlate"
 
 var view: Control
 var left_area: Control
@@ -157,9 +158,24 @@ func _defer_material_storage_layout() -> void:
 func _on_process_frame() -> void:
 	if _tearing_down or view == null or grid == null or header == null:
 		return
-	var desired_columns: int = 3 if int(grid.get_meta("visible_ready_slots", EMPTY_READY_SLOTS)) <= 6 else 6
-	var header_overwritten: bool = not bool(header.get_meta("material_cache_hierarchy", false)) or (not header.text.contains("OPEN") and not header.text.contains("OCCUPIED"))
-	if grid.columns != desired_columns or header_overwritten:
+	var desired_columns: int = 3
+	var tight_compact: bool = bool(view.get_meta("tight_scale_layout", false))
+	var compact: bool = bool(view.get_meta("compact_layout", false))
+	var viewport_size: Vector2 = view.get_viewport_rect().size
+	var wide_support_rail: bool = compact and not tight_compact and viewport_size.x >= 1600.0
+	var desired_header_height: float = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
+	var desired_rail_width: float = 136.0 if tight_compact else 240.0 if wide_support_rail else 180.0 if compact else 286.0
+	var header_overwritten: bool = (
+		not bool(header.get_meta("reliquary_cache_hierarchy", false))
+		or not header.text.contains("RELIQUARY")
+		or not header.text.contains("READY")
+		or not header.text.contains("SEALED")
+		or header.custom_minimum_size.y < desired_header_height
+	)
+	var layout_overwritten: bool = left_area.custom_minimum_size.x < desired_rail_width
+	var shell: Panel = view.get_node_or_null(CACHE_SHELL_NAME) as Panel
+	var shell_unstyled: bool = shell != null and not bool(shell.get_meta("physical_reliquary_shell", false))
+	if grid.columns != desired_columns or header_overwritten or layout_overwritten or shell_unstyled:
 		_apply_material_storage_layout()
 
 func _apply_material_storage_layout() -> void:
@@ -167,29 +183,48 @@ func _apply_material_storage_layout() -> void:
 		return
 	var tight_compact: bool = bool(view.get_meta("tight_scale_layout", false))
 	var compact: bool = bool(view.get_meta("compact_layout", false))
+	var viewport_size: Vector2 = view.get_viewport_rect().size
+	var wide_support_rail: bool = compact and not tight_compact and viewport_size.x >= 1600.0
 	var occupied_slots: int = int(header.get_meta("occupied_slots", 0))
 	var total_slots: int = maxi(1, int(header.get_meta("total_slots", grid.get_child_count())))
-	var visible_slot_budget: int = mini(total_slots, maxi(EMPTY_READY_SLOTS, occupied_slots + 1))
+	var desired_ready_slots: int = mini(EMPTY_READY_SLOTS, maxi(0, total_slots - occupied_slots))
 	var visible_cards: int = 0
-	for card_index: int in range(grid.get_child_count()):
-		var card: Control = grid.get_child(card_index) as Control
+	var ready_slots_shown: int = 0
+	for card_node: Node in grid.get_children():
+		var card: Control = card_node as Control
 		if card == null:
 			continue
 		var filled: bool = String(card.get("item_id")).strip_edges() != ""
-		card.visible = filled or card_index < visible_slot_budget
+		var ready_pocket: bool = not filled and ready_slots_shown < desired_ready_slots
+		card.visible = filled or ready_pocket
+		if ready_pocket:
+			ready_slots_shown += 1
 		if card.visible:
 			visible_cards += 1
-	var material_columns: int = 3 if visible_cards <= 6 else 6
-	var slot_size: Vector2 = Vector2(36.0, 36.0) if tight_compact else Vector2(48.0, 48.0) if compact else Vector2(68.0, 68.0)
-	if material_columns == 6:
-		slot_size = Vector2(19.0, 19.0) if tight_compact else Vector2(23.0, 23.0) if compact else Vector2(42.0, 42.0)
+	var material_columns: int = 3
+	var slot_size: Vector2 = Vector2(40.0, 56.0) if tight_compact else Vector2(70.0, 84.0) if wide_support_rail else Vector2(56.0, 74.0) if compact else Vector2(84.0, 96.0)
+	var horizontal_separation: int = 4 if tight_compact else 6 if compact else 10
+	var vertical_separation: int = 5 if tight_compact else 7 if compact else 10
+	var visible_rows: int = maxi(1, ceili(float(visible_cards) / float(material_columns)))
 	grid.columns = material_columns
-	grid.add_theme_constant_override("h_separation", 4 if tight_compact else 6 if compact else 10)
-	grid.add_theme_constant_override("v_separation", 4 if tight_compact else 6 if compact else 8)
+	var rail_width: float = 136.0 if tight_compact else 240.0 if wide_support_rail else 180.0 if compact else 286.0
+	left_area.custom_minimum_size.x = maxf(left_area.custom_minimum_size.x, rail_width)
+	header.custom_minimum_size.x = maxf(header.custom_minimum_size.x, rail_width)
+	grid.custom_minimum_size.x = maxf(grid.custom_minimum_size.x, rail_width)
+	grid.add_theme_constant_override("h_separation", horizontal_separation)
+	grid.add_theme_constant_override("v_separation", vertical_separation)
+	grid.custom_minimum_size.y = maxf(
+		grid.custom_minimum_size.y,
+		float(visible_rows) * slot_size.y + float(maxi(0, visible_rows - 1) * vertical_separation)
+	)
 	grid.set_meta("material_cache_layout", true)
-	grid.set_meta("visible_ready_slots", visible_cards)
+	grid.set_meta("visible_ready_slots", ready_slots_shown)
+	grid.set_meta("visible_cache_slots", visible_cards)
 	grid.set_meta("sealed_reserve_slots", maxi(0, total_slots - visible_cards))
 	grid.set_meta("material_slot_size", slot_size)
+	grid.set_meta("physical_compartment_shell", true)
+	grid.set_meta("ready_slot_contract", EMPTY_READY_SLOTS)
+	grid.set_meta("cache_scale_tier", "tight" if tight_compact else "wide_support" if wide_support_rail else "compact" if compact else "desktop")
 	for card_node: Node in grid.get_children():
 		var item_card: Control = card_node as Control
 		if item_card != null and item_card.has_method("set_material_slot_presentation"):
@@ -199,43 +234,78 @@ func _apply_material_storage_layout() -> void:
 		router.set_item_grid(_item_grid_helper)
 		for card_node: Node in grid.get_children():
 			router.attach_card(card_node)
-	_apply_material_header_style(occupied_slots, total_slots, visible_cards, tight_compact, compact)
+	_apply_material_header_style(occupied_slots, total_slots, ready_slots_shown, tight_compact, compact, wide_support_rail)
+	_apply_cache_shell_style(tight_compact, compact)
 	grid.queue_sort()
 	left_area.queue_sort()
 
-func _apply_material_header_style(occupied_slots: int, total_slots: int, visible_cards: int, tight_compact: bool, compact: bool) -> void:
+func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_slots: int, tight_compact: bool, compact: bool, wide_support_rail: bool) -> void:
 	if header == null:
 		return
-	var open_slots: int = maxi(0, visible_cards - occupied_slots)
-	var sealed_slots: int = maxi(0, total_slots - visible_cards)
+	var sealed_slots: int = maxi(0, total_slots - occupied_slots - ready_slots)
 	header.text = (
-		"CACHE // %02d OPEN" % open_slots
+		"CACHE RELIQUARY\n%02d READY / %02d SEALED" % [ready_slots, sealed_slots]
 		if tight_compact
-		else "CACHE // %02d OPEN / %02d SEALED" % [open_slots, sealed_slots]
+		else "RELIQUARY CACHE\n%02d HELD  •  %02d READY  •  %02d SEALED" % [occupied_slots, ready_slots, sealed_slots]
 		if compact
-		else "ITEM CACHE // %02d OCCUPIED // %02d OPEN // %02d SEALED" % [occupied_slots, open_slots, sealed_slots]
+		else "EVIDENCE RELIQUARY CACHE\n%02d HELD  •  %02d READY POCKETS  •  %02d SEALED IN RESERVE" % [occupied_slots, ready_slots, sealed_slots]
 	)
-	header.add_theme_font_size_override("font_size", 11 if tight_compact else 12 if compact else 15)
+	header.custom_minimum_size.y = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
+	header.add_theme_font_size_override("font_size", 11 if tight_compact else 13 if wide_support_rail else 12 if compact else 15)
 	header.add_theme_color_override("font_color", Color(0.94, 0.83, 0.68, 1.0))
 	header.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
 	header.add_theme_constant_override("outline_size", 2)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	header.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.clip_text = false
+	header.autowrap_mode = TextServer.AUTOWRAP_OFF
 	var header_style: StyleBoxFlat = StyleBoxFlat.new()
-	header_style.bg_color = Color(0.020, 0.017, 0.019, 0.96)
-	header_style.border_color = Color(0.54, 0.38, 0.22, 0.88)
-	header_style.border_width_left = 4
-	header_style.border_width_top = 1
-	header_style.border_width_right = 1
-	header_style.border_width_bottom = 2
-	header_style.content_margin_left = 7.0
-	header_style.content_margin_right = 5.0
+	header_style.bg_color = Color(0.018, 0.013, 0.016, 0.98)
+	header_style.border_color = Color(0.58, 0.43, 0.29, 0.94)
+	header_style.border_width_left = 5
+	header_style.border_width_top = 2
+	header_style.border_width_right = 2
+	header_style.border_width_bottom = 4
+	header_style.content_margin_left = 8.0
+	header_style.content_margin_top = 4.0
+	header_style.content_margin_right = 6.0
+	header_style.content_margin_bottom = 4.0
+	header_style.shadow_color = Color(0.0, 0.0, 0.0, 0.82)
+	header_style.shadow_size = 4
 	header.add_theme_stylebox_override("normal", header_style)
 	header.set_meta("material_cache_hierarchy", true)
-	header.set_meta("purposeful_empty_focus", occupied_slots == 0 and visible_cards == EMPTY_READY_SLOTS)
+	header.set_meta("reliquary_cache_hierarchy", true)
+	header.set_meta("cache_visual_language", "evidence_reliquary")
+	header.set_meta("ready_slots", ready_slots)
+	header.set_meta("sealed_slots", sealed_slots)
+	header.set_meta("header_hierarchy_lines", 2)
+	header.set_meta("wide_support_rail", wide_support_rail)
+	header.set_meta("purposeful_empty_focus", occupied_slots == 0 and ready_slots == EMPTY_READY_SLOTS)
 	if grid != null:
 		grid.set_meta("material_header_text", header.text)
+
+func _apply_cache_shell_style(tight_compact: bool, compact: bool) -> void:
+	if view == null:
+		return
+	var shell: Panel = view.get_node_or_null(CACHE_SHELL_NAME) as Panel
+	if shell == null:
+		return
+	var shell_style: StyleBoxFlat = StyleBoxFlat.new()
+	shell_style.bg_color = Color(0.012, 0.009, 0.012, 0.98)
+	shell_style.border_color = Color(0.48, 0.38, 0.30, 0.94)
+	shell_style.border_width_left = 4 if tight_compact else 5
+	shell_style.border_width_top = 2
+	shell_style.border_width_right = 2
+	shell_style.border_width_bottom = 5 if compact or tight_compact else 7
+	shell_style.content_margin_left = 7.0 if tight_compact else 9.0
+	shell_style.content_margin_top = 7.0 if tight_compact else 9.0
+	shell_style.content_margin_right = 7.0 if tight_compact else 9.0
+	shell_style.content_margin_bottom = 8.0 if tight_compact else 10.0
+	shell_style.shadow_color = Color(0.18, 0.0, 0.015, 0.68)
+	shell_style.shadow_size = 8 if compact or tight_compact else 12
+	shell.add_theme_stylebox_override("panel", shell_style)
+	shell.set_meta("physical_reliquary_shell", true)
+	shell.set_meta("cache_material_palette", "black_bone_oxblood")
 
 func _get_item_card_scene() -> PackedScene:
 	if _item_card_scene == null:

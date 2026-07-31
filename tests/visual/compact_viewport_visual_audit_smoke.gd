@@ -585,14 +585,28 @@ func _expect_item_cache_contract(context: String) -> void:
 	if left_panel == null or header == null or item_grid == null:
 		return
 	_expect(left_panel.get_global_rect().grow(1.0).encloses(header.get_global_rect()), "%s item-cache label escaped its rail" % context)
-	_expect(header.text.contains("CACHE") or header.text.contains("ITEMS"), "%s item-cache label does not explain the upper-left surface" % context)
-	_expect(header.text.contains("EMPTY") or header.text.contains("/"), "%s item-cache label lacks an intentional inventory state" % context)
+	_expect(header.text.contains("RELIQUARY") and header.text.contains("CACHE"), "%s item-cache label does not identify the upper-left reliquary" % context)
+	_expect(header.text.contains("READY") and header.text.contains("SEALED"), "%s item-cache label lacks ready-pocket and sealed-reserve states" % context)
 	_expect(header.get_theme_font_size("font_size") >= 11, "%s item-cache label is too small" % context)
 	_expect(bool(header.get_meta("material_cache_hierarchy", false)), "%s item cache lacks its constructed docket hierarchy" % context)
+	_expect(bool(header.get_meta("reliquary_cache_hierarchy", false)) and String(header.get_meta("cache_visual_language", "")) == "evidence_reliquary", "%s item cache reverted from the evidence-reliquary language" % context)
+	_expect(int(header.get_meta("header_hierarchy_lines", 0)) == 2 and header.text.count("\n") == 1, "%s item cache collapsed back into a one-line diagnostic header" % context)
 	_expect(bool(item_grid.get_meta("material_cache_layout", false)), "%s item cache reverted to a raw diagnostic slot grid" % context)
 	_expect(item_grid.columns <= 3 and int(item_grid.get_meta("responsive_inventory_columns", 0)) == item_grid.columns, "%s item cache reverted to a compressed six-column diagnostic strip" % context)
 	_expect(String(item_grid.get_meta("inspection_affordance", "")) == "large_centered_cache_slots", "%s item cache lacks its enlarged inspection affordance" % context)
+	_expect(bool(item_grid.get_meta("physical_compartment_shell", false)) and int(item_grid.get_meta("ready_slot_contract", 0)) == 3, "%s item cache lacks its three-pocket physical shell contract" % context)
+	var shell: Panel = _main.get_node_or_null("CombatView/GothicItemsPlate") as Panel if _main != null else null
+	_expect(shell != null and bool(shell.get_meta("physical_reliquary_shell", false)), "%s item-cache backplate is not a physical reliquary shell" % context)
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var tight_layout: bool = bool(combat.get_meta("tight_scale_layout", false)) if combat != null else false
+	var compact_layout: bool = bool(combat.get_meta("compact_layout", false)) if combat != null else false
+	var viewport_size: Vector2 = combat.get_viewport_rect().size if combat != null else Vector2.ZERO
+	var wide_support_rail: bool = compact_layout and not tight_layout and viewport_size.x >= 1600.0
+	var expected_slot_size: Vector2 = Vector2(40.0, 56.0) if tight_layout else Vector2(70.0, 84.0) if wide_support_rail else Vector2(56.0, 74.0) if compact_layout else Vector2(84.0, 96.0)
+	_expect(not wide_support_rail or (bool(header.get_meta("wide_support_rail", false)) and left_panel.custom_minimum_size.x >= 240.0), "%s desktop/ultrawide item cache remained underscaled" % context)
 	var visible_item_slots: int = 0
+	var ready_item_slots: int = 0
+	var binding_positions: Array[float] = []
 	for item_node: Node in item_grid.get_children():
 		var item_card: Control = item_node as Control
 		if item_card == null or not item_card.is_visible_in_tree():
@@ -610,13 +624,26 @@ func _expect_item_cache_contract(context: String) -> void:
 			_expect(outer_style.border_width_left > 0 and outer_style.border_width_top > 0 and outer_style.border_width_right > 0 and outer_style.border_width_bottom > 0, "%s item slot %s outer perimeter is incomplete" % [context, String(item_card.name)])
 		if inner_style != null:
 			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "%s item slot %s inner perimeter is incomplete" % [context, String(item_card.name)])
-		_expect(item_card.size.x >= 32.0 and item_card.size.y >= 32.0, "%s item slot %s collapsed below an inspectable frame: %s" % [context, String(item_card.name), str(item_card.size)])
+		_expect(item_card.custom_minimum_size.x >= expected_slot_size.x and item_card.custom_minimum_size.y >= expected_slot_size.y, "%s item slot %s collapsed below its reliquary scale: %s expected=%s" % [context, String(item_card.name), str(item_card.custom_minimum_size), str(expected_slot_size)])
+		_expect(outer_style == null or (outer_style.border_width_left >= 3 and outer_style.border_width_bottom >= 4), "%s item slot %s lacks weighted reliquary joinery" % [context, String(item_card.name)])
+		var cavity: Panel = item_card.get_node_or_null("PocketCavity") as Panel
+		var binding_rail: ColorRect = item_card.get_node_or_null("BindingRail") as ColorRect
+		var docket: Label = item_card.get_node_or_null("Docket") as Label
+		_expect(cavity != null and cavity.get_theme_stylebox("panel") is StyleBoxFlat, "%s item slot %s lacks a recessed evidence cavity" % [context, String(item_card.name)])
+		_expect(binding_rail != null and docket != null, "%s item slot %s lacks its binding rail or docket" % [context, String(item_card.name)])
 		var empty_mark: Label = item_card.get_node_or_null("EmptyMark") as Label
 		if empty_mark != null and empty_mark.visible:
-			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)) and empty_mark.text.contains("OPEN"), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
+			ready_item_slots += 1
+			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)) and empty_mark.text.contains("RECEIVE"), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
+			_expect(String(item_card.get_meta("cache_slot_state", "")) == "ready" and docket != null and docket.text.contains("READY"), "%s empty item slot %s lacks a ready-pocket docket" % [context, String(item_card.name)])
+			if binding_rail != null and not binding_positions.has(binding_rail.anchor_left):
+				binding_positions.append(binding_rail.anchor_left)
 	_expect(visible_item_slots >= 3, "%s item cache must expose at least three purposeful ready slots" % context)
+	_expect(ready_item_slots == int(header.get_meta("ready_slots", -1)), "%s header ready count disagrees with visible receive pockets" % context)
 	if int(header.get_meta("occupied_slots", 0)) == 0:
 		_expect(visible_item_slots == 3, "%s empty item cache should focus three ready slots instead of exposing the full reserve grid" % context)
+		_expect(ready_item_slots == 3 and binding_positions.size() == 3, "%s empty cache does not present three distinct ready reliquary pockets" % context)
+		_expect(int(header.get_meta("sealed_slots", -1)) == maxi(0, int(header.get_meta("total_slots", 0)) - 3), "%s empty cache sealed reserve count is inconsistent" % context)
 
 func _expect_planning_landmark_contract(context: String, board_column: Control, enemy_board: GridContainer, player_board: GridContainer) -> void:
 	if board_column == null or enemy_board == null or player_board == null:

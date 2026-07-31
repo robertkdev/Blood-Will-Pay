@@ -87,6 +87,14 @@ func _validate_layout(state: String) -> void:
 		_expect(panel_style != null and panel_style.border_width_left >= 10 and panel_style.border_width_bottom >= 8, "%s LedgerPanel should retain an asymmetrically repaired binding" % state)
 	var assembly_layer: Control = _ledger.find_child("AssemblyLayer", true, false) as Control
 	_expect(assembly_layer != null and assembly_layer.get_child_count() >= 3, "%s Ledger should expose assembled repair strips" % state)
+	_expect(panel != null and panel.clip_contents and String(panel.get_meta("decoration_containment", "")) == "panel_frame_gutters", "%s Ledger panel should clip decoration to reserved frame gutters" % state)
+	_expect(assembly_layer != null and assembly_layer.clip_contents and String(assembly_layer.get_meta("decoration_containment", "")) == "panel_rect_and_reserved_gutters", "%s Ledger assembly layer should clip its print damage" % state)
+	var print_scars: Label = _ledger.find_child("PrintScars", true, false) as Label
+	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
+	_expect(print_scars != null and print_scars.get_parent() == assembly_layer, "%s Ledger print scars should live in the clipped assembly layer" % state)
+	_expect(print_scars != null and String(print_scars.get_meta("decoration_region", "")) == "panel_bottom_gutter", "%s Ledger print scars should declare their dedicated bottom-gutter region" % state)
+	if print_scars != null and page_scroll != null:
+		_expect(not print_scars.get_global_rect().intersects(page_scroll.get_global_rect()), "%s Ledger print scars intersect the visible record viewport" % state)
 	var footer_band: PanelContainer = _ledger.find_child("LedgerFooter", true, false) as PanelContainer
 	var footer_stamp: Label = _ledger.find_child("CarbonStamp", true, false) as Label
 	var footer_status: Label = _ledger.find_child("LedgerStatus", true, false) as Label
@@ -94,7 +102,6 @@ func _validate_layout(state: String) -> void:
 	_expect(footer_stamp != null and footer_stamp.get_parent() != assembly_layer, "%s Ledger carbon-copy stamp must live in the dedicated footer, not over the page" % state)
 	_expect(footer_status != null and footer_status.get_parent() == footer_stamp.get_parent(), "%s Ledger status and stamp should share one non-overlapping footer row" % state)
 	_expect(footer_status != null and bool(footer_status.get_meta("persistent_status_uses_utility_face", false)), "%s Ledger footer status regressed to condensed display type" % state)
-	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
 	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s Ledger page must never escape horizontally" % state)
 	if page_scroll != null and panel != null:
 		_expect(_rect_inside(page_scroll.get_global_rect(), panel.get_global_rect().grow(1.0)), "%s Ledger page scroll escaped its record frame" % state)
@@ -104,6 +111,16 @@ func _validate_layout(state: String) -> void:
 		_expect(page_rect.end.y <= footer_rect.position.y + 1.0, "%s Ledger footer masks scroll content instead of following it" % state)
 		_expect(absf(page_rect.position.x - footer_rect.position.x) <= 1.0 and absf(page_rect.end.x - footer_rect.end.x) <= 1.0, "%s Ledger footer should align to the page record width" % state)
 		_expect(footer_rect.size.y >= 48.0, "%s Ledger footer should reserve its own material strip" % state)
+	if print_scars != null and footer_band != null:
+		_expect(not print_scars.get_global_rect().intersects(footer_band.get_global_rect()), "%s Ledger print scars intersect the live footer" % state)
+	var styled_close_button: Button = _ledger.find_child("CloseFileButton", true, false) as Button
+	if styled_close_button != null:
+		var close_pressed: StyleBoxFlat = styled_close_button.get_theme_stylebox("pressed") as StyleBoxFlat
+		var close_focus: StyleBoxFlat = styled_close_button.get_theme_stylebox("focus") as StyleBoxFlat
+		var close_disabled: StyleBoxFlat = styled_close_button.get_theme_stylebox("disabled") as StyleBoxFlat
+		_expect(close_pressed != null and close_focus != null and close_pressed.border_color != close_focus.border_color, "%s Ledger close focus must remain distinct from pressed" % state)
+		_expect(close_focus != null and close_focus.border_color.b > close_focus.border_color.r, "%s Ledger close focus should use signal blue" % state)
+		_expect(close_disabled != null and close_disabled.border_width_left >= 10 and close_disabled.border_width_bottom >= 5, "%s Ledger disabled action should use a blocked shape, not only dimming" % state)
 	var sparse_expected: bool = state != "veteran"
 	_expect(bool(_ledger.get("_sparse_content_record")) == sparse_expected, "%s content-density classification was not %s" % [state, "sparse" if sparse_expected else "populated"])
 	var displayable_starter_rows: int = int(_ledger.get("_displayable_starter_row_count"))

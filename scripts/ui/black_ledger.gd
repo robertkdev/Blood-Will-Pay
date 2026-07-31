@@ -233,19 +233,32 @@ func _build_ui() -> void:
 	add_child(center)
 	_panel = PanelContainer.new()
 	_panel.name = "LedgerPanel"
+	_panel.clip_contents = true
+	_panel.set_meta("decoration_containment", "panel_frame_gutters")
 	_panel.add_theme_stylebox_override("panel", _panel_style())
 	center.add_child(_panel)
 	_build_assembly_layer()
 	var print_scars: Label = Label.new()
 	print_scars.name = "PrintScars"
-	print_scars.text = "///   X   X   //////\n  X  ////  X\n/////    X      ///\n   X   X   ///////"
+	print_scars.text = "/// X /// X ////"
 	print_scars.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	print_scars.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	print_scars.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	print_scars.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	print_scars.add_theme_font_size_override("font_size", 13)
-	print_scars.add_theme_color_override("font_color", Color(0.58, 0.35, 0.20, 0.24))
+	print_scars.add_theme_font_size_override("font_size", 11)
+	print_scars.add_theme_color_override("font_color", Color(0.58, 0.35, 0.20, 0.34))
+	print_scars.set_meta("decoration_region", "panel_bottom_gutter")
+	print_scars.set_meta("live_content_clearance_px", 6.0)
 	VisualTypeSystem.set_utility(print_scars)
-	_panel.add_child(print_scars)
+	if _assembly_layer != null:
+		_assembly_layer.add_child(print_scars)
+		print_scars.anchor_left = 1.0
+		print_scars.anchor_top = 1.0
+		print_scars.anchor_right = 1.0
+		print_scars.anchor_bottom = 1.0
+		print_scars.offset_left = -270.0
+		print_scars.offset_top = -19.0
+		print_scars.offset_right = -20.0
+		print_scars.offset_bottom = -3.0
 	_ledger_margin = MarginContainer.new()
 	_panel.add_child(_ledger_margin)
 	_ledger_frame = VBoxContainer.new()
@@ -452,6 +465,8 @@ func _build_assembly_layer() -> void:
 	_assembly_layer = Control.new()
 	_assembly_layer.name = "AssemblyLayer"
 	_assembly_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_assembly_layer.clip_contents = true
+	_assembly_layer.set_meta("decoration_containment", "panel_rect_and_reserved_gutters")
 	_panel.add_child(_assembly_layer)
 	_assembly_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var top_binding: ColorRect = ColorRect.new()
@@ -783,12 +798,28 @@ func _style_button(button: Button, compact: bool) -> void:
 	button.add_theme_font_size_override("font_size", 17 if compact else 19)
 	VisualTypeSystem.set_action(button)
 	button.add_theme_color_override("font_color", COLOR_BONE)
-	button.add_theme_color_override("font_disabled_color", COLOR_MUTED)
+	button.add_theme_color_override("font_focus_color", Color(0.84, 0.95, 1.0, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.60, 0.56, 1.0))
 	button.add_theme_stylebox_override("normal", _button_style(Color(0.050, 0.041, 0.045, 0.98), Color(0.54, 0.45, 0.34, 0.88)))
 	button.add_theme_stylebox_override("hover", _button_style(Color(0.105, 0.065, 0.055, 1.0), Color(0.92, 0.68, 0.34, 1.0)))
 	button.add_theme_stylebox_override("pressed", _button_style(Color(0.16, 0.025, 0.035, 1.0), Color(0.88, 0.08, 0.10, 1.0)))
-	button.add_theme_stylebox_override("focus", _button_style(Color(0.075, 0.050, 0.050, 1.0), Color(0.98, 0.78, 0.42, 1.0)))
-	button.add_theme_stylebox_override("disabled", _button_style(Color(0.026, 0.024, 0.028, 0.94), Color(0.34, 0.11, 0.12, 0.82)))
+	var focus_style: StyleBoxFlat = _button_style(Color(0.026, 0.072, 0.098, 1.0), Color(0.50, 0.82, 1.0, 1.0))
+	focus_style.border_width_left = 11
+	focus_style.border_width_top = 3
+	focus_style.border_width_right = 3
+	focus_style.border_width_bottom = 4
+	focus_style.expand_margin_left = 2.0
+	focus_style.expand_margin_top = 2.0
+	focus_style.expand_margin_right = 2.0
+	focus_style.expand_margin_bottom = 2.0
+	button.add_theme_stylebox_override("focus", focus_style)
+	var disabled_style: StyleBoxFlat = _button_style(Color(0.026, 0.024, 0.028, 0.94), Color(0.34, 0.32, 0.30, 0.92))
+	disabled_style.border_width_left = 12
+	disabled_style.border_width_right = 4
+	disabled_style.border_width_bottom = 6
+	button.add_theme_stylebox_override("disabled", disabled_style)
+	button.set_meta("focus_visual_cue", "signal_blue_full_frame")
+	button.set_meta("disabled_non_color_cue", "blocked_left_bar_and_bottom_cut")
 
 func _panel_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

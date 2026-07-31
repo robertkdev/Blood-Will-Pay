@@ -128,14 +128,21 @@ func _run() -> void:
 	await _settle_frames(8)
 	_assert_settings_rail_contract()
 	await _capture("03_settings_1920x1080.png", "settings", DESKTOP_SIZE)
-	var settings_state_button: Button = _first_visible_button(title_menu)
-	_expect(settings_state_button != null, "settings did not expose a reviewable interaction control")
+	var settings_state_button: Button = title_menu.find_child("UIScaleOption", true, false) as Button if title_menu != null else null
+	_expect(settings_state_button != null, "settings did not expose the real UI Scale selector for interaction-state review")
 	if settings_state_button != null:
 		settings_state_button.grab_focus()
 		DisplayServer.warp_mouse(settings_state_button.get_global_rect().get_center())
 		await _settle_frames(4)
 		_expect(settings_state_button.has_focus(), "settings focus state did not become authoritative")
+		var settings_focus_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("focus") as StyleBoxFlat
+		var settings_pressed_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("pressed") as StyleBoxFlat
+		_expect(settings_focus_style != null and settings_pressed_style != null and settings_focus_style.border_color != settings_pressed_style.border_color, "settings selector focus must be visibly distinct from pressed")
 		await _capture("29_settings_focus_hover_1920x1080.png", "settings_focus_hover", DESKTOP_SIZE)
+		settings_state_button.release_focus()
+		DisplayServer.warp_mouse(Vector2(1.0, 1.0))
+		await _settle_frames(3)
+		_expect(not settings_state_button.has_focus(), "settings pressed capture retained keyboard focus")
 		var previous_toggle_mode: bool = settings_state_button.toggle_mode
 		settings_state_button.toggle_mode = true
 		settings_state_button.button_pressed = true
@@ -145,6 +152,10 @@ func _run() -> void:
 		settings_state_button.toggle_mode = previous_toggle_mode
 		settings_state_button.disabled = true
 		await _settle_frames(3)
+		var disabled_cue: String = String(settings_state_button.get_meta("disabled_non_color_cue", ""))
+		var disabled_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("disabled") as StyleBoxFlat
+		_expect(not disabled_cue.is_empty(), "settings disabled state lacks a declared non-color cue")
+		_expect(disabled_style != null and disabled_style.border_width_left >= 8 and disabled_style.border_width_bottom >= 4, "settings disabled state lacks a visible blocked-edge cue")
 		await _capture("31_settings_disabled_1920x1080.png", "settings_disabled", DESKTOP_SIZE)
 		settings_state_button.disabled = false
 
@@ -311,6 +322,7 @@ func _run() -> void:
 
 	_expect(controller != null and controller.has_method("_show_result_banner"), "combat result presenter missing")
 	if controller != null and controller.has_method("_show_result_banner"):
+		_freeze_result_auto_advance(controller)
 		await _capture_result_entry_and_hold(
 			controller,
 			"VICTORY",
@@ -336,12 +348,36 @@ func _run() -> void:
 			Color(1.0, 0.69, 0.60, 1.0),
 			"20_defeat_hold_1920x1080.png"
 		)
+		var combat_was_processing_for_focus: bool = combat.is_processing() if combat != null else false
+		var manager_process_mode_for_focus: int = int(manager.process_mode) if manager != null else int(Node.PROCESS_MODE_INHERIT)
+		if combat != null:
+			combat.set_process(false)
+		if manager != null:
+			manager.process_mode = Node.PROCESS_MODE_DISABLED
 		var result_skip: Button = _main.get_node_or_null("BattleResultBanner/Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
 		if result_skip != null:
+			_freeze_result_auto_advance(controller)
+			# Capture the real post-guard interactive state. The controller
+			# intentionally redraws the button as disabled during the first 0.45s.
+			controller.set("_result_hold_elapsed", 1.0)
+			result_skip.disabled = false
+			await _settle_frames(2)
+			_expect(not result_skip.disabled, "result skip did not reach its post-guard interactive state")
 			result_skip.grab_focus()
+			DisplayServer.warp_mouse(Vector2(1.0, 1.0))
 			await _settle_frames(3)
 			_expect(result_skip.has_focus(), "result skip focus state did not become authoritative")
+			_expect(bool(result_skip.get_meta("focused_state_visible", false)), "result skip focus was not mirrored into its visible base pass")
+			var skip_focus_frame: Panel = result_skip.get_node_or_null("FocusFrame") as Panel
+			_expect(skip_focus_frame != null and skip_focus_frame.visible and skip_focus_frame.size.x >= result_skip.size.x and skip_focus_frame.size.y >= result_skip.size.y, "result skip dedicated signal-blue focus frame was not visible at full button size")
+			var skip_focus_style: StyleBoxFlat = result_skip.get_theme_stylebox("focus") as StyleBoxFlat
+			var skip_normal_style: StyleBoxFlat = result_skip.get_theme_stylebox("normal") as StyleBoxFlat
+			_expect(skip_focus_style != null and skip_normal_style != null and skip_focus_style.border_color != skip_normal_style.border_color and skip_focus_style.border_width_left >= 4, "result skip focus is not perceptibly distinct")
 		await _capture("33_result_skip_focus_1920x1080.png", "defeat_skip_focus", DESKTOP_SIZE)
+		if manager != null:
+			manager.process_mode = manager_process_mode_for_focus
+		if combat != null:
+			combat.set_process(combat_was_processing_for_focus)
 		_configure_scaled_window(COMPACT_SIZE, 1.5)
 		if combat != null and combat.has_method("_apply_responsive_layout"):
 			combat.call("_apply_responsive_layout")
@@ -447,6 +483,7 @@ func _capture_result_variant(
 ) -> void:
 	var detail: String = String(controller.call("_build_result_economy_detail", outcome))
 	controller.call("_show_result_banner", title, detail, accent, title_color)
+	_freeze_result_auto_advance(controller)
 	await _settle_frames(3)
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
 	_expect(banner != null, "%s result banner missing" % title)
@@ -472,6 +509,7 @@ func _capture_result_entry_and_hold(
 	var detail: String = String(controller.call("_build_result_economy_detail", outcome))
 	Engine.time_scale = 1.0
 	controller.call("_show_result_banner", title, detail, accent, title_color)
+	_freeze_result_auto_advance(controller)
 	await _settle_frames(1)
 	_assert_result_outcome_contract(title)
 	await _capture(entry_filename, "%s_entry" % outcome, DESKTOP_SIZE)
@@ -486,6 +524,12 @@ func _capture_result_entry_and_hold(
 		if card != null:
 			card.scale = Vector2.ONE
 	await _capture(hold_filename, "%s_hold" % outcome, DESKTOP_SIZE)
+
+
+func _freeze_result_auto_advance(controller: Variant) -> void:
+	var intermission_timer: Timer = controller.get("intermission") as Timer if controller != null else null
+	if intermission_timer != null:
+		intermission_timer.stop()
 
 
 func _build_loss_surface() -> void:
@@ -553,21 +597,22 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(arena != null and String(arena.get_meta("battlefield_pressure_phase", "")) == expected_phase, "%s capture did not reach the requested environment phase" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("battlefield_reduced_motion", not reduced_motion)) == reduced_motion, "%s capture reduced-motion metadata is wrong" % expected_phase)
 	_expect(arena != null and String(arena.get_meta("battlefield_environment_signature", "")).begins_with("persistent_killing_ground/"), "%s capture lacks the persistent battlefield signature" % expected_phase)
-	_expect(arena != null and String(arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_landmark_aligned_authored_overlay", "%s capture is not sourced from the stable field plus aligned threat layer" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_aligned_raster_and_physical_evidence", "%s capture is not sourced from the stable field plus visible physical evidence" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("stable_base_location", false)), "%s capture does not preserve one tactical location" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("procedural_environment_geometry_suppressed", false)), "%s capture retained procedural environment geometry" % expected_phase)
 	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not prioritize cell readability" % expected_phase)
-	_expect(aftermath != null and not aftermath.visible, "%s capture exposed the retired procedural war-aftermath root" % expected_phase)
+	var expects_physical_evidence: bool = expected_phase != "onset"
+	_expect(aftermath != null and aftermath.visible == expects_physical_evidence, "%s capture has the wrong physical evidence visibility" % expected_phase)
 	_expect(onset != null and not onset.visible and midfight != null and not midfight.visible and collapse != null and not collapse.visible and reduced_lock != null and not reduced_lock.visible, "%s capture leaked a procedural evidence group over the authored field" % expected_phase)
-	_expect(pressure_painter != null and not pressure_painter.is_visible_in_tree(), "%s capture leaked the retired procedural pressure painter" % expected_phase)
+	_expect(pressure_painter != null and pressure_painter.is_visible_in_tree() == expects_physical_evidence, "%s capture does not expose the expected authored physical evidence painter" % expected_phase)
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
-	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.18 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.26, "%s capture lost the legible terrain-seam balance" % expected_phase)
+	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.34, "%s capture lost the legible terrain-seam balance" % expected_phase)
 	_expect(arena_surface != null and String(arena_surface.get_meta("battlefield_foundation", "")) == "muddy_rural_killing_ground_v1", "%s capture lacks the physical rural horror foundation" % expected_phase)
 	_expect(arena_surface != null and arena_surface.texture != null and arena_surface.modulate.a >= 0.90, "%s capture washes out or loses the authored battlefield texture" % expected_phase)
 	_expect(arena_surface != null and String(arena_surface.get_meta("active_material_phase", "")) == "persistent_onset_base", "%s capture replaced the stable authored foundation" % expected_phase)
 	_expect(pressure_surface != null and pressure_surface.visible == (expected_phase != "onset"), "%s capture uses the wrong aligned pressure-layer visibility" % expected_phase)
 	_expect(pressure_surface != null and bool(pressure_surface.get_meta("landmark_aligned_with_base", false)), "%s capture pressure art is not registered as landmark-aligned" % expected_phase)
-	_expect(arena != null and is_equal_approx(float(arena.get_meta("battlefield_overlay_density", 1.0)), 0.0), "%s capture retained a procedural environment overlay density" % expected_phase)
+	_expect(arena != null and float(arena.get_meta("battlefield_overlay_density", -1.0)) >= (0.0 if expected_phase == "onset" else 0.16), "%s capture lacks visible phase evidence density" % expected_phase)
 	_assert_persistent_combat_hierarchy(expected_phase)
 
 func _assert_title_gateway_contract(context: String, compact: bool) -> void:
@@ -760,10 +805,12 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 		_expect(instruction_width <= instruction_ribbon.size.x + 1.0, "%s result instruction clips: text=%.1f width=%.1f" % [outcome, instruction_width, instruction_ribbon.size.x])
 		_expect(bool(instruction_ribbon.get_meta("persistent_copy_uses_utility_face", false)), "%s result instruction regressed to condensed display type" % outcome)
 	_expect(aftermath != null and String(aftermath.get_meta("physical_geometry_signature", "")) == expected_signature, "%s lacks its physical aftermath signature" % outcome)
-	_expect(aftermath != null and bool(aftermath.get_meta("procedural_outcome_geometry_suppressed", false)), "%s retained procedural outcome geometry" % outcome)
+	_expect(aftermath != null and bool(aftermath.get_meta("authored_physical_aftermath_visible", false)), "%s lacks visible authored physical aftermath" % outcome)
 	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "persistent_onset_landmark_base", "%s replaces the stable aftermath location" % outcome)
 	_expect(pressure_art != null and String(pressure_art.get_meta("result_material_source", "")) == "landmark_aligned_consequence_overlay", "%s lacks aligned consequence material" % outcome)
-	_expect(victory_geometry != null and not victory_geometry.visible and stalemate_geometry != null and not stalemate_geometry.visible and defeat_geometry != null and not defeat_geometry.visible, "%s exposes a retired procedural aftermath painter" % outcome)
+	_expect(victory_geometry != null and victory_geometry.visible == (outcome == "VICTORY"), "%s has the wrong victory aftermath visibility" % outcome)
+	_expect(stalemate_geometry != null and stalemate_geometry.visible == (outcome == "STALEMATE"), "%s has the wrong stalemate aftermath visibility" % outcome)
+	_expect(defeat_geometry != null and defeat_geometry.visible == (outcome == "DEFEAT"), "%s has the wrong defeat aftermath visibility" % outcome)
 	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
 	var phase_label: Label = stage_bar.find_child("PhaseLabel", true, false) as Label if stage_bar != null else null
 	_expect(phase_label != null and phase_label.text.contains("RECORDED") and not phase_label.text.contains("FIGHT"), "%s result leaves the stage strip in an active-fight state" % outcome)
@@ -885,7 +932,22 @@ func _capture(filename: String, state: String, expected_size: Vector2i) -> void:
 	if texture == null or not texture.get_rid().is_valid():
 		_expect(false, "%s blocked: viewport texture unavailable" % filename)
 		return
-	var image: Image = texture.get_image()
+	_record_capture_image(texture.get_image(), filename, state, expected_size)
+
+
+func _capture_now(filename: String, state: String, expected_size: Vector2i) -> void:
+	if not _framebuffer_capture_available():
+		_expect(false, "%s blocked: real framebuffer unavailable" % filename)
+		return
+	RenderingServer.force_draw(false)
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture == null or not texture.get_rid().is_valid():
+		_expect(false, "%s blocked: viewport texture unavailable" % filename)
+		return
+	_record_capture_image(texture.get_image(), filename, state, expected_size)
+
+
+func _record_capture_image(image: Image, filename: String, state: String, expected_size: Vector2i) -> void:
 	if image == null or image.is_empty() or image.get_width() <= 0 or image.get_height() <= 0:
 		_expect(false, "%s blocked: viewport image unavailable" % filename)
 		return

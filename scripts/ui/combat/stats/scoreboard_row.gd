@@ -138,6 +138,14 @@ func _compact_identity_for_width(unit_name: String, team_prefix: String, availab
 	if clean_name == "":
 		clean_name = "UNIT"
 	var font: Font = name_label.get_theme_font("font") if name_label != null else null
+	if available_width < 112.0:
+		_compact_identity_font_size = 14
+		var tight_badge: String = "%s %s" % [team_prefix.left(1), clean_name]
+		if _compact_text_width(tight_badge, font, _compact_identity_font_size) <= available_width:
+			_compact_identity_mode = "tight_team_marker"
+			return tight_badge
+		_compact_identity_mode = "coded_name_tight_team_marker"
+		return "%s %s" % [team_prefix.left(1), _compact_identity_name(clean_name)]
 	var full_badge: String = "%s %s" % [team_prefix, clean_name]
 	_compact_identity_font_size = 14
 	while _compact_identity_font_size > 10 and _compact_text_width(full_badge, font, _compact_identity_font_size) > available_width:
@@ -159,10 +167,13 @@ func _compact_identity_available_width() -> float:
 	if name_label == null:
 		return 72.0
 	if name_label.size.x > 1.0:
-		return name_label.size.x
+		# Compact rails can settle a few pixels narrower after the row text is
+		# first measured. Reserve that final-layout inset so a full badge never
+		# wins against a provisional width and then clips at 125/150% scaling.
+		return maxf(32.0, name_label.size.x - 8.0)
 	if content_box != null and content_box.size.x > 1.0:
-		return maxf(32.0, content_box.size.x - 52.0)
-	return maxf(32.0, size.x - 62.0)
+		return maxf(32.0, content_box.size.x - 60.0)
+	return maxf(32.0, size.x - 70.0)
 
 func _compact_text_width(text: String, font: Font, font_size: int) -> float:
 	if font != null:

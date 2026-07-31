@@ -655,9 +655,9 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		metric_tabs.visible = not compact
 	var stats_title: Label = stats_panel.find_child("Title", true, false) as Label if stats_panel != null else null
 	if stats_title != null:
-		stats_title.text = "TEAM\nMETRICS" if tight_compact else "TEAM METRICS" if compact else "Team Metrics"
-		stats_title.add_theme_font_size_override("font_size", 14 if tight_compact else 17 if compact else 22)
-		stats_title.custom_minimum_size.y = 34.0 if tight_compact else 0.0
+		stats_title.text = "TEAM METRICS" if compact else "Team Metrics"
+		stats_title.add_theme_font_size_override("font_size", 11 if tight_compact else 17 if compact else 22)
+		stats_title.custom_minimum_size.y = 24.0 if tight_compact else 0.0
 		stats_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if tight_compact else HORIZONTAL_ALIGNMENT_LEFT
 		stats_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		stats_title.clip_text = false
@@ -758,13 +758,13 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 		label.text = "HOLD LINE // COMMIT"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if enemy_side else HORIZONTAL_ALIGNMENT_RIGHT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 10 if tight_compact else 13 if compact else 16)
-	label.add_theme_color_override("font_color", Color(0.96, 0.52, 0.44, 0.74) if enemy_side else Color(0.89, 0.78, 0.60, 0.70))
+	label.add_theme_font_size_override("font_size", 12 if tight_compact else 15 if compact else 19)
+	label.add_theme_color_override("font_color", Color(1.0, 0.58, 0.47, 0.96) if enemy_side else Color(1.0, 0.90, 0.69, 0.96))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.94))
 	label.add_theme_constant_override("outline_size", 2)
 	var label_plate: StyleBoxFlat = StyleBoxFlat.new()
-	label_plate.bg_color = Color(0.012, 0.010, 0.013, 0.74)
-	label_plate.border_color = Color(0.64, 0.06, 0.08, 0.74) if enemy_side else Color(0.54, 0.45, 0.30, 0.68)
+	label_plate.bg_color = Color(0.012, 0.010, 0.013, 0.91)
+	label_plate.border_color = Color(0.82, 0.07, 0.09, 0.92) if enemy_side else Color(0.76, 0.62, 0.38, 0.90)
 	label_plate.border_width_left = 4 if enemy_side else 1
 	label_plate.border_width_right = 1 if enemy_side else 4
 	label_plate.content_margin_left = 8.0
@@ -776,6 +776,7 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	band.set_meta("planning_landmark", true)
 	label.set_meta("planning_landmark", true)
 	label.set_meta("deployment_badge_clearance", true)
+	label.set_meta("practical_contrast_revision", "loop24_high_contrast_plate")
 	area.set_meta("authored_landmark_density", 3 if large_planning_field else 2 if compact else 1)
 
 func _apply_compact_metric_badge(row: Control, compact: bool) -> void:

@@ -35,9 +35,18 @@ func _run() -> void:
 	_expect(panel != null and String(panel.get_meta("decoration_containment", "")) == "calm_panel_interior", "compact System panel missing containment contract")
 	_expect(assembly != null and assembly.clip_contents, "compact System assembly marks must be clipped")
 	_expect(assembly != null and String(assembly.get_meta("decoration_containment", "")) == "panel_rect", "compact System assembly layer missing panel-bound contract")
-	_expect(scars != null and bool(scars.get_meta("contained_by_panel", false)), "compact System X marks must declare panel containment")
+	_expect(scars != null and scars.get_parent() == assembly and bool(scars.get_meta("contained_by_panel", false)), "compact System X marks must live in the clipped assembly layer")
+	_expect(scars != null and String(scars.get_meta("decoration_region", "")) == "right_frame_gutter", "compact System X marks must declare a dedicated frame-gutter region")
+	var system_stack: VBoxContainer = panel.find_child("Stack", true, false) as VBoxContainer if panel != null else null
+	if scars != null and system_stack != null:
+		_expect(not scars.get_global_rect().intersects(system_stack.get_global_rect()), "compact System X marks intersect the live button stack")
 	_expect(settings_button != null and settings_button.visible and settings_button.text.contains("SETTINGS"), "active System menu should expose a visible Settings route")
 	_expect(settings_button != null and bool(settings_button.get_meta("preserves_active_run", false)), "System Settings route should explicitly preserve the active run")
+	if settings_button != null:
+		var settings_pressed: StyleBoxFlat = settings_button.get_theme_stylebox("pressed") as StyleBoxFlat
+		var settings_focus: StyleBoxFlat = settings_button.get_theme_stylebox("focus") as StyleBoxFlat
+		_expect(settings_pressed != null and settings_focus != null and settings_pressed.border_color != settings_focus.border_color, "System Settings focus must remain distinct from pressed")
+		_expect(settings_focus != null and settings_focus.border_color.b > settings_focus.border_color.r, "System Settings focus should use signal blue")
 	if panel != null:
 		_expect(get_viewport().get_visible_rect().grow(1.0).encloses(panel.get_global_rect()), "compact System panel escaped the viewport")
 	if settings_button != null:
@@ -49,6 +58,13 @@ func _run() -> void:
 		_expect(title_menu != null and bool(title_menu.get_meta("runtime_settings_preserves_run", false)), "runtime Settings did not publish its run-preservation contract")
 		_expect(return_to_run != null and return_to_run.visible and bool(return_to_run.get_meta("preserves_active_run", false)), "runtime Settings should provide a clear Return to Run route")
 		_expect(ui_scale_option != null and ui_scale_option.visible and ui_scale_option.item_count == 3, "System Settings route did not render the existing Settings controls")
+		if ui_scale_option != null:
+			var option_pressed: StyleBoxFlat = ui_scale_option.get_theme_stylebox("pressed") as StyleBoxFlat
+			var option_focus: StyleBoxFlat = ui_scale_option.get_theme_stylebox("focus") as StyleBoxFlat
+			var option_disabled: StyleBoxFlat = ui_scale_option.get_theme_stylebox("disabled") as StyleBoxFlat
+			_expect(option_pressed != null and option_focus != null and option_pressed.border_color != option_focus.border_color, "runtime UI Scale focus must remain distinct from pressed")
+			_expect(option_disabled != null and option_disabled.border_width_left >= 10 and option_disabled.border_width_bottom >= 4, "runtime UI Scale disabled state needs a blocked non-color cue")
+			_expect(String(ui_scale_option.get_meta("disabled_non_color_cue", "")) != "", "runtime UI Scale must publish its disabled non-color cue")
 		if return_to_run != null:
 			return_to_run.emit_signal("pressed")
 			await _settle_frames(4)

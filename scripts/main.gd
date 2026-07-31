@@ -284,16 +284,28 @@ func _build_system_menu() -> void:
 	center.add_child(_system_panel)
 	var panel_scars: Label = Label.new()
 	panel_scars.name = "PanelScars"
-	panel_scars.text = "////    X   //////////\n   ///////////   X\n///   X      //////"
+	panel_scars.text = "X\n/\n/\nX\n/"
 	panel_scars.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel_scars.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	panel_scars.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	panel_scars.add_theme_font_size_override("font_size", 14)
-	panel_scars.add_theme_color_override("font_color", Color(0.72, 0.09, 0.10, 0.28))
+	panel_scars.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	panel_scars.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	panel_scars.add_theme_font_size_override("font_size", 11)
+	panel_scars.add_theme_color_override("font_color", Color(0.72, 0.09, 0.10, 0.36))
 	panel_scars.set_meta("contained_by_panel", true)
+	panel_scars.set_meta("decoration_region", "right_frame_gutter")
+	panel_scars.set_meta("live_content_clearance_px", 7.0)
 	VisualTypeSystem.set_utility(panel_scars)
-	_system_panel.add_child(panel_scars)
 	_build_system_assembly_layer(_system_panel)
+	var assembly_layer: Control = _system_panel.find_child("SystemAssemblyLayer", false, false) as Control
+	if assembly_layer != null:
+		assembly_layer.add_child(panel_scars)
+		panel_scars.anchor_left = 1.0
+		panel_scars.anchor_top = 0.28
+		panel_scars.anchor_right = 1.0
+		panel_scars.anchor_bottom = 0.72
+		panel_scars.offset_left = -18.0
+		panel_scars.offset_top = 0.0
+		panel_scars.offset_right = -7.0
+		panel_scars.offset_bottom = 0.0
 
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "Margin"
@@ -646,25 +658,41 @@ func _layout_title_gateway() -> void:
 		return
 	var logical_size: Vector2 = get_viewport_rect().size
 	var compact: bool = logical_size.x <= 1000.0 or logical_size.y <= 560.0
+	var window: Window = get_window()
+	var physical_size: Vector2 = Vector2(window.size) if window != null else logical_size
+	var large_4k: bool = physical_size.x >= 3000.0 and physical_size.y >= 1600.0
 	var docket: PanelContainer = _title_page.get_node_or_null("IncidentEvidenceDocket") as PanelContainer
 	var incident: Label = docket.get_node_or_null("IncidentEvidence") as Label if docket != null else null
 	var entry_affordance: PanelContainer = _title_page.get_node_or_null("Center/Stack/EntryAffordance") as PanelContainer
+	var entry_order: Label = _title_page.get_node_or_null("Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
 	if docket != null:
-		docket.anchor_left = 0.535 if compact else 0.715
-		docket.anchor_top = 0.655 if compact else 0.680
+		docket.anchor_left = 0.535 if compact else (0.675 if large_4k else 0.715)
+		docket.anchor_top = 0.655 if compact else (0.655 if large_4k else 0.680)
 		docket.anchor_right = 0.955
-		docket.anchor_bottom = 0.855 if compact else 0.825
+		docket.anchor_bottom = 0.855 if compact else (0.840 if large_4k else 0.825)
 		docket.set_meta("compact_gateway_layout", compact)
+		docket.set_meta("responsive_density", "4k_readable" if large_4k else ("compact" if compact else "desktop"))
+		var docket_style: StyleBoxFlat = docket.get_theme_stylebox("panel") as StyleBoxFlat
+		if docket_style != null:
+			docket_style.content_margin_left = 20.0 if large_4k else 12.0
+			docket_style.content_margin_top = 14.0 if large_4k else 8.0
+			docket_style.content_margin_right = 18.0 if large_4k else 10.0
+			docket_style.content_margin_bottom = 12.0 if large_4k else 7.0
 	if incident != null:
 		incident.text = TITLE_INCIDENT_COMPACT_COPY if compact else TITLE_INCIDENT_DESKTOP_COPY
-		incident.add_theme_font_size_override("font_size", 11 if compact else 14)
+		incident.add_theme_font_size_override("font_size", 11 if compact else (20 if large_4k else 14))
 		incident.clip_text = false
 		incident.set_meta("compact_copy", compact)
+		incident.set_meta("responsive_type_role", "4k_incident_evidence" if large_4k else ("compact_incident_evidence" if compact else "desktop_incident_evidence"))
 	if entry_affordance != null:
-		entry_affordance.anchor_left = 0.34 if compact else 0.395
-		entry_affordance.anchor_top = 0.895 if compact else 0.910
-		entry_affordance.anchor_right = 0.66 if compact else 0.605
-		entry_affordance.anchor_bottom = 0.950 if compact else 0.954
+		entry_affordance.anchor_left = 0.34 if compact else (0.350 if large_4k else 0.395)
+		entry_affordance.anchor_top = 0.895 if compact else (0.895 if large_4k else 0.910)
+		entry_affordance.anchor_right = 0.66 if compact else (0.650 if large_4k else 0.605)
+		entry_affordance.anchor_bottom = 0.950 if compact else (0.955 if large_4k else 0.954)
+		entry_affordance.set_meta("responsive_density", "4k_readable" if large_4k else ("compact" if compact else "desktop"))
+	if entry_order != null:
+		entry_order.add_theme_font_size_override("font_size", 13 if compact else (20 if large_4k else 13))
+		entry_order.set_meta("responsive_type_role", "4k_click_prompt" if large_4k else ("compact_click_prompt" if compact else "desktop_click_prompt"))
 
 func _add_title_distress_mark(parent: Control, mark_name: String, normalized_rect: Rect2, color: Color) -> void:
 	var mark: ColorRect = ColorRect.new()
@@ -794,13 +822,29 @@ func _apply_system_control_style(button: Button) -> void:
 	var hover: StyleBoxFlat = _system_control_box(Color(0.085, 0.067, 0.052, 0.98), Color(0.88, 0.68, 0.36, 1.0), 5)
 	var pressed: StyleBoxFlat = _system_control_box(Color(0.14, 0.030, 0.035, 0.99), Color(0.82, 0.08, 0.10, 1.0), 5)
 	var disabled: StyleBoxFlat = _system_control_box(Color(0.025, 0.023, 0.025, 0.82), Color(0.30, 0.28, 0.26, 0.72), 2)
+	disabled.border_width_left = 10
+	disabled.border_width_bottom = 5
 	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("focus", hover)
+	button.add_theme_stylebox_override("focus", _system_focus_box())
 	button.add_theme_stylebox_override("hover", hover)
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_stylebox_override("hover_pressed", pressed)
 	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_color_override("font_focus_color", Color(0.82, 0.94, 1.0, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.60, 0.58, 0.54, 1.0))
 	button.set_meta("authored_system_command", true)
+	button.set_meta("disabled_non_color_cue", "blocked_left_bar_and_bottom_cut")
+
+func _system_focus_box() -> StyleBoxFlat:
+	var style: StyleBoxFlat = _system_control_box(Color(0.028, 0.065, 0.086, 0.99), Color(0.48, 0.82, 1.0, 1.0), 10)
+	style.border_width_top = 3
+	style.border_width_right = 3
+	style.border_width_bottom = 4
+	style.expand_margin_left = 2.0
+	style.expand_margin_top = 2.0
+	style.expand_margin_right = 2.0
+	style.expand_margin_bottom = 2.0
+	return style
 
 func _system_control_box(background: Color, border: Color, left_rule_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -863,13 +907,15 @@ func _apply_system_action_style(button: Button, role: String) -> void:
 		normal_border = Color(0.48, 0.11, 0.12, 0.88)
 		hover_bg = Color(0.15, 0.028, 0.035, 1.0)
 		hover_border = Color(0.82, 0.09, 0.11, 1.0)
-	for state_name: String in ["normal", "focus"]:
-		button.add_theme_stylebox_override(state_name, _system_action_box(normal_bg, normal_border, state_name == "focus"))
+	button.add_theme_stylebox_override("normal", _system_action_box(normal_bg, normal_border, false))
+	button.add_theme_stylebox_override("focus", _system_focus_box())
 	for state_name: String in ["hover", "pressed", "hover_pressed"]:
 		button.add_theme_stylebox_override(state_name, _system_action_box(hover_bg, hover_border, true))
 	button.add_theme_color_override("font_color", font_color)
 	button.add_theme_color_override("font_hover_color", font_color.lightened(0.10))
 	button.add_theme_color_override("font_pressed_color", font_color.lightened(0.16))
+	button.add_theme_color_override("font_focus_color", Color(0.82, 0.94, 1.0, 1.0))
+	button.set_meta("focus_visual_cue", "signal_blue_full_frame")
 
 func _system_action_box(background: Color, border: Color, focused: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

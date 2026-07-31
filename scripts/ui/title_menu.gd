@@ -34,6 +34,7 @@ const COLOR_BLOOD_HOT: Color = Color(0.78, 0.060, 0.105, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
 const COLOR_GREEN: Color = Color(0.42, 0.70, 0.50, 1.0)
 const COLOR_BLUE: Color = Color(0.34, 0.55, 0.72, 1.0)
+const COLOR_SIGNAL_BLUE: Color = Color(0.50, 0.82, 1.0, 1.0)
 const COLOR_RAIL_TEXT: Color = Color(0.98, 0.95, 0.88, 1.0)
 const COLOR_RAIL_BACKGROUND: Color = Color(0.018, 0.015, 0.020, 1.0)
 const COMMAND_CHROME_SETTLED_ALPHA: float = 1.0
@@ -1013,7 +1014,7 @@ func _render_active_section() -> void:
 func _render_home() -> void:
 	_set_content_header("FIELD ORDER // FIRST BLOOD", "The road behind you is closed. Muster a company, survive the forced opener, then spend and wager what remains.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search the field record: rules, terms, settings..."
+		_search_field.placeholder_text = "Search the field record: Field Manual, Combat Signs, settings..."
 	if _search_query() != "":
 		_render_global_search_results()
 		return
@@ -1135,7 +1136,16 @@ func _style_manifest_route(route: Button) -> void:
 	route.add_theme_stylebox_override("normal", _manifest_route_style(Color(0.020, 0.018, 0.022, 0.72), Color(0.50, 0.46, 0.39, 0.78), 2))
 	route.add_theme_stylebox_override("hover", _manifest_route_style(Color(0.085, 0.063, 0.045, 0.94), Color(0.96, 0.73, 0.39, 1.0), 5))
 	route.add_theme_stylebox_override("pressed", _manifest_route_style(Color(0.13, 0.030, 0.040, 0.98), Color(0.95, 0.26, 0.22, 1.0), 7))
-	route.add_theme_stylebox_override("focus", _manifest_route_style(Color(0.045, 0.066, 0.080, 0.98), Color(0.50, 0.78, 0.94, 1.0), 6))
+	var focus_style: StyleBoxFlat = _manifest_route_style(Color(0.032, 0.075, 0.098, 0.99), COLOR_SIGNAL_BLUE, 11)
+	focus_style.border_width_top = 3
+	focus_style.border_width_right = 3
+	focus_style.border_width_bottom = 4
+	focus_style.expand_margin_left = 2.0
+	focus_style.expand_margin_top = 2.0
+	focus_style.expand_margin_right = 2.0
+	focus_style.expand_margin_bottom = 2.0
+	route.add_theme_stylebox_override("focus", focus_style)
+	route.set_meta("focus_visual_cue", "signal_blue_full_frame")
 
 func _manifest_route_style(fill: Color, edge: Color, left_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -1175,12 +1185,12 @@ func _render_global_search_results() -> void:
 	count += _render_goal_cards(true, 8)
 	count += _render_approach_cards(true, 8)
 	if count == 0:
-		_add_empty_state("No search results. Try a unit name, role, goal, approach, ability tag, or tutorial word.")
+		_add_empty_state("No search results. Try a unit name, role, goal, approach, ability tag, or Field Manual phrase.")
 
 func _render_how_to_play() -> void:
-	_set_content_header("How to Play", "A compact tutorial for the actual Main-scene loop, from starter pick to post-fight shop decisions.")
+	_set_content_header("FIELD MANUAL", "A compact field manual for the actual Main-scene loop, from starter pick to post-fight shop decisions.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search tutorial: shop, bench, combine, bet, item..."
+		_search_field.placeholder_text = "Search Field Manual: shop, bench, combine, bet, item..."
 	_add_card("1. Pick a Starter", "Start Run opens the Unit Select screen. Pick one starter unit; that unit becomes your first board piece and anchors your opening plan.", "starter unit select start run board")
 	_add_card("2. Survive the Forced First Fight", "Chapter 1 Round 1 begins as a forced opener. The shop is intentionally locked until you win that first fight, so focus on reading your unit and the battlefield.", "first fight forced opener chapter round locked shop win")
 	_add_card("3. Spend Gold in the Shop", "After the opener, the shop offers five units. Buy selectively, reroll when you need a different lane, lock valuable offers, and buy XP to raise your level, add board slots, and improve shop odds. CAPITAL marks the premium current-grade recruit.", "shop gold offers reroll lock xp level board slots odds buy unit capital current grade")
@@ -1188,7 +1198,7 @@ func _render_how_to_play() -> void:
 	_add_card("5. Read Items and Traits", "Items and traits are multipliers on a unit's job. Traits come from unit tags; items add scaling combat effects and should support the unit's role, goal, and approach.", "items traits tags scaling role goal approach")
 	_add_card("6. Shop, Then Wager", "After shopping, choose a wager with visible win odds and after-win or after-loss gold. Shop purchases reduce what you can risk next, and the wager locks when combat starts.", "bet wager shop planning win odds after win after loss gold lock")
 	_add_card("7. Read Chapter Contracts", "Chapter contracts show PRICE, REWARD, RISK, and NEXT FIGHT. Champion changes one unit, Stable changes your formation, and Pit raises danger for a better payout. Passing is always free.", "contract champion stable pit price reward risk next fight pass")
-	_add_card("8. Learn Roles Before Optimizing", "Tank, Brawler, Assassin, Marksman, Mage, and Support describe the broad combat job. Use the Units and Combat Terms pages to understand why two units in the same role can still play very differently.", "roles tank brawler assassin marksman mage support optimize")
+	_add_card("8. Learn Roles Before Optimizing", "Tank, Brawler, Assassin, Marksman, Mage, and Support describe the broad combat job. Use the Units and Combat Signs pages to understand why two units in the same role can still play very differently.", "roles tank brawler assassin marksman mage support optimize")
 
 func _render_units() -> void:
 	_set_content_header("Units", "Searchable roster cards built from current unit, ability, and identity resources.")
@@ -1199,9 +1209,9 @@ func _render_units() -> void:
 		_add_empty_state("No units match the search.")
 
 func _render_rga() -> void:
-	_set_content_header("Combat Terms", "Player-facing language for reading units, boards, and fights.")
+	_set_content_header("COMBAT SIGNS", "Player-facing signs for reading units, boards, and fights.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search terms: backline, peel, sustained, role..."
+		_search_field.placeholder_text = "Search Combat Signs: backline, peel, sustained, role..."
 	var count: int = 0
 	count += _count_card(_add_card("Role", "The broad job a unit is built to perform: tank, brawler, assassin, marksman, mage, or support.", "role tank brawler assassin marksman mage support"))
 	count += _count_card(_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition"))
@@ -1216,7 +1226,7 @@ func _render_rga() -> void:
 	_add_heading("Approaches")
 	count += _render_approach_cards(false, 0)
 	if count == 0:
-		_add_empty_state("No combat terms match this search. Try role, goal, approach, trait, odds, or bench, or clear the search to browse every term.", true)
+		_add_empty_state("No Combat Signs match this search. Try role, goal, approach, trait, odds, or bench, or clear the search to browse every sign.", true)
 
 func _render_settings() -> void:
 	_listening_action = StringName()
@@ -1787,9 +1797,46 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.72, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.76, 0.55, 1.0))
 	HardcoreUIAssets.apply_button_family(button, family)
+	button.add_theme_stylebox_override("focus", _title_action_focus_style())
+	button.add_theme_stylebox_override("disabled", _title_action_disabled_style())
+	button.add_theme_color_override("font_focus_color", Color(0.84, 0.95, 1.0, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.60, 0.56, 1.0))
+	button.set_meta("authored_interaction_states", PackedStringArray(["normal", "hover", "pressed", "focus", "disabled"]))
+	button.set_meta("focus_visual_cue", "signal_blue_full_frame")
+	button.set_meta("disabled_non_color_cue", "blocked_left_bar_and_bottom_cut")
 	if _nav_buttons.has(button):
 		_apply_field_navigation_style(button, false)
 	button.set_meta("visual_role", visual_role)
+
+func _title_action_focus_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = _make_button_style(Color(0.026, 0.072, 0.098, 0.99), COLOR_SIGNAL_BLUE, 3)
+	style.border_width_left = 11
+	style.border_width_top = 3
+	style.border_width_right = 3
+	style.border_width_bottom = 4
+	style.corner_radius_top_left = 0
+	style.corner_radius_top_right = 0
+	style.corner_radius_bottom_right = 0
+	style.corner_radius_bottom_left = 0
+	style.expand_margin_left = 3.0
+	style.expand_margin_top = 3.0
+	style.expand_margin_right = 3.0
+	style.expand_margin_bottom = 3.0
+	style.shadow_color = Color(0.20, 0.62, 0.88, 0.40)
+	style.shadow_size = 8
+	return style
+
+func _title_action_disabled_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = _make_button_style(Color(0.024, 0.022, 0.024, 0.96), Color(0.38, 0.35, 0.32, 0.94), 1)
+	style.border_width_left = 12
+	style.border_width_top = 1
+	style.border_width_right = 4
+	style.border_width_bottom = 6
+	style.corner_radius_top_left = 0
+	style.corner_radius_top_right = 0
+	style.corner_radius_bottom_right = 0
+	style.corner_radius_bottom_left = 0
+	return style
 
 func _is_compact_layout() -> bool:
 	var effective_size: Vector2 = _effective_layout_size()
@@ -1855,7 +1902,16 @@ func _apply_field_navigation_style(button: Button, selected: bool) -> void:
 	var selected_edge: Color = Color(0.98, 0.76, 0.40, 1.0)
 	button.add_theme_stylebox_override("pressed", _field_navigation_row(selected_fill if selected else pressed_fill, selected_edge if selected else Color(0.96, 0.10, 0.13, 1.0), 8 if selected else 7))
 	button.add_theme_stylebox_override("hover_pressed", _field_navigation_row(Color(0.14, 0.105, 0.060, 1.0) if selected else pressed_fill, Color(1.0, 0.88, 0.58, 1.0) if selected else Color(1.0, 0.30, 0.24, 1.0), 8 if selected else 7))
-	button.add_theme_stylebox_override("focus", _field_navigation_row(Color(0.045, 0.066, 0.080, 0.98), Color(0.50, 0.78, 0.94, 1.0), 6))
+	var focus_style: StyleBoxFlat = _field_navigation_row(Color(0.032, 0.075, 0.098, 0.99), COLOR_SIGNAL_BLUE, 11)
+	focus_style.border_width_top = 3
+	focus_style.border_width_right = 3
+	focus_style.border_width_bottom = 4
+	focus_style.expand_margin_left = 2.0
+	focus_style.expand_margin_top = 2.0
+	focus_style.expand_margin_right = 2.0
+	focus_style.expand_margin_bottom = 2.0
+	button.add_theme_stylebox_override("focus", focus_style)
+	button.set_meta("focus_visual_cue", "signal_blue_full_frame")
 
 func _field_navigation_row(fill: Color, edge: Color, left_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -1873,7 +1929,7 @@ func _style_search_field(field: LineEdit) -> void:
 	if field == null:
 		return
 	field.add_theme_stylebox_override("normal", _search_box(Color(0.80, 0.75, 0.65, 0.96), Color(0.92, 0.85, 0.70, 0.95), 2))
-	field.add_theme_stylebox_override("focus", _search_box(Color(0.91, 0.84, 0.70, 1.0), Color(0.74, 0.045, 0.065, 1.0), 4))
+	field.add_theme_stylebox_override("focus", _search_box(Color(0.88, 0.84, 0.74, 1.0), COLOR_SIGNAL_BLUE, 6))
 	field.add_theme_stylebox_override("read_only", _search_box(Color(0.40, 0.38, 0.35, 0.92), Color(0.30, 0.28, 0.26, 0.86), 2))
 	if not field.is_connected("mouse_entered", Callable(self, "_on_input_hover_entered").bind(field)):
 		field.mouse_entered.connect(Callable(self, "_on_input_hover_entered").bind(field))
@@ -1899,6 +1955,7 @@ func _search_box(background_color: Color, border_color: Color, left_width: int) 
 func _style_slider(slider: HSlider) -> void:
 	if slider == null:
 		return
+	slider.focus_mode = Control.FOCUS_ALL
 	var track: StyleBoxFlat = StyleBoxFlat.new()
 	track.bg_color = Color(0.018, 0.014, 0.017, 1.0)
 	track.border_color = Color(0.66, 0.59, 0.49, 0.94)
@@ -1916,8 +1973,28 @@ func _style_slider(slider: HSlider) -> void:
 	slider.add_theme_stylebox_override("grabber_area", fill)
 	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
 	slider.add_theme_icon_override("grabber", HardcoreUIAssets.slider_icon("normal"))
-	slider.add_theme_icon_override("grabber_highlight", HardcoreUIAssets.slider_icon("hover"))
+	slider.add_theme_icon_override("grabber_highlight", HardcoreUIAssets.slider_icon("pressed"))
 	slider.add_theme_icon_override("grabber_disabled", HardcoreUIAssets.slider_icon("disabled"))
+	slider.set_meta("authored_interaction_states", PackedStringArray(["normal", "pressed", "focus", "disabled"]))
+	slider.set_meta("focus_visual_cue", "signal_blue_track_and_grabber")
+	slider.set_meta("disabled_non_color_cue", "crossed_grabber_and_broken_track")
+	if not slider.is_connected("focus_entered", Callable(self, "_on_slider_focus_changed").bind(true, slider)):
+		slider.focus_entered.connect(Callable(self, "_on_slider_focus_changed").bind(true, slider))
+	if not slider.is_connected("focus_exited", Callable(self, "_on_slider_focus_changed").bind(false, slider)):
+		slider.focus_exited.connect(Callable(self, "_on_slider_focus_changed").bind(false, slider))
+
+func _on_slider_focus_changed(focused: bool, slider: HSlider) -> void:
+	if slider == null:
+		return
+	var track: StyleBoxFlat = StyleBoxFlat.new()
+	track.bg_color = Color(0.018, 0.014, 0.017, 1.0)
+	track.border_color = COLOR_SIGNAL_BLUE if focused else Color(0.66, 0.59, 0.49, 0.94)
+	track.set_border_width_all(3 if focused else 2)
+	track.content_margin_top = 7.0
+	track.content_margin_bottom = 7.0
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_icon_override("grabber", HardcoreUIAssets.slider_icon("focus" if focused else "normal"))
+	slider.set_meta("focused_state_visible", focused)
 
 func _style_selector(option: OptionButton) -> void:
 	if option == null:
@@ -1925,11 +2002,21 @@ func _style_selector(option: OptionButton) -> void:
 	option.add_theme_font_size_override("font_size", 20)
 	option.add_theme_color_override("font_color", COLOR_TEXT)
 	option.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.70, 1.0))
+	option.add_theme_color_override("font_pressed_color", Color(1.0, 0.78, 0.58, 1.0))
+	option.add_theme_color_override("font_focus_color", Color(0.84, 0.95, 1.0, 1.0))
+	option.add_theme_color_override("font_disabled_color", Color(0.62, 0.60, 0.56, 1.0))
 	VisualTypeSystem.set_action(option)
 	option.add_theme_stylebox_override("normal", _selector_box(Color(0.035, 0.029, 0.034, 0.98), Color(0.69, 0.61, 0.49, 0.92), 2))
 	option.add_theme_stylebox_override("hover", _selector_box(Color(0.075, 0.050, 0.050, 1.0), Color(0.94, 0.72, 0.39, 1.0), 3))
 	option.add_theme_stylebox_override("pressed", _selector_box(Color(0.12, 0.030, 0.040, 1.0), Color(0.88, 0.075, 0.10, 1.0), 4))
-	option.add_theme_stylebox_override("focus", _selector_box(Color(0.035, 0.055, 0.068, 1.0), Color(0.50, 0.78, 0.94, 1.0), 4))
+	option.add_theme_stylebox_override("focus", _selector_box(Color(0.026, 0.072, 0.098, 1.0), COLOR_SIGNAL_BLUE, 10))
+	var disabled_style: StyleBoxFlat = _selector_box(Color(0.025, 0.023, 0.026, 0.96), Color(0.36, 0.34, 0.31, 0.94), 11)
+	disabled_style.border_width_right = 4
+	disabled_style.border_width_bottom = 5
+	option.add_theme_stylebox_override("disabled", disabled_style)
+	option.set_meta("authored_interaction_states", PackedStringArray(["normal", "hover", "pressed", "focus", "disabled"]))
+	option.set_meta("focus_visual_cue", "signal_blue_full_frame")
+	option.set_meta("disabled_non_color_cue", "blocked_left_bar_and_bottom_cut")
 
 func _selector_box(background_color: Color, border_color: Color, left_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -1952,8 +2039,11 @@ func _style_checkbox(check: CheckBox) -> void:
 	check.add_theme_stylebox_override("normal", _quiet_toggle_box(Color(0.028, 0.025, 0.029, 0.98), Color(0.54, 0.50, 0.43, 0.92), 2))
 	check.add_theme_stylebox_override("hover", _quiet_toggle_box(Color(0.050, 0.045, 0.046, 1.0), Color(0.82, 0.70, 0.50, 1.0), 3))
 	check.add_theme_stylebox_override("pressed", _quiet_toggle_box(Color(0.070, 0.060, 0.052, 1.0), Color(0.94, 0.68, 0.32, 1.0), 4))
-	check.add_theme_stylebox_override("focus", _quiet_toggle_box(Color(0.045, 0.040, 0.042, 1.0), Color(0.92, 0.66, 0.32, 1.0), 4))
-	check.add_theme_stylebox_override("disabled", _quiet_toggle_box(Color(0.025, 0.024, 0.026, 0.86), Color(0.31, 0.29, 0.27, 0.82), 2))
+	check.add_theme_stylebox_override("focus", _quiet_toggle_box(Color(0.026, 0.072, 0.098, 1.0), COLOR_SIGNAL_BLUE, 10))
+	var disabled_style: StyleBoxFlat = _quiet_toggle_box(Color(0.025, 0.024, 0.026, 0.92), Color(0.34, 0.32, 0.30, 0.92), 11)
+	disabled_style.border_width_right = 4
+	disabled_style.border_width_bottom = 5
+	check.add_theme_stylebox_override("disabled", disabled_style)
 	check.add_theme_icon_override("unchecked", _flat_toggle_icon(false, "normal"))
 	check.add_theme_icon_override("unchecked_hover", _flat_toggle_icon(false, "hover"))
 	check.add_theme_icon_override("unchecked_pressed", _flat_toggle_icon(false, "pressed"))
@@ -1962,6 +2052,11 @@ func _style_checkbox(check: CheckBox) -> void:
 	check.add_theme_icon_override("checked_hover", _flat_toggle_icon(true, "hover"))
 	check.add_theme_icon_override("checked_pressed", _flat_toggle_icon(true, "pressed"))
 	check.add_theme_icon_override("checked_disabled", _flat_toggle_icon(true, "disabled"))
+	check.add_theme_color_override("font_focus_color", Color(0.84, 0.95, 1.0, 1.0))
+	check.add_theme_color_override("font_disabled_color", Color(0.62, 0.60, 0.56, 1.0))
+	check.set_meta("authored_interaction_states", PackedStringArray(["normal", "hover", "pressed", "focus", "disabled"]))
+	check.set_meta("focus_visual_cue", "signal_blue_full_frame")
+	check.set_meta("disabled_non_color_cue", "crossed_toggle_and_blocked_left_bar")
 
 func _on_quiet_toggle_visual_changed(enabled: bool, check: CheckBox, title: String) -> void:
 	if check == null:
@@ -2005,6 +2100,10 @@ func _flat_toggle_icon(checked: bool, state: String) -> Texture2D:
 				if state == "disabled":
 					checked_color = Color(0.40, 0.36, 0.29, 0.92)
 				icon_image.set_pixel(x, y, checked_color)
+	if state == "disabled":
+		for diagonal: int in range(4, 16):
+			icon_image.set_pixel(diagonal, diagonal, Color(0.72, 0.70, 0.66, 1.0))
+			icon_image.set_pixel(19 - diagonal, diagonal, Color(0.72, 0.70, 0.66, 1.0))
 	return ImageTexture.create_from_image(icon_image)
 
 func _on_input_hover_entered(field: LineEdit) -> void:
