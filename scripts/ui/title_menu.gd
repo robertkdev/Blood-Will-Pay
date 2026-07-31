@@ -805,7 +805,7 @@ func _ensure_content_panel() -> void:
 		_section_hint.name = "SectionHint"
 		header.add_child(_section_hint)
 	_section_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_section_hint.add_theme_font_size_override("font_size", 18 if short_compact else (19 if compact else 20))
+	_section_hint.add_theme_font_size_override("font_size", 18 if short_compact else (19 if compact else 22))
 	_section_hint.add_theme_color_override("font_color", Color(0.80, 0.77, 0.72, 1.0))
 	VisualTypeSystem.set_utility(_section_hint)
 	_ensure_content_construction_cues(header, compact, short_compact)
@@ -815,9 +815,9 @@ func _ensure_content_panel() -> void:
 		_search_field = LineEdit.new()
 		_search_field.name = "SearchField"
 		header.add_child(_search_field)
-	_search_field.custom_minimum_size = Vector2(0.0, 30.0 if short_compact else (38.0 if compact else 40.0))
+	_search_field.custom_minimum_size = Vector2(0.0, 30.0 if short_compact else (38.0 if compact else 44.0))
 	_search_field.clear_button_enabled = true
-	_search_field.add_theme_font_size_override("font_size", 17 if short_compact else (18 if compact else 20))
+	_search_field.add_theme_font_size_override("font_size", 17 if short_compact else (18 if compact else 22))
 	VisualTypeSystem.set_utility(_search_field)
 	_search_field.add_theme_color_override("font_color", Color(0.075, 0.052, 0.047, 1.0))
 	_search_field.add_theme_color_override("font_placeholder_color", Color(0.12, 0.085, 0.070, 0.92))
@@ -1077,7 +1077,7 @@ func _add_manifest_route(parent: VBoxContainer, number: String, title: String, b
 	route.focus_mode = Control.FOCUS_ALL
 	route.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	var scale_factor: float = _actual_ui_scale()
-	var route_height: float = 92.0
+	var route_height: float = 104.0
 	if _is_short_compact_layout():
 		route_height = 116.0
 	elif _is_compact_layout():
@@ -1123,9 +1123,9 @@ func _add_manifest_route(parent: VBoxContainer, number: String, title: String, b
 	title_copy.name = "RecordTitle"
 	VisualTypeSystem.set_action(title_copy)
 	copy.add_child(title_copy)
-	var body_copy: Label = _make_label(body, 18, Color(0.84, 0.80, 0.72, 1.0), true)
+	var body_copy: Label = _make_label(body, 18 if _is_compact_layout() else 20, Color(0.84, 0.80, 0.72, 1.0), true)
 	body_copy.name = "RecordDescription"
-	body_copy.custom_minimum_size.y = 58.0 if _is_short_compact_layout() or scale_factor >= 1.49 else 52.0
+	body_copy.custom_minimum_size.y = 58.0
 	body_copy.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	VisualTypeSystem.set_utility(body_copy)
 	copy.add_child(body_copy)
@@ -1268,7 +1268,7 @@ func _add_accessibility_priority_banner() -> void:
 	VisualTypeSystem.set_action(heading)
 	copy.add_child(heading)
 	if not _is_short_compact_layout():
-		copy.add_child(_make_label("Scale and motion controls stay first so the command record can be made usable before anything else.", 16, COLOR_MUTED, true))
+		copy.add_child(_make_label("Scale and motion controls stay first so the command record can be made usable before anything else.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
 
 func _add_settings_docket() -> void:
 	var docket: PanelContainer = _make_field_order_container("SettingsDocket")
@@ -1298,7 +1298,7 @@ func _add_settings_docket() -> void:
 	heading.name = "SettingsDocketTitle"
 	copy.add_child(heading)
 	if not _is_short_compact_layout():
-		copy.add_child(_make_label("Changes bind to this station. Keyboard focus is marked in signal blue.", 17, COLOR_MUTED, true))
+		copy.add_child(_make_label("Changes bind to this station. Keyboard focus is marked in signal blue.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
 
 func _render_unit_cards(compact: bool, limit: int) -> int:
 	var count: int = 0
@@ -1557,7 +1557,7 @@ func _add_ui_scale_setting() -> int:
 	option.item_selected.connect(_on_ui_scale_selected.bind(option))
 	stack.add_child(option)
 	var guidance_text: String = "Enlarges interface text and controls." if _is_short_compact_layout() else "Enlarges interface text and controls. Smaller windows reflow this command record into a scrollable compact layout."
-	var scale_guidance: Label = _make_label(guidance_text, 16 if _is_short_compact_layout() else 18, COLOR_MUTED, true)
+	var scale_guidance: Label = _make_label(guidance_text, 16 if _is_short_compact_layout() else (18 if _is_compact_layout() else 20), COLOR_MUTED, true)
 	scale_guidance.name = "UIScaleGuidance"
 	stack.add_child(scale_guidance)
 	return 1
@@ -1582,7 +1582,7 @@ func _add_readability_setting() -> int:
 	status.set_meta("utility_type_floor_px", 15)
 	status.set_meta("functional_type_floor_px", 16)
 	heading.add_child(status)
-	var guidance: Label = _make_label("This command console uses the readable dossier face for utility copy, high-contrast paper and ink, and a 15px utility floor. Use Readable UI Scale at the top for larger controls.", 18, Color(0.86, 0.82, 0.74, 1.0), true)
+	var guidance: Label = _make_label("This command console uses the readable dossier face for utility copy, high-contrast paper and ink, and a 15px utility floor. Use Readable UI Scale at the top for larger controls.", 18 if _is_compact_layout() else 20, Color(0.86, 0.82, 0.74, 1.0), true)
 	guidance.name = "ReadabilityGuidance"
 	stack.add_child(guidance)
 	return 1
@@ -1764,7 +1764,7 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 	if _nav_buttons.has(button):
 		visual_role = "navigation"
 		family = "utility"
-		font_size = 16 if short_compact else (19 if compact else 21)
+		font_size = 16 if short_compact else (19 if compact else 24)
 	elif String(button.name) == "BlackLedgerButton":
 		visual_role = "ledger"
 		family = "poster"

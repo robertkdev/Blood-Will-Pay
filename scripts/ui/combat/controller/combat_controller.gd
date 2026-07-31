@@ -65,10 +65,10 @@ const BOSS_PREP_MIN_CHAPTER: int = 3
 const BOSS_PREP_ROUND: int = 4
 const RESULT_MINIMUM_DWELL_SECONDS: float = 6.0
 const RESULT_SKIP_GUARD_SECONDS: float = 0.45
-const COMBAT_PRESSURE_MIDFIGHT_SECONDS: float = 0.60
-const COMBAT_PRESSURE_COLLAPSE_SECONDS: float = 4.50
-const COMBAT_PRESSURE_MIDFIGHT_CASUALTIES: float = 0.18
-const COMBAT_PRESSURE_COLLAPSE_CASUALTIES: float = 0.55
+const COMBAT_PRESSURE_MIDFIGHT_SECONDS: float = 0.35
+const COMBAT_PRESSURE_COLLAPSE_SECONDS: float = 2.75
+const COMBAT_PRESSURE_MIDFIGHT_CASUALTIES: float = 0.12
+const COMBAT_PRESSURE_COLLAPSE_CASUALTIES: float = 0.35
 const BOSS_PREP_MIN_GOLD: int = 4
 const EARLY_RETRY_RECOVERY_MAX_CHAPTER: int = 2
 const EARLY_RETRY_RECOVERY_MIN_GOLD: int = 4
@@ -3330,8 +3330,8 @@ func _update_environmental_pressure(delta: float) -> void:
 		boundary.modulate.a = 0.70 if reduced_motion else clampf(0.82 + phase_weight + slow_pulse * 0.10, 0.72, 1.0)
 	var pressure_surface: TextureRect = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
 	if pressure_surface != null and pressure_surface.visible:
-		var target_alpha: float = 0.70 if reduced_motion else 0.66 if pressure_phase == 1 else 0.78 if pressure_phase >= 2 else 0.0
-		pressure_surface.modulate.a = target_alpha if reduced_motion else clampf(target_alpha + slow_pulse * 0.025, 0.0, 0.84)
+		var target_alpha: float = 0.86 if reduced_motion else 0.90 if pressure_phase == 1 else 1.0 if pressure_phase >= 2 else 0.0
+		pressure_surface.modulate.a = target_alpha if reduced_motion else clampf(target_alpha + slow_pulse * 0.025, 0.0, 1.0)
 	var exposure_lift: CanvasItem = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaExposureLift") as CanvasItem
 	if exposure_lift != null:
 		var exposure_alpha: float = 0.86 if reduced_motion else 0.76 if pressure_phase == 0 else 0.92 if pressure_phase == 1 else 1.0
@@ -3382,7 +3382,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var pressure_painter: Control = arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
 	if aftermath != null:
 		aftermath.visible = effective_phase >= 1 or reduced_motion
-		aftermath.modulate = Color(1.0, 1.0, 1.0, 0.78 if reduced_motion else 0.88 if effective_phase == 1 else 1.0)
+		aftermath.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	if onset != null:
 		onset.visible = true
 		onset.modulate = Color(1.0, 1.0, 1.0, 0.76 if reduced_motion else 1.0)
@@ -3412,7 +3412,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	if pressure_surface != null:
 		pressure_surface.texture = GothicUIAssets.battlefield_reduced_motion_texture() if reduced_motion else GothicUIAssets.battlefield_midfight_texture()
 		pressure_surface.visible = reduced_motion or effective_phase >= 1
-		pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.70 if reduced_motion else 0.66 if effective_phase == 1 else 0.78)
+		pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.86 if reduced_motion else 0.90 if effective_phase == 1 else 1.0)
 		pressure_surface.set_meta("active_material_phase", "reduced_motion_static" if reduced_motion else phase_name)
 		pressure_surface.set_meta("landmark_aligned_with_base", true)
 	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
@@ -4258,7 +4258,7 @@ func _ensure_result_banner() -> PanelContainer:
 		skip_focus_signal.visible = false
 		skip_focus_signal.add_theme_stylebox_override("panel", _make_result_skip_focus_signal_style())
 		parent.add_child(skip_focus_signal)
-		var edge_color: Color = Color(0.20, 0.76, 1.0, 1.0)
+		var edge_color: Color = Color(0.24, 0.58, 0.82, 1.0)
 		for edge_name: String in ["FocusTop", "FocusRight", "FocusBottom", "FocusLeft"]:
 			var edge: ColorRect = ColorRect.new()
 			edge.name = edge_name
@@ -4444,23 +4444,23 @@ func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 
 func _make_result_skip_focus_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.028, 0.065, 0.085, 0.99)
-	style.border_color = Color(0.50, 0.82, 1.0, 1.0)
+	style.bg_color = Color(0.018, 0.022, 0.026, 0.99)
+	style.border_color = Color(0.30, 0.60, 0.82, 1.0)
 	style.set_border_width_all(4)
 	style.expand_margin_left = 3.0
 	style.expand_margin_top = 3.0
 	style.expand_margin_right = 3.0
 	style.expand_margin_bottom = 3.0
-	style.shadow_color = Color(0.16, 0.52, 0.78, 0.48)
+	style.shadow_color = Color(0.10, 0.34, 0.54, 0.46)
 	style.shadow_size = 10
 	return style
 
 func _make_result_skip_focus_frame_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.50, 0.82, 1.0, 1.0)
+	style.border_color = Color(0.30, 0.60, 0.82, 1.0)
 	style.set_border_width_all(4)
-	style.shadow_color = Color(0.16, 0.52, 0.78, 0.56)
+	style.shadow_color = Color(0.10, 0.34, 0.54, 0.52)
 	style.shadow_size = 8
 	return style
 
@@ -4470,9 +4470,9 @@ func _make_result_skip_focus_signal_style() -> StyleBoxFlat:
 	# This sits above the button so its frame survives result-card redraws. Keep
 	# the fill transparent so the action label remains fully legible.
 	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.20, 0.76, 1.0, 1.0)
+	style.border_color = Color(0.24, 0.58, 0.82, 1.0)
 	style.set_border_width_all(5)
-	style.shadow_color = Color(0.08, 0.46, 0.82, 0.82)
+	style.shadow_color = Color(0.08, 0.30, 0.50, 0.72)
 	style.shadow_size = 10
 	return style
 

@@ -8,6 +8,7 @@ const BountyCatalogScript: GDScript = preload("res://scripts/game/account/bounty
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 
 const COLOR_VOID: Color = Color(0.008, 0.006, 0.010, 0.98)
 const COLOR_PANEL: Color = Color(0.045, 0.031, 0.038, 0.99)
@@ -174,7 +175,13 @@ func _sync_progress_metadata(compact: bool) -> void:
 	if _progress_label == null:
 		return
 	var next_seal_copy: String = "ALL SEALS WITNESSED" if _next_circle_requirement == 0 else "NEXT SEAL %03d" % _next_circle_requirement
-	if compact:
+	var high_scale_compact: bool = compact and UserSettingsScript.get_ui_scale() >= 1.45
+	if high_scale_compact:
+		_progress_label.text = "LIFETIME OMENS %03d\n%s" % [_lifetime_omens, next_seal_copy]
+		_progress_label.custom_minimum_size.y = 46.0
+		_progress_label.add_theme_font_size_override("font_size", 16)
+		_progress_label.set_meta("responsive_layout", "two_row")
+	elif compact:
 		_progress_label.text = "LIFETIME %03d  //  %s" % [_lifetime_omens, next_seal_copy]
 		_progress_label.custom_minimum_size.y = 24.0
 		_progress_label.add_theme_font_size_override("font_size", 15)

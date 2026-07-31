@@ -390,7 +390,7 @@ class ArenaPressurePainter:
 		set_meta("pressure_visual_language", "central_collision_rupture_drag_residue")
 		set_meta("debug_primitives_suppressed", true)
 		set_meta("player_scale_evidence_count", 12 if reduced_motion else 6 + pressure_phase * 4)
-		set_meta("terrain_floor_lift", 0.26 if reduced_motion else 0.18 + float(pressure_phase) * 0.08)
+		set_meta("terrain_floor_lift", 0.62 if reduced_motion else 0.32 + float(pressure_phase) * 0.15)
 		set_meta("physical_lane_encroachment", "static_collision_aftermath" if reduced_motion else "breach_then_central_collision")
 		set_meta("central_collision_visible", pressure_phase >= 1 or reduced_motion)
 		set_meta("central_collision_read", "static_rupture_and_drag" if reduced_motion else "impact_crater_drag_and_residue" if pressure_phase >= 1 else "threatened_intact_ground")
@@ -406,7 +406,7 @@ class ArenaPressurePainter:
 		var motion_clock: float = 0.0 if reduced_motion else elapsed_seconds
 		# The authored raster is intentionally hostile and dark; this quiet warm lift
 		# makes its mud, stone, and bodies readable at a real 1080p player distance.
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0.22, 0.095, 0.050, 0.16 + float(pressure_phase) * 0.045), true)
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.22, 0.095, 0.050, 0.18 + float(pressure_phase) * 0.065), true)
 		# The terrain texture and authored evidence painter carry the battlefield
 		# structure. Pressure adds only soft edge atmosphere and event-grounded
 		# residue; outline craters, rays, streaks, and ruler-straight fences made
@@ -429,54 +429,64 @@ class ArenaPressurePainter:
 				_draw_static_urgent_substitute()
 
 	func _draw_onset_breach_warning() -> void:
-		# Onset is still playable ground, but a dark, displaced rim points toward
-		# where the two forces are about to meet.  It is intentionally incomplete.
-		var left_gouge: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x * 0.30, size.y * 0.43), Vector2(size.x * 0.38, size.y * 0.39),
-			Vector2(size.x * 0.43, size.y * 0.45), Vector2(size.x * 0.39, size.y * 0.50),
-			Vector2(size.x * 0.32, size.y * 0.49),
-		])
-		var right_gouge: PackedVector2Array = PackedVector2Array([
-			Vector2(size.x * 0.70, size.y * 0.58), Vector2(size.x * 0.62, size.y * 0.61),
-			Vector2(size.x * 0.57, size.y * 0.55), Vector2(size.x * 0.61, size.y * 0.50),
-			Vector2(size.x * 0.68, size.y * 0.52),
-		])
-		draw_colored_polygon(left_gouge, Color(0.10, 0.045, 0.025, 0.42))
-		draw_colored_polygon(right_gouge, Color(0.16, 0.022, 0.018, 0.42))
-		draw_polyline(left_gouge, Color(0.58, 0.22, 0.075, 0.36), 3.0, true)
-		draw_polyline(right_gouge, Color(0.70, 0.075, 0.038, 0.38), 3.0, true)
+		# Onset carries displaced soil and splintered cover, not tactical polygons.
+		# The two short churn corridors point at the coming collision while leaving
+		# the deployment cells readable.
+		for bank_index: int in range(5):
+			var fraction: float = float(bank_index) / 4.0
+			var left_center: Vector2 = Vector2(size.x * lerpf(0.29, 0.43, fraction), size.y * lerpf(0.46, 0.49, fraction))
+			var right_center: Vector2 = Vector2(size.x * lerpf(0.71, 0.57, fraction), size.y * lerpf(0.55, 0.51, fraction))
+			var radius: float = 18.0 + float(bank_index % 2) * 9.0
+			draw_circle(left_center, radius, Color(0.11, 0.044, 0.022, 0.48), true)
+			draw_circle(right_center, radius, Color(0.15, 0.032, 0.020, 0.50), true)
+			draw_circle(left_center + Vector2(3.0, -3.0), radius * 0.44, Color(0.48, 0.16, 0.050, 0.20), true)
 		_draw_drag_gouge(Vector2(size.x * 0.18, size.y * 0.48), Vector2(size.x * 0.33, size.y * 0.46), 0.42)
 		_draw_drag_gouge(Vector2(size.x * 0.82, size.y * 0.53), Vector2(size.x * 0.67, size.y * 0.55), 0.42)
 
 	func _draw_collision_rupture() -> void:
-		# A broad, uneven patch of compacted earth is easier to read as an actual
-		# collision site than a clean crater outline. Soft overlapping mud masses,
-		# scattered clods, and displaced blood replace the old target-like ring.
+		# Keep the collision readable as damaged ground, not a translucent overlay.
+		# Local clod clusters, short kinked ruts, and recognisable wreckage replace
+		# the former field-width filled polygons.
 		var center: Vector2 = Vector2(size.x * 0.50, size.y * (0.54 if not reduced_motion else 0.50))
-		var width: float = size.x * (0.285 if not reduced_motion else 0.305)
-		var height: float = size.y * (0.175 if not reduced_motion else 0.195)
-		var west_bank: PackedVector2Array = _rupture_ring(center + Vector2(-width * 0.34, height * 0.04), width * 0.66, height * 0.72, 21, 0.37)
-		var east_bank: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.34, -height * 0.05), width * 0.70, height * 0.68, 23, 1.11)
-		var churn: PackedVector2Array = _rupture_ring(center + Vector2(-width * 0.02, height * 0.08), width * 0.74, height * 0.57, 25, 2.03)
-		var pooled: PackedVector2Array = _rupture_ring(center + Vector2(width * 0.10, height * 0.22), width * 0.38, height * 0.24, 19, 2.71)
-		draw_colored_polygon(west_bank, Color(0.19, 0.075, 0.032, 0.50))
-		draw_colored_polygon(east_bank, Color(0.14, 0.050, 0.026, 0.56))
-		draw_colored_polygon(churn, Color(0.060, 0.025, 0.017, 0.68))
-		draw_colored_polygon(pooled, Color(0.24, 0.016, 0.018, 0.42))
+		var width: float = size.x * (0.34 if not reduced_motion else 0.36)
+		var height: float = size.y * (0.20 if not reduced_motion else 0.22)
 		var clod_offsets: Array[Vector2] = [
-			Vector2(-0.70, -0.24), Vector2(-0.53, 0.35), Vector2(-0.35, -0.48),
-			Vector2(-0.18, 0.52), Vector2(0.04, -0.41), Vector2(0.19, 0.42),
-			Vector2(0.36, -0.31), Vector2(0.51, 0.28), Vector2(0.69, -0.10),
+			Vector2(-0.82, -0.22), Vector2(-0.66, 0.35), Vector2(-0.48, -0.44),
+			Vector2(-0.30, 0.50), Vector2(-0.12, -0.32), Vector2(0.06, 0.34),
+			Vector2(0.24, -0.48), Vector2(0.42, 0.43), Vector2(0.61, -0.24),
+			Vector2(0.78, 0.20),
 		]
 		for clod_index: int in range(clod_offsets.size()):
 			var clod_offset: Vector2 = clod_offsets[clod_index]
 			var clod_center: Vector2 = center + Vector2(clod_offset.x * width, clod_offset.y * height)
-			var clod_radius: float = 10.0 + float(clod_index % 3) * 4.0
-			draw_circle(clod_center, clod_radius, Color(0.20, 0.075, 0.032, 0.62), true)
-			draw_line(clod_center + Vector2(-clod_radius * 0.8, 2.0), clod_center + Vector2(clod_radius, -5.0), Color(0.44, 0.16, 0.055, 0.28), 2.0, true)
-		_draw_drag_gouge(Vector2(size.x * 0.12, size.y * 0.47), center + Vector2(-width * 0.48, -height * 0.02), 0.72)
-		_draw_drag_gouge(Vector2(size.x * 0.88, size.y * 0.59), center + Vector2(width * 0.44, height * 0.18), 0.72)
-		_draw_rupture_debris(center, width, height)
+			var clod_radius: float = minf(size.x, size.y) * (0.020 + float(clod_index % 3) * 0.005)
+			var clod_patch: PackedVector2Array = _rupture_ring(
+				clod_center,
+				clod_radius * (1.25 + float(clod_index % 2) * 0.24),
+				clod_radius * (0.50 + float((clod_index + 1) % 3) * 0.10),
+				13,
+				float(clod_index) * 0.71
+			)
+			var clod_color: Color = Color(0.12, 0.043, 0.021, 0.56) if clod_index % 3 != 1 else Color(0.20, 0.030, 0.021, 0.48)
+			draw_colored_polygon(clod_patch, clod_color)
+			draw_circle(clod_center + Vector2(-clod_radius * 0.22, -clod_radius * 0.20), clod_radius * 0.32, Color(0.44, 0.14, 0.044, 0.30), true)
+		for scar_index: int in range(9):
+			var scar_center: Vector2 = center + Vector2((float(scar_index % 3) - 1.0) * width * 0.31, (float(scar_index / 3) - 1.0) * height * 0.34)
+			var scar_angle: float = -0.24 + float((scar_index * 5) % 7) * 0.075
+			var scar_length: float = width * (0.16 + float(scar_index % 4) * 0.025)
+			var scar_direction: Vector2 = Vector2(cos(scar_angle), sin(scar_angle))
+			var scar_start: Vector2 = scar_center - scar_direction * scar_length * 0.50
+			var scar_finish: Vector2 = scar_center + scar_direction * scar_length * 0.50
+			var scar_bend: Vector2 = scar_center + Vector2(0.0, (-7.0 if scar_index % 2 == 0 else 6.0))
+			draw_line(scar_start, scar_bend, Color(0.018, 0.008, 0.007, 0.78), 7.0 - float(scar_index % 3), true)
+			draw_line(scar_bend, scar_finish, Color(0.018, 0.008, 0.007, 0.78), 6.0 - float(scar_index % 2), true)
+			draw_line(scar_start + Vector2(0.0, 3.0), scar_bend + Vector2(0.0, 3.0), Color(0.48, 0.15, 0.045, 0.24), 2.0, true)
+		_draw_drag_gouge(Vector2(size.x * 0.25, size.y * 0.47), center + Vector2(-width * 0.48, -height * 0.03), 0.58)
+		_draw_drag_gouge(Vector2(size.x * 0.75, size.y * 0.59), center + Vector2(width * 0.44, height * 0.16), 0.58)
+		var wreckage_scale: float = minf(size.x, size.y) * 0.042
+		_draw_wreckage_heap(center + Vector2(-width * 0.46, -height * 0.18), wreckage_scale, 1)
+		_draw_wreckage_heap(center + Vector2(width * 0.48, height * 0.20), wreckage_scale * 0.90, 3)
+		_draw_collision_splinters(center, width, height)
 
 	func _rupture_ring(center: Vector2, radius_x: float, radius_y: float, point_count: int, phase: float) -> PackedVector2Array:
 		var points: PackedVector2Array = PackedVector2Array()
@@ -496,46 +506,50 @@ class ArenaPressurePainter:
 			draw_line(from, to, Color(0.018, 0.008, 0.008, 0.76 * intensity), 8.0 - float(gouge_index) * 1.4, true)
 			draw_line(from + Vector2(0.0, 3.0), to + Vector2(0.0, 3.0), Color(0.62, 0.16, 0.052, 0.28 * intensity), 2.0, true)
 
-	func _draw_rupture_debris(center: Vector2, width: float, height: float) -> void:
+	func _draw_collision_splinters(center: Vector2, width: float, height: float) -> void:
 		var debris_offsets: Array[Vector2] = [
 			Vector2(-0.98, -0.52), Vector2(-0.75, 0.74), Vector2(-0.38, -0.92),
 			Vector2(0.42, 0.86), Vector2(0.78, -0.64), Vector2(1.02, 0.36),
 		]
 		for debris_index: int in range(debris_offsets.size()):
 			var debris_center: Vector2 = center + Vector2(debris_offsets[debris_index].x * width, debris_offsets[debris_index].y * height)
-			var chunk: PackedVector2Array = _rupture_ring(debris_center, width * 0.105, height * 0.22, 6, float(debris_index))
-			draw_colored_polygon(chunk, Color(0.11, 0.044, 0.022, 0.92))
-			draw_polyline(chunk, Color(0.61, 0.22, 0.078, 0.46), 2.0, true)
-			if debris_index % 2 == 0:
-				draw_line(debris_center + Vector2(-width * 0.06, -height * 0.12), debris_center + Vector2(width * 0.09, height * 0.17), Color(0.035, 0.012, 0.010, 0.95), 7.0, true)
+			var direction: float = -1.0 if debris_index % 2 == 0 else 1.0
+			var beam_length: float = width * (0.10 + float(debris_index % 3) * 0.025)
+			draw_line(debris_center - Vector2(beam_length * 0.45, height * 0.07 * direction), debris_center + Vector2(beam_length * 0.55, height * 0.09 * direction), Color(0.055, 0.022, 0.014, 0.96), 11.0, true)
+			draw_line(debris_center - Vector2(beam_length * 0.40, height * 0.06 * direction), debris_center + Vector2(beam_length * 0.48, height * 0.08 * direction), Color(0.55, 0.18, 0.060, 0.46), 2.5, true)
+			for chip_index: int in range(3):
+				var chip_center: Vector2 = debris_center + Vector2((float(chip_index) - 1.0) * 18.0, (float((chip_index + debris_index) % 3) - 1.0) * 13.0)
+				draw_circle(chip_center, 5.0 + float(chip_index), Color(0.20, 0.070, 0.028, 0.76), true)
 
 	func _draw_perimeter_consequence() -> void:
 		# These are deliberately broad, physical silhouettes at player scale: broken
 		# wagon ribs, slagged bodies, and torn standards communicate a killing ground
 		# without consuming the board's central targeting lanes.
-		var evidence_count: int = 2 + pressure_phase * 2
+		var evidence_count: int = 4 + pressure_phase * 2
 		if reduced_motion:
-			evidence_count = maxi(evidence_count, 5)
+			evidence_count = 8
 		var anchors: Array[Vector2] = [
 			Vector2(size.x * 0.105, size.y * 0.18), Vector2(size.x * 0.895, size.y * 0.80),
 			Vector2(size.x * 0.085, size.y * 0.72), Vector2(size.x * 0.92, size.y * 0.28),
-			Vector2(size.x * 0.19, size.y * 0.88), Vector2(size.x * 0.81, size.y * 0.10),
+			Vector2(size.x * 0.20, size.y * 0.86), Vector2(size.x * 0.80, size.y * 0.14),
+			Vector2(size.x * 0.24, size.y * 0.34), Vector2(size.x * 0.76, size.y * 0.67),
 		]
 		for evidence_index: int in range(mini(evidence_count, anchors.size())):
 			var anchor: Vector2 = anchors[evidence_index]
 			var scale_factor: float = minf(size.x, size.y) * (0.030 + float(evidence_index % 2) * 0.008)
-			_draw_body_heap(anchor, scale_factor, evidence_index)
+			_draw_wreckage_heap(anchor, scale_factor, evidence_index)
 			if evidence_index % 2 == 0:
 				_draw_shattered_stake(anchor + Vector2(scale_factor * 0.45, -scale_factor * 0.55), scale_factor, evidence_index)
 
 	func _draw_lane_barricades() -> void:
-		var barricade_count: int = 2 if pressure_phase == 0 else 4 if pressure_phase == 1 else 6
+		var barricade_count: int = 4 if pressure_phase == 0 else 6 if pressure_phase == 1 else 8
 		if reduced_motion:
-			barricade_count = 6
+			barricade_count = 8
 		var anchors: Array[Vector2] = [
 			Vector2(size.x * 0.075, size.y * 0.33), Vector2(size.x * 0.925, size.y * 0.66),
 			Vector2(size.x * 0.14, size.y * 0.54), Vector2(size.x * 0.86, size.y * 0.44),
 			Vector2(size.x * 0.21, size.y * 0.80), Vector2(size.x * 0.79, size.y * 0.18),
+			Vector2(size.x * 0.20, size.y * 0.38), Vector2(size.x * 0.80, size.y * 0.62),
 		]
 		for barricade_index: int in range(barricade_count):
 			var from_left: bool = barricade_index % 2 == 0
@@ -557,15 +571,25 @@ class ArenaPressurePainter:
 			if spar_index == 1:
 				draw_circle(spar_tip + Vector2(direction * thickness * 0.35, thickness * 0.22), thickness * 0.56, Color(0.34, 0.035, 0.020, 0.78), true)
 
-	func _draw_body_heap(center: Vector2, radius: float, variant: int) -> void:
-		var heap: PackedVector2Array = PackedVector2Array()
-		for point_index: int in range(11):
-			var angle: float = TAU * float(point_index) / 11.0
-			var wobble: float = 0.72 + float((point_index * 3 + variant) % 5) * 0.09
-			heap.append(center + Vector2(cos(angle) * radius * wobble, sin(angle) * radius * 0.48 * wobble))
-		draw_colored_polygon(heap, Color(0.075, 0.030, 0.022, 0.88))
-		draw_circle(center + Vector2(radius * 0.14, -radius * 0.12), radius * 0.28, Color(0.20, 0.075, 0.045, 0.72), true)
-		draw_line(center - Vector2(radius * 0.62, radius * 0.10), center + Vector2(radius * 0.72, radius * 0.18), Color(0.48, 0.12, 0.050, 0.48), maxf(2.0, radius * 0.12), true)
+	func _draw_wreckage_heap(center: Vector2, radius: float, variant: int) -> void:
+		var direction: float = -1.0 if variant % 2 == 0 else 1.0
+		var shadow: Color = Color(0.045, 0.020, 0.014, 0.92)
+		var edge: Color = Color(0.46, 0.14, 0.045, 0.50)
+		draw_circle(center + Vector2(radius * 0.08, radius * 0.18), radius * 0.62, Color(0.030, 0.014, 0.011, 0.70), true)
+		for beam_index: int in range(3):
+			var offset: Vector2 = Vector2((float(beam_index) - 1.0) * radius * 0.34, float(beam_index % 2) * radius * 0.18)
+			var beam_start: Vector2 = center + offset - Vector2(radius * 0.72 * direction, radius * 0.22)
+			var beam_finish: Vector2 = center + offset + Vector2(radius * 0.68 * direction, -radius * (0.34 - float(beam_index) * 0.10))
+			draw_line(beam_start, beam_finish, shadow, maxf(5.0, radius * 0.23), true)
+			draw_line(beam_start + Vector2(0.0, -2.0), beam_finish + Vector2(0.0, -2.0), edge, maxf(2.0, radius * 0.055), true)
+		if variant % 2 == 1:
+			var wheel_center: Vector2 = center + Vector2(radius * 0.24 * direction, radius * 0.06)
+			var wheel_radius: float = radius * 0.48
+			draw_circle(wheel_center, wheel_radius, Color(0.018, 0.010, 0.008, 0.82), true)
+			draw_arc(wheel_center, wheel_radius, 0.0, TAU, 20, edge, maxf(2.0, radius * 0.10), true)
+			for spoke_index: int in range(5):
+				var spoke_angle: float = TAU * float(spoke_index) / 5.0
+				draw_line(wheel_center, wheel_center + Vector2(cos(spoke_angle), sin(spoke_angle)) * wheel_radius * 0.88, edge, maxf(1.0, radius * 0.05), true)
 
 	func _draw_shattered_stake(origin: Vector2, length: float, variant: int) -> void:
 		var tilt: float = -0.32 if variant % 2 == 0 else 0.28

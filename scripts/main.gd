@@ -23,13 +23,13 @@ const SYSTEM_LAYER_INDEX := 220
 const SYSTEM_MENU_BACKDROP_COLOR: Color = Color(0.015, 0.01, 0.012, 0.54)
 const TITLE_INCIDENT_DESKTOP_COPY: String = (
 	"RECOVERY TAG // OLD MILL ROAD\n"
-	+ "ROADBLOCK SET // FIRE TRENCH CUT\n"
+	+ "BURNED ROADBLOCK // FIRE TRENCH CUT\n"
 	+ "NINE CHAIRS // EIGHT DRAG MARKS\n"
 	+ "ONE WITNESS RETURNED // RESTRAINT MARKS"
 )
 const TITLE_INCIDENT_COMPACT_COPY: String = (
 	"RECOVERY TAG // OLD MILL ROAD\n"
-	+ "FIRE TRENCH // NINE CHAIRS\n"
+	+ "BURNED ROADBLOCK // FIRE TRENCH\n"
 	+ "EIGHT DRAG MARKS // ONE WITNESS\n"
 	+ "RESTRAINT MARKS // ROADBLOCK SET"
 )
@@ -571,16 +571,16 @@ func _build_title_page() -> void:
 	entry_affordance.anchor_right = 0.605
 	entry_affordance.anchor_bottom = 0.954
 	var entry_style: StyleBoxFlat = StyleBoxFlat.new()
-	entry_style.bg_color = Color(0.010, 0.008, 0.011, 0.62)
-	entry_style.border_color = Color(0.72, 0.070, 0.082, 0.88)
-	entry_style.border_width_left = 0
+	entry_style.bg_color = Color(0.010, 0.008, 0.011, 0.82)
+	entry_style.border_color = Color(0.82, 0.085, 0.090, 0.96)
+	entry_style.border_width_left = 4
 	entry_style.border_width_top = 1
 	entry_style.border_width_right = 0
-	entry_style.border_width_bottom = 0
-	entry_style.content_margin_left = 10.0
-	entry_style.content_margin_top = 5.0
-	entry_style.content_margin_right = 10.0
-	entry_style.content_margin_bottom = 4.0
+	entry_style.border_width_bottom = 1
+	entry_style.content_margin_left = 14.0
+	entry_style.content_margin_top = 8.0
+	entry_style.content_margin_right = 14.0
+	entry_style.content_margin_bottom = 7.0
 	entry_affordance.add_theme_stylebox_override("panel", entry_style)
 	entry_affordance.set_meta("restrained_click_anywhere_cue", true)
 	stack.add_child(entry_affordance)
@@ -595,8 +595,10 @@ func _build_title_page() -> void:
 	entry_order.text = "CLICK ANYWHERE // OPEN FIELD RECORD"
 	entry_order.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	entry_order.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	entry_order.add_theme_font_size_override("font_size", 13)
-	entry_order.add_theme_color_override("font_color", Color(0.84, 0.70, 0.52, 0.94))
+	entry_order.add_theme_font_size_override("font_size", 18)
+	entry_order.add_theme_color_override("font_color", Color(0.96, 0.84, 0.66, 1.0))
+	entry_order.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+	entry_order.add_theme_constant_override("outline_size", 2)
 	VisualTypeSystem.set_utility_bold(entry_order)
 	entry_copy.add_child(entry_order)
 	var entry_action: Label = Label.new()
@@ -685,13 +687,13 @@ func _layout_title_gateway() -> void:
 		incident.set_meta("compact_copy", compact)
 		incident.set_meta("responsive_type_role", "4k_incident_evidence" if large_4k else ("compact_incident_evidence" if compact else "desktop_incident_evidence"))
 	if entry_affordance != null:
-		entry_affordance.anchor_left = 0.34 if compact else (0.350 if large_4k else 0.395)
-		entry_affordance.anchor_top = 0.895 if compact else (0.895 if large_4k else 0.910)
-		entry_affordance.anchor_right = 0.66 if compact else (0.650 if large_4k else 0.605)
-		entry_affordance.anchor_bottom = 0.950 if compact else (0.955 if large_4k else 0.954)
+		entry_affordance.anchor_left = 0.33 if compact else (0.345 if large_4k else 0.385)
+		entry_affordance.anchor_top = 0.888 if compact else (0.885 if large_4k else 0.895)
+		entry_affordance.anchor_right = 0.67 if compact else (0.655 if large_4k else 0.615)
+		entry_affordance.anchor_bottom = 0.956 if compact else (0.960 if large_4k else 0.958)
 		entry_affordance.set_meta("responsive_density", "4k_readable" if large_4k else ("compact" if compact else "desktop"))
 	if entry_order != null:
-		entry_order.add_theme_font_size_override("font_size", 13 if compact else (20 if large_4k else 13))
+		entry_order.add_theme_font_size_override("font_size", 14 if compact else (24 if large_4k else 18))
 		entry_order.set_meta("responsive_type_role", "4k_click_prompt" if large_4k else ("compact_click_prompt" if compact else "desktop_click_prompt"))
 
 func _add_title_distress_mark(parent: Control, mark_name: String, normalized_rect: Rect2, color: Color) -> void:
