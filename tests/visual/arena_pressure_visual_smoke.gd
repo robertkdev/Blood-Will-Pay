@@ -133,17 +133,46 @@ func _build_surface() -> void:
 	_arena.position = Vector2(360.0, 170.0)
 	_arena.size = Vector2(1200.0, 650.0)
 	_arena.clip_contents = true
+	# Lift the arena as one stack above the host backdrop. Its authored terrain
+	# uses negative local z values by design; without this parent offset those
+	# children sit behind the smoke's full-screen backdrop sibling.
+	_arena.z_index = 10
 	var arena_style: StyleBoxFlat = StyleBoxFlat.new()
-	arena_style.bg_color = Color(0.035, 0.028, 0.034, 1.0)
+	# Match the live arena's transparent host. An opaque Panel draws over the
+	# negative-z authored battlefield layers and turns visual-review captures
+	# into a black void even though the textures and metadata are present.
+	arena_style.bg_color = Color(0.035, 0.028, 0.034, 0.0)
 	arena_style.border_color = Color(0.30, 0.20, 0.13, 1.0)
 	arena_style.set_border_width_all(2)
 	_arena.add_theme_stylebox_override("panel", arena_style)
+	var authored_frame_style: StyleBoxTexture = GothicUIAssetsScript.call("arena_frame_style") as StyleBoxTexture
+	if authored_frame_style != null:
+		# The source PNG has an opaque center and is authored for nine-slice use.
+		# Its helper disables center drawing so it frames instead of covering the
+		# battlefield, unlike the former full TextureRect overlay.
+		_arena.add_theme_stylebox_override("panel", authored_frame_style)
 	_host.add_child(_arena)
 	GothicUIThemeScript.call("_ensure_arena_war_aftermath_geometry", _arena)
 	GothicUIThemeScript.call("_ensure_arena_cell_seams", _arena)
 	GothicUIThemeScript.call("_ensure_arena_field_label", _arena, "EnemyFieldLabel", "HOSTILE GROUND", true)
 	GothicUIThemeScript.call("_ensure_arena_field_label", _arena, "PlayerFieldLabel", "HOLD THE LINE", false)
 	GothicUIThemeScript.call("_suppress_procedural_arena_overlays", _arena)
+	# The production scene supplies a wider canvas hierarchy around these
+	# negative-z layers. This isolated review host does not, so normalize its
+	# local stack explicitly instead of letting valid terrain render behind the
+	# host backdrop.
+	var aftermath_stack: Control = _arena.get_node_or_null("ArenaWarAftermath") as Control
+	var seam_stack: Control = _arena.get_node_or_null("ArenaCellSeams") as Control
+	var enemy_label_stack: Control = _arena.get_node_or_null("EnemyFieldLabel") as Control
+	var player_label_stack: Control = _arena.get_node_or_null("PlayerFieldLabel") as Control
+	if aftermath_stack != null:
+		aftermath_stack.z_index = 2
+	if seam_stack != null:
+		seam_stack.z_index = 3
+	if enemy_label_stack != null:
+		enemy_label_stack.z_index = 4
+	if player_label_stack != null:
+		player_label_stack.z_index = 4
 	var battlefield: TextureRect = TextureRect.new()
 	battlefield.name = "GothicArenaSurface"
 	battlefield.texture = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
@@ -151,7 +180,7 @@ func _build_surface() -> void:
 	battlefield.stretch_mode = TextureRect.STRETCH_SCALE
 	battlefield.set_anchors_preset(Control.PRESET_FULL_RECT)
 	battlefield.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	battlefield.z_index = -7
+	battlefield.z_index = 0
 	battlefield.set_meta("active_material_phase", "persistent_onset_base")
 	_arena.add_child(battlefield)
 	var pressure_surface: TextureRect = TextureRect.new()
@@ -161,22 +190,13 @@ func _build_surface() -> void:
 	pressure_surface.stretch_mode = TextureRect.STRETCH_SCALE
 	pressure_surface.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pressure_surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pressure_surface.z_index = -6
+	pressure_surface.z_index = 1
 	pressure_surface.visible = true
 	pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.86)
 	pressure_surface.set_meta("landmark_aligned_with_base", true)
 	_arena.add_child(pressure_surface)
 	_arena.set_meta("stable_base_location", true)
 	_arena.set_meta("battlefield_material_source", "persistent_base_plus_aligned_raster_and_physical_evidence")
-	var arena_frame: TextureRect = TextureRect.new()
-	arena_frame.name = "ArenaFrame"
-	arena_frame.texture = load("res://assets/ui/gothic/arena_frame.png") as Texture2D
-	arena_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	arena_frame.stretch_mode = TextureRect.STRETCH_SCALE
-	arena_frame.set_anchors_preset(Control.PRESET_FULL_RECT)
-	arena_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	arena_frame.z_index = 2
-	_arena.add_child(arena_frame)
 	_bridge = CombatVfxBridgeScript.new() as CombatVfxBridge
 	_bridge.configure(_arena, null, null)
 

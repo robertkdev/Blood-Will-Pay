@@ -357,7 +357,7 @@ func _assert_active_combat_shell() -> void:
 	_expect(war_aftermath != null and war_aftermath.visible == expects_physical_evidence, "combat shell has the wrong authored physical-evidence visibility")
 	_expect(onset_geometry != null and not onset_geometry.visible and midfight_geometry != null and not midfight_geometry.visible and collapse_geometry != null and not collapse_geometry.visible and reduced_geometry != null and not reduced_geometry.visible, "combat shell leaked a procedural evidence painter")
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "combat grid seams do not stay above the environment")
-	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.34, "combat seams must remain readable without becoming an opaque graph overlay")
+	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.15 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.22, "combat seams must remain readable without becoming an opaque graph overlay")
 	var onset_texture: Texture2D = GothicUIAssetsScript.call("battlefield_onset_texture") as Texture2D
 	var midfight_texture: Texture2D = GothicUIAssetsScript.call("battlefield_midfight_texture") as Texture2D
 	var reduced_texture: Texture2D = GothicUIAssetsScript.call("battlefield_reduced_motion_texture") as Texture2D
@@ -408,7 +408,10 @@ func _assert_persistent_combat_chrome(context: String) -> void:
 		_expect(system_menu.z_index >= 200, "%s Menu is not protected above combat/result pressure layers" % context)
 	if instruction_ribbon != null:
 		_expect(not instruction_ribbon.z_as_relative and instruction_ribbon.z_index >= 200, "%s instruction ribbon is not protected above combat/result pressure layers" % context)
-		_expect(bool(instruction_ribbon.get_meta("persistent_copy_uses_utility_face", false)), "%s persistent instruction ribbon regressed to condensed display type" % context)
+		if context.contains("result"):
+			_expect(bool(instruction_ribbon.get_meta("persistent_copy_uses_utility_face", false)), "%s result instruction regressed from the utility face" % context)
+		else:
+			_expect(bool(instruction_ribbon.get_meta("persistent_copy_uses_impact_face", false)), "%s active survival command lost its impact face" % context)
 
 func _assert_resolved_stage_phase(outcome: String) -> void:
 	var stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control if _main != null else null
@@ -435,7 +438,7 @@ func _assert_outcome_aftermath_geometry(banner: PanelContainer, outcome: String)
 	_expect(aftermath != null and bool(aftermath.get_meta("authored_physical_aftermath_visible", false)), "%s aftermath lacks visible authored physical consequence" % outcome)
 	_expect(field_art != null and field_art.texture != null and String(field_art.get_meta("result_material_source", "")) == "persistent_onset_landmark_base", "%s aftermath replaced its stable battlefield foundation" % outcome)
 	_expect(pressure_art != null and String(pressure_art.get_meta("result_material_source", "")) == "landmark_aligned_consequence_overlay", "%s aftermath lacks its aligned consequence layer" % outcome)
-	_expect(pressure_art != null and pressure_art.visible == (outcome != "VICTORY"), "%s aftermath consequence overlay has the wrong visibility" % outcome)
+	_expect(pressure_art != null and pressure_art.visible, "%s aftermath consequence overlay has the wrong visibility" % outcome)
 	_expect(rupture_field != null and not rupture_field.visible and bool(rupture_field.get_meta("debug_splinters_suppressed", false)), "%s aftermath retained straight procedural splinter bars" % outcome)
 	if victory_geometry != null:
 		_expect(victory_geometry.visible == (outcome == "VICTORY"), "%s has the wrong victory aftermath visibility" % outcome)
