@@ -4,12 +4,12 @@ enum CursorState { DEFAULT, INTERACTIVE, DISABLED, DRAG, INVALID, TARGET }
 
 const CURSOR_SIZE: Vector2 = Vector2(32.0, 32.0)
 const CURSOR_PATHS: Dictionary[String, String] = {
-	"default": "res://assets/ui/cursor/default.svg",
-	"interactive": "res://assets/ui/cursor/interactive.svg",
-	"disabled": "res://assets/ui/cursor/disabled.svg",
-	"drag": "res://assets/ui/cursor/drag.svg",
-	"invalid": "res://assets/ui/cursor/invalid.svg",
-	"target": "res://assets/ui/cursor/target.svg",
+	"default": "res://assets/ui/cursor/default.png",
+	"interactive": "res://assets/ui/cursor/interactive.png",
+	"disabled": "res://assets/ui/cursor/disabled.png",
+	"drag": "res://assets/ui/cursor/drag.png",
+	"invalid": "res://assets/ui/cursor/invalid.png",
+	"target": "res://assets/ui/cursor/target.png",
 }
 
 var enabled: bool = true
