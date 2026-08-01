@@ -21,8 +21,11 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 31) fail(`Expected curated history with 31 entries, got ${manifest.items.length}.`);
-if (manifest.items.filter((item) => item.unit === "creep").length !== 3) fail("Creep must have exactly V3, V4, and V5 provenance entries.");
+if (manifest.items.length !== 32) fail(`Expected curated history with 32 entries, got ${manifest.items.length}.`);
+const creepHistory = manifest.items.filter((item) => item.unit === "creep");
+if (creepHistory.length !== 4 || creepHistory.map((item) => item.version).join("|") !== "V3|V4|V5|V6") fail("Creep review history must preserve V3 through V6 in chronological order.");
+if (creepHistory.some((item) => item.version === "V6" && item.current)) fail("Creep V6 portrait crop must not replace the default.");
+if (!creepHistory[3].status.includes("Latest review candidate") || !creepHistory[3].label.includes("exact portrait crop")) fail("Creep V6 portrait crop must remain the newest review candidate.");
 if (!manifest.items.some((item) => item.unit === "luna" && item.version === "Refit V1")) fail("Luna refit is missing.");
 if (!manifest.items.some((item) => item.unit === "mara" && item.source_unit.includes("mara"))) fail("Mara history is missing.");
 if (manifest.items.filter((item) => item.unit === "mara").length !== 17) fail("Expected 17 curated Mara history variants.");
@@ -30,7 +33,7 @@ const canonicalMara = manifest.items.find((item) => item.unit === "mara" && item
 if (!canonicalMara || canonicalMara.local_path !== "history/mara-possession-tableau.png") fail("The user-confirmed possession tableau must be canonical Mara.");
 if (manifest.items.filter((item) => item.unit === "mara" && item.current).length !== 1) fail("Mara must have exactly one canonical current image.");
 if (manifest.items.some((item) => item.unit === "cashmere")) fail("Cashmere cannot remain a visible unit id.");
-if (manifest.items.some((item) => item.unit === "creep" && !item.path.includes("creep_builtin_revision_candidate"))) fail("Non-Creep art leaked into Creep history.");
+if (manifest.items.some((item) => item.unit === "creep" && item.version !== "V6" && !item.path.includes("creep_builtin_revision_candidate"))) fail("Non-Creep art leaked into Creep provenance history.");
 
 const sableReviews = manifest.items.filter((item) => item.unit === "sable");
 if (sableReviews.length !== 8) fail(`Expected 8 Sable review versions, got ${sableReviews.length}.`);
@@ -124,4 +127,4 @@ if (html.includes("padding: clamp(10px, 2vw, 30px)")) fail("Comparison artwork s
 if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use the full available review workspace.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=31 mara=17 sable-reviews=8 kett-reviews=2 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=32 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
