@@ -295,8 +295,7 @@ func _run() -> void:
 				_expect(settings_pressed_style.border_color != settings_focus_style.border_color, "Settings active-page state should remain distinct from keyboard focus", failures)
 				_expect(settings_focus_style.border_color.b > settings_focus_style.border_color.r, "Settings keyboard focus should use the non-red signal-blue channel", failures)
 			var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer
-			var settings_docket_title: Label = title_menu.find_child("SettingsDocketTitle", true, false) as Label
-			_expect(settings_docket != null and settings_docket_title != null and settings_docket_title.text.contains("ACTIVE PAGE"), "Settings should open as a joined local-machine field record", failures)
+			_expect(settings_docket == null, "Settings should omit the redundant active-page docket", failures)
 			_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "Settings should use a machine-console material distinct from the field-order record", failures)
 			var volume_slider: HSlider = title_menu.find_child("MasterVolumeSlider", true, false) as HSlider
 			_expect(volume_slider != null, "Settings did not expose master volume slider", failures)
@@ -328,7 +327,7 @@ func _run() -> void:
 				_expect(option_disabled != null and option_disabled.border_width_left >= 10 and option_disabled.border_width_bottom >= 4, "UIScaleOption disabled state should use a blocked shape, not only dimming", failures)
 				_expect(String(ui_scale_option.get_meta("disabled_non_color_cue", "")) != "", "UIScaleOption should publish its disabled non-color cue", failures)
 			_expect(readability_setting != null, "Settings should expose a visible readability and contrast record", failures)
-			_expect(readability_status != null and readability_status.text.contains("HIGH CONTRAST"), "Settings should state the enforced high-contrast default", failures)
+			_expect(readability_status != null and readability_status.text.to_lower().contains("high contrast"), "Settings should state the enforced high-contrast default", failures)
 			_expect(readability_status != null and readability_status.get_theme_font_size("font_size") >= 19, "Readability status should remain functional-size copy", failures)
 			_expect(scale_guidance != null and not scale_guidance.text.contains("every supported scale"), "UI scale guidance should avoid an unbounded responsiveness claim", failures)
 			_expect(accept_binding != null, "Settings should expose Confirm remapping", failures)

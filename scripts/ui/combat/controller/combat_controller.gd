@@ -136,12 +136,24 @@ class ResultAftermathPainter:
 			Vector2(size.x * 0.70, size.y),
 			Vector2(size.x, size.y),
 		])
-		_draw_earth(west_bank, Color(0.045, 0.030, 0.022, 0.60), Color(0.44, 0.24, 0.11, 0.24))
-		_draw_earth(east_bank, Color(0.045, 0.030, 0.022, 0.60), Color(0.44, 0.24, 0.11, 0.24))
-		_draw_log(Vector2(size.x * 0.03, size.y * 0.78), Vector2(size.x * 0.20, size.y * 0.83), 12.0)
-		_draw_log(Vector2(size.x * 0.80, size.y * 0.83), Vector2(size.x * 0.97, size.y * 0.77), 11.0)
-		_draw_broken_wheel(Vector2(size.x * 0.20, size.y * 0.78), minf(size.x, size.y) * 0.055)
-		_draw_abandoned_pack(Vector2(size.x * 0.77, size.y * 0.79), Vector2(size.x * 0.035, size.y * 0.040), 0.3)
+		_draw_earth(west_bank, Color(0.045, 0.030, 0.022, 0.76), Color(0.50, 0.27, 0.12, 0.36))
+		_draw_earth(east_bank, Color(0.045, 0.030, 0.022, 0.76), Color(0.50, 0.27, 0.12, 0.36))
+		_draw_log(Vector2(size.x * 0.03, size.y * 0.78), Vector2(size.x * 0.20, size.y * 0.83), 16.0)
+		_draw_log(Vector2(size.x * 0.80, size.y * 0.83), Vector2(size.x * 0.97, size.y * 0.77), 15.0)
+		_draw_broken_wheel(Vector2(size.x * 0.20, size.y * 0.78), minf(size.x, size.y) * 0.072)
+		_draw_abandoned_pack(Vector2(size.x * 0.77, size.y * 0.79), Vector2(size.x * 0.048, size.y * 0.052), 0.3)
+		# A charred field standard survives at the open flank. Its torn cloth gives
+		# victory a concrete, readable consequence outside the centered record card.
+		var standard_base: Vector2 = Vector2(size.x * 0.15, size.y * 0.82)
+		var standard_top: Vector2 = Vector2(size.x * 0.17, size.y * 0.24)
+		_draw_log(standard_base, standard_top, 9.0)
+		var torn_standard: PackedVector2Array = PackedVector2Array([
+			standard_top,
+			standard_top + Vector2(size.x * 0.095, size.y * 0.035),
+			standard_top + Vector2(size.x * 0.058, size.y * 0.105),
+			standard_top + Vector2(size.x * 0.018, size.y * 0.078),
+		])
+		draw_colored_polygon(torn_standard, Color(0.31, 0.010, 0.018, 0.72))
 		var opening_steps: Array[Vector2] = [
 			Vector2(size.x * 0.48, size.y * 0.80),
 			Vector2(size.x * 0.52, size.y * 0.63),
@@ -150,12 +162,12 @@ class ResultAftermathPainter:
 		for step_index: int in range(opening_steps.size()):
 			var step_radii: Vector2 = Vector2(size.x * (0.026 - float(step_index) * 0.004), size.y * 0.018)
 			var step_patch: PackedVector2Array = _irregular_ellipse(opening_steps[step_index], step_radii, 14, float(step_index) * 0.8)
-			draw_colored_polygon(step_patch, Color(0.62, 0.42, 0.22, 0.13))
+			draw_colored_polygon(step_patch, Color(0.62, 0.42, 0.22, 0.22))
 		_draw_blood_path(PackedVector2Array([
 			Vector2(size.x * 0.42, size.y * 0.76),
 			Vector2(size.x * 0.47, size.y * 0.60),
 			Vector2(size.x * 0.51, size.y * 0.46),
-		]), minf(size.x, size.y) * 0.012, Color(0.28, 0.012, 0.014, 0.30))
+		]), minf(size.x, size.y) * 0.014, Color(0.34, 0.010, 0.014, 0.44))
 
 	func _draw_stalemate_field() -> void:
 		# A deadlock is expressed by two collapsed, edge-grounded barricades and
@@ -3282,8 +3294,8 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 		arena_container.set_meta("use_full_combat_bounds", in_combat)
 	var arena_objective: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
 	if arena_objective != null:
-		arena_objective.text = "FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
-		arena_objective.add_theme_font_size_override("font_size", 20)
+		arena_objective.text = "SURVIVE"
+		arena_objective.add_theme_font_size_override("font_size", 26)
 	var planning_directive: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
 		var tight_scale_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
@@ -3371,7 +3383,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("stable_base_location", true)
 	arena.set_meta("landmark_continuity_source", "onset_base_persistent")
 	arena.set_meta("procedural_environment_geometry_suppressed", true)
-	arena.set_meta("authored_physical_evidence_visible", effective_phase >= 1 or reduced_motion)
+	arena.set_meta("authored_physical_evidence_visible", true)
 	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
@@ -3381,8 +3393,11 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var reduced_lock: Control = arena.get_node_or_null("ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	var pressure_painter: Control = arena.get_node_or_null("ArenaWarAftermath/ArenaPressurePainter") as Control
 	if aftermath != null:
-		aftermath.visible = effective_phase >= 1 or reduced_motion
-		aftermath.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		# The breach is already authored for phase zero; exposing its parent at the
+		# instant combat starts makes the field feel invaded instead of briefly
+		# reverting to an empty tactical grid.
+		aftermath.visible = true
+		aftermath.modulate = Color(1.0, 1.0, 1.0, 0.82 if effective_phase == 0 and not reduced_motion else 1.0)
 	if onset != null:
 		onset.visible = true
 		onset.modulate = Color(1.0, 1.0, 1.0, 0.76 if reduced_motion else 1.0)
@@ -3504,8 +3519,16 @@ func _protect_persistent_hud_chrome() -> void:
 		instruction_ribbon.z_index = 218
 		instruction_ribbon.modulate = Color.WHITE
 		instruction_ribbon.self_modulate = Color.WHITE
-		var compact_instruction: bool = parent.get_viewport_rect().size.x <= 1000.0
-		instruction_ribbon.text = "FIELD ORDER // RECORDED // ENTER / SPACE" if result_visible and compact_instruction else "FIELD ORDER // CONSEQUENCE RECORDED // ENTER / SPACE TO ADVANCE" if result_visible else "FIELD ORDER // FIGHT // SURVIVE" if compact_instruction else "FIELD ORDER // FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
+		instruction_ribbon.text = "ENTER / SPACE // ADVANCE" if result_visible else "SURVIVE"
+		instruction_ribbon.add_theme_font_size_override("font_size", 20 if result_visible else 26)
+		if result_visible:
+			VisualTypeSystem.set_utility_bold(instruction_ribbon)
+			instruction_ribbon.set_meta("persistent_copy_uses_utility_face", true)
+			instruction_ribbon.set_meta("persistent_copy_uses_impact_face", false)
+		else:
+			VisualTypeSystem.set_impact(instruction_ribbon)
+			instruction_ribbon.set_meta("persistent_copy_uses_utility_face", false)
+			instruction_ribbon.set_meta("persistent_copy_uses_impact_face", true)
 		instruction_ribbon.set_meta("persistent_combat_hierarchy", true)
 	var tree: SceneTree = parent.get_tree()
 	var system_menu: Button = tree.root.find_child("SystemMenuButton", true, false) as Button if tree != null else null
@@ -4379,8 +4402,8 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 		field_art.set_meta("result_material_source", "persistent_onset_landmark_base")
 	if pressure_art != null:
 		pressure_art.texture = GothicUIAssets.battlefield_reduced_motion_texture() if title == "DEFEAT" else GothicUIAssets.battlefield_midfight_texture()
-		pressure_art.visible = title != "VICTORY"
-		pressure_art.modulate = Color(1.0, 1.0, 1.0, 0.54 if title == "STALEMATE" else 0.70)
+		pressure_art.visible = true
+		pressure_art.modulate = Color(1.0, 1.0, 1.0, 0.32 if title == "VICTORY" else 0.54 if title == "STALEMATE" else 0.70)
 		pressure_art.set_meta("result_material_source", "landmark_aligned_consequence_overlay")
 	if blood_wash != null:
 		var opening_wash_alpha: float = 0.015 if title == "VICTORY" else 0.020 if title == "STALEMATE" else 0.035

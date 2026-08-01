@@ -638,12 +638,12 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(arena != null and bool(arena.get_meta("stable_base_location", false)), "%s capture does not preserve one tactical location" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("procedural_environment_geometry_suppressed", false)), "%s capture retained procedural environment geometry" % expected_phase)
 	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not prioritize cell readability" % expected_phase)
-	var expects_physical_evidence: bool = expected_phase != "onset"
+	var expects_physical_evidence: bool = true
 	_expect(aftermath != null and aftermath.visible == expects_physical_evidence, "%s capture has the wrong physical evidence visibility" % expected_phase)
 	_expect(onset != null and not onset.visible and midfight != null and not midfight.visible and collapse != null and not collapse.visible and reduced_lock != null and not reduced_lock.visible, "%s capture leaked a procedural evidence group over the authored field" % expected_phase)
 	_expect(pressure_painter != null and pressure_painter.is_visible_in_tree() == expects_physical_evidence, "%s capture does not expose the expected authored physical evidence painter" % expected_phase)
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "%s capture lost the high-contrast cell-seam layer" % expected_phase)
-	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.34, "%s capture lost the legible terrain-seam balance" % expected_phase)
+	_expect(cell_seams != null and bool(cell_seams.get_meta("debug_graph_grid_suppressed", false)) and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.15 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.22, "%s capture lost the subordinate terrain-seam balance" % expected_phase)
 	_expect(arena_surface != null and String(arena_surface.get_meta("battlefield_foundation", "")) == "muddy_rural_killing_ground_v1", "%s capture lacks the physical rural horror foundation" % expected_phase)
 	_expect(arena_surface != null and arena_surface.texture != null and arena_surface.modulate.a >= 0.90, "%s capture washes out or loses the authored battlefield texture" % expected_phase)
 	_expect(arena_surface != null and String(arena_surface.get_meta("active_material_phase", "")) == "persistent_onset_base", "%s capture replaced the stable authored foundation" % expected_phase)
@@ -711,7 +711,7 @@ func _assert_compact_settings_finish() -> void:
 	_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "150% Settings did not select its distinct machine-console material")
 	_expect(content_scroll != null and content_scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED, "150% Settings content is not scrollable")
 	_expect(content_scroll != null and content_scroll.get_v_scroll_bar().custom_minimum_size.x >= 10.0, "150% Settings scrollbar remains too cramped")
-	_expect(scroll_cue != null and scroll_cue.is_visible_in_tree() and scroll_cue.text.contains("SCROLL"), "150% Settings does not explain the intentionally continued record")
+	_expect(scroll_cue != null and scroll_cue.is_visible_in_tree() and scroll_cue.text.to_lower().contains("settings below"), "150% Settings does not explain the intentionally continued record")
 
 
 func _assert_compact_ledger_finish(ledger: Control) -> void:

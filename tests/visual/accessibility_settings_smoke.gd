@@ -66,7 +66,7 @@ func _run() -> void:
 	_expect(accept_button != null, "Confirm binding button missing")
 	_expect(cancel_button != null, "Menu / Back binding button missing")
 	_expect(reset_button != null, "Reset Defaults button missing")
-	_expect(readability_status != null and readability_status.text.contains("HIGH CONTRAST"), "Settings should expose the enforced high-contrast readability default")
+	_expect(readability_status != null and readability_status.text.to_lower().contains("high contrast"), "Settings should expose the enforced high-contrast readability default")
 	_expect(readability_status != null and int(readability_status.get_meta("utility_type_floor_px", 0)) >= 15, "Settings should publish a 15px utility typography floor")
 	_expect(readability_status != null and int(readability_status.get_meta("functional_type_floor_px", 0)) >= 16, "Settings should publish a 16px functional typography floor")
 	_expect(readability_guidance != null and readability_guidance.get_theme_font_size("font_size") >= 18, "Readability guidance should use legible utility typography")

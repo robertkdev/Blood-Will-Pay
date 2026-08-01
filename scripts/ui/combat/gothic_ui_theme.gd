@@ -1686,7 +1686,7 @@ static func _ensure_arena_threat_boundary(arena: Control) -> void:
 		bar.offset_top = 0.0
 		bar.offset_bottom = 0.0
 		bar.rotation = float(spec.get("rot", 0.0))
-		bar.color = Color(0.72, 0.11, 0.055, 0.20)
+		bar.color = Color(0.46, 0.16, 0.075, 0.12)
 	var objective: Label = boundary.get_node_or_null("CombatObjectiveSignal") as Label
 	if objective == null:
 		objective = Label.new()
@@ -1697,26 +1697,26 @@ static func _ensure_arena_threat_boundary(arena: Control) -> void:
 	objective.anchor_right = 0.5
 	objective.anchor_top = 0.0
 	objective.anchor_bottom = 0.0
-	objective.offset_left = -250.0
-	objective.offset_right = 250.0
+	objective.offset_left = -150.0
+	objective.offset_right = 150.0
 	objective.offset_top = 12.0
 	objective.offset_bottom = 42.0
-	objective.text = "FIGHT // SURVIVE UNTIL THE FIELD CLEARS"
+	objective.text = "SURVIVE"
 	objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	objective.add_theme_font_size_override("font_size", 20)
+	objective.add_theme_font_size_override("font_size", 26)
 	objective.add_theme_color_override("font_color", Color(0.98, 0.90, 0.78, 1.0))
 	objective.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.90))
 	objective.add_theme_constant_override("outline_size", 1)
 	var objective_backing: StyleBoxFlat = StyleBoxFlat.new()
 	objective_backing.bg_color = Color(0.012, 0.010, 0.014, 0.88)
-	objective_backing.border_color = Color(0.68, 0.08, 0.07, 0.90)
-	objective_backing.border_width_top = 2
-	objective_backing.border_width_bottom = 1
+	objective_backing.border_color = Color(0.88, 0.10, 0.09, 0.96)
+	objective_backing.border_width_top = 3
+	objective_backing.border_width_bottom = 2
 	objective_backing.content_margin_left = 10.0
 	objective_backing.content_margin_right = 10.0
 	objective.add_theme_stylebox_override("normal", objective_backing)
-	objective.set_meta("persistent_copy_uses_utility_face", true)
-	VisualTypeSystem.set_utility_bold(objective)
+	objective.set_meta("persistent_copy_uses_impact_face", true)
+	VisualTypeSystem.set_impact(objective)
 
 static func _ensure_tactical_shell_marks(root: Control) -> void:
 	var battle_area: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
@@ -2359,17 +2359,17 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		var enemy_side: bool = row_index <= 2
 		var major_seam: bool = row_index == 2 or column_index == 3
 		var alternating_cell: bool = (row_index + column_index) % 2 == 0
-		seam_style.bg_color = Color(0.09, 0.012, 0.018, 0.050 if alternating_cell else 0.024) if enemy_side else Color(0.12, 0.105, 0.075, 0.050 if alternating_cell else 0.024)
-		seam_style.border_color = Color(0.94, 0.24, 0.18, 0.50 if major_seam else 0.27) if enemy_side else Color(0.96, 0.88, 0.68, 0.54 if major_seam else 0.31)
-		seam_style.border_width_right = 3 if column_index == 3 else 1
-		seam_style.border_width_bottom = 3 if row_index == 2 else 1
-		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.48)
+		seam_style.bg_color = Color(0.10, 0.028, 0.020, 0.034 if alternating_cell else 0.014) if enemy_side else Color(0.10, 0.085, 0.060, 0.034 if alternating_cell else 0.014)
+		seam_style.border_color = Color(0.56, 0.22, 0.12, 0.32 if major_seam else 0.16) if enemy_side else Color(0.62, 0.55, 0.40, 0.34 if major_seam else 0.17)
+		seam_style.border_width_right = 2 if column_index == 3 else 1
+		seam_style.border_width_bottom = 2 if row_index == 2 else 1
+		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.30)
 		seam_style.shadow_size = 1
 		seam_style.shadow_offset = Vector2(1.0, 1.0)
 		cell.add_theme_stylebox_override("panel", seam_style)
-	seams.set_meta("major_seam_non_color_weight", 3)
+	seams.set_meta("major_seam_non_color_weight", 2)
 	seams.set_meta("minor_seam_non_color_weight", 1)
-	seams.set_meta("terrain_seam_alpha", 0.31)
+	seams.set_meta("terrain_seam_alpha", 0.17)
 	seams.set_meta("alternating_material_cell_wash", true)
 	seams.set_meta("side_separation", "enemy_oxblood_player_bone_with_black_understroke")
 	seams.set_meta("debug_graph_grid_suppressed", true)
@@ -2391,14 +2391,14 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 	label.offset_top = 10.0 if enemy_side else -40.0
 	label.offset_bottom = 40.0 if enemy_side else -10.0
 	label.text = "▲ %s // BREACH" % copy if enemy_side else "■ %s // SURVIVE" % copy
-	label.add_theme_font_size_override("font_size", 21)
-	label.add_theme_color_override("font_color", Color(1.0, 0.52, 0.42, 0.96) if enemy_side else Color(0.96, 0.88, 0.70, 0.94))
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Color(0.88, 0.48, 0.38, 0.76) if enemy_side else Color(0.82, 0.76, 0.62, 0.74))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
 	label.add_theme_constant_override("outline_size", 2)
 	var label_backing: StyleBoxFlat = StyleBoxFlat.new()
-	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.78)
-	label_backing.border_color = Color(0.66, 0.08, 0.07, 0.82) if enemy_side else Color(0.58, 0.48, 0.32, 0.74)
-	label_backing.border_width_left = 4
+	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.60)
+	label_backing.border_color = Color(0.48, 0.16, 0.10, 0.64) if enemy_side else Color(0.46, 0.39, 0.28, 0.58)
+	label_backing.border_width_left = 2
 	label_backing.content_margin_left = 8.0
 	label_backing.content_margin_right = 8.0
 	label.add_theme_stylebox_override("normal", label_backing)

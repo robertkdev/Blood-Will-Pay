@@ -104,7 +104,7 @@ func _run() -> void:
 	var survival_label: Label = _arena.get_node_or_null("PlayerFieldLabel") as Label
 	_expect(seams != null and seams.get_child_count() == 48, "battlefield lost its 8x6 cell-seam readability layer")
 	_expect(seams != null and int(seams.get_meta("major_seam_non_color_weight", 0)) >= 2, "battlefield major seams lack a non-color weight cue")
-	_expect(seams != null and float(seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27 and float(seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.34, "battlefield seams must remain tactical over the authored terrain without reverting to an opaque graph overlay")
+	_expect(seams != null and float(seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.15 and float(seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.22, "battlefield seams must remain subordinate to the authored terrain without disappearing")
 	_expect(String(seams.get_meta("side_separation", "")).contains("enemy_oxblood_player_bone"), "battlefield seams must separate hostile and survival territory in color plus line weight")
 	_expect(bool(_arena.get_meta("stable_base_location", false)), "combat escalation must preserve one stable killing ground")
 	_expect(String(_arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_aligned_raster_and_physical_evidence", "combat escalation must layer visible physical evidence over the persistent base")

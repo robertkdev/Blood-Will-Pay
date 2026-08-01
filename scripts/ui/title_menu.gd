@@ -851,12 +851,12 @@ func _ensure_content_panel() -> void:
 		_settings_scroll_cue.name = "SettingsScrollCue"
 		_settings_scroll_cue.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_content_stack.add_child(_settings_scroll_cue)
-	_settings_scroll_cue.text = "MORE MACHINE CONTROLS BELOW  ↓  SCROLL"
+	_settings_scroll_cue.text = "More settings below  ↓"
 	_settings_scroll_cue.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_settings_scroll_cue.custom_minimum_size.y = 22.0
-	_settings_scroll_cue.add_theme_font_size_override("font_size", 15)
-	_settings_scroll_cue.add_theme_color_override("font_color", Color(0.98, 0.70, 0.28, 1.0))
-	VisualTypeSystem.set_utility_bold(_settings_scroll_cue)
+	_settings_scroll_cue.add_theme_font_size_override("font_size", 14)
+	_settings_scroll_cue.add_theme_color_override("font_color", COLOR_MUTED)
+	VisualTypeSystem.set_utility(_settings_scroll_cue)
 	_settings_scroll_cue.visible = _active_section == SECTION_SETTINGS and short_compact
 	_apply_section_material()
 
@@ -865,19 +865,22 @@ func _apply_section_material() -> void:
 		return
 	var is_settings: bool = _active_section == SECTION_SETTINGS
 	var surface: StyleBoxFlat = _make_panel_style(
-		Color(0.035, 0.045, 0.040, 0.94) if is_settings else Color(0.018, 0.016, 0.020, 0.82),
-		Color(0.76, 0.58, 0.24, 0.96) if is_settings else Color(0.56, 0.50, 0.42, 0.92),
+		Color(0.030, 0.034, 0.031, 0.96) if is_settings else Color(0.018, 0.016, 0.020, 0.82),
+		Color(0.46, 0.39, 0.27, 0.82) if is_settings else Color(0.56, 0.50, 0.42, 0.92),
 		0,
 		0,
-		22
+		11 if is_settings else 22
 	)
-	surface.border_width_top = 3 if is_settings else 2
-	surface.border_width_left = 4 if is_settings else 0
-	surface.border_color = Color(0.84, 0.61, 0.24, 0.96) if is_settings else Color(0.79, 0.70, 0.56, 0.90)
+	surface.border_width_top = 2
+	surface.border_width_left = 2 if is_settings else 0
+	surface.border_color = Color(0.52, 0.43, 0.28, 0.84) if is_settings else Color(0.79, 0.70, 0.56, 0.90)
 	_content_panel.add_theme_stylebox_override("panel", surface)
 	_content_panel.set_meta("material_role", "machine_console_olive_steel" if is_settings else "field_order_carbon_record")
 	if _settings_scroll_cue != null:
 		_settings_scroll_cue.visible = is_settings and _is_short_compact_layout()
+	var construction_rule: Control = _content_panel.get_node_or_null("ContentLayout/ContentHeader/ConstructionRule") as Control
+	if construction_rule != null:
+		construction_rule.visible = not is_settings
 
 func _ensure_content_record_assembly() -> void:
 	if _content_panel == null:
@@ -975,6 +978,7 @@ func _ensure_content_construction_cues(header: VBoxContainer, compact: bool, sho
 		rule_row.add_child(blood_tick)
 	blood_tick.custom_minimum_size = Vector2(22.0 if compact else 34.0, 4.0)
 	blood_tick.color = Color(0.62, 0.035, 0.060, 0.90)
+	rule_row.visible = _active_section != SECTION_SETTINGS
 
 func _select_section(section: String, clear_search: bool = true) -> void:
 	_stabilize_command_chrome()
@@ -1236,8 +1240,6 @@ func _render_settings() -> void:
 	if _search_field != null:
 		_search_field.placeholder_text = "Search settings: readability, contrast, scale, motion, keys..."
 	var added: int = 0
-	if _search_query() == "" and not _is_short_compact_layout():
-		_add_settings_docket()
 	_add_accessibility_priority_banner()
 	added += _add_ui_scale_setting()
 	added += _add_motion_setting()
@@ -1263,9 +1265,9 @@ func _add_accessibility_priority_banner() -> void:
 	var copy: VBoxContainer = VBoxContainer.new()
 	copy.add_theme_constant_override("separation", 1)
 	margin.add_child(copy)
-	var heading: Label = _make_label("ACCESSIBILITY // FIRST RESPONSE", 18 if _is_short_compact_layout() else 20, Color(1.0, 0.72, 0.50, 1.0), false)
+	var heading: Label = _make_label("Accessibility first", 18 if _is_short_compact_layout() else 20, Color(0.90, 0.76, 0.56, 1.0), false)
 	heading.name = "AccessibilityPriorityTitle"
-	VisualTypeSystem.set_action(heading)
+	VisualTypeSystem.set_utility_bold(heading)
 	copy.add_child(heading)
 	if not _is_short_compact_layout():
 		copy.add_child(_make_label("Scale and motion controls stay first so the command record can be made usable before anything else.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
@@ -1575,14 +1577,14 @@ func _add_readability_setting() -> int:
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stack.add_child(heading)
 	heading.add_child(_make_label("Readability & Contrast", 22, COLOR_TEXT, false))
-	var status: Label = _make_label("ENFORCED // HIGH CONTRAST", 17, COLOR_GOLD, false)
+	var status: Label = _make_label("High contrast enabled", 17, Color(0.68, 0.76, 0.64, 1.0), false)
 	status.name = "ReadabilityStatus"
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status.set_meta("utility_type_floor_px", 15)
 	status.set_meta("functional_type_floor_px", 16)
 	heading.add_child(status)
-	var guidance: Label = _make_label("This command console uses the readable dossier face for utility copy, high-contrast paper and ink, and a 15px utility floor. Use Readable UI Scale at the top for larger controls.", 18 if _is_compact_layout() else 20, Color(0.86, 0.82, 0.74, 1.0), true)
+	var guidance: Label = _make_label("This command console uses a readable dossier face with high-contrast paper and ink. Use Readable UI Scale above when you need larger controls.", 18 if _is_short_compact_layout() else 20, Color(0.86, 0.82, 0.74, 1.0), true)
 	guidance.name = "ReadabilityGuidance"
 	stack.add_child(guidance)
 	return 1
@@ -1677,7 +1679,13 @@ func _make_card_container(node_name: String, bg: Color, border: Color, border_wi
 	card.name = node_name
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var card_style: StyleBoxFlat = _make_panel_style(bg, border, border_width, 0, 6)
-	card_style.border_width_left = max(4, border_width)
+	var settings_card: bool = _active_section == SECTION_SETTINGS
+	var priority_card: bool = node_name == "AccessibilityPriority"
+	if settings_card:
+		card_style.bg_color = Color(bg.r * 0.70, bg.g * 0.70, bg.b * 0.70, maxf(bg.a, 0.94))
+		card_style.border_color = border if priority_card else Color(border.r * 0.64, border.g * 0.64, border.b * 0.64, minf(border.a, 0.74))
+		card_style.shadow_size = 0
+	card_style.border_width_left = max(3 if priority_card else 2, border_width) if settings_card else max(4, border_width)
 	card_style.border_width_top = 1
 	card_style.border_width_right = 1
 	card_style.border_width_bottom = 1
@@ -2008,7 +2016,7 @@ func _style_selector(option: OptionButton) -> void:
 	VisualTypeSystem.set_action(option)
 	option.add_theme_stylebox_override("normal", _selector_box(Color(0.035, 0.029, 0.034, 0.98), Color(0.69, 0.61, 0.49, 0.92), 2))
 	option.add_theme_stylebox_override("hover", _selector_box(Color(0.075, 0.050, 0.050, 1.0), Color(0.94, 0.72, 0.39, 1.0), 3))
-	option.add_theme_stylebox_override("pressed", _selector_box(Color(0.12, 0.030, 0.040, 1.0), Color(0.88, 0.075, 0.10, 1.0), 4))
+	option.add_theme_stylebox_override("pressed", _selector_box(Color(0.20, 0.045, 0.055, 1.0), Color(1.0, 0.14, 0.16, 1.0), 6))
 	option.add_theme_stylebox_override("focus", _selector_box(Color(0.026, 0.072, 0.098, 1.0), COLOR_SIGNAL_BLUE, 10))
 	var disabled_style: StyleBoxFlat = _selector_box(Color(0.025, 0.023, 0.026, 0.96), Color(0.36, 0.34, 0.31, 0.94), 11)
 	disabled_style.border_width_right = 4
