@@ -298,6 +298,46 @@ window.GAMBLE_BATTLE_UNIT_ART_HISTORY = {
 			status: "Latest review candidate; no default change",
 			local_path: "history/sable/sable-review-v8.png",
 			path: "tools/art/history/sable/sable-review-v8.png"
+		},
+		{
+			unit: "kett",
+			source_unit: "kett",
+			kind: "candidate",
+			version: "Review V1",
+			label: "Pit enforcer gauntlet concept",
+			status: "Historical review candidate",
+			local_path: "history/kett/kett-review-v1.png",
+			path: "tools/art/history/kett/kett-review-v1.png"
+		},
+		{
+			unit: "kett",
+			source_unit: "kett",
+			kind: "candidate",
+			version: "Review V2",
+			label: "Piston gauntlet and bone muzzle",
+			status: "Latest review candidate; no default change",
+			local_path: "history/kett/kett-review-v2.png",
+			path: "tools/art/history/kett/kett-review-v2.png"
+		},
+		{
+			unit: "nyxa",
+			source_unit: "nyxa",
+			kind: "candidate",
+			version: "Review V1",
+			label: "Feral chronomancer volley",
+			status: "Latest review candidate; no default change",
+			local_path: "history/nyxa/nyxa-review-v1.png",
+			path: "tools/art/history/nyxa/nyxa-review-v1.png"
+		},
+		{
+			unit: "pilfer",
+			source_unit: "pilfer",
+			kind: "candidate",
+			version: "Review V1",
+			label: "Feral transfusion assassin",
+			status: "Latest review candidate; no default change",
+			local_path: "history/pilfer/pilfer-review-v1.png",
+			path: "tools/art/history/pilfer/pilfer-review-v1.png"
 		}
 	],
 	excluded_source_categories: [
