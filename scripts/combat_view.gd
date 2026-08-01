@@ -540,7 +540,11 @@ func _set_grid_separation(grid: GridContainer, separation: int) -> void:
 func _apply_board_tile_size(compact: bool, tight_compact: bool, large_planning_field: bool) -> void:
 	var effective_size: Vector2 = get_meta("effective_ui_size", Vector2.ZERO) as Vector2
 	var wide_tight_field: bool = tight_compact and effective_size.x >= 1200.0
-	var tile_size: Vector2 = Vector2(58.0, 26.0) if wide_tight_field else Vector2(42.0, 26.0) if tight_compact else Vector2(92.0, 48.0) if large_planning_field else Vector2(62.0, 46.0) if compact else Vector2(88.0, 72.0)
+	# Ultrawide planning has enough horizontal room to let the deployment grid
+	# read as the battlefield, rather than a small island floating between rails.
+	# The increase is limited to the authored grid cells; side-panel behavior and
+	# compact breakpoints stay unchanged.
+	var tile_size: Vector2 = Vector2(58.0, 26.0) if wide_tight_field else Vector2(42.0, 26.0) if tight_compact else Vector2(112.0, 54.0) if large_planning_field else Vector2(62.0, 46.0) if compact else Vector2(88.0, 72.0)
 	var grid_separation: int = 4 if tight_compact else 6 if compact else 8
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		if grid == null:

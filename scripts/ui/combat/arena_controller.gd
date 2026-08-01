@@ -4,6 +4,10 @@ const Trace := preload("res://scripts/util/trace.gd")
 
 const Debug := preload("res://scripts/util/debug.gd")
 const Strings := preload("res://scripts/util/strings.gd")
+# Keep the rendered fighter footprint legible inside the authored combat cells.
+# This changes the presentation scale only; unit art, animation, and behavior
+# remain untouched.
+const COMBAT_ACTOR_SIZE_SCALE: float = 1.62
 
 var arena_container: Control
 var arena_units: Control
@@ -26,6 +30,9 @@ func configure(_arena_container: Control, _arena_units: Control, _player_grid_he
 func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
     Trace.step("ArenaController.enter_arena: begin")
     _clear()
+    # Keep combat actors slightly larger than planning tiles so the fight stays
+    # visually legible without changing their artwork or motion.
+    var actor_size: Vector2 = Vector2.ONE * float(tile_size) * COMBAT_ACTOR_SIZE_SCALE
     var player_summary: Array[String] = []
     for i in range(player_views.size()):
         var pv: UnitSlotView = player_views[i]
@@ -38,7 +45,7 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
         actor.set_unit(pv.unit)
         actor.set_team_tint(Color(0.12, 0.30, 0.46, 0.72))
         arena_units.add_child(actor)
-        actor.set_size_px(Vector2(tile_size, tile_size))
+        actor.set_size_px(actor_size)
         actor.set_screen_position(pos)
         actor.visible = (pv.unit != null and pv.unit.is_alive())
         player_actors.append(actor)
@@ -58,7 +65,7 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
         actor2.set_unit(ev.unit)
         actor2.set_team_tint(Color(0.54, 0.06, 0.09, 0.76))
         arena_units.add_child(actor2)
-        actor2.set_size_px(Vector2(tile_size, tile_size))
+        actor2.set_size_px(actor_size)
         actor2.set_screen_position(pos2)
         actor2.visible = (ev.unit != null and ev.unit.is_alive())
         enemy_actors.append(actor2)

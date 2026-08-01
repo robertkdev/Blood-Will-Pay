@@ -65,7 +65,7 @@ const BOSS_PREP_MIN_CHAPTER: int = 3
 const BOSS_PREP_ROUND: int = 4
 const RESULT_MINIMUM_DWELL_SECONDS: float = 6.0
 const RESULT_SKIP_GUARD_SECONDS: float = 0.45
-const COMBAT_PRESSURE_MIDFIGHT_SECONDS: float = 0.35
+const COMBAT_PRESSURE_MIDFIGHT_SECONDS: float = 0.14
 const COMBAT_PRESSURE_COLLAPSE_SECONDS: float = 2.75
 const COMBAT_PRESSURE_MIDFIGHT_CASUALTIES: float = 0.12
 const COMBAT_PRESSURE_COLLAPSE_CASUALTIES: float = 0.35
@@ -434,6 +434,7 @@ var _combat_pressure_elapsed: float = 0.0
 var _environmental_pressure_phase: int = -1
 var _environmental_reduced_motion_state: bool = false
 var _environmental_casualty_event_index: int = -1
+var _combat_impact_event_index: int = 0
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -1073,10 +1074,10 @@ func _responsive_tile_size() -> int:
 		return int(UI.TILE_SIZE)
 	var viewport_size: Vector2 = parent.get_viewport_rect().size
 	if viewport_size.y <= 760.0:
-		return 56
+		return 64
 	if viewport_size.y <= 900.0 or viewport_size.x <= 1440.0:
-		return 68
-	return int(UI.TILE_SIZE)
+		return 76
+	return 88
 
 func _apply_grid_dimensions(tile: int) -> void:
 	# Compute desired grid size from constants and theme separations
@@ -2169,6 +2170,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	if continue_button != null:
 		continue_button.text = BATTLE_LOCKED_TEXT
 	_encounter_escalations_seen = 0
+	_combat_impact_event_index = 0
 	_on_log_line("Prepare to fight.")
 	if projectile_bridge and projectile_bridge.has_method("set_visuals_enabled"):
 		projectile_bridge.set_visuals_enabled(true)
@@ -2262,6 +2264,10 @@ func _on_engine_hit_applied(team: String, si: int, ti: int, rolled: int, dealt: 
 	if stats_panel and stats_panel.has_method("_on_hit_applied"):
 		stats_panel._on_hit_applied(team, si, ti, rolled, dealt, crit, before_hp, after_hp, player_cd, enemy_cd)
 	if dealt > 0 and after_hp < before_hp:
+		_combat_impact_event_index += 1
+		var arena: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+		if arena != null:
+			arena.set_meta("battlefield_impact_event_index", _combat_impact_event_index)
 		var target_team: String = "enemy" if team == "player" else "player"
 		if _should_defer_hit_flash(team, si, ti):
 			return
@@ -3266,7 +3272,11 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 		_environmental_pressure_phase = -1
 		_environmental_reduced_motion_state = _reduced_motion_enabled()
 		_environmental_casualty_event_index = -1
+		_combat_impact_event_index = 0
 	_update_tactical_shell_layout(in_combat)
+	var focus_painter: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCombatFocusPainter") as Control
+	if focus_painter != null:
+		focus_painter.visible = in_combat
 	if in_combat:
 		_update_environmental_pressure(0.0)
 	_protect_persistent_hud_chrome()
@@ -3352,13 +3362,63 @@ func _update_environmental_pressure(delta: float) -> void:
 	if aftermath != null:
 		aftermath.pivot_offset = aftermath.size * 0.5
 		aftermath.scale = Vector2.ONE if reduced_motion else Vector2(1.0 + slow_pulse * 0.003, 1.0 + pulse * 0.004)
+	_update_combat_focus_frame(arena, pressure_phase, reduced_motion)
 
 func _resolve_environmental_pressure_phase(casualty_pressure: float) -> int:
-	if casualty_pressure >= COMBAT_PRESSURE_COLLAPSE_CASUALTIES or _combat_pressure_elapsed >= COMBAT_PRESSURE_COLLAPSE_SECONDS:
+	if casualty_pressure >= COMBAT_PRESSURE_COLLAPSE_CASUALTIES or _combat_impact_event_index >= 6 or _combat_pressure_elapsed >= COMBAT_PRESSURE_COLLAPSE_SECONDS:
 		return 2
-	if casualty_pressure >= COMBAT_PRESSURE_MIDFIGHT_CASUALTIES or _combat_pressure_elapsed >= COMBAT_PRESSURE_MIDFIGHT_SECONDS:
+	if casualty_pressure >= COMBAT_PRESSURE_MIDFIGHT_CASUALTIES or _combat_impact_event_index >= 2 or _combat_pressure_elapsed >= COMBAT_PRESSURE_MIDFIGHT_SECONDS:
 		return 1
 	return 0
+
+func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_motion: bool) -> void:
+	if arena == null or not is_instance_valid(arena):
+		return
+	var focus_painter: Control = arena.get_node_or_null("ArenaCombatFocusPainter") as Control
+	if focus_painter == null:
+		return
+	var bounds: Rect2 = Rect2()
+	var found_actor: bool = false
+	if arena_units != null and is_instance_valid(arena_units):
+		var arena_canvas_inverse: Transform2D = arena.get_global_transform_with_canvas().affine_inverse()
+		for child: Node in arena_units.get_children():
+			var actor: Control = child as Control
+			if actor == null or not actor.visible or actor.size.x <= 1.0 or actor.size.y <= 1.0:
+				continue
+			var actor_position: Vector2 = arena_canvas_inverse * actor.global_position
+			var actor_rect: Rect2 = Rect2(actor_position, actor.size)
+			bounds = actor_rect if not found_actor else bounds.merge(actor_rect)
+			found_actor = true
+	var focus_size: Vector2 = Vector2(arena.size.x * (0.66 if pressure_phase == 0 else 0.60), arena.size.y * 0.82)
+	if focus_size.x < 720.0:
+		focus_size.x = 720.0
+	if focus_size.y < 520.0:
+		focus_size.y = 520.0
+	var focus_center: Vector2 = arena.size * Vector2(0.5, 0.5)
+	if found_actor:
+		var padding: Vector2 = Vector2(maxf(180.0, arena.size.x * 0.16), maxf(100.0, arena.size.y * 0.12))
+		var padded_bounds: Rect2 = Rect2(bounds.position - padding, bounds.size + padding * 2.0)
+		focus_size.x = maxf(focus_size.x, padded_bounds.size.x)
+		focus_size.y = maxf(focus_size.y, padded_bounds.size.y)
+		focus_center = padded_bounds.get_center()
+	var max_position: Vector2 = Vector2(maxf(0.0, arena.size.x - focus_size.x), maxf(0.0, arena.size.y - focus_size.y))
+	var focus_position: Vector2 = Vector2(
+		clampf(focus_center.x - focus_size.x * 0.5, 0.0, max_position.x),
+		clampf(focus_center.y - focus_size.y * 0.5, 0.0, max_position.y)
+	)
+	var normalized_rect: Rect2 = Rect2(
+		focus_position.x / maxf(1.0, arena.size.x),
+		focus_position.y / maxf(1.0, arena.size.y),
+		focus_size.x / maxf(1.0, arena.size.x),
+		focus_size.y / maxf(1.0, arena.size.y)
+	)
+	if focus_painter.has_method("set_focus_rect"):
+		focus_painter.call("set_focus_rect", normalized_rect)
+	if focus_painter.has_method("configure"):
+		focus_painter.call("configure", pressure_phase, reduced_motion)
+	focus_painter.visible = true
+	arena.set_meta("battlefield_focus_rect", normalized_rect)
+	arena.set_meta("battlefield_focus_mode", "combat_cluster_frame")
 
 func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool, casualty_pressure: float, casualty_event_index: int = 0) -> void:
 	if parent == null:
@@ -3376,6 +3436,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("battlefield_reduced_motion", reduced_motion)
 	arena.set_meta("battlefield_casualty_pressure", casualty_pressure)
 	arena.set_meta("battlefield_casualty_event_index", casualty_event_index)
+	arena.set_meta("battlefield_impact_event_index", _combat_impact_event_index)
 	arena.set_meta("battlefield_environment_signature", "persistent_killing_ground/%s/%s" % [phase_name, "static_physical_lock" if reduced_motion else "escalating_physical_pressure"])
 	arena.set_meta("battlefield_overlay_density", 0.16 if effective_phase == 0 else 0.38 if effective_phase == 1 else 0.58)
 	arena.set_meta("battlefield_escalation_read", "breached_perimeter" if effective_phase == 0 else "collision_field_and_casualty_residue" if effective_phase == 1 else "collapsed_killing_ground")
@@ -3412,10 +3473,18 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		reduced_lock.modulate = Color(0.82, 0.78, 0.68, 0.34)
 	for retired_group: Control in [onset, midfight, collapse, reduced_lock]:
 		if retired_group != null:
+			# These legacy geometry groups stay retired: the authored raster field and
+			# dedicated pressure painter carry the visible escalation without stacking
+			# procedural debris over the readable tactical grid.
 			retired_group.visible = false
 			retired_group.set_meta("retired_for_authored_raster_field", true)
 	if pressure_painter != null and pressure_painter.has_method("configure"):
 		pressure_painter.call("configure", effective_phase, reduced_motion, casualty_pressure, casualty_event_index)
+	var focus_painter: Control = arena.get_node_or_null("ArenaCombatFocusPainter") as Control
+	if focus_painter != null:
+		focus_painter.visible = true
+		if focus_painter.has_method("configure"):
+			focus_painter.call("configure", effective_phase, reduced_motion)
 	var arena_surface: TextureRect = arena.get_node_or_null("GothicArenaSurface") as TextureRect
 	if arena_surface != null:
 		arena_surface.texture = GothicUIAssets.battlefield_onset_texture()
@@ -3519,7 +3588,9 @@ func _protect_persistent_hud_chrome() -> void:
 		instruction_ribbon.z_index = 218
 		instruction_ribbon.modulate = Color.WHITE
 		instruction_ribbon.self_modulate = Color.WHITE
-		instruction_ribbon.text = "ENTER / SPACE // ADVANCE" if result_visible else "SURVIVE"
+		# The result card owns the actual advance affordance. Keep the persistent
+		# combat ribbon as a quiet record stamp so the two prompts do not compete.
+		instruction_ribbon.text = "/// RECORD SEALED" if result_visible else "SURVIVE"
 		instruction_ribbon.add_theme_font_size_override("font_size", 20 if result_visible else 26)
 		if result_visible:
 			VisualTypeSystem.set_utility_bold(instruction_ribbon)
@@ -3730,7 +3801,10 @@ func _refresh_result_aftermath_layout(banner: PanelContainer, title: String) -> 
 func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
 	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
-	var ideal_size: Vector2 = Vector2(1040.0, 388.0)
+	# Victory is a left-to-right escape record, not a wall of empty black card.
+	# Tighten only the desktop silhouette; compact results retain their authored
+	# breakpoint size and all outcome copy stays intact.
+	var ideal_size: Vector2 = Vector2(920.0, 388.0)
 	var card_rotation: float = -0.012
 	if title == "STALEMATE":
 		ideal_size = Vector2(760.0, 456.0)
@@ -3764,8 +3838,8 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 		_result_banner.offset_top = top_reservation
 		var center: CenterContainer = _result_banner.get_node_or_null("Center") as CenterContainer
 		if center != null:
-			center.anchor_left = 0.0 if compact_layout else 0.04 if title == "VICTORY" else 0.18 if title == "STALEMATE" else 0.36
-			center.anchor_right = 1.0 if compact_layout else 0.72 if title == "VICTORY" else 0.82 if title == "STALEMATE" else 0.96
+			center.anchor_left = 0.0 if compact_layout else 0.14 if title == "VICTORY" else 0.18 if title == "STALEMATE" else 0.36
+			center.anchor_right = 1.0 if compact_layout else 0.86 if title == "VICTORY" else 0.82 if title == "STALEMATE" else 0.96
 			center.anchor_top = 0.0
 			center.anchor_bottom = 1.0
 			center.offset_left = 0.0

@@ -8,6 +8,7 @@ const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.
 const ACTOR_EXTRA_HORIZONTAL: float = 18.0
 const ACTOR_EXTRA_TOP: float = 32.0
 const ACTOR_EXTRA_BOTTOM: float = 18.0
+const COMBAT_ACTOR_SIZE_SCALE: float = 1.62
 
 var arena: ArenaController = null
 var arena_container: Control
@@ -60,7 +61,7 @@ func get_engine_arena_bounds() -> Rect2:
     var render_bounds: Rect2 = get_arena_bounds()
     if render_bounds.size.x <= 1.0 or render_bounds.size.y <= 1.0:
         return render_bounds
-    var half_actor: float = maxf(28.0, float(tile_size) * 0.5)
+    var half_actor: float = maxf(28.0, float(tile_size) * COMBAT_ACTOR_SIZE_SCALE * 0.5)
     var left: float = half_actor + ACTOR_EXTRA_HORIZONTAL
     var right: float = half_actor + ACTOR_EXTRA_HORIZONTAL
     var top: float = half_actor + ACTOR_EXTRA_TOP
@@ -359,7 +360,8 @@ func _recenter_team_formation(positions: Array[Vector2], bounds: Rect2, target_r
     centroid /= float(positions.size())
     var target: Vector2 = bounds.position + bounds.size * target_ratio
     var shift: Vector2 = target - centroid
-    var inset: Vector2 = Vector2(maxf(38.0, float(tile_size) * 0.55), maxf(44.0, float(tile_size) * 0.65))
+    var actor_size: float = maxf(28.0, float(tile_size) * COMBAT_ACTOR_SIZE_SCALE)
+    var inset: Vector2 = Vector2(maxf(38.0, actor_size * 0.55), maxf(44.0, actor_size * 0.65))
     var minimum: Vector2 = bounds.position + inset
     var maximum: Vector2 = bounds.end - inset
     for index: int in range(positions.size()):

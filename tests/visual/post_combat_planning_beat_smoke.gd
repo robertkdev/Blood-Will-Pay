@@ -173,7 +173,7 @@ func _assert_result_card() -> void:
 	var card_rect: Rect2 = card.get_global_rect()
 	var viewport: Viewport = get_viewport()
 	var viewport_size: Vector2 = viewport.get_visible_rect().size if viewport != null else Vector2.ZERO
-	_expect(is_equal_approx(card.custom_minimum_size.x, 1040.0), "victory result should use its authored wide survival-record silhouette, got %.1f" % card.custom_minimum_size.x)
+	_expect(is_equal_approx(card.custom_minimum_size.x, 920.0), "victory result should use its authored tightened survival-record silhouette, got %.1f" % card.custom_minimum_size.x)
 	_expect(is_equal_approx(card.custom_minimum_size.y, 388.0), "victory result should use its authored rising survival-record height, got %.1f" % card.custom_minimum_size.y)
 	_expect(card_rect.size.x < viewport_size.x * 0.58, "result card should not read as a full-screen color panel (card %.1f / viewport %.1f)" % [card_rect.size.x, viewport_size.x])
 	_expect(card.get_theme_stylebox("panel") is StyleBoxFlat, "result card should keep an accessible high-contrast field surface")

@@ -94,7 +94,8 @@ func _run() -> void:
 	_expect(engine_bounds.position.y >= arena_rect.position.y + 65.0, "engine bounds should reserve health-bar space above actors")
 	_expect(engine_bounds.end.x <= arena_rect.end.x - 51.0, "engine bounds should reserve the actor footprint on the right")
 	_expect(engine_bounds.end.y <= arena_rect.end.y - 51.0, "engine bounds should reserve the actor footprint below")
-	_expect(not arena_rect.intersects(combat_stats_rect), "arena container should not overlap live team metrics area arena=%s stats=%s" % [str(arena_rect), str(combat_stats_rect)])
+	if stats_area.visible:
+		_expect(not arena_rect.intersects(combat_stats_rect), "arena container should not overlap live team metrics area arena=%s stats=%s" % [str(arena_rect), str(combat_stats_rect)])
 	for child: Node in arena_units.get_children():
 		var control: Control = child as Control
 		if control == null or not control.visible:

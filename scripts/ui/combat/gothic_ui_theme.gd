@@ -360,6 +360,62 @@ class PlanningFieldPainter:
 			draw_line(origin, origin + Vector2(46.0 * direction, -18.0 + float(beam_index) * 11.0) * scale_factor, timber, 11.0 * scale_factor, true)
 
 
+class CombatFocusPainter:
+	extends Control
+
+	var focus_rect: Rect2 = Rect2(0.17, 0.08, 0.66, 0.82)
+	var pressure_phase: int = 0
+	var reduced_motion: bool = false
+
+	func configure(next_phase: int, next_reduced_motion: bool) -> void:
+		pressure_phase = clampi(next_phase, 0, 2)
+		reduced_motion = next_reduced_motion
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_meta("focus_frame_mode", "combat_cluster_frame")
+		set_meta("focus_frame_phase", pressure_phase)
+		set_meta("focus_frame_reduced_motion", reduced_motion)
+		set_meta("focus_frame_purpose", "tighten_attention_around_live_engagement")
+		queue_redraw()
+
+	func set_focus_rect(next_rect: Rect2) -> void:
+		focus_rect = next_rect
+		set_meta("focus_frame_rect", focus_rect)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		var frame_position: Vector2 = Vector2(focus_rect.position.x * size.x, focus_rect.position.y * size.y)
+		var frame_size: Vector2 = Vector2(focus_rect.size.x * size.x, focus_rect.size.y * size.y)
+		var frame_rect: Rect2 = Rect2(frame_position, frame_size)
+		var edge_alpha: float = 0.20 if reduced_motion else 0.24 + float(pressure_phase) * 0.08
+		var shadow: Color = Color(0.0, 0.0, 0.0, edge_alpha)
+		if frame_rect.position.y > 0.0:
+			draw_rect(Rect2(0.0, 0.0, size.x, frame_rect.position.y), shadow, true)
+		if frame_rect.end.y < size.y:
+			draw_rect(Rect2(0.0, frame_rect.end.y, size.x, size.y - frame_rect.end.y), shadow, true)
+		if frame_rect.position.x > 0.0:
+			draw_rect(Rect2(0.0, frame_rect.position.y, frame_rect.position.x, frame_rect.size.y), shadow, true)
+		if frame_rect.end.x < size.x:
+			draw_rect(Rect2(frame_rect.end.x, frame_rect.position.y, size.x - frame_rect.end.x, frame_rect.size.y), shadow, true)
+		var frame_color: Color = Color(0.80, 0.18, 0.075, 0.22 + float(pressure_phase) * 0.08)
+		var line_width: float = 2.0 if reduced_motion else 2.5 + float(pressure_phase) * 0.7
+		var top_left: Vector2 = frame_rect.position
+		var top_right: Vector2 = Vector2(frame_rect.end.x, frame_rect.position.y)
+		var bottom_left: Vector2 = Vector2(frame_rect.position.x, frame_rect.end.y)
+		var bottom_right: Vector2 = frame_rect.end
+		var top_gap: float = frame_rect.size.x * 0.12
+		var side_gap: float = frame_rect.size.y * 0.14
+		draw_line(top_left, top_left + Vector2(frame_rect.size.x * 0.24, 0.0), frame_color, line_width, true)
+		draw_line(top_right - Vector2(frame_rect.size.x * 0.24, 0.0), top_right - Vector2(top_gap, 0.0), frame_color, line_width, true)
+		draw_line(bottom_left, bottom_left + Vector2(frame_rect.size.x * 0.18, 0.0), frame_color, line_width, true)
+		draw_line(bottom_right - Vector2(frame_rect.size.x * 0.18, 0.0), bottom_right - Vector2(top_gap, 0.0), frame_color, line_width, true)
+		draw_line(top_left, top_left + Vector2(0.0, frame_rect.size.y * 0.22), frame_color, line_width, true)
+		draw_line(bottom_left - Vector2(0.0, frame_rect.size.y * 0.22), bottom_left - Vector2(0.0, side_gap), frame_color, line_width, true)
+		draw_line(top_right, top_right + Vector2(0.0, frame_rect.size.y * 0.22), frame_color, line_width, true)
+		draw_line(bottom_right - Vector2(0.0, frame_rect.size.y * 0.22), bottom_right - Vector2(0.0, side_gap), frame_color, line_width, true)
+
+
 class ArenaPressurePainter:
 	extends Control
 
@@ -470,23 +526,22 @@ class ArenaPressurePainter:
 			var clod_color: Color = Color(0.12, 0.043, 0.021, 0.56) if clod_index % 3 != 1 else Color(0.20, 0.030, 0.021, 0.48)
 			draw_colored_polygon(clod_patch, clod_color)
 			draw_circle(clod_center + Vector2(-clod_radius * 0.22, -clod_radius * 0.20), clod_radius * 0.32, Color(0.44, 0.14, 0.044, 0.30), true)
-		for scar_index: int in range(9):
+		for scar_index: int in range(5):
 			var scar_center: Vector2 = center + Vector2((float(scar_index % 3) - 1.0) * width * 0.31, (float(scar_index / 3) - 1.0) * height * 0.34)
 			var scar_angle: float = -0.24 + float((scar_index * 5) % 7) * 0.075
-			var scar_length: float = width * (0.16 + float(scar_index % 4) * 0.025)
+			var scar_length: float = width * (0.075 + float(scar_index % 3) * 0.018)
 			var scar_direction: Vector2 = Vector2(cos(scar_angle), sin(scar_angle))
 			var scar_start: Vector2 = scar_center - scar_direction * scar_length * 0.50
 			var scar_finish: Vector2 = scar_center + scar_direction * scar_length * 0.50
-			var scar_bend: Vector2 = scar_center + Vector2(0.0, (-7.0 if scar_index % 2 == 0 else 6.0))
-			draw_line(scar_start, scar_bend, Color(0.018, 0.008, 0.007, 0.78), 7.0 - float(scar_index % 3), true)
-			draw_line(scar_bend, scar_finish, Color(0.018, 0.008, 0.007, 0.78), 6.0 - float(scar_index % 2), true)
-			draw_line(scar_start + Vector2(0.0, 3.0), scar_bend + Vector2(0.0, 3.0), Color(0.48, 0.15, 0.045, 0.24), 2.0, true)
+			var scar_bend: Vector2 = scar_center + Vector2(0.0, (-4.0 if scar_index % 2 == 0 else 3.0))
+			draw_line(scar_start, scar_bend, Color(0.018, 0.008, 0.007, 0.62), 4.5 - float(scar_index % 2), true)
+			draw_line(scar_bend, scar_finish, Color(0.018, 0.008, 0.007, 0.62), 4.0, true)
+			draw_line(scar_start + Vector2(0.0, 2.0), scar_bend + Vector2(0.0, 2.0), Color(0.48, 0.15, 0.045, 0.20), 1.5, true)
 		_draw_drag_gouge(Vector2(size.x * 0.25, size.y * 0.47), center + Vector2(-width * 0.48, -height * 0.03), 0.58)
 		_draw_drag_gouge(Vector2(size.x * 0.75, size.y * 0.59), center + Vector2(width * 0.44, height * 0.16), 0.58)
 		var wreckage_scale: float = minf(size.x, size.y) * 0.042
 		_draw_wreckage_heap(center + Vector2(-width * 0.46, -height * 0.18), wreckage_scale, 1)
 		_draw_wreckage_heap(center + Vector2(width * 0.48, height * 0.20), wreckage_scale * 0.90, 3)
-		_draw_collision_splinters(center, width, height)
 
 	func _rupture_ring(center: Vector2, radius_x: float, radius_y: float, point_count: int, phase: float) -> PackedVector2Array:
 		var points: PackedVector2Array = PackedVector2Array()
@@ -499,12 +554,17 @@ class ArenaPressurePainter:
 	func _draw_drag_gouge(start: Vector2, finish: Vector2, intensity: float) -> void:
 		var direction: Vector2 = finish - start
 		var normal: Vector2 = Vector2(-direction.y, direction.x).normalized()
-		for gouge_index: int in range(3):
-			var offset: float = (float(gouge_index) - 1.0) * 12.0
-			var from: Vector2 = start + normal * offset
-			var to: Vector2 = finish + normal * offset * 0.35
-			draw_line(from, to, Color(0.018, 0.008, 0.008, 0.76 * intensity), 8.0 - float(gouge_index) * 1.4, true)
-			draw_line(from + Vector2(0.0, 3.0), to + Vector2(0.0, 3.0), Color(0.62, 0.16, 0.052, 0.28 * intensity), 2.0, true)
+		var direction_unit: Vector2 = direction.normalized()
+		var segment_length: float = direction.length() / 4.0 * 0.58
+		for gouge_index: int in range(4):
+			var fraction: float = (float(gouge_index) + 0.5) / 4.0
+			var segment_center: Vector2 = start.lerp(finish, fraction) + normal * (sin(float(gouge_index) * 1.9) * 7.0)
+			var segment_direction: Vector2 = direction_unit.rotated(sin(float(gouge_index) * 1.4) * 0.13)
+			var from: Vector2 = segment_center - segment_direction * segment_length * 0.5
+			var to: Vector2 = segment_center + segment_direction * segment_length * 0.5
+			draw_line(from, to, Color(0.018, 0.008, 0.008, 0.62 * intensity), 6.0, true)
+			draw_line(from + normal * 2.0, to + normal * 2.0, Color(0.62, 0.16, 0.052, 0.24 * intensity), 1.8, true)
+			draw_circle(segment_center + normal * 3.0, 4.0 + float(gouge_index % 2), Color(0.20, 0.070, 0.028, 0.42 * intensity), true)
 
 	func _draw_collision_splinters(center: Vector2, width: float, height: float) -> void:
 		var debris_offsets: Array[Vector2] = [
@@ -625,11 +685,10 @@ class ArenaPressurePainter:
 			var bank_radius: float = minf(size.x, size.y) * (0.065 + float(bank_index) * 0.012)
 			draw_circle(west_center, bank_radius, Color(0.14, 0.11, 0.09, 0.20 + density_bonus), true)
 			draw_circle(east_center, bank_radius, Color(0.22, 0.035, 0.025, 0.22 + density_bonus), true)
-		var trench_color: Color = Color(0.025, 0.013, 0.010, 0.84)
-		draw_line(Vector2(0.0, size.y * 0.44), Vector2(size.x * 0.17, size.y * 0.50), trench_color, 18.0, true)
-		draw_line(Vector2(size.x, size.y * 0.56), Vector2(size.x * 0.83, size.y * 0.50), trench_color, 18.0, true)
-		draw_line(Vector2(0.0, size.y * 0.44), Vector2(size.x * 0.17, size.y * 0.50), Color(0.52, 0.16, 0.060, 0.32), 3.0, true)
-		draw_line(Vector2(size.x, size.y * 0.56), Vector2(size.x * 0.83, size.y * 0.50), Color(0.62, 0.12, 0.050, 0.34), 3.0, true)
+		# The breach is a collection of nearby churned-earth clumps, not a pair of
+		# full-width black guide lines that can be mistaken for UI decoration.
+		_draw_ground_clump(Vector2(size.x * 0.11, size.y * 0.46), minf(size.x, size.y) * 0.030, 7)
+		_draw_ground_clump(Vector2(size.x * 0.89, size.y * 0.54), minf(size.x, size.y) * 0.034, 8)
 
 	func _draw_broken_pressure_fence(origin: Vector2, extent: Vector2, lean_left: bool) -> void:
 		var lean: float = -1.0 if lean_left else 1.0
@@ -649,12 +708,22 @@ class ArenaPressurePainter:
 		for index: int in range(rut_count):
 			var side_sign: float = -1.0 if index % 2 == 0 else 1.0
 			var y_ratio: float = 0.70 + float(index % 3) * 0.075
-			var start_x: float = size.x * (0.04 if side_sign < 0.0 else 0.96)
-			var finish_x: float = size.x * (0.23 if side_sign < 0.0 else 0.77)
-			var start: Vector2 = Vector2(start_x, size.y * y_ratio)
-			var finish: Vector2 = Vector2(finish_x, size.y * (y_ratio - 0.055 + float(index % 2) * 0.02))
-			draw_line(start, finish, Color(0.018, 0.010, 0.009, 0.74), 8.0, true)
-			draw_line(start + Vector2(0.0, 4.0), finish + Vector2(0.0, 4.0), Color(0.48, 0.19, 0.07, 0.20), 2.0, true)
+			var x_ratio: float = 0.12 + float(index % 3) * 0.055 if side_sign < 0.0 else 0.88 - float(index % 3) * 0.055
+			var center: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
+			_draw_ground_clump(center, minf(size.x, size.y) * (0.022 + float(index % 2) * 0.006), index + 12)
+
+	func _draw_ground_clump(center: Vector2, radius: float, variant: int) -> void:
+		var points: PackedVector2Array = PackedVector2Array()
+		for point_index: int in range(9):
+			var angle: float = TAU * float(point_index) / 9.0
+			var wobble: float = 0.72 + float((point_index * 5 + variant * 3) % 5) * 0.075
+			points.append(center + Vector2(cos(angle), sin(angle) * 0.56) * radius * wobble)
+		draw_colored_polygon(points, Color(0.022, 0.011, 0.008, 0.72))
+		for point_index: int in range(points.size()):
+			draw_line(points[point_index], points[(point_index + 1) % points.size()], Color(0.48, 0.15, 0.045, 0.25), maxf(1.5, radius * 0.065), true)
+		for chip_index: int in range(3):
+			var chip_center: Vector2 = center + Vector2((float(chip_index) - 1.0) * radius * 0.64, (float((chip_index + variant) % 3) - 1.0) * radius * 0.30)
+			draw_circle(chip_center, maxf(2.0, radius * (0.12 + float(chip_index % 2) * 0.05)), Color(0.32, 0.10, 0.030, 0.36), true)
 
 	func _draw_impact_scars() -> void:
 		var scar_centers: Array[Vector2] = [
@@ -1559,6 +1628,22 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	_ensure_arena_exposure_lift(arena)
 	_ensure_arena_cell_seams(arena)
 	_ensure_arena_ash_marks(arena)
+	var focus_painter: CombatFocusPainter = arena.get_node_or_null("ArenaCombatFocusPainter") as CombatFocusPainter
+	if focus_painter == null:
+		focus_painter = CombatFocusPainter.new()
+		focus_painter.name = "ArenaCombatFocusPainter"
+		focus_painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		focus_painter.z_index = -1
+		arena.add_child(focus_painter)
+		focus_painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		focus_painter.offset_left = 0.0
+		focus_painter.offset_top = 0.0
+		focus_painter.offset_right = 0.0
+		focus_painter.offset_bottom = 0.0
+	focus_painter.z_index = -1
+	focus_painter.visible = false
+	focus_painter.configure(0, false)
+	focus_painter.set_meta("visual_role", "combat_attention_frame")
 	var rupture: ColorRect = arena.get_node_or_null("TerritoryRupture") as ColorRect
 	if rupture == null:
 		rupture = ColorRect.new()
@@ -2359,8 +2444,11 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		var enemy_side: bool = row_index <= 2
 		var major_seam: bool = row_index == 2 or column_index == 3
 		var alternating_cell: bool = (row_index + column_index) % 2 == 0
-		seam_style.bg_color = Color(0.10, 0.028, 0.020, 0.034 if alternating_cell else 0.014) if enemy_side else Color(0.10, 0.085, 0.060, 0.034 if alternating_cell else 0.014)
-		seam_style.border_color = Color(0.56, 0.22, 0.12, 0.32 if major_seam else 0.16) if enemy_side else Color(0.62, 0.55, 0.40, 0.34 if major_seam else 0.17)
+		# Lift the tactical plane just enough to keep placement readable over the
+		# authored mud texture. The seam remains subordinate to the fighters and
+		# horror dressing, but no longer disappears at a real 1080p play distance.
+		seam_style.bg_color = Color(0.10, 0.028, 0.020, 0.045 if alternating_cell else 0.020) if enemy_side else Color(0.10, 0.085, 0.060, 0.045 if alternating_cell else 0.020)
+		seam_style.border_color = Color(0.60, 0.23, 0.12, 0.38 if major_seam else 0.20) if enemy_side else Color(0.66, 0.57, 0.40, 0.40 if major_seam else 0.22)
 		seam_style.border_width_right = 2 if column_index == 3 else 1
 		seam_style.border_width_bottom = 2 if row_index == 2 else 1
 		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.30)
@@ -2369,7 +2457,7 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		cell.add_theme_stylebox_override("panel", seam_style)
 	seams.set_meta("major_seam_non_color_weight", 2)
 	seams.set_meta("minor_seam_non_color_weight", 1)
-	seams.set_meta("terrain_seam_alpha", 0.17)
+	seams.set_meta("terrain_seam_alpha", 0.21)
 	seams.set_meta("alternating_material_cell_wash", true)
 	seams.set_meta("side_separation", "enemy_oxblood_player_bone_with_black_understroke")
 	seams.set_meta("debug_graph_grid_suppressed", true)
