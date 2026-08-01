@@ -37,6 +37,16 @@ window.GAMBLE_BATTLE_UNIT_ART_HISTORY = {
 			path: "outputs/art_pipeline/style_validation/creep_builtin_revision_candidate_v5_2026_07_01/creep_builtin_revision_candidate_v5_cutout_birefnet_foregroundml_despill_edgeclean.png"
 		},
 		{
+			unit: "creep",
+			source_unit: "creep",
+			kind: "candidate",
+			version: "V6",
+			label: "P2-01 exact portrait crop",
+			status: "Latest review candidate; no default change",
+			local_path: "history/creep-v6-portrait-crop.png",
+			path: "tools/art/history/creep-v6-portrait-crop.png"
+		},
+		{
 			unit: "luna",
 			source_unit: "luna",
 			kind: "candidate",
