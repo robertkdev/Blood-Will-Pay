@@ -2,7 +2,7 @@ extends Node
 
 enum CursorState { DEFAULT, INTERACTIVE, DISABLED, DRAG, INVALID, TARGET }
 
-const CURSOR_SIZE: Vector2 = Vector2(32.0, 32.0)
+const HOTSPOT: Vector2 = Vector2(4.0, 2.0)
 const CURSOR_PATHS: Dictionary[String, String] = {
 	"default": "res://assets/ui/cursor/default.png",
 	"interactive": "res://assets/ui/cursor/interactive.png",
@@ -36,7 +36,7 @@ func set_enabled(value: bool) -> void:
 	if enabled:
 		_apply_state(CursorState.DEFAULT)
 	else:
-		Input.set_custom_mouse_cursor(null)
+		_clear_custom_cursors()
 
 func set_state(state: CursorState) -> void:
 	_apply_state(state)
@@ -44,13 +44,13 @@ func set_state(state: CursorState) -> void:
 func _state_for_control(control: Control) -> CursorState:
 	if control == null:
 		return CursorState.DEFAULT
+	if control is BaseButton and (control as BaseButton).disabled:
+		return CursorState.DISABLED
 	if control.mouse_default_cursor_shape == Control.CURSOR_FORBIDDEN:
 		return CursorState.INVALID
 	if control.mouse_default_cursor_shape == Control.CURSOR_DRAG:
 		return CursorState.DRAG
 	if control.mouse_default_cursor_shape == Control.CURSOR_POINTING_HAND:
-		if control is BaseButton and (control as BaseButton).disabled:
-			return CursorState.DISABLED
 		return CursorState.INTERACTIVE
 	return CursorState.DEFAULT
 
@@ -59,7 +59,21 @@ func _apply_state(state: CursorState) -> void:
 	var key: String = _key_for_state(state)
 	var texture: Texture2D = _textures.get(key, null)
 	if texture != null and enabled:
-		Input.set_custom_mouse_cursor(texture, Input.CURSOR_ARROW, Vector2(4.0, 2.0))
+		_set_custom_cursors(texture)
+	elif enabled:
+		_clear_custom_cursors()
+
+func _set_custom_cursors(texture: Texture2D) -> void:
+	Input.set_custom_mouse_cursor(texture, Input.CURSOR_ARROW, HOTSPOT)
+	Input.set_custom_mouse_cursor(texture, Input.CURSOR_POINTING_HAND, HOTSPOT)
+	Input.set_custom_mouse_cursor(texture, Input.CURSOR_DRAG, HOTSPOT)
+	Input.set_custom_mouse_cursor(texture, Input.CURSOR_FORBIDDEN, HOTSPOT)
+
+func _clear_custom_cursors() -> void:
+	Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+	Input.set_custom_mouse_cursor(null, Input.CURSOR_POINTING_HAND)
+	Input.set_custom_mouse_cursor(null, Input.CURSOR_DRAG)
+	Input.set_custom_mouse_cursor(null, Input.CURSOR_FORBIDDEN)
 
 func _key_for_state(state: CursorState) -> String:
 	match state:
