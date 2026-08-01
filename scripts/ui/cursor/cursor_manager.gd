@@ -2,7 +2,8 @@ extends Node
 
 enum CursorState { DEFAULT, INTERACTIVE, DISABLED, DRAG, INVALID, TARGET }
 
-const HOTSPOT: Vector2 = Vector2(4.0, 2.0)
+const CURSOR_DISPLAY_SIZE: Vector2i = Vector2i(48, 48)
+const HOTSPOT: Vector2 = Vector2(6.0, 3.0)
 const CURSOR_PATHS: Dictionary[String, String] = {
 	"default": "res://assets/ui/cursor/default.png",
 	"interactive": "res://assets/ui/cursor/interactive.png",
@@ -20,8 +21,15 @@ func _ready() -> void:
 	for key: String in CURSOR_PATHS:
 		var texture: Texture2D = load(CURSOR_PATHS[key]) as Texture2D
 		if texture != null:
-			_textures[key] = texture
+			_textures[key] = _scaled_texture(texture)
 	_apply_state(CursorState.DEFAULT)
+
+func _scaled_texture(texture: Texture2D) -> Texture2D:
+	var image: Image = texture.get_image()
+	if image == null or image.is_empty():
+		return texture
+	image.resize(CURSOR_DISPLAY_SIZE.x, CURSOR_DISPLAY_SIZE.y, Image.INTERPOLATE_LANCZOS)
+	return ImageTexture.create_from_image(image)
 
 func _process(_delta: float) -> void:
 	if not enabled:
