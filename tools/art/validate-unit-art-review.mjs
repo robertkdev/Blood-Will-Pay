@@ -21,7 +21,7 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 29) fail(`Expected curated history with 29 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 33) fail(`Expected curated history with 33 entries, got ${manifest.items.length}.`);
 if (manifest.items.filter((item) => item.unit === "creep").length !== 3) fail("Creep must have exactly V3, V4, and V5 provenance entries.");
 if (!manifest.items.some((item) => item.unit === "luna" && item.version === "Refit V1")) fail("Luna refit is missing.");
 if (!manifest.items.some((item) => item.unit === "mara" && item.source_unit.includes("mara"))) fail("Mara history is missing.");
@@ -39,6 +39,24 @@ if (sableReviews.map((item) => item.version).join("|") !== expectedSableVersions
 if (sableReviews.some((item) => item.current)) fail("Sable review history must not replace the default.");
 if (!sableReviews[7].status.includes("Latest review candidate") || !sableReviews[7].label.includes("corrected sleeves")) fail("Sable corrected-sleeves pass must remain the newest review candidate.");
 if (!/\{ unit: "sable"[^}]*current: true[^}]*path: "units\/sable\.png" \}/.test(html)) fail("Sable's existing P2 default is missing or was changed.");
+
+const kettReviews = manifest.items.filter((item) => item.unit === "kett");
+if (kettReviews.length !== 2 || kettReviews.map((item) => item.version).join("|") !== "Review V1|Review V2") fail("Kett review versions are missing or out of order.");
+if (kettReviews.some((item) => item.current)) fail("Kett review history must not replace the default.");
+if (!kettReviews[1].status.includes("Latest review candidate") || !kettReviews[1].label.includes("Piston gauntlet")) fail("Kett piston-gauntlet concept must remain the newest review candidate.");
+if (!/\{ unit: "kett"[^}]*current: true[^}]*path: "units\/kett\.png" \}/.test(html)) fail("Kett's existing P2 default is missing or was changed.");
+
+const nyxaReviews = manifest.items.filter((item) => item.unit === "nyxa");
+if (nyxaReviews.length !== 1 || nyxaReviews.map((item) => item.version).join("|") !== "Review V1") fail("Nyxa review versions are missing or out of order.");
+if (nyxaReviews.some((item) => item.current)) fail("Nyxa review history must not replace the default.");
+if (!nyxaReviews[0].status.includes("Latest review candidate") || nyxaReviews[0].label !== "Feral chronomancer volley") fail("Nyxa feral-chronomancer concept must remain the newest review candidate.");
+if (!/\{ unit: "nyxa"[^}]*version: "P2-02"[^}]*current: true[^}]*path: "units\/nyxa\.png" \}/.test(html)) fail("Nyxa's existing P2-02 default is missing or was changed.");
+
+const pilferReviews = manifest.items.filter((item) => item.unit === "pilfer");
+if (pilferReviews.length !== 1 || pilferReviews.map((item) => item.version).join("|") !== "Review V1") fail("Pilfer review versions are missing or out of order.");
+if (pilferReviews.some((item) => item.current)) fail("Pilfer review history must not replace the default.");
+if (!pilferReviews[0].status.includes("Latest review candidate") || pilferReviews[0].label !== "Feral transfusion assassin") fail("Pilfer's feral transfusion concept must remain the newest review candidate.");
+if (!/\{ unit: "pilfer"[^}]*version: "P2-02"[^}]*current: true[^}]*path: "units\/pilfer\.png" \}/.test(html)) fail("Pilfer's existing P2-02 default is missing or was changed.");
 
 for (const item of manifest.items) {
 	if (!item.local_path) fail(`Curated history entry is not bundled locally: ${item.path}`);
@@ -118,4 +136,4 @@ if (html.includes("padding: clamp(10px, 2vw, 30px)")) fail("Comparison artwork s
 if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use the full available review workspace.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=29 mara=17 sable-reviews=8 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=33 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
