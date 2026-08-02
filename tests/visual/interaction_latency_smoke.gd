@@ -62,8 +62,12 @@ func _run_result_dismissal_probe() -> void:
 		return
 	Engine.time_scale = 1.0
 	await _settle_frames(1)
+	# Preserve a real result-screen frame for visual review, but let the capture
+	# work drain before starting the input timer. Otherwise screenshot encoding
+	# contaminates the following process-frame latency measurement.
+	_capture_runtime_frame("result_visible", Time.get_ticks_usec())
+	await _settle_frames(2)
 	var result_visible_usec: int = Time.get_ticks_usec()
-	_capture_runtime_frame("result_visible", result_visible_usec)
 	var key_event: InputEventKey = _make_accept_event()
 	var input_accepted_usec: int = Time.get_ticks_usec()
 	Input.parse_input_event(key_event)
@@ -115,6 +119,7 @@ func _run_result_dismissal_probe() -> void:
 		"first_frame_ms": first_frame_ms,
 		"cleanup_ms": cleanup_ms,
 		"settled_ms": settled_ms,
+		"cleanup_steps_ms": latency.get("cleanup_steps_ms", {}),
 		"cleanup_deferred": bool(latency.get("cleanup_deferred", false)),
 		"repeated_input_count": repeated_count,
 		"cleanup_count": cleanup_count,
@@ -350,7 +355,7 @@ func _button_with_text(text: String) -> Button:
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and String(button.text) == text:
+		if button != null and (String(button.text) == text or String(button.text).begins_with(text)):
 			return button
 	return null
 

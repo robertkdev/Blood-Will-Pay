@@ -38,9 +38,24 @@ func _ready() -> void:
 	var normal_result: Dictionary[String, Variant] = PacingMetrics.analyze(normal_report)
 	var fast_result: Dictionary[String, Variant] = PacingMetrics.analyze(fast_report)
 	var slow_result: Dictionary[String, Variant] = PacingMetrics.analyze(slow_report)
+	var loss_retry_report: Dictionary[String, Variant] = _make_report(
+		"controlled_loss_retry",
+		[-1.0],
+		[-1.0],
+		[4.0],
+		[6.0],
+		[-1.0],
+		[-1.0],
+		{"scope": "loss_retry", "time_to_first_decision_seconds": 3.0, "onboarding_to_first_combat_seconds": 8.0, "max_dead_time_seconds": 6.0, "boss_intervals": [], "boss_count": 0, "loss_retry_recovery_seconds": [0.8], "target_stage": 2, "highest_stage": 2, "reached_target": false, "skip_response_supported": false, "terminal": "loss_retry_recovered"}
+	)
+	var loss_retry_result: Dictionary[String, Variant] = PacingMetrics.analyze(loss_retry_report)
 	_expect(String(normal_result.get("verdict", "FAIL")) == "PASS", "normal rhythm should pass")
 	_expect(String(fast_result.get("verdict", "PASS")) == "FAIL", "known-fast rhythm should fail")
 	_expect(String(slow_result.get("verdict", "PASS")) == "FAIL", "known-slow rhythm should fail")
+	_expect(String(loss_retry_result.get("verdict", "FAIL")) == "PASS", "scoped loss/retry rhythm should pass without an inapplicable planning beat")
+	var loss_retry_metrics: Dictionary[String, Variant] = loss_retry_result.get("metrics", {}) as Dictionary[String, Variant]
+	var loss_retry_planning: Dictionary[String, Variant] = loss_retry_metrics.get("planning_time_use_seconds", {}) as Dictionary[String, Variant]
+	_expect(String(loss_retry_planning.get("status", "FAIL")) == "N/A", "scoped loss/retry planning should be explicitly N/A")
 	_expect(_has_failure(fast_result, "planning_time_use_seconds:too_fast"), "known-fast planning should fail as too_fast")
 	_expect(_has_failure(fast_result, "combat_duration_seconds:too_fast"), "known-fast combat should fail as too_fast")
 	_expect(_has_failure(slow_result, "planning_time_use_seconds:too_slow"), "known-slow planning should fail as too_slow")
@@ -48,7 +63,7 @@ func _ready() -> void:
 	var suite: Dictionary[String, Variant] = {"runs": [normal_report, fast_report, slow_report]}
 	var suite_result: Dictionary[String, Variant] = PacingMetrics.analyze_suite(suite)
 	_expect(String(suite_result.get("verdict", "PASS")) == "FAIL", "mixed suite should fail when a controlled case fails")
-	print("PacingMetricsContractTest: normal=%s fast=%s slow=%s suite=%s" % [normal_result.get("verdict"), fast_result.get("verdict"), slow_result.get("verdict"), suite_result.get("verdict")])
+	print("PacingMetricsContractTest: normal=%s fast=%s slow=%s loss_retry=%s suite=%s" % [normal_result.get("verdict"), fast_result.get("verdict"), slow_result.get("verdict"), loss_retry_result.get("verdict"), suite_result.get("verdict")])
 	for failure: String in _failures:
 		push_error("PacingMetricsContractTest: " + failure)
 	await get_tree().create_timer(1.0).timeout

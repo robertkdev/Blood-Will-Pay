@@ -208,6 +208,10 @@ func enable_audit_panel_for_test() -> CanvasLayer:
 	return _audit_panel
 
 func request_return_to_title() -> void:
+	# Starter selection completes on the next process frame. Returning to the
+	# title in that window must invalidate the queued transition before the
+	# combat view can be reactivated behind the title page.
+	_set_starter_transition_pending(false)
 	_close_system_menu()
 	if combat_view != null and combat_view.has_method("save_active_run_now"):
 		combat_view.call("save_active_run_now")

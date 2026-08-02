@@ -39,17 +39,18 @@ The schema version is `gamble-battle.pacing.v1`. A run fails when an observed me
 | `loss_retry_recovery_seconds` | Loss overlay visible to verified retry/unit-select recovery | 0–30 s | maximum |
 | `run_length_stages` | Highest observed stage versus the campaign target | minimum 5; target 9 | target/reached |
 
-The result skip metric is explicitly reported. It is `N/A` when the observed Main flow has no player-facing result skip control; the harness does not invent one or treat an internal transition as a skip response.
+The result skip metric is explicitly reported as `N/A` inside this longitudinal sample because result-dismissal latency is owned by `InteractionLatencySmoke.tscn`. Main does expose a player-facing Enter/Space advance control; the pacing harness does not duplicate or contradict that dedicated timing gate.
 
 ## Controlled falsification
 
-`PacingMetricsContractTest.tscn` feeds the same analyzer three known traces:
+`PacingMetricsContractTest.tscn` feeds the same analyzer four known traces:
 
 - Normal: planning 4–8 s, combat 4–10 s, result dwell 2–3 s, recovery 1–2.5 s, shop 1–2.5 s: `PASS`.
 - Known-fast: planning 0.25 s, combat 0.2 s, result dwell 0.2 s, and first decision 0.2 s: `FAIL` with `too_fast` findings.
 - Known-slow: planning 75 s, combat 65 s, result dwell 12 s, dead time 20 s, and retry 40 s: `FAIL` with `too_slow` findings.
+- Scoped loss/retry: a terminal fight and retry without a planning/shop beat: `PASS`, with those intentionally absent metrics reported as `N/A`.
 
-The scene prints `normal=PASS fast=FAIL slow=FAIL suite=FAIL`. `PacingRecorderParseTest.tscn` is a lightweight load/parse guard for the recorder dependency.
+The scene prints `normal=PASS fast=FAIL slow=FAIL loss_retry=PASS suite=FAIL`. `PacingRecorderParseTest.tscn` is a lightweight load/parse guard for the recorder dependency.
 
 ## Event model and maintenance
 

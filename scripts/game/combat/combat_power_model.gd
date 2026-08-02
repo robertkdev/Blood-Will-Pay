@@ -11,7 +11,7 @@ const MIN_POWER: float = 1.0
 const RAW_POWER_DIVISOR: float = 100.0
 const TRAIT_TIER_STEP: float = 0.075
 const TRAIT_COUNT_STEP: float = 0.012
-const ODDS_EXPONENT: float = 1.35
+const ODDS_EXPONENT: float = 1.55
 
 static var _unit_power_cache: Dictionary = {}
 static var _team_power_cache: Dictionary = {}

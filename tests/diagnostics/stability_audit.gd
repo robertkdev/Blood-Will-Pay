@@ -30,8 +30,14 @@ func _run() -> void:
 	await _run_main_lifecycle_probe()
 	_run_large_board_probe()
 	_evidence["save_load_continue"] = {
-		"status": "N/A",
-		"reason": "The authoritative revision exposes high-score persistence only; no run save/load/continue API or player-facing surface exists to exercise.",
+		"status": "DEDICATED_GATE",
+		"reason": "Persistence uses fresh-process fixtures and is validated separately so this in-process lifecycle audit cannot produce a false positive from shared autoload state.",
+		"scenes": [
+			"tests/rga_testing/validation/RunStateStoreProbe.tscn",
+			"tests/rga_testing/validation/ActiveRunResumeProbe.tscn",
+			"tests/rga_testing/validation/FreshProcessResumeWriter.tscn",
+			"tests/rga_testing/validation/FreshProcessResumeReader.tscn",
+		],
 	}
 	await _finish()
 

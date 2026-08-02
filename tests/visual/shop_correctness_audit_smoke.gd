@@ -42,7 +42,7 @@ func _run() -> void:
 	_assert_opening_choice_quality(catalog, roller, rng)
 	_assert_affordability_reserves_wager()
 	_assert_lock_reroll_and_bench_full(catalog, roller)
-	_assert_buy_xp_at_max_level_is_transactional(roller)
+	_assert_max_level_command_research_is_transactional(roller)
 	_finish()
 
 func _assert_cost_pools(catalog: UnitCatalog, roller: ShopRoller, rng: ShopRng) -> void:
@@ -139,16 +139,22 @@ func _assert_lock_reroll_and_bench_full(catalog: UnitCatalog, roller: ShopRoller
 	_expect(not bool(buy_result.get("ok", false)), "bench-full purchase should be rejected")
 	_expect(String(buy_result.get("error", "")) == String(ShopErrorsScript.BENCH_FULL), "bench-full purchase should return BENCH_FULL, got %s" % String(buy_result.get("error", "")))
 
-func _assert_buy_xp_at_max_level_is_transactional(roller: ShopRoller) -> void:
+func _assert_max_level_command_research_is_transactional(roller: ShopRoller) -> void:
 	var progress: PlayerProgress = PlayerProgressScript.new()
 	progress.set_level(int(ShopConfigScript.MAX_LEVEL))
 	var transactions: ShopTransactions = ShopTransactionsScript.new()
 	transactions.configure(roller, null)
-	var result: Dictionary = transactions.buy_xp(progress, int(ShopConfigScript.BUY_XP_COST) + 2)
-	_expect(not bool(result.get("ok", false)), "Buy XP at max level should be rejected before spending")
-	_expect(String(result.get("error", "")) == String(ShopErrorsScript.MAX_LEVEL), "Buy XP at max level should return MAX_LEVEL, got %s" % String(result.get("error", "")))
-	_expect(progress.is_at_max_level(), "max-level progress should remain at max level after rejected Buy XP")
-	_expect(progress.xp == 0, "max-level progress should not accumulate hidden XP")
+	var first_result: Dictionary = transactions.buy_xp(progress, int(ShopConfigScript.BUY_XP_COST) + 2)
+	_expect(bool(first_result.get("ok", false)), "max-level progression should purchase Command Research")
+	_expect(String(first_result.get("purchase_kind", "")) == "command", "max-level progression should report command purchase kind")
+	_expect(int(first_result.get("gold_spent", 0)) == int(ShopConfigScript.BUY_XP_COST), "Command Research should quote the configured progression cost")
+	_expect(progress.is_at_max_level(), "Command Research should preserve max player level")
+	_expect(progress.xp == 0, "Command Research should not accumulate hidden XP")
+	var result: Dictionary = first_result
+	while bool(result.get("ok", false)):
+		result = transactions.buy_xp(progress, int(ShopConfigScript.BUY_XP_COST) + 2)
+	_expect(String(result.get("error", "")) == "COMMAND_RESEARCH_COMPLETE", "completed Command Research should reject before spending, got %s" % String(result.get("error", "")))
+	_expect(not result.has("gold_spent"), "completed Command Research rejection should not report a spend")
 
 func _configured_starter_ids(catalog: UnitCatalog) -> Array[String]:
 	var ids: Array[String] = []

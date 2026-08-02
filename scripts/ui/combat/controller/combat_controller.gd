@@ -2607,19 +2607,25 @@ func _on_deferred_intermission_finished() -> void:
 func _on_intermission_finished() -> void:
 	if _intermission_finish_in_progress:
 		return
+	var cleanup_steps_ms: Dictionary[String, float] = {}
+	var cleanup_step_usec: int = Time.get_ticks_usec()
 	_intermission_finish_in_progress = true
 	_intermission_finish_scheduled = false
 	_intermission_finish_count += 1
 	var planning_redeployed: bool = false
 	_hide_result_banner()
-	if arena_container and arena_container.visible:
+	if arena_container:
 		_exit_combat_arena()
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.POST_COMBAT)
 	if projectile_bridge:
 		projectile_bridge.clear()
+	cleanup_steps_ms["arena_and_projectiles"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	cleanup_step_usec = Time.get_ticks_usec()
 	if manager and manager.has_method("finalize_post_combat"):
 		manager.finalize_post_combat()
+		cleanup_steps_ms["manager_finalize"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+		cleanup_step_usec = Time.get_ticks_usec()
 		# Advance progression on victory so planning shows the upcoming enemy
 		var win2: bool = (_post_combat_outcome == "victory")
 		if win2 and (Engine.has_singleton("GameState") or parent.has_node("/root/GameState")):
@@ -2627,14 +2633,15 @@ func _on_intermission_finished() -> void:
 		# Build a fresh preview for the next attempt (next stage on win, same stage on defeat)
 		if manager.has_method("setup_stage_preview"):
 			manager.setup_stage_preview()
-			# Force enemy grid to reflect upcoming round immediately (e.g., creeps)
-			if grid_placement and manager:
-				grid_placement.rebuild_enemy_views(manager.enemy_team)
-				enemy_views = grid_placement.get_enemy_views()
-			# Ensure HUD labels reflect the previewed enemy immediately
+			# refresh_all_views below rebuilds the upcoming enemy once. Rebuilding it
+			# here as well doubled the most expensive result-dismissal work.
 			_refresh_stats()
+		cleanup_steps_ms["next_stage_preview"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+		cleanup_step_usec = Time.get_ticks_usec()
 		# Rebuild UI after state changes
 		refresh_all_views()
+		cleanup_steps_ms["planning_view_rebuild"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+		cleanup_step_usec = Time.get_ticks_usec()
 		if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 			if _post_combat_outcome != "":
 				var win: bool = (_post_combat_outcome == "victory")
@@ -2651,22 +2658,29 @@ func _on_intermission_finished() -> void:
 			if economy_ui:
 				economy_ui.refresh()
 				economy_ui.set_bet_editable(true)
-	# Optional: add layout prints here when debugging sizes
-			# Auto-refresh the shop after combat ends (respect lock; free refresh)
-			if _post_combat_outcome != "tie" and (Engine.has_singleton("Shop") or parent.has_node("/root/Shop")):
-				var locked: bool = (bool(Shop.state.locked) if Shop and Shop.state else false)
-				if not locked:
-					Shop.add_free_rerolls(1)
-					Shop.reroll()
+		cleanup_steps_ms["economy_settlement"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+		cleanup_step_usec = Time.get_ticks_usec()
+		# Auto-refresh the shop after combat ends (respect lock; free refresh)
+		if _post_combat_outcome != "tie" and (Engine.has_singleton("Shop") or parent.has_node("/root/Shop")):
+			var locked: bool = (bool(Shop.state.locked) if Shop and Shop.state else false)
+			if not locked:
+				Shop.add_free_rerolls(1)
+				Shop.reroll()
+	cleanup_steps_ms["shop_refresh"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	cleanup_step_usec = Time.get_ticks_usec()
 	# Refresh label to reflect the stage/round the player will fight next
 	_update_stage_label()
 	# Return to planning phase after post-combat housekeeping
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.PREVIEW)
+	cleanup_steps_ms["planning_phase"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	cleanup_step_usec = Time.get_ticks_usec()
 	_queue_active_run_save()
 	_sync_bottom_combat_visibility()
 	if parent and parent.has_method("reset_planning_timer"):
 		parent.call("reset_planning_timer")
+	cleanup_steps_ms["planning_controls"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	cleanup_step_usec = Time.get_ticks_usec()
 	if _post_combat_outcome == "defeat" and (Engine.has_singleton("Economy") or parent.has_node("/root/Economy")) and Economy.is_broke():
 		# Show loss screen instead of flipping the continue button to Restart
 		var loss_scene: PackedScene = load("res://scenes/ui/LossScreen.tscn") as PackedScene
@@ -2712,6 +2726,8 @@ func _on_intermission_finished() -> void:
 			continue_button.disabled = false
 			continue_button.visible = true
 		planning_redeployed = true
+	cleanup_steps_ms["loss_or_continue"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	cleanup_step_usec = Time.get_ticks_usec()
 	_pending_continue = false
 	if planning_redeployed:
 		# The return bridge is deliberately shown after planning has been restored.
@@ -2720,6 +2736,9 @@ func _on_intermission_finished() -> void:
 		_show_phase_transition_bridge("combat_to_planning")
 	_post_combat_outcome = ""
 	_intermission_finish_in_progress = false
+	cleanup_steps_ms["transition_bridge"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	if not _last_result_latency.is_empty():
+		_last_result_latency["cleanup_steps_ms"] = cleanup_steps_ms
 
 func _apply_first_boss_prep_gold_floor(win: bool) -> void:
 	if not win:
@@ -4381,6 +4400,11 @@ func _skip_result_hold() -> void:
 	# Hide the result immediately. The post-combat rebuild is intentionally
 	# deferred so refresh_all_views and settlement cannot stall this response.
 	_hide_result_banner()
+	# Stop per-frame actor synchronization immediately while leaving teardown to
+	# the deferred cleanup pass. A finished arena can otherwise consume the first
+	# response frame even though the result card is already hidden.
+	if arena_container != null:
+		arena_container.visible = false
 	var visible_response_usec: int = Time.get_ticks_usec()
 	_last_result_latency = {
 		"input_path": "result_skip",

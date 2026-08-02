@@ -77,14 +77,17 @@ func _run_campaign_sample() -> void:
 	_two_stage_results.clear()
 	_two_stage_battles = 0
 	_two_stage_buy_xp_clicks = 0
-	# Main.tscn intentionally auto-starts the first fight as soon as the
-	# starter is confirmed. Measure that onboarding beat as-is; later rounds
-	# exercise the natural planning/shop/deploy flow through the inherited
-	# round driver.
+	# Main normally schedules an opening auto-start. If that deferred action is
+	# not accepted on this frame, continue through the same visible opening-fight
+	# control a player would use instead of waiting out a false harness timeout.
 	await _ensure_unit_select()
 	await _select_starter(_flow_starter_id())
 	await _settle_frames(4)
 	_expect(_node_visible("CombatView"), "CombatView did not open for pacing campaign")
+	if GameState.phase == GameState.GamePhase.PREVIEW and not Economy.combat_active:
+		await _reposition_first_board_unit("pacing opening decision")
+		_set_planning_timer_safe()
+		await _press_continue(true, "pacing opening fight")
 	var first_result: String = await _wait_for_first_result(_flow_first_fight_timeout())
 	_expect(first_result == "shop", "pacing opener should win into first shop, got %s state=%s" % [first_result, JSON.stringify(_two_stage_state())])
 	if first_result != "shop":
@@ -132,6 +135,12 @@ func _run_loss_retry_sample() -> void:
 	await _ensure_unit_select()
 	await _select_starter("axiom")
 	var loss_manager: Object = loss_combat_view.get("manager") as Object if loss_combat_view != null else null
+	# Opening defeats intentionally receive recovery gold, so they cannot prove
+	# the terminal loss overlay. Move this scoped fixture to the next real stage
+	# before forcing the all-in defeat.
+	GameState.set_chapter_and_stage(1, 2)
+	if loss_manager != null and loss_manager.has_method("setup_stage_preview"):
+		loss_manager.call("setup_stage_preview")
 	_apply_controlled_loss_fixture(loss_manager)
 	_set_bet_to_max()
 	_set_planning_timer_safe()

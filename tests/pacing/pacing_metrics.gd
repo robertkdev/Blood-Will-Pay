@@ -36,7 +36,7 @@ static func analyze(report: Dictionary[String, Variant]) -> Dictionary[String, V
 	metric_results["onboarding_to_first_combat_seconds"] = _check_scalar(first_combat, _threshold(threshold_map, "onboarding_to_first_combat_seconds"))
 
 	var planning_values: Array[float] = _stage_metric_values(stages, "planning_time_use_seconds")
-	metric_results["planning_time_use_seconds"] = _check_distribution(planning_values, _threshold(threshold_map, "planning_time_use_seconds"))
+	metric_results["planning_time_use_seconds"] = _not_applicable("loss/retry sample begins at the forced terminal fight and does not include a planning beat") if scope == "loss_retry" else _check_distribution(planning_values, _threshold(threshold_map, "planning_time_use_seconds"))
 	var action_density_values: Array[float] = _stage_metric_values(stages, "action_density_per_planning_minute")
 	metric_results["action_density_per_planning_minute"] = _not_applicable("loss/retry sample intentionally contains no shop/deployment action sequence") if scope == "loss_retry" else _check_distribution(action_density_values, _threshold(threshold_map, "action_density_per_planning_minute"))
 	var combat_values: Array[float] = _stage_metric_values(stages, "combat_duration_seconds")
@@ -65,7 +65,7 @@ static func analyze(report: Dictionary[String, Variant]) -> Dictionary[String, V
 		"status": "N/A" if not skip_supported else "PASS",
 		"supported": skip_supported,
 		"response_seconds": run.get("skip_response_seconds", null),
-		"note": "No player-facing result skip control was present in the observed Main.tscn flow." if not skip_supported else "Result skip response was observed.",
+		"note": "Result-skip latency is outside the longitudinal sample and is covered by InteractionLatencySmoke.tscn." if not skip_supported else "Result skip response was observed.",
 	}
 
 	var failures: Array[String] = []
