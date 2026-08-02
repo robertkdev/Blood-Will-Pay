@@ -1,8 +1,14 @@
 param(
-	[string]$ReportDir = "$env:APPDATA\Godot\app_userdata\Gamble Battle\identity_reports",
+	[string]$ReportDir = "",
 	[string]$OutputDir = "outputs/audit_playtest/rga_accepted_misses_current",
 	[string[]]$IgnoredReportNames = @("faeling.json")
 )
+
+$renamedReportDir = "$env:APPDATA\Godot\app_userdata\Blood Will Pay\identity_reports"
+$legacyReportDir = "$env:APPDATA\Godot\app_userdata\Gamble Battle\identity_reports"
+if ([string]::IsNullOrWhiteSpace($ReportDir)) {
+	$ReportDir = if (Test-Path -LiteralPath $renamedReportDir) { $renamedReportDir } else { $legacyReportDir }
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"

@@ -10,17 +10,29 @@ const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
+const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
 const COLOR_PANEL: Color = Color(0.034, 0.029, 0.039, 0.94)
 const COLOR_PANEL_DEEP: Color = Color(0.018, 0.015, 0.023, 0.98)
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
-const COLOR_MUTED: Color = Color(0.65, 0.60, 0.53, 1.0)
+const COLOR_MUTED: Color = Color(0.78, 0.73, 0.64, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.66, 0.32, 1.0)
 const COLOR_BLOOD: Color = Color(0.52, 0.040, 0.080, 1.0)
 const COLOR_BLOOD_HOT: Color = Color(0.82, 0.070, 0.120, 1.0)
 const FULL_LAYOUT_SIZE: Vector2 = Vector2(1320.0, 900.0)
 const COMPACT_VIEWPORT_HEIGHT: float = 780.0
+const REGISTRATION_MARK_POSITION: Vector2 = Vector2(22.0, 18.0)
+const COMPACT_MENU_RESERVED_RIGHT: float = 132.0
+const COMPACT_REGISTRATION_MARK_GAP: float = 16.0
+const COMPACT_REGISTRATION_MARK_POSITION: Vector2 = Vector2(COMPACT_MENU_RESERVED_RIGHT + COMPACT_REGISTRATION_MARK_GAP, 18.0)
+const IDENTITY_PANEL_MIN_HEIGHT: float = 96.0
+const START_BUTTON_READY_TEXT: String = "Start Game"
+const START_BUTTON_PENDING_TEXT: String = "Preparing Battle..."
+
+var account_profile_path: String = "user://account_profile_v1.json"
 
 @onready var background: ColorRect = $Background
 @onready var hbox: HBoxContainer = $Center/HBox
@@ -53,14 +65,23 @@ var _start_button_hover_tween: Tween = null
 var _left_plate: Panel = null
 var _right_plate: Panel = null
 var _preview_art_plate: Panel = null
+var _plate_reposition_queued: bool = false
 var _last_scroll_bar_value: float = 0.0
+var _hardcore_backdrop: TextureRect = null
+var _registration_overlay: Control = null
+var _roster_record_label: Label = null
+var _preview_record_label: Label = null
+var _card_label_styles: Dictionary[String, StyleBoxFlat] = {}
 
 func _ready() -> void:
 	_ensure_grid_wrapper()
 	_ensure_preview_panel()
+	_ensure_record_labels()
 	_apply_gothic_layout()
 	_wire_start_button_hover()
 	start_button.disabled = true
+	start_button.text = START_BUTTON_READY_TEXT
+	_style_start_button()
 	if help_label:
 		help_label.visible = true
 	if not start_button.is_connected("pressed", Callable(self, "_on_StartButton_pressed")):
@@ -107,11 +128,13 @@ func _ensure_preview_panel() -> void:
 		preview.add_theme_constant_override("separation", 10)
 		preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		right.add_child(preview)
+	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview.custom_minimum_size = Vector2.ZERO
 	selected_label = preview.get_node_or_null("SelectedLabel") as Label
 	if selected_label == null:
 		selected_label = Label.new()
 		selected_label.name = "SelectedLabel"
-		selected_label.text = "No champion chosen"
+		selected_label.text = "No starter chosen"
 		preview.add_child(selected_label)
 	_ensure_identity_panel(preview)
 	var art_wrap: CenterContainer = preview.get_node_or_null("ArtWrap") as CenterContainer
@@ -122,13 +145,13 @@ func _ensure_preview_panel() -> void:
 			old_art.queue_free()
 		art_wrap = CenterContainer.new()
 		art_wrap.name = "ArtWrap"
-		art_wrap.custom_minimum_size = Vector2(380, 300)
+		art_wrap.custom_minimum_size = Vector2(380, 320)
 		preview.add_child(art_wrap)
 	preview_art = art_wrap.get_node_or_null("Art") as TextureRect
 	if preview_art == null:
 		preview_art = TextureRect.new()
 		preview_art.name = "Art"
-		preview_art.custom_minimum_size = Vector2(360, 360)
+		preview_art.custom_minimum_size = Vector2(320, 320)
 		preview_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		preview_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		preview_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -159,33 +182,41 @@ func _ensure_preview_panel() -> void:
 		right.add_child(help_label)
 	right.custom_minimum_size = Vector2(500, 0)
 	right.size_flags_horizontal = 0
-	start_button.size_flags_vertical = 0
+	start_button.size_flags_vertical = Control.SIZE_SHRINK_END
 	right.move_child(preview, 0)
 	right.move_child(start_button, right.get_child_count() - 1)
 
 func _apply_gothic_layout() -> void:
+	z_index = 20
 	if background:
-		background.color = COLOR_VOID
-		if background.material is ShaderMaterial:
-			var mat: ShaderMaterial = background.material as ShaderMaterial
-			mat.set_shader_parameter("top_color", Color(0.034, 0.026, 0.036, 1.0))
-			mat.set_shader_parameter("bottom_color", Color(0.006, 0.005, 0.008, 1.0))
-			mat.set_shader_parameter("vignette", 0.48)
-			mat.set_shader_parameter("vignette_softness", 0.62)
+		background.color = Color(COLOR_VOID.r, COLOR_VOID.g, COLOR_VOID.b, 0.16)
+		background.material = null
+		background.z_index = -10
+	_ensure_hardcore_backdrop()
+	_ensure_registration_marks()
 	if hbox:
 		hbox.custom_minimum_size = Vector2(1320.0, 900.0)
 		hbox.add_theme_constant_override("separation", 34)
 	if left_column:
 		left_column.custom_minimum_size = Vector2(760.0, 880.0)
 		left_column.add_theme_constant_override("separation", 14)
-		_left_plate = _ensure_float_plate(left_column, "GothicRosterPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _make_panel_style(COLOR_PANEL, Color(0.36, 0.29, 0.27, 0.86), 1, 7)), -2, 10.0)
+		var roster_style: StyleBoxFlat = _make_panel_style(Color(0.020, 0.018, 0.023, 0.86), Color(0.70, 0.055, 0.085, 0.92), 2, 0)
+		roster_style.border_width_left = 6
+		_left_plate = _ensure_float_plate(left_column, "GothicRosterPlate", roster_style, -2, 10.0)
 	if right_column:
 		right_column.custom_minimum_size = Vector2(500.0, 880.0)
 		right_column.add_theme_constant_override("separation", 16)
-		_right_plate = _ensure_float_plate(right_column, "GothicPreviewPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _make_panel_style(Color(0.030, 0.025, 0.034, 0.96), Color(0.48, 0.34, 0.25, 0.88), 1, 7)), -2, 10.0)
+		var preview_style: StyleBoxFlat = _make_panel_style(Color(0.024, 0.021, 0.026, 0.88), Color(0.76, 0.67, 0.54, 0.88), 2, 0)
+		preview_style.border_width_left = 6
+		preview_style.border_width_top = 2
+		preview_style.border_width_right = 1
+		preview_style.border_width_bottom = 1
+		_right_plate = _ensure_float_plate(right_column, "GothicPreviewPlate", preview_style, -2, 10.0)
 	if heading_label:
-		heading_label.text = "Choose Your Starting Unit"
-		heading_label.add_theme_font_size_override("font_size", 38)
+		heading_label.text = "CHOOSE YOUR STARTER"
+		heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		heading_label.add_theme_font_size_override("font_size", 34)
+		VisualTypeSystem.set_impact(heading_label)
 		heading_label.add_theme_color_override("font_color", COLOR_TEXT)
 		heading_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.76))
 		heading_label.add_theme_constant_override("outline_size", 3)
@@ -194,10 +225,12 @@ func _apply_gothic_layout() -> void:
 	if scroll:
 		scroll.custom_minimum_size = Vector2(720.0, 800.0)
 		scroll.clip_contents = true
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		scroll.add_theme_stylebox_override("focus", _make_panel_style(Color(0.0, 0.0, 0.0, 0.0), COLOR_GOLD, 1, 4))
 	if grid_wrap:
 		grid_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		grid_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		grid_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		grid_wrap.custom_minimum_size = Vector2(max(720.0, float(scroll.size.x)), 0.0)
 	if grid:
 		grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -205,8 +238,10 @@ func _apply_gothic_layout() -> void:
 		grid.add_theme_constant_override("v_separation", 14)
 	if selected_label:
 		selected_label.custom_minimum_size = Vector2(500.0, 64.0)
+		selected_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		selected_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		selected_label.add_theme_font_size_override("font_size", 32)
+		VisualTypeSystem.set_action(selected_label)
 		selected_label.add_theme_color_override("font_color", COLOR_TEXT)
 		selected_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.70))
 		selected_label.add_theme_constant_override("outline_size", 2)
@@ -214,24 +249,142 @@ func _apply_gothic_layout() -> void:
 		identity_goal_label.add_theme_color_override("font_color", COLOR_MUTED)
 	if details_label:
 		details_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		details_label.add_theme_font_size_override("font_size", 16)
-		details_label.add_theme_color_override("font_color", COLOR_MUTED)
+		details_label.add_theme_font_size_override("font_size", 18)
+		VisualTypeSystem.set_utility(details_label)
+		details_label.add_theme_color_override("font_color", COLOR_TEXT)
+		details_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+		details_label.add_theme_constant_override("outline_size", 2)
 	if details_scroll:
 		details_scroll.custom_minimum_size = Vector2(500.0, 126.0)
-		details_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		details_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		details_scroll.clip_contents = true
+		var details_style: StyleBoxFlat = _make_panel_style(Color(0.020, 0.018, 0.023, 0.98), Color(0.48, 0.43, 0.36, 0.94), 1, 0)
+		details_style.border_width_left = 4
+		details_scroll.add_theme_stylebox_override("panel", details_style)
 	if help_label:
-		help_label.add_theme_font_size_override("font_size", 16)
-		help_label.add_theme_color_override("font_color", COLOR_MUTED)
+		help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		help_label.add_theme_font_size_override("font_size", 18)
+		VisualTypeSystem.set_utility_bold(help_label)
+		help_label.add_theme_color_override("font_color", COLOR_TEXT)
+		help_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+		help_label.add_theme_constant_override("outline_size", 2)
 	if preview_art:
-		preview_art.custom_minimum_size = Vector2(360.0, 360.0)
+		preview_art.custom_minimum_size = Vector2(320.0, 320.0)
 		preview_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		preview_art.modulate = Color(0.92, 0.88, 0.82, 1.0)
 	var art_wrap: Control = right_column.get_node_or_null("Preview/ArtWrap") as Control
 	if art_wrap:
-		art_wrap.custom_minimum_size = Vector2(430.0, 360.0)
-		_preview_art_plate = _ensure_float_plate(art_wrap, "GothicArtPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.grid_panel_style(), _make_panel_style(Color(0.014, 0.012, 0.018, 0.86), Color(0.32, 0.24, 0.23, 0.84), 1, 6)), -1, 8.0)
-	call_deferred("_position_gothic_plates")
+		art_wrap.custom_minimum_size = Vector2(430.0, 320.0)
+		var art_style: StyleBoxFlat = _make_panel_style(Color(0.014, 0.012, 0.018, 0.92), Color(0.55, 0.49, 0.40, 0.92), 1, 0)
+		art_style.border_width_top = 3
+		art_style.border_width_left = 3
+		art_style.border_width_right = 1
+		art_style.border_width_bottom = 5
+		_preview_art_plate = _ensure_float_plate(art_wrap, "GothicArtPlate", art_style, -1, 6.0)
+		if not art_wrap.resized.is_connected(Callable(self, "_queue_gothic_plate_reposition")):
+			art_wrap.resized.connect(_queue_gothic_plate_reposition)
+	if right_column != null and not right_column.sort_children.is_connected(Callable(self, "_queue_gothic_plate_reposition")):
+		right_column.sort_children.connect(_queue_gothic_plate_reposition)
+	_queue_gothic_plate_reposition()
 	_style_start_button()
+
+func _ensure_hardcore_backdrop() -> void:
+	_hardcore_backdrop = get_node_or_null("HardcoreBackdrop") as TextureRect
+	if _hardcore_backdrop == null:
+		_hardcore_backdrop = TextureRect.new()
+		_hardcore_backdrop.name = "HardcoreBackdrop"
+		_hardcore_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_hardcore_backdrop)
+		move_child(_hardcore_backdrop, 0)
+	# Keep the authored backdrop inside this screen's own canvas layer. The
+	# UnitSelect root is raised above Main's dormant shells, then its negative
+	# local z keeps this image behind the functional dossier controls.
+	_hardcore_backdrop.z_index = -9
+	_hardcore_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hardcore_backdrop.offset_left = 0.0
+	_hardcore_backdrop.offset_top = 0.0
+	_hardcore_backdrop.offset_right = 0.0
+	_hardcore_backdrop.offset_bottom = 0.0
+	_hardcore_backdrop.texture = HardcoreUIAssets.unit_select_backdrop_texture()
+	_hardcore_backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_hardcore_backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_hardcore_backdrop.modulate = Color(1.18, 1.12, 1.06, 1.0)
+
+func _ensure_record_labels() -> void:
+	if left_column != null:
+		_roster_record_label = left_column.get_node_or_null("RosterRecord") as Label
+		if _roster_record_label == null:
+			_roster_record_label = Label.new()
+			_roster_record_label.name = "RosterRecord"
+			left_column.add_child(_roster_record_label)
+		_roster_record_label.text = "INTAKE GRID // 06 FILES // ONE SURVIVOR"
+		_roster_record_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_roster_record_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_roster_record_label.add_theme_font_size_override("font_size", 16)
+		_roster_record_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.72, 0.98))
+		_roster_record_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+		_roster_record_label.add_theme_constant_override("outline_size", 2)
+		VisualTypeSystem.set_utility_bold(_roster_record_label)
+		left_column.move_child(_roster_record_label, min(heading_label.get_index() + 1, left_column.get_child_count() - 1))
+	if right_column != null:
+		var preview: VBoxContainer = right_column.get_node_or_null("Preview") as VBoxContainer
+		if preview != null:
+			_preview_record_label = preview.get_node_or_null("RecordMark") as Label
+			if _preview_record_label == null:
+				_preview_record_label = Label.new()
+				_preview_record_label.name = "RecordMark"
+				preview.add_child(_preview_record_label)
+			_preview_record_label.text = "PERSONNEL RECORD // LIVE ASSESSMENT"
+			_preview_record_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			_preview_record_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_preview_record_label.add_theme_font_size_override("font_size", 15)
+			_preview_record_label.add_theme_color_override("font_color", Color(0.96, 0.18, 0.22, 0.98))
+			VisualTypeSystem.set_utility_bold(_preview_record_label)
+			preview.move_child(_preview_record_label, min(selected_label.get_index() + 1, preview.get_child_count() - 1))
+
+func _ensure_registration_marks() -> void:
+	_registration_overlay = get_node_or_null("StarterRegistrationMarks") as Control
+	if _registration_overlay == null:
+		_registration_overlay = Control.new()
+		_registration_overlay.name = "StarterRegistrationMarks"
+		_registration_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_registration_overlay.z_index = -8
+		add_child(_registration_overlay)
+	_registration_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_registration_overlay.offset_left = 0.0
+	_registration_overlay.offset_top = 0.0
+	_registration_overlay.offset_right = 0.0
+	_registration_overlay.offset_bottom = 0.0
+	var top_mark: Label = _registration_overlay.get_node_or_null("TopMark") as Label
+	if top_mark == null:
+		top_mark = Label.new()
+		top_mark.name = "TopMark"
+		top_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_registration_overlay.add_child(top_mark)
+	top_mark.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	top_mark.position = REGISTRATION_MARK_POSITION
+	top_mark.z_index = 10
+	top_mark.text = "STARTER DOSSIER // INTAKE 01"
+	top_mark.add_theme_font_size_override("font_size", 15)
+	VisualTypeSystem.set_utility_bold(top_mark)
+	top_mark.add_theme_color_override("font_color", Color(0.82, 0.74, 0.62, 0.82))
+	top_mark.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
+	top_mark.add_theme_constant_override("outline_size", 2)
+	top_mark.set_meta("global_menu_reserved_right_px", COMPACT_MENU_RESERVED_RIGHT)
+	top_mark.set_meta("minimum_shell_gap_px", 12.0)
+	_position_registration_mark(get_viewport_rect().size)
+	var bottom_mark: Label = _registration_overlay.get_node_or_null("BottomMark") as Label
+	if bottom_mark == null:
+		bottom_mark = Label.new()
+		bottom_mark.name = "BottomMark"
+		bottom_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_registration_overlay.add_child(bottom_mark)
+	bottom_mark.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	bottom_mark.position = Vector2(-286.0, -38.0)
+	bottom_mark.text = "REGISTER // COMMIT // SURVIVE"
+	bottom_mark.add_theme_font_size_override("font_size", 13)
+	VisualTypeSystem.set_utility_bold(bottom_mark)
+	bottom_mark.add_theme_color_override("font_color", Color(0.69, 0.08, 0.11, 0.72))
 
 func _ensure_grid_wrapper() -> void:
 	if scroll == null or grid == null:
@@ -245,7 +398,7 @@ func _ensure_grid_wrapper() -> void:
 		grid_wrap.add_child(grid)
 	grid_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	grid_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	grid_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 func _ensure_identity_panel(preview: VBoxContainer) -> void:
@@ -254,8 +407,12 @@ func _ensure_identity_panel(preview: VBoxContainer) -> void:
 		identity_panel = VBoxContainer.new()
 		identity_panel.name = "IdentityPanel"
 		identity_panel.add_theme_constant_override("separation", 4)
-		identity_panel.visible = false
 		preview.add_child(identity_panel)
+	# Keep this slot in the VBox layout even when its labels are empty. Hiding the
+	# container made ArtWrap jump vertically whenever a card gained/lost hover.
+	identity_panel.visible = true
+	identity_panel.custom_minimum_size = Vector2(0.0, IDENTITY_PANEL_MIN_HEIGHT)
+	identity_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if selected_label:
 		var index: int = selected_label.get_index() + 1
 		preview.move_child(identity_panel, min(index, preview.get_child_count() - 1))
@@ -270,7 +427,8 @@ func _ensure_identity_panel(preview: VBoxContainer) -> void:
 	identity_role_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	identity_role_label.custom_minimum_size = Vector2(132.0, 0.0)
 	identity_role_label.add_theme_stylebox_override("normal", _make_badge_style())
-	identity_role_label.add_theme_font_size_override("font_size", 13)
+	identity_role_label.add_theme_font_size_override("font_size", 18)
+	VisualTypeSystem.set_action(identity_role_label)
 	identity_role_label.add_theme_color_override("font_color", COLOR_TEXT)
 	identity_goal_label = identity_panel.get_node_or_null("GoalLabel") as Label
 	if identity_goal_label == null:
@@ -278,6 +436,7 @@ func _ensure_identity_panel(preview: VBoxContainer) -> void:
 		identity_goal_label.name = "GoalLabel"
 		identity_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		identity_goal_label.add_theme_font_size_override("font_size", 18)
+		VisualTypeSystem.set_utility_bold(identity_goal_label)
 		identity_goal_label.modulate = Color(1, 1, 1, 0.9)
 		identity_panel.add_child(identity_goal_label)
 	identity_approach_tags = identity_panel.get_node_or_null("ApproachTags") as FlowContainer
@@ -291,9 +450,12 @@ func _ensure_identity_panel(preview: VBoxContainer) -> void:
 
 func show_screen() -> void:
 	visible = true
+	_populate_units()
 	_apply_gothic_layout()
 	_style_unit_cards()
 	start_button.disabled = selected_id == ""
+	_refresh_start_button_copy()
+	_style_start_button()
 	if help_label:
 		help_label.visible = start_button.disabled
 	_on_resized()
@@ -318,6 +480,7 @@ func reset_selection() -> void:
 	if start_button != null:
 		start_button.disabled = true
 		start_button.scale = Vector2.ONE
+		_refresh_start_button_copy()
 		_style_start_button()
 	if help_label != null:
 		help_label.visible = true
@@ -330,14 +493,18 @@ func _populate_units() -> void:
 	buttons_by_id.clear()
 	_preview_units_by_id.clear()
 	for child in grid.get_children():
+		grid.remove_child(child)
 		child.queue_free()
 	# Use catalog to obtain starter-eligible units at starting level
 	var catalog: UnitCatalog = UnitCatalog.new()
 	catalog.refresh()
 	var level: int = int(ShopConfig.STARTING_LEVEL)
 	var ids: Array[String] = catalog.list_starter_ids(level)
+	var unlocked_ids: Array[String] = AccountProgressionScript.unlocked_starter_ids(account_profile_path)
 	var meta_items: Array[Dictionary] = []
 	for uid: String in ids:
+		if not unlocked_ids.has(uid.to_lower()):
+			continue
 		var meta: Dictionary = catalog.get_unit_meta(String(uid))
 		if meta.is_empty():
 			continue
@@ -441,11 +608,15 @@ func _unit_entry_from_resource(res: Resource) -> Dictionary:
 	}
 
 func _on_unit_button_pressed(_btn: Button, id: String, _name: String) -> void:
+	var previous_selected_id: String = selected_id
 	selected_id = id
 	_update_preview(id, true)
 	start_button.disabled = false
+	_refresh_start_button_copy()
 	_style_start_button()
-	_style_unit_cards()
+	if previous_selected_id != "" and previous_selected_id != id:
+		_refresh_unit_card(previous_selected_id)
+	_refresh_unit_card(id)
 	if help_label:
 		help_label.visible = false
 
@@ -454,14 +625,40 @@ func _on_StartButton_pressed() -> void:
 		return
 	emit_signal("unit_selected", selected_id)
 
+
+func _refresh_start_button_copy() -> void:
+	if start_button == null:
+		return
+	if selected_id == "":
+		start_button.text = START_BUTTON_READY_TEXT
+		return
+	var selected_entry: Dictionary = items_by_id.get(selected_id, {})
+	var display_name: String = String(selected_entry.get("name", selected_id)).to_upper()
+	start_button.text = "START // %s READY" % display_name
+
+func set_transition_pending(pending: bool) -> void:
+	if start_button == null:
+		return
+	if pending:
+		start_button.text = START_BUTTON_PENDING_TEXT
+	else:
+		_refresh_start_button_copy()
+	start_button.disabled = pending or selected_id == ""
+	if pending:
+		start_button.release_focus()
+	if is_inside_tree():
+		_style_start_button()
+
 func _on_unit_hovered(id: String) -> void:
 	if id != "":
 		if _hovered_id != id and _hovered_id != "":
-			_apply_unit_button_motion(_hovered_id, false)
+			var previous_hovered_id: String = _hovered_id
+			_apply_unit_button_motion(previous_hovered_id, false)
+			_refresh_unit_card(previous_hovered_id)
 		_hovered_id = id
 		_apply_unit_button_motion(id, true)
 		_update_preview(id, false)
-		_style_unit_cards()
+		_refresh_unit_card(id)
 
 func _update_preview(id: String, is_selected: bool = false) -> void:
 	if selected_label == null:
@@ -471,7 +668,7 @@ func _update_preview(id: String, is_selected: bool = false) -> void:
 		_clear_preview()
 		return
 	var display_name: String = String(it.get("name", ""))
-	selected_label.text = ("%s" if is_selected else "Inspecting %s") % [display_name]
+	selected_label.text = ("LOCKED // %s // READY" if is_selected else "INSPECTING /// %s") % [display_name.to_upper()]
 	var role_text: String = _format_role(String(it.get("primary_role", "")))
 	var goal_text: String = _format_goal(String(it.get("primary_goal", "")))
 	var approach_arr: Array = _duplicate_strings(it.get("approaches", PackedStringArray()))
@@ -482,6 +679,7 @@ func _update_preview(id: String, is_selected: bool = false) -> void:
 	if details_label:
 		var lines: Array[String] = _build_detail_lines(id, it)
 		details_label.text = "\n".join(lines)
+	_queue_gothic_plate_reposition()
 
 func _build_detail_lines(id: String, it: Dictionary) -> Array[String]:
 	var lines: Array[String] = []
@@ -559,9 +757,10 @@ func _format_ability_info(unit: Unit) -> String:
 
 func _on_unit_unhovered() -> void:
 	if _hovered_id != "":
-		_apply_unit_button_motion(_hovered_id, false)
+		var previous_hovered_id: String = _hovered_id
+		_apply_unit_button_motion(previous_hovered_id, false)
 		_hovered_id = ""
-		_style_unit_cards()
+		_refresh_unit_card(previous_hovered_id)
 	if selected_id != "":
 		_update_preview(selected_id, true)
 		return
@@ -573,9 +772,10 @@ func _on_scroll_changed(_value: float) -> void:
 
 func _clear_hover_for_scroll() -> void:
 	if _hovered_id != "":
-		_apply_unit_button_motion(_hovered_id, false)
+		var previous_hovered_id: String = _hovered_id
+		_apply_unit_button_motion(previous_hovered_id, false)
 		_hovered_id = ""
-		_style_unit_cards()
+		_refresh_unit_card(previous_hovered_id)
 	if selected_id != "":
 		_update_preview(selected_id, true)
 	else:
@@ -583,12 +783,14 @@ func _clear_hover_for_scroll() -> void:
 
 func _clear_preview() -> void:
 	if selected_label:
-		selected_label.text = "No champion chosen"
+		selected_label.text = "No starter chosen"
+	_refresh_start_button_copy()
 	if preview_art:
 		preview_art.texture = null
 	_clear_identity_panel()
 	if details_label:
 		details_label.text = "Hover a unit to preview"
+	_queue_gothic_plate_reposition()
 
 func _set_identity_summary(role_text: String, goal_text: String, approaches: Array) -> void:
 	var show_role: bool = role_text.strip_edges() != ""
@@ -599,9 +801,9 @@ func _set_identity_summary(role_text: String, goal_text: String, approaches: Arr
 	if identity_goal_label:
 		identity_goal_label.text = goal_text
 		identity_goal_label.visible = show_goal
-	var show_tags: bool = _set_identity_approach_tags(approaches)
+	_set_identity_approach_tags(approaches)
 	if identity_panel:
-		identity_panel.visible = show_role or show_goal or show_tags
+		identity_panel.visible = true
 
 func _set_identity_approach_tags(approaches: Array) -> bool:
 	if identity_approach_tags == null:
@@ -641,45 +843,74 @@ func _clear_identity_panel() -> void:
 			child.queue_free()
 		identity_approach_tags.visible = false
 	if identity_panel:
-		identity_panel.visible = false
+		identity_panel.visible = true
 
 func _on_resized() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var compact: bool = viewport_size.y <= COMPACT_VIEWPORT_HEIGHT or viewport_size.x < 1400.0
-	var available_width: float = max(960.0, viewport_size.x - 48.0)
-	var available_height: float = max(640.0, viewport_size.y - 48.0)
+	var short_compact: bool = compact and viewport_size.y < 620.0
+	var available_width: float = max(800.0, viewport_size.x - 32.0)
+	var available_height: float = max(440.0, viewport_size.y - 32.0)
 	var layout_width: float = min(FULL_LAYOUT_SIZE.x, available_width)
-	var layout_height: float = min(FULL_LAYOUT_SIZE.y, available_height)
-	var gap: float = 20.0 if compact else 34.0
-	var right_width: float = min(500.0, max(420.0, layout_width * 0.38))
-	var left_width: float = max(520.0, layout_width - right_width - gap)
-	var heading_height: float = 52.0 if compact else 70.0
-	var scroll_height: float = max(470.0, layout_height - heading_height - 26.0)
-	var tile_width: float = 138.0 if compact else 150.0
-	var tile_height: float = 166.0 if compact else 184.0
-	var button_size: Vector2 = Vector2(138.0, 116.0) if compact else Vector2(150.0, 138.0)
-	var preview_art_size: float = 270.0 if compact else 360.0
+	var layout_height: float = min(720.0 if not compact else 688.0, available_height)
+	var gap: float = 12.0 if short_compact else (20.0 if compact else 34.0)
+	var right_width: float = min(500.0, max(360.0 if short_compact else 420.0, layout_width * 0.38))
+	var left_width: float = max(420.0 if short_compact else 520.0, layout_width - right_width - gap)
+	var heading_height: float = 44.0 if short_compact else (58.0 if compact else 70.0)
+	var tile_width: float = 150.0 if short_compact else (168.0 if compact else 226.0)
+	var tile_height: float = 154.0 if short_compact else (172.0 if compact else 220.0)
+	var button_size: Vector2 = Vector2(150.0, 104.0) if short_compact else (Vector2(168.0, 118.0) if compact else Vector2(226.0, 164.0))
+	var preview_art_size: float = 150.0 if short_compact else (230.0 if compact else 320.0)
+	var details_font_size: int = 16 if short_compact else (18 if compact else 19)
+	var details_visible_lines: int = 2 if short_compact else (3 if compact else 5)
+	var details_height: float = _line_safe_details_height(details_font_size, details_visible_lines)
+	var roster_rows: int = ceili(float(grid.get_child_count()) / 3.0)
+	var roster_content_height: float = float(max(1, roster_rows)) * tile_height + float(max(0, roster_rows - 1)) * 14.0
+	var grid_bottom_gutter: float = 6.0 if compact else 10.0
+	var record_height: float = 24.0
+	var scroll_height: float = roster_content_height + grid_bottom_gutter
+	var left_content_height: float = heading_height + record_height + scroll_height + float(20 if compact else 28)
 	if hbox != null:
 		hbox.custom_minimum_size = Vector2(layout_width, layout_height)
 		hbox.add_theme_constant_override("separation", int(gap))
 	if left_column != null:
-		left_column.custom_minimum_size = Vector2(left_width, layout_height)
+		left_column.custom_minimum_size = Vector2(left_width, left_content_height)
+		left_column.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		left_column.add_theme_constant_override("separation", 10 if compact else 14)
 	if right_column != null:
-		right_column.custom_minimum_size = Vector2(right_width, layout_height)
-		right_column.add_theme_constant_override("separation", 10 if compact else 16)
+		right_column.custom_minimum_size = Vector2(right_width, 0.0)
+		right_column.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		right_column.add_theme_constant_override("separation", 5 if short_compact else (10 if compact else 16))
 	if heading_label != null:
 		heading_label.custom_minimum_size = Vector2(0.0, heading_height)
-		heading_label.add_theme_font_size_override("font_size", 30 if compact else 38)
+		heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		heading_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		heading_label.add_theme_font_size_override("font_size", 25 if short_compact else (32 if compact else 44))
 	if scroll != null:
 		scroll.custom_minimum_size = Vector2(left_width, scroll_height)
+		scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	if _roster_record_label != null:
+		_roster_record_label.custom_minimum_size = Vector2(left_width, record_height)
+		_roster_record_label.add_theme_font_size_override("font_size", 15 if compact else 16)
+	if _preview_record_label != null:
+		_preview_record_label.custom_minimum_size = Vector2(right_width, 22.0)
+		_preview_record_label.add_theme_font_size_override("font_size", 15)
 	if selected_label != null:
-		selected_label.custom_minimum_size = Vector2(right_width, 50.0 if compact else 64.0)
-		selected_label.add_theme_font_size_override("font_size", 24 if compact else 32)
+		selected_label.custom_minimum_size = Vector2(right_width, 40.0 if short_compact else (50.0 if compact else 64.0))
+		selected_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		selected_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		selected_label.add_theme_font_size_override("font_size", 21 if short_compact else (25 if compact else 34))
+	if identity_panel != null:
+		identity_panel.custom_minimum_size = Vector2(0.0, 68.0 if short_compact else IDENTITY_PANEL_MIN_HEIGHT)
+	if identity_goal_label != null:
+		identity_goal_label.add_theme_font_size_override("font_size", 14 if short_compact else (16 if compact else 18))
 	if details_scroll != null:
-		details_scroll.custom_minimum_size = Vector2(right_width, 92.0 if compact else 126.0)
+		details_scroll.custom_minimum_size = Vector2(right_width, details_height)
+		details_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	if details_label != null:
-		details_label.add_theme_font_size_override("font_size", 15 if compact else 16)
+		details_label.add_theme_font_size_override("font_size", details_font_size)
+		details_label.add_theme_constant_override("line_spacing", 2)
 	if preview_art != null:
 		preview_art.custom_minimum_size = Vector2(preview_art_size, preview_art_size)
 	var art_wrap: Control = null
@@ -688,8 +919,11 @@ func _on_resized() -> void:
 	if art_wrap != null:
 		art_wrap.custom_minimum_size = Vector2(right_width, preview_art_size)
 	if start_button != null:
-		start_button.custom_minimum_size = Vector2(right_width, 54.0 if compact else 68.0)
-		start_button.add_theme_font_size_override("font_size", 22 if compact else 27)
+		start_button.custom_minimum_size = Vector2(right_width, 46.0 if short_compact else (54.0 if compact else 68.0))
+		start_button.add_theme_font_size_override("font_size", 20 if short_compact else (24 if compact else 30))
+		start_button.size_flags_vertical = Control.SIZE_SHRINK_END
+	if help_label != null:
+		help_label.visible = not short_compact and start_button != null and start_button.disabled
 	for tile_node: Node in grid.get_children():
 		var tile: VBoxContainer = tile_node as VBoxContainer
 		if tile == null:
@@ -702,14 +936,35 @@ func _on_resized() -> void:
 				continue
 			var label: Label = child as Label
 			if label != null:
-				label.add_theme_font_size_override("font_size", 13 if compact and label.name == "UnitName" else (10 if compact else (15 if label.name == "UnitName" else 11)))
+				label.custom_minimum_size = Vector2(tile_width, 22.0)
+				label.clip_text = false
+				label.add_theme_font_size_override("font_size", (16 if compact else 20) if label.name == "UnitName" else (15 if compact else 16))
 	var tile_w: float = tile_width + 14.0
-	var available: float = max(1.0, float(scroll.size.x))
+	var available: float = max(1.0, left_width)
 	var cols: int = int(floor(available / tile_w))
-	grid.columns = max(3, min(cols, 5))
+	grid.columns = max(2, min(cols, 3))
 	if grid_wrap:
-		grid_wrap.custom_minimum_size = Vector2(available, max(float(grid.size.y), float(scroll.size.y)))
+		var row_count: int = ceili(float(grid.get_child_count()) / float(max(1, grid.columns)))
+		var content_height: float = float(row_count) * tile_height + float(max(0, row_count - 1)) * 14.0
+		grid_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		grid_wrap.custom_minimum_size = Vector2(available, content_height + grid_bottom_gutter)
+	_position_registration_mark(viewport_size)
 	_position_gothic_plates()
+
+func _position_registration_mark(viewport_size: Vector2) -> void:
+	if _registration_overlay == null:
+		return
+	var top_mark: Label = _registration_overlay.get_node_or_null("TopMark") as Label
+	if top_mark == null:
+		return
+	var compact: bool = viewport_size.y <= COMPACT_VIEWPORT_HEIGHT or viewport_size.x < 1400.0
+	top_mark.position = COMPACT_REGISTRATION_MARK_POSITION if compact else REGISTRATION_MARK_POSITION
+
+func _line_safe_details_height(font_size: int, visible_lines: int) -> float:
+	var line_spacing: int = 2
+	var font: Font = details_label.get_theme_font("font") if details_label != null else null
+	var font_height: float = font.get_height(font_size) if font != null else float(font_size + 4)
+	return ceilf(font_height) * float(visible_lines) + float(line_spacing * max(0, visible_lines - 1))
 
 func _format_role(value: String) -> String:
 	var text := String(value).strip_edges().to_lower()
@@ -810,81 +1065,99 @@ func _style_unit_cards() -> void:
 		var tile: VBoxContainer = tile_node as VBoxContainer
 		if tile == null:
 			continue
-		var button: Button = null
-		var name_label: Label = null
-		var role_label: Label = null
-		for child in tile.get_children():
-			if child is Button:
-				button = child as Button
-			elif child is Label and child.name == "UnitName":
-				name_label = child as Label
-			elif child is Label and child.name == "UnitRole":
-				role_label = child as Label
-		if button == null:
-			continue
-		var unit_id: String = String(button.get_meta("unit_id")) if button.has_meta("unit_id") else ""
-		var hovered: bool = unit_id != "" and unit_id == _hovered_id
-		_style_unit_card(tile, button, name_label, role_label, button.button_pressed, hovered)
+		var button: Button = tile.get_child(0) as Button if tile.get_child_count() > 0 else null
+		var unit_id: String = String(button.get_meta("unit_id")) if button != null and button.has_meta("unit_id") else ""
+		_refresh_unit_card(unit_id)
+
+func _refresh_unit_card(unit_id: String) -> void:
+	var button: Button = buttons_by_id.get(unit_id, null) as Button
+	if button == null:
+		return
+	var tile: VBoxContainer = button.get_parent() as VBoxContainer
+	if tile == null:
+		return
+	var name_label: Label = tile.get_node_or_null("UnitName") as Label
+	var role_label: Label = tile.get_node_or_null("UnitRole") as Label
+	var hovered: bool = unit_id == _hovered_id
+	_style_unit_card(tile, button, name_label, role_label, button.button_pressed, hovered)
 
 func _style_unit_card(tile: VBoxContainer, button: Button, name_label: Label, role_label: Label, selected: bool, hovered: bool = false) -> void:
 	var compact: bool = _is_compact_layout()
-	tile.add_theme_constant_override("separation", 4)
+	tile.add_theme_constant_override("separation", 2 if compact else 3)
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.pivot_offset = button.size * 0.5 if button.size != Vector2.ZERO else button.custom_minimum_size * 0.5
-	button.add_theme_stylebox_override("normal", _make_unit_button_style(selected, hovered))
-	button.add_theme_stylebox_override("hover", _make_unit_button_style(false, true))
-	button.add_theme_stylebox_override("pressed", _make_unit_button_style(true, true))
-	button.add_theme_stylebox_override("focus", GothicUIAssets.focus_outline_style(5, COLOR_GOLD))
-	button.add_theme_stylebox_override("disabled", _make_unit_button_style(false, false))
+	if not bool(button.get_meta("hardcore_card_state_styles_initialized", false)):
+		HardcoreUIAssets.apply_unit_card_states(button)
+		button.set_meta("hardcore_card_state_styles_initialized", true)
 	if name_label:
-		name_label.add_theme_font_size_override("font_size", 13 if compact else 15)
+		name_label.add_theme_font_size_override("font_size", 16 if compact else 20)
+		VisualTypeSystem.set_utility_bold(name_label)
 		name_label.add_theme_color_override("font_color", COLOR_TEXT if selected or hovered else Color(0.82, 0.78, 0.70, 1.0))
 		name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
 		name_label.add_theme_constant_override("outline_size", 1)
+		name_label.add_theme_stylebox_override("normal", _make_card_label_style(selected, hovered, true))
 	if role_label:
-		role_label.add_theme_font_size_override("font_size", 10 if compact else 11)
-		role_label.add_theme_color_override("font_color", COLOR_GOLD if selected or hovered else COLOR_MUTED)
+		role_label.add_theme_font_size_override("font_size", 15 if compact else 16)
+		VisualTypeSystem.set_utility_bold(role_label)
+		role_label.add_theme_color_override("font_color", COLOR_GOLD if selected or hovered else Color(0.88, 0.83, 0.74, 1.0))
+		role_label.add_theme_stylebox_override("normal", _make_card_label_style(selected, hovered, false))
+
+func _make_card_label_style(selected: bool, highlighted: bool, primary: bool) -> StyleBoxFlat:
+	var cache_key: String = "%d:%d:%d" % [int(selected), int(highlighted), int(primary)]
+	if _card_label_styles.has(cache_key):
+		return _card_label_styles[cache_key]
+	var fill: Color = Color(0.29, 0.018, 0.038, 0.96) if selected else (Color(0.15, 0.040, 0.050, 0.90) if highlighted else Color(0.018, 0.016, 0.021, 0.80))
+	var border: Color = COLOR_BLOOD_HOT if selected else (COLOR_GOLD if highlighted else Color(0.25, 0.22, 0.20, 0.72))
+	var style: StyleBoxFlat = _make_panel_style(fill, border, 1, 0)
+	style.border_width_left = 5 if selected and primary else (3 if highlighted and primary else 1)
+	style.content_margin_left = 5.0
+	style.content_margin_right = 5.0
+	style.content_margin_top = 1.0
+	style.content_margin_bottom = 1.0
+	style.shadow_size = 0
+	_card_label_styles[cache_key] = style
+	return style
 
 func _is_compact_layout() -> bool:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	return viewport_size.y <= COMPACT_VIEWPORT_HEIGHT or viewport_size.x < 1400.0
-
-func _make_unit_button_style(selected: bool, highlighted: bool) -> StyleBox:
-	var bg: Color = Color(0.040, 0.035, 0.045, 0.96)
-	var border: Color = Color(0.24, 0.21, 0.22, 0.92)
-	var style_modulate: Color = Color.WHITE
-	if selected:
-		bg = Color(0.105, 0.044, 0.056, 0.98)
-		border = COLOR_GOLD
-		style_modulate = Color(1.14, 1.04, 0.84, 1.0)
-	elif highlighted:
-		bg = Color(0.070, 0.047, 0.057, 0.98)
-		border = Color(0.62, 0.38, 0.25, 0.96)
-		style_modulate = Color(1.10, 1.02, 0.90, 1.0)
-	var sb: StyleBoxFlat = _make_panel_style(bg, border, 2 if selected or highlighted else 1, 5)
-	sb.shadow_size = 10 if selected or highlighted else 5
-	sb.shadow_color = Color(0.56, 0.15, 0.040, 0.30) if selected or highlighted else Color(0.0, 0.0, 0.0, 0.38)
-	sb.content_margin_left = 6
-	sb.content_margin_right = 6
-	sb.content_margin_top = 6
-	sb.content_margin_bottom = 6
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(style_modulate), sb)
 
 func _style_start_button() -> void:
 	if start_button == null:
 		return
 	start_button.custom_minimum_size = Vector2(500.0, 68.0)
 	start_button.mouse_default_cursor_shape = Control.CURSOR_ARROW if start_button.disabled else Control.CURSOR_POINTING_HAND
-	start_button.add_theme_font_size_override("font_size", 27)
+	start_button.add_theme_font_size_override("font_size", 30)
+	VisualTypeSystem.set_impact(start_button)
+	if start_button.disabled and start_button.text == START_BUTTON_READY_TEXT:
+		start_button.text = "SELECT A STARTER // LOCKED"
+	elif not start_button.disabled and start_button.text.begins_with("SELECT A STARTER"):
+		start_button.text = START_BUTTON_READY_TEXT
 	start_button.add_theme_color_override("font_color", COLOR_TEXT)
 	start_button.add_theme_color_override("font_hover_color", Color(1.0, 0.91, 0.76, 1.0))
 	start_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.80, 0.58, 1.0))
 	start_button.add_theme_color_override("font_disabled_color", Color(0.43, 0.40, 0.38, 1.0))
-	start_button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(), _make_panel_style(COLOR_BLOOD, Color(0.92, 0.47, 0.30, 0.86), 2, 5)))
-	start_button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.18, 1.06, 0.92, 1.0)), _make_panel_style(COLOR_BLOOD_HOT, COLOR_GOLD, 2, 5)))
-	start_button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.84, 0.70, 0.66, 1.0)), _make_panel_style(Color(0.22, 0.020, 0.040, 1.0), COLOR_GOLD, 2, 5)))
-	start_button.add_theme_stylebox_override("focus", GothicUIAssets.focus_outline_style(5, COLOR_GOLD))
-	start_button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.46, 0.44, 0.42, 0.80)), _make_panel_style(Color(0.030, 0.027, 0.034, 0.84), Color(0.16, 0.15, 0.17, 0.88), 1, 5)))
+	start_button.add_theme_stylebox_override("normal", _make_hard_action_style(Color(0.42, 0.025, 0.050, 0.98), Color(0.88, 0.12, 0.13, 1.0), 5))
+	start_button.add_theme_stylebox_override("hover", _make_hard_action_style(Color(0.58, 0.035, 0.060, 1.0), Color(1.0, 0.34, 0.24, 1.0), 7))
+	start_button.add_theme_stylebox_override("pressed", _make_hard_action_style(Color(0.25, 0.018, 0.030, 1.0), Color(0.98, 0.64, 0.28, 1.0), 8))
+	start_button.add_theme_stylebox_override("focus", _make_hard_action_style(Color(0.48, 0.028, 0.052, 1.0), Color(0.98, 0.66, 0.30, 1.0), 7))
+	start_button.add_theme_stylebox_override("disabled", _make_hard_action_style(Color(0.030, 0.027, 0.031, 0.96), Color(0.34, 0.31, 0.28, 0.90), 3))
+
+func _make_hard_action_style(background_color: Color, border_color: Color, left_width: int) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = background_color
+	style.border_color = border_color
+	style.border_width_left = left_width
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.content_margin_left = 18.0
+	style.content_margin_right = 18.0
+	style.content_margin_top = 8.0
+	style.content_margin_bottom = 8.0
+	style.shadow_size = 5
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.48)
+	return style
 
 func _wire_start_button_hover() -> void:
 	if start_button == null:
@@ -940,7 +1213,7 @@ func _ensure_float_plate(control: Control, plate_name: String, style: StyleBox, 
 		plate.name = plate_name
 		plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		plate.z_index = z_value
-		plate.z_as_relative = false
+		plate.z_as_relative = true
 		add_child(plate)
 		move_child(plate, 1)
 	plate.set_meta("target_path", get_path_to(control))
@@ -953,6 +1226,17 @@ func _position_gothic_plates() -> void:
 	_position_float_plate(_left_plate)
 	_position_float_plate(_right_plate)
 	_position_float_plate(_preview_art_plate)
+
+func _queue_gothic_plate_reposition() -> void:
+	if _plate_reposition_queued or not is_inside_tree():
+		return
+	_plate_reposition_queued = true
+	get_tree().process_frame.connect(_position_gothic_plates_after_layout, CONNECT_ONE_SHOT)
+
+func _position_gothic_plates_after_layout() -> void:
+	_plate_reposition_queued = false
+	if is_inside_tree():
+		_position_gothic_plates()
 
 func _position_float_plate(plate: Panel) -> void:
 	if plate == null or not plate.has_meta("target_path"):

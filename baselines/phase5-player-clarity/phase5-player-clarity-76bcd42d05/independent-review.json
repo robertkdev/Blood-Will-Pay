@@ -1,0 +1,35 @@
+{
+  "reviewer": "phase5_final_independent_review",
+  "independent": true,
+  "run_id": "phase5-player-clarity-76bcd42d05",
+  "verdict": "pass",
+  "reviewed_images": [
+    "00-agent-review-instructions.png",
+    "01-overview-board-01.png",
+    "01-overview-board-02.png",
+    "03-camera-layer-matrix.png",
+    "03-state-viewport-matrix.png",
+    "04-accessibility-sheet-01.png",
+    "99-final-verdict-board.png"
+  ],
+  "packet_hashes": {
+    "00-agent-review-instructions.png": "a28073804ba5eabe634b65c530bfe2d613425ac8184794c628ccbcd0d7971e7e",
+    "01-overview-board-01.png": "2f62dae7211ce2822ffdff9bcd5c21479f2fbfcc58dcbc26662b6d71414abb8a",
+    "01-overview-board-02.png": "b27ccb940612f7a297978f6f1ddc0aefbb541a462a5fb80f85b6fa9d9021a20f",
+    "03-camera-layer-matrix.png": "3a9fbaed01f648515e9993db403843fb313c5c7e4eadfbde12067fd81bd6e2fe",
+    "03-state-viewport-matrix.png": "ff12e635d655507a1fc6a65604c7ec4c4bb5235672a08d7bb075580f390172ad",
+    "04-accessibility-sheet-01.png": "b5999f909c20871b677d2ed15dea0c4a8f4c438fe1df1c97936d31d136665849",
+    "99-final-verdict-board.png": "dd8f6027d17480bec0a7aef2f43f48effb753209ae9c6eec9c1e740336cbc910"
+  },
+  "reviewed_panel_ids": [
+    "P001",
+    "P002",
+    "P003",
+    "P004",
+    "P005",
+    "P006",
+    "P007",
+    "P008"
+  ],
+  "notes": "All seven hashes matched and every PNG was visually reviewed. P001-P008 are covered. No hard clipping, offscreen controls, overlap, missing or unreadable tutorial/settings controls, broken 150 percent layout, unclear terminology, or obvious broken states were observed. P003/P007 wager footers remain fully inside the viewport and usable. P004/P008 combat actors remain inset from arena edges. Below-fold content in compact tutorial/settings views has a visible scrollbar. The UNKNOWN verdict badge was not counted as a defect."
+}

@@ -1,5 +1,7 @@
 # Unit Art Unapproved Iteration - 2026-07-02
 
+> Mara naming note (2026-07-28): Mara is the current unit name. Remaining lower-case `cashmere` paths are pre-rename artifact provenance only, and the associated formal ledger-clad image is not current Mara art.
+
 ## Scope
 
 User request: iterate unapproved units first, leave new units for last, and keep Vellum as the primary veto anchor.
@@ -13,7 +15,7 @@ The original roster now has a latest current candidate recorded in `docs/art/uni
 New or refreshed review artifacts:
 
 - Berebell: `outputs/art_pipeline/style_validation/berebell_vellum_lore_alignment_2026_07_02/berebell_vellum_lore_alignment_v6_raw_candidate.png`
-- Cashmere: `outputs/art_pipeline/style_validation/cashmere_vellum_alignment_2026_07_01/cashmere_vellum_alignment_v3_raw_candidate.png`
+- Mara: `outputs/art_pipeline/style_validation/cashmere_vellum_alignment_2026_07_01/cashmere_vellum_alignment_v3_raw_candidate.png`
 - Mortem: `outputs/art_pipeline/style_validation/mortem_vellum_lore_alignment_2026_07_02/mortem_vellum_lore_alignment_v3_raw_candidate.png`
 - Nyxa: `outputs/art_pipeline/style_validation/nyxa_vellum_lore_alignment_2026_07_02/nyxa_vellum_lore_alignment_v3_raw_candidate.png`
 - Repo: `outputs/art_pipeline/style_validation/repo_vellum_lore_alignment_2026_07_02/repo_vellum_lore_alignment_v3_raw_candidate.png`
@@ -49,14 +51,14 @@ These are not approved and should not be used as live replacements without revie
 
 ## Image Generation Issue
 
-Native image generation worked for Berebell, Cashmere, Mortem, Nyxa, and Repo earlier in the pass.
+Native image generation worked for Berebell, Mara, Mortem, Nyxa, and Repo earlier in the pass.
 
 Later, it returned unrelated educational/infographic images for Creep and Grint prompts. Those outputs were discarded and not copied into the project. After that failure, only deterministic foreground-only matte-post fallback candidates were produced.
 
 ## Telegram Artifacts
 
 - Berebell sheet/raw: 455, 456
-- Cashmere sheet/raw: 457, 458
+- Mara sheet/raw: 457, 458
 - Mortem raw/sheet: 459, 460
 - Nyxa sheet/raw: 461, 462
 - Repo sheet/raw: 463, 464

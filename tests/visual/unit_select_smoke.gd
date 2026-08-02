@@ -3,6 +3,7 @@ extends Node
 const UNIT_SELECT_SCENE: PackedScene = preload("res://scenes/UnitSelect.tscn")
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
 const UnitCatalogScript := preload("res://scripts/game/shop/unit_catalog.gd")
+const AccountProgressionScript := preload("res://scripts/game/account/account_progression.gd")
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -19,6 +20,11 @@ func _run() -> void:
 	await get_tree().process_frame
 
 	var failures: Array[String] = []
+	var full_layout: HBoxContainer = view.get_node_or_null("Center/HBox") as HBoxContainer
+	_expect(full_layout != null, "Unit Select full layout missing", failures)
+	if full_layout != null:
+		_expect(absf(full_layout.size.x - 1320.0) <= 1.0, "Unit Select full layout must retain the authored 1320px width, got %s" % str(full_layout.size), failures)
+		_expect(_rect_inside(full_layout.get_global_rect(), view.get_viewport().get_visible_rect().grow(2.0)), "Unit Select full layout escaped the 1920x1080 viewport", failures)
 	var roster_plate: Panel = view.get_node_or_null("GothicRosterPlate") as Panel
 	_expect(roster_plate != null, "Roster gothic plate missing", failures)
 	if roster_plate != null:
@@ -27,8 +33,7 @@ func _run() -> void:
 	_expect(preview_plate != null, "Preview gothic plate missing", failures)
 	if preview_plate != null:
 		_expect(preview_plate.size.y > 300.0, "Preview gothic plate collapsed", failures)
-		var preview_plate_style: StyleBox = preview_plate.get_theme_stylebox("panel")
-		_expect(preview_plate_style is StyleBoxTexture, "Preview gothic plate should use the generated wide panel asset", failures)
+		_expect_flat_style_with_border(preview_plate, "panel", 6, "Preview dossier plate should retain its authored hard-left rule", failures)
 	var heading: Label = view.get_node_or_null("Center/HBox/Left/Label") as Label
 	_expect(heading != null, "Heading missing", failures)
 	if heading != null:
@@ -38,21 +43,25 @@ func _run() -> void:
 	if start_button != null:
 		_expect(start_button.disabled, "StartButton should begin disabled", failures)
 		_expect(start_button.custom_minimum_size.x >= 500.0, "StartButton width is not visually prioritized", failures)
-		_expect_texture_style(start_button, "normal", "Unit Select StartButton normal state should use the generated primary button asset", failures)
-		_expect_texture_style(start_button, "disabled", "Unit Select StartButton disabled state should use the generated primary button asset", failures)
+		_expect_flat_style_with_border(start_button, "normal", 5, "Unit Select StartButton normal state should retain its hardcore action stripe", failures)
+		_expect_flat_style_with_border(start_button, "disabled", 3, "Unit Select StartButton disabled state should retain a visible locked stripe", failures)
 	var art_plate: Panel = view.get_node_or_null("GothicArtPlate") as Panel
 	_expect(art_plate != null, "Preview art gothic plate missing", failures)
 	if art_plate != null:
-		_expect_texture_style(art_plate, "panel", "Preview art plate should use a generated texture frame", failures)
+		_expect_flat_style_with_border(art_plate, "panel", 3, "Preview art plate should retain its authored dossier frame", failures)
 	var selected_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/SelectedLabel") as Label
-	_expect(selected_label != null and selected_label.text == "No champion chosen", "Unit Select should begin with no inspected champion", failures)
+	_expect(selected_label != null and selected_label.text == "No starter chosen", "Unit Select should begin with no inspected starter", failures)
 	var details_scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll") as ScrollContainer
 	_expect(details_scroll != null, "Unit Select preview details should use a scrollable container", failures)
+	if details_scroll != null:
+		_expect(details_scroll.clip_contents, "Unit Select preview details must clip long targeting copy inside the scroll panel", failures)
 	var details_label: Label = view.get_node_or_null("Center/HBox/Right/Preview/DetailsScroll/Details") as Label
 	_expect(details_label != null and details_label.text == "Hover a unit to preview", "Unit Select should begin with neutral preview help", failures)
 	var initial_art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
 	_expect(initial_art != null and initial_art.texture == null, "Unit Select should begin without default preview art", failures)
+	var scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Left/Scroll") as ScrollContainer
 	_verify_rendered_starter_surface(view, failures)
+	_verify_card_chrome_contained(view, scroll, 16, "1920x1080", failures)
 	var sari_button: Button = _button_for_unit(view, "sari")
 	_expect(sari_button != null, "Sari starter button missing", failures)
 	if sari_button != null:
@@ -86,25 +95,37 @@ func _run() -> void:
 		_expect_texture_style(first_button, "normal", "Starter card normal state should use the generated 150x138 frame asset", failures)
 		_expect_texture_style(first_button, "hover", "Starter card hover state should use the generated 150x138 frame asset", failures)
 		_expect_texture_style(first_button, "pressed", "Starter card pressed state should use the generated 150x138 frame asset", failures)
-		_expect_focus_outline(first_button, "Starter card focus should preserve the underlying card state", failures)
+		_expect_texture_style(first_button, "focus", "Starter card focus should use the generated 150x138 focus asset", failures)
 		first_button.emit_signal("pressed")
 		await get_tree().process_frame
 		_expect(not start_button.disabled, "StartButton did not enable after unit selection", failures)
-		_expect(selected_label != null and selected_label.text != "No champion chosen", "Selection label did not update", failures)
+		_expect(selected_label != null and selected_label.text != "No starter chosen", "Selection label did not update", failures)
 		var art: TextureRect = view.get_node_or_null("Center/HBox/Right/Preview/ArtWrap/Art") as TextureRect
 		_expect(art != null and art.texture != null, "Preview art did not load", failures)
+		if details_scroll != null:
+			var help_label: Label = view.get_node_or_null("Center/HBox/Right/HelpLabel") as Label
+			var scroll_rect: Rect2 = details_scroll.get_global_rect()
+			var start_rect: Rect2 = start_button.get_global_rect()
+			_expect(help_label != null and not help_label.visible, "Selected starter should hide the redundant footer help row", failures)
+			_expect(
+				scroll_rect.end.y <= start_rect.position.y + 0.5,
+				"Preview details panel should end before Start Game (scroll_bottom=%.1f start_top=%.1f)" % [
+					scroll_rect.end.y,
+					start_rect.position.y
+				],
+				failures
+			)
 		view.reset_selection()
 		await get_tree().process_frame
 		_expect(start_button.disabled, "StartButton did not disable after reset_selection", failures)
 		_expect(view.selected_id == "", "selected_id did not clear after reset_selection", failures)
-		_expect(selected_label != null and selected_label.text == "No champion chosen", "Selection label did not reset", failures)
+		_expect(selected_label != null and selected_label.text == "No starter chosen", "Selection label did not reset", failures)
 		_expect(art != null and art.texture == null, "Preview art did not clear after reset_selection", failures)
 		var unit_id: String = String(first_button.get_meta("unit_id")) if first_button.has_meta("unit_id") else ""
 		if unit_id != "":
 			first_button.emit_signal("mouse_entered")
 			await get_tree().process_frame
-			_expect(selected_label != null and selected_label.text.begins_with("Inspecting "), "Hover preview did not show inspecting state", failures)
-			var scroll: ScrollContainer = view.get_node_or_null("Center/HBox/Left/Scroll") as ScrollContainer
+			_expect(selected_label != null and selected_label.text.begins_with("INSPECTING /// "), "Hover preview did not show inspecting state", failures)
 			var scroll_bar: VScrollBar = scroll.get_v_scroll_bar() if scroll != null else null
 			if scroll_bar != null and scroll_bar.max_value > scroll_bar.min_value:
 				var start_value: float = float(scroll.scroll_vertical)
@@ -118,7 +139,37 @@ func _run() -> void:
 					await get_tree().process_frame
 					await get_tree().process_frame
 					_expect(view.selected_id == "", "Scroll should not select a unit", failures)
-					_expect(selected_label != null and selected_label.text == "No champion chosen", "Scroll did not clear stale hover preview", failures)
+					_expect(selected_label != null and selected_label.text == "No starter chosen", "Scroll did not clear stale hover preview", failures)
+
+	if window != null:
+		window.size = Vector2i(1280, 720)
+		window.content_scale_size = Vector2i(1280, 720)
+	DisplayServer.window_set_size(Vector2i(1280, 720))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	view.call("_on_resized")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var compact_viewport: Rect2 = view.get_viewport().get_visible_rect()
+	var compact_layout: HBoxContainer = view.get_node_or_null("Center/HBox") as HBoxContainer
+	var compact_dossier_mark: Label = view.get_node_or_null("StarterRegistrationMarks/TopMark") as Label
+	_expect(compact_layout != null and _rect_inside(compact_layout.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter layout escaped the viewport", failures)
+	_expect(heading != null and _rect_inside(heading.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 starter heading escaped the viewport", failures)
+	_expect(start_button != null and _rect_inside(start_button.get_global_rect(), compact_viewport.grow(2.0)), "1280x720 Start Game escaped the viewport", failures)
+	if compact_dossier_mark != null:
+		var menu_reserved_right: float = float(compact_dossier_mark.get_meta("global_menu_reserved_right_px", 0.0))
+		var minimum_shell_gap: float = float(compact_dossier_mark.get_meta("minimum_shell_gap_px", 0.0))
+		var actual_shell_gap: float = compact_dossier_mark.position.x - menu_reserved_right
+		_expect(minimum_shell_gap >= 12.0, "1280x720 starter dossier mark should publish a 12px minimum Menu gap", failures)
+		_expect(actual_shell_gap >= minimum_shell_gap, "1280x720 starter dossier mark must clear SYS // MENU by at least %.1fpx, got %.1fpx" % [minimum_shell_gap, actual_shell_gap], failures)
+	else:
+		_expect(false, "1280x720 starter dossier mark missing", failures)
+	_verify_card_chrome_contained(view, scroll, 15, "1280x720", failures)
+	if start_button != null:
+		view.set_transition_pending(true)
+		_expect(start_button.text == "Preparing Battle...", "Preparing Battle must retain its explicit pending label", failures)
+		_expect_flat_style_with_border(start_button, "normal", 5, "Preparing Battle must retain the authored hardcore action surface", failures)
+		view.set_transition_pending(false)
 
 	if failures.size() > 0:
 		for failure: String in failures:
@@ -133,12 +184,39 @@ func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:
 		failures.append(message)
 
+func _verify_card_chrome_contained(view: UnitSelect, roster_scroll: ScrollContainer, minimum_role_size: int, viewport_label: String, failures: Array[String]) -> void:
+	if view == null or roster_scroll == null:
+		failures.append("%s starter chrome containment prerequisites missing" % viewport_label)
+		return
+	var scroll_rect: Rect2 = roster_scroll.get_global_rect().grow(1.0)
+	for node: Node in view.find_children("UnitRole", "Label", true, false):
+		var role_label: Label = node as Label
+		if role_label == null:
+			continue
+		_expect(
+			_rect_inside(role_label.get_global_rect(), scroll_rect),
+			"%s role strip %s should remain fully inside the roster scroll shell" % [viewport_label, role_label.get_parent().name],
+			failures
+		)
+		_expect(
+			role_label.get_theme_font_size("font_size") >= minimum_role_size,
+			"%s role strip %s should remain readable at %dpx or larger" % [viewport_label, role_label.get_parent().name, minimum_role_size],
+			failures
+		)
+
 func _expect_texture_style(control: Control, style_name: String, message: String, failures: Array[String]) -> void:
 	if control == null:
 		failures.append(message)
 		return
 	var style: StyleBox = control.get_theme_stylebox(style_name)
 	_expect(style is StyleBoxTexture, message, failures)
+
+func _expect_flat_style_with_border(control: Control, style_name: String, minimum_left_border: int, message: String, failures: Array[String]) -> void:
+	if control == null:
+		failures.append(message)
+		return
+	var style: StyleBoxFlat = control.get_theme_stylebox(style_name) as StyleBoxFlat
+	_expect(style != null and style.border_width_left >= minimum_left_border, message, failures)
 
 func _expect_focus_outline(control: Control, message: String, failures: Array[String]) -> void:
 	if control == null:
@@ -159,7 +237,12 @@ func _first_label_child(parent: Control) -> Label:
 func _verify_rendered_starter_surface(view: UnitSelect, failures: Array[String]) -> void:
 	var catalog: UnitCatalog = UnitCatalogScript.new()
 	catalog.refresh()
-	var expected_ids: Array[String] = _sorted_string_copy(catalog.list_starter_ids(ShopConfig.STARTING_LEVEL))
+	var eligible_ids: Array[String] = _sorted_string_copy(catalog.list_starter_ids(ShopConfig.STARTING_LEVEL))
+	var unlocked_ids: Array[String] = AccountProgressionScript.unlocked_starter_ids(view.account_profile_path)
+	var expected_ids: Array[String] = []
+	for unit_id: String in eligible_ids:
+		if unlocked_ids.has(unit_id.to_lower()):
+			expected_ids.append(unit_id)
 	var rendered_ids: Array[String] = _rendered_unit_button_ids(view)
 	_expect_lists_equal("rendered starter ids", expected_ids, rendered_ids, failures)
 	_expect(not rendered_ids.has("hexeon"), "Hexeon should remain hidden from the level-1 starter picker", failures)
@@ -199,3 +282,6 @@ func _expect_lists_equal(label: String, expected: Array[String], actual: Array[S
 	var actual_text: String = ",".join(PackedStringArray(actual))
 	if expected_text != actual_text:
 		failures.append("%s expected [%s] got [%s]" % [label, expected_text, actual_text])
+
+func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
+	return outer.has_point(inner.position) and outer.has_point(inner.end)

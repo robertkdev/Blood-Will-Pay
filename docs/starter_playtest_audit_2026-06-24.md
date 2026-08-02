@@ -1,5 +1,7 @@
 # Gamble Battle Starter Playtest Audit - 2026-06-24
 
+> Legacy naming note (2026-07-28): this dated audit preserves the former display name `Cashmere`, retired technical IDs, exact probe names, captured arrays, and evidence filenames. The current unit is Mara. Do not reuse the retired name in current implementation or prose.
+
 Status: complete for the original 21-unit manual starter surface, with follow-up revalidation against the current branch. The current cost-tier branch exposes 12 level-1 starter-selectable units; the 9 cost-2 premium units and cost-3 Hexeon are no longer starter-visible at level 1. This document records real MCP-launched/manual UI play, external screenshot evidence captured from the MCP-launched debug window, supporting starter runner data, and later MCP validation after fixes landed. No gameplay code changes were made during the original manual audit.
 
 ## Evidence

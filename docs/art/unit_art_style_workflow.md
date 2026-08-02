@@ -1,6 +1,6 @@
-# Gamble Battle Unit Art Style Workflow
+# Blood Will Pay Unit Art Style Workflow
 
-This guide is the locked workflow for recreating existing Gamble Battle units and making new unit or gameplay assets that align with the current premium gothic direction.
+This guide is the locked workflow for recreating existing Blood Will Pay units and making new unit or gameplay assets that align with the current premium gothic direction.
 
 It is intentionally stricter than a normal prompt note. Future runs should start from this document, `docs/art/unit_art_prompt_cases.json`, and the proof ledger at `docs/art/unit_art_proof_matrix.json`, then record any new accepted or rejected proof before claiming the workflow is stronger.
 
@@ -106,7 +106,7 @@ For non-character assets:
 Start every character prompt from this contract, then add unit-specific identity:
 
 ```text
-Create a full-body centered Gamble Battle unit character in western dark gothic fantasy board-game art, about 10 percent grounded realism, premium tabletop-card painting, dry powder-matte skin, de-shined velvet cloth, dull aged metal, parchment, soot, ink, matte gouache, dry brush, high-detail matte gothic illustration, layered fabric, parchment, and dry edge wear, hand-painted surface breakup, Vellum-level dry detail richness, Paisley as secondary contrast context only, heavy occlusion shadows, clean readable game-board silhouette, flat solid safety-orange #f84401 background, no text, logo, watermark.
+Create a full-body centered Blood Will Pay unit character in western dark gothic fantasy board-game art, about 10 percent grounded realism, premium tabletop-card painting, dry powder-matte skin, de-shined velvet cloth, dull aged metal, parchment, soot, ink, matte gouache, dry brush, high-detail matte gothic illustration, layered fabric, parchment, and dry edge wear, hand-painted surface breakup, Vellum-level dry detail richness, Paisley as secondary contrast context only, heavy occlusion shadows, clean readable game-board silhouette, flat solid safety-orange #f84401 background, no text, logo, watermark.
 ```
 
 Add the hard matte goth gate near the top for every unit, especially tanks and weapon-heavy units:

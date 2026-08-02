@@ -1,5 +1,7 @@
 # Unit Art Alignment Rank - 2026-07-02
 
+> Mara naming note (2026-07-28): Mara is the current unit name. Any remaining lower-case `cashmere` filename or path below is retained only as pre-rename artifact provenance; the associated formal ledger-clad image is not approved as current Mara art.
+
 Scope: live `assets/units/*.png` only. This ranks the 51 current unit PNGs against the Vellum-led vision, not against gameplay value or implementation completeness.
 
 Reference rule: Vellum remains the off-list top anchor. Paisley is treated as intentional contrast, not as the material-style template.
@@ -65,7 +67,7 @@ Review artifact:
 | 42 | Totem | Fail current-live | Live art is still the clean tree/cyan-eye problem; the separate v26 research candidate would rank much higher. |
 | 43 | Velour | Fail current-live | Pretty and detailed, but too clean/blessed/heroic; not enough suffering or corruption. |
 | 44 | Miri | Fail current-live | Warm scholar/professor read, clean and charming rather than tragic or occult. |
-| 45 | Cashmere | Fail current-live | Modern clean suit with little world marking; does not read like this folklore setting. |
+| 45 | Mara | Fail current-live | Modern clean suit with little world marking; does not read like this folklore setting. |
 | 46 | Knoll | Fail current-live | Whimsical caricature merchant; too cartoon and too intact. |
 | 47 | Luna | Fail current-live | Bright cheerful pop/flower styling is almost opposite the shared world material. |
 | 48 | Korath (1) | Fail current-live | Clean white/gold heroic angel/armor language; too pristine and shiny. |
@@ -75,7 +77,7 @@ Review artifact:
 
 ## Immediate Rework Priority
 
-Highest rework priority is the bottom failure block, especially Volt, Veyra, Kythera, Korath, Luna, Knoll, Cashmere, Miri, Velour, and live Totem.
+Highest rework priority is the bottom failure block, especially Volt, Veyra, Kythera, Korath, Luna, Knoll, Mara, Miri, Velour, and live Totem.
 
 Do not use the middle mixed group as style anchors. The safest current live anchors are Omenry, Orielle, Saffron, Juno Vale, Sable, Nullora, Ravel, Ivara, Bastionne, and Vesper.
 

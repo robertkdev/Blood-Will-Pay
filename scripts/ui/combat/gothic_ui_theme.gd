@@ -2,7 +2,10 @@ extends Object
 class_name GothicUITheme
 
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const CombatVfxInstallerScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_installer.gd")
+const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const TITLE_WOODLAND_TEXTURE_PATH: String = "res://assets/ui/title/blood_will_pay_title_screen_4k.png"
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
 const COLOR_PANEL: Color = Color(0.050, 0.044, 0.056, 0.97)
@@ -11,7 +14,7 @@ const COLOR_PANEL_SOFT: Color = Color(0.090, 0.078, 0.090, 0.94)
 const COLOR_IRON: Color = Color(0.34, 0.33, 0.38, 0.90)
 const COLOR_IRON_DIM: Color = Color(0.16, 0.15, 0.18, 0.92)
 const COLOR_TEXT: Color = Color(0.90, 0.87, 0.80, 1.0)
-const COLOR_TEXT_MUTED: Color = Color(0.66, 0.62, 0.57, 1.0)
+const COLOR_TEXT_MUTED: Color = Color(0.75, 0.71, 0.65, 1.0)
 const COLOR_BLOOD: Color = Color(0.55, 0.045, 0.085, 1.0)
 const COLOR_BLOOD_HOT: Color = Color(0.82, 0.075, 0.12, 1.0)
 const COLOR_GOLD: Color = Color(0.92, 0.68, 0.34, 1.0)
@@ -20,6 +23,867 @@ const COLOR_BLUE_STEEL: Color = Color(0.23, 0.31, 0.34, 1.0)
 const COLOR_PURPLE: Color = Color(0.32, 0.20, 0.42, 1.0)
 const COLOR_TILE_PLAYER: Color = Color(0.030, 0.040, 0.043, 0.90)
 const COLOR_TILE_ENEMY: Color = Color(0.080, 0.025, 0.034, 0.90)
+
+class ArenaEvidencePainter:
+	extends Control
+
+	var evidence_state: String = "onset"
+
+	func configure(next_state: String) -> void:
+		evidence_state = next_state
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_meta("physical_material_language", "wet_mud_pooled_crater_splintered_timber_torn_cloth")
+		set_meta("outlined_primitive_count", 0)
+		set_meta("straight_bar_count", 0)
+		set_meta("phase_evidence_signature", "breached_edges" if evidence_state == "onset" else "contaminated_crossfire" if evidence_state == "midfight" else "collapsed_perimeter" if evidence_state == "collapse" else "static_threat_lock")
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		match evidence_state:
+			"onset":
+				_draw_onset()
+			"midfight":
+				_draw_midfight()
+			"collapse":
+				_draw_collapse()
+			"reduced":
+				_draw_reduced()
+
+	func _draw_onset() -> void:
+		_draw_earthwork(
+			PackedVector2Array([
+				_point(0.00, 0.91),
+				_point(0.08, 0.87),
+				_point(0.18, 0.90),
+				_point(0.31, 0.86),
+				_point(0.42, 0.91),
+				_point(0.42, 1.00),
+				_point(0.00, 1.00),
+			]),
+			Color(0.16, 0.10, 0.065, 0.44),
+			Color(0.58, 0.36, 0.18, 0.30)
+		)
+		_draw_cart(Vector2(size.x * 0.12, size.y * 0.81), minf(size.x, size.y) * 0.052)
+		_draw_barricade(Vector2(size.x * 0.835, size.y * 0.18), Vector2(size.x * 0.14, size.y * 0.18), false)
+		_draw_crater(Vector2(size.x * 0.82, size.y * 0.78), Vector2(size.x * 0.075, size.y * 0.043), Color(0.10, 0.052, 0.030, 0.38))
+		_draw_ground_stain(
+			PackedVector2Array([
+				_point(0.68, 0.87),
+				_point(0.73, 0.84),
+				_point(0.79, 0.88),
+				_point(0.76, 0.92),
+				_point(0.70, 0.93),
+			]),
+			Color(0.27, 0.020, 0.016, 0.24)
+		)
+		_draw_torn_cloth(Vector2(size.x * 0.90, size.y * 0.69), Vector2(size.x * 0.034, size.y * 0.026), Color(0.29, 0.025, 0.025, 0.54), 0.3)
+		_draw_ash(Vector2(size.x * 0.04, size.y * 0.23), 5, 18.0)
+		_draw_ash(Vector2(size.x * 0.91, size.y * 0.43), 4, 14.0)
+
+	func _draw_midfight() -> void:
+		_draw_barricade(Vector2(size.x * 0.035, size.y * 0.34), Vector2(size.x * 0.13, size.y * 0.23), true)
+		_draw_barricade(Vector2(size.x * 0.835, size.y * 0.57), Vector2(size.x * 0.14, size.y * 0.23), false)
+		_draw_crater(Vector2(size.x * 0.24, size.y * 0.23), Vector2(size.x * 0.063, size.y * 0.040), Color(0.15, 0.055, 0.027, 0.42))
+		_draw_crater(Vector2(size.x * 0.71, size.y * 0.82), Vector2(size.x * 0.072, size.y * 0.045), Color(0.19, 0.035, 0.022, 0.44))
+		_draw_ground_stain(
+			PackedVector2Array([
+				_point(0.43, 0.74),
+				_point(0.455, 0.715),
+				_point(0.49, 0.723),
+				_point(0.515, 0.704),
+				_point(0.55, 0.731),
+				_point(0.575, 0.768),
+				_point(0.535, 0.782),
+				_point(0.505, 0.807),
+				_point(0.468, 0.787),
+				_point(0.442, 0.792),
+			]),
+			Color(0.29, 0.010, 0.012, 0.20)
+		)
+		_draw_torn_cloth(Vector2(size.x * 0.08, size.y * 0.72), Vector2(size.x * 0.046, size.y * 0.036), Color(0.34, 0.022, 0.022, 0.60), 1.1)
+		_draw_torn_cloth(Vector2(size.x * 0.91, size.y * 0.18), Vector2(size.x * 0.038, size.y * 0.030), Color(0.20, 0.055, 0.042, 0.52), 2.3)
+		_draw_timber(_point(0.17, 0.89), _point(0.34, 0.84), 9.0, Color(0.13, 0.070, 0.038, 0.82))
+		_draw_timber(_point(0.76, 0.13), _point(0.92, 0.10), 8.0, Color(0.12, 0.060, 0.034, 0.78))
+		_draw_smoke(Vector2(size.x * 0.075, size.y * 0.10), minf(size.x, size.y) * 0.060, Color(0.22, 0.19, 0.16, 0.18))
+		_draw_smoke(Vector2(size.x * 0.91, size.y * 0.30), minf(size.x, size.y) * 0.074, Color(0.19, 0.15, 0.14, 0.20))
+		_draw_ash(Vector2(size.x * 0.02, size.y * 0.63), 6, 22.0)
+		_draw_ash(Vector2(size.x * 0.88, size.y * 0.72), 7, 20.0)
+
+	func _draw_collapse() -> void:
+		_draw_earthwork(
+			PackedVector2Array([
+				_point(0.00, 0.84),
+				_point(0.10, 0.78),
+				_point(0.22, 0.82),
+				_point(0.32, 0.77),
+				_point(0.44, 0.85),
+				_point(0.56, 0.81),
+				_point(0.70, 0.87),
+				_point(0.84, 0.80),
+				_point(1.00, 0.85),
+				_point(1.00, 1.00),
+				_point(0.00, 1.00),
+			]),
+			Color(0.11, 0.060, 0.043, 0.55),
+			Color(0.62, 0.17, 0.07, 0.24)
+		)
+		_draw_timber(_point(0.00, 0.16), _point(0.22, 0.07), 16.0, Color(0.045, 0.026, 0.022, 0.90))
+		_draw_timber(_point(0.78, 0.08), _point(1.00, 0.20), 18.0, Color(0.040, 0.022, 0.020, 0.92))
+		_draw_timber(_point(0.02, 0.21), _point(0.16, 0.30), 9.0, Color(0.11, 0.055, 0.030, 0.82))
+		_draw_timber(_point(0.84, 0.29), _point(0.98, 0.17), 10.0, Color(0.10, 0.050, 0.028, 0.84))
+		_draw_crater(Vector2(size.x * 0.50, size.y * 0.87), Vector2(size.x * 0.12, size.y * 0.065), Color(0.19, 0.015, 0.016, 0.50))
+		_draw_torn_cloth(Vector2(size.x * 0.76, size.y * 0.76), Vector2(size.x * 0.065, size.y * 0.045), Color(0.27, 0.018, 0.020, 0.66), 0.8)
+		_draw_smoke(Vector2(size.x * 0.11, size.y * 0.19), minf(size.x, size.y) * 0.090, Color(0.14, 0.12, 0.11, 0.18))
+		_draw_smoke(Vector2(size.x * 0.88, size.y * 0.18), minf(size.x, size.y) * 0.105, Color(0.15, 0.11, 0.11, 0.20))
+		_draw_ash(Vector2(size.x * 0.04, size.y * 0.48), 8, 28.0)
+		_draw_ash(Vector2(size.x * 0.88, size.y * 0.57), 8, 26.0)
+
+	func _draw_reduced() -> void:
+		_draw_earthwork(
+			PackedVector2Array([
+				_point(0.00, 0.94),
+				_point(0.16, 0.90),
+				_point(0.33, 0.94),
+				_point(0.50, 0.91),
+				_point(0.67, 0.95),
+				_point(0.84, 0.91),
+				_point(1.00, 0.94),
+				_point(1.00, 1.00),
+				_point(0.00, 1.00),
+			]),
+			Color(0.20, 0.16, 0.12, 0.28),
+			Color(0.68, 0.52, 0.32, 0.16)
+		)
+		_draw_crater(Vector2(size.x * 0.84, size.y * 0.84), Vector2(size.x * 0.055, size.y * 0.030), Color(0.12, 0.080, 0.052, 0.28))
+		_draw_timber(_point(0.04, 0.87), _point(0.16, 0.82), 7.0, Color(0.20, 0.13, 0.075, 0.48))
+		_draw_torn_cloth(Vector2(size.x * 0.89, size.y * 0.70), Vector2(size.x * 0.038, size.y * 0.028), Color(0.24, 0.028, 0.028, 0.50), 1.7)
+		_draw_ash(Vector2(size.x * 0.02, size.y * 0.27), 3, 12.0)
+		_draw_ash(Vector2(size.x * 0.92, size.y * 0.51), 3, 12.0)
+
+	func _point(x_ratio: float, y_ratio: float) -> Vector2:
+		return Vector2(size.x * x_ratio, size.y * y_ratio)
+
+	func _irregular_ellipse(center: Vector2, radii: Vector2, steps: int, phase: float) -> PackedVector2Array:
+		var points: PackedVector2Array = PackedVector2Array()
+		for index: int in range(steps):
+			var angle: float = TAU * float(index) / float(steps)
+			var wobble: float = 1.0 + sin(float(index) * 2.37 + phase) * 0.10 + cos(float(index) * 1.21 + phase * 0.7) * 0.055
+			points.append(center + Vector2(cos(angle) * radii.x * wobble, sin(angle) * radii.y * wobble))
+		return points
+
+	func _closed(points: PackedVector2Array) -> PackedVector2Array:
+		var closed_points: PackedVector2Array = points.duplicate()
+		if not closed_points.is_empty():
+			closed_points.append(closed_points[0])
+		return closed_points
+
+	func _draw_earthwork(points: PackedVector2Array, fill: Color, edge: Color) -> void:
+		draw_colored_polygon(points, fill)
+		if points.size() >= 4:
+			var lower_edge: PackedVector2Array = PackedVector2Array()
+			for point_index: int in range(1, points.size()):
+				if points[point_index].y >= size.y * 0.72:
+					lower_edge.append(points[point_index])
+			if lower_edge.size() >= 2:
+				draw_polyline(lower_edge, Color(edge.r, edge.g, edge.b, edge.a * 0.46), 2.0, true)
+
+	func _draw_ground_stain(points: PackedVector2Array, fill: Color) -> void:
+		draw_colored_polygon(points, fill)
+		var pooled: PackedVector2Array = PackedVector2Array()
+		var center: Vector2 = Vector2.ZERO
+		for point: Vector2 in points:
+			center += point
+		if not points.is_empty():
+			center /= float(points.size())
+		for point: Vector2 in points:
+			pooled.append(center.lerp(point, 0.64) + Vector2(2.0, 2.0))
+		if pooled.size() >= 3:
+			draw_colored_polygon(pooled, Color(fill.r * 0.42, fill.g * 0.34, fill.b * 0.36, fill.a * 0.72))
+
+	func _draw_timber(from: Vector2, to: Vector2, width: float, color: Color) -> void:
+		var length: float = from.distance_to(to)
+		if length <= 1.0:
+			return
+		var direction: Vector2 = (to - from) / length
+		var normal: Vector2 = Vector2(-direction.y, direction.x)
+		var shadow: PackedVector2Array = PackedVector2Array([
+			from - normal * width * 0.74 - direction * width * 0.42,
+			from + normal * width * 0.62 - direction * width * 0.18,
+			to + normal * width * 0.48 + direction * width * 0.52,
+			to - normal * width * 0.66 + direction * width * 0.22,
+		])
+		draw_colored_polygon(shadow, Color(0.012, 0.007, 0.006, minf(0.88, color.a + 0.08)))
+		var body: PackedVector2Array = PackedVector2Array([
+			from - normal * width * 0.46,
+			from + normal * width * 0.42,
+			from + direction * length * 0.43 + normal * width * 0.56,
+			to + normal * width * 0.30,
+			to + direction * width * 0.68,
+			to - normal * width * 0.48,
+			from + direction * length * 0.57 - normal * width * 0.58,
+		])
+		draw_colored_polygon(body, color)
+		draw_line(from + direction * length * 0.12 + normal * width * 0.08, to - direction * length * 0.16 + normal * width * 0.02, Color(0.50, 0.25, 0.11, color.a * 0.34), 1.4, true)
+		draw_line(to - direction * width * 0.18, to + direction * width * 0.88 + normal * width * 0.72, Color(0.055, 0.024, 0.014, color.a), maxf(2.0, width * 0.25), true)
+
+	func _draw_cart(center: Vector2, radius: float) -> void:
+		var rim: Color = Color(0.22, 0.12, 0.060, 0.82)
+		var iron: Color = Color(0.10, 0.075, 0.060, 0.86)
+		var wheel: PackedVector2Array = _irregular_ellipse(center, Vector2(radius, radius * 0.86), 18, 1.4)
+		var hub: PackedVector2Array = _irregular_ellipse(center + Vector2(radius * 0.10, radius * 0.06), Vector2(radius * 0.20, radius * 0.16), 10, 0.2)
+		draw_colored_polygon(wheel, Color(0.025, 0.018, 0.014, 0.48))
+		draw_colored_polygon(hub, iron)
+		for spoke_index: int in [0, 1, 3, 5, 6]:
+			var angle: float = TAU * float(spoke_index) / 8.0
+			draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius * 0.78, rim, 2.5, true)
+		_draw_timber(center + Vector2(-radius * 1.4, -radius * 0.45), center + Vector2(radius * 2.35, -radius * 0.88), 10.0, Color(0.17, 0.085, 0.040, 0.82))
+		_draw_timber(center + Vector2(radius * 0.75, -radius * 0.68), center + Vector2(radius * 3.20, -radius * 1.55), 6.0, Color(0.14, 0.070, 0.036, 0.78))
+
+	func _draw_barricade(origin: Vector2, extent: Vector2, lean_left: bool) -> void:
+		var timber: Color = Color(0.16, 0.082, 0.040, 0.82)
+		var shadow: Color = Color(0.040, 0.022, 0.018, 0.88)
+		var lean: float = -1.0 if lean_left else 1.0
+		for post_index: int in range(3):
+			var x_value: float = origin.x + extent.x * (0.18 + float(post_index) * 0.31)
+			var top: Vector2 = Vector2(x_value + lean * extent.x * 0.04, origin.y)
+			var bottom: Vector2 = Vector2(x_value - lean * extent.x * 0.03, origin.y + extent.y)
+			_draw_timber(top, bottom, 8.0 if post_index != 1 else 10.0, timber)
+			draw_line(top - Vector2(5.0, 0.0), top + Vector2(3.0, -12.0), shadow, 3.0, true)
+		_draw_timber(origin + Vector2(0.0, extent.y * 0.35), origin + Vector2(extent.x, extent.y * 0.58), 9.0, timber)
+		_draw_timber(origin + Vector2(extent.x * 0.12, extent.y * 0.76), origin + Vector2(extent.x * 0.83, extent.y * 0.18), 7.0, Color(0.13, 0.065, 0.034, 0.78))
+
+	func _draw_crater(center: Vector2, radii: Vector2, fill: Color) -> void:
+		var outer: PackedVector2Array = _irregular_ellipse(center, radii, 28, 0.35)
+		var inner: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.06, radii.y * 0.08), radii * 0.60, 24, 1.75)
+		draw_colored_polygon(outer, fill)
+		draw_colored_polygon(inner, Color(0.014, 0.010, 0.011, fill.a * 0.86))
+		var water: PackedVector2Array = _irregular_ellipse(center + Vector2(radii.x * 0.12, radii.y * 0.16), radii * Vector2(0.40, 0.26), 18, 2.6)
+		draw_colored_polygon(water, Color(0.14, 0.13, 0.12, fill.a * 0.26))
+		for debris_index: int in range(7):
+			var angle: float = TAU * float(debris_index) / 7.0 + 0.31
+			var clod_center: Vector2 = center + Vector2(cos(angle) * radii.x * (0.92 + float(debris_index % 3) * 0.10), sin(angle) * radii.y * (0.92 + float(debris_index % 3) * 0.10))
+			var clod: PackedVector2Array = _irregular_ellipse(clod_center, Vector2(radii.x * 0.10, radii.y * 0.16), 9, angle)
+			draw_colored_polygon(clod, Color(0.20, 0.105, 0.052, fill.a * 0.40))
+
+	func _draw_torn_cloth(center: Vector2, extent: Vector2, color: Color, phase: float) -> void:
+		var points: PackedVector2Array = PackedVector2Array([
+			center + Vector2(-extent.x, -extent.y * 0.32),
+			center + Vector2(-extent.x * 0.42, -extent.y),
+			center + Vector2(extent.x * 0.18, -extent.y * (0.60 + sin(phase) * 0.12)),
+			center + Vector2(extent.x, -extent.y * 0.14),
+			center + Vector2(extent.x * 0.54, extent.y * 0.72),
+			center + Vector2(-extent.x * 0.08, extent.y * 0.46),
+			center + Vector2(-extent.x * 0.72, extent.y),
+		])
+		draw_colored_polygon(points, color)
+		draw_line(points[1], points[4], Color(0.72, 0.34, 0.22, color.a * 0.24), 1.5, true)
+
+	func _draw_smoke(center: Vector2, radius: float, color: Color) -> void:
+		var offsets: Array[Vector2] = [
+			Vector2(-radius * 0.42, radius * 0.10),
+			Vector2(-radius * 0.16, -radius * 0.24),
+			Vector2(radius * 0.18, -radius * 0.40),
+			Vector2(radius * 0.42, -radius * 0.12),
+			Vector2(radius * 0.22, radius * 0.18),
+		]
+		for index: int in range(offsets.size()):
+			var puff_radius: float = radius * (0.42 + float(index % 3) * 0.08)
+			var puff_color: Color = Color(color.r, color.g, color.b, color.a * (0.78 + float(index % 2) * 0.16))
+			draw_circle(center + offsets[index], puff_radius, puff_color, true)
+
+	func _draw_ash(origin: Vector2, count: int, spread: float) -> void:
+		for index: int in range(count):
+			var offset: Vector2 = Vector2(float(index) * spread * 0.78, float((index * 7) % 5) * spread * 0.36)
+			var start: Vector2 = origin + offset
+			var finish: Vector2 = start + Vector2(5.0 + float(index % 3) * 3.0, -2.0 - float(index % 2) * 3.0)
+			draw_line(start, finish, Color(0.78, 0.68, 0.54, 0.26), 1.5, true)
+
+class PlanningFieldPainter:
+	extends Control
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_meta("planning_field_material", "wet_earth_broken_cover_wreckage_and_trench_lanes")
+		set_meta("planning_widescreen_composition", "anchored_landmarks_with_open_deployment_lanes")
+		set_meta("planning_diagram_primitives_suppressed", true)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		# A quiet floor lift makes the authored mud readable, then the fragments at
+		# the edges make the empty deployment board feel like a place under siege.
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.16, 0.085, 0.042, 0.16), true)
+		_draw_wreckage_cluster(Vector2(size.x * 0.10, size.y * 0.22), 0.95, false)
+		_draw_wreckage_cluster(Vector2(size.x * 0.88, size.y * 0.76), 1.15, true)
+		_draw_mud_lane(Vector2(size.x * 0.04, size.y * 0.72), Vector2(size.x * 0.31, size.y * 0.57), 0.46)
+		_draw_mud_lane(Vector2(size.x * 0.96, size.y * 0.31), Vector2(size.x * 0.70, size.y * 0.45), 0.38)
+		_draw_broken_cover(Vector2(size.x * 0.20, size.y * 0.90), 1.0, false)
+		_draw_broken_cover(Vector2(size.x * 0.78, size.y * 0.10), 0.92, true)
+
+	func _draw_mud_lane(from: Vector2, to: Vector2, alpha: float) -> void:
+		var direction: Vector2 = to - from
+		var normal: Vector2 = Vector2(-direction.y, direction.x).normalized()
+		for mark_index: int in range(4):
+			var fraction: float = (float(mark_index) + 0.2) / 4.4
+			var center: Vector2 = from.lerp(to, fraction) + normal * (18.0 if mark_index % 2 == 0 else -14.0)
+			draw_circle(center, 24.0 + float(mark_index % 2) * 8.0, Color(0.045, 0.020, 0.013, alpha), true)
+			draw_circle(center + Vector2(3.0, -2.0), 12.0, Color(0.34, 0.08, 0.035, alpha * 0.34), true)
+
+	func _draw_wreckage_cluster(anchor: Vector2, scale_factor: float, mirrored: bool) -> void:
+		var direction: float = -1.0 if mirrored else 1.0
+		var iron: Color = Color(0.075, 0.045, 0.028, 0.92)
+		var edge: Color = Color(0.43, 0.16, 0.06, 0.45)
+		draw_line(anchor + Vector2(-42.0 * direction, 28.0) * scale_factor, anchor + Vector2(66.0 * direction, -20.0) * scale_factor, iron, 18.0 * scale_factor, true)
+		draw_line(anchor + Vector2(-40.0 * direction, 24.0) * scale_factor, anchor + Vector2(62.0 * direction, -24.0) * scale_factor, edge, 3.0 * scale_factor, true)
+		var wheel_center: Vector2 = anchor + Vector2(4.0 * direction, 6.0) * scale_factor
+		var wheel_radius: float = 25.0 * scale_factor
+		draw_circle(wheel_center, wheel_radius, Color(0.035, 0.023, 0.016, 0.82), true)
+		draw_arc(wheel_center, wheel_radius, 0.0, TAU, 24, edge, 3.0 * scale_factor, true)
+		draw_arc(wheel_center, wheel_radius * 0.30, 0.0, TAU, 16, edge, 2.0 * scale_factor, true)
+		for spoke_index: int in range(6):
+			var spoke_angle: float = TAU * float(spoke_index) / 6.0 + 0.18
+			var spoke_inner: Vector2 = wheel_center + Vector2(cos(spoke_angle), sin(spoke_angle)) * wheel_radius * 0.30
+			var spoke_outer: Vector2 = wheel_center + Vector2(cos(spoke_angle), sin(spoke_angle)) * wheel_radius * 0.88
+			draw_line(spoke_inner, spoke_outer, edge, 2.0 * scale_factor, true)
+		for spar_index: int in range(3):
+			var base: Vector2 = anchor + Vector2((-28.0 + float(spar_index) * 27.0) * direction, 18.0) * scale_factor
+			draw_line(base, base + Vector2(18.0 * direction, -48.0 + float(spar_index % 2) * 16.0) * scale_factor, iron, 8.0 * scale_factor, true)
+
+	func _draw_broken_cover(anchor: Vector2, scale_factor: float, mirrored: bool) -> void:
+		var direction: float = -1.0 if mirrored else 1.0
+		var timber: Color = Color(0.10, 0.046, 0.022, 0.78)
+		for beam_index: int in range(3):
+			var origin: Vector2 = anchor + Vector2(float(beam_index) * 24.0 * direction, float(beam_index % 2) * 10.0) * scale_factor
+			draw_line(origin, origin + Vector2(46.0 * direction, -18.0 + float(beam_index) * 11.0) * scale_factor, timber, 11.0 * scale_factor, true)
+
+
+class CombatFocusPainter:
+	extends Control
+
+	var focus_rect: Rect2 = Rect2(0.20, 0.14, 0.60, 0.72)
+	var pressure_phase: int = 0
+	var reduced_motion: bool = false
+	var clash_source: Vector2 = Vector2.ZERO
+	var clash_target: Vector2 = Vector2.ZERO
+	var has_clash_pair: bool = false
+
+	func configure(next_phase: int, next_reduced_motion: bool) -> void:
+		pressure_phase = clampi(next_phase, 0, 2)
+		reduced_motion = next_reduced_motion
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_meta("focus_frame_mode", "combat_cluster_frame")
+		set_meta("focus_frame_phase", pressure_phase)
+		set_meta("focus_frame_reduced_motion", reduced_motion)
+		set_meta("focus_frame_purpose", "tighten_attention_around_live_engagement")
+		set_meta("focus_frame_visual_priority", "luminous_contact_zone_over_muted_perimeter")
+		queue_redraw()
+
+	func set_focus_rect(next_rect: Rect2) -> void:
+		focus_rect = next_rect
+		set_meta("focus_frame_rect", focus_rect)
+		queue_redraw()
+
+	func set_clash_pair(next_source: Vector2, next_target: Vector2) -> void:
+		clash_source = next_source
+		clash_target = next_target
+		has_clash_pair = next_source.distance_to(next_target) > 1.0
+		set_meta("focus_frame_clash_pair_active", has_clash_pair)
+		set_meta("focus_frame_clash_mode", "nearest_opposing_visual_anchor" if has_clash_pair else "none")
+		queue_redraw()
+
+	func clear_clash_pair() -> void:
+		has_clash_pair = false
+		set_meta("focus_frame_clash_pair_active", false)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		var frame_position: Vector2 = Vector2(focus_rect.position.x * size.x, focus_rect.position.y * size.y)
+		var frame_size: Vector2 = Vector2(focus_rect.size.x * size.x, focus_rect.size.y * size.y)
+		var frame_rect: Rect2 = Rect2(frame_position, frame_size)
+		# The contact must read at a glance from a living-room distance. Keep the
+		# broader grid available for tactics, but make its perimeter fall behind the
+		# immediate collision instead of competing with it as a flat diagram.
+		# Reduced-motion uses the same held physical composition, but leaves a little
+		# more of the outer grid legible so the static combat read never collapses
+		# into a featureless black field at a glance.
+		# Keep the outer board unmistakably subordinate, but never so crushed that
+		# movement lanes or the larger actor silhouettes read as a black void.
+		var edge_alpha: float = 0.26 if reduced_motion else 0.40 + float(pressure_phase) * 0.035
+		var shadow: Color = Color(0.0, 0.0, 0.0, edge_alpha)
+		if frame_rect.position.y > 0.0:
+			draw_rect(Rect2(0.0, 0.0, size.x, frame_rect.position.y), shadow, true)
+		if frame_rect.end.y < size.y:
+			draw_rect(Rect2(0.0, frame_rect.end.y, size.x, size.y - frame_rect.end.y), shadow, true)
+		if frame_rect.position.x > 0.0:
+			draw_rect(Rect2(0.0, frame_rect.position.y, frame_rect.position.x, frame_rect.size.y), shadow, true)
+		if frame_rect.end.x < size.x:
+			draw_rect(Rect2(frame_rect.end.x, frame_rect.position.y, size.x - frame_rect.end.x, frame_rect.size.y), shadow, true)
+		# A restrained, irregular lift beneath the fighters gives the violence a
+		# physical focal point without converting the board into a neon VFX field.
+		# Actors sit above this painter, so the warm wound in the ground separates
+		# silhouettes and health readouts from the surrounding mud and grid seams.
+		var impact_center: Vector2 = frame_rect.get_center()
+		var impact_width: float = frame_rect.size.x * (0.44 + float(pressure_phase) * 0.030)
+		var impact_height: float = frame_rect.size.y * (0.29 + float(pressure_phase) * 0.022)
+		var impact_footprint: PackedVector2Array = PackedVector2Array([
+			impact_center + Vector2(-impact_width, -impact_height * 0.12),
+			impact_center + Vector2(-impact_width * 0.58, -impact_height),
+			impact_center + Vector2(-impact_width * 0.06, -impact_height * 0.60),
+			impact_center + Vector2(impact_width * 0.54, -impact_height * 0.86),
+			impact_center + Vector2(impact_width, impact_height * 0.14),
+			impact_center + Vector2(impact_width * 0.42, impact_height),
+			impact_center + Vector2(-impact_width * 0.20, impact_height * 0.68),
+			impact_center + Vector2(-impact_width * 0.82, impact_height * 0.48),
+		])
+		var impact_fill: Color = Color(0.40, 0.14, 0.050, 0.24 if reduced_motion else 0.33 + float(pressure_phase) * 0.040)
+		draw_colored_polygon(impact_footprint, impact_fill)
+		var impact_core: Color = Color(0.78, 0.42, 0.14, 0.16 if reduced_motion else 0.22 + float(pressure_phase) * 0.030)
+		draw_circle(impact_center + Vector2(0.0, impact_height * 0.10), minf(impact_width, impact_height) * 0.76, impact_core, true)
+		if has_clash_pair:
+			var clash_distance: float = clash_source.distance_to(clash_target)
+			var clash_direction: Vector2 = (clash_target - clash_source).normalized()
+			var clash_normal: Vector2 = Vector2(-clash_direction.y, clash_direction.x)
+			var clash_inset: float = minf(62.0, clash_distance * 0.22)
+			var clash_start: Vector2 = clash_source + clash_direction * clash_inset
+			var clash_end: Vector2 = clash_target - clash_direction * clash_inset
+			var clash_midpoint: Vector2 = (clash_start + clash_end) * 0.5
+			# An exact, quiet wound makes the closest enemy pair read before the grid.
+			# It is static under reduced motion and lives entirely beneath actor layers.
+			draw_line(clash_start, clash_end, Color(0.12, 0.015, 0.010, 0.76), 24.0, true)
+			draw_line(clash_start, clash_end, Color(0.96, 0.24, 0.09, 0.68), 3.0, true)
+			draw_circle(clash_midpoint, minf(30.0, clash_distance * 0.12), Color(0.84, 0.13, 0.050, 0.30), true)
+			for scar_index: int in range(3):
+				var scar_shift: float = float(scar_index - 1) * 12.0
+				var scar_start: Vector2 = clash_midpoint - clash_direction * 24.0 + clash_normal * scar_shift
+				var scar_end: Vector2 = clash_midpoint + clash_direction * 24.0 - clash_normal * scar_shift * 0.36
+				draw_line(scar_start, scar_end, Color(1.0, 0.58, 0.18, 0.66), 2.0, true)
+		var impact_cut: Color = Color(0.94, 0.66, 0.29, 0.46 if reduced_motion else 0.62 + float(pressure_phase) * 0.06)
+		for cut_index: int in range(3):
+			var cut_offset: float = float(cut_index - 1) * impact_height * 0.44
+			var cut_start: Vector2 = impact_center + Vector2(-impact_width * (0.52 - float(cut_index) * 0.06), cut_offset)
+			var cut_end: Vector2 = impact_center + Vector2(impact_width * (0.38 + float(cut_index) * 0.08), cut_offset + impact_height * (0.10 if cut_index % 2 == 0 else -0.12))
+			draw_line(cut_start, cut_end, impact_cut, 2.0 + float(pressure_phase), true)
+		var frame_color: Color = Color(0.88, 0.48, 0.18, 0.42 + float(pressure_phase) * 0.08)
+		var line_width: float = 2.5 if reduced_motion else 3.0 + float(pressure_phase) * 0.8
+		var top_left: Vector2 = frame_rect.position
+		var top_right: Vector2 = Vector2(frame_rect.end.x, frame_rect.position.y)
+		var bottom_left: Vector2 = Vector2(frame_rect.position.x, frame_rect.end.y)
+		var bottom_right: Vector2 = frame_rect.end
+		var top_gap: float = frame_rect.size.x * 0.12
+		var side_gap: float = frame_rect.size.y * 0.14
+		draw_line(top_left, top_left + Vector2(frame_rect.size.x * 0.24, 0.0), frame_color, line_width, true)
+		draw_line(top_right - Vector2(frame_rect.size.x * 0.24, 0.0), top_right - Vector2(top_gap, 0.0), frame_color, line_width, true)
+		draw_line(bottom_left, bottom_left + Vector2(frame_rect.size.x * 0.18, 0.0), frame_color, line_width, true)
+		draw_line(bottom_right - Vector2(frame_rect.size.x * 0.18, 0.0), bottom_right - Vector2(top_gap, 0.0), frame_color, line_width, true)
+		draw_line(top_left, top_left + Vector2(0.0, frame_rect.size.y * 0.22), frame_color, line_width, true)
+		draw_line(bottom_left - Vector2(0.0, frame_rect.size.y * 0.22), bottom_left - Vector2(0.0, side_gap), frame_color, line_width, true)
+		draw_line(top_right, top_right + Vector2(0.0, frame_rect.size.y * 0.22), frame_color, line_width, true)
+		draw_line(bottom_right - Vector2(0.0, frame_rect.size.y * 0.22), bottom_right - Vector2(0.0, side_gap), frame_color, line_width, true)
+
+
+class ArenaPressurePainter:
+	extends Control
+
+	var pressure_phase: int = 0
+	var reduced_motion: bool = false
+	var casualty_pressure: float = 0.0
+	var casualty_event_index: int = 0
+	var elapsed_seconds: float = 0.0
+
+	func configure(next_phase: int, next_reduced_motion: bool, next_casualty_pressure: float, next_event_index: int) -> void:
+		pressure_phase = clampi(next_phase, 0, 2)
+		reduced_motion = next_reduced_motion
+		casualty_pressure = clampf(next_casualty_pressure, 0.0, 1.0)
+		casualty_event_index = maxi(0, next_event_index)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_process(not reduced_motion)
+		set_meta("pressure_phase", pressure_phase)
+		set_meta("reduced_motion", reduced_motion)
+		set_meta("casualty_event_index", casualty_event_index)
+		set_meta("bounded_edge_pressure", true)
+		# This is a deployment board, not a clean arena floor.  Preserve the cells,
+		# but reserve the centre for one readable material event rather than hiding
+		# every consequence at the perimeter.
+		set_meta("protected_center_rect", Rect2(0.28, 0.16, 0.44, 0.68))
+		set_meta("kinetic_mark_budget", 0)
+		set_meta("reduced_motion_scene_parity", "same_physical_field_static")
+		set_meta("full_field_warning_chevrons", false)
+		set_meta("pressure_visual_language", "central_collision_rupture_drag_residue")
+		set_meta("debug_primitives_suppressed", true)
+		set_meta("player_scale_evidence_count", 14 if reduced_motion else 8 + pressure_phase * 4)
+		set_meta("terrain_floor_lift", 0.74 if reduced_motion else 0.46 + float(pressure_phase) * 0.15)
+		set_meta("physical_lane_encroachment", "static_collision_aftermath_and_ruined_lanes" if reduced_motion else "breach_then_central_collision_and_ruined_lanes")
+		set_meta("central_collision_visible", pressure_phase >= 1 or reduced_motion)
+		set_meta("central_collision_read", "static_rupture_and_drag" if reduced_motion else "impact_crater_drag_and_residue" if pressure_phase >= 1 else "threatened_intact_ground")
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		elapsed_seconds = fposmod(elapsed_seconds + maxf(0.0, delta), 12.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		var motion_clock: float = 0.0 if reduced_motion else elapsed_seconds
+		# The authored raster is intentionally hostile and dark; this quiet warm lift
+		# makes its mud, stone, and bodies readable at a real 1080p player distance.
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.24, 0.12, 0.065, 0.27 + float(pressure_phase) * 0.070), true)
+		# The terrain texture and authored evidence painter carry the battlefield
+		# structure. Pressure adds only soft edge atmosphere and event-grounded
+		# residue; outline craters, rays, streaks, and ruler-straight fences made
+		# the field read as a debug overlay rather than a physical killing ground.
+		if pressure_phase == 0 and not reduced_motion:
+			_draw_onset_breach_warning()
+		else:
+			_draw_collision_rupture()
+		_draw_casualty_residue()
+		_draw_smoke_banks(motion_clock)
+		_draw_perimeter_consequence()
+		_draw_lane_barricades()
+		if pressure_phase >= 1:
+			# Escalation must change the ground itself, not merely tint the HUD.
+			# Keep the readable center clear while the perimeter caves inward with
+			# smoke, broken timber, breached trenches, and churned mud.
+			_draw_hostile_edge_light(motion_clock)
+			_draw_ground_ruts()
+			if reduced_motion:
+				_draw_static_urgent_substitute()
+
+	func _draw_onset_breach_warning() -> void:
+		# Onset carries displaced soil and splintered cover, not tactical polygons.
+		# The two short churn corridors point at the coming collision while leaving
+		# the deployment cells readable.
+		for bank_index: int in range(5):
+			var fraction: float = float(bank_index) / 4.0
+			var left_center: Vector2 = Vector2(size.x * lerpf(0.29, 0.43, fraction), size.y * lerpf(0.46, 0.49, fraction))
+			var right_center: Vector2 = Vector2(size.x * lerpf(0.71, 0.57, fraction), size.y * lerpf(0.55, 0.51, fraction))
+			var radius: float = 24.0 + float(bank_index % 2) * 11.0
+			draw_circle(left_center, radius, Color(0.11, 0.044, 0.022, 0.48), true)
+			draw_circle(right_center, radius, Color(0.15, 0.032, 0.020, 0.50), true)
+			draw_circle(left_center + Vector2(3.0, -3.0), radius * 0.44, Color(0.48, 0.16, 0.050, 0.20), true)
+		_draw_drag_gouge(Vector2(size.x * 0.18, size.y * 0.48), Vector2(size.x * 0.33, size.y * 0.46), 0.42)
+		_draw_drag_gouge(Vector2(size.x * 0.82, size.y * 0.53), Vector2(size.x * 0.67, size.y * 0.55), 0.42)
+
+	func _draw_collision_rupture() -> void:
+		# Keep the collision readable as damaged ground, not a translucent overlay.
+		# Local clod clusters, short kinked ruts, and recognisable wreckage replace
+		# the former field-width filled polygons.
+		var center: Vector2 = Vector2(size.x * 0.50, size.y * (0.54 if not reduced_motion else 0.50))
+		var width: float = size.x * (0.42 if not reduced_motion else 0.44)
+		var height: float = size.y * (0.26 if not reduced_motion else 0.28)
+		var clod_offsets: Array[Vector2] = [
+			Vector2(-0.82, -0.22), Vector2(-0.66, 0.35), Vector2(-0.48, -0.44),
+			Vector2(-0.30, 0.50), Vector2(-0.12, -0.32), Vector2(0.06, 0.34),
+			Vector2(0.24, -0.48), Vector2(0.42, 0.43), Vector2(0.61, -0.24),
+			Vector2(0.78, 0.20),
+		]
+		for clod_index: int in range(clod_offsets.size()):
+			var clod_offset: Vector2 = clod_offsets[clod_index]
+			var clod_center: Vector2 = center + Vector2(clod_offset.x * width, clod_offset.y * height)
+			var clod_radius: float = minf(size.x, size.y) * (0.024 + float(clod_index % 3) * 0.006)
+			var clod_patch: PackedVector2Array = _rupture_ring(
+				clod_center,
+				clod_radius * (1.25 + float(clod_index % 2) * 0.24),
+				clod_radius * (0.50 + float((clod_index + 1) % 3) * 0.10),
+				13,
+				float(clod_index) * 0.71
+			)
+			var clod_color: Color = Color(0.12, 0.043, 0.021, 0.56) if clod_index % 3 != 1 else Color(0.20, 0.030, 0.021, 0.48)
+			draw_colored_polygon(clod_patch, clod_color)
+			draw_circle(clod_center + Vector2(-clod_radius * 0.22, -clod_radius * 0.20), clod_radius * 0.32, Color(0.44, 0.14, 0.044, 0.30), true)
+		for scar_index: int in range(5):
+			var scar_center: Vector2 = center + Vector2((float(scar_index % 3) - 1.0) * width * 0.31, (float(scar_index / 3) - 1.0) * height * 0.34)
+			var scar_angle: float = -0.24 + float((scar_index * 5) % 7) * 0.075
+			var scar_length: float = width * (0.075 + float(scar_index % 3) * 0.018)
+			var scar_direction: Vector2 = Vector2(cos(scar_angle), sin(scar_angle))
+			var scar_start: Vector2 = scar_center - scar_direction * scar_length * 0.50
+			var scar_finish: Vector2 = scar_center + scar_direction * scar_length * 0.50
+			var scar_bend: Vector2 = scar_center + Vector2(0.0, (-4.0 if scar_index % 2 == 0 else 3.0))
+			draw_line(scar_start, scar_bend, Color(0.018, 0.008, 0.007, 0.62), 4.5 - float(scar_index % 2), true)
+			draw_line(scar_bend, scar_finish, Color(0.018, 0.008, 0.007, 0.62), 4.0, true)
+			draw_line(scar_start + Vector2(0.0, 2.0), scar_bend + Vector2(0.0, 2.0), Color(0.48, 0.15, 0.045, 0.20), 1.5, true)
+		_draw_drag_gouge(Vector2(size.x * 0.25, size.y * 0.47), center + Vector2(-width * 0.48, -height * 0.03), 0.58)
+		_draw_drag_gouge(Vector2(size.x * 0.75, size.y * 0.59), center + Vector2(width * 0.44, height * 0.16), 0.58)
+		_draw_collision_splinters(center, width, height)
+		var wreckage_scale: float = minf(size.x, size.y) * 0.055
+		_draw_wreckage_heap(center + Vector2(-width * 0.46, -height * 0.18), wreckage_scale, 1)
+		_draw_wreckage_heap(center + Vector2(width * 0.48, height * 0.20), wreckage_scale * 0.90, 3)
+
+	func _rupture_ring(center: Vector2, radius_x: float, radius_y: float, point_count: int, phase: float) -> PackedVector2Array:
+		var points: PackedVector2Array = PackedVector2Array()
+		for point_index: int in range(point_count):
+			var angle: float = TAU * float(point_index) / float(point_count)
+			var wobble: float = 0.78 + float((point_index * 7 + 3) % 6) * 0.065 + sin(angle * 3.0 + phase) * 0.045
+			points.append(center + Vector2(cos(angle) * radius_x * wobble, sin(angle) * radius_y * wobble))
+		return points
+
+	func _draw_drag_gouge(start: Vector2, finish: Vector2, intensity: float) -> void:
+		var direction: Vector2 = finish - start
+		var normal: Vector2 = Vector2(-direction.y, direction.x).normalized()
+		var direction_unit: Vector2 = direction.normalized()
+		var segment_length: float = direction.length() / 4.0 * 0.58
+		for gouge_index: int in range(4):
+			var fraction: float = (float(gouge_index) + 0.5) / 4.0
+			var segment_center: Vector2 = start.lerp(finish, fraction) + normal * (sin(float(gouge_index) * 1.9) * 7.0)
+			var segment_direction: Vector2 = direction_unit.rotated(sin(float(gouge_index) * 1.4) * 0.13)
+			var from: Vector2 = segment_center - segment_direction * segment_length * 0.5
+			var to: Vector2 = segment_center + segment_direction * segment_length * 0.5
+			draw_line(from, to, Color(0.018, 0.008, 0.008, 0.62 * intensity), 6.0, true)
+			draw_line(from + normal * 2.0, to + normal * 2.0, Color(0.62, 0.16, 0.052, 0.24 * intensity), 1.8, true)
+			draw_circle(segment_center + normal * 3.0, 4.0 + float(gouge_index % 2), Color(0.20, 0.070, 0.028, 0.42 * intensity), true)
+
+	func _draw_collision_splinters(center: Vector2, width: float, height: float) -> void:
+		var debris_offsets: Array[Vector2] = [
+			Vector2(-0.98, -0.52), Vector2(-0.75, 0.74), Vector2(-0.38, -0.92),
+			Vector2(0.42, 0.86), Vector2(0.78, -0.64), Vector2(1.02, 0.36),
+		]
+		for debris_index: int in range(debris_offsets.size()):
+			var debris_center: Vector2 = center + Vector2(debris_offsets[debris_index].x * width, debris_offsets[debris_index].y * height)
+			var direction: float = -1.0 if debris_index % 2 == 0 else 1.0
+			var beam_length: float = width * (0.10 + float(debris_index % 3) * 0.025)
+			draw_line(debris_center - Vector2(beam_length * 0.45, height * 0.07 * direction), debris_center + Vector2(beam_length * 0.55, height * 0.09 * direction), Color(0.055, 0.022, 0.014, 0.96), 11.0, true)
+			draw_line(debris_center - Vector2(beam_length * 0.40, height * 0.06 * direction), debris_center + Vector2(beam_length * 0.48, height * 0.08 * direction), Color(0.55, 0.18, 0.060, 0.46), 2.5, true)
+			for chip_index: int in range(3):
+				var chip_center: Vector2 = debris_center + Vector2((float(chip_index) - 1.0) * 18.0, (float((chip_index + debris_index) % 3) - 1.0) * 13.0)
+				draw_circle(chip_center, 5.0 + float(chip_index), Color(0.20, 0.070, 0.028, 0.76), true)
+
+	func _draw_perimeter_consequence() -> void:
+		# These are deliberately broad, physical silhouettes at player scale: broken
+		# wagon ribs, slagged bodies, and torn standards communicate a killing ground
+		# without consuming the board's central targeting lanes.
+		var evidence_count: int = 6 + pressure_phase * 2
+		if reduced_motion:
+			evidence_count = 8
+		var anchors: Array[Vector2] = [
+			Vector2(size.x * 0.105, size.y * 0.18), Vector2(size.x * 0.895, size.y * 0.80),
+			Vector2(size.x * 0.085, size.y * 0.72), Vector2(size.x * 0.92, size.y * 0.28),
+			Vector2(size.x * 0.20, size.y * 0.86), Vector2(size.x * 0.80, size.y * 0.14),
+			Vector2(size.x * 0.24, size.y * 0.34), Vector2(size.x * 0.76, size.y * 0.67),
+		]
+		for evidence_index: int in range(mini(evidence_count, anchors.size())):
+			var anchor: Vector2 = anchors[evidence_index]
+			var scale_factor: float = minf(size.x, size.y) * (0.038 + float(evidence_index % 2) * 0.010)
+			_draw_wreckage_heap(anchor, scale_factor, evidence_index)
+			if evidence_index % 2 == 0:
+				_draw_shattered_stake(anchor + Vector2(scale_factor * 0.45, -scale_factor * 0.55), scale_factor, evidence_index)
+
+	func _draw_lane_barricades() -> void:
+		var barricade_count: int = 6 if pressure_phase == 0 else 8
+		if reduced_motion:
+			barricade_count = 8
+		var anchors: Array[Vector2] = [
+			Vector2(size.x * 0.075, size.y * 0.33), Vector2(size.x * 0.925, size.y * 0.66),
+			Vector2(size.x * 0.14, size.y * 0.54), Vector2(size.x * 0.86, size.y * 0.44),
+			Vector2(size.x * 0.21, size.y * 0.80), Vector2(size.x * 0.79, size.y * 0.18),
+			Vector2(size.x * 0.20, size.y * 0.38), Vector2(size.x * 0.80, size.y * 0.62),
+		]
+		for barricade_index: int in range(barricade_count):
+			var from_left: bool = barricade_index % 2 == 0
+			_draw_crushed_barricade(anchors[barricade_index], from_left, barricade_index)
+
+	func _draw_crushed_barricade(anchor: Vector2, from_left: bool, variant: int) -> void:
+		var direction: float = 1.0 if from_left else -1.0
+		var span: float = minf(size.x, size.y) * (0.105 if variant < 2 else 0.080)
+		var thickness: float = minf(size.x, size.y) * 0.026
+		var root: Vector2 = anchor + Vector2(-direction * span * 0.78, thickness * 0.44)
+		var tip: Vector2 = anchor + Vector2(direction * span * 0.72, -thickness * 0.20)
+		draw_line(root, tip, Color(0.090, 0.035, 0.018, 0.94), thickness * 1.65, true)
+		draw_line(root + Vector2(0.0, -thickness * 0.18), tip + Vector2(0.0, -thickness * 0.18), Color(0.56, 0.22, 0.075, 0.76), maxf(3.0, thickness * 0.28), true)
+		for spar_index: int in range(3):
+			var fraction: float = 0.18 + float(spar_index) * 0.30
+			var spar_base: Vector2 = root.lerp(tip, fraction)
+			var spar_tip: Vector2 = spar_base + Vector2(direction * span * 0.12, -thickness * (2.6 + float(spar_index % 2)))
+			draw_line(spar_base, spar_tip, Color(0.13, 0.052, 0.025, 0.96), maxf(4.0, thickness * 0.38), true)
+			if spar_index == 1:
+				draw_circle(spar_tip + Vector2(direction * thickness * 0.35, thickness * 0.22), thickness * 0.56, Color(0.34, 0.035, 0.020, 0.78), true)
+
+	func _draw_wreckage_heap(center: Vector2, radius: float, variant: int) -> void:
+		var direction: float = -1.0 if variant % 2 == 0 else 1.0
+		var shadow: Color = Color(0.045, 0.020, 0.014, 0.92)
+		var edge: Color = Color(0.46, 0.14, 0.045, 0.50)
+		draw_circle(center + Vector2(radius * 0.08, radius * 0.18), radius * 0.62, Color(0.030, 0.014, 0.011, 0.70), true)
+		for beam_index: int in range(3):
+			var offset: Vector2 = Vector2((float(beam_index) - 1.0) * radius * 0.34, float(beam_index % 2) * radius * 0.18)
+			var beam_start: Vector2 = center + offset - Vector2(radius * 0.72 * direction, radius * 0.22)
+			var beam_finish: Vector2 = center + offset + Vector2(radius * 0.68 * direction, -radius * (0.34 - float(beam_index) * 0.10))
+			draw_line(beam_start, beam_finish, shadow, maxf(5.0, radius * 0.23), true)
+			draw_line(beam_start + Vector2(0.0, -2.0), beam_finish + Vector2(0.0, -2.0), edge, maxf(2.0, radius * 0.055), true)
+		if variant % 2 == 1:
+			var wheel_center: Vector2 = center + Vector2(radius * 0.24 * direction, radius * 0.06)
+			var wheel_radius: float = radius * 0.48
+			draw_circle(wheel_center, wheel_radius, Color(0.018, 0.010, 0.008, 0.82), true)
+			draw_arc(wheel_center, wheel_radius, 0.0, TAU, 20, edge, maxf(2.0, radius * 0.10), true)
+			for spoke_index: int in range(5):
+				var spoke_angle: float = TAU * float(spoke_index) / 5.0
+				draw_line(wheel_center, wheel_center + Vector2(cos(spoke_angle), sin(spoke_angle)) * wheel_radius * 0.88, edge, maxf(1.0, radius * 0.05), true)
+
+	func _draw_shattered_stake(origin: Vector2, length: float, variant: int) -> void:
+		var tilt: float = -0.32 if variant % 2 == 0 else 0.28
+		var top: Vector2 = origin + Vector2(length * tilt, -length * 1.35)
+		draw_line(origin, top, Color(0.11, 0.050, 0.026, 0.92), maxf(3.0, length * 0.18), true)
+		draw_line(origin + Vector2(0.0, length * 0.10), top + Vector2(length * 0.08, length * 0.18), Color(0.52, 0.20, 0.075, 0.44), maxf(1.0, length * 0.05), true)
+		var cloth: PackedVector2Array = PackedVector2Array([top, top + Vector2(length * 0.54, length * 0.22), top + Vector2(length * 0.22, length * 0.66), top + Vector2(-length * 0.08, length * 0.42)])
+		draw_colored_polygon(cloth, Color(0.34, 0.016, 0.020, 0.74))
+
+	func _draw_hostile_edge_light(motion_clock: float) -> void:
+		var phase_weight: float = float(pressure_phase) * 0.022
+		var breathing: float = 0.0 if reduced_motion else sin(motion_clock * 2.1) * 0.012
+		var inset: float = 0.095 + phase_weight + breathing
+		var edge_alpha: float = 0.22 if reduced_motion else 0.24 + float(pressure_phase) * 0.055
+		var west_bank_center: Vector2 = Vector2(size.x * (inset * 0.32), size.y * 0.46)
+		var east_bank_center: Vector2 = Vector2(size.x * (1.0 - inset * 0.30), size.y * 0.48)
+		for puff_index: int in range(5):
+			var y_offset: float = size.y * (-0.34 + float(puff_index) * 0.17)
+			var radius: float = minf(size.x, size.y) * (0.105 + float(puff_index % 2) * 0.025)
+			draw_circle(west_bank_center + Vector2(0.0, y_offset), radius, Color(0.025, 0.017, 0.016, edge_alpha), true)
+			draw_circle(east_bank_center + Vector2(0.0, -y_offset * 0.82), radius, Color(0.16, 0.018, 0.015, edge_alpha + 0.035), true)
+		_draw_broken_pressure_fence(Vector2(size.x * 0.018, size.y * 0.22), Vector2(size.x * 0.13, size.y * 0.30), true)
+		_draw_broken_pressure_fence(Vector2(size.x * 0.852, size.y * 0.53), Vector2(size.x * 0.13, size.y * 0.30), false)
+		if pressure_phase >= 1:
+			_draw_midfight_edge_breach(motion_clock)
+
+	func _draw_midfight_edge_breach(motion_clock: float) -> void:
+		var drift: float = 0.0 if reduced_motion else sin(motion_clock * 1.7) * 0.012
+		var density_bonus: float = float(pressure_phase - 1) * 0.05
+		for bank_index: int in range(3):
+			var west_center: Vector2 = Vector2(size.x * (0.018 + float(bank_index) * 0.036 + drift), size.y * (0.20 + float(bank_index) * 0.27))
+			var east_center: Vector2 = Vector2(size.x - west_center.x, size.y - west_center.y)
+			var bank_radius: float = minf(size.x, size.y) * (0.065 + float(bank_index) * 0.012)
+			draw_circle(west_center, bank_radius, Color(0.14, 0.11, 0.09, 0.20 + density_bonus), true)
+			draw_circle(east_center, bank_radius, Color(0.22, 0.035, 0.025, 0.22 + density_bonus), true)
+		# The breach is a collection of nearby churned-earth clumps, not a pair of
+		# full-width black guide lines that can be mistaken for UI decoration.
+		_draw_ground_clump(Vector2(size.x * 0.11, size.y * 0.46), minf(size.x, size.y) * 0.030, 7)
+		_draw_ground_clump(Vector2(size.x * 0.89, size.y * 0.54), minf(size.x, size.y) * 0.034, 8)
+
+	func _draw_broken_pressure_fence(origin: Vector2, extent: Vector2, lean_left: bool) -> void:
+		var lean: float = -1.0 if lean_left else 1.0
+		var timber: Color = Color(0.055, 0.026, 0.018, 0.90)
+		var edge: Color = Color(0.40, 0.16, 0.070, 0.36)
+		for post_index: int in range(3):
+			var x_value: float = origin.x + extent.x * (0.14 + float(post_index) * 0.36)
+			var top: Vector2 = Vector2(x_value + lean * extent.x * 0.06, origin.y + extent.y * (0.08 * float(post_index % 2)))
+			var bottom: Vector2 = Vector2(x_value - lean * extent.x * 0.03, origin.y + extent.y)
+			draw_line(top, bottom, timber, 12.0 if post_index == 1 else 8.0, true)
+			draw_line(top, bottom, edge, 2.0, true)
+		draw_line(origin + Vector2(0.0, extent.y * 0.42), origin + Vector2(extent.x, extent.y * 0.60), timber, 10.0, true)
+		draw_line(origin + Vector2(extent.x * 0.12, extent.y * 0.78), origin + Vector2(extent.x * 0.86, extent.y * 0.20), timber, 7.0, true)
+
+	func _draw_ground_ruts() -> void:
+		var rut_count: int = 3 if reduced_motion else 4 + pressure_phase * 2
+		for index: int in range(rut_count):
+			var side_sign: float = -1.0 if index % 2 == 0 else 1.0
+			var y_ratio: float = 0.70 + float(index % 3) * 0.075
+			var x_ratio: float = 0.12 + float(index % 3) * 0.055 if side_sign < 0.0 else 0.88 - float(index % 3) * 0.055
+			var center: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
+			_draw_ground_clump(center, minf(size.x, size.y) * (0.022 + float(index % 2) * 0.006), index + 12)
+
+	func _draw_ground_clump(center: Vector2, radius: float, variant: int) -> void:
+		var points: PackedVector2Array = PackedVector2Array()
+		for point_index: int in range(9):
+			var angle: float = TAU * float(point_index) / 9.0
+			var wobble: float = 0.72 + float((point_index * 5 + variant * 3) % 5) * 0.075
+			points.append(center + Vector2(cos(angle), sin(angle) * 0.56) * radius * wobble)
+		draw_colored_polygon(points, Color(0.022, 0.011, 0.008, 0.72))
+		for point_index: int in range(points.size()):
+			draw_line(points[point_index], points[(point_index + 1) % points.size()], Color(0.48, 0.15, 0.045, 0.25), maxf(1.5, radius * 0.065), true)
+		for chip_index: int in range(3):
+			var chip_center: Vector2 = center + Vector2((float(chip_index) - 1.0) * radius * 0.64, (float((chip_index + variant) % 3) - 1.0) * radius * 0.30)
+			draw_circle(chip_center, maxf(2.0, radius * (0.12 + float(chip_index % 2) * 0.05)), Color(0.32, 0.10, 0.030, 0.36), true)
+
+	func _draw_impact_scars() -> void:
+		var scar_centers: Array[Vector2] = [
+			Vector2(size.x * 0.17, size.y * 0.29),
+			Vector2(size.x * 0.83, size.y * 0.67),
+			Vector2(size.x * 0.11, size.y * 0.76),
+			Vector2(size.x * 0.90, size.y * 0.23),
+		]
+		var scar_count: int = 2 if reduced_motion else 2 + pressure_phase
+		for scar_index: int in range(scar_count):
+			var center: Vector2 = scar_centers[scar_index]
+			var radius: float = minf(size.x, size.y) * (0.035 + float(scar_index % 2) * 0.012)
+			draw_circle(center, radius, Color(0.012, 0.006, 0.006, 0.68), true)
+			draw_circle(center, radius, Color(0.78, 0.16, 0.045, 0.42), false, 4.0, true)
+			for ray_index: int in range(7):
+				var angle: float = TAU * float(ray_index) / 7.0 + float(scar_index) * 0.43
+				var start: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * 0.84
+				var finish: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius * (1.45 + float(ray_index % 3) * 0.18)
+				draw_line(start, finish, Color(0.65, 0.18, 0.06, 0.42), 2.0, true)
+
+	func _draw_casualty_residue() -> void:
+		var residue_count: int = mini(4, maxi(casualty_event_index, ceili(casualty_pressure * 4.0)))
+		for index: int in range(residue_count):
+			var left_side: bool = index % 2 == 0
+			var center: Vector2 = Vector2(
+				size.x * (0.21 - float(index) * 0.018 if left_side else 0.79 + float(index) * 0.012),
+				size.y * (0.54 + float((index * 3) % 4) * 0.075)
+			)
+			var radii: Vector2 = Vector2(size.x * (0.030 + float(index % 2) * 0.012), size.y * 0.014)
+			var residue_points: PackedVector2Array = PackedVector2Array()
+			for point_index: int in range(12):
+				var angle: float = TAU * float(point_index) / 12.0
+				var wobble: float = 0.86 + float((point_index * 5 + index) % 4) * 0.075
+				residue_points.append(center + Vector2(cos(angle) * radii.x * wobble, sin(angle) * radii.y * wobble))
+			draw_colored_polygon(residue_points, Color(0.17, 0.003, 0.008, 0.50))
+			draw_polyline(residue_points, Color(0.62, 0.035, 0.018, 0.30), 2.0, true)
+			draw_circle(center + Vector2(radii.x * 0.14, -radii.y * 0.12), maxf(2.0, radii.y * 0.26), Color(0.88, 0.16, 0.06, 0.16), true)
+
+	func _draw_smoke_banks(motion_clock: float) -> void:
+		var bank_count: int = 4 if pressure_phase == 0 else 7 if pressure_phase == 1 else 9
+		for index: int in range(bank_count):
+			var left_side: bool = index % 2 == 0
+			var cycle: float = fposmod(motion_clock * (0.18 + float(index % 3) * 0.035) + float(index) * 0.17, 1.0)
+			var x_ratio: float = 0.025 + float(index % 3) * 0.048 if left_side else 0.975 - float(index % 3) * 0.048
+			var y_ratio: float = 0.10 + fposmod(float(index) * 0.19 + cycle * 0.16, 0.78)
+			var center: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
+			var radius: float = minf(size.x, size.y) * (0.046 + float(index % 3) * 0.012 + float(pressure_phase) * 0.006)
+			var color: Color = Color(0.075, 0.062, 0.056, 0.31 + float(pressure_phase) * 0.050)
+			if not left_side:
+				color = Color(0.19, 0.050, 0.028, 0.32 + float(pressure_phase) * 0.060)
+			for puff_index: int in range(4):
+				var puff_angle: float = float(puff_index) * 1.71 + cycle * 0.8
+				var puff_center: Vector2 = center + Vector2(cos(puff_angle), sin(puff_angle)) * radius * 0.34
+				draw_circle(puff_center, radius * (0.54 + float(puff_index % 2) * 0.14), color, true)
+
+	func _draw_debris_streaks(motion_clock: float) -> void:
+		var streak_count: int = 5 if pressure_phase == 0 else 10 if pressure_phase == 1 else 13
+		for index: int in range(streak_count):
+			var left_to_right: bool = index % 2 == 0
+			var travel: float = fposmod(motion_clock * (0.42 + float(index % 4) * 0.065) + float(index) * 0.137, 1.0)
+			var edge_span: float = 0.24
+			var x_ratio: float = travel * edge_span if left_to_right else 1.0 - travel * edge_span
+			var y_ratio: float = 0.08 + fposmod(float(index) * 0.137, 0.82)
+			var direction: Vector2 = Vector2(1.0, -0.16) if left_to_right else Vector2(-1.0, 0.14)
+			var start: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
+			var streak_length: float = 42.0 + float(index % 5) * 13.0 + float(pressure_phase) * 14.0
+			var finish: Vector2 = start + direction * streak_length
+			draw_line(start, finish, Color(0.96, 0.52, 0.19, 0.62), 3.5 + float(index % 2), true)
+			draw_line(finish, finish + direction * 12.0, Color(0.18, 0.07, 0.035, 0.78), 5.0, true)
+
+	func _draw_static_urgent_substitute() -> void:
+		# Reduced Motion keeps the same breached field and consequence evidence.
+		# Only time-based drift, flash, shake, and flying debris are removed.
+		_draw_broken_pressure_fence(Vector2(size.x * 0.025, size.y * 0.56), Vector2(size.x * 0.12, size.y * 0.25), true)
+		_draw_broken_pressure_fence(Vector2(size.x * 0.855, size.y * 0.18), Vector2(size.x * 0.12, size.y * 0.25), false)
+		var west_crater: Vector2 = Vector2(size.x * 0.13, size.y * 0.29)
+		var east_crater: Vector2 = Vector2(size.x * 0.87, size.y * 0.73)
+		var crater_centers: Array[Vector2] = [west_crater, east_crater]
+		for crater_index: int in range(crater_centers.size()):
+			var crater_center: Vector2 = crater_centers[crater_index]
+			var crater_radius: float = minf(size.x, size.y) * 0.045
+			var crater_points: PackedVector2Array = PackedVector2Array()
+			for point_index: int in range(14):
+				var angle: float = TAU * float(point_index) / 14.0
+				var wobble: float = 0.72 + float((point_index * 5 + crater_index * 3) % 6) * 0.065
+				crater_points.append(crater_center + Vector2(cos(angle), sin(angle) * 0.58) * crater_radius * wobble)
+			draw_colored_polygon(crater_points, Color(0.018, 0.010, 0.009, 0.72))
+			for edge_index: int in range(0, crater_points.size() - 1, 2):
+				draw_line(crater_points[edge_index], crater_points[edge_index + 1], Color(0.56, 0.18, 0.070, 0.34), 3.0, true)
 
 static var _theme: Theme = null
 
@@ -39,6 +903,7 @@ static func _get_theme() -> Theme:
 		return _theme
 	_theme = Theme.new()
 	_theme.default_base_scale = 1.0
+	VisualTypeSystem.apply_theme(_theme)
 	_theme.set_color("font_color", "Label", COLOR_TEXT)
 	_theme.set_color("font_shadow_color", "Label", Color(0.0, 0.0, 0.0, 0.65))
 	_theme.set_color("default_color", "RichTextLabel", COLOR_TEXT_MUTED)
@@ -46,11 +911,11 @@ static func _get_theme() -> Theme:
 	_theme.set_color("font_hover_color", "Button", Color(1.0, 0.92, 0.82, 1.0))
 	_theme.set_color("font_pressed_color", "Button", Color(1.0, 0.84, 0.68, 1.0))
 	_theme.set_color("font_disabled_color", "Button", Color(0.62, 0.58, 0.52, 1.0))
-	_theme.set_stylebox("normal", "Button", _style(COLOR_PANEL_SOFT, COLOR_IRON, 1, 5))
-	_theme.set_stylebox("hover", "Button", _hover_style(Color(0.15, 0.10, 0.11, 0.98), COLOR_GOLD_HOT, 1, 5))
-	_theme.set_stylebox("pressed", "Button", _style(COLOR_PANEL_DEEP, COLOR_BLOOD_HOT, 1, 5))
-	_theme.set_stylebox("disabled", "Button", _style(Color(0.035, 0.032, 0.039, 0.82), Color(0.18, 0.17, 0.19, 0.86), 1, 5))
-	_theme.set_stylebox("focus", "Button", _focus_outline(5))
+	_theme.set_stylebox("normal", "Button", _style(COLOR_PANEL_SOFT, Color(0.48, 0.44, 0.39, 0.96), 2, 1))
+	_theme.set_stylebox("hover", "Button", _hover_style(Color(0.18, 0.075, 0.085, 0.98), COLOR_TEXT, 3, 1))
+	_theme.set_stylebox("pressed", "Button", _style(Color(0.25, 0.025, 0.045, 1.0), COLOR_BLOOD_HOT, 4, 1))
+	_theme.set_stylebox("disabled", "Button", _style(Color(0.040, 0.036, 0.042, 0.96), Color(0.30, 0.27, 0.28, 0.96), 2, 1))
+	_theme.set_stylebox("focus", "Button", _focus_outline(1))
 	_theme.set_color("font_color", "LineEdit", COLOR_TEXT)
 	_theme.set_color("font_placeholder_color", "LineEdit", COLOR_TEXT_MUTED)
 	_theme.set_stylebox("normal", "LineEdit", _style(COLOR_PANEL_DEEP, COLOR_IRON_DIM, 1, 4))
@@ -82,14 +947,32 @@ static func _apply_named_nodes(root: Control) -> void:
 	_configure_combat_layout(root)
 	_ensure_combat_vfx_installer(root)
 	_clear_battlefield_rect(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground")
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicPlanningTopSurface", GothicUIAssets.battlefield_top_texture(), -8, Color(0.94, 0.91, 0.86, 0.95))
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(0.92, 0.94, 0.90, 0.95))
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaSurface", GothicUIAssets.battlefield_texture(), -8, Color(1.16, 1.10, 1.04, 1.0))
-	_style_label(root, "MarginContainer/VBoxContainer/StageLabel", 34, COLOR_TEXT, true)
-	_style_label(root, "MarginContainer/VBoxContainer/PlanningTimerLabel", 18, COLOR_GOLD, true)
-	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/GoldLabel", 22, COLOR_GOLD, true)
-	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetLabel", 17, COLOR_TEXT_MUTED, false)
-	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetValue", 18, COLOR_TEXT, false)
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicPlanningTopSurface", GothicUIAssets.battlefield_top_texture(), -8, Color(0.98, 0.97, 0.94, 0.98))
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(0.98, 0.97, 0.94, 0.98))
+	_ensure_planning_pressure(root)
+	_ensure_planning_phase_geometry(root)
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaSurface", GothicUIAssets.battlefield_onset_texture(), -7, Color(1.0, 1.0, 1.0, 0.96))
+	var arena_surface: TextureRect = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
+	if arena_surface != null:
+		arena_surface.set_meta("battlefield_foundation", "muddy_rural_killing_ground_v1")
+		arena_surface.set_meta("physical_depth_language", "authored_raster_wet_mud_standing_water_embedded_splintered_wreckage")
+		arena_surface.set_meta("horror_lighting", "localized_practical_ember_cold_wet_field")
+		arena_surface.set_meta("active_material_phase", "onset")
+		arena_surface.set_meta("stable_landmark_base", true)
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaPressureSurface", GothicUIAssets.battlefield_midfight_texture(), -6, Color(1.0, 1.0, 1.0, 0.0))
+	var pressure_surface: TextureRect = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
+	if pressure_surface != null:
+		pressure_surface.visible = false
+		pressure_surface.set_meta("battlefield_escalation_layer", "landmark_aligned_authored_damage_and_smoke")
+		pressure_surface.set_meta("shares_camera_and_landmarks_with_base", true)
+	_ensure_arena_zone_guides(root)
+	_ensure_tactical_shell_marks(root)
+	_style_label(root, "MarginContainer/VBoxContainer/StageLabel", 42, COLOR_TEXT, true)
+	_style_label(root, "MarginContainer/VBoxContainer/PlanningTimerLabel", 21, COLOR_GOLD_HOT, true)
+	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/GoldLabel", 24, COLOR_GOLD, true)
+	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetLabel", 18, COLOR_TEXT, false)
+	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetValue", 20, COLOR_TEXT, false)
+	_style_label(root, "MarginContainer/VBoxContainer/WagerSummary", 20, COLOR_TEXT, true)
 	_style_label(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle", 18, COLOR_GOLD, true)
 	_style_label_by_name(root, "GoldLabel", 22, COLOR_GOLD, true)
 	_style_label_by_name(root, "BetLabel", 16, COLOR_TEXT_MUTED, false)
@@ -97,11 +980,11 @@ static func _apply_named_nodes(root: Control) -> void:
 	_style_button(root, "MarginContainer/VBoxContainer/ActionsRow/ContinueButton", true)
 	_style_button(root, "MarginContainer/VBoxContainer/ActionsRow/AttackButton", false)
 	_style_button(root, "TopBar/MenuButton", false)
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(340.0, 596.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(296.0, 596.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(296.0, 164.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(296.0, 398.0))
-	_set_min_size_by_name(root, "StatsPanel", Vector2(316.0, 560.0))
+	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(310.0, 596.0))
+	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(286.0, 596.0))
+	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(286.0, 164.0))
+	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(286.0, 398.0))
+	_set_min_size_by_name(root, "StatsPanel", Vector2(292.0, 560.0))
 	_set_min_size_by_name(root, "Scoreboard", Vector2(294.0, 430.0))
 	_set_min_size_by_name(root, "MetricTabs", Vector2(294.0, 52.0))
 	_set_min_size(root, "MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
@@ -121,21 +1004,35 @@ static func _apply_named_nodes(root: Control) -> void:
 	_add_grid_separator(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow", 10)
 	_add_grid_separator(root, "MarginContainer/VBoxContainer/BottomStorageArea", 10)
 	_style_shop_command_bar(root)
+	var actions_row: Control = root.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as Control
+	if actions_row != null:
+		_ensure_backplate_on_control(actions_row, "PlanningCommandRecordPlate", _hard_panel_style(Color(0.020, 0.016, 0.022, 0.96), Color(0.68, 0.055, 0.085, 0.88), true), -5)
+	var wager_controls: Control = root.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow/BetRow") as Control
+	if wager_controls != null:
+		wager_controls.set_meta("visual_role", "planning_utility_group")
+		_ensure_backplate_on_control(wager_controls, "PlanningUtilitiesPlate", _hard_panel_style(Color(0.032, 0.027, 0.032, 0.98), Color(0.54, 0.45, 0.32, 0.82), false), -5)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea", "GothicBattlePlate", _style(Color(0.016, 0.013, 0.018, 0.38), Color(0.23, 0.19, 0.18, 0.42), 1, 6), -20)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.050, 0.024, 0.024, 0.070), Color(0.42, 0.22, 0.16, 0.26), 1, 4), -5)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.026, 0.038, 0.036, 0.070), Color(0.34, 0.31, 0.22, 0.26), 1, 4), -5)
-	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.grid_panel_style(Color(0.86, 0.80, 0.76, 0.94)), _style(Color(0.034, 0.029, 0.038, 0.94), Color(0.34, 0.27, 0.27, 0.90), 1, 6)), 0, 8.0)
-	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.item_storage_panel_style(Color(0.94, 0.86, 0.78, 0.94)), _style(Color(0.030, 0.026, 0.034, 0.88), Color(0.20, 0.18, 0.20, 0.84), 1, 6)), 0, 8.0)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.traits_panel_style(Color(0.90, 0.82, 0.76, 0.94)), _style(Color(0.026, 0.023, 0.031, 0.94), Color(0.38, 0.28, 0.26, 0.86), 1, 6)), -2)
-	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BenchArea/BenchGrid", "GothicBenchPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.status_strip_style(Color(0.72, 0.68, 0.58, 0.72)), _style(Color(0.026, 0.023, 0.030, 0.78), Color(0.34, 0.27, 0.18, 0.58), 1, 5)), 0, 8.0)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.055, 0.018, 0.022, 0.08), Color(0.72, 0.07, 0.09, 0.88), 2, 1), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.032, 0.038, 0.036, 0.07), Color(0.72, 0.68, 0.58, 0.82), 2, 1), -5)
+	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.42, 0.40, 0.38, 0.72), false), 0, 8.0)
+	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.56, 0.52, 0.46, 0.62), false), 0, 8.0)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.42, 0.40, 0.38, 0.68), false), -2)
+	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BenchArea/BenchGrid", "GothicBenchPlate", _hard_panel_style(Color(0.018, 0.016, 0.020, 0.88), Color(0.72, 0.64, 0.52, 0.64), false), 0, 8.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/ActionsRow/GoldLabel", "GothicGoldPlate", _style(Color(0.085, 0.061, 0.033, 0.74), Color(0.78, 0.48, 0.20, 0.72), 1, 4), -5)
 	_ensure_backplate_by_name(root, "GoldLabel", "GothicGoldPlate", _style(Color(0.085, 0.061, 0.033, 0.76), Color(0.78, 0.48, 0.20, 0.76), 1, 4), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/WagerSummary", "GothicWagerSummaryPlate", _hard_panel_style(Color(0.018, 0.016, 0.020, 0.92), Color(0.68, 0.61, 0.50, 0.72), false), -5)
 	if opening_shop:
 		_hide_named_control(root, "GothicShopPlate")
 	else:
-		_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BottomStorageArea", "GothicShopPlate", GothicUIAssets.style_or_fallback(GothicUIAssets.wide_panel_style(), _style(Color(0.026, 0.022, 0.030, 0.96), Color(0.39, 0.29, 0.25, 0.90), 1, 6)), 0, 10.0)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaVignette", GothicUIAssets.style_or_fallback(GothicUIAssets.arena_frame_style(Color(0.82, 0.76, 0.68, 0.70)), _style(Color(0.0, 0.0, 0.0, 0.040), Color(0.56, 0.34, 0.18, 0.30), 1, 4)), -5)
+		_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BottomStorageArea", "GothicShopPlate", _hard_panel_style(Color(0.026, 0.022, 0.030, 0.96), Color(0.39, 0.29, 0.25, 0.90), true), 0, 6.0)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaVignette", _style(Color(0.0, 0.0, 0.0, 0.025), Color(0.58, 0.12, 0.13, 0.72), 3, 1), -5)
 	_remove_named_child(root, "GothicTimerPlate")
+	var stage_heading: Label = root.get_node_or_null("MarginContainer/VBoxContainer/StageLabel") as Label
+	if stage_heading != null:
+		VisualTypeSystem.set_impact(stage_heading)
+	var planning_timer: Label = root.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Label
+	if planning_timer != null:
+		VisualTypeSystem.set_utility_bold(planning_timer)
 
 static func _apply_tree(node: Node) -> void:
 	if node is Button:
@@ -178,9 +1075,13 @@ static func _apply_button_node(button: Button) -> void:
 	if button.name == "ContinueButton":
 		_style_button_node(button, true)
 		return
+	if _has_ancestor_named(button, "BetRow"):
+		_apply_flat_button_states(button, COLOR_BLOOD)
+		return
 	if button.name == "MenuButton":
 		button.custom_minimum_size = Vector2(76.0, 32.0)
-		button.add_theme_font_size_override("font_size", 14)
+		button.add_theme_font_size_override("font_size", 18)
+		VisualTypeSystem.set_utility_bold(button)
 		_style_button_node(button, false)
 		return
 	if button.name == "WindowAll" or button.name == "Window3s" or button.name == "ExpandButton":
@@ -195,56 +1096,72 @@ static func _apply_button_node(button: Button) -> void:
 	if button.name == "ShopCard" or _is_shop_card(button):
 		_style_shop_card(button)
 		return
-	button.custom_minimum_size.y = max(button.custom_minimum_size.y, 32.0)
-	button.add_theme_font_size_override("font_size", 15)
+	button.custom_minimum_size.y = max(button.custom_minimum_size.y, 38.0)
+	button.add_theme_font_size_override("font_size", 18)
+	VisualTypeSystem.set_utility_bold(button)
 
 static func _apply_label_node(label: Label) -> void:
 	if not label.has_theme_color_override("font_color"):
 		label.add_theme_color_override("font_color", COLOR_TEXT)
 	if label.name == "Title":
-		label.add_theme_font_size_override("font_size", 20)
+		label.add_theme_font_size_override("font_size", 24)
 		label.add_theme_color_override("font_color", COLOR_GOLD)
+		VisualTypeSystem.set_impact(label)
 	elif label.name == "Role" or label.name == "RoleBadge":
-		label.add_theme_font_size_override("font_size", 13)
+		label.add_theme_font_size_override("font_size", 16)
 		label.add_theme_color_override("font_color", Color(0.78, 0.73, 0.66, 1.0))
+		VisualTypeSystem.set_action_medium(label)
 	elif label.name == "Name":
-		label.add_theme_font_size_override("font_size", 15)
+		label.add_theme_font_size_override("font_size", 18)
 		label.add_theme_color_override("font_color", COLOR_TEXT)
+		VisualTypeSystem.set_utility_bold(label)
 	elif label.name == "Price":
-		label.add_theme_font_size_override("font_size", 14)
-		label.add_theme_color_override("font_color", COLOR_GOLD)
+		label.add_theme_font_size_override("font_size", 19)
+		label.add_theme_color_override("font_color", COLOR_GOLD_HOT)
+		VisualTypeSystem.set_utility_bold(label)
 	elif label.name == "GoalLabel":
-		label.add_theme_font_size_override("font_size", 12)
+		label.add_theme_font_size_override("font_size", 16)
 		label.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	elif label.name == "GoldLabel":
-		_style_label_node(label, 22, COLOR_GOLD, true)
+		_style_label_node(label, 24, COLOR_GOLD, true)
 		label.custom_minimum_size = Vector2(112.0, 44.0)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	elif label.name == "BetLabel":
-		_style_label_node(label, 16, COLOR_TEXT_MUTED, false)
+		_style_label_node(label, 18, COLOR_TEXT, false)
+		VisualTypeSystem.set_utility_bold(label)
 	elif label.name == "BetValue":
-		_style_label_node(label, 17, COLOR_TEXT, false)
+		_style_label_node(label, 20, COLOR_TEXT, false)
+		VisualTypeSystem.set_utility_bold(label)
 		label.custom_minimum_size.x = 34.0
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	elif label.name == "BoardTimerLabel" or label.name == "BoardCapacityLabel" or label.name == "WinOddsLabel":
-		_style_label_node(label, 15, Color(0.96, 0.82, 0.56, 1.0), true)
-		var status_width: float = 116.0 if label.name == "BoardTimerLabel" or label.name == "BoardCapacityLabel" else 142.0
+	elif label.name == "BoardPhaseLabel" or label.name == "BoardTimerLabel" or label.name == "BoardCapacityLabel" or label.name == "WinOddsLabel":
+		_style_label_node(label, 20, Color(0.98, 0.87, 0.66, 1.0), true)
+		VisualTypeSystem.set_utility_bold(label)
+		var status_width: float = 120.0 if label.name != "WinOddsLabel" else 148.0
 		label.custom_minimum_size = Vector2(status_width, 26.0)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	elif label.name == "PlanningTimerLabel":
 		_style_label_node(label, 21, COLOR_GOLD_HOT, true)
+		VisualTypeSystem.set_utility_bold(label)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	elif _has_ancestor_named(label, "StatsPanel") or _has_ancestor_named(label, "Scoreboard"):
 		if label.name == "Title":
 			_style_label_node(label, 22, COLOR_GOLD, true)
 		else:
-			_style_label_node(label, 14, COLOR_TEXT, false)
+			_style_label_node(label, 18, Color(0.95, 0.91, 0.83, 1.0), false)
+			VisualTypeSystem.set_utility_bold(label)
+	elif _has_ancestor_named(label, "TraitsPanel"):
+		_style_label_node(label, max(17, label.get_theme_font_size("font_size")), Color(0.94, 0.90, 0.82, 1.0), false)
+		VisualTypeSystem.set_utility_bold(label)
+	elif _has_ancestor_named(label, "StageProgressTopBar"):
+		VisualTypeSystem.set_utility_bold(label)
 
 static func _apply_rich_text(text: RichTextLabel) -> void:
 	text.add_theme_color_override("default_color", COLOR_TEXT_MUTED)
-	text.add_theme_font_size_override("normal_font_size", 14)
+	text.add_theme_font_size_override("normal_font_size", 18)
+	VisualTypeSystem.set_utility(text)
 	text.scroll_following = true
 
 static func _apply_panel_container(panel: PanelContainer) -> void:
@@ -255,7 +1172,7 @@ static func _apply_hbox_container(box: HBoxContainer) -> void:
 	if box.name == "BoardStatusRow":
 		box.alignment = BoxContainer.ALIGNMENT_CENTER
 		box.add_theme_constant_override("separation", 8)
-		box.custom_minimum_size = Vector2(414.0, 28.0)
+		box.custom_minimum_size = Vector2(540.0, 34.0)
 		return
 	if box.get_parent() != null and box.get_parent().name == "BottomStorageArea":
 		box.add_theme_constant_override("separation", 14)
@@ -302,73 +1219,81 @@ static func _apply_color_rect(rect: ColorRect) -> void:
 
 static func _apply_tile(button: Button, is_player: bool) -> void:
 	var bg_color: Color = COLOR_TILE_PLAYER if is_player else COLOR_TILE_ENEMY
-	var border_color: Color = Color(0.30, 0.38, 0.34, 0.52) if is_player else Color(0.42, 0.16, 0.12, 0.52)
+	var cell_index: int = int(String(button.name).get_slice("_", 1))
+	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
+	bg_color.a = 0.52 if strong_seam else 0.42
+	var border_color: Color = Color(0.96, 0.88, 0.68, 0.76 if strong_seam else 0.54) if is_player else Color(0.96, 0.27, 0.19, 0.78 if strong_seam else 0.56)
 	var hover_color: Color = Color(0.060, 0.078, 0.070, 0.92) if is_player else Color(0.120, 0.044, 0.040, 0.92)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
-	var hover_style: StyleBoxFlat = _hover_style(hover_color, COLOR_GOLD_HOT, 1, 3)
+	if not strong_seam:
+		normal_style.border_width_top = 0
+		normal_style.border_width_left = 0
+	var hover_style: StyleBoxFlat = _hover_style(hover_color, COLOR_GOLD_HOT, 2, 3)
 	hover_style.shadow_size = 12
-	var normal_asset: StyleBoxTexture = GothicUIAssets.board_tile_style(is_player, Color(0.62, 0.58, 0.52, 0.60))
-	var hover_asset: StyleBoxTexture = GothicUIAssets.board_tile_style(is_player, Color(0.96, 0.88, 0.70, 0.88))
-	var pressed_asset: StyleBoxTexture = GothicUIAssets.board_tile_style(is_player, Color(0.58, 0.52, 0.46, 0.66))
 	var tile_size: float = maxf(button.custom_minimum_size.x, button.custom_minimum_size.y)
 	if tile_size <= 0.0:
 		tile_size = 72.0
 	button.custom_minimum_size = Vector2(tile_size, tile_size)
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(normal_asset, normal_style))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(normal_asset, normal_style))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(hover_asset, hover_style))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(pressed_asset, hover_style))
+	normal_style.corner_radius_top_left = 0
+	normal_style.corner_radius_top_right = 0
+	normal_style.corner_radius_bottom_left = 0
+	normal_style.corner_radius_bottom_right = 0
+	hover_style.corner_radius_top_left = 0
+	hover_style.corner_radius_top_right = 0
+	hover_style.corner_radius_bottom_left = 0
+	hover_style.corner_radius_bottom_right = 0
+	button.add_theme_stylebox_override("normal", normal_style)
+	button.add_theme_stylebox_override("disabled", normal_style)
+	button.add_theme_stylebox_override("hover", hover_style)
+	button.add_theme_stylebox_override("pressed", hover_style)
 	button.add_theme_stylebox_override("focus", _focus_outline(3))
 
 static func _apply_bench_slot(button: Button) -> void:
-	var normal_style: StyleBoxFlat = _style(Color(0.024, 0.021, 0.027, 0.82), Color(0.34, 0.28, 0.20, 0.60), 1, 5)
+	var normal_style: StyleBoxFlat = _style(Color(0.024, 0.021, 0.027, 0.86), Color(0.56, 0.50, 0.41, 0.78), 2, 5)
 	var hover_style: StyleBoxFlat = _hover_style(Color(0.054, 0.041, 0.038, 0.94), COLOR_GOLD, 1, 5)
 	var disabled_style: StyleBoxFlat = _style(Color(0.020, 0.018, 0.024, 0.64), Color(0.18, 0.16, 0.15, 0.50), 1, 5)
-	var normal_asset: StyleBoxTexture = GothicUIAssets.bench_slot_style(Color(0.88, 0.82, 0.70, 0.86))
-	var hover_asset: StyleBoxTexture = GothicUIAssets.bench_slot_style(Color(1.10, 1.00, 0.78, 0.98))
-	var disabled_asset: StyleBoxTexture = GothicUIAssets.bench_slot_style(Color(0.46, 0.44, 0.40, 0.58))
 	var tile_size: float = maxf(button.custom_minimum_size.x, button.custom_minimum_size.y)
 	if tile_size <= 0.0:
 		tile_size = 72.0
 	button.custom_minimum_size = Vector2(tile_size, tile_size)
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(normal_asset, normal_style))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(hover_asset, hover_style))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(hover_asset, hover_style))
+	normal_style.corner_radius_top_left = 0
+	normal_style.corner_radius_top_right = 0
+	normal_style.corner_radius_bottom_left = 0
+	normal_style.corner_radius_bottom_right = 0
+	hover_style.corner_radius_top_left = 0
+	hover_style.corner_radius_top_right = 0
+	hover_style.corner_radius_bottom_left = 0
+	hover_style.corner_radius_bottom_right = 0
+	disabled_style.corner_radius_top_left = 0
+	disabled_style.corner_radius_top_right = 0
+	disabled_style.corner_radius_bottom_left = 0
+	disabled_style.corner_radius_bottom_right = 0
+	button.add_theme_stylebox_override("normal", normal_style)
+	button.add_theme_stylebox_override("hover", hover_style)
+	button.add_theme_stylebox_override("pressed", hover_style)
 	button.add_theme_stylebox_override("focus", _focus_outline(5))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(disabled_asset, disabled_style))
+	button.add_theme_stylebox_override("disabled", disabled_style)
 
 static func _style_shop_card(button: Button) -> void:
 	button.custom_minimum_size = Vector2(144.0, 124.0)
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(), _style(Color(0.036, 0.030, 0.038, 0.98), Color(0.50, 0.37, 0.28, 0.98), 2, 5)))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(1.14, 1.05, 0.92, 1.0)), _hover_style(Color(0.105, 0.046, 0.056, 0.99), COLOR_GOLD_HOT, 2, 5)))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(0.92, 0.82, 0.78, 1.0)), _style(COLOR_PANEL_DEEP, COLOR_BLOOD_HOT, 2, 5)))
-	button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(1.02, 0.88, 0.80, 1.0)), _hover_style(Color(0.16, 0.045, 0.058, 0.99), COLOR_GOLD_HOT, 2, 5)))
-	button.add_theme_stylebox_override("focus", _focus_outline(5))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(0.48, 0.46, 0.44, 0.74)), _style(Color(0.028, 0.025, 0.030, 0.82), Color(0.20, 0.18, 0.18, 0.72), 1, 5)))
-	button.add_theme_font_size_override("font_size", 13)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_flat_button_states(button, Color(0.52, 0.31, 0.20, 1.0))
+	button.add_theme_font_size_override("font_size", 18)
 	button.clip_text = false
 
 static func _style_shop_action_button(button: Button) -> void:
 	button.custom_minimum_size = Vector2(96.0, 40.0)
-	button.add_theme_font_size_override("font_size", 15)
+	button.add_theme_font_size_override("font_size", 20)
+	VisualTypeSystem.set_utility_bold(button)
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.58, 0.52, 1.0))
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _style(Color(0.055, 0.047, 0.058, 0.97), Color(0.31, 0.27, 0.28, 0.96), 1, 5)))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.18, 1.08, 0.90, 1.0)), _hover_style(Color(0.13, 0.078, 0.088, 0.99), COLOR_GOLD_HOT, 1, 5)))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.88, 0.72, 0.68, 1.0)), _style(Color(0.17, 0.040, 0.055, 0.98), COLOR_BLOOD_HOT, 1, 5)))
-	button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.98, 0.82, 0.72, 1.0)), _hover_style(Color(0.18, 0.045, 0.060, 0.99), COLOR_GOLD_HOT, 1, 5)))
-	button.add_theme_stylebox_override("focus", _focus_outline(5))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.60, 0.56, 0.50, 0.86)), _style(Color(0.046, 0.041, 0.045, 0.88), Color(0.34, 0.30, 0.25, 0.86), 1, 5)))
+	_apply_flat_button_states(button, Color(0.46, 0.38, 0.32, 1.0))
 
 static func _style_metric_button(button: Button) -> void:
 	var is_small_expand: bool = button.name == "ExpandButton"
 	button.custom_minimum_size = Vector2(48.0, 36.0) if is_small_expand else Vector2(76.0, 36.0)
-	button.add_theme_font_size_override("font_size", 14)
-	button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _style(Color(0.044, 0.038, 0.048, 0.96), Color(0.28, 0.25, 0.28, 0.92), 1, 4)))
-	button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _hover_style(Color(0.12, 0.073, 0.085, 0.99), COLOR_GOLD_HOT, 1, 4)))
-	button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.86, 0.72, 0.68, 1.0)), _style(Color(0.17, 0.034, 0.050, 0.98), COLOR_BLOOD_HOT, 1, 4)))
-	button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.98, 0.82, 0.72, 1.0)), _hover_style(Color(0.18, 0.042, 0.056, 0.99), COLOR_GOLD_HOT, 1, 4)))
-	button.add_theme_stylebox_override("focus", _focus_outline(4))
-	button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.48, 0.46, 0.43, 0.72)), _style(Color(0.028, 0.026, 0.030, 0.76), Color(0.18, 0.17, 0.17, 0.64), 1, 4)))
+	button.add_theme_font_size_override("font_size", 17)
+	VisualTypeSystem.set_utility_bold(button)
+	_apply_flat_button_states(button, Color(0.46, 0.38, 0.32, 1.0))
 
 static func _apply_metric_tabs(tabs: Control) -> void:
 	tabs.custom_minimum_size = Vector2(max(tabs.custom_minimum_size.x, 294.0), 52.0)
@@ -395,24 +1320,18 @@ static func _style_button(root: Control, path: String, primary: bool) -> void:
 
 static func _style_button_node(button: Button, primary: bool) -> void:
 	if primary:
-		button.custom_minimum_size = Vector2(224.0, 48.0)
-		button.add_theme_font_size_override("font_size", 20)
+		button.custom_minimum_size = Vector2(304.0, 54.0)
+		button.add_theme_font_size_override("font_size", 26)
+		button.set_meta("visual_role", "primary_commit")
+		VisualTypeSystem.set_utility_bold(button)
 		button.add_theme_color_override("font_disabled_color", Color(0.66, 0.60, 0.52, 1.0))
-		button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(), _style(COLOR_BLOOD, Color(0.92, 0.48, 0.31, 0.78), 1, 5)))
-		button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.18, 1.06, 0.92, 1.0)), _hover_style(COLOR_BLOOD_HOT, COLOR_GOLD_HOT, 1, 5)))
-		button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.84, 0.70, 0.66, 1.0)), _style(Color(0.30, 0.018, 0.038, 1.0), COLOR_GOLD, 1, 5)))
-		button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(1.02, 0.84, 0.74, 1.0)), _hover_style(Color(0.38, 0.024, 0.045, 1.0), COLOR_GOLD_HOT, 1, 5)))
-		button.add_theme_stylebox_override("focus", _focus_outline(5))
-		button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.primary_button_style(Color(0.58, 0.54, 0.46, 0.84)), _style(Color(0.10, 0.08, 0.08, 0.82), Color(0.34, 0.26, 0.22, 0.84), 1, 5)))
+		_apply_flat_button_states(button, COLOR_BLOOD)
 	else:
 		button.custom_minimum_size.y = max(button.custom_minimum_size.y, 34.0)
+		button.add_theme_font_size_override("font_size", 18)
+		VisualTypeSystem.set_utility_bold(button)
 		button.add_theme_color_override("font_disabled_color", Color(0.60, 0.56, 0.50, 1.0))
-		button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _style(COLOR_PANEL_SOFT, COLOR_IRON_DIM, 1, 5)))
-		button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _hover_style(Color(0.115, 0.087, 0.098, 0.98), COLOR_GOLD_HOT, 1, 5)))
-		button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.86, 0.72, 0.68, 1.0)), _style(COLOR_PANEL_DEEP, COLOR_BLOOD_HOT, 1, 5)))
-		button.add_theme_stylebox_override("hover_pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.98, 0.82, 0.72, 1.0)), _hover_style(Color(0.16, 0.052, 0.064, 0.99), COLOR_GOLD_HOT, 1, 5)))
-		button.add_theme_stylebox_override("focus", _focus_outline(5))
-		button.add_theme_stylebox_override("disabled", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.50, 0.47, 0.44, 0.72)), _style(Color(0.030, 0.028, 0.032, 0.78), Color(0.18, 0.17, 0.18, 0.66), 1, 5)))
+		_apply_flat_button_states(button, Color(0.46, 0.38, 0.32, 1.0))
 
 static func _style_label(root: Control, path: String, font_size: int, color: Color, outline: bool) -> void:
 	var label: Label = root.get_node_or_null(path) as Label
@@ -460,8 +1379,8 @@ static func _apply_screen_backdrop(root: Control) -> void:
 	backdrop.z_index = -39
 	backdrop.texture = texture
 	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	backdrop.stretch_mode = TextureRect.STRETCH_SCALE
-	backdrop.modulate = Color(0.52, 0.50, 0.48, 0.78)
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.modulate = Color(0.68, 0.64, 0.60, 0.88)
 
 static func _configure_combat_layout(root: Control) -> void:
 	var arena: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
@@ -484,6 +1403,1265 @@ static func _clear_battlefield_rect(root: Control, path: String) -> void:
 		return
 	rect.color = Color(0.0, 0.0, 0.0, 0.0)
 	rect.material = null
+
+static func _ensure_planning_pressure(root: Control) -> void:
+	var area_paths: PackedStringArray = PackedStringArray([
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea",
+	])
+	for area_index: int in range(area_paths.size()):
+		var area: Control = root.get_node_or_null(area_paths[area_index]) as Control
+		if area == null:
+			continue
+		var enemy_side: bool = area_index == 0
+		var pressure_name: String = "HostilePressureWash" if enemy_side else "SurvivalPressureWash"
+		var pressure: TextureRect = area.get_node_or_null(pressure_name) as TextureRect
+		if pressure == null:
+			pressure = TextureRect.new()
+			pressure.name = pressure_name
+			pressure.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			pressure.z_index = -7
+			area.add_child(pressure)
+			pressure.set_anchors_preset(Control.PRESET_FULL_RECT)
+			pressure.offset_left = 0.0
+			pressure.offset_top = 0.0
+			pressure.offset_right = 0.0
+			pressure.offset_bottom = 0.0
+		var gradient: Gradient = Gradient.new()
+		gradient.offsets = PackedFloat32Array([0.0, 0.28, 0.70, 1.0])
+		if enemy_side:
+			gradient.colors = PackedColorArray([
+				Color(0.82, 0.075, 0.035, 0.30),
+				Color(0.36, 0.025, 0.024, 0.13),
+				Color(0.04, 0.01, 0.014, 0.02),
+				Color(0.0, 0.0, 0.0, 0.0),
+			])
+		else:
+			gradient.colors = PackedColorArray([
+				Color(0.0, 0.0, 0.0, 0.0),
+				Color(0.025, 0.035, 0.034, 0.03),
+				Color(0.30, 0.25, 0.14, 0.11),
+				Color(0.86, 0.57, 0.22, 0.22),
+			])
+		var gradient_texture: GradientTexture2D = GradientTexture2D.new()
+		gradient_texture.width = 512
+		gradient_texture.height = 192
+		gradient_texture.fill_from = Vector2(0.94, 0.08) if enemy_side else Vector2(0.06, 0.92)
+		gradient_texture.fill_to = Vector2(0.08, 0.82) if enemy_side else Vector2(0.92, 0.18)
+		gradient_texture.gradient = gradient
+		pressure.texture = gradient_texture
+		pressure.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pressure.stretch_mode = TextureRect.STRETCH_SCALE
+		pressure.visible = false
+		pressure.set_meta("broad_faction_wash_suppressed", true)
+		var scars_name: String = "HostileFieldScars" if enemy_side else "SurvivalFieldScars"
+		var scars: Control = area.get_node_or_null(scars_name) as Control
+		if scars == null:
+			scars = Control.new()
+			scars.name = scars_name
+			scars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			scars.z_index = -6
+			area.add_child(scars)
+			scars.set_anchors_preset(Control.PRESET_FULL_RECT)
+			scars.offset_left = 0.0
+			scars.offset_top = 0.0
+			scars.offset_right = 0.0
+			scars.offset_bottom = 0.0
+		scars.visible = false
+		scars.set_meta("procedural_field_scars_suppressed", true)
+		var scar_specs: Array[Dictionary] = [
+			{"x": 0.08, "y": 0.24, "w": 0.24, "r": -0.08, "a": 0.20},
+			{"x": 0.42, "y": 0.72, "w": 0.31, "r": 0.06, "a": 0.13},
+			{"x": 0.73, "y": 0.16, "w": 0.18, "r": -0.13, "a": 0.18},
+			{"x": 0.21, "y": 0.88, "w": 0.14, "r": 0.16, "a": 0.11},
+		]
+		for scar_index: int in range(scar_specs.size()):
+			var scar_name: String = "FieldScar_%02d" % scar_index
+			var scar: ColorRect = scars.get_node_or_null(scar_name) as ColorRect
+			if scar == null:
+				scar = ColorRect.new()
+				scar.name = scar_name
+				scar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				scars.add_child(scar)
+			var spec: Dictionary = scar_specs[scar_index]
+			scar.anchor_left = float(spec.get("x", 0.0))
+			scar.anchor_right = scar.anchor_left + float(spec.get("w", 0.2))
+			scar.anchor_top = float(spec.get("y", 0.0))
+			scar.anchor_bottom = scar.anchor_top
+			scar.offset_left = 0.0
+			scar.offset_right = 0.0
+			scar.offset_top = -1.0
+			scar.offset_bottom = 1.0
+			scar.rotation = float(spec.get("r", 0.0))
+			var scar_alpha: float = float(spec.get("a", 0.14))
+			scar.color = Color(0.92, 0.16, 0.10, scar_alpha) if enemy_side else Color(0.91, 0.72, 0.38, scar_alpha)
+			_ensure_planning_breach_marks(area, enemy_side)
+
+static func _ensure_planning_phase_geometry(root: Control) -> void:
+	var planning: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea") as Control
+	if planning == null:
+		return
+	var top_area: Control = planning.get_node_or_null("TopArea") as Control
+	var bottom_area: Control = planning.get_node_or_null("BottomArea") as Control
+	_ensure_planning_field_painter(top_area, "PlanningWarFieldTopPainter")
+	_ensure_planning_field_painter(bottom_area, "PlanningWarFieldBottomPainter")
+	var geometry: Control = planning.get_node_or_null("PlanningDeploymentGeometry") as Control
+	if geometry == null:
+		geometry = Control.new()
+		geometry.name = "PlanningDeploymentGeometry"
+		geometry.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		geometry.z_index = -1
+		planning.add_child(geometry)
+		geometry.set_anchors_preset(Control.PRESET_FULL_RECT)
+		geometry.offset_left = 0.0
+		geometry.offset_top = 0.0
+		geometry.offset_right = 0.0
+		geometry.offset_bottom = 0.0
+	var lane_specs: Array[Dictionary] = [
+		{"name": "DeploymentLaneLeft", "x": 0.12},
+		{"name": "DeploymentLaneCenter", "x": 0.50},
+		{"name": "DeploymentLaneRight", "x": 0.88},
+	]
+	for spec: Dictionary in lane_specs:
+		var lane_name: String = String(spec.get("name", "DeploymentLane"))
+		var lane: ColorRect = geometry.get_node_or_null(lane_name) as ColorRect
+		if lane == null:
+			lane = ColorRect.new()
+			lane.name = lane_name
+			lane.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			geometry.add_child(lane)
+		var lane_x: float = float(spec.get("x", 0.5))
+		lane.anchor_left = lane_x
+		lane.anchor_right = lane_x
+		lane.anchor_top = 0.07
+		lane.anchor_bottom = 0.93
+		lane.offset_left = -1.0
+		lane.offset_right = 1.0
+		lane.offset_top = 0.0
+		lane.offset_bottom = 0.0
+		lane.color = Color(0.84, 0.79, 0.68, 0.10)
+	var commit_rule: ColorRect = geometry.get_node_or_null("PlanningCommitBoundary") as ColorRect
+	if commit_rule == null:
+		commit_rule = ColorRect.new()
+		commit_rule.name = "PlanningCommitBoundary"
+		commit_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		geometry.add_child(commit_rule)
+	commit_rule.anchor_left = 0.06
+	commit_rule.anchor_right = 0.94
+	commit_rule.anchor_top = 0.5
+	commit_rule.anchor_bottom = 0.5
+	commit_rule.offset_left = 0.0
+	commit_rule.offset_right = 0.0
+	commit_rule.offset_top = -1.0
+	commit_rule.offset_bottom = 1.0
+	commit_rule.color = Color(0.98, 0.24, 0.16, 0.42)
+	var directive: Label = geometry.get_node_or_null("PlanningDirective") as Label
+	if directive == null:
+		directive = Label.new()
+		directive.name = "PlanningDirective"
+		directive.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		geometry.add_child(directive)
+	directive.anchor_left = 0.5
+	directive.anchor_right = 0.5
+	directive.anchor_top = 0.0
+	directive.anchor_bottom = 0.0
+	directive.offset_left = -286.0
+	directive.offset_right = 286.0
+	directive.offset_top = 12.0
+	directive.offset_bottom = 54.0
+	directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
+	directive.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	directive.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# The ordered command needs to survive above the field painters and the compact
+	# shop shelf. Keep it below the persistent HUD, but outside the muted board layer.
+	directive.z_index = 110
+	directive.z_as_relative = false
+	directive.add_theme_font_size_override("font_size", 20)
+	directive.add_theme_color_override("font_color", Color(1.0, 0.93, 0.82, 1.0))
+	directive.add_theme_color_override("font_outline_color", Color(0.10, 0.0, 0.012, 1.0))
+	directive.add_theme_constant_override("outline_size", 3)
+	var directive_style: StyleBoxFlat = StyleBoxFlat.new()
+	directive_style.bg_color = Color(0.022, 0.004, 0.010, 0.99)
+	directive_style.border_color = Color(0.92, 0.10, 0.07, 0.98)
+	directive_style.border_width_left = 7
+	directive_style.border_width_top = 2
+	directive_style.border_width_right = 2
+	directive_style.border_width_bottom = 3
+	directive_style.content_margin_left = 20.0
+	directive_style.content_margin_right = 20.0
+	directive_style.shadow_color = Color(0.0, 0.0, 0.0, 0.92)
+	directive_style.shadow_size = 8
+	directive.add_theme_stylebox_override("normal", directive_style)
+	directive.set_meta("persistent_copy_uses_utility_face", true)
+	directive.set_meta("planning_action_order", "deploy>wager>commit")
+	directive.set_meta("planning_directive_above_field", true)
+	VisualTypeSystem.set_utility_bold(directive)
+
+
+static func _ensure_planning_field_painter(parent: Control, painter_name: String) -> void:
+	if parent == null:
+		return
+	var painter: PlanningFieldPainter = parent.get_node_or_null(painter_name) as PlanningFieldPainter
+	if painter == null:
+		painter = PlanningFieldPainter.new()
+		painter.name = painter_name
+		painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		painter.z_index = -4
+		parent.add_child(painter)
+		painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		painter.offset_left = 0.0
+		painter.offset_top = 0.0
+		painter.offset_right = 0.0
+		painter.offset_bottom = 0.0
+	painter.visible = true
+	painter.z_index = -4
+	painter.queue_redraw()
+
+
+static func _ensure_planning_breach_marks(area: Control, enemy_side: bool) -> void:
+	var cluster_name: String = "HostileBreachMarks" if enemy_side else "SurvivalBreachMarks"
+	var marks: Control = area.get_node_or_null(cluster_name) as Control
+	if marks == null:
+		marks = Control.new()
+		marks.name = cluster_name
+		marks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		marks.z_index = -5
+		area.add_child(marks)
+		marks.set_anchors_preset(Control.PRESET_FULL_RECT)
+		marks.offset_left = 0.0
+		marks.offset_top = 0.0
+		marks.offset_right = 0.0
+		marks.offset_bottom = 0.0
+	marks.visible = false
+	marks.set_meta("procedural_breach_marks_suppressed", true)
+	var breach_specs: Array[Dictionary] = [
+		{"x": 0.015, "y": 0.10, "w": 0.19, "h": 4.0, "rot": -0.19, "a": 0.56},
+		{"x": 0.74, "y": 0.055, "w": 0.24, "h": 3.0, "rot": 0.12, "a": 0.42},
+		{"x": 0.87, "y": 0.73, "w": 0.12, "h": 5.0, "rot": -0.27, "a": 0.48},
+		{"x": 0.04, "y": 0.84, "w": 0.16, "h": 2.0, "rot": 0.22, "a": 0.38},
+	]
+	for index: int in range(breach_specs.size()):
+		var mark_name: String = "Breach_%02d" % index
+		var mark: ColorRect = marks.get_node_or_null(mark_name) as ColorRect
+		if mark == null:
+			mark = ColorRect.new()
+			mark.name = mark_name
+			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			marks.add_child(mark)
+		var spec: Dictionary = breach_specs[index]
+		mark.anchor_left = float(spec.get("x", 0.0))
+		mark.anchor_right = mark.anchor_left + float(spec.get("w", 0.1))
+		mark.anchor_top = float(spec.get("y", 0.0))
+		mark.anchor_bottom = mark.anchor_top
+		mark.offset_left = 0.0
+		mark.offset_right = 0.0
+		mark.offset_top = 0.0
+		mark.offset_bottom = float(spec.get("h", 3.0))
+		mark.rotation = float(spec.get("rot", 0.0))
+		var alpha: float = float(spec.get("a", 0.4))
+		mark.color = Color(0.98, 0.12, 0.055, alpha) if enemy_side else Color(0.86, 0.69, 0.38, alpha * 0.72)
+
+static func _ensure_arena_zone_guides(root: Control) -> void:
+	var arena: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	if arena == null:
+		return
+	var enemy_zone: Panel = arena.get_node_or_null("EnemyTerritoryGuide") as Panel
+	if enemy_zone == null:
+		enemy_zone = Panel.new()
+		enemy_zone.name = "EnemyTerritoryGuide"
+		enemy_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		enemy_zone.z_index = -6
+		arena.add_child(enemy_zone)
+	enemy_zone.anchor_left = 0.0
+	enemy_zone.anchor_top = 0.0
+	enemy_zone.anchor_right = 1.0
+	enemy_zone.anchor_bottom = 0.5
+	enemy_zone.offset_left = 0.0
+	enemy_zone.offset_top = 0.0
+	enemy_zone.offset_right = 0.0
+	enemy_zone.offset_bottom = 0.0
+	enemy_zone.add_theme_stylebox_override("panel", _arena_zone_style(false))
+	var player_zone: Panel = arena.get_node_or_null("PlayerTerritoryGuide") as Panel
+	if player_zone == null:
+		player_zone = Panel.new()
+		player_zone.name = "PlayerTerritoryGuide"
+		player_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		player_zone.z_index = -6
+		arena.add_child(player_zone)
+	player_zone.anchor_left = 0.0
+	player_zone.anchor_top = 0.5
+	player_zone.anchor_right = 1.0
+	player_zone.anchor_bottom = 1.0
+	player_zone.offset_left = 0.0
+	player_zone.offset_top = 0.0
+	player_zone.offset_right = 0.0
+	player_zone.offset_bottom = 0.0
+	player_zone.add_theme_stylebox_override("panel", _arena_zone_style(true))
+	_ensure_arena_woodland_backdrop(arena)
+	_ensure_arena_woodland_silhouettes(arena)
+	_ensure_arena_war_aftermath_geometry(arena)
+	_ensure_arena_weather_banks(arena)
+	_ensure_arena_wet_ground_reflection(arena)
+	_ensure_arena_threat_veil(arena)
+	_ensure_arena_pressure_lighting(arena)
+	_ensure_arena_threat_incursions(arena)
+	_ensure_arena_exposure_lift(arena)
+	_ensure_arena_cell_seams(arena)
+	_ensure_arena_ash_marks(arena)
+	var focus_painter: CombatFocusPainter = arena.get_node_or_null("ArenaCombatFocusPainter") as CombatFocusPainter
+	if focus_painter == null:
+		focus_painter = CombatFocusPainter.new()
+		focus_painter.name = "ArenaCombatFocusPainter"
+		focus_painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Above seams and pressure residue, below actors/readouts (arena units are
+		# explicitly layered at 8 by ArenaController).
+		focus_painter.z_index = 1
+		arena.add_child(focus_painter)
+		focus_painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		focus_painter.offset_left = 0.0
+		focus_painter.offset_top = 0.0
+		focus_painter.offset_right = 0.0
+		focus_painter.offset_bottom = 0.0
+	focus_painter.z_index = 1
+	focus_painter.visible = false
+	focus_painter.configure(0, false)
+	focus_painter.set_meta("visual_role", "combat_attention_frame")
+	var rupture: ColorRect = arena.get_node_or_null("TerritoryRupture") as ColorRect
+	if rupture == null:
+		rupture = ColorRect.new()
+		rupture.name = "TerritoryRupture"
+		rupture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rupture.z_index = -2
+		arena.add_child(rupture)
+	rupture.z_index = -2
+	rupture.anchor_left = 0.0
+	rupture.anchor_top = 0.5
+	rupture.anchor_right = 1.0
+	rupture.anchor_bottom = 0.5
+	rupture.offset_left = 0.0
+	rupture.offset_top = -0.5
+	rupture.offset_right = 0.0
+	rupture.offset_bottom = 0.5
+	rupture.color = Color(0.66, 0.15, 0.070, 0.12)
+	var rupture_glow: ColorRect = arena.get_node_or_null("TerritoryRuptureGlow") as ColorRect
+	if rupture_glow == null:
+		rupture_glow = ColorRect.new()
+		rupture_glow.name = "TerritoryRuptureGlow"
+		rupture_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rupture_glow.z_index = -3
+		arena.add_child(rupture_glow)
+	rupture_glow.anchor_left = 0.0
+	rupture_glow.anchor_top = 0.5
+	rupture_glow.anchor_right = 1.0
+	rupture_glow.anchor_bottom = 0.5
+	rupture_glow.offset_left = 0.0
+	rupture_glow.offset_top = -4.0
+	rupture_glow.offset_right = 0.0
+	rupture_glow.offset_bottom = 4.0
+	rupture_glow.color = Color(0.52, 0.090, 0.030, 0.07)
+	_ensure_arena_rupture_segments(arena)
+	_ensure_arena_rupture_branches(arena)
+	_ensure_arena_threat_boundary(arena)
+	_ensure_arena_field_label(arena, "EnemyFieldLabel", "HOSTILE GROUND", true)
+	_ensure_arena_field_label(arena, "PlayerFieldLabel", "HOLD THE LINE", false)
+	_suppress_procedural_arena_overlays(arena)
+
+static func _ensure_arena_exposure_lift(arena: Control) -> void:
+	var exposure: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaExposureLift", -5)
+	if exposure == null:
+		return
+	var gradient: Gradient = Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.20, 0.50, 0.78, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(0.36, 0.16, 0.10, 0.090),
+		Color(0.22, 0.19, 0.16, 0.120),
+		Color(0.44, 0.38, 0.30, 0.180),
+		Color(0.30, 0.25, 0.20, 0.130),
+		Color(0.28, 0.08, 0.055, 0.100),
+	])
+	var texture: GradientTexture2D = GradientTexture2D.new()
+	texture.width = 512
+	texture.height = 512
+	texture.fill_from = Vector2(0.08, 0.04)
+	texture.fill_to = Vector2(0.92, 0.96)
+	texture.gradient = gradient
+	exposure.texture = texture
+	exposure.visible = true
+	exposure.modulate = Color.WHITE
+	exposure.set_meta("visual_role", "battlefield_exposure_lift_for_material_readability")
+	exposure.set_meta("preserves_landmarks", true)
+
+static func _suppress_procedural_arena_overlays(arena: Control) -> void:
+	if arena == null:
+		return
+	var suppressed_names: PackedStringArray = PackedStringArray([
+		"ArenaWoodlandHorizon",
+		"ArenaWoodlandSilhouettes",
+		"ArenaWarAftermath",
+		"ArenaGroundFog",
+		"ArenaHostileSmoke",
+		"ArenaWetGroundReflection",
+		"ArenaEnemyPressureLight",
+		"ArenaPlayerPressureLight",
+		"ArenaThreatIncursions",
+		"ArenaAshThreatVeil",
+		"ArenaAshMarks",
+		"ArenaRuptureBranches",
+		"ArenaRuptureSegments",
+		"TerritoryRupture",
+		"TerritoryRuptureGlow",
+	])
+	for node_name: String in suppressed_names:
+		var overlay: CanvasItem = arena.get_node_or_null(node_name) as CanvasItem
+		if overlay != null:
+			overlay.visible = false
+			overlay.set_meta("retired_for_authored_raster_field", true)
+	arena.set_meta("procedural_environment_geometry_suppressed", true)
+
+static func _ensure_arena_threat_boundary(arena: Control) -> void:
+	var boundary: Control = arena.get_node_or_null("CombatThreatBoundary") as Control
+	if boundary == null:
+		boundary = Control.new()
+		boundary.name = "CombatThreatBoundary"
+		boundary.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		boundary.z_index = -1
+		arena.add_child(boundary)
+		boundary.set_anchors_preset(Control.PRESET_FULL_RECT)
+		boundary.offset_left = 0.0
+		boundary.offset_top = 0.0
+		boundary.offset_right = 0.0
+		boundary.offset_bottom = 0.0
+	var bar_specs: Array[Dictionary] = [
+		{"name": "ThreatJawLeft", "left": 0.003, "right": 0.012, "top": 0.18, "bottom": 0.82, "rot": -0.010},
+		{"name": "ThreatJawRight", "left": 0.988, "right": 0.997, "top": 0.17, "bottom": 0.81, "rot": 0.012},
+		{"name": "ThreatCeiling", "left": 0.31, "right": 0.69, "top": 0.018, "bottom": 0.024, "rot": -0.004},
+	]
+	for spec: Dictionary in bar_specs:
+		var bar_name: String = String(spec.get("name", "ThreatBoundary"))
+		var bar: ColorRect = boundary.get_node_or_null(bar_name) as ColorRect
+		if bar == null:
+			bar = ColorRect.new()
+			bar.name = bar_name
+			bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			boundary.add_child(bar)
+		bar.anchor_left = float(spec.get("left", 0.0))
+		bar.anchor_right = float(spec.get("right", 0.0))
+		bar.anchor_top = float(spec.get("top", 0.0))
+		bar.anchor_bottom = float(spec.get("bottom", 0.0))
+		bar.offset_left = 0.0
+		bar.offset_right = 0.0
+		bar.offset_top = 0.0
+		bar.offset_bottom = 0.0
+		bar.rotation = float(spec.get("rot", 0.0))
+		bar.color = Color(0.46, 0.16, 0.075, 0.12)
+	var objective: Label = boundary.get_node_or_null("CombatObjectiveSignal") as Label
+	if objective == null:
+		objective = Label.new()
+		objective.name = "CombatObjectiveSignal"
+		objective.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		boundary.add_child(objective)
+	objective.anchor_left = 0.5
+	objective.anchor_right = 0.5
+	objective.anchor_top = 0.0
+	objective.anchor_bottom = 0.0
+	objective.offset_left = -150.0
+	objective.offset_right = 150.0
+	objective.offset_top = 12.0
+	objective.offset_bottom = 42.0
+	objective.text = "SURVIVE"
+	objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	objective.add_theme_font_size_override("font_size", 26)
+	objective.add_theme_color_override("font_color", Color(0.98, 0.90, 0.78, 1.0))
+	objective.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.90))
+	objective.add_theme_constant_override("outline_size", 1)
+	var objective_backing: StyleBoxFlat = StyleBoxFlat.new()
+	objective_backing.bg_color = Color(0.012, 0.010, 0.014, 0.88)
+	objective_backing.border_color = Color(0.88, 0.10, 0.09, 0.96)
+	objective_backing.border_width_top = 3
+	objective_backing.border_width_bottom = 2
+	objective_backing.content_margin_left = 10.0
+	objective_backing.content_margin_right = 10.0
+	objective.add_theme_stylebox_override("normal", objective_backing)
+	objective.set_meta("persistent_copy_uses_impact_face", true)
+	VisualTypeSystem.set_impact(objective)
+	var reduced_motion_lock_cue: Label = boundary.get_node_or_null("ReducedMotionLockCue") as Label
+	if reduced_motion_lock_cue == null:
+		reduced_motion_lock_cue = Label.new()
+		reduced_motion_lock_cue.name = "ReducedMotionLockCue"
+		reduced_motion_lock_cue.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		reduced_motion_lock_cue.z_as_relative = false
+		reduced_motion_lock_cue.z_index = 218
+		boundary.add_child(reduced_motion_lock_cue)
+	reduced_motion_lock_cue.anchor_left = 0.5
+	reduced_motion_lock_cue.anchor_right = 0.5
+	reduced_motion_lock_cue.anchor_top = 0.0
+	reduced_motion_lock_cue.anchor_bottom = 0.0
+	reduced_motion_lock_cue.offset_left = -220.0
+	reduced_motion_lock_cue.offset_right = 220.0
+	reduced_motion_lock_cue.offset_top = 44.0
+	reduced_motion_lock_cue.offset_bottom = 78.0
+	reduced_motion_lock_cue.text = "MOTION LOCK // STATIC THREAT // FRAME HELD"
+	reduced_motion_lock_cue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reduced_motion_lock_cue.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	reduced_motion_lock_cue.add_theme_font_size_override("font_size", 15)
+	reduced_motion_lock_cue.add_theme_color_override("font_color", Color(0.92, 0.78, 0.62, 1.0))
+	reduced_motion_lock_cue.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
+	reduced_motion_lock_cue.add_theme_constant_override("outline_size", 2)
+	var lock_backing: StyleBoxFlat = StyleBoxFlat.new()
+	lock_backing.bg_color = Color(0.015, 0.012, 0.016, 0.96)
+	lock_backing.border_color = Color(0.72, 0.40, 0.18, 0.94)
+	lock_backing.border_width_top = 2
+	lock_backing.border_width_bottom = 2
+	lock_backing.content_margin_left = 12.0
+	lock_backing.content_margin_right = 12.0
+	reduced_motion_lock_cue.add_theme_stylebox_override("normal", lock_backing)
+	reduced_motion_lock_cue.visible = false
+	reduced_motion_lock_cue.set_meta("persistent_reduced_motion_lock", true)
+	reduced_motion_lock_cue.set_meta("reduced_motion_frame_policy", "persistent_board_actors_hud_and_lock")
+	VisualTypeSystem.set_utility_bold(reduced_motion_lock_cue)
+	var exchange_signal: Label = boundary.get_node_or_null("CombatExchangeSignal") as Label
+	if exchange_signal == null:
+		exchange_signal = Label.new()
+		exchange_signal.name = "CombatExchangeSignal"
+		exchange_signal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		exchange_signal.z_as_relative = false
+		exchange_signal.z_index = 218
+		boundary.add_child(exchange_signal)
+	exchange_signal.anchor_left = 0.5
+	exchange_signal.anchor_right = 0.5
+	exchange_signal.anchor_top = 0.0
+	exchange_signal.anchor_bottom = 0.0
+	# The objective names the survival state; this second, broader line names the
+	# actual causal exchange. Keep it large enough to read at normal fight speed
+	# without competing with the objective itself.
+	exchange_signal.offset_left = -258.0
+	exchange_signal.offset_right = 258.0
+	exchange_signal.offset_top = 46.0
+	exchange_signal.offset_bottom = 82.0
+	exchange_signal.text = "CONTACT LOG // READ THE WOUND"
+	exchange_signal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	exchange_signal.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	exchange_signal.add_theme_font_size_override("font_size", 17)
+	exchange_signal.add_theme_color_override("font_color", Color(0.96, 0.84, 0.62, 1.0))
+	exchange_signal.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
+	exchange_signal.add_theme_constant_override("outline_size", 2)
+	var exchange_backing: StyleBoxFlat = StyleBoxFlat.new()
+	exchange_backing.bg_color = Color(0.015, 0.012, 0.016, 0.90)
+	exchange_backing.border_color = Color(0.70, 0.14, 0.10, 0.76)
+	exchange_backing.border_width_left = 4
+	exchange_backing.border_width_top = 2
+	exchange_backing.border_width_right = 2
+	exchange_backing.border_width_bottom = 2
+	exchange_backing.content_margin_left = 14.0
+	exchange_backing.content_margin_right = 14.0
+	exchange_signal.add_theme_stylebox_override("normal", exchange_backing)
+	exchange_signal.visible = false
+	exchange_signal.set_meta("combat_exchange_channel", "health_causality")
+	exchange_signal.set_meta("combat_exchange_readability", "objective_then_causal_hit_receipt")
+	VisualTypeSystem.set_utility_bold(exchange_signal)
+
+static func _ensure_tactical_shell_marks(root: Control) -> void:
+	var battle_area: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
+	if battle_area == null:
+		return
+	var shell: Control = battle_area.get_node_or_null("TacticalFieldRecordShell") as Control
+	if shell == null:
+		shell = Control.new()
+		shell.name = "TacticalFieldRecordShell"
+		shell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		shell.z_index = 28
+		battle_area.add_child(shell)
+		shell.set_anchors_preset(Control.PRESET_FULL_RECT)
+		shell.offset_left = 0.0
+		shell.offset_top = 0.0
+		shell.offset_right = 0.0
+		shell.offset_bottom = 0.0
+	var record: Label = shell.get_node_or_null("TacticalRecordMark") as Label
+	if record == null:
+		record = Label.new()
+		record.name = "TacticalRecordMark"
+		record.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		shell.add_child(record)
+	record.anchor_left = 0.0
+	record.anchor_right = 0.0
+	record.anchor_top = 1.0
+	record.anchor_bottom = 1.0
+	record.offset_left = 12.0
+	record.offset_right = 440.0
+	record.offset_top = -26.0
+	record.offset_bottom = -4.0
+	record.text = "FIELD RECORD // TACTICAL SHELL // LIVE COPY"
+	record.visible = false
+	record.add_theme_font_size_override("font_size", 16)
+	record.add_theme_color_override("font_color", Color(0.80, 0.73, 0.62, 0.70))
+	VisualTypeSystem.set_utility_bold(record)
+	var corner_specs: Array[Dictionary] = [
+		{"name": "RecordCornerNW", "left": 0.0, "top": 0.0, "right": 0.055, "bottom": 0.012},
+		{"name": "RecordCornerNE", "left": 0.945, "top": 0.0, "right": 1.0, "bottom": 0.012},
+		{"name": "RecordCornerSW", "left": 0.0, "top": 0.988, "right": 0.055, "bottom": 1.0},
+		{"name": "RecordCornerSE", "left": 0.945, "top": 0.988, "right": 1.0, "bottom": 1.0},
+	]
+	for spec: Dictionary in corner_specs:
+		var corner_name: String = String(spec.get("name", "RecordCorner"))
+		var corner: ColorRect = shell.get_node_or_null(corner_name) as ColorRect
+		if corner == null:
+			corner = ColorRect.new()
+			corner.name = corner_name
+			corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			shell.add_child(corner)
+		corner.anchor_left = float(spec.get("left", 0.0))
+		corner.anchor_right = float(spec.get("right", 0.0))
+		corner.anchor_top = float(spec.get("top", 0.0))
+		corner.anchor_bottom = float(spec.get("bottom", 0.0))
+		corner.offset_left = 0.0
+		corner.offset_right = 0.0
+		corner.offset_top = 0.0
+		corner.offset_bottom = 0.0
+		corner.color = Color(0.82, 0.12, 0.11, 0.56)
+
+static func _ensure_arena_threat_veil(arena: Control) -> void:
+	var veil: TextureRect = arena.get_node_or_null("ArenaAshThreatVeil") as TextureRect
+	if veil == null:
+		veil = TextureRect.new()
+		veil.name = "ArenaAshThreatVeil"
+		veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		veil.z_index = -5
+		arena.add_child(veil)
+		veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+		veil.offset_left = 0.0
+		veil.offset_top = 0.0
+		veil.offset_right = 0.0
+		veil.offset_bottom = 0.0
+	var gradient: Gradient = Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.34, 0.72, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(0.48, 0.035, 0.025, 0.25),
+		Color(0.16, 0.11, 0.10, 0.08),
+		Color(0.23, 0.21, 0.17, 0.045),
+		Color(0.64, 0.34, 0.16, 0.12),
+	])
+	var veil_texture: GradientTexture2D = GradientTexture2D.new()
+	veil_texture.width = 512
+	veil_texture.height = 512
+	veil_texture.fill_from = Vector2(0.86, 0.06)
+	veil_texture.fill_to = Vector2(0.18, 0.92)
+	veil_texture.gradient = gradient
+	veil.texture = veil_texture
+	veil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	veil.stretch_mode = TextureRect.STRETCH_SCALE
+
+static func _ensure_arena_woodland_backdrop(arena: Control) -> void:
+	var source: Texture2D = load(TITLE_WOODLAND_TEXTURE_PATH) as Texture2D
+	if source == null:
+		return
+	var source_width: float = float(source.get_width())
+	var source_height: float = float(source.get_height())
+	var crop_x: float = source_width * 0.34
+	var crop_width: float = source_width - crop_x
+	var crop_height: float = minf(source_height * 0.42, crop_width / 3.45)
+	var crop_y: float = minf(source_height - crop_height, source_height * 0.24)
+	var woodland_texture: AtlasTexture = AtlasTexture.new()
+	woodland_texture.atlas = source
+	woodland_texture.region = Rect2(crop_x, crop_y, crop_width, crop_height)
+	var woodland: TextureRect = arena.get_node_or_null("ArenaWoodlandHorizon") as TextureRect
+	if woodland == null:
+		woodland = TextureRect.new()
+		woodland.name = "ArenaWoodlandHorizon"
+		woodland.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		woodland.z_index = -9
+		arena.add_child(woodland)
+		woodland.set_anchors_preset(Control.PRESET_FULL_RECT)
+		woodland.offset_left = 0.0
+		woodland.offset_top = 0.0
+		woodland.offset_right = 0.0
+		woodland.offset_bottom = 0.0
+	# Use a panorama-shaped crop from the title's right-hand woodland. This
+	# preserves the authored trees and wet ground without pulling the baked
+	# title lettering into combat or stretching a portrait crop flat.
+	woodland.texture = woodland_texture
+	woodland.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	woodland.stretch_mode = TextureRect.STRETCH_SCALE
+	woodland.modulate = Color(1.12, 1.02, 0.92, 1.0)
+
+static func _ensure_arena_woodland_silhouettes(arena: Control) -> void:
+	var silhouettes: Control = arena.get_node_or_null("ArenaWoodlandSilhouettes") as Control
+	if silhouettes == null:
+		silhouettes = Control.new()
+		silhouettes.name = "ArenaWoodlandSilhouettes"
+		silhouettes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		silhouettes.z_index = -5
+		arena.add_child(silhouettes)
+		silhouettes.set_anchors_preset(Control.PRESET_FULL_RECT)
+		silhouettes.offset_left = 0.0
+		silhouettes.offset_top = 0.0
+		silhouettes.offset_right = 0.0
+		silhouettes.offset_bottom = 0.0
+	var trunk_specs: Array[Dictionary] = [
+		{"name": "TrunkWest", "left": 0.025, "right": 0.062, "top": -0.04, "bottom": 0.67, "rot": -0.055},
+		{"name": "TrunkWestInner", "left": 0.105, "right": 0.126, "top": -0.08, "bottom": 0.48, "rot": 0.048},
+		{"name": "TrunkEastInner", "left": 0.865, "right": 0.888, "top": -0.06, "bottom": 0.50, "rot": -0.040},
+		{"name": "TrunkEast", "left": 0.938, "right": 0.978, "top": -0.03, "bottom": 0.70, "rot": 0.050},
+	]
+	for spec: Dictionary in trunk_specs:
+		var trunk: ColorRect = _ensure_arena_rect(silhouettes, String(spec.get("name", "Trunk")))
+		trunk.anchor_left = float(spec.get("left", 0.0))
+		trunk.anchor_right = float(spec.get("right", 0.0))
+		trunk.anchor_top = float(spec.get("top", 0.0))
+		trunk.anchor_bottom = float(spec.get("bottom", 0.5))
+		trunk.offset_left = 0.0
+		trunk.offset_right = 0.0
+		trunk.offset_top = 0.0
+		trunk.offset_bottom = 0.0
+		trunk.rotation = float(spec.get("rot", 0.0))
+		trunk.color = Color(0.005, 0.004, 0.006, 0.88)
+	var branch_specs: Array[Dictionary] = [
+		{"name": "BranchWestHigh", "left": -0.01, "right": 0.34, "top": 0.13, "height": 10.0, "rot": 0.16},
+		{"name": "BranchWestLow", "left": 0.04, "right": 0.30, "top": 0.34, "height": 7.0, "rot": -0.19},
+		{"name": "BranchEastHigh", "left": 0.68, "right": 1.02, "top": 0.16, "height": 9.0, "rot": -0.15},
+		{"name": "BranchEastLow", "left": 0.73, "right": 0.98, "top": 0.36, "height": 7.0, "rot": 0.18},
+	]
+	for spec: Dictionary in branch_specs:
+		var branch: ColorRect = _ensure_arena_rect(silhouettes, String(spec.get("name", "Branch")))
+		branch.anchor_left = float(spec.get("left", 0.0))
+		branch.anchor_right = float(spec.get("right", 0.2))
+		branch.anchor_top = float(spec.get("top", 0.0))
+		branch.anchor_bottom = branch.anchor_top
+		branch.offset_left = 0.0
+		branch.offset_right = 0.0
+		branch.offset_top = 0.0
+		branch.offset_bottom = float(spec.get("height", 6.0))
+		branch.rotation = float(spec.get("rot", 0.0))
+		branch.color = Color(0.008, 0.006, 0.009, 0.82)
+	_ensure_hostile_fortification(silhouettes)
+
+static func _ensure_hostile_fortification(silhouettes: Control) -> void:
+	var beam: ColorRect = _ensure_arena_rect(silhouettes, "RuinedPalisadeBeam")
+	beam.anchor_left = 0.17
+	beam.anchor_right = 0.35
+	beam.anchor_top = 0.27
+	beam.anchor_bottom = 0.27
+	beam.offset_left = 0.0
+	beam.offset_right = 0.0
+	beam.offset_top = 0.0
+	beam.offset_bottom = 7.0
+	beam.rotation = 0.045
+	beam.color = Color(0.055, 0.028, 0.021, 0.58)
+	var east_beam: ColorRect = _ensure_arena_rect(silhouettes, "RuinedPalisadeBeamEast")
+	east_beam.anchor_left = 0.65
+	east_beam.anchor_right = 0.83
+	east_beam.anchor_top = 0.28
+	east_beam.anchor_bottom = 0.28
+	east_beam.offset_left = 0.0
+	east_beam.offset_right = 0.0
+	east_beam.offset_top = 0.0
+	east_beam.offset_bottom = 7.0
+	east_beam.rotation = -0.052
+	east_beam.color = Color(0.055, 0.028, 0.021, 0.58)
+	var post_specs: Array[Dictionary] = [
+		{"x": 0.18, "top": 0.12, "bottom": 0.31, "w": 0.010, "rot": -0.06},
+		{"x": 0.29, "top": 0.16, "bottom": 0.32, "w": 0.009, "rot": 0.035},
+		{"x": 0.43, "top": 0.10, "bottom": 0.27, "w": 0.011, "rot": -0.025},
+		{"x": 0.56, "top": 0.13, "bottom": 0.28, "w": 0.010, "rot": 0.040},
+		{"x": 0.69, "top": 0.15, "bottom": 0.32, "w": 0.009, "rot": -0.045},
+		{"x": 0.80, "top": 0.11, "bottom": 0.29, "w": 0.010, "rot": 0.055},
+	]
+	for index: int in range(post_specs.size()):
+		var spec: Dictionary = post_specs[index]
+		var post: ColorRect = _ensure_arena_rect(silhouettes, "RuinedPalisadePost_%02d" % index)
+		var x_anchor: float = float(spec.get("x", 0.0))
+		post.anchor_left = x_anchor
+		post.anchor_right = x_anchor + float(spec.get("w", 0.016))
+		post.anchor_top = float(spec.get("top", 0.1))
+		post.anchor_bottom = float(spec.get("bottom", 0.45))
+		post.offset_left = 0.0
+		post.offset_right = 0.0
+		post.offset_top = 0.0
+		post.offset_bottom = 0.0
+		post.rotation = float(spec.get("rot", 0.0))
+		post.color = Color(0.035, 0.018, 0.015, 0.62)
+	var watch_post: ColorRect = _ensure_arena_rect(silhouettes, "HostileWatchPost")
+	watch_post.anchor_left = 0.485
+	watch_post.anchor_right = 0.515
+	watch_post.anchor_top = 0.04
+	watch_post.anchor_bottom = 0.23
+	watch_post.offset_left = 0.0
+	watch_post.offset_right = 0.0
+	watch_post.offset_top = 0.0
+	watch_post.offset_bottom = 0.0
+	watch_post.color = Color(0.028, 0.014, 0.013, 0.64)
+	var watch_crossbar: ColorRect = _ensure_arena_rect(silhouettes, "HostileWatchCrossbar")
+	watch_crossbar.anchor_left = 0.445
+	watch_crossbar.anchor_right = 0.555
+	watch_crossbar.anchor_top = 0.12
+	watch_crossbar.anchor_bottom = 0.12
+	watch_crossbar.offset_left = 0.0
+	watch_crossbar.offset_right = 0.0
+	watch_crossbar.offset_top = 0.0
+	watch_crossbar.offset_bottom = 10.0
+	watch_crossbar.rotation = 0.02
+	watch_crossbar.color = Color(0.028, 0.014, 0.013, 0.64)
+
+static func _ensure_arena_war_aftermath_geometry(arena: Control) -> void:
+	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
+	if aftermath == null:
+		aftermath = Control.new()
+		aftermath.name = "ArenaWarAftermath"
+		aftermath.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		aftermath.z_index = -2
+		arena.add_child(aftermath)
+		aftermath.set_anchors_preset(Control.PRESET_FULL_RECT)
+		aftermath.offset_left = 0.0
+		aftermath.offset_top = 0.0
+		aftermath.offset_right = 0.0
+		aftermath.offset_bottom = 0.0
+	aftermath.set_meta("visual_role", "non_unit_physical_war_aftermath")
+	var pressure_painter: ArenaPressurePainter = aftermath.get_node_or_null("ArenaPressurePainter") as ArenaPressurePainter
+	if pressure_painter == null:
+		pressure_painter = ArenaPressurePainter.new()
+		pressure_painter.name = "ArenaPressurePainter"
+		# The evidence is above the raster ground but still below actor/status layers.
+		pressure_painter.z_index = 1
+		aftermath.add_child(pressure_painter)
+		pressure_painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		pressure_painter.offset_left = 0.0
+		pressure_painter.offset_top = 0.0
+		pressure_painter.offset_right = 0.0
+		pressure_painter.offset_bottom = 0.0
+	# Repair already-instantiated boards as well as newly-created ones.
+	pressure_painter.z_index = 1
+	pressure_painter.configure(0, false, 0.0, 0)
+
+	var onset: Control = _ensure_arena_state_group(aftermath, "OnsetAftermathGeometry")
+	_populate_arena_war_geometry(onset, "onset", 6, 0.24)
+
+	var midfight: Control = _ensure_arena_state_group(aftermath, "MidfightAftermathGeometry")
+	_populate_arena_war_geometry(midfight, "midfight", 10, 0.36)
+
+	var collapse: Control = _ensure_arena_state_group(aftermath, "CollapseAftermathGeometry")
+	_populate_arena_war_geometry(collapse, "collapse", 9, 0.46)
+
+	var reduced_lock: Control = _ensure_arena_state_group(aftermath, "ReducedMotionGrimeLock")
+	_populate_arena_war_geometry(reduced_lock, "reduced", 4, 0.12)
+	if not aftermath.has_meta("state_groups_initialized"):
+		onset.visible = true
+		midfight.visible = false
+		collapse.visible = false
+		reduced_lock.visible = false
+		aftermath.set_meta("state_groups_initialized", true)
+
+static func _ensure_arena_state_group(parent_control: Control, node_name: String) -> Control:
+	var group: Control = parent_control.get_node_or_null(node_name) as Control
+	if group == null:
+		group = Control.new()
+		group.name = node_name
+		group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent_control.add_child(group)
+		group.set_anchors_preset(Control.PRESET_FULL_RECT)
+		group.offset_left = 0.0
+		group.offset_top = 0.0
+		group.offset_right = 0.0
+		group.offset_bottom = 0.0
+	return group
+
+static func _populate_arena_war_geometry(group: Control, evidence_state: String, evidence_count: int, overlay_density: float) -> void:
+	for child: Node in group.get_children():
+		if child.name != "PhysicalEvidencePainter":
+			group.remove_child(child)
+			child.queue_free()
+	var painter: ArenaEvidencePainter = group.get_node_or_null("PhysicalEvidencePainter") as ArenaEvidencePainter
+	if painter == null:
+		painter = ArenaEvidencePainter.new()
+		painter.name = "PhysicalEvidencePainter"
+		group.add_child(painter)
+		painter.set_anchors_preset(Control.PRESET_FULL_RECT)
+		painter.offset_left = 0.0
+		painter.offset_top = 0.0
+		painter.offset_right = 0.0
+		painter.offset_bottom = 0.0
+	painter.configure(evidence_state)
+	group.set_meta("physical_evidence_state", evidence_state)
+	group.set_meta("physical_evidence_count", evidence_count)
+	group.set_meta("overlay_density", overlay_density)
+	group.set_meta("protected_center_clear", true)
+
+static func _ensure_arena_weather_banks(arena: Control) -> void:
+	var fog: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaGroundFog", -3)
+	if fog != null:
+		var fog_gradient: Gradient = Gradient.new()
+		fog_gradient.offsets = PackedFloat32Array([0.0, 0.30, 0.58, 0.80, 1.0])
+		fog_gradient.colors = PackedColorArray([
+			Color(0.02, 0.018, 0.020, 0.0),
+			Color(0.18, 0.19, 0.17, 0.05),
+			Color(0.44, 0.42, 0.36, 0.20),
+			Color(0.12, 0.13, 0.12, 0.10),
+			Color(0.01, 0.009, 0.012, 0.0),
+		])
+		var fog_texture: GradientTexture2D = GradientTexture2D.new()
+		fog_texture.width = 512
+		fog_texture.height = 256
+		fog_texture.fill_from = Vector2(0.05, 0.88)
+		fog_texture.fill_to = Vector2(0.95, 0.46)
+		fog_texture.gradient = fog_gradient
+		fog.texture = fog_texture
+	var smoke: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaHostileSmoke", -3)
+	if smoke != null:
+		var smoke_gradient: Gradient = Gradient.new()
+		smoke_gradient.offsets = PackedFloat32Array([0.0, 0.26, 0.64, 1.0])
+		smoke_gradient.colors = PackedColorArray([
+			Color(0.22, 0.030, 0.024, 0.10),
+			Color(0.10, 0.075, 0.070, 0.09),
+			Color(0.18, 0.17, 0.15, 0.04),
+			Color(0.0, 0.0, 0.0, 0.0),
+		])
+		var smoke_texture: GradientTexture2D = GradientTexture2D.new()
+		smoke_texture.width = 512
+		smoke_texture.height = 256
+		smoke_texture.fill_from = Vector2(0.98, 0.02)
+		smoke_texture.fill_to = Vector2(0.12, 0.56)
+		smoke_texture.gradient = smoke_gradient
+		smoke.texture = smoke_texture
+
+static func _ensure_arena_wet_ground_reflection(arena: Control) -> void:
+	var reflection: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaWetGroundReflection", -3)
+	if reflection == null:
+		return
+	var reflection_gradient: Gradient = Gradient.new()
+	reflection_gradient.offsets = PackedFloat32Array([0.0, 0.44, 0.63, 0.78, 1.0])
+	reflection_gradient.colors = PackedColorArray([
+		Color(0.0, 0.0, 0.0, 0.0),
+		Color(0.0, 0.0, 0.0, 0.0),
+		Color(0.78, 0.66, 0.48, 0.06),
+		Color(0.72, 0.14, 0.09, 0.06),
+		Color(0.22, 0.20, 0.17, 0.05),
+	])
+	var reflection_texture: GradientTexture2D = GradientTexture2D.new()
+	reflection_texture.width = 512
+	reflection_texture.height = 512
+	reflection_texture.fill_from = Vector2(0.5, 0.0)
+	reflection_texture.fill_to = Vector2(0.5, 1.0)
+	reflection_texture.gradient = reflection_gradient
+	reflection.texture = reflection_texture
+
+static func _ensure_arena_rect(parent_control: Control, node_name: String) -> ColorRect:
+	var rect: ColorRect = parent_control.get_node_or_null(node_name) as ColorRect
+	if rect == null:
+		rect = ColorRect.new()
+		rect.name = node_name
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent_control.add_child(rect)
+	return rect
+
+static func _ensure_arena_pressure_lighting(arena: Control) -> void:
+	var enemy_light: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaEnemyPressureLight", -4)
+	if enemy_light != null:
+		var enemy_gradient: Gradient = Gradient.new()
+		enemy_gradient.offsets = PackedFloat32Array([0.0, 0.30, 0.68, 1.0])
+		enemy_gradient.colors = PackedColorArray([
+			Color(0.98, 0.24, 0.08, 0.28),
+			Color(0.54, 0.055, 0.035, 0.20),
+			Color(0.13, 0.012, 0.018, 0.06),
+			Color(0.0, 0.0, 0.0, 0.0),
+		])
+		var enemy_texture: GradientTexture2D = GradientTexture2D.new()
+		enemy_texture.width = 512
+		enemy_texture.height = 512
+		enemy_texture.fill_from = Vector2(0.98, 0.02)
+		enemy_texture.fill_to = Vector2(0.12, 0.84)
+		enemy_texture.gradient = enemy_gradient
+		enemy_light.texture = enemy_texture
+	var player_light: TextureRect = _ensure_arena_gradient_layer(arena, "ArenaPlayerPressureLight", -4)
+	if player_light != null:
+		var player_gradient: Gradient = Gradient.new()
+		player_gradient.offsets = PackedFloat32Array([0.0, 0.26, 0.62, 1.0])
+		player_gradient.colors = PackedColorArray([
+			Color(0.88, 0.72, 0.38, 0.20),
+			Color(0.31, 0.34, 0.26, 0.14),
+			Color(0.035, 0.075, 0.070, 0.05),
+			Color(0.0, 0.0, 0.0, 0.0),
+		])
+		var player_texture: GradientTexture2D = GradientTexture2D.new()
+		player_texture.width = 512
+		player_texture.height = 512
+		player_texture.fill_from = Vector2(0.04, 0.98)
+		player_texture.fill_to = Vector2(0.88, 0.22)
+		player_texture.gradient = player_gradient
+		player_light.texture = player_texture
+
+static func _ensure_arena_threat_incursions(arena: Control) -> void:
+	var incursions: Control = arena.get_node_or_null("ArenaThreatIncursions") as Control
+	if incursions == null:
+		incursions = Control.new()
+		incursions.name = "ArenaThreatIncursions"
+		incursions.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		incursions.z_index = -3
+		arena.add_child(incursions)
+		incursions.set_anchors_preset(Control.PRESET_FULL_RECT)
+		incursions.offset_left = 0.0
+		incursions.offset_top = 0.0
+		incursions.offset_right = 0.0
+		incursions.offset_bottom = 0.0
+	var incursion_specs: Array[Dictionary] = [
+		{"name": "IncursionNorthWest", "left": -0.01, "top": 0.08, "right": 0.10, "h": 4.0, "rot": -0.12, "a": 0.22},
+		{"name": "IncursionNorthEast", "left": 0.90, "top": 0.22, "right": 1.01, "h": 3.0, "rot": 0.08, "a": 0.20},
+		{"name": "IncursionSouthEast", "left": 0.91, "top": 0.76, "right": 1.01, "h": 3.0, "rot": -0.19, "a": 0.18},
+	]
+	for spec: Dictionary in incursion_specs:
+		var incursion_name: String = String(spec.get("name", "Incursion"))
+		var incursion: ColorRect = incursions.get_node_or_null(incursion_name) as ColorRect
+		if incursion == null:
+			incursion = ColorRect.new()
+			incursion.name = incursion_name
+			incursion.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			incursions.add_child(incursion)
+		incursion.anchor_left = float(spec.get("left", 0.0))
+		incursion.anchor_right = float(spec.get("right", 0.2))
+		incursion.anchor_top = float(spec.get("top", 0.0))
+		incursion.anchor_bottom = incursion.anchor_top
+		incursion.offset_left = 0.0
+		incursion.offset_right = 0.0
+		incursion.offset_top = 0.0
+		incursion.offset_bottom = float(spec.get("h", 4.0))
+		incursion.rotation = float(spec.get("rot", 0.0))
+		incursion.color = Color(0.72, 0.13, 0.060, float(spec.get("a", 0.2)))
+
+static func _ensure_arena_gradient_layer(arena: Control, node_name: String, z_value: int) -> TextureRect:
+	var layer: TextureRect = arena.get_node_or_null(node_name) as TextureRect
+	if layer == null:
+		layer = TextureRect.new()
+		layer.name = node_name
+		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.z_index = z_value
+		arena.add_child(layer)
+		layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+		layer.offset_left = 0.0
+		layer.offset_top = 0.0
+		layer.offset_right = 0.0
+		layer.offset_bottom = 0.0
+	layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	layer.stretch_mode = TextureRect.STRETCH_SCALE
+	return layer
+
+static func _ensure_arena_ash_marks(arena: Control) -> void:
+	var marks: Control = arena.get_node_or_null("ArenaAshMarks") as Control
+	if marks == null:
+		marks = Control.new()
+		marks.name = "ArenaAshMarks"
+		marks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		marks.z_index = -1
+		arena.add_child(marks)
+		marks.set_anchors_preset(Control.PRESET_FULL_RECT)
+		marks.offset_left = 0.0
+		marks.offset_top = 0.0
+		marks.offset_right = 0.0
+		marks.offset_bottom = 0.0
+	var mark_specs: Array[Dictionary] = [
+		{"x": 0.08, "y": 0.15, "w": 104.0, "rot": -0.16, "a": 0.16},
+		{"x": 0.27, "y": 0.08, "w": 62.0, "rot": 0.11, "a": 0.11},
+		{"x": 0.58, "y": 0.20, "w": 132.0, "rot": -0.09, "a": 0.14},
+		{"x": 0.78, "y": 0.32, "w": 78.0, "rot": 0.18, "a": 0.12},
+		{"x": 0.14, "y": 0.67, "w": 92.0, "rot": 0.13, "a": 0.10},
+		{"x": 0.42, "y": 0.78, "w": 144.0, "rot": -0.12, "a": 0.13},
+		{"x": 0.70, "y": 0.64, "w": 116.0, "rot": 0.08, "a": 0.11},
+		{"x": 0.88, "y": 0.82, "w": 54.0, "rot": -0.20, "a": 0.15},
+	]
+	for index: int in range(mark_specs.size()):
+		var mark_name: String = "AshSlash_%02d" % index
+		var mark: ColorRect = marks.get_node_or_null(mark_name) as ColorRect
+		if mark == null:
+			mark = ColorRect.new()
+			mark.name = mark_name
+			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			marks.add_child(mark)
+		var spec: Dictionary = mark_specs[index]
+		var x_anchor: float = float(spec.get("x", 0.0))
+		var y_anchor: float = float(spec.get("y", 0.0))
+		mark.anchor_left = x_anchor
+		mark.anchor_right = x_anchor
+		mark.anchor_top = y_anchor
+		mark.anchor_bottom = y_anchor
+		mark.offset_left = -8.0
+		mark.offset_top = -1.0
+		mark.offset_right = float(spec.get("w", 80.0))
+		mark.offset_bottom = 1.0
+		mark.rotation = float(spec.get("rot", 0.0))
+		var alpha: float = float(spec.get("a", 0.10))
+		mark.color = Color(0.88, 0.78, 0.62, alpha)
+
+static func _ensure_arena_rupture_branches(arena: Control) -> void:
+	var branches: Control = arena.get_node_or_null("ArenaRuptureBranches") as Control
+	if branches == null:
+		branches = Control.new()
+		branches.name = "ArenaRuptureBranches"
+		branches.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		branches.z_index = -1
+		arena.add_child(branches)
+		branches.set_anchors_preset(Control.PRESET_FULL_RECT)
+		branches.offset_left = 0.0
+		branches.offset_top = 0.0
+		branches.offset_right = 0.0
+		branches.offset_bottom = 0.0
+	var branch_specs: Array[Dictionary] = [
+		{"x": 0.13, "w": 72.0, "rot": -0.34},
+		{"x": 0.34, "w": 54.0, "rot": 0.28},
+		{"x": 0.61, "w": 86.0, "rot": -0.24},
+		{"x": 0.82, "w": 64.0, "rot": 0.31},
+	]
+	for index: int in range(branch_specs.size()):
+		var branch_name: String = "RuptureBranch_%02d" % index
+		var branch: ColorRect = branches.get_node_or_null(branch_name) as ColorRect
+		if branch == null:
+			branch = ColorRect.new()
+			branch.name = branch_name
+			branch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			branches.add_child(branch)
+		var spec: Dictionary = branch_specs[index]
+		var x_anchor: float = float(spec.get("x", 0.0))
+		branch.anchor_left = x_anchor
+		branch.anchor_right = x_anchor
+		branch.anchor_top = 0.5
+		branch.anchor_bottom = 0.5
+		branch.offset_left = -4.0
+		branch.offset_top = -1.0
+		branch.offset_right = float(spec.get("w", 64.0))
+		branch.offset_bottom = 1.0
+		branch.rotation = float(spec.get("rot", 0.0))
+		branch.color = Color(0.98, 0.19, 0.09, 0.34)
+
+static func _ensure_arena_rupture_segments(arena: Control) -> void:
+	var segments: Control = arena.get_node_or_null("ArenaRuptureSegments") as Control
+	if segments == null:
+		segments = Control.new()
+		segments.name = "ArenaRuptureSegments"
+		segments.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		segments.z_index = -1
+		arena.add_child(segments)
+		segments.set_anchors_preset(Control.PRESET_FULL_RECT)
+		segments.offset_left = 0.0
+		segments.offset_top = 0.0
+		segments.offset_right = 0.0
+		segments.offset_bottom = 0.0
+	var segment_specs: Array[Dictionary] = [
+		{"left": 0.02, "right": 0.08, "y": 0.500, "h": 3.0, "rot": -0.025},
+		{"left": 0.18, "right": 0.25, "y": 0.494, "h": 2.0, "rot": 0.032},
+		{"left": 0.38, "right": 0.45, "y": 0.505, "h": 3.0, "rot": -0.018},
+		{"left": 0.55, "right": 0.62, "y": 0.496, "h": 2.0, "rot": 0.028},
+		{"left": 0.75, "right": 0.82, "y": 0.507, "h": 3.0, "rot": -0.036},
+		{"left": 0.92, "right": 0.98, "y": 0.498, "h": 2.0, "rot": 0.020},
+	]
+	for index: int in range(segment_specs.size()):
+		var segment_name: String = "RuptureSegment_%02d" % index
+		var segment: ColorRect = segments.get_node_or_null(segment_name) as ColorRect
+		if segment == null:
+			segment = ColorRect.new()
+			segment.name = segment_name
+			segment.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			segments.add_child(segment)
+		var spec: Dictionary = segment_specs[index]
+		segment.anchor_left = float(spec.get("left", 0.0))
+		segment.anchor_right = float(spec.get("right", 0.1))
+		segment.anchor_top = float(spec.get("y", 0.5))
+		segment.anchor_bottom = segment.anchor_top
+		segment.offset_left = 0.0
+		segment.offset_right = 0.0
+		segment.offset_top = -1.0
+		segment.offset_bottom = float(spec.get("h", 4.0)) - 1.0
+		segment.rotation = float(spec.get("rot", 0.0))
+		segment.color = Color(0.82, 0.20, 0.080, 0.42)
+
+static func _ensure_arena_cell_seams(arena: Control) -> void:
+	var seams: GridContainer = arena.get_node_or_null("ArenaCellSeams") as GridContainer
+	if seams == null:
+		seams = GridContainer.new()
+		seams.name = "ArenaCellSeams"
+		seams.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		seams.z_index = -1
+		seams.columns = 8
+		seams.add_theme_constant_override("h_separation", 0)
+		seams.add_theme_constant_override("v_separation", 0)
+		arena.add_child(seams)
+		seams.set_anchors_preset(Control.PRESET_FULL_RECT)
+		seams.offset_left = 0.0
+		seams.offset_top = 0.0
+		seams.offset_right = 0.0
+		seams.offset_bottom = 0.0
+		for cell_index: int in range(48):
+			var cell: Panel = Panel.new()
+			cell.name = "SeamCell_%02d" % cell_index
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			cell.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			seams.add_child(cell)
+	for cell_index: int in range(mini(48, seams.get_child_count())):
+		var cell: Panel = seams.get_child(cell_index) as Panel
+		if cell == null:
+			continue
+		var seam_style: StyleBoxFlat = StyleBoxFlat.new()
+		var row_index: int = floori(float(cell_index) / 8.0)
+		var column_index: int = cell_index % 8
+		var enemy_side: bool = row_index <= 2
+		var major_seam: bool = row_index == 2 or column_index == 3
+		var alternating_cell: bool = (row_index + column_index) % 2 == 0
+		# The field remains muddy and subordinate, but the side-specific wash and
+		# weighted seams now survive a real 1080p combat glance without turning
+		# into a debug graph.
+		seam_style.bg_color = Color(0.14, 0.030, 0.018, 0.070 if alternating_cell else 0.032) if enemy_side else Color(0.14, 0.115, 0.070, 0.066 if alternating_cell else 0.030)
+		seam_style.border_color = Color(0.68, 0.25, 0.10, 0.50 if major_seam else 0.29) if enemy_side else Color(0.76, 0.66, 0.42, 0.52 if major_seam else 0.31)
+		seam_style.border_width_right = 2 if column_index == 3 else 1
+		seam_style.border_width_bottom = 2 if row_index == 2 else 1
+		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
+		seam_style.shadow_size = 1
+		seam_style.shadow_offset = Vector2(1.0, 1.0)
+		cell.add_theme_stylebox_override("panel", seam_style)
+	seams.set_meta("major_seam_non_color_weight", 2)
+	seams.set_meta("minor_seam_non_color_weight", 1)
+	seams.set_meta("terrain_seam_alpha", 0.21)
+	seams.set_meta("alternating_material_cell_wash", true)
+	seams.set_meta("side_separation", "enemy_oxblood_player_bone_with_black_understroke")
+	seams.set_meta("debug_graph_grid_suppressed", true)
+
+static func _ensure_arena_field_label(arena: Control, node_name: String, copy: String, enemy_side: bool) -> void:
+	var label: Label = arena.get_node_or_null(node_name) as Label
+	if label == null:
+		label = Label.new()
+		label.name = node_name
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.z_index = -1
+		arena.add_child(label)
+	label.anchor_left = 0.0
+	label.anchor_right = 0.0
+	label.anchor_top = 0.0 if enemy_side else 1.0
+	label.anchor_bottom = 0.0 if enemy_side else 1.0
+	label.offset_left = 12.0
+	label.offset_right = 360.0
+	label.offset_top = 10.0 if enemy_side else -40.0
+	label.offset_bottom = 40.0 if enemy_side else -10.0
+	label.text = "▲ %s // BREACH" % copy if enemy_side else "■ %s // SURVIVE" % copy
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Color(0.88, 0.48, 0.38, 0.76) if enemy_side else Color(0.82, 0.76, 0.62, 0.74))
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
+	label.add_theme_constant_override("outline_size", 2)
+	var label_backing: StyleBoxFlat = StyleBoxFlat.new()
+	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.60)
+	label_backing.border_color = Color(0.48, 0.16, 0.10, 0.64) if enemy_side else Color(0.46, 0.39, 0.28, 0.58)
+	label_backing.border_width_left = 2
+	label_backing.content_margin_left = 8.0
+	label_backing.content_margin_right = 8.0
+	label.add_theme_stylebox_override("normal", label_backing)
+	label.set_meta("non_color_zone_cue", "triangle_breach" if enemy_side else "square_survival")
+	label.set_meta("persistent_copy_uses_utility_face", true)
+	VisualTypeSystem.set_utility_bold(label)
+
+static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	if is_player:
+		style.bg_color = Color(0.055, 0.074, 0.072, 0.042)
+		style.border_color = Color(0.75, 0.70, 0.58, 0.78)
+		style.border_width_top = 3
+	else:
+		style.bg_color = Color(0.12, 0.025, 0.030, 0.050)
+		style.border_color = Color(0.80, 0.075, 0.09, 0.84)
+		style.border_width_bottom = 3
+	return style
 
 static func _remove_named_child(root: Control, node_name: String) -> void:
 	var node: Node = root.find_child(node_name, true, false)
@@ -630,8 +2808,9 @@ static func _style_shop_command_bar(root: Control) -> void:
 				var label: Label = grandchild as Label
 				if label.name == "Label" and label.text.begins_with("Lvl "):
 					label.custom_minimum_size = Vector2(98.0, 40.0)
-					label.add_theme_font_size_override("font_size", 15)
-					label.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+					label.add_theme_font_size_override("font_size", 18)
+					VisualTypeSystem.set_action(label)
+					label.add_theme_color_override("font_color", COLOR_TEXT)
 					label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 static func _has_ancestor_named(node: Node, ancestor_name: String) -> bool:
@@ -664,8 +2843,34 @@ static func _hover_style(bg_color: Color, border_color: Color, border_width: int
 	style.shadow_color = Color(0.74, 0.22, 0.055, 0.34)
 	return style
 
+static func _hard_panel_style(bg_color: Color, accent_color: Color, side_accent: bool) -> StyleBoxFlat:
+	var style: StyleBoxFlat = _style(bg_color, accent_color, 1, 0)
+	style.border_width_left = 5 if side_accent else 2
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 2
+	style.shadow_size = 12
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.58)
+	return style
+
 static func _focus_outline(radius: int) -> StyleBoxFlat:
-	return GothicUIAssets.focus_outline_style(radius, COLOR_GOLD_HOT)
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	style.border_color = COLOR_GOLD_HOT
+	style.set_border_width_all(2)
+	style.expand_margin_left = 2.0
+	style.expand_margin_top = 2.0
+	style.expand_margin_right = 2.0
+	style.expand_margin_bottom = 2.0
+	return style
+
+static func _apply_flat_button_states(button: Button, accent: Color) -> void:
+	button.add_theme_stylebox_override("normal", _hard_panel_style(Color(0.052, 0.045, 0.054, 0.98), Color(accent.r, accent.g, accent.b, 0.78), false))
+	button.add_theme_stylebox_override("hover", _hard_panel_style(Color(0.10, 0.052, 0.058, 0.99), Color(minf(1.0, accent.r + 0.18), minf(1.0, accent.g + 0.18), minf(1.0, accent.b + 0.16), 0.96), true))
+	button.add_theme_stylebox_override("pressed", _hard_panel_style(Color(0.16, 0.025, 0.038, 1.0), COLOR_BLOOD_HOT, true))
+	button.add_theme_stylebox_override("hover_pressed", _hard_panel_style(Color(0.20, 0.028, 0.042, 1.0), COLOR_GOLD, true))
+	button.add_theme_stylebox_override("disabled", _hard_panel_style(Color(0.030, 0.027, 0.032, 0.88), Color(0.25, 0.23, 0.24, 0.72), false))
+	button.add_theme_stylebox_override("focus", _focus_outline(0))
 
 static func _mark_interactive(button: Button) -> void:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

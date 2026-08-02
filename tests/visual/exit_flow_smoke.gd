@@ -1,6 +1,7 @@
 extends Node
 
 const MainScene: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/exit_menu_pass"
 const SYSTEM_BACKDROP_MAX_ALPHA: float = 0.62
@@ -24,9 +25,13 @@ func _run() -> void:
 	add_child(_main)
 	await _settle_frames(2)
 
-	_expect(_node_visible("TitleMenu"), "title menu should be visible on boot")
+	_expect(_node_visible("TitlePage"), "title page should be visible on boot")
+	_expect(not _node_visible("TitleMenu"), "title menu should wait behind the title page on boot")
 	_expect(not _button_visible("SystemMenuButton"), "system menu button should be hidden on title")
 
+	_press_title_enter()
+	await _settle_frames(2)
+	_expect(_node_visible("TitleMenu"), "title menu should be visible after entering title page")
 	_press_title_start()
 	await _settle_frames(2)
 	_expect(_node_visible("UnitSelect"), "unit select should be visible after start")
@@ -37,9 +42,9 @@ func _run() -> void:
 	_expect(get_tree().paused, "opening system menu should pause the game")
 	_expect(_overlay_visible(), "system menu overlay should be visible during unit select")
 	_expect(_system_backdrop_alpha_in_range(), "system menu backdrop should keep underlying context readable")
-	_expect(_control_uses_texture_style("SystemMenuButton", "normal"), "system menu button should use the generated small button asset")
-	_expect(_control_uses_texture_style("SystemMenuOverlay/Center/Panel", "panel"), "system menu overlay should use the generated wide panel asset")
-	_expect(_control_uses_texture_style("SystemMenuOverlay/Center/Panel/Margin/Stack/ResumeButton", "normal"), "resume button should use the generated primary button asset")
+	_expect(_control_uses_hard_flat_style("SystemMenuButton", "normal"), "system menu button should use hard rectangular routine furniture")
+	_expect(_control_uses_hard_flat_style("SystemMenuOverlay/Center/Panel", "panel"), "system menu overlay should use hard rectangular field furniture")
+	_expect(_control_uses_hard_flat_style("SystemMenuOverlay/Center/Panel/Margin/Stack/ResumeButton", "normal"), "resume button should use a hard rectangular action state")
 	_expect(_button_exists("ResumeButton"), "resume button missing")
 	_expect(_button_exists("NewRunButton"), "new run button missing")
 	_expect(_button_exists("ReturnTitleButton"), "return to title button missing")
@@ -61,8 +66,8 @@ func _run() -> void:
 
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle_frames(6)
-	_expect(_node_visible("CombatView"), "combat view should be visible after selecting a unit")
+	var combat: Control = await MainTransitionWait.for_combat_view(self, _main)
+	_expect(combat != null and _node_visible("CombatView"), "combat view should be visible after selecting a unit")
 	_expect(_button_visible("SystemMenuButton"), "system menu button should be visible during combat")
 	_expect(not _embedded_combat_menu_visible(), "embedded combat menu button should be hidden")
 
@@ -75,7 +80,8 @@ func _run() -> void:
 	_press_button("ReturnTitleButton")
 	await _settle_frames(3)
 	_expect(not get_tree().paused, "return to title should unpause")
-	_expect(_node_visible("TitleMenu"), "return to title should show title menu")
+	_expect(_node_visible("TitlePage"), "return to title should show title page")
+	_expect(not _node_visible("TitleMenu"), "return to title should hide title menu until entered")
 	_expect(not _node_visible("CombatView"), "return to title should hide combat")
 	_expect(not _button_visible("SystemMenuButton"), "system menu button should hide on title")
 	_expect(GameState.phase == GameState.GamePhase.MENU, "return to title should set menu phase")
@@ -84,6 +90,8 @@ func _run() -> void:
 	fake_loss_layer.name = "LossOverlayLayer"
 	fake_loss_layer.layer = 100
 	get_tree().root.add_child(fake_loss_layer)
+	_press_title_enter()
+	await _settle_frames(2)
 	_press_title_start()
 	await _settle_frames(2)
 	_refresh_system_menu_state()
@@ -101,12 +109,31 @@ func _run() -> void:
 	_expect(_unit_select_reset(), "new run from overlay state should clear unit select choice")
 
 	UnitFactory.suppress_validation_warnings = _previous_suppress_validation_warnings
+	var exit_code: int = 0
 	if _failures.is_empty():
 		print("ExitFlowSmoke: OK")
 	else:
 		for failure: String in _failures:
 			push_error("ExitFlowSmoke: " + failure)
-	get_tree().quit()
+		exit_code = 1
+	if _main != null and is_instance_valid(_main):
+		var combat_view: Node = _main.get_node_or_null("CombatView")
+		if combat_view != null and combat_view.has_method("_teardown"):
+			combat_view.call("_teardown")
+		var main_parent: Node = _main.get_parent()
+		if main_parent != null:
+			main_parent.remove_child(_main)
+		_main.free()
+		_main = null
+	await _settle_frames(4)
+	get_tree().quit(exit_code)
+
+func _press_title_enter() -> void:
+	var button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
+	if button == null:
+		_expect(false, "title page enter button missing")
+		return
+	button.pressed.emit()
 
 func _press_title_start() -> void:
 	var button: Button = _main.get_node_or_null("TitleMenu/Center/VBox/StartButton") as Button
@@ -153,6 +180,19 @@ func _control_uses_texture_style(path_or_name: String, style_name: String) -> bo
 		return false
 	return control.get_theme_stylebox(style_name) is StyleBoxTexture
 
+func _control_uses_hard_flat_style(path_or_name: String, style_name: String) -> bool:
+	if _main == null:
+		return false
+	var control: Control = _main.get_node_or_null("SystemMenuLayer/" + path_or_name) as Control
+	if control == null:
+		control = _main.find_child(path_or_name, true, false) as Control
+	if control == null:
+		return false
+	var style: StyleBoxFlat = control.get_theme_stylebox(style_name) as StyleBoxFlat
+	if style == null:
+		return false
+	return style.corner_radius_top_left == 0 and style.corner_radius_top_right == 0 and style.corner_radius_bottom_left == 0 and style.corner_radius_bottom_right == 0
+
 func _overlay_visible() -> bool:
 	var overlay: Control = _main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay") as Control
 	return overlay != null and overlay.visible
@@ -194,15 +234,15 @@ func _save_capture(filename: String) -> void:
 		return
 	var texture: ViewportTexture = get_viewport().get_texture()
 	if texture == null or not texture.get_rid().is_valid():
-		print("ExitFlowSmoke: skipped %s because viewport texture is unavailable" % filename)
+		_expect(false, "capture failed for %s because viewport texture is unavailable" % filename)
 		return
 	var image: Image = texture.get_image()
 	if image == null or image.is_empty():
-		print("ExitFlowSmoke: skipped %s because viewport image is unavailable" % filename)
+		_expect(false, "capture failed for %s because viewport image is unavailable" % filename)
 		return
 	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
 	var err: Error = image.save_png(path)
 	if err != OK:
-		print("ExitFlowSmoke: failed to save %s error=%d" % [ProjectSettings.globalize_path(path), int(err)])
+		_expect(false, "failed to save %s error=%d" % [ProjectSettings.globalize_path(path), int(err)])
 		return
 	print("ExitFlowSmoke: saved %s" % ProjectSettings.globalize_path(path))

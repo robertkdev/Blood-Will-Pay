@@ -1,0 +1,1435 @@
+{
+  "schema_version": 1,
+  "source_files": [
+    "tools/art/source/hardcore_ui_2026_07_29/menu_backdrop_source.png",
+    "tools/art/source/hardcore_ui_2026_07_29/hardcore_components_source.png",
+    "tools/art/source/hardcore_ui_2026_07_29/gothic_components_source.png"
+  ],
+  "asset_count": 178,
+  "assets": [
+    {
+      "path": "assets/ui/hardcore/menu_backdrop_4k.png",
+      "width": 3840,
+      "height": 2160,
+      "alpha_min": 255,
+      "alpha_max": 255,
+      "sha256": "d66a2a731b950a51a9be20736969dda65e0e354f540b3b88f9f1f8abe3e2dfac"
+    },
+    {
+      "path": "assets/ui/hardcore/menu_poster_border_4k.png",
+      "width": 3840,
+      "height": 2160,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e005f2fd628292b4b3fc3849dd2c413b4b247399f533b534d084f48fae903f5c"
+    },
+    {
+      "path": "assets/ui/hardcore/loss_backdrop_4k.png",
+      "width": 3840,
+      "height": 2160,
+      "alpha_min": 255,
+      "alpha_max": 255,
+      "sha256": "af940ed78037ec7b951d7a9a96f0eac82561f0f821d3722191b5115636b7df1e"
+    },
+    {
+      "path": "assets/ui/hardcore/xerox_grain_tile.png",
+      "width": 512,
+      "height": 512,
+      "alpha_min": 72,
+      "alpha_max": 72,
+      "sha256": "aa9d84be2e91318c2d3c090421aa2ccc5076b206f254de696fb65079e16ae497"
+    },
+    {
+      "path": "assets/ui/hardcore/menu_scrim.png",
+      "width": 1920,
+      "height": 1080,
+      "alpha_min": 158,
+      "alpha_max": 158,
+      "sha256": "94de9f146289a7dbf67102e152cae3cfa44e8e54b9a43bda80996aca381b5e72"
+    },
+    {
+      "path": "assets/ui/hardcore/hazard_border.png",
+      "width": 1920,
+      "height": 1080,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "b8ee45cc90a585eab719f0ecb55219980b80a8150a1cbf1544ad12f0140d5739"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_menu_rail.png",
+      "width": 640,
+      "height": 1024,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e540b6bd37cf178e514b30bfb9e52eb919197aa1851d05bcd400ba222c8f879d"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_menu_content.png",
+      "width": 1280,
+      "height": 768,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "bc097d1fa0a6d638300866f5cd9efa13bfc325c15a094b614ce5a4a5af59e8a6"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_modal.png",
+      "width": 1020,
+      "height": 680,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "603de12b21ec4491268bb0e355566e588fa1d97782b03112004847f23abdcb2b"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_choice_card.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "3f1989a8b07f25f94f6aa5b2187180bd7275fc013258b76701f9cb86aa39d111"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_info_card.png",
+      "width": 640,
+      "height": 192,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "473412d30e7461b0c1850b7e91d4e4bcffb4550c506fcdc5f69d95b8a0786f6a"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_popup_menu.png",
+      "width": 360,
+      "height": 256,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6b741a9d19d48c7c4f86c2b7c5121a62178882a553ff7c574959bcfdfb736dad"
+    },
+    {
+      "path": "assets/ui/hardcore/popup_item_highlight.png",
+      "width": 320,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "c089aadf60c8156bbc1b82ef37e69d8b098f2726b6365fb6d5631dcd85bcb8a4"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_tooltip.png",
+      "width": 640,
+      "height": 384,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "35b5087694dbc4f62f54757a531165a5df3f7d8de45466a0d98c25d6efaaa78e"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_loss_summary.png",
+      "width": 900,
+      "height": 720,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9d542d00a52d5061ec5da9bd289d0a5aa0b981d5334e6c6d20ad2ee9a3ee7058"
+    },
+    {
+      "path": "assets/ui/hardcore/panel_result_data.png",
+      "width": 760,
+      "height": 280,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "85459865559a9fe78a385c654d5cd6ff8c140af8e94a737abc1307ad1c182778"
+    },
+    {
+      "path": "assets/ui/hardcore/tag.png",
+      "width": 160,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "f0e331f06788f6feaaa773645ab3cc53631ea4919eecbdcb1f94a1d02fd19e84"
+    },
+    {
+      "path": "assets/ui/hardcore/number_badge.png",
+      "width": 40,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "7e29d0241e374e932cb62067f5432b7721e46878e48cd8a0fd35683bf00972b7"
+    },
+    {
+      "path": "assets/ui/hardcore/torn_rule.png",
+      "width": 512,
+      "height": 8,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "f3578fe54965fbcf03ff8653318ff395d3b65689c9a2217311b3aa43ab5bd48d"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_roster_panel.png",
+      "width": 760,
+      "height": 880,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "748f7fad0d4ba54919789bc5b4f0caedd279775099dfe55684ad53c5dc127dd8"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_preview_panel.png",
+      "width": 500,
+      "height": 880,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "34ece06a4b2d9d0efc4eb9dc843754463dc9ec73a63fb087e5b29d31bf214373"
+    },
+    {
+      "path": "assets/ui/hardcore/role_badge.png",
+      "width": 160,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "098eb9646cd12376f98b18d52db56d09d3805b81c9725ce52d3a1a49313ebec1"
+    },
+    {
+      "path": "assets/ui/hardcore/goal_field.png",
+      "width": 500,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "7158caa9215cf3a4d108f928c5f4c402d4b06e9069222c2d9ccd36387d3e3bd5"
+    },
+    {
+      "path": "assets/ui/hardcore/approach_tag.png",
+      "width": 160,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "480e188b3425c83f937c4c30e51d58cc31e8987e2546babb0cc45ef45519cdf5"
+    },
+    {
+      "path": "assets/ui/hardcore/result_victory.png",
+      "width": 560,
+      "height": 176,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "b715a24e5e666f79b92e3387223c0829f6a03c2d3aca8f001b6b6ead4d2e4e9b"
+    },
+    {
+      "path": "assets/ui/hardcore/result_victory_bounty.png",
+      "width": 560,
+      "height": 176,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "77e09024a4599dc5db4d0f1511cbbca5c99df87105bb57c64f91584c65814d95"
+    },
+    {
+      "path": "assets/ui/hardcore/result_defeat.png",
+      "width": 560,
+      "height": 176,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "fd50273b9b98ff2826aa05552582895635a6dce6392519ca4e2d0d8031beda41"
+    },
+    {
+      "path": "assets/ui/hardcore/result_stalemate.png",
+      "width": 560,
+      "height": 176,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6e81d2321bec84d0b2e4e792f076d0ba46a301b53215da2944b5edfa470885fc"
+    },
+    {
+      "path": "assets/ui/hardcore/loss_record_badge.png",
+      "width": 360,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9b106c7f0811e8506b4865d0c3cb00d95a45d909ac640c62c88e6e99ec325c38"
+    },
+    {
+      "path": "assets/ui/hardcore/loss_empty_stats.png",
+      "width": 720,
+      "height": 220,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "2525f43cc6b47e959445ccc2280eab008dbd7e85b318e859af8b09e032958bd0"
+    },
+    {
+      "path": "assets/ui/hardcore/pressure_status_low.png",
+      "width": 572,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "2f39b576fcb67ff4da363411037679e8f566deebf99e14b3800fdae57e08fc5d"
+    },
+    {
+      "path": "assets/ui/hardcore/pressure_status_high.png",
+      "width": 572,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "cc75cdca607f138b9bcef3976082067d27110d2c7eeb1c649be7e7f44752f35b"
+    },
+    {
+      "path": "assets/ui/hardcore/pressure_status_critical.png",
+      "width": 572,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "866d73e2a88c7863f744c90a1e789ad6a68ea7c206ebd0092574aa14184c4b91"
+    },
+    {
+      "path": "assets/ui/hardcore/pressure_impact_low.png",
+      "width": 1180,
+      "height": 112,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "414619e9083ac140506ce2959acf1bc5caf39c0b7f8714fafc4b272e53ba086c"
+    },
+    {
+      "path": "assets/ui/hardcore/pressure_impact_high.png",
+      "width": 1180,
+      "height": 112,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ebf39f3edf11bab1c371df9a60523737c98844a3bd977b5475aee788fff13be7"
+    },
+    {
+      "path": "assets/ui/hardcore/pressure_impact_critical.png",
+      "width": 1180,
+      "height": 112,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "c9453386cad767b3226028b35520dacdb4a070716310be7f447aa2aad1acaa93"
+    },
+    {
+      "path": "assets/ui/hardcore/reinforcement_callout_normal.png",
+      "width": 232,
+      "height": 54,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e878c64c0b006f02832c591f4bb25ba93aa9709885e1a57c671afd3c229e5b65"
+    },
+    {
+      "path": "assets/ui/hardcore/reinforcement_callout_critical.png",
+      "width": 232,
+      "height": 54,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "3e9686468d1742771628f6af325838c0834e0d3c6e4f8c597e3b589943c2d36d"
+    },
+    {
+      "path": "assets/ui/hardcore/result_scrim.png",
+      "width": 1920,
+      "height": 1080,
+      "alpha_min": 132,
+      "alpha_max": 132,
+      "sha256": "4c19cc5884bfe7755a8ba516583783387f05af48014fc0191dd75abeb4e47edb"
+    },
+    {
+      "path": "assets/ui/hardcore/intermission_track.png",
+      "width": 480,
+      "height": 8,
+      "alpha_min": 0,
+      "alpha_max": 235,
+      "sha256": "aa07e68b89a0feded331e344407d39bea8400bced41fbebbdf283017a9ead0e3"
+    },
+    {
+      "path": "assets/ui/hardcore/intermission_fill.png",
+      "width": 480,
+      "height": 8,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "b9f41906ddbe257ea6c68bdb1db16182f6d86264b08846ff64424903d66d3026"
+    },
+    {
+      "path": "assets/ui/hardcore/button_poster_row_normal.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "d2b9317e765315f2e5f80081cc061d13dcb7166b58155cf9cccbd7e4d0977b89"
+    },
+    {
+      "path": "assets/ui/hardcore/button_poster_row_hover.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6e340eb0090b27627ed8bf05da44e0f9722b981cb19fc1d7be19b7347ce2ccc6"
+    },
+    {
+      "path": "assets/ui/hardcore/button_poster_row_pressed.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6d2e3167f3bc6a3445c7fde591776d5f3836254cd0abdb8caa4eb4e5fe8fadd5"
+    },
+    {
+      "path": "assets/ui/hardcore/button_poster_row_focus.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "7a081bd8d20f6d7c3ec5187e4a97f3fc07a2d745f956f3fb208afb6f4ec64d20"
+    },
+    {
+      "path": "assets/ui/hardcore/button_poster_row_selected.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e7fcd232ec0d3944fbe5dfe538f6a1e81978404f603b660f4d13fd25d2f6374b"
+    },
+    {
+      "path": "assets/ui/hardcore/button_poster_row_hover_selected.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "56e23ef1788317ee4d455aa71c8fb380a878e4e4272827390046783be1f5ec5b"
+    },
+    {
+      "path": "assets/ui/hardcore/button_poster_row_disabled.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "adcd328f17dd74d6649d1749de515daad5714d4325b425e8a923e69837604a1f"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_normal.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "09b1a798c87993441cb973780ccc5c6b1f4fef4b8f4a50496afd8fe4ef5a58c2"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_hover.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "411a2e7e1363aa8d61a752c64b60617bc058b42b2d6247edcd88f33acf582e9e"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_pressed.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "f5fc4f487fda4a0748813a92be1a2081d1fd142615f8ff2491be6d55731f117e"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_focus.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "380e7efd511ef668bf73fa81200e7ca3b2f56923c6b311008ee22199ba5384dd"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_selected.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "3e1e8527fc4af5a27a7809c9dcd032d29f6eb4e863e65c58771fe9daf96b8b07"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_hover_selected.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e3ce6c72a24bf572e0bd92637fd2fd80625a310be8037ec124193ee903c53a3f"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_disabled.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "b1708ef8db662785de70242b21be268df88980ed055b804e88f2dae2f826c7a4"
+    },
+    {
+      "path": "assets/ui/hardcore/button_compact_normal.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "0be0a98887beff3cedbecdec0eb3415fe5b12444310f52b79c8dacda7b4c3dbf"
+    },
+    {
+      "path": "assets/ui/hardcore/button_compact_hover.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "019e829cfa1bf2e420e365a9a5f299f07a75d18c1f65e67deb2cead2397ad216"
+    },
+    {
+      "path": "assets/ui/hardcore/button_compact_pressed.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "47a5585e5667cc1f5f1b926c3a265b09c35f1755cb85505effb081c9423fd21b"
+    },
+    {
+      "path": "assets/ui/hardcore/button_compact_focus.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "c9d92e3f2ef4045930667bef0cde040d4b23edea905602fca030ff37f81a4370"
+    },
+    {
+      "path": "assets/ui/hardcore/button_compact_selected.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "99d3189f1921f254d2dc20806be6ab3cca71e34564e693ddbdd573156dde32d1"
+    },
+    {
+      "path": "assets/ui/hardcore/button_compact_hover_selected.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9351af864a777f6c7ed8fc976244d4ecb4278730d8a1c643f23e0ae84b8417c6"
+    },
+    {
+      "path": "assets/ui/hardcore/button_compact_disabled.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6260e5b7df48b874f6312a6a8e9fcda3fa96c0eee62d9afcc70e37498e6bf793"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_normal.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "754088671bac22156c68d09243a879408c3752ba84fc9a4691307b005fcce802"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_hover.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "44a13cdfedc91d4ea3a8cdfc78e6124593019489122d7bfdc9a4963e6b066886"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_pressed.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "1618912a11939c6277d744bdb2262edd7183d13557ba8db8108b3524769b55b5"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_focus.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "8ef2664916679c7f4d33e73b641491744029bf54cfabc9e82f79f399e4beb3da"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_selected.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "d3da7f588d4af864d7694cc9f98f8926e9e9a49d5173abc88895cbcd92a7f506"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_hover_selected.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "f4a20d314ad29f21dae01e291a6777a5aa280e8466284b96a73f4806018eb6ea"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_disabled.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "99b0f470bc623993a404283258c211c63304b1dbce6a530376498e663d9f581c"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_exhausted.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "a491d198a14d076da15c2a3d83c1b2d8d90158ebc0d3c69835876b9027201871"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_error.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "143c333084e3bf0f7b5e9aa09ebb0f63523b7c835f10cd172942f988877e60a5"
+    },
+    {
+      "path": "assets/ui/hardcore/button_choice_success.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "0837d126e5a165612183a3fc352521a7326c89691467053ab438b25782f74e3a"
+    },
+    {
+      "path": "assets/ui/hardcore/button_primary_loading.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e85c0edf8e6a855af908754dbbb6dcbfcc5f99f0a5a6c907a19d64a56709aba2"
+    },
+    {
+      "path": "assets/ui/hardcore/focus_overlay_poster_row.png",
+      "width": 520,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "693cd6e3e565fedeb3bbe2939e9c20b92008ea8fcc119b6d4b5df1693efbce05"
+    },
+    {
+      "path": "assets/ui/hardcore/focus_overlay_primary.png",
+      "width": 320,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "44faf94ab44bc6f5d411117722678c653a376e8c935b88c4b13ce9bdc90fb3a2"
+    },
+    {
+      "path": "assets/ui/hardcore/focus_overlay_compact.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "df274fd1c223186f748022665d9f9baed350d3b8f3034e6350bbad1a4949d59c"
+    },
+    {
+      "path": "assets/ui/hardcore/focus_overlay_choice.png",
+      "width": 900,
+      "height": 132,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ef74986bbf2dc5d66d334c5615c3c6f091e2acfd239d0248b268a9f12ed050ae"
+    },
+    {
+      "path": "assets/ui/hardcore/input_normal.png",
+      "width": 640,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "0c17990f1b812b9f330edddc86dea116cf7d63d50b130c610644ab9580364e41"
+    },
+    {
+      "path": "assets/ui/hardcore/input_hover.png",
+      "width": 640,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "d7d9d37b9ac747d50b32d2715ab985681af3164b0084494f10c15e09e32631b3"
+    },
+    {
+      "path": "assets/ui/hardcore/input_focus.png",
+      "width": 640,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "388e024a9998c6d7d28c605a2d3d82f26ef43e399ab412aa4ac725cf5e38edbb"
+    },
+    {
+      "path": "assets/ui/hardcore/input_populated.png",
+      "width": 640,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "23e3888617bbba3da88cbc31a10f9044228794c25c4a4a6e4a73b561628a67a8"
+    },
+    {
+      "path": "assets/ui/hardcore/input_disabled.png",
+      "width": 640,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "48d245b99934d1ad925ab7f128caf4e9e93dbce1cf0d0b32066b58f0878fc56e"
+    },
+    {
+      "path": "assets/ui/hardcore/input_error.png",
+      "width": 640,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6c5af170ddc921460615459ccbd95164af1d6fc899ea391cd018f7c459ef861d"
+    },
+    {
+      "path": "assets/ui/hardcore/input_success.png",
+      "width": 640,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "bf368250f8e0366e8f06677ccdc010bf9085a90989202952fea45e74c8f315ca"
+    },
+    {
+      "path": "assets/ui/hardcore/checkbox_unchecked.png",
+      "width": 24,
+      "height": 24,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "695c349f27f726dd27815640db653019f00b2331a7bfbdfd7ec975c1971cb7ca"
+    },
+    {
+      "path": "assets/ui/hardcore/checkbox_unchecked_hover.png",
+      "width": 24,
+      "height": 24,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "60451c74bbf3590468757f3b0ea6c7a9ff8b4f080cd89378363d820289bdf28e"
+    },
+    {
+      "path": "assets/ui/hardcore/checkbox_unchecked_focus.png",
+      "width": 24,
+      "height": 24,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ab043068c39b19b38112590eff9cf30d1be246c2a975f698220768a03bd31c67"
+    },
+    {
+      "path": "assets/ui/hardcore/checkbox_checked.png",
+      "width": 24,
+      "height": 24,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "61de204c84a9d6b20c44d5bc530c3a064f55affc1e08587628840e4362f165c3"
+    },
+    {
+      "path": "assets/ui/hardcore/checkbox_checked_hover.png",
+      "width": 24,
+      "height": 24,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "7dcfbd8a20b29d796579bf89da85d99689c072e239fa9c9a7ca520d0a7de1de8"
+    },
+    {
+      "path": "assets/ui/hardcore/checkbox_checked_focus.png",
+      "width": 24,
+      "height": 24,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "974e4129a3829983c3da1914c39393d8f7f766138440d9f1922e07d5692a0887"
+    },
+    {
+      "path": "assets/ui/hardcore/checkbox_disabled.png",
+      "width": 24,
+      "height": 24,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "325bc3690c3a1eb95ba7e9122af2a8b08cb8f760995f5f762e77a5703117133f"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_clear_normal.png",
+      "width": 20,
+      "height": 20,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "954413752f990591a921c805b75194d8b964e5d51f1cbe547795cad784e5c4aa"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_clear_hover.png",
+      "width": 20,
+      "height": 20,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6c8c543f82e9be7602042539c8e0c373d42310ed1d72b4dcd7cc43d9ec01fb45"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_clear_pressed.png",
+      "width": 20,
+      "height": 20,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "4bc8929730b638f1130dd88a5771b1f88bdede90b70d7b45131bba4b232294fc"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_dropdown_normal.png",
+      "width": 20,
+      "height": 20,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "476c54e617c01faa0c649cc7106be9115d76791246be0a03a4c460ed4d4801fd"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_dropdown_hover.png",
+      "width": 20,
+      "height": 20,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "58e4100d8db8e4ec34add951a81a732dfcbe9a9e956920a071fbb4a873524972"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_dropdown_disabled.png",
+      "width": 20,
+      "height": 20,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "748fb5f4ee9e72980bbb8340a65b77695cb792cfb9a204b5ad619aacdc04c28d"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_check.png",
+      "width": 20,
+      "height": 20,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "cf7908242b724caab52086d7caf79acb31305ede03a61d3bf27e8abd3ae61029"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_scroll_up.png",
+      "width": 12,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9eb9b9fd6e069bd038a25fc9e122c658454d7eb38b8d1633ae9c3365ae1c9bf1"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_scroll_down.png",
+      "width": 12,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9210b41645bc9a9193a5ff95e7aa759d5e4fe7cb01d425d19932d5ceb125fd4d"
+    },
+    {
+      "path": "assets/ui/hardcore/warning_icon.png",
+      "width": 64,
+      "height": 64,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "8dfb92d8f2517ec8b417403af79ea6a84febb3ae3ca315c848fb922a034a90ce"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_reinforcement.png",
+      "width": 64,
+      "height": 64,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "29508d513ceb1c3f0179a1160b443137479df0b1280cbb301675ab56e39b3a2e"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_ward.png",
+      "width": 64,
+      "height": 64,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "1a122ac6d8d4ac885dfa22849de520f4ae20c9c1efe578117eae2a75e147c2ab"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_hazard.png",
+      "width": 64,
+      "height": 64,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "c8157f76a71899c1639cbdb99214fcb346d640b50f6a7aa8a1f3339007936c28"
+    },
+    {
+      "path": "assets/ui/hardcore/icon_legacy.png",
+      "width": 64,
+      "height": 64,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9678ca2c29af391b1d5c1a2611904751937228d7b7eb438f08d8426fee066e68"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_track.png",
+      "width": 512,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "57c6547fc11c258deddd89fffc1d5184c99bb5015eff28689a9bd84a5d642486"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_track_disabled.png",
+      "width": 512,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "5c17ff4feaebe01c851e8b6728d254d2a1b0a5ff85d21cb122ccea09a5852589"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_fill.png",
+      "width": 512,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "265e1daf69360608770584146beb83189bfc0d9b1d37c20660ebe301860460bb"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_fill_disabled.png",
+      "width": 512,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "5c17ff4feaebe01c851e8b6728d254d2a1b0a5ff85d21cb122ccea09a5852589"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_grabber_normal.png",
+      "width": 28,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "5cf81dbec07259a83de139d1055fa5f620f59d210b56e4622cf915dbf7bec9ea"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_grabber_hover.png",
+      "width": 28,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "78edfcfc9c13afaea66579ce713e1b1209fc3893cd40025072b57c4b519160d5"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_grabber_focus.png",
+      "width": 28,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "5226aaa251c294e47d989fc9ebfd84fe5de7be9dce79c0d4c21d13bbba5d05e9"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_grabber_pressed.png",
+      "width": 28,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "fe6c9679e8b37635ef683e140b5c9ab743fd241af8605f60f13a67d065d5ba6d"
+    },
+    {
+      "path": "assets/ui/hardcore/slider_grabber_disabled.png",
+      "width": 28,
+      "height": 28,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e83974106a45be2ca4028f86146f90e2a08c96a597ccbaef6723e10735fdbeba"
+    },
+    {
+      "path": "assets/ui/hardcore/scroll_track.png",
+      "width": 16,
+      "height": 96,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "1f5a2d1560689e7a600f544a8260cb7f498c0fc42c75317bade73720611e18d7"
+    },
+    {
+      "path": "assets/ui/hardcore/scroll_grabber_normal.png",
+      "width": 16,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "f8857f573ffd179fa7a4995d3cdaf17baac1163d7f616b2ec7a9812b129a1e5e"
+    },
+    {
+      "path": "assets/ui/hardcore/scroll_grabber_hover.png",
+      "width": 16,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "aebca804bcc538cabb493ad2cef95b8e26927c650556bdaf4f6da80cf776f492"
+    },
+    {
+      "path": "assets/ui/hardcore/scroll_grabber_pressed.png",
+      "width": 16,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ef47c31f6aca3b5cf62ad61fb4e1c4be02a29742b7d57389abddfd8b8e24e77a"
+    },
+    {
+      "path": "assets/ui/hardcore/scroll_grabber_disabled.png",
+      "width": 16,
+      "height": 56,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "1fc14e6d4bf1e84c72ba320e553f13841932c1741c2f2361b0f1164dcf03f643"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_select_backdrop_4k.png",
+      "width": 3840,
+      "height": 2160,
+      "alpha_min": 255,
+      "alpha_max": 255,
+      "sha256": "f07e7bec70316bdafe32e516c750e0d1a1f392921bf13e705202cb4efea337d1"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_card_normal.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "48f15e74ab97d5c4ae87fef10fe65c532fc66729b81044521c4f6e56ed30fd3a"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_card_hover.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "45ffdcf6e740a9bd05e8b5a69e974fa609df1c20b105246549e5bdcc6e98e565"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_card_pressed.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e65e54fed64d8d7b94627206deb0a967344142ea263d2c0afc3376d980c220b1"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_card_focus.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "5a8d64b4b5b84ee59a9a7baee9af68f7f6f41b2fe513849b901db97682d05400"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_card_selected.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "4ed9fc7bea20f54d508d8e8086a1a1ae0de6dcae877facb23f21ebbd4223dc9c"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_card_hover_selected.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ee2baf5b3018631d900234b1d389cc8596cc9654dc1569ad69f9f0bdae08d95e"
+    },
+    {
+      "path": "assets/ui/hardcore/unit_card_disabled.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "2a118e0272f0ada572517ce463c270416ead6484d7950171227eef12ae51efd7"
+    },
+    {
+      "path": "assets/ui/hardcore/stamp_sold.png",
+      "width": 220,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "2965ff7e562948103bf5f4dba334cc77712a85f668a7261a25c4432c7705593c"
+    },
+    {
+      "path": "assets/ui/hardcore/stamp_unaffordable.png",
+      "width": 300,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "09a87652327f366b0cdf64b0760a5c93a0bc81c936d3d89f5152367c7e18f880"
+    },
+    {
+      "path": "assets/ui/hardcore/stamp_locked.png",
+      "width": 220,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "2dfb665eb3c9c20beaeebceff84fdb808e1b4a12c26cbb54f25dc1035d9ed0ae"
+    },
+    {
+      "path": "assets/ui/hardcore/stamp_research_complete.png",
+      "width": 360,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e28621a49c3b8aae6fcf588f9b31853f0675cbc7904ec2e00d42193ef7408b0d"
+    },
+    {
+      "path": "assets/ui/hardcore/stamp_selected.png",
+      "width": 260,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "aa09bac7b29135342daaf760c009d237eea49fcd3b7439944e274bd3f951b437"
+    },
+    {
+      "path": "assets/ui/hardcore/stamp_success.png",
+      "width": 260,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "c6c8f47723b9040dd9529f58c21e099e4239dc978ef9bf4fa6b871bf39b3c5ba"
+    },
+    {
+      "path": "assets/ui/hardcore/stamp_error.png",
+      "width": 260,
+      "height": 80,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "0cf9f66993974b73367bdd086dca87eaed40d1992ca8477d841d3debf5281a2c"
+    },
+    {
+      "path": "assets/ui/gothic_v3/ledger_panel.png",
+      "width": 1080,
+      "height": 610,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "cf64eebb4cbe72efca5bad9a8321684a9e40494fdf3cff0c085affa40cdc9ffb"
+    },
+    {
+      "path": "assets/ui/gothic_v3/ledger_row_available.png",
+      "width": 455,
+      "height": 72,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "d12595123d2707a818eb1372503fa08d4841d1dea21046100c2b46cc5502a2f1"
+    },
+    {
+      "path": "assets/ui/gothic_v3/ledger_row_sealed.png",
+      "width": 455,
+      "height": 72,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6081e39c012cfe99c8aa31c388473945270ddd23d5bc5ec165f34f4cde0fd31a"
+    },
+    {
+      "path": "assets/ui/gothic_v3/ledger_row_complete.png",
+      "width": 455,
+      "height": 72,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "0497808e80687a3a0942600117fba56e292228dabfd1510bb8bc516c95831a00"
+    },
+    {
+      "path": "assets/ui/gothic_v3/utility_tooltip.png",
+      "width": 640,
+      "height": 384,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ffe0cd6b5954aca34c672ac2201e40e968ada0bf72a7385e9f24ed8bf5e15b5c"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_panel.png",
+      "width": 720,
+      "height": 360,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "742a29f1e5661a9aaa811c7054986b0b1eb55fd9cf6d2af6bd62b1b9d4eb5bee"
+    },
+    {
+      "path": "assets/ui/gothic_v3/portrait_frame_large.png",
+      "width": 360,
+      "height": 360,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "339de118c28468ce9f4ff628458f4d0c5161df999b0bb94801c206680c755616"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_empty_slot.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "4bd084fe947e1a07cbb76d3cb9d90dfa8a8547c9e4562cd0b77d8a9dccbb6992"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_command_strip.png",
+      "width": 1120,
+      "height": 64,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "8afbc37abe806fd99b12b68876333eee63bee0ab61d17bcddd7b82b5a570b65f"
+    },
+    {
+      "path": "assets/ui/gothic_v3/wager_strip.png",
+      "width": 640,
+      "height": 64,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "2479cf0a6d8e142342c747d1a62b86efbdd31ea33895408593046438ca7472cd"
+    },
+    {
+      "path": "assets/ui/gothic_v3/scoreboard_row_normal.png",
+      "width": 720,
+      "height": 54,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e8c5437c2663b3505ee5e2a8bc284ac1b54f58be0e914f4b7efc495ca84e5377"
+    },
+    {
+      "path": "assets/ui/gothic_v3/scoreboard_row_hover.png",
+      "width": 720,
+      "height": 54,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "38dedee37c2ff5af8070ee86db190dc277d72136bbb2b98fac6eb70333d3feb5"
+    },
+    {
+      "path": "assets/ui/gothic_v3/scoreboard_value_well.png",
+      "width": 120,
+      "height": 42,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "0521ada87b61a2ca0b14d579762e9d766015260dbb570b6482558e4052d0e6ce"
+    },
+    {
+      "path": "assets/ui/gothic_v3/metric_bar_track.png",
+      "width": 512,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "c2973be718ab359ee47cfbd0c4960e8dcd93b1136b0a4f1f3460e2ad24e58e95"
+    },
+    {
+      "path": "assets/ui/gothic_v3/metric_bar_fill.png",
+      "width": 512,
+      "height": 12,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "74d0cca7a4201e916ddc09dc3fdd07fdc2804878a177ac0f410cbfda117f9588"
+    },
+    {
+      "path": "assets/ui/gothic_v3/portrait_frame_small.png",
+      "width": 42,
+      "height": 42,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ae5fdacd20e2cf5ae3e45776ff0682d3c94484b4b5f88c6c814701eeb0472d7d"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_utility_normal.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "d830f5455c814fac0985e4857646f0b18f4efe9756a07ab90d7a5eab3c26ab09"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_utility_hover.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "47169e96be77bf7db889c7a6a066f38e42dc2e7f775a71c6f7eede91cba4d70c"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_utility_pressed.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "219f316256fde22e7b85ad7bc5b67fd41fd5bacf563a6182b74aa550b17a2a77"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_utility_focus.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "c9d4a845c5671cbfc9a61237cca46e53dbb09047016b7e19bc2641adeeaf1ccd"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_utility_selected.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "e9f8cc8f5dc37db76699200383ad74fada1fca01547597eade3d13d00e709ed0"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_utility_hover_selected.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "032825e6c118460b8b17a434049a68d34f7e763def1a37812f2072343b1a892d"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_utility_disabled.png",
+      "width": 180,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ea5a3d8547970ac773fdd94787573df9df364a43983ed3fd0ea5aa775462b657"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_wager_normal.png",
+      "width": 224,
+      "height": 48,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "8e35a65d422254a242a64519ca617f9055a981a9e4e83662bd636ed3e2dccfd0"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_wager_hover.png",
+      "width": 224,
+      "height": 48,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "7e08866b497874a2394550197343fd95397b12879e5089f4dd66cb42651c365e"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_wager_pressed.png",
+      "width": 224,
+      "height": 48,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "3cdca9e2220719c2e8200db64ca4ee636855f7591ace8109003234393a3f96f3"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_wager_focus.png",
+      "width": 224,
+      "height": 48,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "7acf394b360c32d131221f3a9a19a31c48a6376b4a64f15eb21f370f790d72d4"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_wager_selected.png",
+      "width": 224,
+      "height": 48,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "cdc8f8ca279997313a5e4fe411a5c08066879286dd882afed7e4bb564c5de642"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_wager_hover_selected.png",
+      "width": 224,
+      "height": 48,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "77d23607aa65064b4be5458d52e7bf8288f97f7b5281cfa59e9be5c00fe29848"
+    },
+    {
+      "path": "assets/ui/gothic_v3/button_wager_disabled.png",
+      "width": 224,
+      "height": 48,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9efacd4ffed16685a1a2efe1678ec4c95b6c6b2b4eaa766a39f4a06317d9a120"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_card_normal.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "6f6ce3cd0a18dcca8a168b1127b4143c9c33d6f30871aedefcf103b94d461a99"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_card_hover.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ddaf59f8983e62a3833432e2517ac043f6d7ec60de39eda7444dcc7e5b82dc79"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_card_pressed.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "3bbc44a769aa3b79a8fe9e332fab33006b2745b6888cd3012c84f94ae8690fe2"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_card_focus.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "64f6e005cd1f72f43a54eb5e2bebd58a2f947bd7c816bd80c2ecf00432a9be56"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_card_selected.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "324aa45830896498a959e6ec1546f0ab566975b14805ae3080300243011d948a"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_card_hover_selected.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "a7c8497a539103954bd1135c9faea6ebcf6a5d9d0cf33bc28f5b6db9d42a26fb"
+    },
+    {
+      "path": "assets/ui/gothic_v3/shop_card_disabled.png",
+      "width": 150,
+      "height": 138,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "06df2e8b40c4dc2646322f9204d25eba2ea0a102e8261443589fe3edb54bf64b"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_tab_normal.png",
+      "width": 120,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "d8734cf0ea3d448713443b9735f84f281ee73b1d0841659caf62d4386729bfed"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_tab_hover.png",
+      "width": 120,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "23c8d9e772e9e1bc5f809c61459a135c298908564b9208341294bda372ac26c8"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_tab_pressed.png",
+      "width": 120,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "9cd69c5144b0abb911cbfa0a3c544c643599d72e414887aad13f846e672d560e"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_tab_focus.png",
+      "width": 120,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "976f48de9d937c549c5dd03bb0016ae0c008dbd155939710f8ebab8ed69bfa3c"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_tab_selected.png",
+      "width": 120,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "52c01aec66ccb77e630e52fafecf58bd467adb7ec45565c2bdf60074cbf1f869"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_tab_hover_selected.png",
+      "width": 120,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "99e48b72f17c1d3c1bb43a7392d0d6cdc9cc0b5b1359cec468b2ddf07b80ec6c"
+    },
+    {
+      "path": "assets/ui/gothic_v3/stats_tab_disabled.png",
+      "width": 120,
+      "height": 40,
+      "alpha_min": 0,
+      "alpha_max": 255,
+      "sha256": "ea601526dde26eb100a130e676f6483cfc8611f80864e26027bc3fb598ea1cd7"
+    }
+  ]
+}

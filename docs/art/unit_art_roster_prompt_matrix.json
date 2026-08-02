@@ -71,15 +71,18 @@
       "prompt_addendum": "Preserve Brute as a massive skull-faced titan-fortified tank: broad hunched stone-and-bone bulk, rib armor, huge slab fists, cracked shoulder plates, black tattered waist cloth, tiny green fissures, and dust at the feet. Hard matte material lock: chalky charcoal stone, dry bone, dull oxidized iron only; no polished metal, no glossy wet rock, no chrome highlights, no oily shine."
     },
     {
-      "id": "cashmere",
-      "display_name": "Cashmere",
+      "id": "mara_legacy_art_provenance",
+      "display_name": "Mara - retired pre-rename art provenance",
+      "status": "retired_legacy_provenance",
+      "active_for_generation": false,
+      "legacy_source_id": "cashmere",
       "traits": ["Arcanist", "Mogul"],
       "source_image": "assets/units/cashmere.png",
       "coverage_group": ["humanoid_mage", "small_narrow"],
       "visual_identity": "pale platinum-blond formal occult businesswoman/arcanist, glasses, black suit, white shirt, black tie, long black coat, severe mogul posture",
       "preserve": ["pale platinum-blond bob", "glasses", "black suit and long coat", "white shirt and black tie", "upright mogul posture", "formal occult businesswoman read"],
       "avoid_drift": ["bald head", "generic vampire", "superhero", "anime butler", "shiny tuxedo", "gender change", "plastic salon hair"],
-      "prompt_addendum": "Preserve Cashmere from the live source as a pale platinum-blond occult businesswoman in glasses, a matte black suit, white shirt, black tie, and long coat, formal and severe, with dry cloth rather than glossy tuxedo shine."
+      "prompt_addendum": "Do not use this retired source to generate current Mara. It is preserved only to identify and quarantine the rejected pale platinum-blond formal ledger character."
     },
     {
       "id": "grint",

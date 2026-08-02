@@ -14,7 +14,7 @@ const COST_1_UNITS: Array[String] = [
 	"bo",
 	"bonko",
 	"brute",
-	"cashmere",
+	"mara",
 	"grint",
 	"knoll",
 	"korath",

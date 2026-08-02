@@ -1,6 +1,7 @@
 extends Node
 
 const SMOKE_NAME: String = "BoardPurchaseCombineSmoke"
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const ShopOfferScript: Script = preload("res://scripts/game/shop/shop_offer.gd")
 const ShopStateScript: Script = preload("res://scripts/game/shop/shop_state.gd")
@@ -22,11 +23,12 @@ func _run() -> void:
 	if _main.has_method("_on_start"):
 		_main.call("_on_start")
 	await _settle_frames(8)
+	var prewarmed_view: Control = _main.get_node_or_null("CombatView") as Control
+	if prewarmed_view != null and prewarmed_view.has_method("set_auto_start_battle_enabled"):
+		prewarmed_view.call("set_auto_start_battle_enabled", false)
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "bonko")
-	await _settle_frames(12)
-
-	_view = _main.get_node_or_null("CombatView") as Control
+	_view = await MainTransitionWait.for_combat_view(self, _main)
 	if _view == null:
 		_fail("CombatView missing")
 		_finish()
@@ -45,6 +47,7 @@ func _run() -> void:
 
 	_set_gold(10)
 	GameState.set_phase(GameState.GamePhase.PREVIEW)
+	_expect(not bool(Economy.combat_active), "combine setup should remain outside combat")
 	var offer: ShopOffer = ShopOfferScript.new("bonko", "Bonko", 1, "")
 	var offers: Array[ShopOffer] = [offer]
 	Shop.state = ShopStateScript.new(offers, false, 0)

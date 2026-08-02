@@ -51,7 +51,7 @@ horizontal_alignment = 2
 [node name="StageLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 61
-text = "Stage 1"
+text = "Round 1"
 horizontal_alignment = 1
 
 [node name="PlanningTimerLabel" type="Label" parent="MarginContainer/VBoxContainer"]
@@ -83,6 +83,13 @@ size_flags_horizontal = 0
 size_flags_vertical = 6
 theme_override_constants/separation = 10
 
+[node name="ItemStorageHeader" type="Label" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+text = "ITEM CACHE // EMPTY"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="ItemStorageGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
 custom_minimum_size = Vector2(320, 164)
 layout_mode = 2
@@ -93,6 +100,7 @@ theme_override_constants/v_separation = 6
 columns = 6
 
 [node name="LeftSpacer" type="Control" parent="MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea"]
+visible = false
 layout_mode = 2
 size_flags_vertical = 0
 
@@ -544,11 +552,23 @@ size_flags_horizontal = 3
 size_flags_vertical = 4
 min_value = 1.0
 max_value = 2.0
+step = 1.0
 value = 1.0
 
 [node name="BetValue" type="Label" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
 layout_mode = 2
 text = "1"
+
+[node name="AllInButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
+layout_mode = 2
+text = "All In"
+
+[node name="WagerSummary" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Wager 1g | Win 50% | Gross 2g | After win 3g | After loss 1g"
+horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="BottomStorageArea" type="VBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

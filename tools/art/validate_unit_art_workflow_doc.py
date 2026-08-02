@@ -229,7 +229,7 @@ REQUIRED_REVIEW_QUEUE_SNIPPETS = [
 ]
 
 REQUIRED_FUTURE_AGENT_HANDOFF_SNIPPETS = [
-    "Gamble Battle Unit Art Future Agent Handoff",
+    "Blood Will Pay Unit Art Future Agent Handoff",
     "The larger art-workflow goal is active, not complete",
     "Vellum is the only primary/ultimate character style anchor",
     "Every serious candidate must also get a Vellum-first pairwise audit sheet",

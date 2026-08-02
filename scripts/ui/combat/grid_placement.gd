@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GridPlacement
 
+signal player_placements_changed()
+
 const UnitViewClass := preload("res://scripts/ui/combat/unit_view.gd")
 const UnitSlotView := preload("res://scripts/ui/combat/unit_slot_view.gd")
 const UnitItemsView := preload("res://scripts/ui/items/unit_items_view.gd")
@@ -56,6 +58,21 @@ func get_player_views() -> Array:
 
 func get_enemy_views() -> Array:
 	return enemy_views
+
+func get_player_placements() -> Array[int]:
+	var placements: Array[int] = []
+	for slot: UnitSlotView in player_views:
+		placements.append(int(slot.tile_idx) if slot != null else -1)
+	return placements
+
+func set_player_placements(player_team: Array[Unit], placements: Array[int]) -> void:
+	_player_index_by_unit.clear()
+	var count: int = min(player_team.size(), placements.size())
+	for index: int in range(count):
+		var unit: Unit = player_team[index]
+		var tile_index: int = int(placements[index])
+		if unit != null and tile_index >= 0 and tile_index < player_tiles.size():
+			_player_index_by_unit[unit] = tile_index
 
 func teardown() -> void:
 	if player_grid_helper != null:
@@ -251,3 +268,4 @@ func _on_player_unit_dropped(i: int, idx: int) -> void:
 		if player_grid_helper and ctrl:
 			player_grid_helper.attach(ctrl, idx)
 		player_views[i].tile_idx = idx
+	player_placements_changed.emit()

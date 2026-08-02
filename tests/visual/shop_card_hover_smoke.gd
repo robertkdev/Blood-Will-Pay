@@ -2,6 +2,7 @@ extends Node
 
 const SMOKE_NAME: String = "ShopCardHoverSmoke"
 const ShopPresenterLib: Script = preload("res://scripts/ui/shop/shop_presenter.gd")
+const OUTPUT_DIR: String = "res://outputs/visual_iter/shop_card_hover_pass"
 
 var _failures: Array[String] = []
 var _presenter: ShopPresenter = null
@@ -43,18 +44,29 @@ func _run() -> void:
 	var tooltip: Control = _first_tooltip()
 	_expect(tooltip != null and _control_inside_viewport(tooltip), "shop tooltip should stay inside the viewport")
 	if tooltip != null:
+		var tooltip_layer: CanvasLayer = tooltip.get_parent() as CanvasLayer
+		_expect(tooltip_layer != null and tooltip_layer.layer >= 400, "shop tooltip should live above shop/footer CanvasLayers")
 		_expect(tooltip.get_theme_stylebox("panel") is StyleBoxTexture, "shop tooltip should use the generated panel asset")
+		_expect(not tooltip.get_global_rect().intersects(card.get_global_rect()), "shop tooltip should not cover its source card")
+		var card_grid: Control = card.get_parent() as Control
+		_expect(card_grid == null or not tooltip.get_global_rect().intersects(card_grid.get_global_rect()), "shop tooltip should not cover the shop-card strip")
 		_expect(_tooltip_contains(tooltip, "Attack Targeting:"), "shop tooltip should show attack targeting")
 		_expect(_tooltip_contains(tooltip, "Ability Targeting:"), "shop tooltip should show ability targeting")
 		_expect(not _tooltip_contains(tooltip, "Positioning:"), "shop tooltip should not prescribe positioning")
+	_save_capture("01_shop_card_hover_tooltip.png")
 	_move_hover(card)
 	await _settle_frames(2)
 	_expect(_tooltip_count() == 1, "shop hover motion should keep a single tooltip")
 
+	var old_card_instance_id: int = card.get_instance_id()
 	var reroll_result: Dictionary = Shop.reroll()
 	_expect(bool(reroll_result.get("ok", false)), "shop reroll should succeed during hover cleanup test")
+	_expect(_tooltip_count() == 0, "shop rebuild should synchronously clear tooltip from old hovered card")
 	await _settle_frames(8)
-	_expect(_tooltip_count() == 0, "shop rebuild should clear tooltip from old hovered card")
+	_expect(_tooltip_count() <= 1, "shop rebuild should never leave stacked old and new tooltips")
+	var rebuilt_tooltip: Control = _first_tooltip()
+	if rebuilt_tooltip != null:
+		_expect(int(rebuilt_tooltip.get_meta("source_card_instance_id", 0)) != old_card_instance_id, "shop rebuild should clear tooltip owned by the old hovered card")
 
 	var next_card: ShopCard = _first_shop_card()
 	_expect(next_card != null, "shop card missing after reroll")
@@ -111,11 +123,11 @@ func _first_shop_card() -> ShopCard:
 func _hover_card(card: ShopCard) -> void:
 	var center: Vector2 = card.get_global_rect().get_center()
 	Input.warp_mouse(center)
-	card.emit_signal("mouse_entered")
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.position = center
 	event.global_position = center
-	card.emit_signal("gui_input", event)
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
 
 func _move_hover(card: ShopCard) -> void:
 	var position: Vector2 = card.get_global_rect().get_center() + Vector2(20.0, 12.0)
@@ -123,7 +135,8 @@ func _move_hover(card: ShopCard) -> void:
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.position = position
 	event.global_position = position
-	card.emit_signal("gui_input", event)
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
 
 func _unhover_card(card: ShopCard) -> void:
 	card.emit_signal("mouse_exited")
@@ -163,6 +176,28 @@ func _tooltip_contains(control: Control, needle: String) -> bool:
 func _settle_frames(count: int) -> void:
 	for _frame_index: int in range(count):
 		await get_tree().process_frame
+
+func _save_capture(filename: String) -> void:
+	var display_name: String = DisplayServer.get_name().to_lower()
+	var driver_name: String = RenderingServer.get_current_rendering_driver_name().to_lower()
+	if display_name == "headless" or display_name == "server" or display_name == "dummy" or driver_name.contains("dummy"):
+		print("%s: skipped %s because framebuffer capture is unavailable" % [SMOKE_NAME, filename])
+		return
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture == null or not texture.get_rid().is_valid():
+		push_error("%s: viewport unavailable for %s" % [SMOKE_NAME, filename])
+		return
+	var image: Image = texture.get_image()
+	if image == null or image.is_empty():
+		push_error("%s: image unavailable for %s" % [SMOKE_NAME, filename])
+		return
+	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
+	var error: Error = image.save_png(path)
+	if error != OK:
+		push_error("%s: save failed %s error=%d" % [SMOKE_NAME, path, int(error)])
+		return
+	print("%s: saved %s" % [SMOKE_NAME, ProjectSettings.globalize_path(path)])
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

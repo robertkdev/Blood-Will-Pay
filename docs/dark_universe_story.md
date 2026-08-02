@@ -1,6 +1,6 @@
 # The Ashen Covenant
 
-Status: story-first universe draft for Gamble Battle. This replaces the rejected `docs/lore.md`.
+Status: story-first universe draft for Blood Will Pay. This replaces the rejected `docs/lore.md`.
 
 This document treats the world as primary. The battles, characters, factions, and visual direction come from this universe; the universe is not an explanation of a rules surface.
 
@@ -220,13 +220,13 @@ Axiom belongs here, and his shame is that he has trained both saints and murdere
 
 Arcanists learned to make language injure reality. They do not cast spells so much as litigate with existence. A true Arcanist can convince a wound it has always been open.
 
-Cashmere and Paisley are Arcanists. Cashmere makes debt magical. Paisley makes wonder dangerous enough to hurt.
+Mara and Paisley are Arcanists. Mara makes debt magical. Paisley makes wonder dangerous enough to hurt.
 
 ### The Mogul Houses
 
 Moguls believe survival proves value. To them, mercy is admirable but insolvency is fatal. They buy relics, promises, names, marriages, cures, and sometimes forgiveness.
 
-Cashmere and Teller are Mogul creatures, but Teller's exile makes his relationship to wealth bitter. He knows what money can buy because he knows what it failed to save.
+Mara and Teller are Mogul creatures, but Teller's exile makes his relationship to wealth bitter. He knows what money can buy because he knows what it failed to save.
 
 ### The Cartel Choir
 
@@ -293,7 +293,7 @@ This section is a continuity anchor for the current roster. The story can grow b
 | Bo | Fortified, Executioner | A horned red-black brute who carries execution as architecture. | He is what justice looks like when it has forgotten tenderness. |
 | Bonko | Cartel, Chronomancer | A wiry masked raider who stole extra seconds and now spends them badly. | He proves comic cruelty can still be tragic if the laughter is a wound. |
 | Brute | Titan, Fortified | A skull-faced stone tank built from siege dead and unfinished oaths. | He shows endurance as both nobility and curse. |
-| Cashmere | Arcanist, Mogul | A pale occult financier whose contracts can outlive the signers. | He is the argument that evil becomes respectable when written clearly. |
+| Mara | Arcanist, Mogul | A pale occult financier whose contracts can outlive the signers. | She is the argument that evil becomes respectable when written clearly. |
 | Grint | Cartel, Harmony | A grimy enforcer trying to balance protection and extortion. | He embodies the moral ambiguity of corrupt institutions that still keep people alive. |
 | Hexeon | Kaleidoscope, Executioner | A black prismatic assassin with too many eyes and no stable mercy. | He asks whether seeing every version of a person makes killing them easier or worse. |
 | Korath | Titan, Blessed | A haloed titan who stores pain until it becomes healing. | He is sacred endurance, but he cannot save everyone who hides behind him. |
@@ -433,7 +433,7 @@ Across Eremar, every god hears it.
 
 When the black bell rings, the factions interpret it according to their wounds.
 
-Cashmere smiles because unclaimed things can be claimed if one writes quickly enough. He sends Teller, the exile mogul, to buy Sari's future before the Inquest can condemn it.
+Mara smiles because unclaimed things can be claimed if one writes quickly enough. She sends Teller, the exile mogul, to buy Sari's future before the Inquest can condemn it.
 
 Teller finds Sari hiding in a plague inn with Axiom and Ilyra. He offers money, papers, passage, and a new name.
 
@@ -575,7 +575,7 @@ Ilyra says mortals need law that can be ashamed.
 
 This is the central confrontation. Not good against evil. Not mortal against god. It is the difference between a universe where pain is redeemed by interpretation and a universe where pain remains pain even after love responds to it.
 
-Repo kneels when Auralis appears. Kythera does not. Morrak grips his scythe until his hands bleed. Mortem smells divine guilt and nearly collapses. Cashmere begins calculating whether a god's apology can be monetized, then stops because even he is not empty enough for that.
+Repo kneels when Auralis appears. Kythera does not. Morrak grips his scythe until his hands bleed. Mortem smells divine guilt and nearly collapses. Mara begins calculating whether a god's apology can be monetized, then stops because even she is not empty enough for that.
 
 Volt arrives overloaded with prayers from every temple that heard the black bell. The voices pour through him:
 
@@ -655,7 +655,7 @@ Repo continues collecting debts, but sometimes he reads the context first.
 
 Morrak executes a tyrant and then sits beside the tyrant's daughter until she stops shaking.
 
-Cashmere forgives one debt anonymously and hates the feeling so much he does it again.
+Mara forgives one debt anonymously and hates the feeling so much she does it again.
 
 Teller finds his sister's nameless chapel and begins buying back names from anyone who will sell.
 

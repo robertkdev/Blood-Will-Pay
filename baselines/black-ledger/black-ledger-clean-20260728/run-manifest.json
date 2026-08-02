@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "run_id": "black-ledger-clean-20260728",
+  "project": "Gamble Battle",
+  "scenario_id": "black-ledger",
+  "title": "Ledger",
+  "objective": "Verify readable fresh and veteran account progression in Main.",
+  "adapter": "godot",
+  "created_utc": "2026-07-29T00:51:26.818242+00:00",
+  "source_root": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af",
+  "run_root": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728",
+  "panels": [
+    {
+      "id": "P001",
+      "label": "Fresh local profile",
+      "group": "ledger",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\captures\\P001.png",
+      "sha256": "b4b6fafff673fbe441794cecc9e72192ae9a148f706906cf7c5dfca2895128d9",
+      "width": 1920,
+      "height": 1080,
+      "pair": null,
+      "role": "actual",
+      "state": "fresh",
+      "viewport": "desktop-1920x1080",
+      "camera": "player",
+      "layer": "final",
+      "variant": null,
+      "event": "f",
+      "timestamp_ms": 0,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\black_ledger\\raw\\01_main_fresh.png",
+      "source_mtime_utc": "2026-07-29T00:51:06.799823+00:00",
+      "captured_utc": "2026-07-29T00:51:26.780241+00:00",
+      "metadata": {
+        "actual_height": 1080,
+        "branch": "codex/019fa92b-00f-godot-capture-playtest",
+        "sha256": "b4b6fafff673fbe441794cecc9e72192ae9a148f706906cf7c5dfca2895128d9",
+        "entrypoint": "res://tests/visual/BlackLedgerFreshFixture.tscn",
+        "runtime": "Godot 4.5 editor game framebuffer",
+        "commit": "133ed4a178e1d506be1f09e0e0e04730b82e7ff9",
+        "worktree_dirty": true,
+        "actual_width": 1920,
+        "main_scene": "res://scenes/Main.tscn",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\black_ledger\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    },
+    {
+      "id": "P002",
+      "label": "Veteran local profile",
+      "group": "ledger",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\captures\\P002.png",
+      "sha256": "30f466cf7e82ef460acee27b71cab28501085d2b94766b755be5a26dcfa0f59c",
+      "width": 1920,
+      "height": 1080,
+      "pair": null,
+      "role": "actual",
+      "state": "veteran",
+      "viewport": "desktop-1920x1080",
+      "camera": "player",
+      "layer": "final",
+      "variant": null,
+      "event": "v",
+      "timestamp_ms": 0,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\black_ledger\\raw\\02_main_veteran.png",
+      "source_mtime_utc": "2026-07-29T00:51:25.957246+00:00",
+      "captured_utc": "2026-07-29T00:51:26.817243+00:00",
+      "metadata": {
+        "actual_height": 1080,
+        "branch": "codex/019fa92b-00f-godot-capture-playtest",
+        "sha256": "30f466cf7e82ef460acee27b71cab28501085d2b94766b755be5a26dcfa0f59c",
+        "entrypoint": "res://tests/visual/BlackLedgerVeteranFixture.tscn",
+        "runtime": "Godot 4.5 editor game framebuffer",
+        "commit": "133ed4a178e1d506be1f09e0e0e04730b82e7ff9",
+        "worktree_dirty": true,
+        "actual_width": 1920,
+        "main_scene": "res://scenes/Main.tscn",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\black_ledger\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    }
+  ],
+  "packet_images": [
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\packet\\00-agent-review-instructions.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\packet\\01-overview-board-01.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\packet\\03-camera-layer-matrix.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\packet\\03-state-viewport-matrix.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\packet\\07-review-acceptance.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa92b-00f9-7221-a9a9-81d2894c44af\\outputs\\visual_debug\\vdh_runs\\black-ledger-clean-20260728\\packet\\99-final-verdict-board.png"
+  ],
+  "missing_groups": [],
+  "missing_evidence": [],
+  "verdict": "pass",
+  "findings": [],
+  "metadata": {
+    "capture_started_utc": "2026-07-29T00:50:49.792746+00:00",
+    "runtime_provenance": {
+      "entrypoint": "Godot 4.5 editor game framebuffer",
+      "scene": "Black Ledger capture hosts instantiating res://scenes/Main.tscn",
+      "build": "current Black Ledger integration worktree"
+    },
+    "evidence_profile": {
+      "required_groups": [],
+      "required_cameras": [
+        "player"
+      ],
+      "required_layers": [
+        "final"
+      ],
+      "required_states": [
+        "fresh",
+        "veteran"
+      ],
+      "required_viewports": [
+        "desktop-1920x1080"
+      ],
+      "required_events": [
+        "f",
+        "v"
+      ],
+      "required_pairs": {},
+      "required_combinations": [],
+      "min_temporal_frames": 0,
+      "max_source_age_seconds": 300,
+      "require_runtime_provenance": true,
+      "required_runtime_fields": [
+        "entrypoint",
+        "scene",
+        "build"
+      ]
+    }
+  }
+}

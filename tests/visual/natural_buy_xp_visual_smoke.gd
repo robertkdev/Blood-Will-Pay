@@ -4,15 +4,17 @@ const SMOKE_NAME: String = "NaturalBuyXPVisualSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/natural_buy_xp_pass"
 const STARTER_ID: String = "bonko"
 const MIN_SAFE_BUY_XP_GOLD: int = 5
+const EXPECTED_REWARD_FUNDED_GOLD: int = 6
 const MAX_REWARD_FUNDED_ATTEMPTS: int = 1
 const GUARANTEED_BUY_XP_GOLD_POOL: String = "res://tests/visual/fixtures/guaranteed_buy_xp_gold_pool.tres"
+const OPENING_STAGE_CACHE_KEY: String = "1:1"
 
 var _attempts_used: int = 0
 var _success_stage_in_chapter: int = 0
 var _success_gold_before: int = 0
 var _success_gold_after: int = 0
 var _finished: bool = false
-var _saved_stage_one_entry: Dictionary = {}
+var _saved_roster_runtime: Dictionary = {}
 var _stage_one_reward_overridden: bool = false
 
 func _run() -> void:
@@ -25,11 +27,6 @@ func _run() -> void:
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
 	Engine.time_scale = 8.0
-
-	_force_reward_funded_opening()
-	if not _failures.is_empty():
-		_finish_natural_buy_xp()
-		return
 
 	for attempt_index: int in range(1, MAX_REWARD_FUNDED_ATTEMPTS + 1):
 		_attempts_used = attempt_index
@@ -51,13 +48,12 @@ func _force_reward_funded_opening() -> void:
 	if not ResourceLoader.exists(GUARANTEED_BUY_XP_GOLD_POOL):
 		_expect(false, "test reward pool missing: %s" % GUARANTEED_BUY_XP_GOLD_POOL)
 		return
-	var chapter_one: Dictionary = RunLoopRosterCatalog._entries.get(1, {})
-	if not chapter_one.has(1):
-		_expect(false, "chapter 1 stage 1 roster entry missing")
+	_saved_roster_runtime = RunLoopRosterCatalog.snapshot_runtime()
+	var opening_spec: Dictionary = RunLoopRosterCatalog.get_spec(1, 1)
+	if opening_spec.is_empty():
+		_expect(false, "chapter 1 stage 1 procedural roster spec missing")
 		return
-	_saved_stage_one_entry = (chapter_one.get(1, {}) as Dictionary).duplicate(true)
-	var entry: Dictionary = _saved_stage_one_entry.duplicate(true)
-	var raw_rules: Variant = entry.get(RunLoopStageTypes.KEY_RULES, {})
+	var raw_rules: Variant = opening_spec.get(RunLoopStageTypes.KEY_RULES, {})
 	var rules: Dictionary = (raw_rules.duplicate(true) if typeof(raw_rules) == TYPE_DICTIONARY else {})
 	rules["rewards"] = {
 		"pool_path": GUARANTEED_BUY_XP_GOLD_POOL,
@@ -66,14 +62,15 @@ func _force_reward_funded_opening() -> void:
 		"source_team": "player",
 		"max_triggers": 1,
 	}
-	entry[RunLoopStageTypes.KEY_RULES] = rules
-	RunLoopRosterCatalog._entries[1][1] = entry
+	opening_spec[RunLoopStageTypes.KEY_RULES] = rules
+	RunLoopRosterCatalog._procedural_spec_cache[OPENING_STAGE_CACHE_KEY] = opening_spec.duplicate(true)
 	_stage_one_reward_overridden = true
 
 func _restore_reward_funded_opening() -> void:
 	if not _stage_one_reward_overridden:
 		return
-	RunLoopRosterCatalog._entries[1][1] = _saved_stage_one_entry.duplicate(true)
+	RunLoopRosterCatalog.restore_runtime(_saved_roster_runtime)
+	_saved_roster_runtime.clear()
 	_stage_one_reward_overridden = false
 
 func _start_attempt_scene() -> void:
@@ -89,20 +86,22 @@ func _run_natural_buy_xp_attempt(attempt_index: int) -> bool:
 	await _ensure_unit_select()
 	if not _failures.is_empty():
 		return false
+	_force_reward_funded_opening()
+	if not _failures.is_empty():
+		return false
 	await _select_starter(STARTER_ID)
+	_set_planning_timer_safe()
 	await _settle_frames(4)
 	_expect(_node_visible("CombatView"), "CombatView did not open for natural Buy XP smoke")
-	var repositioned: bool = await _reposition_first_board_unit("natural Buy XP opener reposition")
-	_expect(repositioned, "starter did not reposition before natural Buy XP opener")
 	if not _failures.is_empty():
 		return false
 
-	_set_planning_timer_safe()
 	await _press_continue(true, "natural Buy XP forced opener")
 	var shop_ready: bool = await _wait_for_shop_after_win(30.0)
 	_expect(shop_ready, "natural Buy XP path did not reach the first shop")
 	if not _failures.is_empty():
 		return false
+	_expect(int(Economy.gold) == EXPECTED_REWARD_FUNDED_GOLD, "reward-funded opener should reach exactly %d gold, got %d" % [EXPECTED_REWARD_FUNDED_GOLD, int(Economy.gold)])
 	if int(Economy.gold) < MIN_SAFE_BUY_XP_GOLD:
 		print("%s: attempt %d reached first shop with gold=%d; expected reward-funded safe-gold opener" % [SMOKE_NAME, attempt_index, int(Economy.gold)])
 		return false
@@ -113,7 +112,7 @@ func _attempt_natural_buy_xp_success() -> bool:
 		return true
 	if int(Economy.gold) < MIN_SAFE_BUY_XP_GOLD:
 		return false
-	var buy_xp: Button = _button_with_text("Buy XP")
+	var buy_xp: Button = _button_with_text_prefix("Buy XP")
 	_expect(buy_xp != null, "Buy XP button missing at natural safe-gold moment")
 	if buy_xp == null:
 		return false
@@ -130,7 +129,7 @@ func _attempt_natural_buy_xp_success() -> bool:
 
 	var clicked: bool = await _click_button(buy_xp, "natural Buy XP")
 	_expect(clicked, "natural Buy XP click did not fire")
-	await _settle_frames(4)
+	await _settle_frames(12)
 	_normalize_capture_timer()
 	await get_tree().process_frame
 	_save_capture("02_natural_buy_xp_success.png")
@@ -145,13 +144,16 @@ func _attempt_natural_buy_xp_success() -> bool:
 	_expect(_progress_label_text() == "Lvl 2 (2/6)", "natural Buy XP should repaint progress to Lvl 2 (2/6), got %s" % _progress_label_text())
 	return _failures.is_empty()
 
-func _button_with_text(text: String) -> Button:
+func _uses_manual_opening_continue() -> bool:
+	return true
+
+func _button_with_text_prefix(text: String) -> Button:
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and String(button.text) == text:
+		if button != null and String(button.text).begins_with(text):
 			return button
 	return null
 
