@@ -69,6 +69,8 @@ const COMBAT_PRESSURE_MIDFIGHT_SECONDS: float = 0.14
 const COMBAT_PRESSURE_COLLAPSE_SECONDS: float = 2.75
 const COMBAT_PRESSURE_MIDFIGHT_CASUALTIES: float = 0.12
 const COMBAT_PRESSURE_COLLAPSE_CASUALTIES: float = 0.35
+const PHASE_TRANSITION_HOLD_SECONDS: float = 0.62
+const PHASE_TRANSITION_FADE_SECONDS: float = 0.16
 const BOSS_PREP_MIN_GOLD: int = 4
 const EARLY_RETRY_RECOVERY_MAX_CHAPTER: int = 2
 const EARLY_RETRY_RECOVERY_MIN_GOLD: int = 4
@@ -435,6 +437,9 @@ var _environmental_pressure_phase: int = -1
 var _environmental_reduced_motion_state: bool = false
 var _environmental_casualty_event_index: int = -1
 var _combat_impact_event_index: int = 0
+var _combat_exchange_copy: String = "CLOSE CONTACT // HOLD THE LINE"
+var _phase_transition_bridge: Control = null
+var _phase_transition_hide_tween: Tween = null
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -570,6 +575,12 @@ func teardown() -> void:
 	if _result_banner != null and is_instance_valid(_result_banner):
 		_result_banner.queue_free()
 	_result_banner = null
+	if _phase_transition_hide_tween != null and _phase_transition_hide_tween.is_valid():
+		_phase_transition_hide_tween.kill()
+	_phase_transition_hide_tween = null
+	if _phase_transition_bridge != null and is_instance_valid(_phase_transition_bridge):
+		_phase_transition_bridge.queue_free()
+	_phase_transition_bridge = null
 	if _encounter_banner_tween != null and _encounter_banner_tween.is_valid():
 		_encounter_banner_tween.kill()
 	_encounter_banner_tween = null
@@ -2171,6 +2182,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 		continue_button.text = BATTLE_LOCKED_TEXT
 	_encounter_escalations_seen = 0
 	_combat_impact_event_index = 0
+	_combat_exchange_copy = "CLOSE CONTACT // HOLD THE LINE"
 	_on_log_line("Prepare to fight.")
 	if projectile_bridge and projectile_bridge.has_method("set_visuals_enabled"):
 		projectile_bridge.set_visuals_enabled(true)
@@ -2192,6 +2204,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 		player_views = grid_placement.get_player_views()
 	Trace.step("CombatView._on_battle_started: enter arena")
 	_enter_combat_arena()
+	_show_phase_transition_bridge("planning_to_combat")
 	# Optional: add layout prints here when debugging sizes
 	# Ensure economy UI reflects combat lock state immediately
 	if economy_ui:
@@ -2265,10 +2278,19 @@ func _on_engine_hit_applied(team: String, si: int, ti: int, rolled: int, dealt: 
 		stats_panel._on_hit_applied(team, si, ti, rolled, dealt, crit, before_hp, after_hp, player_cd, enemy_cd)
 	if dealt > 0 and after_hp < before_hp:
 		_combat_impact_event_index += 1
+		_combat_exchange_copy = "LIVE EXCHANGE // %d DAMAGE" % dealt
 		var arena: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 		if arena != null:
 			arena.set_meta("battlefield_impact_event_index", _combat_impact_event_index)
+			arena.set_meta("combat_exchange_receipt", "engine_resolved_damage")
+			arena.set_meta("combat_exchange_damage", dealt)
+			arena.set_meta("combat_exchange_critical", crit)
 		var target_team: String = "enemy" if team == "player" else "player"
+		if arena_bridge != null and arena_bridge.has_method("present_combat_exchange_focus"):
+			# This is a read-only presentation tether between the engine's resolved
+			# source and target. RGA range, targeting, movement, and hit timing stay
+			# entirely inside the authoritative combat simulation.
+			arena_bridge.present_combat_exchange_focus(team, si, target_team, ti, dealt, crit)
 		if _should_defer_hit_flash(team, si, ti):
 			return
 		if arena_bridge:
@@ -2525,6 +2547,7 @@ func _result_minimum_dwell_seconds() -> float:
 	return RESULT_MINIMUM_DWELL_SECONDS
 
 func _on_intermission_finished() -> void:
+	var planning_redeployed: bool = false
 	_hide_result_banner()
 	if arena_container and arena_container.visible:
 		_exit_combat_arena()
@@ -2625,7 +2648,13 @@ func _on_intermission_finished() -> void:
 			_set_continue_to_start_text()
 			continue_button.disabled = false
 			continue_button.visible = true
+		planning_redeployed = true
 	_pending_continue = false
+	if planning_redeployed:
+		# The return bridge is deliberately shown after planning has been restored.
+		# It therefore reads as a redeploy handoff over the real shop and board,
+		# never as a decorative overlay stranded over a defeat result.
+		_show_phase_transition_bridge("combat_to_planning")
 	_post_combat_outcome = ""
 
 func _apply_first_boss_prep_gold_floor(win: bool) -> void:
@@ -3279,6 +3308,7 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 		focus_painter.visible = in_combat
 	if in_combat:
 		_update_environmental_pressure(0.0)
+	_enforce_reduced_motion_composition_lock()
 	_protect_persistent_hud_chrome()
 
 func _update_tactical_shell_layout(in_combat: bool) -> void:
@@ -3363,6 +3393,7 @@ func _update_environmental_pressure(delta: float) -> void:
 		aftermath.pivot_offset = aftermath.size * 0.5
 		aftermath.scale = Vector2.ONE if reduced_motion else Vector2(1.0 + slow_pulse * 0.003, 1.0 + pulse * 0.004)
 	_update_combat_focus_frame(arena, pressure_phase, reduced_motion)
+	_enforce_reduced_motion_composition_lock()
 
 func _resolve_environmental_pressure_phase(casualty_pressure: float) -> int:
 	if casualty_pressure >= COMBAT_PRESSURE_COLLAPSE_CASUALTIES or _combat_impact_event_index >= 6 or _combat_pressure_elapsed >= COMBAT_PRESSURE_COLLAPSE_SECONDS:
@@ -3379,6 +3410,8 @@ func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_mot
 		return
 	var bounds: Rect2 = Rect2()
 	var found_actor: bool = false
+	var player_actors: Array[Control] = []
+	var enemy_actors: Array[Control] = []
 	if arena_units != null and is_instance_valid(arena_units):
 		var arena_canvas_inverse: Transform2D = arena.get_global_transform_with_canvas().affine_inverse()
 		for child: Node in arena_units.get_children():
@@ -3389,6 +3422,10 @@ func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_mot
 			var actor_rect: Rect2 = Rect2(actor_position, actor.size)
 			bounds = actor_rect if not found_actor else bounds.merge(actor_rect)
 			found_actor = true
+			if String(actor.get_meta("combat_side", "")) == "player":
+				player_actors.append(actor)
+			elif String(actor.get_meta("combat_side", "")) == "enemy":
+				enemy_actors.append(actor)
 	var focus_size: Vector2 = Vector2(arena.size.x * (0.66 if pressure_phase == 0 else 0.60), arena.size.y * 0.82)
 	if focus_size.x < 720.0:
 		focus_size.x = 720.0
@@ -3416,9 +3453,34 @@ func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_mot
 		focus_painter.call("set_focus_rect", normalized_rect)
 	if focus_painter.has_method("configure"):
 		focus_painter.call("configure", pressure_phase, reduced_motion)
+	var closest_player: Control = null
+	var closest_enemy: Control = null
+	var closest_distance: float = 1.0e30
+	for player_actor: Control in player_actors:
+		for enemy_actor: Control in enemy_actors:
+			var candidate_distance: float = player_actor.get_global_rect().get_center().distance_to(enemy_actor.get_global_rect().get_center())
+			if candidate_distance < closest_distance:
+				closest_distance = candidate_distance
+				closest_player = player_actor
+				closest_enemy = enemy_actor
+	if closest_player != null and closest_enemy != null:
+		var arena_canvas_inverse: Transform2D = arena.get_global_transform_with_canvas().affine_inverse()
+		var source_center: Vector2 = arena_canvas_inverse * closest_player.get_global_rect().get_center()
+		var target_center: Vector2 = arena_canvas_inverse * closest_enemy.get_global_rect().get_center()
+		if focus_painter.has_method("set_clash_pair"):
+			focus_painter.call("set_clash_pair", source_center, target_center)
+		arena.set_meta("battlefield_clash_anchor", "nearest_opposing_visual_wound")
+		arena.set_meta("battlefield_clash_anchor_distance", closest_distance)
+	else:
+		if focus_painter.has_method("clear_clash_pair"):
+			focus_painter.call("clear_clash_pair")
+		arena.set_meta("battlefield_clash_anchor", "no_visible_opposing_pair")
 	focus_painter.visible = true
 	arena.set_meta("battlefield_focus_rect", normalized_rect)
 	arena.set_meta("battlefield_focus_mode", "combat_cluster_frame")
+	arena.set_meta("battlefield_focus_priority", "live_collision_pair_and_first_ring")
+	arena.set_meta("battlefield_outer_grid_treatment", "muted_perimeter")
+	arena.set_meta("battlefield_outer_grid_mask", "focus_frame_overlay")
 
 func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool, casualty_pressure: float, casualty_event_index: int = 0) -> void:
 	if parent == null:
@@ -3601,6 +3663,16 @@ func _protect_persistent_hud_chrome() -> void:
 			instruction_ribbon.set_meta("persistent_copy_uses_utility_face", false)
 			instruction_ribbon.set_meta("persistent_copy_uses_impact_face", true)
 		instruction_ribbon.set_meta("persistent_combat_hierarchy", true)
+	var exchange_signal: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatExchangeSignal") as Label
+	if exchange_signal != null:
+		var reduced_motion: bool = _reduced_motion_enabled()
+		var exchange_receipt_active: bool = _combat_impact_event_index > 0
+		exchange_signal.visible = combat_context_visible and not result_visible and not reduced_motion and exchange_receipt_active
+		exchange_signal.text = _combat_exchange_copy
+		exchange_signal.set_meta("combat_exchange_copy", _combat_exchange_copy)
+		exchange_signal.set_meta("combat_exchange_is_engine_resolved", true)
+		exchange_signal.set_meta("combat_exchange_receipt_active", exchange_receipt_active)
+		exchange_signal.set_meta("combat_exchange_does_not_override_rga", true)
 	var tree: SceneTree = parent.get_tree()
 	var system_menu: Button = tree.root.find_child("SystemMenuButton", true, false) as Button if tree != null else null
 	if system_menu != null:
@@ -3623,6 +3695,179 @@ func _set_root_control_visible(node_name: String, visible_state: bool) -> void:
 	var control: Control = parent.get_node_or_null(node_name) as Control
 	if control != null:
 		control.visible = visible_state
+
+func _ensure_phase_transition_bridge() -> Control:
+	if parent == null:
+		return null
+	if _phase_transition_bridge != null and is_instance_valid(_phase_transition_bridge):
+		return _phase_transition_bridge
+	var bridge: Control = Control.new()
+	bridge.name = "CombatPhaseTransitionBridge"
+	bridge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bridge.z_as_relative = false
+	bridge.z_index = 500
+	bridge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bridge.visible = false
+	parent.add_child(bridge)
+	var field_lock: Panel = Panel.new()
+	field_lock.name = "TransitionLockField"
+	field_lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The transition remains a physical field order, not a blocking modal. Keep
+	# the live board materially visible around a brief textured strip in both
+	# directions so deployment and combat retain spatial continuity.
+	field_lock.anchor_left = 0.22
+	field_lock.anchor_right = 0.78
+	field_lock.anchor_top = 0.38
+	field_lock.anchor_bottom = 0.62
+	field_lock.offset_left = 0.0
+	field_lock.offset_right = 0.0
+	field_lock.offset_top = 0.0
+	field_lock.offset_bottom = 0.0
+	field_lock.set_meta("transition_field_lock", true)
+	var field_style: StyleBoxFlat = StyleBoxFlat.new()
+	field_style.bg_color = Color(0.012, 0.008, 0.010, 0.64)
+	field_style.border_color = Color(0.78, 0.10, 0.065, 0.94)
+	field_style.border_width_left = 5
+	field_style.border_width_top = 3
+	field_style.border_width_right = 3
+	field_style.border_width_bottom = 3
+	field_style.corner_radius_top_left = 8
+	field_style.corner_radius_top_right = 8
+	field_style.corner_radius_bottom_left = 8
+	field_style.corner_radius_bottom_right = 8
+	field_style.shadow_color = Color(0.0, 0.0, 0.0, 0.86)
+	field_style.shadow_size = 16
+	field_style.shadow_offset = Vector2(0.0, 5.0)
+	var transition_texture: StyleBoxTexture = HardcoreUIAssets.pressure_impact_style(2)
+	field_lock.add_theme_stylebox_override("panel", GothicUIAssets.style_or_fallback(transition_texture, field_style))
+	field_lock.set_meta("transition_material", "pressure_impact_record_strip")
+	field_lock.set_meta("transition_occlusion_budget", "brief_strip_under_30pct_height")
+	bridge.add_child(field_lock)
+	var headline: Label = Label.new()
+	headline.name = "TransitionHeadline"
+	headline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	headline.anchor_left = 0.05
+	headline.anchor_right = 0.95
+	headline.anchor_top = 0.13
+	headline.anchor_bottom = 0.50
+	headline.offset_left = 0.0
+	headline.offset_right = 0.0
+	headline.offset_top = 0.0
+	headline.offset_bottom = 0.0
+	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	headline.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	headline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	headline.clip_text = false
+	headline.add_theme_font_size_override("font_size", 34)
+	headline.add_theme_color_override("font_color", Color(0.98, 0.78, 0.61, 1.0))
+	headline.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
+	headline.add_theme_constant_override("outline_size", 4)
+	VisualTypeSystem.set_impact(headline)
+	field_lock.add_child(headline)
+	var detail: Label = Label.new()
+	detail.name = "TransitionDetail"
+	detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail.anchor_left = 0.10
+	detail.anchor_right = 0.90
+	detail.anchor_top = 0.50
+	detail.anchor_bottom = 0.76
+	detail.offset_left = 0.0
+	detail.offset_right = 0.0
+	detail.offset_top = 0.0
+	detail.offset_bottom = 0.0
+	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.clip_text = false
+	detail.add_theme_font_size_override("font_size", 16)
+	detail.add_theme_color_override("font_color", Color(0.86, 0.78, 0.66, 1.0))
+	detail.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.96))
+	detail.add_theme_constant_override("outline_size", 2)
+	VisualTypeSystem.set_utility_bold(detail)
+	field_lock.add_child(detail)
+	var stamp: Label = Label.new()
+	stamp.name = "TransitionRecordStamp"
+	stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stamp.anchor_left = 0.08
+	stamp.anchor_right = 0.92
+	stamp.anchor_top = 0.78
+	stamp.anchor_bottom = 0.96
+	stamp.offset_left = 0.0
+	stamp.offset_right = 0.0
+	stamp.offset_top = 0.0
+	stamp.offset_bottom = 0.0
+	stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stamp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	stamp.add_theme_font_size_override("font_size", 11)
+	stamp.add_theme_color_override("font_color", Color(0.72, 0.18, 0.12, 0.96))
+	VisualTypeSystem.set_utility_bold(stamp)
+	field_lock.add_child(stamp)
+	_phase_transition_bridge = bridge
+	return bridge
+
+func _show_phase_transition_bridge(kind: String) -> void:
+	var bridge: Control = _ensure_phase_transition_bridge()
+	if bridge == null:
+		return
+	if _phase_transition_hide_tween != null and _phase_transition_hide_tween.is_valid():
+		_phase_transition_hide_tween.kill()
+	_phase_transition_hide_tween = null
+	var field_lock: Panel = bridge.get_node_or_null("TransitionLockField") as Panel
+	var headline: Label = bridge.find_child("TransitionHeadline", true, false) as Label
+	var detail: Label = bridge.find_child("TransitionDetail", true, false) as Label
+	var stamp: Label = bridge.find_child("TransitionRecordStamp", true, false) as Label
+	var combat_entry: bool = kind == "planning_to_combat"
+	if headline != null:
+		headline.text = "CONTACT // LINE OPEN" if combat_entry else "FIELD ORDER // REDEPLOY"
+	if detail != null:
+		detail.text = "LINE OPEN // HOLD OR DIE" if combat_entry else "GRID RESET // SPEND, POSITION, SURVIVE"
+	if stamp != null:
+		stamp.text = "BLOOD WILL PAY // CONTACT RECORD" if combat_entry else "FIELD RECORD // REDEPLOYMENT WINDOW"
+	if field_lock != null:
+		field_lock.visible = true
+		field_lock.set_meta("transition_field_lock", true)
+		field_lock.set_meta("transition_field_state", "breach_lock" if combat_entry else "redeploy_lock")
+	bridge.visible = true
+	bridge.modulate = Color.WHITE
+	bridge.set_meta("transition_active", true)
+	bridge.set_meta("transition_kind", kind)
+	bridge.set_meta("transition_copy_complete", true)
+	bridge.set_meta("transition_visual_only", true)
+	bridge.set_meta("transition_hold_seconds", PHASE_TRANSITION_HOLD_SECONDS)
+	bridge.set_meta("transition_respects_reduced_motion", _reduced_motion_enabled())
+	bridge.set_meta("transition_surface", "brief_material_field_order_strip")
+	bridge.set_meta("transition_board_visibility", "live_board_retained_around_strip")
+	_phase_transition_hide_tween = bridge.create_tween()
+	_phase_transition_hide_tween.tween_interval(PHASE_TRANSITION_HOLD_SECONDS)
+	if _reduced_motion_enabled():
+		_phase_transition_hide_tween.tween_callback(Callable(self, "_hide_phase_transition_bridge"))
+	else:
+		_phase_transition_hide_tween.tween_property(bridge, "modulate:a", 0.0, PHASE_TRANSITION_FADE_SECONDS)
+		_phase_transition_hide_tween.tween_callback(Callable(self, "_hide_phase_transition_bridge"))
+
+func _hide_phase_transition_bridge() -> void:
+	if _phase_transition_hide_tween != null and _phase_transition_hide_tween.is_valid():
+		_phase_transition_hide_tween.kill()
+	_phase_transition_hide_tween = null
+	if _phase_transition_bridge == null or not is_instance_valid(_phase_transition_bridge):
+		return
+	_phase_transition_bridge.visible = false
+	_phase_transition_bridge.modulate = Color.WHITE
+	_phase_transition_bridge.set_meta("transition_active", false)
+
+func _enforce_reduced_motion_composition_lock() -> void:
+	if parent == null:
+		return
+	var lock_cue: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/ReducedMotionLockCue") as Label
+	var active: bool = _tactical_phase_visual_state == 1 and _reduced_motion_enabled()
+	if lock_cue != null:
+		lock_cue.visible = active
+		lock_cue.text = "MOTION LOCK // STATIC THREAT // FRAME HELD"
+		lock_cue.modulate = Color.WHITE
+		lock_cue.self_modulate = Color.WHITE
+		lock_cue.set_meta("persistent_reduced_motion_lock_active", active)
+		lock_cue.set_meta("persistent_reduced_motion_lock_surface", "board_actors_hud_lock_held")
+	parent.set_meta("reduced_motion_composition_lock", active)
 
 func _show_result_banner(title: String, detail: String, accent_color: Color, title_color: Color) -> void:
 	var banner: PanelContainer = _ensure_result_banner()

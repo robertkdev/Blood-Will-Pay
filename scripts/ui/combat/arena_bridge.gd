@@ -8,7 +8,7 @@ const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.
 const ACTOR_EXTRA_HORIZONTAL: float = 18.0
 const ACTOR_EXTRA_TOP: float = 32.0
 const ACTOR_EXTRA_BOTTOM: float = 18.0
-const COMBAT_ACTOR_SIZE_SCALE: float = 1.62
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.50
 
 var arena: ArenaController = null
 var arena_container: Control
@@ -258,6 +258,10 @@ func get_actor(team: String, index: int) -> UnitActor:
         return arena.get_actor(team, index)
     return null
 
+func present_combat_exchange_focus(source_team: String, source_index: int, target_team: String, target_index: int, damage: int, critical: bool) -> void:
+    if arena != null:
+        arena.present_combat_exchange_focus(source_team, source_index, target_team, target_index, damage, critical)
+
 func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlotView], _enemy_views: Array[UnitSlotView]) -> void:
     if manager == null:
         return
@@ -414,6 +418,10 @@ func _on_manager_position_updated(team: String, index: int, x: float, y: float) 
         return
     actor.set_screen_position(Vector2(x, y))
     actor.visible = (actor.unit != null and actor.unit.is_alive())
+    if arena.has_method("refresh_combat_presentation_spacing"):
+        arena.refresh_combat_presentation_spacing()
+    elif arena.has_method("reflow_combat_readouts"):
+        arena.reflow_combat_readouts()
 
 func _sync_actor_visibility(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
     if arena == null:

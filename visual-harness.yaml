@@ -4,7 +4,7 @@ scenarios:
   - id: non-unit-visual-overhaul
     title: Non-unit visual overhaul
     adapter: godot
-    objective: "Verify the complete non-unit shell in provenance-locked Godot runtime captures: title, command/settings, Ledger, starter shell, planning, active combat, all result outcomes, System, and loss at desktop plus compact widths without evaluating unit artwork or unit abilities."
+    objective: "Verify the complete non-unit shell in provenance-locked Godot runtime captures: title, command/settings, Ledger, stable starter-selection card surfaces and lock confirmation, planning with concise risk/return hierarchy, dossier-style planning-to-combat and combat-to-planning bridges, a tight high-intensity active combat frame with enlarged presentation-scale actors, legible local HP readouts and an exchange cue, three identical reduced-motion temporal samples with a persistent lock cue, all result outcomes, System, and loss at desktop plus compact widths without evaluating unit artwork or unit abilities."
     capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Package-NonUnitVisualEvidence.ps1"]
     capture_manifest: "outputs/visual_debug/non_unit_overhaul/captures.json"
     required_groups: [gateway, menu, ledger, selection, battle, result, system, loss]
@@ -15,9 +15,10 @@ scenarios:
     evidence:
       required_cameras: [player]
       required_layers: [final]
-      required_states: [title_gateway, command_menu, settings, black_ledger, starter_selected, forced_combat, planning, victory_result, defeat_result, system_menu, loss_overlay]
+      required_states: [title_gateway, command_menu, settings, black_ledger, starter_selected, starter_selection_temporal, planning, planning_to_combat_bridge, combat_contact_bridge, forced_combat, reduced_motion_temporal, combat_to_planning_bridge, victory_result, defeat_result, system_menu, loss_overlay]
       required_viewports: [desktop-1920x1080, compact-1280x720]
-      required_events: [title_ready, gateway_accepted, settings_opened, ledger_opened, starter_selected, combat_active, planning_restored, victory_resolved, defeat_resolved, system_opened, run_lost]
+      required_events: [title_ready, gateway_accepted, settings_opened, ledger_opened, starter_selected, starter_selection_t0, starter_selection_t1, starter_selection_t2, planning_to_combat, combat_contact, combat_active, reduced_motion_t0, reduced_motion_t1, reduced_motion_t2, combat_to_planning, planning_restored, victory_resolved, defeat_resolved, system_opened, run_lost]
+      min_temporal_frames: 3
       require_runtime_provenance: true
       required_runtime_fields: [entrypoint, scene, build]
       max_source_age_seconds: 3600

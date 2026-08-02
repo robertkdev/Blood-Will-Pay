@@ -71,6 +71,7 @@ var _hardcore_backdrop: TextureRect = null
 var _registration_overlay: Control = null
 var _roster_record_label: Label = null
 var _preview_record_label: Label = null
+var _card_label_styles: Dictionary[String, StyleBoxFlat] = {}
 
 func _ready() -> void:
 	_ensure_grid_wrapper()
@@ -453,6 +454,7 @@ func show_screen() -> void:
 	_apply_gothic_layout()
 	_style_unit_cards()
 	start_button.disabled = selected_id == ""
+	_refresh_start_button_copy()
 	_style_start_button()
 	if help_label:
 		help_label.visible = start_button.disabled
@@ -478,6 +480,7 @@ func reset_selection() -> void:
 	if start_button != null:
 		start_button.disabled = true
 		start_button.scale = Vector2.ONE
+		_refresh_start_button_copy()
 		_style_start_button()
 	if help_label != null:
 		help_label.visible = true
@@ -605,11 +608,15 @@ func _unit_entry_from_resource(res: Resource) -> Dictionary:
 	}
 
 func _on_unit_button_pressed(_btn: Button, id: String, _name: String) -> void:
+	var previous_selected_id: String = selected_id
 	selected_id = id
 	_update_preview(id, true)
 	start_button.disabled = false
+	_refresh_start_button_copy()
 	_style_start_button()
-	_style_unit_cards()
+	if previous_selected_id != "" and previous_selected_id != id:
+		_refresh_unit_card(previous_selected_id)
+	_refresh_unit_card(id)
 	if help_label:
 		help_label.visible = false
 
@@ -618,10 +625,24 @@ func _on_StartButton_pressed() -> void:
 		return
 	emit_signal("unit_selected", selected_id)
 
+
+func _refresh_start_button_copy() -> void:
+	if start_button == null:
+		return
+	if selected_id == "":
+		start_button.text = START_BUTTON_READY_TEXT
+		return
+	var selected_entry: Dictionary = items_by_id.get(selected_id, {})
+	var display_name: String = String(selected_entry.get("name", selected_id)).to_upper()
+	start_button.text = "START // %s READY" % display_name
+
 func set_transition_pending(pending: bool) -> void:
 	if start_button == null:
 		return
-	start_button.text = START_BUTTON_PENDING_TEXT if pending else START_BUTTON_READY_TEXT
+	if pending:
+		start_button.text = START_BUTTON_PENDING_TEXT
+	else:
+		_refresh_start_button_copy()
 	start_button.disabled = pending or selected_id == ""
 	if pending:
 		start_button.release_focus()
@@ -631,11 +652,13 @@ func set_transition_pending(pending: bool) -> void:
 func _on_unit_hovered(id: String) -> void:
 	if id != "":
 		if _hovered_id != id and _hovered_id != "":
-			_apply_unit_button_motion(_hovered_id, false)
+			var previous_hovered_id: String = _hovered_id
+			_apply_unit_button_motion(previous_hovered_id, false)
+			_refresh_unit_card(previous_hovered_id)
 		_hovered_id = id
 		_apply_unit_button_motion(id, true)
 		_update_preview(id, false)
-		_style_unit_cards()
+		_refresh_unit_card(id)
 
 func _update_preview(id: String, is_selected: bool = false) -> void:
 	if selected_label == null:
@@ -645,7 +668,7 @@ func _update_preview(id: String, is_selected: bool = false) -> void:
 		_clear_preview()
 		return
 	var display_name: String = String(it.get("name", ""))
-	selected_label.text = ("SELECTED /// %s" if is_selected else "INSPECTING /// %s") % [display_name.to_upper()]
+	selected_label.text = ("LOCKED // %s // READY" if is_selected else "INSPECTING /// %s") % [display_name.to_upper()]
 	var role_text: String = _format_role(String(it.get("primary_role", "")))
 	var goal_text: String = _format_goal(String(it.get("primary_goal", "")))
 	var approach_arr: Array = _duplicate_strings(it.get("approaches", PackedStringArray()))
@@ -734,9 +757,10 @@ func _format_ability_info(unit: Unit) -> String:
 
 func _on_unit_unhovered() -> void:
 	if _hovered_id != "":
-		_apply_unit_button_motion(_hovered_id, false)
+		var previous_hovered_id: String = _hovered_id
+		_apply_unit_button_motion(previous_hovered_id, false)
 		_hovered_id = ""
-		_style_unit_cards()
+		_refresh_unit_card(previous_hovered_id)
 	if selected_id != "":
 		_update_preview(selected_id, true)
 		return
@@ -748,9 +772,10 @@ func _on_scroll_changed(_value: float) -> void:
 
 func _clear_hover_for_scroll() -> void:
 	if _hovered_id != "":
-		_apply_unit_button_motion(_hovered_id, false)
+		var previous_hovered_id: String = _hovered_id
+		_apply_unit_button_motion(previous_hovered_id, false)
 		_hovered_id = ""
-		_style_unit_cards()
+		_refresh_unit_card(previous_hovered_id)
 	if selected_id != "":
 		_update_preview(selected_id, true)
 	else:
@@ -759,6 +784,7 @@ func _clear_hover_for_scroll() -> void:
 func _clear_preview() -> void:
 	if selected_label:
 		selected_label.text = "No starter chosen"
+	_refresh_start_button_copy()
 	if preview_art:
 		preview_art.texture = null
 	_clear_identity_panel()
@@ -1039,33 +1065,30 @@ func _style_unit_cards() -> void:
 		var tile: VBoxContainer = tile_node as VBoxContainer
 		if tile == null:
 			continue
-		var button: Button = null
-		var name_label: Label = null
-		var role_label: Label = null
-		for child in tile.get_children():
-			if child is Button:
-				button = child as Button
-			elif child is Label and child.name == "UnitName":
-				name_label = child as Label
-			elif child is Label and child.name == "UnitRole":
-				role_label = child as Label
-		if button == null:
-			continue
-		var unit_id: String = String(button.get_meta("unit_id")) if button.has_meta("unit_id") else ""
-		var hovered: bool = unit_id != "" and unit_id == _hovered_id
-		_style_unit_card(tile, button, name_label, role_label, button.button_pressed, hovered)
+		var button: Button = tile.get_child(0) as Button if tile.get_child_count() > 0 else null
+		var unit_id: String = String(button.get_meta("unit_id")) if button != null and button.has_meta("unit_id") else ""
+		_refresh_unit_card(unit_id)
+
+func _refresh_unit_card(unit_id: String) -> void:
+	var button: Button = buttons_by_id.get(unit_id, null) as Button
+	if button == null:
+		return
+	var tile: VBoxContainer = button.get_parent() as VBoxContainer
+	if tile == null:
+		return
+	var name_label: Label = tile.get_node_or_null("UnitName") as Label
+	var role_label: Label = tile.get_node_or_null("UnitRole") as Label
+	var hovered: bool = unit_id == _hovered_id
+	_style_unit_card(tile, button, name_label, role_label, button.button_pressed, hovered)
 
 func _style_unit_card(tile: VBoxContainer, button: Button, name_label: Label, role_label: Label, selected: bool, hovered: bool = false) -> void:
 	var compact: bool = _is_compact_layout()
 	tile.add_theme_constant_override("separation", 2 if compact else 3)
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.pivot_offset = button.size * 0.5 if button.size != Vector2.ZERO else button.custom_minimum_size * 0.5
-	button.add_theme_stylebox_override("normal", _make_unit_button_style(selected, hovered))
-	button.add_theme_stylebox_override("hover", HardcoreUIAssets.unit_card_style("hover"))
-	button.add_theme_stylebox_override("pressed", HardcoreUIAssets.unit_card_style("selected"))
-	button.add_theme_stylebox_override("hover_pressed", HardcoreUIAssets.unit_card_style("hover_selected"))
-	button.add_theme_stylebox_override("focus", HardcoreUIAssets.unit_card_style("focus"))
-	button.add_theme_stylebox_override("disabled", HardcoreUIAssets.unit_card_style("disabled"))
+	if not bool(button.get_meta("hardcore_card_state_styles_initialized", false)):
+		HardcoreUIAssets.apply_unit_card_states(button)
+		button.set_meta("hardcore_card_state_styles_initialized", true)
 	if name_label:
 		name_label.add_theme_font_size_override("font_size", 16 if compact else 20)
 		VisualTypeSystem.set_utility_bold(name_label)
@@ -1080,6 +1103,9 @@ func _style_unit_card(tile: VBoxContainer, button: Button, name_label: Label, ro
 		role_label.add_theme_stylebox_override("normal", _make_card_label_style(selected, hovered, false))
 
 func _make_card_label_style(selected: bool, highlighted: bool, primary: bool) -> StyleBoxFlat:
+	var cache_key: String = "%d:%d:%d" % [int(selected), int(highlighted), int(primary)]
+	if _card_label_styles.has(cache_key):
+		return _card_label_styles[cache_key]
 	var fill: Color = Color(0.29, 0.018, 0.038, 0.96) if selected else (Color(0.15, 0.040, 0.050, 0.90) if highlighted else Color(0.018, 0.016, 0.021, 0.80))
 	var border: Color = COLOR_BLOOD_HOT if selected else (COLOR_GOLD if highlighted else Color(0.25, 0.22, 0.20, 0.72))
 	var style: StyleBoxFlat = _make_panel_style(fill, border, 1, 0)
@@ -1089,25 +1115,12 @@ func _make_card_label_style(selected: bool, highlighted: bool, primary: bool) ->
 	style.content_margin_top = 1.0
 	style.content_margin_bottom = 1.0
 	style.shadow_size = 0
+	_card_label_styles[cache_key] = style
 	return style
 
 func _is_compact_layout() -> bool:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	return viewport_size.y <= COMPACT_VIEWPORT_HEIGHT or viewport_size.x < 1400.0
-
-func _make_unit_button_style(selected: bool, highlighted: bool) -> StyleBox:
-	if selected:
-		return HardcoreUIAssets.unit_card_style("selected")
-	elif highlighted:
-		return HardcoreUIAssets.unit_card_style("hover")
-	var sb: StyleBoxFlat = _make_panel_style(Color(0.040, 0.035, 0.045, 0.96), Color(0.24, 0.21, 0.22, 0.92), 1, 5)
-	sb.shadow_size = 5
-	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.38)
-	sb.content_margin_left = 6
-	sb.content_margin_right = 6
-	sb.content_margin_top = 6
-	sb.content_margin_bottom = 6
-	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.unit_card_style("normal"), sb)
 
 func _style_start_button() -> void:
 	if start_button == null:

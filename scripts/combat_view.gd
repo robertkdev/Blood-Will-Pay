@@ -380,6 +380,10 @@ func _apply_responsive_layout() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
 	var effective_size: Vector2 = _effective_ui_viewport_size(viewport_size)
+	var physical_window_size: Vector2 = get_window().size
+	var scaled_compact_physical_frame: bool = ui_scale >= 1.25 and (
+		physical_window_size.x <= 1280.0 or physical_window_size.y <= 720.0
+	)
 	# 1080p is the normal shipping planning target. Its desktop stack is taller
 	# than the available field once the live shop and decision controls exist,
 	# so it uses the compact (still fully legible) tier.
@@ -388,6 +392,7 @@ func _apply_responsive_layout() -> void:
 		effective_size.y <= 520.0
 		or effective_size.x <= 1100.0
 		or (ui_scale >= 1.25 and effective_size.y <= 720.0)
+		or scaled_compact_physical_frame
 	)
 	# At the maximum supported scale, do not simply shrink every planning
 	# surface equally. The board and the commitment decision remain the reading
@@ -399,6 +404,7 @@ func _apply_responsive_layout() -> void:
 	set_meta("maximum_scale_layout", maximum_scale_layout)
 	set_meta("persisted_ui_scale", ui_scale)
 	set_meta("effective_ui_size", effective_size)
+	set_meta("physical_window_size", physical_window_size)
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
 	if stage_progress_top_bar != null and stage_progress_top_bar.has_method("set_compact_layout"):
 		stage_progress_top_bar.call("set_compact_layout", compact)
@@ -406,7 +412,10 @@ func _apply_responsive_layout() -> void:
 		margin.add_theme_constant_override("margin_left", 6 if tight_compact else 10 if compact else 20)
 		margin.add_theme_constant_override("margin_top", 4 if tight_compact else 8 if compact else 14)
 		margin.add_theme_constant_override("margin_right", 6 if tight_compact else 10 if compact else 20)
-		margin.add_theme_constant_override("margin_bottom", 0 if tight_compact else 8 if compact else 18)
+		# Keep a physical 8px escape gutter below the shop chrome at enlarged UI
+		# scale. Without it, a valid internal ShopBottomGutter can still be hidden
+		# by the framebuffer edge after container rounding.
+		margin.add_theme_constant_override("margin_bottom", 8 if tight_compact else 8 if compact else 18)
 	stage_label.visible = not compact
 	stage_label.custom_minimum_size = Vector2.ZERO if compact else Vector2(0.0, 64.0)
 	if planning_timer_label != null:
@@ -435,11 +444,11 @@ func _apply_responsive_layout() -> void:
 		board_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if planning_area != null:
 		planning_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(120.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
 	_apply_side_panel_layout(compact, tight_compact)
 	for half_path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea",
@@ -461,21 +470,24 @@ func _apply_responsive_layout() -> void:
 		bottom_storage.size_flags_vertical = Control.SIZE_SHRINK_END
 		_ensure_shop_bottom_gutter(bottom_storage, compact)
 	var opening_shop: bool = shop_grid != null and bool(shop_grid.get_meta("opening_fight_empty", false))
-	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 62.0) if opening_shop and tight_compact else Vector2(520.0, 92.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(640.0 if tight_compact else 900.0 if compact else 1120.0, 62.0 if tight_compact else 92.0 if compact else 108.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(440.0, 58.0) if opening_shop and tight_compact else Vector2(520.0, 92.0) if opening_shop and compact else Vector2(560.0, 108.0) if opening_shop else Vector2(640.0 if tight_compact else 900.0 if compact else 1120.0, 58.0 if tight_compact else 92.0 if compact else 108.0))
 	if shop_grid != null:
 		shop_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if opening_shop else Control.SIZE_EXPAND_FILL
 	var planning_actions_row: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
 	if planning_actions_row != null:
 		var actions_embedded: bool = continue_button != null and continue_button.get_parent() == planning_actions_row
 		planning_actions_row.visible = _is_planning_phase() and actions_embedded
-		planning_actions_row.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 38.0 if tight_compact else 36.0 if compact else 56.0)
+		planning_actions_row.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, 36.0 if tight_compact else 34.0 if compact else 48.0)
 		planning_actions_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	_set_minimum_size("MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(254.0 if tight_compact else 334.0 if compact else 392.0, 36.0 if tight_compact else 44.0 if compact else 50.0))
-	wager_summary.add_theme_font_size_override("font_size", 14 if tight_compact else 18 if compact else 22)
-	wager_summary.custom_minimum_size = Vector2(0.0, 22.0 if tight_compact else 0.0)
-	wager_summary.autowrap_mode = TextServer.AUTOWRAP_OFF if tight_compact else TextServer.AUTOWRAP_WORD_SMART
+	_set_minimum_size("MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(254.0 if tight_compact else 334.0 if compact else 392.0, 34.0 if tight_compact else 40.0 if compact else 46.0))
+	# Make the wager quote a decision line rather than a tertiary footnote. The
+	# battle field retains its scale because the flexible BattleArea absorbs this
+	# two-pixel increase before the fixed shop/gutter stack does.
+	wager_summary.add_theme_font_size_override("font_size", 17 if tight_compact else 18 if compact else 19)
+	wager_summary.custom_minimum_size = Vector2(0.0, 24.0 if tight_compact else 22.0)
+	wager_summary.autowrap_mode = TextServer.AUTOWRAP_OFF
 	wager_summary.clip_text = false
-	_set_box_separation("MarginContainer/VBoxContainer", 2 if tight_compact else 4 if compact else 6)
+	_set_box_separation("MarginContainer/VBoxContainer", 2 if tight_compact else 3 if compact else 3)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 10 if tight_compact else 14 if compact else 20)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", 2 if tight_compact else 8 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn", 6 if compact else 8)
@@ -489,6 +501,8 @@ func _apply_responsive_layout() -> void:
 	_apply_functional_typography(compact, tight_compact)
 	_apply_planning_action_hierarchy(compact, tight_compact)
 	_sync_compact_resource_strip()
+	if controller != null and controller.economy_ui != null:
+		controller.economy_ui.refresh()
 	if controller != null and controller.has_method("refresh_result_banner_layout"):
 		controller.call("refresh_result_banner_layout")
 	_update_external_backplates()
@@ -540,11 +554,12 @@ func _set_grid_separation(grid: GridContainer, separation: int) -> void:
 func _apply_board_tile_size(compact: bool, tight_compact: bool, large_planning_field: bool) -> void:
 	var effective_size: Vector2 = get_meta("effective_ui_size", Vector2.ZERO) as Vector2
 	var wide_tight_field: bool = tight_compact and effective_size.x >= 1200.0
+	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	# Ultrawide planning has enough horizontal room to let the deployment grid
 	# read as the battlefield, rather than a small island floating between rails.
 	# The increase is limited to the authored grid cells; side-panel behavior and
 	# compact breakpoints stay unchanged.
-	var tile_size: Vector2 = Vector2(58.0, 26.0) if wide_tight_field else Vector2(42.0, 26.0) if tight_compact else Vector2(112.0, 54.0) if large_planning_field else Vector2(62.0, 46.0) if compact else Vector2(88.0, 72.0)
+	var tile_size: Vector2 = Vector2(58.0, 26.0) if wide_tight_field else Vector2(44.0, 26.0) if maximum_scale_layout else Vector2(42.0, 26.0) if tight_compact else Vector2(112.0, 54.0) if large_planning_field else Vector2(62.0, 46.0) if compact else Vector2(88.0, 72.0)
 	var grid_separation: int = 4 if tight_compact else 6 if compact else 8
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		if grid == null:
@@ -590,6 +605,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		left_item_area.visible = true
 		left_item_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		left_item_area.clip_contents = true if tight_compact else false
+		left_item_area.modulate.a = 0.76 if maximum_scale_layout else 1.0
 	var item_storage: GridContainer = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
 	var item_storage_header: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
 	var empty_item_cache: bool = item_storage_header != null and int(item_storage_header.get_meta("occupied_slots", 0)) <= 0
@@ -637,12 +653,13 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		)
 	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	if stats_area != null:
-		stats_area.custom_minimum_size.x = 164.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0
+		stats_area.custom_minimum_size.x = 148.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0
 		stats_area.size_flags_horizontal = Control.SIZE_SHRINK_END
 		stats_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
+		stats_area.modulate.a = 0.80 if maximum_scale_layout else 1.0
 	var stats_panel: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel") as Control
 	if stats_panel != null:
-		stats_panel.custom_minimum_size = Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
+		stats_panel.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
 		stats_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_panel.clip_contents = false
 		var stats_vbox: VBoxContainer = stats_panel.get_node_or_null("VBox") as VBoxContainer
@@ -656,7 +673,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			recent_button.visible = not compact
 	var scoreboard: Control = find_child("Scoreboard", true, false) as Control
 	if scoreboard != null:
-		scoreboard.custom_minimum_size = Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 142.0 if tight_compact else 156.0 if compact else 430.0)
+		scoreboard.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 142.0 if tight_compact else 156.0 if compact else 430.0)
 		var scoreboard_header: Control = scoreboard.get_node_or_null("Header") as Control
 		if scoreboard_header != null:
 			# "TEAM METRICS" already supplies the surface label. Removing the
@@ -669,7 +686,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 				_apply_compact_metric_badge(row_control, compact)
 	var metric_tabs: Control = find_child("MetricTabs", true, false) as Control
 	if metric_tabs != null:
-		metric_tabs.custom_minimum_size = Vector2(164.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
+		metric_tabs.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
 		# The eight-column desktop metric selector cannot remain legible inside
 		# a 178px rail. Compact keeps the default Total scoreboard and removes
 		# the selector row instead of squeezing its controls into noise.
@@ -751,7 +768,8 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	band.offset_top = 0.0
 	band.offset_right = 0.0
 	band.offset_bottom = 0.0
-	band.color = Color(0.52, 0.025, 0.034, 0.18) if enemy_side else Color(0.42, 0.35, 0.24, 0.16)
+	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
+	band.color = Color(0.52, 0.025, 0.034, 0.25 if maximum_scale_layout else 0.18) if enemy_side else Color(0.42, 0.35, 0.24, 0.22 if maximum_scale_layout else 0.16)
 	var label_name: String = "HostileFieldOrderLabel" if enemy_side else "SurvivalFieldOrderLabel"
 	var label: Label = area.get_node_or_null(label_name) as Label
 	if label == null:
@@ -779,7 +797,7 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 		label.text = "HOLD LINE // COMMIT"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if enemy_side else HORIZONTAL_ALIGNMENT_RIGHT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 12 if tight_compact else 15 if compact else 19)
+	label.add_theme_font_size_override("font_size", 13 if maximum_scale_layout else 12 if tight_compact else 15 if compact else 19)
 	label.add_theme_color_override("font_color", Color(1.0, 0.58, 0.47, 0.96) if enemy_side else Color(1.0, 0.90, 0.69, 0.96))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.94))
 	label.add_theme_constant_override("outline_size", 2)
@@ -847,7 +865,7 @@ func _enforce_compact_metric_badges() -> void:
 			_apply_compact_metric_badge(row, true)
 
 func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
-	var card_size: Vector2 = Vector2(120.0, 56.0) if tight_compact else Vector2(132.0, 86.0) if compact else Vector2(144.0, 124.0)
+	var card_size: Vector2 = Vector2(120.0, 52.0) if tight_compact else Vector2(132.0, 86.0) if compact else Vector2(144.0, 124.0)
 	if shop_grid != null:
 		shop_grid.add_theme_constant_override("h_separation", 6 if tight_compact else 10 if compact else 16)
 		shop_grid.add_theme_constant_override("v_separation", 4 if tight_compact else 6 if compact else 10)
@@ -906,11 +924,32 @@ func _ensure_shop_bottom_gutter(bottom_storage: VBoxContainer, compact: bool) ->
 		_shop_bottom_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bottom_storage.add_child(_shop_bottom_gutter)
 	bottom_storage.move_child(_shop_bottom_gutter, bottom_storage.get_child_count() - 1)
-	var gutter_height: float = 8.0 if compact else 12.0
+	var gutter_height: float = 10.0 if compact else 12.0
 	_shop_bottom_gutter.custom_minimum_size = Vector2(0.0, gutter_height)
 	_shop_bottom_gutter.visible = true
 	_shop_bottom_gutter.set_meta("visual_safe_gutter", true)
 	_shop_bottom_gutter.set_meta("safe_gutter_height", gutter_height)
+	var gutter_surface: ColorRect = _shop_bottom_gutter.get_node_or_null("VisibleGutterSurface") as ColorRect
+	if gutter_surface == null:
+		gutter_surface = ColorRect.new()
+		gutter_surface.name = "VisibleGutterSurface"
+		gutter_surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gutter_surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_shop_bottom_gutter.add_child(gutter_surface)
+	var gutter_rail: ColorRect = _shop_bottom_gutter.get_node_or_null("VisibleGutterRail") as ColorRect
+	if gutter_rail == null:
+		gutter_rail = ColorRect.new()
+		gutter_rail.name = "VisibleGutterRail"
+		gutter_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gutter_rail.anchor_left = 0.0
+		gutter_rail.anchor_right = 1.0
+		gutter_rail.anchor_top = 0.0
+		gutter_rail.anchor_bottom = 0.0
+		gutter_rail.offset_bottom = 1.0
+		_shop_bottom_gutter.add_child(gutter_rail)
+	gutter_surface.color = Color(0.012, 0.008, 0.010, 0.96)
+	gutter_rail.color = Color(0.72, 0.14, 0.07, 0.72)
+	_shop_bottom_gutter.set_meta("visible_gutter_surface", true)
 	if shop_grid != null:
 		shop_grid.set_meta("safe_bottom_gutter", maxf(gutter_height, float(shop_grid.get_meta("safe_bottom_gutter", 0.0))))
 
@@ -1050,17 +1089,17 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		board_status_plate.offset_right = 240.0 if tight_compact else 278.0
 	var planning_directive: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
-		planning_directive.text = "DEPLOY // WAGER // COMMIT" if tight_compact else "DEPLOYMENT GRID // SET WAGER // COMMIT"
-		planning_directive.add_theme_font_size_override("font_size", 18)
-		# Keep the directive as a concise board annotation at maximum scale so it
-		# cannot compete with the player-side survival landmark.
-		planning_directive.offset_left = -150.0 if maximum_scale_layout else -200.0
-		planning_directive.offset_right = 150.0 if maximum_scale_layout else 200.0
-		# The explicit Start Battle action and board status already teach the
-		# planning sequence. Remove this duplicate instruction at the maximum
-		# scale instead of making every surface smaller.
-		planning_directive.visible = not maximum_scale_layout
-		planning_directive.set_meta("maximum_scale_disclosure", "hidden_redundant_instruction" if maximum_scale_layout else "shown")
+		planning_directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
+		planning_directive.add_theme_font_size_override("font_size", 16 if tight_compact else 20)
+		planning_directive.offset_left = -246.0 if tight_compact else -286.0
+		planning_directive.offset_right = 246.0 if tight_compact else 286.0
+		planning_directive.offset_top = 0.0 if tight_compact else 12.0
+		planning_directive.offset_bottom = 34.0 if tight_compact else 54.0
+		planning_directive.visible = true
+		planning_directive.z_index = 110
+		planning_directive.z_as_relative = false
+		planning_directive.set_meta("planning_action_order", "deploy>wager>commit")
+		planning_directive.set_meta("maximum_scale_disclosure", "persistent_ordered_command")
 	if continue_button != null:
 		continue_button.set_meta("visual_role", "primary_commit")
 		continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1252,7 +1291,7 @@ func _update_external_backplates() -> void:
 		if not plate.visible:
 			continue
 		var authored_pad: float = float(plate.get_meta("pad", 0.0))
-		var pad: float = minf(authored_pad, 3.0) if tight_scale_layout else minf(authored_pad, 4.0) if compact_layout else authored_pad
+		var pad: float = minf(authored_pad, 2.0) if tight_scale_layout else minf(authored_pad, 3.0) if compact_layout else authored_pad
 		if plate_name == "GothicShopPlate" and target.get_global_rect().end.y >= get_viewport_rect().end.y - 1.0:
 			# The grid can terminate at the framebuffer, but its compact cards
 			# retain an authored internal gutter. Keep the exterior plate inside

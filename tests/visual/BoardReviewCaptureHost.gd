@@ -8,6 +8,8 @@ const UNIT_FACTORY_SCRIPT: GDScript = preload("res://scripts/unit_factory.gd")
 
 const CAPTURE_NAME: String = "BoardReviewCaptureHost"
 const OUTPUT_ROOT: String = "user://board_review_capture"
+const EXTERNAL_OUTPUT_ROOT: String = "D:/CodexRuntimeArtifacts/BloodWillPay/board_review_capture"
+const OUTPUT_ROOT_ENVIRONMENT_VARIABLE: String = "BOARD_REVIEW_CAPTURE_ROOT"
 const SEAT_ARGUMENT_PREFIX: String = "--board-review-seat="
 const SEAT_ENVIRONMENT_VARIABLE: String = "BOARD_REVIEW_SEAT_ID"
 const DESKTOP_SIZE: Vector2i = Vector2i(1920, 1080)
@@ -32,6 +34,8 @@ const EXPECTED_FILES: Array[String] = [
 	"14_active_combat_onset_1920x1080.png",
 	"15_active_combat_midfight_1920x1080.png",
 	"16_active_combat_reduced_motion_1920x1080.png",
+	"34_active_combat_reduced_motion_temporal_a_1920x1080.png",
+	"35_active_combat_reduced_motion_temporal_b_1920x1080.png",
 	"17_victory_entry_1920x1080.png",
 	"18_victory_hold_1920x1080.png",
 	"19_stalemate_hold_1920x1080.png",
@@ -49,6 +53,13 @@ const EXPECTED_FILES: Array[String] = [
 	"31_settings_disabled_1920x1080.png",
 	"32_planning_ultrawide_2560x1080.png",
 	"33_result_skip_focus_1920x1080.png",
+	"46_settings_focus_hover_1280x720_150pct.png",
+	"47_settings_pressed_1280x720_150pct.png",
+	"48_settings_disabled_1280x720_150pct.png",
+	"52_planning_to_combat_bridge_1920x1080.png",
+	"53_combat_contact_bridge_1920x1080.png",
+	"54_combat_to_planning_bridge_1920x1080.png",
+	"55_dense_combat_midfight_1920x1080.png",
 ]
 
 var _main: Control = null
@@ -63,9 +74,11 @@ var _seat_id: String = ""
 var _seat_identity_source: String = ""
 var _run_id: String = ""
 var _output_dir: String = ""
+var _output_root: String = ""
 var _manifest_path: String = ""
 var _settings_path: String = ""
 var _profile_path: String = ""
+var _temporal_probe_verdict: Dictionary[String, Variant] = {}
 
 
 func _ready() -> void:
@@ -138,6 +151,7 @@ func _run() -> void:
 		var settings_focus_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("focus") as StyleBoxFlat
 		var settings_pressed_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("pressed") as StyleBoxFlat
 		_expect(settings_focus_style != null and settings_pressed_style != null and settings_focus_style.border_color != settings_pressed_style.border_color, "settings selector focus must be visibly distinct from pressed")
+		_assert_settings_focus_surface_contract(title_menu, settings_state_button)
 		await _capture("29_settings_focus_hover_1920x1080.png", "settings_focus_hover", DESKTOP_SIZE)
 		settings_state_button.release_focus()
 		DisplayServer.warp_mouse(Vector2(1.0, 1.0))
@@ -147,10 +161,17 @@ func _run() -> void:
 		settings_state_button.toggle_mode = true
 		settings_state_button.button_pressed = true
 		await _settle_frames(3)
-		await _capture("30_settings_pressed_1920x1080.png", "settings_pressed", DESKTOP_SIZE)
+		if title_menu.has_method("ensure_settings_surface_visible"):
+			title_menu.call("ensure_settings_surface_visible")
+		await _settle_frames(2)
+		_assert_settings_pressed_surface_contract(title_menu, settings_state_button)
+		var settings_pressed_frame: Image = await _capture("30_settings_pressed_1920x1080.png", "settings_pressed", DESKTOP_SIZE)
+		_assert_settings_pressed_pixels(settings_pressed_frame, title_menu)
 		settings_state_button.button_pressed = false
 		settings_state_button.toggle_mode = previous_toggle_mode
 		settings_state_button.disabled = true
+		if title_menu.has_method("ensure_settings_surface_visible"):
+			title_menu.call("ensure_settings_surface_visible")
 		await _settle_frames(3)
 		var disabled_cue: String = String(settings_state_button.get_meta("disabled_non_color_cue", ""))
 		var disabled_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("disabled") as StyleBoxFlat
@@ -170,6 +191,36 @@ func _run() -> void:
 	await _settle_frames(12)
 	_assert_compact_settings_finish()
 	await _capture("23_settings_1280x720_150pct.png", "settings_150_percent", COMPACT_SIZE)
+	var compact_settings_state_button: Button = title_menu.find_child("UIScaleOption", true, false) as Button if title_menu != null else null
+	_expect(compact_settings_state_button != null, "150% settings did not retain a live UI Scale selector for interaction-state review")
+	if compact_settings_state_button != null:
+		compact_settings_state_button.disabled = false
+		compact_settings_state_button.grab_focus()
+		DisplayServer.warp_mouse(compact_settings_state_button.get_global_rect().get_center())
+		await _settle_frames(4)
+		_assert_settings_focus_surface_contract(title_menu, compact_settings_state_button)
+		await _capture("46_settings_focus_hover_1280x720_150pct.png", "settings_focus_hover_150_percent", COMPACT_SIZE)
+		compact_settings_state_button.release_focus()
+		DisplayServer.warp_mouse(Vector2(1.0, 1.0))
+		await _settle_frames(2)
+		var compact_toggle_mode: bool = compact_settings_state_button.toggle_mode
+		compact_settings_state_button.toggle_mode = true
+		compact_settings_state_button.button_pressed = true
+		if title_menu.has_method("ensure_settings_surface_visible"):
+			title_menu.call("ensure_settings_surface_visible")
+		await _settle_frames(3)
+		_assert_settings_pressed_surface_contract(title_menu, compact_settings_state_button)
+		var compact_pressed_frame: Image = await _capture("47_settings_pressed_1280x720_150pct.png", "settings_pressed_150_percent", COMPACT_SIZE)
+		_assert_settings_pressed_pixels(compact_pressed_frame, title_menu)
+		compact_settings_state_button.button_pressed = false
+		compact_settings_state_button.toggle_mode = compact_toggle_mode
+		compact_settings_state_button.disabled = true
+		if title_menu.has_method("ensure_settings_surface_visible"):
+			title_menu.call("ensure_settings_surface_visible")
+		await _settle_frames(3)
+		_assert_settings_disabled_surface_contract(title_menu, compact_settings_state_button)
+		await _capture("48_settings_disabled_1280x720_150pct.png", "settings_disabled_150_percent", COMPACT_SIZE)
+		compact_settings_state_button.disabled = false
 
 	_configure_window(DESKTOP_SIZE)
 	if title_menu != null:
@@ -286,17 +337,33 @@ func _run() -> void:
 	var controller: Variant = combat.get("controller") if combat != null else null
 	var manager: CombatManager = combat.get("manager") as CombatManager if combat != null else null
 	_expect(manager != null, "combat manager missing from planning surface")
+	if controller != null and controller.has_method("_show_phase_transition_bridge"):
+		controller.call("_show_phase_transition_bridge", "planning_to_combat")
+		await _settle_frames(3)
+		_assert_phase_transition_bridge(combat, "planning_to_combat", "planning bridge")
+		await _capture("52_planning_to_combat_bridge_1920x1080.png", "planning_to_combat_bridge", DESKTOP_SIZE)
+		controller.call("_hide_phase_transition_bridge")
+		await _settle_frames(2)
 	if manager != null:
 		var options: Dictionary[String, Variant] = {
 			"label": CAPTURE_NAME,
 			"stage": 2,
 			"seed": 73,
 			"deterministic_rolls": true,
-			"abilities_enabled": true,
+			"abilities_enabled": false,
 		}
-		var battle_result: Dictionary[String, Variant] = manager.start_custom_battle(["bonko"], ["brute"], options)
+		# Capture a genuinely crowded, live 4v4 field. These are existing roster IDs;
+		# this only supplies a visual-review fixture and never rewrites RGA range,
+		# targeting, movement, ability, or outcome rules.
+		var battle_result: Dictionary[String, Variant] = manager.start_custom_battle(["bonko", "berebell", "luna", "nyxa"], ["brute", "mortem", "morrak", "malachor"], options)
 		_expect(bool(battle_result.get("ok", false)), "deterministic capture battle failed: %s" % String(battle_result.get("reason", "unknown")))
 	Engine.time_scale = 0.0
+	if controller != null and controller.has_method("_show_phase_transition_bridge"):
+		controller.call("_show_phase_transition_bridge", "planning_to_combat")
+		await _settle_frames(3)
+		_assert_phase_transition_bridge(combat, "planning_to_combat", "combat contact bridge")
+		await _capture("53_combat_contact_bridge_1920x1080.png", "combat_contact_bridge", DESKTOP_SIZE)
+		controller.call("_hide_phase_transition_bridge")
 	if controller != null and controller.has_method("_update_environmental_pressure"):
 		controller.set("_combat_pressure_elapsed", 0.0)
 		controller.call("_update_environmental_pressure", 0.0)
@@ -304,20 +371,52 @@ func _run() -> void:
 	_assert_combat_environment_contract(combat, "onset", false)
 	await _capture("14_active_combat_onset_1920x1080.png", "active_combat_onset", DESKTOP_SIZE)
 	Engine.time_scale = 1.0
-	await get_tree().create_timer(0.75, true, false, true).timeout
+	await get_tree().create_timer(1.45, true, false, true).timeout
 	Engine.time_scale = 0.0
 	if controller != null and controller.has_method("_update_environmental_pressure"):
 		controller.set("_combat_pressure_elapsed", 1.0)
 		controller.call("_update_environmental_pressure", 0.0)
 	await _settle_frames(4)
 	_assert_combat_environment_contract(combat, "midfight", false)
-	await _capture("15_active_combat_midfight_1920x1080.png", "active_combat_midfight", DESKTOP_SIZE)
+	var midfight_frame: Image = await _capture("15_active_combat_midfight_1920x1080.png", "active_combat_midfight", DESKTOP_SIZE)
+	var midfight_impact_count: int = int(controller.get("_combat_impact_event_index")) if controller != null else 0
+	# Frame 55 is a separate, later live-combat sample rather than a duplicate
+	# label. Resume the actual deterministic battle until at least one further
+	# resolved hit is observed, then freeze the existing RGA state for review.
+	Engine.time_scale = 1.0
+	var dense_wait_seconds: float = 0.0
+	while dense_wait_seconds < 1.20 and (controller == null or int(controller.get("_combat_impact_event_index")) <= midfight_impact_count):
+		await get_tree().create_timer(0.15, true, false, true).timeout
+		dense_wait_seconds += 0.15
+	Engine.time_scale = 0.0
+	if controller != null and controller.has_method("_update_environmental_pressure"):
+		controller.call("_update_environmental_pressure", 0.0)
+	var dense_impact_count: int = int(controller.get("_combat_impact_event_index")) if controller != null else 0
+	_expect(dense_impact_count > midfight_impact_count, "dense combat capture did not advance to a new engine-resolved exchange")
+	await _settle_frames(4)
+	_assert_dense_combat_readability_contract(combat, manager)
+	_assert_live_exchange_receipt_contract(combat, "dense combat")
+	var dense_frame: Image = await _capture("55_dense_combat_midfight_1920x1080.png", "dense_combat_late_exchange", DESKTOP_SIZE)
+	_assert_distinct_runtime_frames(midfight_frame, dense_frame, "dense combat proof")
 	USER_SETTINGS_SCRIPT.set_reduced_motion(true)
 	if controller != null and controller.has_method("_update_environmental_pressure"):
 		controller.call("_update_environmental_pressure", 0.0)
+	if controller != null and controller.has_method("_enforce_reduced_motion_composition_lock"):
+		controller.call("_enforce_reduced_motion_composition_lock")
 	await _settle_frames(8)
 	_assert_combat_environment_contract(combat, "reduced_motion_static_midfight", true)
-	await _capture("16_active_combat_reduced_motion_1920x1080.png", "active_combat_reduced_motion", DESKTOP_SIZE)
+	_assert_reduced_motion_scene_contract(combat, "reduced-motion first sample")
+	var reduced_motion_frame: Image = await _capture("16_active_combat_reduced_motion_1920x1080.png", "active_combat_reduced_motion", DESKTOP_SIZE)
+	_assert_reduced_motion_surface_pixels(reduced_motion_frame, "active reduced-motion combat")
+	var temporal_probe_started_at: int = Time.get_ticks_msec()
+	var reduced_motion_temporal_frame_a: Image = await _capture("34_active_combat_reduced_motion_temporal_a_1920x1080.png", "active_combat_reduced_motion_temporal_a", DESKTOP_SIZE)
+	_assert_reduced_motion_scene_contract(combat, "reduced-motion temporal sample A")
+	await get_tree().create_timer(1.0, true, false, true).timeout
+	var reduced_motion_frame_b: Image = await _capture("35_active_combat_reduced_motion_temporal_b_1920x1080.png", "active_combat_reduced_motion_temporal_b", DESKTOP_SIZE)
+	_assert_reduced_motion_scene_contract(combat, "reduced-motion temporal sample B")
+	_assert_reduced_motion_surface_pixels(reduced_motion_temporal_frame_a, "reduced-motion temporal A")
+	_assert_reduced_motion_surface_pixels(reduced_motion_frame_b, "reduced-motion temporal B")
+	_assert_temporal_stability(reduced_motion_frame, reduced_motion_temporal_frame_a, reduced_motion_frame_b, "reduced motion combat", Time.get_ticks_msec() - temporal_probe_started_at)
 	USER_SETTINGS_SCRIPT.set_reduced_motion(false)
 
 	_expect(controller != null and controller.has_method("_show_result_banner"), "combat result presenter missing")
@@ -424,6 +523,20 @@ func _run() -> void:
 		_assert_result_outcome_contract("DEFEAT")
 		_assert_compact_result_contract()
 		await _capture("25_defeat_hold_1280x720_150pct.png", "defeat_150_percent", COMPACT_SIZE)
+		_configure_window(DESKTOP_SIZE)
+		if combat != null and combat.has_method("_apply_responsive_layout"):
+			combat.call("_apply_responsive_layout")
+		await _settle_frames(6)
+		# Exercise the real post-combat handoff rather than painting a return lock
+		# over a frozen defeat card. The bridge must sit over the restored planning
+		# shop and deployment surface.
+		controller.set("_post_combat_outcome", "victory")
+		controller.call("_on_intermission_finished")
+		await _settle_frames(3)
+		_assert_phase_transition_bridge(combat, "combat_to_planning", "planning return bridge")
+		_assert_redeployed_planning_surface(combat, "planning return bridge")
+		await _capture("54_combat_to_planning_bridge_1920x1080.png", "combat_to_planning_bridge", DESKTOP_SIZE)
+		controller.call("_hide_phase_transition_bridge")
 
 	Engine.time_scale = 1.0
 	_configure_window(DESKTOP_SIZE)
@@ -628,6 +741,8 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	var collapse: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/CollapseAftermathGeometry") as Control
 	var reduced_lock: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	var pressure_painter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ArenaPressurePainter") as Control
+	var focus_painter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCombatFocusPainter") as Control
+	var reduced_motion_lock_cue: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/ReducedMotionLockCue") as Label
 	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
 	var arena_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
 	var pressure_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
@@ -637,7 +752,14 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(arena != null and String(arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_aligned_raster_and_physical_evidence", "%s capture is not sourced from the stable field plus visible physical evidence" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("stable_base_location", false)), "%s capture does not preserve one tactical location" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("procedural_environment_geometry_suppressed", false)), "%s capture retained procedural environment geometry" % expected_phase)
-	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not prioritize cell readability" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not retain subordinate terrain seams above the horror field" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_focus_priority", "")) == "live_collision_pair_and_first_ring", "%s capture does not prioritize the local clash" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_outer_grid_treatment", "")) == "muted_perimeter", "%s capture does not mute the outer grid" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_clash_anchor", "")) == "nearest_opposing_visual_wound", "%s capture lacks the exact nearest-opponent wound anchor" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_outer_grid_mask", "")) == "focus_frame_overlay", "%s capture does not isolate the outer grid behind the local clash" % expected_phase)
+	_expect(focus_painter != null and focus_painter.z_index >= 1 and bool(focus_painter.get_meta("focus_frame_clash_pair_active", false)), "%s capture lost the below-actor local clash painter" % expected_phase)
+	_expect(reduced_motion_lock_cue != null and reduced_motion_lock_cue.visible == reduced_motion, "%s capture lost its persistent reduced-motion lock cue" % expected_phase)
+	_expect(reduced_motion_lock_cue != null and bool(reduced_motion_lock_cue.get_meta("persistent_reduced_motion_lock_active", false)) == reduced_motion, "%s capture reduced-motion lock cue lacks its persistent-state contract" % expected_phase)
 	var expects_physical_evidence: bool = true
 	_expect(aftermath != null and aftermath.visible == expects_physical_evidence, "%s capture has the wrong physical evidence visibility" % expected_phase)
 	_expect(onset != null and not onset.visible and midfight != null and not midfight.visible and collapse != null and not collapse.visible and reduced_lock != null and not reduced_lock.visible, "%s capture leaked a procedural evidence group over the authored field" % expected_phase)
@@ -651,6 +773,144 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(pressure_surface != null and bool(pressure_surface.get_meta("landmark_aligned_with_base", false)), "%s capture pressure art is not registered as landmark-aligned" % expected_phase)
 	_expect(arena != null and float(arena.get_meta("battlefield_overlay_density", -1.0)) >= (0.0 if expected_phase == "onset" else 0.16), "%s capture lacks visible phase evidence density" % expected_phase)
 	_assert_persistent_combat_hierarchy(expected_phase)
+
+
+func _assert_reduced_motion_scene_contract(combat: Control, context: String) -> void:
+	_expect(combat != null and combat.is_visible_in_tree(), "%s lost the combat HUD" % context)
+	if combat == null:
+		return
+	var arena_units: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaUnits") as Control
+	var lock_cue: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/ReducedMotionLockCue") as Label
+	_expect(arena_units != null and arena_units.is_visible_in_tree() and arena_units.get_child_count() >= 6, "%s lost the combat board or actors" % context)
+	_expect(lock_cue != null and lock_cue.is_visible_in_tree() and lock_cue.text.contains("MOTION LOCK"), "%s lost the persistent reduced-motion lock cue" % context)
+	_expect(lock_cue != null and bool(lock_cue.get_meta("persistent_reduced_motion_lock_active", false)), "%s lock cue did not declare active persistence" % context)
+	if arena_units != null:
+		for actor_node: Node in arena_units.get_children():
+			var actor: Control = actor_node as Control
+			_expect(actor != null and actor.is_visible_in_tree(), "%s lost a combat actor" % context)
+
+
+func _assert_dense_combat_readability_contract(combat: Control, manager: CombatManager) -> void:
+	_expect(manager != null and manager.player_team.size() >= 4, "dense combat review did not retain four allied combatants")
+	_expect(manager != null and manager.enemy_team.size() >= 4, "dense combat review did not retain four hostile combatants")
+	if combat == null or manager == null:
+		return
+	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	var arena_units: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaUnits") as Control
+	_expect(arena != null and String(arena.get_meta("combat_actor_presentation_spacing", "")) == "simulation_anchored_collision_separation", "dense combat review did not declare simulation-anchored visual collision separation")
+	_expect(arena != null and String(arena.get_meta("combat_actor_formation", "")) == "none_simulation_positions_preserved", "dense combat review replaced RGA positions with a presentation formation")
+	_expect(arena != null and bool(arena.get_meta("combat_rga_positions_authoritative", false)), "dense combat review did not retain RGA positions as authoritative")
+	_expect(arena_units != null and arena_units.is_visible_in_tree() and arena_units.get_child_count() >= 8, "dense combat review did not render the eight combat actors")
+	if arena_units == null:
+		return
+	var visible_actors: Array[UnitActor] = []
+	var actor_slots: Dictionary[String, bool] = {}
+	for actor_node: Node in arena_units.get_children():
+		var actor: UnitActor = actor_node as UnitActor
+		_expect(actor != null and actor.is_visible_in_tree(), "dense combat review retained a non-visible actor entry")
+		if actor == null or not actor.is_visible_in_tree():
+			continue
+		visible_actors.append(actor)
+		var actor_side: String = String(actor.get_meta("combat_side", ""))
+		var roster_index: int = int(actor.get_meta("combat_roster_index", -1))
+		var roster_size: int = manager.player_team.size() if actor_side == "player" else manager.enemy_team.size()
+		var actor_slot: String = "%s:%d" % [actor_side, roster_index]
+		_expect(actor_side == "player" or actor_side == "enemy", "dense combat review actor lacks a simulation side")
+		_expect(roster_index >= 0 and roster_index < roster_size, "dense combat review actor no longer maps to its RGA roster index")
+		_expect(not actor_slots.has(actor_slot), "dense combat review duplicated an RGA roster actor")
+		actor_slots[actor_slot] = true
+		var simulation_position: Vector2 = actor.get_combat_simulation_screen_position()
+		var simulation_meta: Variant = actor.get_meta("combat_simulation_screen_position", null)
+		var visual_offset_meta: Variant = actor.get_meta("combat_visual_collision_offset", null)
+		_expect(String(actor.get_meta("combat_presentation_spacing", "")) == "simulation_anchored_collision_separation", "dense combat review actor lacks visual-only collision spacing metadata")
+		_expect(simulation_meta is Vector2 and (simulation_meta as Vector2).is_equal_approx(simulation_position), "dense combat review mutated an actor simulation position for visual spacing")
+		_expect(visual_offset_meta is Vector2, "dense combat review did not isolate collision separation as a visual offset")
+		var readout_tether: Control = actor.get_node_or_null("HealthReadoutTether") as Control
+		var readout_bounds: Rect2 = actor.get_combat_readout_bounds()
+		var actor_center: Vector2 = actor.get_global_rect().get_center()
+		var readout_distance: float = readout_bounds.get_center().distance_to(actor_center)
+		_expect(readout_tether != null and String(readout_tether.get_meta("combat_readout_tether", "")) == "near_silhouette", "dense combat review lost an actor-owned telemetry tether")
+		_expect(String(actor.get_meta("combat_readout_anchor", "")) == "tight_tether_to_silhouette", "dense combat review lost the actor-owned telemetry anchor")
+		_expect(readout_distance <= maxf(166.0, actor.size.y * 0.92), "dense combat review left a health readout visually detached from its actor")
+		if visual_offset_meta is Vector2:
+			var visual_offset: Vector2 = visual_offset_meta as Vector2
+			_expect(actor.get_global_rect().get_center().is_equal_approx(actor.get_combat_unspaced_center() + visual_offset), "dense combat review visual collision offset leaked into the simulation position")
+	_expect(visible_actors.size() >= 8, "dense combat review lost a live actor before the readability capture")
+	for first_index: int in range(visible_actors.size() - 1):
+		var first_actor: UnitActor = visible_actors[first_index]
+		for second_index: int in range(first_index + 1, visible_actors.size()):
+			var second_actor: UnitActor = visible_actors[second_index]
+			var body_overlap: Rect2 = first_actor.get_global_rect().intersection(second_actor.get_global_rect())
+			_expect(body_overlap.size.x <= 0.5 or body_overlap.size.y <= 0.5, "dense combat review left two rendered actors overlapping")
+
+
+func _assert_live_exchange_receipt_contract(combat: Control, context: String) -> void:
+	_expect(combat != null, "%s receipt proof is missing CombatView" % context)
+	if combat == null:
+		return
+	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	var exchange_signal: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatExchangeSignal") as Label
+	var exchange_focus: Control = arena.get_node_or_null("CombatExchangeFocus") as Control if arena != null else null
+	_expect(arena != null and String(arena.get_meta("combat_exchange_receipt", "")) == "engine_resolved_damage", "%s lacks an engine-resolved causal receipt" % context)
+	_expect(int(arena.get_meta("combat_exchange_damage", 0)) > 0, "%s receipt does not contain a positive resolved damage value" % context)
+	_expect(exchange_signal != null and exchange_signal.is_visible_in_tree() and exchange_signal.text.contains("LIVE EXCHANGE"), "%s hides its live damage receipt" % context)
+	_expect(exchange_signal != null and bool(exchange_signal.get_meta("combat_exchange_receipt_active", false)), "%s damage receipt does not declare itself active" % context)
+	_expect(exchange_focus != null and exchange_focus.is_visible_in_tree() and String(exchange_focus.get_meta("exchange_focus_mode", "")) == "live_source_target_breach", "%s lacks the visible source-to-target trajectory" % context)
+	_expect(exchange_focus != null and String(exchange_focus.get_meta("exchange_receipt", "")) == "engine_resolved_damage", "%s impact focus is not tied to a resolved hit" % context)
+
+
+func _assert_distinct_runtime_frames(first: Image, second: Image, context: String) -> void:
+	_expect(first != null and second != null and not first.is_empty() and not second.is_empty(), "%s did not produce two valid runtime images" % context)
+	if first == null or second == null or first.is_empty() or second.is_empty():
+		return
+	var first_data: PackedByteArray = first.get_data()
+	var second_data: PackedByteArray = second.get_data()
+	_expect(first.get_size() == second.get_size(), "%s changed framebuffer dimensions instead of proving a distinct match state" % context)
+	_expect(first_data != second_data, "%s reused an identical framebuffer for two claimed combat states" % context)
+
+
+func _assert_phase_transition_bridge(combat: Control, expected_kind: String, context: String) -> void:
+	_expect(combat != null, "%s missing CombatView" % context)
+	if combat == null:
+		return
+	var bridge: Control = combat.get_node_or_null("CombatPhaseTransitionBridge") as Control
+	var headline: Label = bridge.find_child("TransitionHeadline", true, false) as Label if bridge != null else null
+	var detail: Label = bridge.find_child("TransitionDetail", true, false) as Label if bridge != null else null
+	var field_lock: Panel = bridge.get_node_or_null("TransitionLockField") as Panel if bridge != null else null
+	_expect(bridge != null and bridge.is_visible_in_tree() and bool(bridge.get_meta("transition_active", false)), "%s phase bridge is not visible in the authoritative runtime" % context)
+	_expect(bridge != null and String(bridge.get_meta("transition_kind", "")) == expected_kind, "%s phase bridge exposes the wrong direction" % context)
+	_expect(detail != null and detail.is_visible_in_tree() and detail.text.contains("//"), "%s phase bridge lacks readable directional copy" % context)
+	_expect(detail != null and not detail.clip_text, "%s phase bridge may truncate its directional copy" % context)
+	_expect(bridge != null and bool(bridge.get_meta("transition_copy_complete", false)), "%s phase bridge did not declare an atomic copy treatment" % context)
+	_expect(field_lock != null and field_lock.is_visible_in_tree() and bool(field_lock.get_meta("transition_field_lock", false)), "%s phase bridge lacks its material transition strip" % context)
+	if field_lock != null:
+		var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+		var field_lock_rect: Rect2 = field_lock.get_global_rect()
+		_expect(viewport_rect.encloses(field_lock_rect), "%s material transition strip leaves the viewport" % context)
+		_expect(field_lock_rect.size.x >= viewport_rect.size.x * 0.50 and field_lock_rect.size.x <= viewport_rect.size.x * 0.62, "%s transition strip is outside its readable-width budget" % context)
+		_expect(field_lock_rect.size.y >= viewport_rect.size.y * 0.18 and field_lock_rect.size.y <= viewport_rect.size.y * 0.30, "%s transition strip violates its live-board occlusion budget" % context)
+		_expect(String(field_lock.get_meta("transition_material", "")) == "pressure_impact_record_strip", "%s transition strip lacks its physical record material" % context)
+		_expect(String(field_lock.get_meta("transition_occlusion_budget", "")) == "brief_strip_under_30pct_height", "%s transition strip does not declare its occlusion ceiling" % context)
+	if expected_kind == "planning_to_combat":
+		_expect(headline != null and headline.text.contains("CONTACT"), "%s does not communicate combat entry" % context)
+		_expect(detail != null and detail.text.contains("HOLD OR DIE"), "%s contact bridge omits its complete fight-or-flight directive" % context)
+		_expect(field_lock != null and String(field_lock.get_meta("transition_field_state", "")) == "breach_lock", "%s bridge lacks its breach state" % context)
+	else:
+		_expect(headline != null and headline.text.contains("FIELD ORDER") and headline.text.contains("REDEPLOY"), "%s does not communicate planning return" % context)
+		_expect(field_lock != null and String(field_lock.get_meta("transition_field_state", "")) == "redeploy_lock", "%s bridge lacks its redeploy state" % context)
+
+
+func _assert_redeployed_planning_surface(combat: Control, context: String) -> void:
+	_expect(combat != null, "%s missing CombatView for planning handoff" % context)
+	if combat == null:
+		return
+	var planning_area: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea") as Control
+	var shop_surface: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as Control
+	var continue_surface: Button = combat.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow/ContinueButton") as Button
+	_expect(planning_area != null and planning_area.is_visible_in_tree(), "%s does not reveal the real planning deployment surface beneath the bridge" % context)
+	_expect(shop_surface != null and shop_surface.is_visible_in_tree(), "%s does not reveal the real shop surface beneath the bridge" % context)
+	_expect(continue_surface == null or continue_surface.is_visible_in_tree(), "%s leaves the planning action hidden beneath the bridge" % context)
+
 
 func _assert_title_gateway_contract(context: String, compact: bool) -> void:
 	var title_page: Control = _main.get_node_or_null("TitlePage") as Control if _main != null else null
@@ -701,6 +961,94 @@ func _assert_settings_rail_contract() -> void:
 		visible_navigation_labels += 1
 		_expect(button.modulate.a >= 0.99 and button.self_modulate.a >= 0.99, "desktop Settings navigation action %s remained faded" % String(button.name))
 	_expect(visible_navigation_labels >= 6, "desktop Settings navigation rail exposes too few readable actions")
+
+func _assert_settings_pressed_surface_contract(title_menu: Control, selector: Button) -> void:
+	# A pressed-state screenshot is only useful if it preserves the real command
+	# surface. Guard against a transient menu fade or a selector-only frame being
+	# mistaken for an interaction-state proof.
+	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	var rail: Control = title_menu.get_node_or_null("TitlePanel") as Control if title_menu != null else null
+	var backing: Control = title_menu.get_node_or_null("ContentRecordBacking") as Control if title_menu != null else null
+	var integrity_shell: Control = title_menu.get_node_or_null("SettingsIntegrityShell") as Control if title_menu != null else null
+	_expect(title_menu != null and title_menu.is_visible_in_tree(), "settings pressed proof lost the command surface")
+	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "settings pressed proof lost the settings content panel")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings pressed proof lost the UI scale card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings pressed proof lost its readable scale heading")
+	_expect(selector != null and selector.is_visible_in_tree() and selector.button_pressed, "settings pressed proof did not retain the pressed selector")
+	_expect(rail != null and bool(rail.get_meta("settings_pressed_surface_readability", false)), "settings pressed proof lost the persistent navigation-rail substrate")
+	_expect(content_panel != null and bool(content_panel.get_meta("settings_pressed_surface_readability", false)), "settings pressed proof lost the persistent dossier substrate")
+	_expect(backing != null and bool(backing.get_meta("settings_pressed_surface_readability", false)), "settings pressed proof lost the settings record backing")
+	_expect(integrity_shell != null and integrity_shell.is_visible_in_tree() and bool(integrity_shell.get_meta("settings_surface_invariant", false)), "settings pressed proof lost the invariant full dossier shell")
+	if integrity_shell != null:
+		var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+		var integrity_rect: Rect2 = integrity_shell.get_global_rect()
+		_expect(integrity_rect.size.x >= viewport_rect.size.x * 0.80 and integrity_rect.size.y >= viewport_rect.size.y * 0.80, "settings pressed proof reduced the full dossier shell to a fragment")
+
+func _assert_settings_pressed_pixels(image: Image, title_menu: Control) -> void:
+	if image == null or image.is_empty() or title_menu == null:
+		_expect(false, "settings pressed pixel proof did not receive a full framebuffer")
+		return
+	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control
+	var integrity_shell: Control = title_menu.get_node_or_null("SettingsIntegrityShell") as Control
+	var content_rect: Rect2 = content_panel.get_global_rect() if content_panel != null else Rect2(0.0, 0.0, float(image.get_width()), float(image.get_height()))
+	var scan_rect: Rect2i = Rect2i(content_rect).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+	var lit_samples: int = 0
+	var shell_samples: int = 0
+	for sample_y: int in range(18):
+		for sample_x: int in range(24):
+			var px: int = clampi(scan_rect.position.x + int((float(sample_x) + 0.5) / 24.0 * float(maxi(1, scan_rect.size.x))), 0, image.get_width() - 1)
+			var py: int = clampi(scan_rect.position.y + int((float(sample_y) + 0.5) / 18.0 * float(maxi(1, scan_rect.size.y))), 0, image.get_height() - 1)
+			var color: Color = image.get_pixel(px, py)
+			if color.r + color.g + color.b >= 0.24:
+				lit_samples += 1
+			if color.r + color.g + color.b >= 0.18:
+				shell_samples += 1
+	_expect(lit_samples >= 36, "settings pressed framebuffer lost its full readable content shell: lit_samples=%d" % lit_samples)
+	# The real pressed Settings shell intentionally carries a low-key charcoal
+	# dossier texture. 81/432 structured samples is visibly complete; 76 still
+	# rejects a missing rail/panel while avoiding a false black-frame failure.
+	_expect(shell_samples >= 76, "settings pressed framebuffer lost dossier-surface contrast: shell_samples=%d" % shell_samples)
+	if integrity_shell != null:
+		var integrity_rect: Rect2i = Rect2i(integrity_shell.get_global_rect()).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+		var integrity_samples: int = 0
+		for sample_y: int in range(14):
+			for sample_x: int in range(18):
+				var integrity_x: int = clampi(integrity_rect.position.x + int((float(sample_x) + 0.5) / 18.0 * float(maxi(1, integrity_rect.size.x))), 0, image.get_width() - 1)
+				var integrity_y: int = clampi(integrity_rect.position.y + int((float(sample_y) + 0.5) / 14.0 * float(maxi(1, integrity_rect.size.y))), 0, image.get_height() - 1)
+				var integrity_color: Color = image.get_pixel(integrity_x, integrity_y)
+				if integrity_color.r + integrity_color.g + integrity_color.b >= 0.16:
+					integrity_samples += 1
+		_expect(integrity_samples >= 32, "settings pressed framebuffer lost the visible dossier substrate: integrity_samples=%d" % integrity_samples)
+
+
+func _assert_settings_focus_surface_contract(title_menu: Control, selector: Button) -> void:
+	# Focus/hover evidence must retain the full settings shell; a selector-only
+	# composite is not a valid interaction-state review even if the focus flag is set.
+	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	var integrity_shell: Control = title_menu.get_node_or_null("SettingsIntegrityShell") as Control if title_menu != null else null
+	_expect(title_menu != null and title_menu.is_visible_in_tree(), "settings focus proof lost the command surface")
+	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "settings focus proof lost the settings content panel")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings focus proof lost the UI scale card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings focus proof lost its readable scale heading")
+	_expect(selector != null and selector.is_visible_in_tree() and selector.has_focus(), "settings focus proof did not retain the focused selector")
+	_expect(integrity_shell != null and integrity_shell.is_visible_in_tree(), "settings focus proof lost the full dossier shell")
+
+
+func _assert_settings_disabled_surface_contract(title_menu: Control, selector: Button) -> void:
+	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	var integrity_shell: Control = title_menu.get_node_or_null("SettingsIntegrityShell") as Control if title_menu != null else null
+	_expect(title_menu != null and title_menu.is_visible_in_tree(), "150% settings disabled proof lost the command surface")
+	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "150% settings disabled proof lost the settings content shell")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "150% settings disabled proof lost the UI scale card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "150% settings disabled proof lost its readable scale heading")
+	_expect(selector != null and selector.is_visible_in_tree() and selector.disabled, "150% settings disabled proof did not retain the disabled selector")
+	_expect(integrity_shell != null and integrity_shell.is_visible_in_tree(), "150% settings disabled proof lost the full dossier shell")
 
 
 func _assert_compact_settings_finish() -> void:
@@ -927,6 +1275,9 @@ func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
 		contract["battlefield_casualty_pressure"] = float(arena.get_meta("battlefield_casualty_pressure", 0.0))
 		contract["battlefield_casualty_event_index"] = int(arena.get_meta("battlefield_casualty_event_index", 0))
 		contract["battlefield_reduced_motion"] = bool(arena.get_meta("battlefield_reduced_motion", false))
+		contract["battlefield_impact_event_index"] = int(arena.get_meta("battlefield_impact_event_index", 0))
+		contract["combat_exchange_receipt"] = String(arena.get_meta("combat_exchange_receipt", ""))
+		contract["combat_exchange_damage"] = int(arena.get_meta("combat_exchange_damage", 0))
 	var banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
 	var aftermath: Control = banner.get_node_or_null("BattleResultAftermath") as Control if banner != null else null
@@ -958,18 +1309,20 @@ func _rect_contract(rect: Rect2) -> Dictionary[String, float]:
 	}
 
 
-func _capture(filename: String, state: String, expected_size: Vector2i) -> void:
+func _capture(filename: String, state: String, expected_size: Vector2i) -> Image:
 	await _settle_frames(2)
 	if not _framebuffer_capture_available():
 		_expect(false, "%s blocked: real framebuffer unavailable" % filename)
-		return
+		return null
 	RenderingServer.force_draw(false)
 	await get_tree().process_frame
 	var texture: ViewportTexture = get_viewport().get_texture()
 	if texture == null or not texture.get_rid().is_valid():
 		_expect(false, "%s blocked: viewport texture unavailable" % filename)
-		return
-	_record_capture_image(texture.get_image(), filename, state, expected_size)
+		return null
+	var image: Image = texture.get_image()
+	_record_capture_image(image, filename, state, expected_size)
+	return image
 
 
 func _capture_now(filename: String, state: String, expected_size: Vector2i) -> void:
@@ -982,6 +1335,66 @@ func _capture_now(filename: String, state: String, expected_size: Vector2i) -> v
 		_expect(false, "%s blocked: viewport texture unavailable" % filename)
 		return
 	_record_capture_image(texture.get_image(), filename, state, expected_size)
+
+func _assert_reduced_motion_surface_pixels(image: Image, context: String) -> void:
+	if image == null or image.is_empty():
+		_expect(false, "%s lost its framebuffer" % context)
+		return
+	var scan_rect: Rect2i = Rect2i(
+		Vector2i(int(float(image.get_width()) * 0.22), int(float(image.get_height()) * 0.16)),
+		Vector2i(int(float(image.get_width()) * 0.56), int(float(image.get_height()) * 0.70))
+	)
+	var populated_samples: int = 0
+	for sample_y: int in range(18):
+		for sample_x: int in range(24):
+			var px: int = clampi(scan_rect.position.x + int((float(sample_x) + 0.5) / 24.0 * float(maxi(1, scan_rect.size.x))), 0, image.get_width() - 1)
+			var py: int = clampi(scan_rect.position.y + int((float(sample_y) + 0.5) / 18.0 * float(maxi(1, scan_rect.size.y))), 0, image.get_height() - 1)
+			var color: Color = image.get_pixel(px, py)
+			if color.r + color.g + color.b >= 0.20:
+				populated_samples += 1
+	_expect(populated_samples >= 42, "%s lost the persistent combat field or fighters: populated_samples=%d" % [context, populated_samples])
+
+
+func _assert_temporal_stability(initial: Image, first: Image, second: Image, context: String, sample_gap_msec: int) -> void:
+	_expect(initial != null and first != null and second != null and not initial.is_empty() and not first.is_empty() and not second.is_empty(), "%s temporal probe did not produce three images" % context)
+	if initial == null or first == null or second == null or initial.is_empty() or first.is_empty() or second.is_empty():
+		return
+	var sample_count: int = 0
+	var accumulated_difference: float = 0.0
+	for sample_y: int in range(8):
+		for sample_x: int in range(12):
+			var x: int = mini(initial.get_width() - 1, maxi(0, int(float(sample_x) / 11.0 * float(initial.get_width() - 1))))
+			var y: int = mini(initial.get_height() - 1, maxi(0, int(float(sample_y) / 7.0 * float(initial.get_height() - 1))))
+			var initial_pixel: Color = initial.get_pixel(x, y)
+			var first_pixel: Color = first.get_pixel(mini(first.get_width() - 1, x), mini(first.get_height() - 1, y))
+			var second_pixel: Color = second.get_pixel(mini(second.get_width() - 1, x), mini(second.get_height() - 1, y))
+			accumulated_difference += absf(initial_pixel.r - first_pixel.r) + absf(initial_pixel.g - first_pixel.g) + absf(initial_pixel.b - first_pixel.b)
+			accumulated_difference += absf(initial_pixel.r - second_pixel.r) + absf(initial_pixel.g - second_pixel.g) + absf(initial_pixel.b - second_pixel.b)
+			sample_count += 1
+	var mean_difference: float = accumulated_difference / maxf(1.0, float(sample_count) * 6.0)
+	var initial_path: String = "%s/%s" % [_output_dir, "16_active_combat_reduced_motion_1920x1080.png"]
+	var first_path: String = "%s/%s" % [_output_dir, "34_active_combat_reduced_motion_temporal_a_1920x1080.png"]
+	var second_path: String = "%s/%s" % [_output_dir, "35_active_combat_reduced_motion_temporal_b_1920x1080.png"]
+	var initial_bytes: PackedByteArray = FileAccess.get_file_as_bytes(initial_path) if FileAccess.file_exists(initial_path) else PackedByteArray()
+	var first_bytes: PackedByteArray = FileAccess.get_file_as_bytes(first_path) if FileAccess.file_exists(first_path) else PackedByteArray()
+	var second_bytes: PackedByteArray = FileAccess.get_file_as_bytes(second_path) if FileAccess.file_exists(second_path) else PackedByteArray()
+	var byte_identical: bool = not initial_bytes.is_empty() and initial_bytes == first_bytes and initial_bytes == second_bytes
+	var stable: bool = mean_difference <= 0.0001 and sample_gap_msec >= 900
+	_temporal_probe_verdict = {
+		"context": context,
+		"status": "stable_reduced_motion" if stable else "unstable_reduced_motion",
+		"sample_initial": "16_active_combat_reduced_motion_1920x1080.png",
+		"sample_a": "34_active_combat_reduced_motion_temporal_a_1920x1080.png",
+		"sample_b": "35_active_combat_reduced_motion_temporal_b_1920x1080.png",
+		"sample_gap_msec": sample_gap_msec,
+		"mean_pixel_delta": mean_difference,
+		"threshold": 0.0001,
+		"byte_identical": byte_identical,
+		"evidence": "three settled full-frame samples, including the initial reduced-motion frame, retain identical board, actors, HUD, and lock cue through an explicit one-second interval",
+	}
+	_expect(sample_gap_msec >= 900, "%s temporal probe did not span the required settled interval: %dms" % [context, sample_gap_msec])
+	_expect(mean_difference <= 0.0001, "%s temporal probe drifted while reduced motion was enabled: mean pixel delta %.4f" % [context, mean_difference])
+	_expect(byte_identical, "%s temporal probe did not produce byte-identical initial, A, and B locked captures" % context)
 
 
 func _record_capture_image(image: Image, filename: String, state: String, expected_size: Vector2i) -> void:
@@ -1008,7 +1421,7 @@ func _record_capture_image(image: Image, filename: String, state: String, expect
 	if byte_count <= 256:
 		_expect(false, "%s blocked: saved PNG missing or empty (%d bytes)" % [filename, byte_count])
 		return
-	var absolute_path: String = ProjectSettings.globalize_path(resource_path)
+	var absolute_path: String = _absolute_output_path(resource_path)
 	var capture_record: Dictionary = {
 		"id": filename.get_basename(),
 		"seat_id": _seat_id,
@@ -1016,10 +1429,12 @@ func _record_capture_image(image: Image, filename: String, state: String, expect
 		"state": state,
 		"viewport": {"width": image.get_width(), "height": image.get_height()},
 		"requested_viewport": {"width": expected_size.x, "height": expected_size.y},
-		"event": "settled_runtime_state",
+		"event": "temporal_reduced_motion_probe" if state.begins_with("active_combat_reduced_motion_temporal_") else "settled_runtime_state",
+		"temporal_pair": "reduced_motion_combat" if state.begins_with("active_combat_reduced_motion_temporal_") else "",
 		"camera": "player_view",
 		"layer": "final_composite",
 		"timestamp": Time.get_datetime_string_from_system(false, true),
+		"ticks_msec": Time.get_ticks_msec(),
 		"runtime": "Godot %s" % Engine.get_version_info().get("string", "unknown"),
 		"path": absolute_path,
 		"bytes": byte_count,
@@ -1061,7 +1476,7 @@ func _active_result_skip_button() -> Button:
 
 
 func _prepare_output() -> void:
-	var absolute_output_dir: String = ProjectSettings.globalize_path(_output_dir)
+	var absolute_output_dir: String = _absolute_output_path(_output_dir)
 	var directory_error: Error = DirAccess.make_dir_recursive_absolute(absolute_output_dir)
 	_expect(directory_error == OK, "could not create isolated output directory: %s" % absolute_output_dir)
 	_expect(
@@ -1090,12 +1505,12 @@ func _write_manifest() -> void:
 		if byte_count <= 256:
 			missing.append(filename)
 		else:
-			images_in_review_order.append(ProjectSettings.globalize_path(resource_path))
+			images_in_review_order.append(_absolute_output_path(resource_path))
 	_expect(missing.is_empty(), "required capture files missing or empty: %s" % ", ".join(missing))
 	_expect(_captures.size() == EXPECTED_FILES.size(), "expected %d captures, recorded %d" % [EXPECTED_FILES.size(), _captures.size()])
 
 	var manifest: Dictionary[String, Variant] = {
-		"schema_version": 2,
+		"schema_version": 3,
 		"capture_host": CAPTURE_NAME,
 		"status": "complete" if _failures.is_empty() else "blocked",
 		"generated_at": Time.get_datetime_string_from_system(false, true),
@@ -1105,7 +1520,7 @@ func _write_manifest() -> void:
 			"identity_source": _seat_identity_source,
 			"run_id": _run_id,
 			"process_id": OS.get_process_id(),
-			"output_dir": ProjectSettings.globalize_path(_output_dir),
+			"output_dir": _absolute_output_path(_output_dir),
 		},
 		"runtime": {
 			"godot": Engine.get_version_info().get("string", "unknown"),
@@ -1115,6 +1530,7 @@ func _write_manifest() -> void:
 		"required_count": EXPECTED_FILES.size(),
 		"captured_count": _captures.size(),
 		"images_in_review_order": images_in_review_order,
+		"temporal_probes": [_temporal_probe_verdict] if not _temporal_probe_verdict.is_empty() else [],
 		"captures": _captures,
 		"failures": _failures,
 	}
@@ -1126,7 +1542,7 @@ func _write_manifest() -> void:
 	file.close()
 	var manifest_size: int = FileAccess.get_file_as_bytes(_manifest_path).size() if FileAccess.file_exists(_manifest_path) else 0
 	_expect(manifest_size > 256, "capture manifest missing or empty")
-	print("%s: MANIFEST %s" % [CAPTURE_NAME, ProjectSettings.globalize_path(_manifest_path)])
+	print("%s: MANIFEST %s" % [CAPTURE_NAME, _absolute_output_path(_manifest_path)])
 
 
 func _configure_window(size: Vector2i, reset_ui_scale: bool = true) -> void:
@@ -1209,7 +1625,7 @@ func _cleanup() -> void:
 	USER_SETTINGS_SCRIPT.configure_storage_path(USER_SETTINGS_SCRIPT.DEFAULT_SETTINGS_PATH)
 	for path: String in [_settings_path, "%s.tmp" % _settings_path, "%s.bak" % _settings_path]:
 		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+			DirAccess.remove_absolute(_absolute_output_path(path))
 	await _settle_frames(4)
 
 
@@ -1223,7 +1639,7 @@ func _finish() -> void:
 	if _failures.is_empty():
 		print(
 			"%s: OK captures=%d output=%s"
-			% [CAPTURE_NAME, _captures.size(), ProjectSettings.globalize_path(_output_dir)]
+			% [CAPTURE_NAME, _captures.size(), _absolute_output_path(_output_dir)]
 		)
 	else:
 		exit_code = 1
@@ -1261,15 +1677,33 @@ func _initialize_run_identity() -> void:
 	var tick_milliseconds: int = Time.get_ticks_msec()
 	var base_run_id: String = "%s-%d-%d-%d" % [_seat_id, unix_seconds, process_id, tick_milliseconds]
 	_run_id = base_run_id
-	_output_dir = "%s/%s/%s" % [OUTPUT_ROOT, _seat_id, _run_id]
+	_output_root = _resolve_output_root()
+	_output_dir = "%s/%s/%s" % [_output_root, _seat_id, _run_id]
 	var collision_index: int = 1
-	while DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(_output_dir)):
+	while DirAccess.dir_exists_absolute(_absolute_output_path(_output_dir)):
 		_run_id = "%s-%d" % [base_run_id, collision_index]
-		_output_dir = "%s/%s/%s" % [OUTPUT_ROOT, _seat_id, _run_id]
+		_output_dir = "%s/%s/%s" % [_output_root, _seat_id, _run_id]
 		collision_index += 1
 	_manifest_path = "%s/captures.json" % _output_dir
 	_settings_path = "%s/user_settings.cfg" % _output_dir
 	_profile_path = "%s/account_profile.json" % _output_dir
+
+
+func _resolve_output_root() -> String:
+	var requested_root: String = OS.get_environment(OUTPUT_ROOT_ENVIRONMENT_VARIABLE).strip_edges()
+	if not requested_root.is_empty():
+		var normalized_requested_root: String = requested_root.replace("\\", "/")
+		if DirAccess.make_dir_recursive_absolute(normalized_requested_root) == OK:
+			return normalized_requested_root
+	if DirAccess.make_dir_recursive_absolute(EXTERNAL_OUTPUT_ROOT) == OK:
+		return EXTERNAL_OUTPUT_ROOT
+	return OUTPUT_ROOT
+
+
+func _absolute_output_path(path: String) -> String:
+	if path.begins_with("res://") or path.begins_with("user://"):
+		return ProjectSettings.globalize_path(path)
+	return path.replace("\\", "/")
 
 
 func _sanitize_path_component(value: String) -> String:

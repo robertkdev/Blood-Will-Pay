@@ -145,6 +145,10 @@ func _is_forced_first_fight() -> bool:
 		return true
 	return shop.state.offers.is_empty()
 
+
+func _is_tight_compact_layout() -> bool:
+	return _root != null and bool(_root.get_meta("tight_scale_layout", false))
+
 func refresh() -> void:
 	if not _has_economy():
 		return
@@ -253,32 +257,45 @@ func _refresh_all_in_visual(in_combat: bool, forced_first_fight: bool) -> void:
 func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	if wager_summary == null or not _has_economy():
 		return
+	var tight_compact: bool = _is_tight_compact_layout()
 	if forced_first_fight:
-		wager_summary.text = "Opening wager 1g | Betting unlocks after the first shop"
+		wager_summary.text = "OPENING RISK // 1g // SHOP NEXT" if tight_compact else "OPENING RISK // 1g // SHOP UNLOCKS NEXT"
 		wager_summary.tooltip_text = "Win the forced opener to unlock wager choice and outcome quotes."
+		wager_summary.set_meta("compact_summary_format", "opening_risk")
 		return
 	var wager: int = max(0, int(Economy.current_bet))
 	if not in_combat and bet_slider != null:
 		wager = max(0, int(bet_slider.value))
 	var probability: float = clampf(float(Economy.projected_win_probability), 0.01, 1.0)
 	var odds_percent: int = int(roundf(probability * 100.0))
-	var gross: int = int(Economy.quoted_payout(wager))
 	var after_loss: int = max(0, int(Economy.gold))
 	if not in_combat:
 		after_loss = max(0, int(Economy.gold) - wager)
-	var after_win: int = after_loss + gross
+	var after_win: int = after_loss + int(Economy.quoted_payout(wager))
 	var risk_prefix: String = ""
 	if not in_combat and wager > 0 and wager >= int(Economy.gold):
-		risk_prefix = "ALL IN ARMED | "
-	wager_summary.text = "%sWager %dg%s | Win %d%% | Gross %dg | After win %dg | After loss %dg" % [
-		risk_prefix,
-		wager,
-		" locked" if in_combat else "",
-		odds_percent,
-		gross,
-		after_win,
-		after_loss,
-	]
+		risk_prefix = "ALL IN // " if tight_compact else "ALL IN ARMED | "
+	if tight_compact:
+		var locked_suffix: String = " LOCKED" if in_combat else ""
+		wager_summary.text = "DECISION // %sRISK %dg%s // WIN %d%% // BANK W%dg / L%dg" % [
+			risk_prefix,
+			wager,
+			locked_suffix,
+			odds_percent,
+			after_win,
+			after_loss,
+		]
+		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
+	else:
+		wager_summary.text = "DECISION // %sRISK %dg%s // WIN %d%% // BANK W%dg / L%dg" % [
+			risk_prefix,
+			wager,
+			" LOCKED" if in_combat else "",
+			odds_percent,
+			after_win,
+			after_loss,
+		]
+		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
 	wager_summary.tooltip_text = "Gross return includes the wager. Win odds are an estimate, not a guarantee."
 
 func set_bet_editable(editable: bool) -> void:

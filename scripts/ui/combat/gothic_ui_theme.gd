@@ -363,9 +363,12 @@ class PlanningFieldPainter:
 class CombatFocusPainter:
 	extends Control
 
-	var focus_rect: Rect2 = Rect2(0.17, 0.08, 0.66, 0.82)
+	var focus_rect: Rect2 = Rect2(0.20, 0.14, 0.60, 0.72)
 	var pressure_phase: int = 0
 	var reduced_motion: bool = false
+	var clash_source: Vector2 = Vector2.ZERO
+	var clash_target: Vector2 = Vector2.ZERO
+	var has_clash_pair: bool = false
 
 	func configure(next_phase: int, next_reduced_motion: bool) -> void:
 		pressure_phase = clampi(next_phase, 0, 2)
@@ -375,11 +378,25 @@ class CombatFocusPainter:
 		set_meta("focus_frame_phase", pressure_phase)
 		set_meta("focus_frame_reduced_motion", reduced_motion)
 		set_meta("focus_frame_purpose", "tighten_attention_around_live_engagement")
+		set_meta("focus_frame_visual_priority", "luminous_contact_zone_over_muted_perimeter")
 		queue_redraw()
 
 	func set_focus_rect(next_rect: Rect2) -> void:
 		focus_rect = next_rect
 		set_meta("focus_frame_rect", focus_rect)
+		queue_redraw()
+
+	func set_clash_pair(next_source: Vector2, next_target: Vector2) -> void:
+		clash_source = next_source
+		clash_target = next_target
+		has_clash_pair = next_source.distance_to(next_target) > 1.0
+		set_meta("focus_frame_clash_pair_active", has_clash_pair)
+		set_meta("focus_frame_clash_mode", "nearest_opposing_visual_anchor" if has_clash_pair else "none")
+		queue_redraw()
+
+	func clear_clash_pair() -> void:
+		has_clash_pair = false
+		set_meta("focus_frame_clash_pair_active", false)
 		queue_redraw()
 
 	func _draw() -> void:
@@ -388,7 +405,15 @@ class CombatFocusPainter:
 		var frame_position: Vector2 = Vector2(focus_rect.position.x * size.x, focus_rect.position.y * size.y)
 		var frame_size: Vector2 = Vector2(focus_rect.size.x * size.x, focus_rect.size.y * size.y)
 		var frame_rect: Rect2 = Rect2(frame_position, frame_size)
-		var edge_alpha: float = 0.20 if reduced_motion else 0.24 + float(pressure_phase) * 0.08
+		# The contact must read at a glance from a living-room distance. Keep the
+		# broader grid available for tactics, but make its perimeter fall behind the
+		# immediate collision instead of competing with it as a flat diagram.
+		# Reduced-motion uses the same held physical composition, but leaves a little
+		# more of the outer grid legible so the static combat read never collapses
+		# into a featureless black field at a glance.
+		# Keep the outer board unmistakably subordinate, but never so crushed that
+		# movement lanes or the larger actor silhouettes read as a black void.
+		var edge_alpha: float = 0.26 if reduced_motion else 0.40 + float(pressure_phase) * 0.035
 		var shadow: Color = Color(0.0, 0.0, 0.0, edge_alpha)
 		if frame_rect.position.y > 0.0:
 			draw_rect(Rect2(0.0, 0.0, size.x, frame_rect.position.y), shadow, true)
@@ -398,8 +423,53 @@ class CombatFocusPainter:
 			draw_rect(Rect2(0.0, frame_rect.position.y, frame_rect.position.x, frame_rect.size.y), shadow, true)
 		if frame_rect.end.x < size.x:
 			draw_rect(Rect2(frame_rect.end.x, frame_rect.position.y, size.x - frame_rect.end.x, frame_rect.size.y), shadow, true)
-		var frame_color: Color = Color(0.80, 0.18, 0.075, 0.22 + float(pressure_phase) * 0.08)
-		var line_width: float = 2.0 if reduced_motion else 2.5 + float(pressure_phase) * 0.7
+		# A restrained, irregular lift beneath the fighters gives the violence a
+		# physical focal point without converting the board into a neon VFX field.
+		# Actors sit above this painter, so the warm wound in the ground separates
+		# silhouettes and health readouts from the surrounding mud and grid seams.
+		var impact_center: Vector2 = frame_rect.get_center()
+		var impact_width: float = frame_rect.size.x * (0.44 + float(pressure_phase) * 0.030)
+		var impact_height: float = frame_rect.size.y * (0.29 + float(pressure_phase) * 0.022)
+		var impact_footprint: PackedVector2Array = PackedVector2Array([
+			impact_center + Vector2(-impact_width, -impact_height * 0.12),
+			impact_center + Vector2(-impact_width * 0.58, -impact_height),
+			impact_center + Vector2(-impact_width * 0.06, -impact_height * 0.60),
+			impact_center + Vector2(impact_width * 0.54, -impact_height * 0.86),
+			impact_center + Vector2(impact_width, impact_height * 0.14),
+			impact_center + Vector2(impact_width * 0.42, impact_height),
+			impact_center + Vector2(-impact_width * 0.20, impact_height * 0.68),
+			impact_center + Vector2(-impact_width * 0.82, impact_height * 0.48),
+		])
+		var impact_fill: Color = Color(0.40, 0.14, 0.050, 0.24 if reduced_motion else 0.33 + float(pressure_phase) * 0.040)
+		draw_colored_polygon(impact_footprint, impact_fill)
+		var impact_core: Color = Color(0.78, 0.42, 0.14, 0.16 if reduced_motion else 0.22 + float(pressure_phase) * 0.030)
+		draw_circle(impact_center + Vector2(0.0, impact_height * 0.10), minf(impact_width, impact_height) * 0.76, impact_core, true)
+		if has_clash_pair:
+			var clash_distance: float = clash_source.distance_to(clash_target)
+			var clash_direction: Vector2 = (clash_target - clash_source).normalized()
+			var clash_normal: Vector2 = Vector2(-clash_direction.y, clash_direction.x)
+			var clash_inset: float = minf(62.0, clash_distance * 0.22)
+			var clash_start: Vector2 = clash_source + clash_direction * clash_inset
+			var clash_end: Vector2 = clash_target - clash_direction * clash_inset
+			var clash_midpoint: Vector2 = (clash_start + clash_end) * 0.5
+			# An exact, quiet wound makes the closest enemy pair read before the grid.
+			# It is static under reduced motion and lives entirely beneath actor layers.
+			draw_line(clash_start, clash_end, Color(0.12, 0.015, 0.010, 0.76), 24.0, true)
+			draw_line(clash_start, clash_end, Color(0.96, 0.24, 0.09, 0.68), 3.0, true)
+			draw_circle(clash_midpoint, minf(30.0, clash_distance * 0.12), Color(0.84, 0.13, 0.050, 0.30), true)
+			for scar_index: int in range(3):
+				var scar_shift: float = float(scar_index - 1) * 12.0
+				var scar_start: Vector2 = clash_midpoint - clash_direction * 24.0 + clash_normal * scar_shift
+				var scar_end: Vector2 = clash_midpoint + clash_direction * 24.0 - clash_normal * scar_shift * 0.36
+				draw_line(scar_start, scar_end, Color(1.0, 0.58, 0.18, 0.66), 2.0, true)
+		var impact_cut: Color = Color(0.94, 0.66, 0.29, 0.46 if reduced_motion else 0.62 + float(pressure_phase) * 0.06)
+		for cut_index: int in range(3):
+			var cut_offset: float = float(cut_index - 1) * impact_height * 0.44
+			var cut_start: Vector2 = impact_center + Vector2(-impact_width * (0.52 - float(cut_index) * 0.06), cut_offset)
+			var cut_end: Vector2 = impact_center + Vector2(impact_width * (0.38 + float(cut_index) * 0.08), cut_offset + impact_height * (0.10 if cut_index % 2 == 0 else -0.12))
+			draw_line(cut_start, cut_end, impact_cut, 2.0 + float(pressure_phase), true)
+		var frame_color: Color = Color(0.88, 0.48, 0.18, 0.42 + float(pressure_phase) * 0.08)
+		var line_width: float = 2.5 if reduced_motion else 3.0 + float(pressure_phase) * 0.8
 		var top_left: Vector2 = frame_rect.position
 		var top_right: Vector2 = Vector2(frame_rect.end.x, frame_rect.position.y)
 		var bottom_left: Vector2 = Vector2(frame_rect.position.x, frame_rect.end.y)
@@ -439,15 +509,15 @@ class ArenaPressurePainter:
 		# This is a deployment board, not a clean arena floor.  Preserve the cells,
 		# but reserve the centre for one readable material event rather than hiding
 		# every consequence at the perimeter.
-		set_meta("protected_center_rect", Rect2(0.34, 0.24, 0.32, 0.52))
+		set_meta("protected_center_rect", Rect2(0.28, 0.16, 0.44, 0.68))
 		set_meta("kinetic_mark_budget", 0)
 		set_meta("reduced_motion_scene_parity", "same_physical_field_static")
 		set_meta("full_field_warning_chevrons", false)
 		set_meta("pressure_visual_language", "central_collision_rupture_drag_residue")
 		set_meta("debug_primitives_suppressed", true)
-		set_meta("player_scale_evidence_count", 12 if reduced_motion else 6 + pressure_phase * 4)
-		set_meta("terrain_floor_lift", 0.62 if reduced_motion else 0.32 + float(pressure_phase) * 0.15)
-		set_meta("physical_lane_encroachment", "static_collision_aftermath" if reduced_motion else "breach_then_central_collision")
+		set_meta("player_scale_evidence_count", 14 if reduced_motion else 8 + pressure_phase * 4)
+		set_meta("terrain_floor_lift", 0.74 if reduced_motion else 0.46 + float(pressure_phase) * 0.15)
+		set_meta("physical_lane_encroachment", "static_collision_aftermath_and_ruined_lanes" if reduced_motion else "breach_then_central_collision_and_ruined_lanes")
 		set_meta("central_collision_visible", pressure_phase >= 1 or reduced_motion)
 		set_meta("central_collision_read", "static_rupture_and_drag" if reduced_motion else "impact_crater_drag_and_residue" if pressure_phase >= 1 else "threatened_intact_ground")
 		queue_redraw()
@@ -462,7 +532,7 @@ class ArenaPressurePainter:
 		var motion_clock: float = 0.0 if reduced_motion else elapsed_seconds
 		# The authored raster is intentionally hostile and dark; this quiet warm lift
 		# makes its mud, stone, and bodies readable at a real 1080p player distance.
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0.22, 0.095, 0.050, 0.18 + float(pressure_phase) * 0.065), true)
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.24, 0.12, 0.065, 0.27 + float(pressure_phase) * 0.070), true)
 		# The terrain texture and authored evidence painter carry the battlefield
 		# structure. Pressure adds only soft edge atmosphere and event-grounded
 		# residue; outline craters, rays, streaks, and ruler-straight fences made
@@ -492,7 +562,7 @@ class ArenaPressurePainter:
 			var fraction: float = float(bank_index) / 4.0
 			var left_center: Vector2 = Vector2(size.x * lerpf(0.29, 0.43, fraction), size.y * lerpf(0.46, 0.49, fraction))
 			var right_center: Vector2 = Vector2(size.x * lerpf(0.71, 0.57, fraction), size.y * lerpf(0.55, 0.51, fraction))
-			var radius: float = 18.0 + float(bank_index % 2) * 9.0
+			var radius: float = 24.0 + float(bank_index % 2) * 11.0
 			draw_circle(left_center, radius, Color(0.11, 0.044, 0.022, 0.48), true)
 			draw_circle(right_center, radius, Color(0.15, 0.032, 0.020, 0.50), true)
 			draw_circle(left_center + Vector2(3.0, -3.0), radius * 0.44, Color(0.48, 0.16, 0.050, 0.20), true)
@@ -504,8 +574,8 @@ class ArenaPressurePainter:
 		# Local clod clusters, short kinked ruts, and recognisable wreckage replace
 		# the former field-width filled polygons.
 		var center: Vector2 = Vector2(size.x * 0.50, size.y * (0.54 if not reduced_motion else 0.50))
-		var width: float = size.x * (0.34 if not reduced_motion else 0.36)
-		var height: float = size.y * (0.20 if not reduced_motion else 0.22)
+		var width: float = size.x * (0.42 if not reduced_motion else 0.44)
+		var height: float = size.y * (0.26 if not reduced_motion else 0.28)
 		var clod_offsets: Array[Vector2] = [
 			Vector2(-0.82, -0.22), Vector2(-0.66, 0.35), Vector2(-0.48, -0.44),
 			Vector2(-0.30, 0.50), Vector2(-0.12, -0.32), Vector2(0.06, 0.34),
@@ -515,7 +585,7 @@ class ArenaPressurePainter:
 		for clod_index: int in range(clod_offsets.size()):
 			var clod_offset: Vector2 = clod_offsets[clod_index]
 			var clod_center: Vector2 = center + Vector2(clod_offset.x * width, clod_offset.y * height)
-			var clod_radius: float = minf(size.x, size.y) * (0.020 + float(clod_index % 3) * 0.005)
+			var clod_radius: float = minf(size.x, size.y) * (0.024 + float(clod_index % 3) * 0.006)
 			var clod_patch: PackedVector2Array = _rupture_ring(
 				clod_center,
 				clod_radius * (1.25 + float(clod_index % 2) * 0.24),
@@ -539,7 +609,8 @@ class ArenaPressurePainter:
 			draw_line(scar_start + Vector2(0.0, 2.0), scar_bend + Vector2(0.0, 2.0), Color(0.48, 0.15, 0.045, 0.20), 1.5, true)
 		_draw_drag_gouge(Vector2(size.x * 0.25, size.y * 0.47), center + Vector2(-width * 0.48, -height * 0.03), 0.58)
 		_draw_drag_gouge(Vector2(size.x * 0.75, size.y * 0.59), center + Vector2(width * 0.44, height * 0.16), 0.58)
-		var wreckage_scale: float = minf(size.x, size.y) * 0.042
+		_draw_collision_splinters(center, width, height)
+		var wreckage_scale: float = minf(size.x, size.y) * 0.055
 		_draw_wreckage_heap(center + Vector2(-width * 0.46, -height * 0.18), wreckage_scale, 1)
 		_draw_wreckage_heap(center + Vector2(width * 0.48, height * 0.20), wreckage_scale * 0.90, 3)
 
@@ -585,7 +656,7 @@ class ArenaPressurePainter:
 		# These are deliberately broad, physical silhouettes at player scale: broken
 		# wagon ribs, slagged bodies, and torn standards communicate a killing ground
 		# without consuming the board's central targeting lanes.
-		var evidence_count: int = 4 + pressure_phase * 2
+		var evidence_count: int = 6 + pressure_phase * 2
 		if reduced_motion:
 			evidence_count = 8
 		var anchors: Array[Vector2] = [
@@ -596,13 +667,13 @@ class ArenaPressurePainter:
 		]
 		for evidence_index: int in range(mini(evidence_count, anchors.size())):
 			var anchor: Vector2 = anchors[evidence_index]
-			var scale_factor: float = minf(size.x, size.y) * (0.030 + float(evidence_index % 2) * 0.008)
+			var scale_factor: float = minf(size.x, size.y) * (0.038 + float(evidence_index % 2) * 0.010)
 			_draw_wreckage_heap(anchor, scale_factor, evidence_index)
 			if evidence_index % 2 == 0:
 				_draw_shattered_stake(anchor + Vector2(scale_factor * 0.45, -scale_factor * 0.55), scale_factor, evidence_index)
 
 	func _draw_lane_barricades() -> void:
-		var barricade_count: int = 4 if pressure_phase == 0 else 6 if pressure_phase == 1 else 8
+		var barricade_count: int = 6 if pressure_phase == 0 else 8
 		if reduced_motion:
 			barricade_count = 8
 		var anchors: Array[Vector2] = [
@@ -771,9 +842,9 @@ class ArenaPressurePainter:
 			var y_ratio: float = 0.10 + fposmod(float(index) * 0.19 + cycle * 0.16, 0.78)
 			var center: Vector2 = Vector2(size.x * x_ratio, size.y * y_ratio)
 			var radius: float = minf(size.x, size.y) * (0.046 + float(index % 3) * 0.012 + float(pressure_phase) * 0.006)
-			var color: Color = Color(0.055, 0.045, 0.042, 0.25 + float(pressure_phase) * 0.045)
+			var color: Color = Color(0.075, 0.062, 0.056, 0.31 + float(pressure_phase) * 0.050)
 			if not left_side:
-				color = Color(0.17, 0.030, 0.022, 0.25 + float(pressure_phase) * 0.055)
+				color = Color(0.19, 0.050, 0.028, 0.32 + float(pressure_phase) * 0.060)
 			for puff_index: int in range(4):
 				var puff_angle: float = float(puff_index) * 1.71 + cycle * 0.8
 				var puff_center: Vector2 = center + Vector2(cos(puff_angle), sin(puff_angle)) * radius * 0.34
@@ -1494,27 +1565,36 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	directive.anchor_right = 0.5
 	directive.anchor_top = 0.0
 	directive.anchor_bottom = 0.0
-	directive.offset_left = 0.0
-	directive.offset_right = 400.0
-	directive.offset_top = -32.0
-	directive.offset_bottom = -4.0
-	directive.text = "DEPLOYMENT GRID // SET WAGER // COMMIT"
+	directive.offset_left = -286.0
+	directive.offset_right = 286.0
+	directive.offset_top = 12.0
+	directive.offset_bottom = 54.0
+	directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
 	directive.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	directive.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	directive.z_index = 4
-	directive.add_theme_font_size_override("font_size", 18)
-	directive.add_theme_color_override("font_color", Color(0.96, 0.90, 0.79, 1.0))
+	# The ordered command needs to survive above the field painters and the compact
+	# shop shelf. Keep it below the persistent HUD, but outside the muted board layer.
+	directive.z_index = 110
+	directive.z_as_relative = false
+	directive.add_theme_font_size_override("font_size", 20)
+	directive.add_theme_color_override("font_color", Color(1.0, 0.93, 0.82, 1.0))
+	directive.add_theme_color_override("font_outline_color", Color(0.10, 0.0, 0.012, 1.0))
+	directive.add_theme_constant_override("outline_size", 3)
 	var directive_style: StyleBoxFlat = StyleBoxFlat.new()
-	directive_style.bg_color = Color(0.018, 0.014, 0.018, 0.96)
-	directive_style.border_color = Color(0.58, 0.06, 0.09, 0.94)
-	directive_style.border_width_left = 5
-	directive_style.border_width_top = 1
-	directive_style.border_width_right = 1
-	directive_style.border_width_bottom = 2
-	directive_style.content_margin_left = 8.0
-	directive_style.content_margin_right = 8.0
+	directive_style.bg_color = Color(0.022, 0.004, 0.010, 0.99)
+	directive_style.border_color = Color(0.92, 0.10, 0.07, 0.98)
+	directive_style.border_width_left = 7
+	directive_style.border_width_top = 2
+	directive_style.border_width_right = 2
+	directive_style.border_width_bottom = 3
+	directive_style.content_margin_left = 20.0
+	directive_style.content_margin_right = 20.0
+	directive_style.shadow_color = Color(0.0, 0.0, 0.0, 0.92)
+	directive_style.shadow_size = 8
 	directive.add_theme_stylebox_override("normal", directive_style)
 	directive.set_meta("persistent_copy_uses_utility_face", true)
+	directive.set_meta("planning_action_order", "deploy>wager>commit")
+	directive.set_meta("planning_directive_above_field", true)
 	VisualTypeSystem.set_utility_bold(directive)
 
 
@@ -1633,14 +1713,16 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 		focus_painter = CombatFocusPainter.new()
 		focus_painter.name = "ArenaCombatFocusPainter"
 		focus_painter.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		focus_painter.z_index = -1
+		# Above seams and pressure residue, below actors/readouts (arena units are
+		# explicitly layered at 8 by ArenaController).
+		focus_painter.z_index = 1
 		arena.add_child(focus_painter)
 		focus_painter.set_anchors_preset(Control.PRESET_FULL_RECT)
 		focus_painter.offset_left = 0.0
 		focus_painter.offset_top = 0.0
 		focus_painter.offset_right = 0.0
 		focus_painter.offset_bottom = 0.0
-	focus_painter.z_index = -1
+	focus_painter.z_index = 1
 	focus_painter.visible = false
 	focus_painter.configure(0, false)
 	focus_painter.set_meta("visual_role", "combat_attention_frame")
@@ -1691,11 +1773,11 @@ static func _ensure_arena_exposure_lift(arena: Control) -> void:
 	var gradient: Gradient = Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.20, 0.50, 0.78, 1.0])
 	gradient.colors = PackedColorArray([
-		Color(0.36, 0.16, 0.10, 0.055),
-		Color(0.22, 0.19, 0.16, 0.075),
-		Color(0.44, 0.38, 0.30, 0.105),
-		Color(0.30, 0.25, 0.20, 0.080),
-		Color(0.28, 0.08, 0.055, 0.060),
+		Color(0.36, 0.16, 0.10, 0.090),
+		Color(0.22, 0.19, 0.16, 0.120),
+		Color(0.44, 0.38, 0.30, 0.180),
+		Color(0.30, 0.25, 0.20, 0.130),
+		Color(0.28, 0.08, 0.055, 0.100),
 	])
 	var texture: GradientTexture2D = GradientTexture2D.new()
 	texture.width = 512
@@ -1802,6 +1884,81 @@ static func _ensure_arena_threat_boundary(arena: Control) -> void:
 	objective.add_theme_stylebox_override("normal", objective_backing)
 	objective.set_meta("persistent_copy_uses_impact_face", true)
 	VisualTypeSystem.set_impact(objective)
+	var reduced_motion_lock_cue: Label = boundary.get_node_or_null("ReducedMotionLockCue") as Label
+	if reduced_motion_lock_cue == null:
+		reduced_motion_lock_cue = Label.new()
+		reduced_motion_lock_cue.name = "ReducedMotionLockCue"
+		reduced_motion_lock_cue.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		reduced_motion_lock_cue.z_as_relative = false
+		reduced_motion_lock_cue.z_index = 218
+		boundary.add_child(reduced_motion_lock_cue)
+	reduced_motion_lock_cue.anchor_left = 0.5
+	reduced_motion_lock_cue.anchor_right = 0.5
+	reduced_motion_lock_cue.anchor_top = 0.0
+	reduced_motion_lock_cue.anchor_bottom = 0.0
+	reduced_motion_lock_cue.offset_left = -220.0
+	reduced_motion_lock_cue.offset_right = 220.0
+	reduced_motion_lock_cue.offset_top = 44.0
+	reduced_motion_lock_cue.offset_bottom = 78.0
+	reduced_motion_lock_cue.text = "MOTION LOCK // STATIC THREAT // FRAME HELD"
+	reduced_motion_lock_cue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reduced_motion_lock_cue.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	reduced_motion_lock_cue.add_theme_font_size_override("font_size", 15)
+	reduced_motion_lock_cue.add_theme_color_override("font_color", Color(0.92, 0.78, 0.62, 1.0))
+	reduced_motion_lock_cue.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
+	reduced_motion_lock_cue.add_theme_constant_override("outline_size", 2)
+	var lock_backing: StyleBoxFlat = StyleBoxFlat.new()
+	lock_backing.bg_color = Color(0.015, 0.012, 0.016, 0.96)
+	lock_backing.border_color = Color(0.72, 0.40, 0.18, 0.94)
+	lock_backing.border_width_top = 2
+	lock_backing.border_width_bottom = 2
+	lock_backing.content_margin_left = 12.0
+	lock_backing.content_margin_right = 12.0
+	reduced_motion_lock_cue.add_theme_stylebox_override("normal", lock_backing)
+	reduced_motion_lock_cue.visible = false
+	reduced_motion_lock_cue.set_meta("persistent_reduced_motion_lock", true)
+	reduced_motion_lock_cue.set_meta("reduced_motion_frame_policy", "persistent_board_actors_hud_and_lock")
+	VisualTypeSystem.set_utility_bold(reduced_motion_lock_cue)
+	var exchange_signal: Label = boundary.get_node_or_null("CombatExchangeSignal") as Label
+	if exchange_signal == null:
+		exchange_signal = Label.new()
+		exchange_signal.name = "CombatExchangeSignal"
+		exchange_signal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		exchange_signal.z_as_relative = false
+		exchange_signal.z_index = 218
+		boundary.add_child(exchange_signal)
+	exchange_signal.anchor_left = 0.5
+	exchange_signal.anchor_right = 0.5
+	exchange_signal.anchor_top = 0.0
+	exchange_signal.anchor_bottom = 0.0
+	# The objective names the survival state; this second, broader line names the
+	# actual causal exchange. Keep it large enough to read at normal fight speed
+	# without competing with the objective itself.
+	exchange_signal.offset_left = -258.0
+	exchange_signal.offset_right = 258.0
+	exchange_signal.offset_top = 46.0
+	exchange_signal.offset_bottom = 82.0
+	exchange_signal.text = "CONTACT LOG // READ THE WOUND"
+	exchange_signal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	exchange_signal.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	exchange_signal.add_theme_font_size_override("font_size", 17)
+	exchange_signal.add_theme_color_override("font_color", Color(0.96, 0.84, 0.62, 1.0))
+	exchange_signal.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
+	exchange_signal.add_theme_constant_override("outline_size", 2)
+	var exchange_backing: StyleBoxFlat = StyleBoxFlat.new()
+	exchange_backing.bg_color = Color(0.015, 0.012, 0.016, 0.90)
+	exchange_backing.border_color = Color(0.70, 0.14, 0.10, 0.76)
+	exchange_backing.border_width_left = 4
+	exchange_backing.border_width_top = 2
+	exchange_backing.border_width_right = 2
+	exchange_backing.border_width_bottom = 2
+	exchange_backing.content_margin_left = 14.0
+	exchange_backing.content_margin_right = 14.0
+	exchange_signal.add_theme_stylebox_override("normal", exchange_backing)
+	exchange_signal.visible = false
+	exchange_signal.set_meta("combat_exchange_channel", "health_causality")
+	exchange_signal.set_meta("combat_exchange_readability", "objective_then_causal_hit_receipt")
+	VisualTypeSystem.set_utility_bold(exchange_signal)
 
 static func _ensure_tactical_shell_marks(root: Control) -> void:
 	var battle_area: Control = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
@@ -2444,14 +2601,14 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		var enemy_side: bool = row_index <= 2
 		var major_seam: bool = row_index == 2 or column_index == 3
 		var alternating_cell: bool = (row_index + column_index) % 2 == 0
-		# Lift the tactical plane just enough to keep placement readable over the
-		# authored mud texture. The seam remains subordinate to the fighters and
-		# horror dressing, but no longer disappears at a real 1080p play distance.
-		seam_style.bg_color = Color(0.10, 0.028, 0.020, 0.045 if alternating_cell else 0.020) if enemy_side else Color(0.10, 0.085, 0.060, 0.045 if alternating_cell else 0.020)
-		seam_style.border_color = Color(0.60, 0.23, 0.12, 0.38 if major_seam else 0.20) if enemy_side else Color(0.66, 0.57, 0.40, 0.40 if major_seam else 0.22)
+		# The field remains muddy and subordinate, but the side-specific wash and
+		# weighted seams now survive a real 1080p combat glance without turning
+		# into a debug graph.
+		seam_style.bg_color = Color(0.14, 0.030, 0.018, 0.070 if alternating_cell else 0.032) if enemy_side else Color(0.14, 0.115, 0.070, 0.066 if alternating_cell else 0.030)
+		seam_style.border_color = Color(0.68, 0.25, 0.10, 0.50 if major_seam else 0.29) if enemy_side else Color(0.76, 0.66, 0.42, 0.52 if major_seam else 0.31)
 		seam_style.border_width_right = 2 if column_index == 3 else 1
 		seam_style.border_width_bottom = 2 if row_index == 2 else 1
-		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.30)
+		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
 		seam_style.shadow_size = 1
 		seam_style.shadow_offset = Vector2(1.0, 1.0)
 		cell.add_theme_stylebox_override("panel", seam_style)

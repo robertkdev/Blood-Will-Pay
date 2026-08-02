@@ -63,6 +63,7 @@ var _content_stack: VBoxContainer = null
 var _content_scroll: ScrollContainer = null
 var _content_body: VBoxContainer = null
 var _settings_scroll_cue: Label = null
+var _settings_press_witness: Label = null
 var _section_title: Label = null
 var _section_hint: Label = null
 var _search_field: LineEdit = null
@@ -86,8 +87,11 @@ var _rail_fit_queued: bool = false
 var _scaled_focus_target_name: String = ""
 var _runtime_settings_mode: bool = false
 var _runtime_return_button: Button = null
+var _settings_pressed_surface_active: bool = false
+var _settings_integrity_shell: Panel = null
 
 func _ready() -> void:
+	set_process(true)
 	UserSettingsScript.initialize(get_window())
 	set_meta("effective_ui_scale", _actual_ui_scale())
 	set_meta("effective_layout_size", _effective_layout_size())
@@ -116,6 +120,10 @@ func _ready() -> void:
 		viewport.size_changed.connect(_on_layout_resized)
 	_start_bg_loop()
 	_start_logo_float()
+
+func _process(_delta: float) -> void:
+	_sync_settings_press_witness()
+	_enforce_settings_surface_visible()
 
 func _input(event: InputEvent) -> void:
 	if _runtime_settings_mode:
@@ -391,6 +399,7 @@ func _apply_gothic_layout() -> void:
 		_ensure_wordmark_treatment()
 	_ensure_title_panel()
 	_ensure_shade()
+	_ensure_settings_integrity_shell()
 	_remove_hero()
 	_ensure_sigil()
 	_ensure_subtitle()
@@ -451,11 +460,8 @@ func _ensure_title_panel() -> void:
 	_title_panel.offset_top = 0.0
 	_title_panel.offset_right = 0.0
 	_title_panel.offset_bottom = 0.0
-	var rail_style: StyleBoxFlat = _make_panel_style(Color(0.020, 0.018, 0.022, 0.93), Color(0.78, 0.70, 0.57, 0.92), 0, 0, 28)
-	rail_style.border_width_left = 7
-	rail_style.border_width_bottom = 1
-	rail_style.border_color = Color(0.72, 0.055, 0.085, 0.96)
-	_title_panel.add_theme_stylebox_override("panel", rail_style)
+	_settings_pressed_surface_active = false
+	_apply_title_panel_surface(false)
 	if center != null:
 		center.z_index = 5
 	if center_vbox != null:
@@ -475,6 +481,73 @@ func _ensure_shade() -> void:
 	_shade.z_index = 1
 	_shade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_shade.color = Color(0.0, 0.0, 0.0, 0.24)
+
+func _ensure_settings_integrity_shell() -> void:
+	_settings_integrity_shell = get_node_or_null("SettingsIntegrityShell") as Panel
+	if _settings_integrity_shell == null:
+		_settings_integrity_shell = Panel.new()
+		_settings_integrity_shell.name = "SettingsIntegrityShell"
+		_settings_integrity_shell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_settings_integrity_shell)
+	# Keep an opaque, independently layered dossier substrate under every
+	# interactive settings control.  It must stay above the title backdrop but
+	# below the rail/content records, so a pressed selector can never expose a
+	# full-screen void or replace the rest of the surface.
+	_settings_integrity_shell.z_index = 4
+	_settings_integrity_shell.anchor_left = 0.018
+	_settings_integrity_shell.anchor_top = 0.012 if _is_short_compact_layout() else 0.026
+	_settings_integrity_shell.anchor_right = 0.982
+	_settings_integrity_shell.anchor_bottom = 0.988 if _is_short_compact_layout() else 0.965
+	_settings_integrity_shell.offset_left = 0.0
+	_settings_integrity_shell.offset_top = 0.0
+	_settings_integrity_shell.offset_right = 0.0
+	_settings_integrity_shell.offset_bottom = 0.0
+	var shell_style: StyleBoxFlat = _make_panel_style(
+		Color(0.082, 0.046, 0.040, 0.995),
+		Color(0.86, 0.39, 0.24, 0.98),
+		0,
+		0,
+		18
+	)
+	shell_style.border_width_left = 4
+	shell_style.border_width_top = 3
+	shell_style.border_width_right = 3
+	shell_style.border_width_bottom = 4
+	_settings_integrity_shell.add_theme_stylebox_override("panel", shell_style)
+	_settings_integrity_shell.visible = _active_section == SECTION_SETTINGS
+	_settings_integrity_shell.set_meta("settings_surface_invariant", true)
+	_settings_integrity_shell.set_meta("settings_surface_role", "persistent_full_dossier_substrate")
+	_settings_integrity_shell.set_meta("settings_surface_interaction_scope", "selector_local_only")
+	_settings_integrity_shell.set_meta("settings_pressed_shell_policy", "opaque_full_dossier_under_local_selector_feedback")
+
+func _apply_title_panel_surface(_held_input: bool) -> void:
+	if _title_panel == null or not is_instance_valid(_title_panel):
+		return
+	# The Settings shell is a persistent command landmark. A focused or pressed
+	# selector may change its own surface, but must never repaint the entire rail
+	# into a transient blackout or alert treatment.
+	var settings_active: bool = _active_section == SECTION_SETTINGS
+	# Keep the active Settings record visibly separated from the black backdrop at
+	# a glance. This persistent amber-brown substrate is intentionally stronger
+	# than selector feedback so a held input cannot read as a vanished shell.
+	var rail_fill: Color = Color(0.105, 0.055, 0.040, 0.99) if settings_active else Color(0.020, 0.018, 0.022, 0.93)
+	var rail_edge: Color = Color(0.96, 0.34, 0.18, 0.98) if settings_active else Color(0.72, 0.055, 0.085, 0.96)
+	var rail_style: StyleBoxFlat = _make_panel_style(
+		rail_fill,
+		rail_edge,
+		0,
+		0,
+		22 if settings_active else 28
+	)
+	rail_style.border_width_left = 8 if settings_active else 7
+	rail_style.border_width_top = 2 if settings_active else 0
+	rail_style.border_width_right = 2 if settings_active else 0
+	rail_style.border_width_bottom = 2 if settings_active else 1
+	rail_style.border_color = rail_edge
+	_title_panel.add_theme_stylebox_override("panel", rail_style)
+	_title_panel.set_meta("settings_pressed_surface_readability", settings_active)
+	_title_panel.set_meta("settings_shell_surface", "persistent_amber_rail" if settings_active else "default_command_rail")
+	_title_panel.set_meta("settings_interaction_scope", "selector_local_only")
 
 func _ensure_poster_border() -> void:
 	_poster_border = get_node_or_null("PosterBorder") as TextureRect
@@ -751,7 +824,9 @@ func _ensure_content_panel() -> void:
 	_content_panel.z_index = 6
 	_content_panel.anchor_left = 0.35 if short_compact else 0.38
 	_content_panel.anchor_top = 0.025 if short_compact else 0.075
-	_content_panel.anchor_right = 0.95 if short_compact else 0.965
+	# Keep a physical right-side safety gutter at maximum UI scale so the full
+	# settings dossier shell remains inside the framebuffer in every input state.
+	_content_panel.anchor_right = 0.94 if short_compact else 0.965
 	_content_panel.anchor_bottom = 0.975 if short_compact else 0.92
 	_content_panel.offset_left = 0.0
 	_content_panel.offset_top = 0.0
@@ -761,7 +836,9 @@ func _ensure_content_panel() -> void:
 	content_style.border_width_top = 2
 	content_style.border_color = Color(0.79, 0.70, 0.56, 0.90)
 	_content_panel.add_theme_stylebox_override("panel", content_style)
+	_settings_pressed_surface_active = false
 	_ensure_content_record_assembly()
+	_ensure_settings_integrity_shell()
 
 	var margin: MarginContainer = _content_panel.get_node_or_null("Margin") as MarginContainer
 	if margin == null:
@@ -864,18 +941,25 @@ func _apply_section_material() -> void:
 	if _content_panel == null:
 		return
 	var is_settings: bool = _active_section == SECTION_SETTINGS
+	# Interaction feedback belongs to the active selector. Keeping these large
+	# surfaces invariant preserves the complete Settings record at every state.
+	var held_input: bool = false
+	_apply_title_panel_surface(false)
 	var surface: StyleBoxFlat = _make_panel_style(
-		Color(0.030, 0.034, 0.031, 0.96) if is_settings else Color(0.018, 0.016, 0.020, 0.82),
-		Color(0.46, 0.39, 0.27, 0.82) if is_settings else Color(0.56, 0.50, 0.42, 0.92),
+		Color(0.052, 0.034, 0.038, 0.99) if held_input else (Color(0.075, 0.058, 0.044, 0.99) if is_settings else Color(0.018, 0.016, 0.020, 0.82)),
+		Color(0.96, 0.32, 0.24, 1.0) if held_input else (Color(0.70, 0.46, 0.29, 0.94) if is_settings else Color(0.56, 0.50, 0.42, 0.92)),
 		0,
 		0,
-		11 if is_settings else 22
+		8 if held_input else (11 if is_settings else 22)
 	)
-	surface.border_width_top = 2
-	surface.border_width_left = 2 if is_settings else 0
-	surface.border_color = Color(0.52, 0.43, 0.28, 0.84) if is_settings else Color(0.79, 0.70, 0.56, 0.90)
+	surface.border_width_top = 3 if held_input else (3 if is_settings else 2)
+	surface.border_width_left = 4 if held_input else (4 if is_settings else 0)
+	surface.border_width_right = 2 if is_settings else 0
+	surface.border_width_bottom = 2 if held_input else (3 if is_settings else 0)
+	surface.border_color = Color(0.96, 0.32, 0.24, 1.0) if held_input else (Color(0.78, 0.52, 0.32, 0.96) if is_settings else Color(0.79, 0.70, 0.56, 0.90))
 	_content_panel.add_theme_stylebox_override("panel", surface)
 	_content_panel.set_meta("material_role", "machine_console_olive_steel" if is_settings else "field_order_carbon_record")
+	_content_panel.set_meta("settings_pressed_surface_readability", is_settings)
 	if _settings_scroll_cue != null:
 		_settings_scroll_cue.visible = is_settings and _is_short_compact_layout()
 	var construction_rule: Control = _content_panel.get_node_or_null("ContentLayout/ContentHeader/ConstructionRule") as Control
@@ -901,10 +985,7 @@ func _ensure_content_record_assembly() -> void:
 	backing.offset_top = 8.0
 	backing.offset_right = -8.0
 	backing.offset_bottom = -10.0
-	var backing_style: StyleBoxFlat = _make_panel_style(Color(0.055, 0.043, 0.043, 0.78), Color(0.34, 0.30, 0.26, 0.78), 0, 0, 14)
-	backing_style.border_width_left = 2
-	backing_style.border_width_bottom = 2
-	backing.add_theme_stylebox_override("panel", backing_style)
+	_apply_content_record_backing_surface(false)
 	var fasteners: Label = get_node_or_null("ContentFasteners") as Label
 	if fasteners == null:
 		fasteners = Label.new()
@@ -925,6 +1006,24 @@ func _ensure_content_record_assembly() -> void:
 	fasteners.add_theme_font_size_override("font_size", 13)
 	fasteners.add_theme_color_override("font_color", Color(0.88, 0.75, 0.52, 0.82))
 	VisualTypeSystem.set_utility_bold(fasteners)
+
+func _apply_content_record_backing_surface(held_input: bool) -> void:
+	var backing: Panel = get_node_or_null("ContentRecordBacking") as Panel
+	if backing == null or not is_instance_valid(backing):
+		return
+	var settings_active: bool = _active_section == SECTION_SETTINGS
+	var backing_style: StyleBoxFlat = _make_panel_style(
+		Color(0.095, 0.048, 0.046, 0.90) if held_input else (Color(0.085, 0.058, 0.046, 0.94) if settings_active else Color(0.055, 0.043, 0.043, 0.78)),
+		Color(0.74, 0.34, 0.24, 0.96) if held_input else (Color(0.58, 0.40, 0.28, 0.92) if settings_active else Color(0.34, 0.30, 0.26, 0.78)),
+		0,
+		0,
+		10 if held_input else 14
+	)
+	backing_style.border_width_left = 3 if held_input else (3 if settings_active else 2)
+	backing_style.border_width_top = 2 if held_input else (2 if settings_active else 0)
+	backing_style.border_width_bottom = 3 if held_input else (3 if settings_active else 2)
+	backing.add_theme_stylebox_override("panel", backing_style)
+	backing.set_meta("settings_pressed_surface_readability", settings_active)
 
 func _ensure_content_construction_cues(header: VBoxContainer, compact: bool, short_compact: bool) -> void:
 	if header == null:
@@ -1014,6 +1113,75 @@ func _render_active_section() -> void:
 		_:
 			_render_home()
 	call_deferred("_reset_content_scroll")
+
+func _sync_settings_press_witness() -> void:
+	if _settings_press_witness == null or not is_instance_valid(_settings_press_witness):
+		return
+	var option: OptionButton = _content_body.find_child("UIScaleOption", true, false) as OptionButton if _content_body != null and is_instance_valid(_content_body) else null
+	var pressed_state: bool = _active_section == SECTION_SETTINGS and option != null and option.button_pressed
+	if pressed_state != _settings_pressed_surface_active:
+		_settings_pressed_surface_active = pressed_state
+		# Do not turn a local selector press into a whole-shell state. The rail,
+		# dossier backing, and settings record stay visually constant while the
+		# selector itself supplies the focused/pressed feedback.
+		_apply_title_panel_surface(false)
+		_apply_section_material()
+		_apply_content_record_backing_surface(false)
+	var released_copy: String = "SHELL LOCKED // RECORD PERSISTS" if _is_short_compact_layout() else "SHELL LOCKED // RECORD PERSISTS THROUGH INPUT"
+	# The shell marker stays in the record for every interaction state. Pressing
+	# only escalates its copy and colour, so a held control can never read as a
+	# detached mini-panel or a missing settings surface.
+	_settings_press_witness.visible = _active_section == SECTION_SETTINGS
+	_settings_press_witness.text = "INPUT HELD // SELECTOR ACTIVE" if pressed_state else released_copy
+	_settings_press_witness.add_theme_color_override("font_color", Color(1.0, 0.80, 0.56, 1.0) if pressed_state else Color(0.78, 0.70, 0.58, 1.0))
+	_settings_press_witness.set_meta("pressed_state_visible", pressed_state)
+	_settings_press_witness.set_meta("settings_shell_witness_mode", "local_selector_hold" if pressed_state else "persistent")
+	if _title_panel != null and is_instance_valid(_title_panel):
+		_title_panel.set_meta("settings_interaction_scope", "selector_local_only")
+	if _content_panel != null and is_instance_valid(_content_panel):
+		_content_panel.set_meta("settings_press_shell_active", false)
+		_content_panel.set_meta("settings_interaction_scope", "selector_local_only")
+
+func ensure_settings_surface_visible() -> void:
+	if _active_section != SECTION_SETTINGS:
+		return
+	_ensure_settings_integrity_shell()
+	_apply_title_panel_surface(false)
+	_apply_section_material()
+	_apply_content_record_backing_surface(false)
+	_enforce_settings_surface_visible()
+	if _content_scroll != null and is_instance_valid(_content_scroll):
+		_content_scroll.scroll_vertical = 0
+
+func _enforce_settings_surface_visible() -> void:
+	if _settings_integrity_shell != null and is_instance_valid(_settings_integrity_shell):
+		_settings_integrity_shell.visible = visible and _active_section == SECTION_SETTINGS
+	if not visible or _active_section != SECTION_SETTINGS:
+		return
+	_ensure_settings_integrity_shell()
+	var surface_hosts: Array[Control] = [
+		_title_panel,
+		center,
+		center_vbox,
+		_content_panel,
+		_content_stack,
+		_content_scroll,
+		_content_body,
+		get_node_or_null("ContentRecordBacking") as Control,
+	]
+	for surface_host: Control in surface_hosts:
+		if surface_host == null or not is_instance_valid(surface_host):
+			continue
+		surface_host.visible = true
+		surface_host.modulate = Color.WHITE
+		surface_host.self_modulate = Color.WHITE
+	if _settings_integrity_shell != null and is_instance_valid(_settings_integrity_shell):
+		_settings_integrity_shell.visible = true
+		_settings_integrity_shell.modulate = Color.WHITE
+		_settings_integrity_shell.self_modulate = Color.WHITE
+		_settings_integrity_shell.set_meta("settings_surface_visible_after_input", true)
+	set_meta("settings_full_shell_visible", true)
+	set_meta("settings_interaction_surface", "full_dossier_persisted")
 
 func _render_home() -> void:
 	_set_content_header("FIELD ORDER // FIRST BLOOD", "The road behind you is closed. Muster a company, survive the forced opener, then spend and wager what remains.")
@@ -1240,6 +1408,7 @@ func _render_settings() -> void:
 	if _search_field != null:
 		_search_field.placeholder_text = "Search settings: readability, contrast, scale, motion, keys..."
 	var added: int = 0
+	_add_settings_docket()
 	_add_accessibility_priority_banner()
 	added += _add_ui_scale_setting()
 	added += _add_motion_setting()
@@ -1275,6 +1444,7 @@ func _add_accessibility_priority_banner() -> void:
 func _add_settings_docket() -> void:
 	var docket: PanelContainer = _make_field_order_container("SettingsDocket")
 	docket.custom_minimum_size.y = 64.0 if _is_compact_layout() else 72.0
+	docket.set_meta("settings_shell_persistence", "full_dossier_record_remains_visible_across_input_states")
 	_content_body.add_child(docket)
 	var margin: MarginContainer = docket.get_node("Margin") as MarginContainer
 	var row: HBoxContainer = HBoxContainer.new()
@@ -1296,11 +1466,11 @@ func _add_settings_docket() -> void:
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	copy.add_theme_constant_override("separation", 1)
 	row.add_child(copy)
-	var heading: Label = _make_label("LOCAL MACHINE RECORD // ACTIVE PAGE", 19, COLOR_TEXT, _is_short_compact_layout())
+	var heading: Label = _make_label("FULL DOSSIER SHELL // LOCKED DURING INPUT", 19, COLOR_TEXT, _is_short_compact_layout())
 	heading.name = "SettingsDocketTitle"
 	copy.add_child(heading)
 	if not _is_short_compact_layout():
-		copy.add_child(_make_label("Changes bind to this station. Keyboard focus is marked in signal blue.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
+		copy.add_child(_make_label("Rail, header, command record, and control state persist through input. Keyboard focus is marked in signal blue.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
 
 func _render_unit_cards(compact: bool, limit: int) -> int:
 	var count: int = 0
@@ -1558,6 +1728,26 @@ func _add_ui_scale_setting() -> int:
 	popup.add_theme_stylebox_override("hover", HardcoreUIAssets.popup_highlight_style())
 	option.item_selected.connect(_on_ui_scale_selected.bind(option))
 	stack.add_child(option)
+	var press_witness_copy: String = "SHELL LOCKED // RECORD PERSISTS" if _is_short_compact_layout() else "SHELL LOCKED // RECORD PERSISTS THROUGH INPUT"
+	var press_witness: Label = _make_label(press_witness_copy, 17, Color(0.78, 0.70, 0.58, 1.0), false)
+	press_witness.name = "SettingsPressWitness"
+	# This witness must never force the settings shell past a compact framebuffer.
+	# Wrap it inside the dossier instead of letting interaction-state copy expand
+	# the entire record beyond the right edge.
+	press_witness.custom_minimum_size.y = 38.0 if _is_short_compact_layout() else 26.0
+	press_witness.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	press_witness.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	press_witness.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	press_witness.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.96))
+	press_witness.add_theme_constant_override("outline_size", 2)
+	var press_witness_style: StyleBoxFlat = _make_panel_style(Color(0.18, 0.020, 0.030, 0.98), Color(1.0, 0.18, 0.14, 1.0), 2, 0, 0)
+	press_witness_style.content_margin_left = 10.0
+	press_witness_style.content_margin_right = 10.0
+	press_witness.add_theme_stylebox_override("normal", press_witness_style)
+	press_witness.visible = true
+	press_witness.set_meta("interaction_state", "pressed_shell_witness")
+	stack.add_child(press_witness)
+	_settings_press_witness = press_witness
 	var guidance_text: String = "Enlarges interface text and controls." if _is_short_compact_layout() else "Enlarges interface text and controls. Smaller windows reflow this command record into a scrollable compact layout."
 	var scale_guidance: Label = _make_label(guidance_text, 16 if _is_short_compact_layout() else (18 if _is_compact_layout() else 20), COLOR_MUTED, true)
 	scale_guidance.name = "UIScaleGuidance"
@@ -1772,6 +1962,7 @@ func _style_menu_button(button: Button, primary: bool) -> void:
 	if _nav_buttons.has(button):
 		visual_role = "navigation"
 		family = "utility"
+		minimum_width = 196.0 if short_compact else (208.0 if compact else 320.0)
 		font_size = 16 if short_compact else (19 if compact else 24)
 	elif String(button.name) == "BlackLedgerButton":
 		visual_role = "ledger"
@@ -1880,16 +2071,20 @@ func _update_nav_state() -> void:
 	for nav_button: Button in _nav_buttons:
 		var section: String = String(nav_button.get_meta("section", ""))
 		var is_active: bool = section == _active_section
+		var compact_settings_active: bool = is_active and section == SECTION_SETTINGS and _is_short_compact_layout()
 		if not nav_button.has_meta("base_label"):
 			nav_button.set_meta("base_label", nav_button.text)
 		var base_label: String = String(nav_button.get_meta("base_label", nav_button.text))
 		nav_button.toggle_mode = true
 		nav_button.button_pressed = is_active
 		nav_button.text = "ACTIVE // " + base_label if is_active else base_label
+		if _is_short_compact_layout():
+			nav_button.add_theme_font_size_override("font_size", 14 if compact_settings_active else 16)
 		nav_button.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62, 1.0) if is_active else COLOR_RAIL_TEXT)
 		nav_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.91, 0.68, 1.0) if is_active else Color(1.0, 0.76, 0.55, 1.0))
 		_apply_field_navigation_style(nav_button, is_active)
 		nav_button.set_meta("active_page", is_active)
+		nav_button.set_meta("compact_active_label_fit", compact_settings_active)
 		nav_button.set_meta("settled_opacity", COMMAND_CHROME_SETTLED_ALPHA)
 		nav_button.set_meta("minimum_contrast_ratio", COMMAND_RAIL_MIN_CONTRAST_RATIO)
 		if is_active:
@@ -1923,12 +2118,13 @@ func _apply_field_navigation_style(button: Button, selected: bool) -> void:
 
 func _field_navigation_row(fill: Color, edge: Color, left_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
+	var short_compact: bool = _is_short_compact_layout()
 	style.bg_color = fill
 	style.border_color = edge
 	style.border_width_left = left_width
 	style.border_width_bottom = 1
-	style.content_margin_left = 15.0
-	style.content_margin_right = 12.0
+	style.content_margin_left = 9.0 if short_compact else 15.0
+	style.content_margin_right = 7.0 if short_compact else 12.0
 	style.content_margin_top = 7.0
 	style.content_margin_bottom = 7.0
 	return style
@@ -2186,6 +2382,7 @@ func _set_content_header(title: String, hint: String) -> void:
 		_section_hint.text = hint
 
 func _clear_content_body() -> void:
+	_settings_press_witness = null
 	for child: Node in _content_body.get_children():
 		_content_body.remove_child(child)
 		child.queue_free()
