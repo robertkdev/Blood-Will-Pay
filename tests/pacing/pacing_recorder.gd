@@ -11,6 +11,8 @@ const PacingMetrics: Script = preload("res://tests/pacing/pacing_metrics.gd")
 const RosterCatalog: Script = preload("res://scripts/game/progression/roster_catalog.gd")
 const StageTypes: Script = preload("res://scripts/game/progression/stage_types.gd")
 const ProgressionService: Script = preload("res://scripts/game/progression/progression_service.gd")
+const TeamOddsEstimator: Script = preload("res://scripts/game/combat/team_odds_estimator.gd")
+const ShopOffer: Script = preload("res://scripts/game/shop/shop_offer.gd")
 
 const DEAD_TIME_EXEMPTION_SECONDS: float = 2.0
 
@@ -159,7 +161,19 @@ func _wire_ui_controls() -> void:
 		button.pressed.connect(callback)
 		_button_bindings.append({"button": button, "callback": callback})
 	for node: Node in _main.find_children("*", "ShopCard", true, false):
+		if not _is_live_shop_card(node):
+			continue
 		_connect_signal(node, "clicked", Callable(self, "_on_shop_card_clicked").bind(node))
+
+func _is_live_shop_card(node: Node) -> bool:
+	if node == null or not is_instance_valid(node):
+		return false
+	var parent: Node = node.get_parent()
+	while parent != null:
+		if parent.name == "ShopGrid":
+			return true
+		parent = parent.get_parent()
+	return false
 
 func _connect_signal(source: Object, signal_name: String, callback: Callable) -> void:
 	if source == null or not is_instance_valid(source) or signal_name == "" or not source.has_signal(signal_name):
@@ -192,9 +206,54 @@ func _on_battle_started(stage: int, enemy: Variant) -> void:
 	var enemy_name: String = ""
 	if enemy != null and enemy is Object:
 		enemy_name = String((enemy as Object).get("name"))
-	_mark("combat_started", {"enemy": enemy_name}, stage)
+	var battle_data: Dictionary[String, Variant] = {"enemy": enemy_name}
+	var combat_view: Node = _main.get_node_or_null("CombatView") if _main != null else null
+	var manager_value: Variant = combat_view.get("manager") if combat_view != null else null
+	var manager: Object = manager_value as Object
+	if manager != null and is_instance_valid(manager):
+		var player_team_value: Variant = manager.get("player_team")
+		var enemy_team_value: Variant = manager.get("enemy_team")
+		var player_team: Array[Unit] = _unit_array(player_team_value)
+		var enemy_team: Array[Unit] = _unit_array(enemy_team_value)
+		var player_rating: float = TeamOddsEstimator.team_rating(player_team)
+		var enemy_rating: float = TeamOddsEstimator.team_rating(enemy_team)
+		battle_data["player_ids"] = _unit_ids(player_team)
+		battle_data["enemy_ids"] = _unit_ids(enemy_team)
+		battle_data["player_levels"] = _unit_levels(player_team)
+		battle_data["enemy_levels"] = _unit_levels(enemy_team)
+		battle_data["player_power"] = player_rating
+		battle_data["enemy_power"] = enemy_rating
+		battle_data["estimated_odds_percent"] = TeamOddsEstimator.estimate_from_ratings(player_rating, enemy_rating)
+	var economy: Node = _root_node("Economy")
+	if economy != null:
+		battle_data["gold"] = int(economy.get("gold"))
+		battle_data["current_bet"] = int(economy.get("current_bet"))
+		battle_data["combat_spent"] = int(economy.get("combat_spent"))
+		battle_data["projected_win_probability"] = float(economy.get("projected_win_probability"))
+	_mark("combat_started", battle_data, stage)
 	_mark("phase_combat", {"stage": stage}, stage)
 	_wire_ui_controls()
+
+func _unit_array(value: Variant) -> Array[Unit]:
+	var units: Array[Unit] = []
+	if not value is Array:
+		return units
+	for item: Variant in value as Array:
+		if item is Unit:
+			units.append(item as Unit)
+	return units
+
+func _unit_ids(units: Array[Unit]) -> Array[String]:
+	var ids: Array[String] = []
+	for unit: Unit in units:
+		ids.append(String(unit.id))
+	return ids
+
+func _unit_levels(units: Array[Unit]) -> Array[int]:
+	var levels: Array[int] = []
+	for unit: Unit in units:
+		levels.append(int(unit.level))
+	return levels
 
 func _on_victory(stage: int) -> void:
 	_mark("outcome_victory", {}, stage)
@@ -208,7 +267,24 @@ func _on_tie(stage: int) -> void:
 
 func _on_offers_changed(offers: Array) -> void:
 	if _phase_is_preview():
-		_mark("shop_offers_ready", {"count": offers.size()})
+		var offer_rows: Array[Dictionary] = []
+		for raw_offer: Variant in offers:
+			if raw_offer is ShopOffer:
+				var offer: ShopOffer = raw_offer as ShopOffer
+				offer_rows.append({
+					"id": String(offer.id),
+					"cost": int(offer.cost),
+					"primary_role": String(offer.primary_role),
+					"primary_goal": String(offer.primary_goal),
+				})
+		var economy: Node = _root_node("Economy")
+		var shop: Node = _root_node("Shop")
+		_mark("shop_offers_ready", {
+			"count": offers.size(),
+			"offers": offer_rows,
+			"gold": int(economy.get("gold")) if economy != null else -1,
+			"level": int(shop.call("get_level")) if shop != null and shop.has_method("get_level") else -1,
+		})
 	_wire_ui_controls()
 
 func _on_locked_changed(locked: bool) -> void:
@@ -226,7 +302,27 @@ func _on_first_purchase_needs_deploy(unit_id: String, bench_slot: int) -> void:
 	_mark("deployment_assist", {"unit_id": unit_id, "bench_slot": bench_slot})
 
 func _on_shop_card_clicked(slot_index: int, card: Node) -> void:
-	_mark("shop_card_clicked", {"slot": slot_index, "offer_id": String(card.get("offer_id")) if card != null else ""})
+	var click_data: Dictionary[String, Variant] = {
+		"slot": slot_index,
+		"offer_id": String(card.get("offer_id")) if card != null else "",
+	}
+	var shop: Node = _root_node("Shop")
+	var state_value: Variant = shop.get("state") if shop != null else null
+	var state: Object = state_value as Object
+	if state != null and is_instance_valid(state):
+		var offers_value: Variant = state.get("offers")
+		var offer_rows: Array[Dictionary] = []
+		if offers_value is Array:
+			for raw_offer: Variant in offers_value as Array:
+				if raw_offer is ShopOffer:
+					var offer: ShopOffer = raw_offer as ShopOffer
+					offer_rows.append({
+						"id": String(offer.id),
+						"cost": int(offer.cost),
+						"primary_role": String(offer.primary_role),
+					})
+		click_data["offers"] = offer_rows
+	_mark("shop_card_clicked", click_data)
 
 func _on_button_pressed(button: Button) -> void:
 	if button == null or not is_instance_valid(button):

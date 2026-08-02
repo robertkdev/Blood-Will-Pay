@@ -3,10 +3,12 @@
 ## Verdict
 
 The longitudinal `scenes/Main.tscn` pacing harness is operational and remains
-**FAIL** for one honest reason: the natural Bonko campaign loses at the first
-boss (stage 4), so it cannot prove a stage-9 runway or an interval between two
-bosses. The scoped loss/retry sample is **PASS**. Timing guardrails pass over
-the four observed campaign stages.
+**FAIL/BLOCKED for closure**: the natural Bonko campaign loses at the first
+boss (stage 4), while the competent comparator wins that boss and reaches stage
+5 before a later cap/economy automation stop. A fresh stage-9/two-boss artifact
+and runtime framebuffer capture are still required before declaring green. The
+scoped loss/retry sample is **PASS**. Timing guardrails pass over the observed
+campaign stages.
 
 This verdict must not be converted to green by forcing a boss win. The harness
 is now useful precisely because it separates transition rhythm from balance
@@ -32,6 +34,17 @@ zero gold. The separate forced-loss fixture reached the production loss screen
 and returned to unit selection in 0.08 seconds. It is scope-aware: planning,
 shop, action-density, boss cadence, and run length are explicitly N/A rather
 than false failures.
+
+## Policy diagnosis
+
+The same-seed competent comparator reaches the stage-4 boss with
+`bonko,grint,sari,mara`, player power `127.59`, enemy power `174.56`, and
+estimated odds `38%`, then wins and advances to stage 5. Its later stage-6 stop
+has board 4, bench `mara`, and gold 4, exposing the cap/XP reserve constraint.
+The current test-only policy adds a controlled XP reserve release when a bench
+is blocked at cap and preserves both policy reports in
+`user://pacing/policy_comparison.json`. This is an automation diagnosis, not a
+production rebalance; see `docs/pacing_policy_comparison_2026-08-02.md`.
 
 Result-screen skipping is player-facing and was validated separately by
 `InteractionLatencySmoke.tscn`: immediate hide 5.1 ms, first observed frame

@@ -13,12 +13,15 @@ run_project(
 )
 ```
 
-The harness owns two scoped samples:
+The harness owns three scoped samples:
 
-- `natural_campaign_bonko` (`scope=campaign`): starts at the real title/unit-select flow, accepts Main's automatic opening battle, then follows shop, deployment, combat, results, recovery, and escalation until target stage 9, a bounded timeout, or a real terminal outcome.
+- `policy_comparison_natural_bonko` (`scope=policy_comparison`): the baseline purchase/deploy policy on the real title/unit-select flow, sampled through the first boss gate.
+- `competent_campaign_bonko` (`scope=campaign`): a competent-player-equivalent policy on the same seed and Main.tscn flow. It buys up to two high-value offers, prefers duplicates and role coverage, releases the level/cap reserve when the board is blocked, and continues until stage 10 (resolving the stage-9 boss) or a bounded terminal outcome.
 - `natural_loss_retry` (`scope=loss_retry`): uses a test-only runtime weak-unit fixture after starter selection, observes the actual loss overlay, presses the production New Game/retry control, and verifies return to unit selection. This proves the retry rhythm; it is not a combat-balance claim.
 
-Outputs are written to `user://pacing/longitudinal_pacing_suite.json` and `user://pacing/longitudinal_pacing_report.md` (on this machine: `%APPDATA%\\Godot\\app_userdata\\Gamble Battle\\pacing\\`). Every run preserves `sample`, `run`, `stages`, and the raw per-stage `events` list. Stage records retain chapter, round, global stage, `CREEPS`/`NORMAL`/`BOSS` kind, and derived metrics.
+Outputs are written to `user://pacing/longitudinal_pacing_suite.json`, `user://pacing/longitudinal_pacing_report.md`, and `user://pacing/policy_comparison.json` (on this machine: `%APPDATA%\\Godot\\app_userdata\\Blood Will Pay\\pacing\\`). Every run preserves `sample`, `run`, `stages`, and the raw per-stage `events` list. Stage records retain chapter, round, global stage, `CREEPS`/`NORMAL`/`BOSS` kind, and derived metrics. `policy_comparison.json` keeps the two side-by-side reports instead of reducing them to one aggregate completion number.
+
+The comparison is a diagnosis harness, not a production rebalance. The seed, entrypoint, delay constants, combat rules, shop catalog, results controls, and progression rules stay fixed; only the test policy changes. A natural failure paired with a competent first-boss win is evidence against "the boss alone is impossible". A competent failure with healthy gold/board/cap telemetry points toward economy or boss tuning instead. A policy-only trace that differs before the first combat is an automation failure and should not be used to justify production economy changes.
 
 ## Metric contract
 
