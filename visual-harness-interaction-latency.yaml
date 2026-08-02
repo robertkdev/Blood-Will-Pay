@@ -1,0 +1,27 @@
+version: 1
+project: Gamble Battle interaction latency
+scenarios:
+  - id: interaction-latency
+    title: Result dismissal and high-frequency interaction latency
+    adapter: godot
+    objective: Verify that accepted result dismissal, shop actions, drag/deploy, and menu input produce visible feedback within their budgets on the real Main.tscn runtime, with timestamped evidence separating deferred cleanup from frame scheduling.
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Capture-InteractionLatencyEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/interaction_latency/captures.json"
+    required_groups: [result_dismissal]
+    runtime_provenance:
+      entrypoint: "Godot 4.5 editor game framebuffer"
+      scene: "res://scenes/Main.tscn exercised by InteractionLatencySmoke.tscn"
+      build: "codex/019fc109-035-interaction-latency"
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [result_visible, dismissed_settled]
+      required_viewports: [desktop-1920x1080]
+      required_events: []
+      min_temporal_frames: 0
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 300
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 1
+    telegram_context: "Gamble Battle interaction latency"
