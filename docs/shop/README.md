@@ -52,6 +52,12 @@ Card UX Notes
 - If bench is full, cards show a disabled state with tooltip.
 - If you cannot afford a card, the price is tinted and a tooltip indicates "Not enough gold".
 
+Correctness Contract
+- Normal rolls keep `ALLOW_DUPLICATES=true`: repeated units are legitimate shop outcomes, not an error by themselves.
+- The guarded opening roll must put a configured helper in slot 0 and filter that starter's blocked IDs. When at least two eligible units exist in the rolled cost tier, the guard preserves at least two distinct choices; it does not fill every slot with the helper.
+- Seeded rolls must route every draw through `ShopRng`; weighted cost tiers are traversed in numeric order so a seed maps to the same offers on replay.
+- Buy XP at `MAX_LEVEL` returns `MAX_LEVEL`, spends no gold, and surfaces `Already at max level` through the shop presenter.
+
 Lifecycle
 - New Run: `Shop.reset_run()` clears state; `PlayerProgress` resets to level 1, XP 0.
 - Reroll: `Shop.reroll()` spends `REROLL_COST` gold (unless a free reroll is available) and populates `SLOT_COUNT` offers.
@@ -78,7 +84,7 @@ Phase Rules
 - A non-broke Chapter 1 Stage 1 defeat receives enough opening retry recovery to return to 2 gold, so a support starter can buy exactly one 1-cost helper while still keeping the 1-health planning reserve. Axiom's configured retry helpers are guarded by `AxiomRetryChoiceQualitySmoke` and the production retry-shop slot 0 path is covered by `AxiomRetryEconomySmoke`.
 
 Error Codes
-- `UNKNOWN`, `COMBAT_PHASE`, `INVALID_SLOT`, `NO_OFFERS`, `INSUFFICIENT_GOLD`, `BENCH_FULL`, `SHOP_LOCKED`, `INVALID_UNIT`, `NOT_FOUND`, `ACTION_FAILED`.
+- `UNKNOWN`, `COMBAT_PHASE`, `INVALID_SLOT`, `NO_OFFERS`, `INSUFFICIENT_GOLD`, `BENCH_FULL`, `SHOP_LOCKED`, `INVALID_UNIT`, `NOT_FOUND`, `ACTION_FAILED`, `MAX_LEVEL`.
 
 Extension Points
 - Odds: edit `ODDS_BY_LEVEL` and `VALID_COSTS` in config; logic lives in `ShopOdds`.

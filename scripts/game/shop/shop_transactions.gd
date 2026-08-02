@@ -90,6 +90,10 @@ func reroll(state: ShopState, level: int, available_gold: int, opening_starter_i
 
 func buy_xp(progress: PlayerProgress, available_gold: int) -> Dictionary:
 	# Returns { ok: bool, error?: String, gold_spent?: int, level?: int, xp?: int, xp_to_next?: int }
+	if progress == null:
+		return { "ok": false, "error": ShopErrors.UNKNOWN }
+	if progress.is_at_max_level():
+		return { "ok": false, "error": ShopErrors.MAX_LEVEL }
 	var cost: int = int(ShopConfig.BUY_XP_COST)
 	var in_combat: bool = false
 	if Engine.has_singleton("GameState"):
@@ -99,8 +103,6 @@ func buy_xp(progress: PlayerProgress, available_gold: int) -> Dictionary:
 	var aff: Dictionary = ShopAffordability.can_afford(int(available_gold), bet, cost, in_combat, spent)
 	if not bool(aff.get("ok", false)):
 		return { "ok": false, "error": ShopErrors.WOULD_KILL_YOU, "need_more": int(aff.get("need_more", 0)) }
-	if progress == null:
-		return { "ok": false, "error": ShopErrors.UNKNOWN }
 	progress.buy_xp()
 	return {
 		"ok": true,

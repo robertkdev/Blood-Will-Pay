@@ -2,6 +2,7 @@ extends Node
 
 const SMOKE_NAME: String = "BuyXPTransactionalFeedbackSmoke"
 const ShopPresenterLib: Script = preload("res://scripts/ui/shop/shop_presenter.gd")
+const ShopConfigLib: Script = preload("res://scripts/game/shop/shop_config.gd")
 
 var _failures: Array[String] = []
 var _presenter: ShopPresenter = null
@@ -50,6 +51,14 @@ func _run() -> void:
 	_expect(int(Shop.get_xp()) == 2, "6g Buy XP should preserve overflow XP after leveling")
 	_expect(int(Shop.get_xp_to_next()) == 6, "6g Buy XP should expose the next XP threshold")
 	_expect(_label_with_text("Lvl 2 (2/6)") != null, "6g Buy XP should repaint progress label to Lvl 2 (2/6)")
+
+	_set_gold(6)
+	Shop.set_level(int(ShopConfigLib.MAX_LEVEL))
+	await get_tree().process_frame
+	_press_button(buy_xp)
+	await get_tree().process_frame
+	_expect(int(Economy.gold) == 6, "max-level Buy XP should leave gold unchanged")
+	_expect(_label_with_text("Already at max level") != null, "max-level Buy XP should show clear feedback")
 	_finish()
 
 func _autoloads_ready() -> bool:

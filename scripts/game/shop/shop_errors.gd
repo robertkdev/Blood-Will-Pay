@@ -14,6 +14,7 @@ const INVALID_UNIT := "INVALID_UNIT"
 const NOT_FOUND := "NOT_FOUND"
 const ACTION_FAILED := "ACTION_FAILED"
 const WOULD_KILL_YOU := "WOULD_KILL_YOU"
+const MAX_LEVEL := "MAX_LEVEL"
 
 const MESSAGES := {
 	UNKNOWN: "Unknown error",
@@ -27,6 +28,7 @@ const MESSAGES := {
 	NOT_FOUND: "Not found",
 	ACTION_FAILED: "Action failed",
 	WOULD_KILL_YOU: "Purchasing this now would kill you",
+	MAX_LEVEL: "Already at max level",
 }
 
 static func message(code: String) -> String:
