@@ -8,6 +8,7 @@ const BattleState = preload("res://scripts/game/combat/battle_state.gd")
 const CombatEngine = preload("res://scripts/game/combat/combat_engine.gd")
 const TraitRuntimeLib = preload("res://scripts/game/traits/runtime/trait_runtime.gd")
 const MentorLink = preload("res://scripts/game/traits/runtime/mentor_link.gd")
+const StageRuleRunner = preload("res://scripts/game/progression/stage_rule_runner.gd")
 
 # Runs a single SimJob through the CombatEngine in deterministic lockstep.
 # Optionally accepts a base stats collector that will be attached and ticked during the run.
@@ -27,6 +28,8 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	state.stage = 1
 	var scen: OpenFieldScenario = OpenFieldScenario.new()
 	var info: Dictionary = scen.make(state, job.team_a_ids, job.team_b_ids, job.map_params)
+	_apply_stage_spec(state.player_team, meta_root.get("player_stage_spec", null), meta_root, "player")
+	_apply_stage_spec(state.enemy_team, meta_root.get("enemy_stage_spec", null), meta_root, "enemy")
 
 	# Engine setup
 	var engine: CombatEngine = CombatEngine.new()
@@ -337,6 +340,18 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	result["engine_outcome"] = outcome
 	result["events"] = (events if collect_events else [])
 	return result
+
+func _apply_stage_spec(units: Array, raw_spec: Variant, metadata: Dictionary, side: String) -> void:
+	if not (raw_spec is Dictionary):
+		return
+	var spec: Dictionary = raw_spec as Dictionary
+	if spec.is_empty():
+		return
+	var chapter_key: String = "%s_stage_chapter" % side
+	var index_key: String = "%s_stage_index" % side
+	var chapter: int = max(1, int(metadata.get(chapter_key, 1)))
+	var stage_index: int = max(1, int(metadata.get(index_key, 1)))
+	StageRuleRunner.post_spawn(units, spec, chapter, stage_index)
 
 # --- capability derivation -----------------------------------------------
 

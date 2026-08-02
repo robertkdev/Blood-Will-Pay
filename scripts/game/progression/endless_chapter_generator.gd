@@ -4,6 +4,7 @@ class_name EndlessChapterGenerator
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const RgaStageChallengeDirector := preload("res://scripts/game/progression/rga_stage_challenge_director.gd")
+const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
 
 const PLAYABLE_UNIT_ROOT := "res://data/units"
 const DEFAULT_SEED := 730711
@@ -144,7 +145,7 @@ static func score_spec(spec: Dictionary) -> int:
 	var levels: Dictionary = {}
 	if rules.has("levels") and typeof(rules["levels"]) == TYPE_DICTIONARY:
 		levels = rules["levels"]
-	var breakdown: Dictionary = _score_ids_with_levels_breakdown(_strings_from_array(ids), levels)
+	var breakdown: Dictionary = _score_ids_with_levels_breakdown(_strings_from_array(ids), levels, float(rules.get("stat_scale", 1.0)))
 	return int(breakdown.get("total_rating", 0))
 
 static func unit_rating(unit_id: String, level: int) -> int:
@@ -152,14 +153,9 @@ static func unit_rating(unit_id: String, level: int) -> int:
 	var record: Dictionary = _record_for_id(unit_id)
 	if record.is_empty():
 		if CREEP_IDS.has(clean_id):
-			return _creep_rating(level)
+			return max(1, int(round(CombatPowerModel.unit_power_for_id(clean_id, level))))
 		return 0
-	var cost: int = max(0, int(record.get("cost", 1)))
-	if cost == 0:
-		return _creep_rating(level)
-	var base: float = 6.0 + float(cost) * 6.0
-	var value: float = base * pow(1.45, float(max(1, int(level)) - 1))
-	return max(1, int(round(value)))
+	return max(1, int(round(CombatPowerModel.unit_power_for_id(clean_id, level))))
 
 static func _make_creep_spec(chapter: int, stage_index: int, seed: int) -> Dictionary:
 	if int(chapter) == int(ProgressionConfig.PROCEDURAL_START_CHAPTER) and int(stage_index) == int(ProgressionConfig.CREEP_STAGE):
@@ -213,6 +209,7 @@ static func _make_runway_opener_creep_spec(seed: int) -> Dictionary:
 		"difficulty_rating": target,
 		"rating_error": 0,
 		"generator_seed": int(seed),
+		"combat_power_model_version": CombatPowerModel.MODEL_VERSION,
 		"stat_overrides": {"index": {0: RUNWAY_OPENER_STATS.duplicate(true)}},
 	}
 	return StageTypes.make_spec([RUNWAY_OPENER_CREEP_ID], StageTypes.KIND_CREEPS, rules)
@@ -222,21 +219,23 @@ static func _make_runway_rga_spec(chapter: int, stage_index: int, seed: int) -> 
 	var spec: Dictionary = RgaStageChallengeDirector.get_normal_spec(int(chapter), int(stage_index))
 	var ids: Array[String] = _strings_from_array(spec.get(StageTypes.KEY_IDS, []))
 	var rules: Dictionary = spec.get(StageTypes.KEY_RULES, {}) if typeof(spec.get(StageTypes.KEY_RULES, {})) == TYPE_DICTIONARY else {}
-	var unit_rating: int = _score_ids_with_levels(ids, rules.get("levels", {}))
-	var trait_rows: Array[Dictionary] = _active_trait_rows_for_ids(ids, unit_rating)
-	var trait_pressure: int = _sum_trait_pressure(trait_rows)
-	var difficulty: int = unit_rating + trait_pressure
+	var rating_breakdown: Dictionary = _score_ids_with_levels_breakdown(ids, rules.get("levels", {}))
+	var unit_rating_value: int = int(rating_breakdown.get("unit_rating", 0))
+	var trait_rows: Array[Dictionary] = _active_trait_rows_for_ids(ids, unit_rating_value)
+	var trait_pressure: int = int(rating_breakdown.get("trait_pressure_rating", 0))
+	var difficulty: int = unit_rating_value + trait_pressure
 	rules["procedural"] = true
 	rules["endless"] = true
 	rules["runway"] = true
 	rules["theme"] = "chapter_one_runway"
 	rules["target_rating"] = difficulty
-	rules["unit_rating"] = unit_rating
+	rules["unit_rating"] = unit_rating_value
 	rules["trait_pressure_rating"] = trait_pressure
 	rules["active_traits"] = trait_rows
 	rules["difficulty_rating"] = difficulty
 	rules["rating_error"] = 0
 	rules["generator_seed"] = int(seed)
+	rules["combat_power_model_version"] = CombatPowerModel.MODEL_VERSION
 	return StageTypes.make_spec(ids, StageTypes.KIND_NORMAL, rules)
 
 static func _make_mirror_spec(chapter: int, stage_index: int, seed: int) -> Dictionary:
@@ -257,18 +256,22 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 		return StageTypes.make_spec(["bonko"], kind, {"target_rating": target, "difficulty_rating": 0, "procedural": true, "endless": true})
 	var theme: Dictionary = _pick_theme(chapter, stage_index, seed, kind)
 	var desired_size: int = _desired_size_for_target(target, kind)
-	var ids: Array[String] = _select_unit_ids(catalog, theme, desired_size, chapter, stage_index, seed, kind, state)
+	var ids: Array[String] = _select_unit_ids(catalog, theme, desired_size, chapter, stage_index, target, seed, kind, state)
 	var level_cap: int = _level_cap_for(chapter, kind)
 	var levels: Dictionary = _tune_levels(ids, target, level_cap)
 	var rating_breakdown: Dictionary = _score_ids_with_levels_breakdown(ids, levels)
 	var rating: int = int(rating_breakdown.get("total_rating", 0))
 	while ids.size() < MAX_BOARD_UNITS and rating < int(round(float(target) * 0.88)):
-		var extra: String = _pick_extra_unit(catalog, ids, theme, chapter, stage_index, seed, kind)
+		var extra: String = _pick_extra_unit(catalog, ids, theme, chapter, stage_index, target, seed, kind)
 		if extra == "":
 			break
 		ids.append(extra)
 		levels = _tune_levels(ids, target, level_cap)
 		rating_breakdown = _score_ids_with_levels_breakdown(ids, levels)
+		rating = int(rating_breakdown.get("total_rating", 0))
+	var stat_scale: float = _stat_scale_for_target(ids, levels, target, rating)
+	if absf(stat_scale - 1.0) >= 0.001:
+		rating_breakdown = _score_ids_with_levels_breakdown(ids, levels, stat_scale)
 		rating = int(rating_breakdown.get("total_rating", 0))
 	var rules: Dictionary = {
 		"levels": levels,
@@ -282,7 +285,10 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 		"difficulty_rating": int(rating),
 		"rating_error": int(rating) - int(target),
 		"generator_seed": int(seed),
+		"combat_power_model_version": CombatPowerModel.MODEL_VERSION,
 	}
+	if absf(stat_scale - 1.0) >= 0.001:
+		rules["stat_scale"] = stat_scale
 	if kind == StageTypes.KIND_NORMAL:
 		rules["rga_challenge"] = {
 			"id": "procedural_%s_%d_%d" % [String(theme.get("id", "board")), int(chapter), int(stage_index)],
@@ -294,26 +300,26 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 		}
 	return StageTypes.make_spec(ids, kind, rules)
 
-static func _select_unit_ids(catalog: Array[Dictionary], theme: Dictionary, desired_size: int, chapter: int, stage_index: int, seed: int, kind: String, state: Dictionary) -> Array[String]:
+static func _select_unit_ids(catalog: Array[Dictionary], theme: Dictionary, desired_size: int, chapter: int, stage_index: int, target: int, seed: int, kind: String, state: Dictionary) -> Array[String]:
 	var selected: Array[String] = []
-	var front_id: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, seed, kind, "front")
+	var front_id: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, target, seed, kind, "front")
 	if front_id != "":
 		selected.append(front_id)
-	var damage_id: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, seed + 17, kind, "damage")
+	var damage_id: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, target, seed + 17, kind, "damage")
 	if damage_id != "":
 		selected.append(damage_id)
 	while selected.size() < desired_size:
 		var role_slot: String = "any"
 		if selected.size() == desired_size - 1 and desired_size >= 4:
 			role_slot = "utility"
-		var picked: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, seed + selected.size() * 31, kind, role_slot)
+		var picked: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, target, seed + selected.size() * 31, kind, role_slot)
 		if picked == "":
 			break
 		selected.append(picked)
-	_register_or_shift_recent(selected, catalog, theme, chapter, stage_index, seed, kind, state)
+	_register_or_shift_recent(selected, catalog, theme, chapter, stage_index, target, seed, kind, state)
 	return selected
 
-static func _register_or_shift_recent(ids: Array[String], catalog: Array[Dictionary], theme: Dictionary, chapter: int, stage_index: int, seed: int, kind: String, state: Dictionary) -> void:
+static func _register_or_shift_recent(ids: Array[String], catalog: Array[Dictionary], theme: Dictionary, chapter: int, stage_index: int, target: int, seed: int, kind: String, state: Dictionary) -> void:
 	if state == null:
 		return
 	if not state.has("recent_signatures") or not (state["recent_signatures"] is Array):
@@ -326,7 +332,7 @@ static func _register_or_shift_recent(ids: Array[String], catalog: Array[Diction
 				var kept: Array[String] = ids.duplicate()
 				var banned: Array[String] = ids.duplicate()
 				kept.remove_at(slot)
-				var replacement: String = _pick_best_unit_excluding(catalog, kept, banned, theme, chapter, stage_index, seed + 101 + attempt + slot * 19, kind, "any")
+				var replacement: String = _pick_best_unit_excluding(catalog, kept, banned, theme, chapter, stage_index, target, seed + 101 + attempt + slot * 19, kind, "any")
 				if replacement == "":
 					continue
 				ids[slot] = replacement
@@ -336,13 +342,13 @@ static func _register_or_shift_recent(ids: Array[String], catalog: Array[Diction
 			if not recent.has(signature):
 				break
 	if recent.has(signature):
-		_force_unique_signature(ids, catalog, chapter, stage_index, seed, recent)
+		_force_unique_signature(ids, catalog, chapter, stage_index, target, seed, recent)
 		signature = _signature_for(ids)
 	recent.append(signature)
 	while recent.size() > RECENT_SIGNATURE_LIMIT:
 		recent.pop_front()
 
-static func _force_unique_signature(ids: Array[String], catalog: Array[Dictionary], chapter: int, stage_index: int, seed: int, recent: Array) -> void:
+static func _force_unique_signature(ids: Array[String], catalog: Array[Dictionary], chapter: int, stage_index: int, target: int, seed: int, recent: Array) -> void:
 	if ids.is_empty():
 		return
 	var signature: String = _signature_for(ids)
@@ -355,6 +361,8 @@ static func _force_unique_signature(ids: Array[String], catalog: Array[Dictionar
 			var candidate: String = String(record.get("id", "")).strip_edges()
 			if candidate == "" or ids.has(candidate):
 				continue
+			if not _record_allowed_for_target(record, target):
+				continue
 			ids[slot] = candidate
 			signature = _signature_for(ids)
 			if not recent.has(signature):
@@ -365,23 +373,27 @@ static func _force_unique_signature(ids: Array[String], catalog: Array[Dictionar
 			var candidate2: String = String(record2.get("id", "")).strip_edges()
 			if candidate2 == "" or ids.has(candidate2):
 				continue
+			if not _record_allowed_for_target(record2, target):
+				continue
 			ids.append(candidate2)
 			signature = _signature_for(ids)
 			if not recent.has(signature):
 				return
 			ids.pop_back()
 
-static func _pick_extra_unit(catalog: Array[Dictionary], selected: Array[String], theme: Dictionary, chapter: int, stage_index: int, seed: int, kind: String) -> String:
-	return _pick_best_unit(catalog, selected, theme, chapter, stage_index, seed + 503, kind, "any")
+static func _pick_extra_unit(catalog: Array[Dictionary], selected: Array[String], theme: Dictionary, chapter: int, stage_index: int, target: int, seed: int, kind: String) -> String:
+	return _pick_best_unit(catalog, selected, theme, chapter, stage_index, target, seed + 503, kind, "any")
 
-static func _pick_best_unit(catalog: Array[Dictionary], selected: Array[String], theme: Dictionary, chapter: int, stage_index: int, seed: int, kind: String, role_slot: String) -> String:
-	return _pick_best_unit_excluding(catalog, selected, selected, theme, chapter, stage_index, seed, kind, role_slot)
+static func _pick_best_unit(catalog: Array[Dictionary], selected: Array[String], theme: Dictionary, chapter: int, stage_index: int, target: int, seed: int, kind: String, role_slot: String) -> String:
+	return _pick_best_unit_excluding(catalog, selected, selected, theme, chapter, stage_index, target, seed, kind, role_slot)
 
-static func _pick_best_unit_excluding(catalog: Array[Dictionary], selected: Array[String], banned: Array[String], theme: Dictionary, chapter: int, stage_index: int, seed: int, kind: String, role_slot: String) -> String:
+static func _pick_best_unit_excluding(catalog: Array[Dictionary], selected: Array[String], banned: Array[String], theme: Dictionary, chapter: int, stage_index: int, target: int, seed: int, kind: String, role_slot: String) -> String:
 	var scored: Array[Dictionary] = []
 	for record: Dictionary in catalog:
 		var id: String = String(record.get("id", "")).strip_edges()
 		if id == "" or selected.has(id) or banned.has(id):
+			continue
+		if not _record_allowed_for_target(record, target):
 			continue
 		var slot_score: float = _slot_score(record, role_slot)
 		if slot_score < 0.0:
@@ -397,6 +409,24 @@ static func _pick_best_unit_excluding(catalog: Array[Dictionary], selected: Arra
 		return ""
 	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("_sort_score", 0.0)) > float(b.get("_sort_score", 0.0)))
 	return String(scored[0].get("id", ""))
+
+static func _record_allowed_for_target(record: Dictionary, target: int) -> bool:
+	var max_cost: int = _max_generated_unit_cost_for_target(target)
+	if max_cost <= 0:
+		return true
+	return int(record.get("cost", 1)) <= max_cost
+
+static func _max_generated_unit_cost_for_target(target: int) -> int:
+	var rating: int = max(1, int(target))
+	if rating < 110:
+		return 1
+	if rating < 180:
+		return 2
+	if rating < 300:
+		return 3
+	if rating < 450:
+		return 4
+	return 5
 
 static func _slot_score(record: Dictionary, role_slot: String) -> float:
 	var role: String = String(record.get("role", "")).strip_edges()
@@ -496,21 +526,42 @@ static func _score_ids_with_levels(ids: Array[String], levels: Dictionary) -> in
 	var breakdown: Dictionary = _score_ids_with_levels_breakdown(ids, levels)
 	return int(breakdown.get("total_rating", 0))
 
-static func _score_ids_with_levels_breakdown(ids: Array[String], levels: Dictionary) -> Dictionary:
+static func _score_ids_with_levels_breakdown(ids: Array[String], levels: Dictionary, stat_scale: float = 1.0) -> Dictionary:
 	var unit_total: int = 0
 	for i: int in range(ids.size()):
 		var id: String = ids[i]
 		unit_total += unit_rating(id, _level_for_index_and_id(levels, i, id))
 	var trait_rows: Array[Dictionary] = _active_trait_rows_for_ids(ids, unit_total)
-	var trait_pressure: int = 0
-	for row: Dictionary in trait_rows:
-		trait_pressure += int(row.get("pressure_rating", 0))
+	var shared_breakdown: Dictionary = CombatPowerModel.team_power_for_ids(ids, levels, stat_scale)
+	var scaled_unit_total: int = max(1, int(round(float(shared_breakdown.get("base_power", unit_total)))))
+	var shared_total: int = max(1, int(round(float(shared_breakdown.get("total_power", scaled_unit_total)))))
+	var trait_pressure: int = max(0, shared_total - scaled_unit_total)
 	return {
-		"unit_rating": unit_total,
+		"unit_rating": scaled_unit_total,
 		"trait_pressure_rating": trait_pressure,
-		"total_rating": unit_total + trait_pressure,
+		"total_rating": scaled_unit_total + trait_pressure,
 		"active_traits": trait_rows,
 	}
+
+static func _stat_scale_for_target(ids: Array[String], levels: Dictionary, target: int, current_rating: int) -> float:
+	var safe_target: float = float(max(1, int(target)))
+	var safe_rating: float = float(max(1, int(current_rating)))
+	if safe_rating <= 0.0 or absf(safe_rating - safe_target) / safe_target <= 0.12:
+		return 1.0
+	var lower: float = 0.25
+	var upper: float = 4.0
+	for _iteration: int in range(18):
+		var middle: float = (lower + upper) * 0.5
+		var middle_rating: float = float(_score_ids_with_levels_breakdown(ids, levels, middle).get("total_rating", 0))
+		if middle_rating < safe_target:
+			lower = middle
+		else:
+			upper = middle
+	var result: float = clampf((lower + upper) * 0.5, 0.25, 4.0)
+	var result_rating: float = float(_score_ids_with_levels_breakdown(ids, levels, result).get("total_rating", 0))
+	if result_rating <= 0.0:
+		return 1.0
+	return result
 
 static func _active_trait_rows_for_ids(ids: Array[String], unit_total: int) -> Array[Dictionary]:
 	var counts: Dictionary[String, int] = {}
@@ -587,9 +638,18 @@ static func _level_for_index_and_id(levels: Dictionary, index: int, id: String) 
 	return 1
 
 static func _desired_size_for_target(target: int, kind: String) -> int:
-	var minimum: int = 4 if kind == StageTypes.KIND_BOSS else 3
-	var size: int = minimum + int(floor(float(max(0, int(target) - 260)) / 260.0))
-	return clampi(size, minimum, MAX_BOARD_UNITS)
+	var rating: int = max(1, int(target))
+	if kind == StageTypes.KIND_BOSS:
+		if rating < 520:
+			return 4
+		return clampi(4 + int(floor(float(max(0, rating - 520)) / 260.0)), 4, MAX_BOARD_UNITS)
+	if rating <= 120:
+		return 1
+	if rating <= 230:
+		return 2
+	if rating < 360:
+		return 3
+	return clampi(4 + int(floor(float(max(0, rating - 360)) / 260.0)), 4, MAX_BOARD_UNITS)
 
 static func _level_cap_for(chapter: int, kind: String) -> int:
 	var procedural_index: int = _procedural_index_for(chapter)

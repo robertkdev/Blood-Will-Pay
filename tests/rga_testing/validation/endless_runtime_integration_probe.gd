@@ -115,7 +115,8 @@ func _validate_board_capacity_and_odds(failures: Array[String]) -> void:
 		var enemy_team: Array[Unit] = [enemy]
 		var evenish_odds: int = TeamOddsEstimator.estimate_win_percent(player_team, enemy_team)
 		_expect(evenish_odds > 0 and evenish_odds < 100, "odds should be bounded 1..99, got %d" % evenish_odds, failures)
-		player.level = 4
+		var level_spec: Dictionary = StageTypes.make_spec(["bonko"], StageTypes.KIND_NORMAL, {"levels": {0: 4, "bonko": 4}})
+		StageRuleRunner.post_spawn(player_team, level_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.FIRST_RGA_STAGE)
 		var stronger_odds: int = TeamOddsEstimator.estimate_win_percent(player_team, enemy_team)
 		_expect(stronger_odds > evenish_odds, "unit level should improve displayed odds, before=%d after=%d" % [evenish_odds, stronger_odds], failures)
 	if shop_node != null and shop_node.has_method("reset_run"):

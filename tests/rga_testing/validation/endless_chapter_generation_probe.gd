@@ -4,6 +4,7 @@ const EndlessChapterGenerator := preload("res://scripts/game/progression/endless
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
+const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
 
 const START_CHAPTER := 1
 const CHAPTERS_PER_SEED := 40
@@ -103,6 +104,8 @@ func _validate_spec(seed: int, chapter: int, stage_index: int, spec: Dictionary,
 	_expect(rules.has("levels"), "seed %d chapter %d stage %d missing levels" % [seed, chapter, stage_index], failures)
 	_expect(rules.has("target_rating"), "seed %d chapter %d stage %d missing target rating" % [seed, chapter, stage_index], failures)
 	_expect(rules.has("difficulty_rating"), "seed %d chapter %d stage %d missing difficulty rating" % [seed, chapter, stage_index], failures)
+	if kind == StageTypes.KIND_NORMAL or kind == StageTypes.KIND_BOSS:
+		_expect(String(rules.get("combat_power_model_version", "")) == CombatPowerModel.MODEL_VERSION, "seed %d chapter %d stage %d missing combat power model metadata" % [seed, chapter, stage_index], failures)
 	if kind == StageTypes.KIND_CREEPS:
 		_expect(rules.has("rewards"), "seed %d chapter %d creep stage missing rewards" % [seed, chapter], failures)
 	for id_value: Variant in ids:
