@@ -121,6 +121,14 @@ func _on_continue_pressed() -> void:
 	controller._on_continue_pressed()
 
 func _auto_start_battle() -> void:
+	# Main schedules this call deferred after starter selection. A rapid New Run,
+	# Return to Title, or teardown can hide this view and clear its controller
+	# before the deferred callback resumes. Treat that callback as stale rather
+	# than invoking a freed controller or starting combat behind a reset screen.
+	if _teardown_done or controller == null or not is_instance_valid(controller):
+		return
+	if not is_inside_tree() or not is_visible_in_tree() or not is_processing():
+		return
 	controller._auto_start_battle()
 
 func _refresh_economy_ui() -> void:
