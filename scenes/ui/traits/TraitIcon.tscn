@@ -1,7 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://dknrjs86pxvmg"]
+[gd_scene load_steps=2 format=3 uid="uid://dknrjs86pxvmg"]
 
 [ext_resource type="Script" uid="uid://yvr0j8nfgrwh" path="res://scripts/ui/traits/trait_icon.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://cf8d4n4py86h0" path="res://assets/traits/blessed_symbol.png" id="2_a837b"]
 
 [node name="TraitIcon" type="Control"]
 custom_minimum_size = Vector2(40.3, 40.3)
@@ -29,6 +28,5 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("2_a837b")
 expand_mode = 1
 stretch_mode = 5

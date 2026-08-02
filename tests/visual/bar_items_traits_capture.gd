@@ -1,6 +1,8 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
+const UI_FIT_AUDITOR: GDScript = preload("res://tests/visual/ui_fit_auditor.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/bar_items_traits_pass"
 
 var _main: Control = null
@@ -26,8 +28,7 @@ func _run() -> void:
 	await _settle(0.20)
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle(0.30)
-	_view = _main.get_node_or_null("CombatView") as Control
+	_view = await MainTransitionWait.for_combat_view(self, _main)
 	if _view == null:
 		push_error("BarItemsTraitsCapture: CombatView missing")
 		get_tree().quit(1)
@@ -63,6 +64,10 @@ func _run() -> void:
 		push_error("BarItemsTraitsCapture: item tooltip bleeds into the board column")
 		get_tree().quit(1)
 		return
+	if not _tooltip_content_fits("CaptureItemTooltip"):
+		push_error("BarItemsTraitsCapture: item tooltip content overflowed its containers")
+		get_tree().quit(1)
+		return
 	_clear_tooltips()
 	_show_trait_tooltip()
 	await _settle(0.25)
@@ -72,6 +77,10 @@ func _run() -> void:
 		return
 	if not _tooltip_respects_board_gap("CaptureTraitTooltip"):
 		push_error("BarItemsTraitsCapture: trait tooltip bleeds into the board column")
+		get_tree().quit(1)
+		return
+	if not _tooltip_content_fits("CaptureTraitTooltip"):
+		push_error("BarItemsTraitsCapture: trait tooltip content overflowed its containers")
 		get_tree().quit(1)
 		return
 	_save_capture("02_trait_tooltip_and_item_cards.png")
@@ -410,6 +419,15 @@ func _tooltip_respects_board_gap(tooltip_name: String) -> bool:
 	if board_surface == null:
 		return true
 	return tooltip.get_global_rect().end.x <= board_surface.get_global_rect().position.x - 2.0
+
+func _tooltip_content_fits(tooltip_name: String) -> bool:
+	var tooltip: Control = get_tree().root.get_node_or_null(tooltip_name) as Control
+	if tooltip == null:
+		return false
+	var issues: Array[String] = UI_FIT_AUDITOR.audit(tooltip, tooltip_name)
+	for issue: String in issues:
+		push_warning("BarItemsTraitsCapture: %s" % issue)
+	return issues.is_empty()
 
 func _rect_is_stable(before_rect: Rect2, after_rect: Rect2) -> bool:
 	return before_rect.position.distance_to(after_rect.position) <= 0.5 and before_rect.size.distance_to(after_rect.size) <= 0.5

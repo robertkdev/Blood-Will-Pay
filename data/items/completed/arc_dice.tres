@@ -9,7 +9,8 @@ name = "Arc Dice"
 type = "completed"
 icon_path = "res://assets/items/arcdice_icon.png"
 stat_mods = {"flat_sp": 60.0, "pct_crit_chance": 0.20}
-effects = []
+effects = ["arc_dice"]
 components = ["wand", "spike"]
 tags = PackedStringArray("mage")
+build_axes = PackedStringArray("spell_power", "crit", "burst")
 

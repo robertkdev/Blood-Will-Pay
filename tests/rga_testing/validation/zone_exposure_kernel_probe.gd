@@ -23,7 +23,7 @@ func _run() -> void:
 			"a": [
 				{
 					"unit_index": 0,
-					"unit_id": "paisley"
+					"unit_id": "cinder"
 				}
 			],
 			"b": [
@@ -48,7 +48,7 @@ func _run() -> void:
 	var zone_block: Dictionary = result.get("zone_exposure", {}) if (result is Dictionary) else {}
 	var per_unit: Dictionary = zone_block.get("per_unit", {}) if (zone_block is Dictionary) else {}
 	var side_a: Dictionary = per_unit.get("a", {}) if (per_unit is Dictionary) else {}
-	var rec: Dictionary = side_a.get("paisley", {}) if (side_a is Dictionary) else {}
+	var rec: Dictionary = side_a.get("cinder", {}) if (side_a is Dictionary) else {}
 	var approach_result: Dictionary = _run_approach_result(result)
 	var goal_result: Dictionary = _run_goal_result(result)
 
@@ -98,10 +98,10 @@ func _run() -> void:
 
 func _make_state() -> BattleState:
 	var state: BattleState = BattleStateScript.new()
-	var paisley: Unit = Unit.new()
-	paisley.id = "paisley"
-	paisley.max_hp = 1000
-	paisley.hp = 1000
+	var cinder: Unit = Unit.new()
+	cinder.id = "cinder"
+	cinder.max_hp = 1000
+	cinder.hp = 1000
 	var brute: Unit = Unit.new()
 	brute.id = "brute"
 	brute.max_hp = 1000
@@ -110,7 +110,7 @@ func _make_state() -> BattleState:
 	korath.id = "korath"
 	korath.max_hp = 1000
 	korath.hp = 1000
-	var player_team: Array[Unit] = [paisley]
+	var player_team: Array[Unit] = [cinder]
 	var enemy_team: Array[Unit] = [brute, korath]
 	state.player_team = player_team
 	state.enemy_team = enemy_team
@@ -130,7 +130,7 @@ func _base_payload(kernel_result: Dictionary, include_goal_support: bool) -> Dic
 		kernels["combat_patterns"] = {
 			"per_unit": {
 				"a": {
-					"paisley": {
+					"cinder": {
 						"aoe_dps": 6.0,
 						"multi_target_groups": 1,
 						"max_targets_hit": 2
@@ -142,7 +142,7 @@ func _base_payload(kernel_result: Dictionary, include_goal_support: bool) -> Dic
 			"supported": true,
 			"per_unit": {
 				"a": {
-					"paisley": {
+					"cinder": {
 						"forced_reposition_events": 0,
 						"formation_break_events": 0
 					}
@@ -155,7 +155,7 @@ func _base_payload(kernel_result: Dictionary, include_goal_support: bool) -> Dic
 			"sims": {
 				"probe": {
 					"context": {
-						"team_a_ids": ["paisley"],
+						"team_a_ids": ["cinder"],
 						"team_b_ids": ["brute", "korath"]
 					},
 					"outcome": {
@@ -172,7 +172,7 @@ func _base_payload(kernel_result: Dictionary, include_goal_support: bool) -> Dic
 					"units": {
 						"a": [
 							{
-								"unit_id": "paisley",
+								"unit_id": "cinder",
 								"damage": 20.0,
 								"incoming": 0.0,
 								"pre_mit_incoming": 0.0,
@@ -197,7 +197,7 @@ func _base_payload(kernel_result: Dictionary, include_goal_support: bool) -> Dic
 				}
 			}
 		},
-		"subject_unit_ids": ["paisley"]
+		"subject_unit_ids": ["cinder"]
 	}
 
 func _has_span_prefix(metric_result: Dictionary, prefix: String) -> bool:

@@ -10,6 +10,11 @@ var _remove_from_board_cb: Callable = Callable()
 func configure(roster) -> void:
 	_roster = roster
 
+func clear_runtime() -> void:
+	_roster = null
+	_get_team = Callable()
+	_remove_from_board_cb = Callable()
+
 func set_team_provider(cb: Callable) -> void:
 	# Supplies the current on-board team (Array[Unit]) when available
 	_get_team = cb if cb != null else Callable()
@@ -21,7 +26,7 @@ func set_remove_from_board(cb: Callable) -> void:
 
 func combine() -> Array:
 	# Scan bench (and optionally board) for three-of-a-kind (same id and level).
-	# Promote one copy by +1 level (max 3), remove two others. Repeat while possible.
+	# Promote one copy by +1 level (max 4), remove two others. Repeat while possible.
 	var results: Array = []
 	var bench_count: int = _bench_size()
 	if bench_count <= 0 and not _has_team():
@@ -40,8 +45,8 @@ func combine() -> Array:
 		var id_level: Array = match_key.split("#")
 		var id: String = String(id_level[0])
 		var level: int = int(id_level[1])
-		if level >= 3:
-			# No promotion beyond 3-star; drop this group to avoid infinite loop
+		if level >= 4:
+			# No promotion beyond level 4; drop this group to avoid infinite loop
 			groups.erase(match_key)
 			continue
 		var u: Unit = kept.get("unit")
@@ -197,27 +202,34 @@ func _equipped_count(u: Unit) -> int:
 func _get_equipped_list(u: Unit) -> Array:
 	if not _has_items() or u == null:
 		return []
+	var items: Node = _items_singleton()
+	if items == null:
+		return []
 	# Prefer explicit get_equipped; fallback to get_equipped_ids
-	if Items.has_method("get_equipped"):
-		var eq = Items.get_equipped(u)
+	if items.has_method("get_equipped"):
+		var eq = items.call("get_equipped", u)
 		return (eq.duplicate() if eq is Array else [])
-	if Items.has_method("get_equipped_ids"):
-		var eq2 = Items.get_equipped_ids(u)
+	if items.has_method("get_equipped_ids"):
+		var eq2 = items.call("get_equipped_ids", u)
 		return (eq2.duplicate() if eq2 is Array else [])
 	return []
 
 func _items_remove_all(u: Unit) -> void:
 	if not _has_items() or u == null:
 		return
-	if Items.has_method("remove_all"):
-		Items.remove_all(u)
+	var items: Node = _items_singleton()
+	if items != null and items.has_method("remove_all"):
+		items.call("remove_all", u)
 
 func _equip_onto(target: Unit, ids: Array[String]) -> void:
 	if not _has_items() or target == null or ids == null:
 		return
 	var cap: int = 3
-	if Items.has_method("slot_count"):
-		cap = int(Items.slot_count(target))
+	var items: Node = _items_singleton()
+	if items == null:
+		return
+	if items.has_method("slot_count"):
+		cap = int(items.call("slot_count", target))
 	var existing: int = _equipped_count(target)
 	var space: int = int(max(0, cap - existing))
 	if space <= 0:
@@ -229,13 +241,23 @@ func _equip_onto(target: Unit, ids: Array[String]) -> void:
 		var id: String = String(iid)
 		if id == "":
 			continue
-		if Items.has_method("equip"):
-			var res = Items.equip(target, id)
-			if bool(res.get("ok", false)):
+		if items.has_method("equip"):
+			var res: Variant = items.call("equip", target, id)
+			if res is Dictionary and bool((res as Dictionary).get("ok", false)):
 				equipped_now += 1
 
 func _has_items() -> bool:
-	return Engine.has_singleton("Items")
+	return _items_singleton() != null
+
+func _items_singleton() -> Node:
+	if Engine.has_singleton("Items"):
+		return Items
+	var loop: MainLoop = Engine.get_main_loop()
+	if loop is SceneTree:
+		var tree: SceneTree = loop as SceneTree
+		if tree.root != null:
+			return tree.root.get_node_or_null("/root/Items")
+	return null
 
 func _pick_consumed(entries: Array, kept: Dictionary, count: int) -> Array:
 	# Prefer consuming bench entries; exclude 'kept'
@@ -261,7 +283,7 @@ func _pick_consumed(entries: Array, kept: Dictionary, count: int) -> Array:
 	return out
 
 func _promote_one_level(u: Unit) -> void:
-	# Increase unit.level by 1 (max 3) and apply multiplicative step to scaled stats.
+	# Increase unit.level by 1 (max 4) and apply multiplicative step to scaled stats.
 	if u == null:
 		return
 	var steps := 1
@@ -286,6 +308,6 @@ func _promote_one_level(u: Unit) -> void:
 					u.magic_resist = max(0.0, curv)
 				"true_damage":
 					u.true_damage = max(0.0, curv)
-	u.level = min(3, int(u.level) + 1)
+	u.level = min(4, int(u.level) + 1)
 	# Heal to full after promotion
 	u.hp = u.max_hp

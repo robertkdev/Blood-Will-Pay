@@ -18,6 +18,7 @@ const UnitIdentity := preload("res://scripts/game/identity/unit_identity.gd")
 @export var primary_goal: String = ""
 @export var approaches: Array[String] = []
 @export var alt_goals: Array[String] = []
+@export var build_affinities: Dictionary = {}
 @export var identity: UnitIdentity = null
 
 # Availability flags (explicit visibility controls)

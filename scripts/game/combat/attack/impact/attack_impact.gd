@@ -3,6 +3,7 @@ class_name AttackImpact
 
 const Health := preload("res://scripts/game/stats/health.gd")
 const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
+const TeamUtils := preload("res://scripts/game/combat/attack/support/team_utils.gd")
 
 var state: BattleState
 var rng: RandomNumberGenerator
@@ -156,6 +157,10 @@ func apply_hit(source_team: String, source_index: int, src: Unit, tgt_team: Stri
 		var div: int = int(r.get("diverted", 0))
 		if div > 0:
 			result.redirected += div
+			result.redirect_team = String(r.get("redirect_team", tgt_team))
+			result.redirect_index = int(r.get("redirect_index", target_index))
+			result.redirect_kind = String(r.get("kind", "absorb_redirect"))
+			_apply_conserved_redirect_damage(result, tgt_team, target_index, div)
 			dealt_left = int(r.get("leftover", dealt_left))
 
 	# Apply damage
@@ -270,6 +275,10 @@ func apply_ability_hit(source_team: String, source_index: int, src: Unit, tgt_te
 		var div: int = int(r.get("diverted", 0))
 		if div > 0:
 			result.redirected += div
+			result.redirect_team = String(r.get("redirect_team", tgt_team))
+			result.redirect_index = int(r.get("redirect_index", target_index))
+			result.redirect_kind = String(r.get("kind", "absorb_redirect"))
+			_apply_conserved_redirect_damage(result, tgt_team, target_index, div)
 			dealt_left = int(r.get("leftover", dealt_left))
 
 	# Apply damage
@@ -300,3 +309,16 @@ func apply_ability_hit(source_team: String, source_index: int, src: Unit, tgt_te
 		result.messages.append("%s hits you with an ability for %d." % [src.name, dealt])
 
 	return result
+
+func _apply_conserved_redirect_damage(result: AttackResult, original_team: String, original_index: int, amount: int) -> void:
+	if result == null or state == null or amount <= 0:
+		return
+	if result.redirect_team == original_team and result.redirect_index == original_index:
+		return
+	var recipient: Unit = TeamUtils.unit_at(state, result.redirect_team, result.redirect_index)
+	if recipient == null or not recipient.is_alive():
+		return
+	result.redirect_before_hp = int(recipient.hp)
+	var health_result: Dictionary = Health.apply_damage(recipient, amount)
+	result.redirected_dealt = int(health_result.get("dealt", 0))
+	result.redirect_after_hp = int(recipient.hp)

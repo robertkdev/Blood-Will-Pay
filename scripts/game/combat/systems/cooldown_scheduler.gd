@@ -106,6 +106,11 @@ func _collect_events(team: String, units: Array[Unit], cds: Array[float], delta:
 		var shots: int = 0
 		while cds[idx] <= 0.0 and shots < max_shots:
 			var target_idx: int = target_controller.current_target(team, idx)
+			if target_idx < 0:
+				# No valid target (for example, every living enemy is untargetable).
+				# Keep the unit ready and retry on a later frame without spending a shot.
+				cds[idx] = 0.0
+				break
 			var evt: AttackEvent = AttackEvent.new(team, idx, target_idx, 0, false, 0.0)
 			cds[idx] += cooldown
 			evt.pending_cooldown = cds[idx]

@@ -43,6 +43,8 @@ signal hit_overkill(source_team: String, source_index: int, target_team: String,
 signal hit_components(source_team: String, source_index: int, target_team: String, target_index: int, phys: int, mag: int, tru: int)
 signal amp_output_applied(source_team: String, source_index: int, beneficiary_team: String, beneficiary_index: int, target_team: String, target_index: int, amount: float, amp_pct: float, kind: String)
 signal damage_redirected(source_team: String, source_index: int, original_target_team: String, original_target_index: int, redirect_team: String, redirect_index: int, amount: int, kind: String)
+signal redirected_damage_applied(source_team: String, source_index: int, original_target_team: String, original_target_index: int, redirect_team: String, redirect_index: int, dealt_damage: int, before_hp: int, after_hp: int, kind: String)
+signal arena_pressure_changed(sustain_effectiveness: float, stage: int)
 signal redirect_semantic_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, duration_s: float, amount: float, risk_s: float)
 signal cc_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, duration: float)
 signal buff_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, fields: Dictionary, magnitude: float, duration: float)
@@ -108,11 +110,16 @@ var emit_auto_attack_logs: bool = false
 var emit_ability_logs: bool = false
 
 var _resolver_emitters: Dictionary[String, Callable] = {}
-var combat_timeout_s: float = 45.0
-var no_progress_timeout_s: float = 12.0
+var combat_timeout_s: float = 300.0
+var no_progress_timeout_s: float = 300.0
 var _last_progress_time: float = 0.0
 var _last_progress_total_damage: int = 0
 var _last_progress_positions: Array[Vector2] = []
+const ARENA_PRESSURE_START_S: float = 30.0
+const ARENA_PRESSURE_FULL_S: float = 55.0
+const ARENA_PRESSURE_MIN_EFFECTIVENESS: float = 0.20
+const ARENA_PRESSURE_CALLOUT_INTERVAL_S: float = 5.0
+var _arena_pressure_stage: int = 0
 
 func set_seed(seed: int) -> void:
 	if rng == null:
@@ -128,6 +135,8 @@ func configure(_state: BattleState, _player: Unit, _stage: int, _selector: Calla
 	Trace.step("CombatEngine.configure: begin")
 	_disconnect_signal_bindings()
 	state = _state
+	state.sustain_effectiveness = 1.0
+	_arena_pressure_stage = 0
 	player_ref = _player
 	stage = _stage
 	# Prefer engine-provided closest-target selector if none supplied
@@ -139,13 +148,14 @@ func configure(_state: BattleState, _player: Unit, _stage: int, _selector: Calla
 	_resolver_emitters = _build_resolver_emitters()
 	if outcome_resolver == null:
 		outcome_resolver = OutcomeResolver.new()
+	# Ensure buff and ability systems
+	if buff_system == null:
+		buff_system = BuffSystemLib.new()
+	target_controller.buff_system = buff_system
 	target_controller.configure(state, select_closest_target)
 	cooldown_scheduler.configure(state, target_controller, buff_system)
 	cooldown_scheduler.rng = rng
 	cooldown_scheduler.apply_rules(process_player_first, alternate_order)
-	# Ensure buff and ability systems
-	if buff_system == null:
-		buff_system = BuffSystemLib.new()
 	# Ability system is optional based on toggle
 	if abilities_enabled:
 		if ability_system == null:
@@ -193,6 +203,7 @@ func teardown() -> void:
 	if target_controller != null:
 		target_controller.state = null
 		target_controller.selector = Callable()
+		target_controller.buff_system = null
 		target_controller._resolving_player.clear()
 		target_controller._resolving_enemy.clear()
 	if cooldown_scheduler != null:
@@ -268,7 +279,21 @@ func _engine_select_closest_target(my_team: String, my_index: int, enemy_team: S
 		enemy_arr,
 		enemy_positions,
 		current_target,
-		arena_state.tile_size())
+		arena_state.tile_size(),
+		Callable(self, "_targetable_index_for_team").bind(enemy_team))
+
+func _targetable_index_for_team(index: int, team: String) -> bool:
+	return is_unit_targetable(team, index)
+
+func is_unit_targetable(team: String, index: int) -> bool:
+	if state == null:
+		return false
+	var units: Array[Unit] = state.player_team if team == "player" else state.enemy_team
+	if not BattleState.is_target_alive(units, index):
+		return false
+	if buff_system == null:
+		return true
+	return bool(buff_system.is_targetable(state, team, index))
 
 func _positions_for_team(team: String) -> Array[Vector2]:
 	if arena_state == null:
@@ -437,10 +462,13 @@ func start() -> void:
 	attack_resolver.begin_frame()
 	state.regen_tick_accum = 0.0
 	state.elapsed_time = 0.0
+	state.sustain_effectiveness = 1.0
+	_arena_pressure_stage = 0
 	state.player_cds = BattleState.fill_cds_for(state.player_team)
 	state.enemy_cds = BattleState.fill_cds_for(state.enemy_team)
 	state.player_targets.clear()
 	state.enemy_targets.clear()
+	target_controller.buff_system = buff_system
 	target_controller.configure(state, select_closest_target)
 	cooldown_scheduler.configure(state, target_controller, buff_system)
 	cooldown_scheduler.apply_rules(process_player_first, alternate_order)
@@ -487,6 +515,7 @@ func process(delta: float) -> void:
 			_emit_outcome(idle_outcome)
 		return
 	state.elapsed_time += delta
+	_update_arena_pressure()
 	_retarget_if_due(delta)
 	target_controller.copy_arena_targets(_movement_player_targets_scratch, _movement_enemy_targets_scratch)
 	arena_state.update_movement_with_targets(state, delta, _movement_player_targets_scratch, _movement_enemy_targets_scratch)
@@ -525,6 +554,32 @@ func process(delta: float) -> void:
 		return
 	_update_totals_cache()
 	_reset_debug_counters()
+
+func _update_arena_pressure() -> void:
+	if state == null:
+		return
+	var elapsed: float = max(0.0, float(state.elapsed_time))
+	var effectiveness: float = 1.0
+	if elapsed > ARENA_PRESSURE_START_S:
+		var progress: float = clamp(
+			(elapsed - ARENA_PRESSURE_START_S) / max(0.01, ARENA_PRESSURE_FULL_S - ARENA_PRESSURE_START_S),
+			0.0,
+			1.0
+		)
+		effectiveness = lerp(1.0, ARENA_PRESSURE_MIN_EFFECTIVENESS, progress)
+	state.sustain_effectiveness = effectiveness
+	var stage_now: int = 0
+	if elapsed >= ARENA_PRESSURE_START_S:
+		stage_now = 1 + int(floor((elapsed - ARENA_PRESSURE_START_S) / ARENA_PRESSURE_CALLOUT_INTERVAL_S))
+		stage_now = clampi(stage_now, 1, 6)
+	if stage_now == _arena_pressure_stage:
+		return
+	_arena_pressure_stage = stage_now
+	if stage_now == 1:
+		_resolver_emit_log("Arena Pressure begins: healing and new shields will weaken until the fight breaks.")
+	elif stage_now > 1:
+		_resolver_emit_log("Arena Pressure rises: healing and new shields are %d%% effective." % int(round(effectiveness * 100.0)))
+	emit_signal("arena_pressure_changed", effectiveness, stage_now)
 
 func _retarget_if_due(delta: float) -> void:
 	if target_controller == null:
@@ -621,10 +676,10 @@ func _combat_timeout_outcome() -> String:
 	if state == null or not state.battle_active:
 		return ""
 	if combat_timeout_s > 0.0 and float(state.elapsed_time) >= combat_timeout_s:
-		emit_signal("log_line", "Combat timeout: forcing result from current board state.")
+		emit_signal("log_line", "Combat timeout: tie/refund unless a side is defeated.")
 		return _fallback_timeout_outcome()
 	if no_progress_timeout_s > 0.0 and float(state.elapsed_time) - _last_progress_time >= no_progress_timeout_s:
-		emit_signal("log_line", "Combat no-progress timeout: forcing result from current board state.")
+		emit_signal("log_line", "Combat no-progress timeout: tie/refund unless a side is defeated.")
 		return _fallback_timeout_outcome()
 	return ""
 
@@ -636,10 +691,6 @@ func _fallback_timeout_outcome() -> String:
 	if enemy_alive <= 0 and player_alive > 0:
 		return "victory"
 	if player_alive <= 0 and enemy_alive > 0:
-		return "defeat"
-	if total_damage_player > total_damage_enemy:
-		return "victory"
-	if total_damage_enemy > total_damage_player:
 		return "defeat"
 	return "tie"
 
@@ -838,6 +889,7 @@ func _build_resolver_emitters() -> Dictionary[String, Callable]:
 		"hit_components": Callable(self, "_resolver_emit_hit_components"),
 		"amp_output_applied": Callable(self, "_resolver_emit_amp_output_applied"),
 		"damage_redirected": Callable(self, "_resolver_emit_damage_redirected"),
+		"redirected_damage_applied": Callable(self, "_resolver_emit_redirected_damage_applied"),
 		"redirect_semantic_applied": Callable(self, "_resolver_emit_redirect_semantic_applied"),
 		"dot_tick_applied": Callable(self, "_resolver_emit_dot_tick_applied"),
 		"reset_triggered": Callable(self, "_resolver_emit_reset_triggered"),
@@ -873,6 +925,14 @@ func _filter_events_in_range(events: Array[AttackEvent]) -> Array[AttackEvent]:
 				shooter = state.enemy_team[idx]
 		if not shooter or not shooter.is_alive():
 			continue
+		var target_team: String = "enemy" if team == "player" else "player"
+		var target_units: Array[Unit] = state.enemy_team if team == "player" else state.player_team
+		if not BattleState.is_target_alive(target_units, tgt_idx):
+			var replacement_target: int = target_controller.current_target(team, idx) if target_controller != null else -1
+			if not BattleState.is_target_alive(target_units, replacement_target):
+				continue
+			tgt_idx = replacement_target
+			evt.target_index = replacement_target
 		var spos: Vector2 = arena_state.get_player_position(idx) if team == "player" else arena_state.get_enemy_position(idx)
 		var tpos: Vector2 = arena_state.get_enemy_position(tgt_idx) if team == "player" else arena_state.get_player_position(tgt_idx)
 		var prof: Variant = arena_state.get_profile(team, idx) if arena_state and arena_state.has_method("get_profile") else null
@@ -891,6 +951,17 @@ func _filter_events_in_range(events: Array[AttackEvent]) -> Array[AttackEvent]:
 						state.enemy_cds = cds
 				# Skip scheduling this immediate event; it will fire after wind-up
 				continue
+			if not is_unit_targetable(target_team, tgt_idx):
+				_resolver_emit_targetability_threat_interaction(
+					team,
+					idx,
+					target_team,
+					tgt_idx,
+					"basic_attack_target_drop",
+					max(0.0, float(evt.pending_cooldown)),
+					_is_key_threat(shooter),
+					true)
+				continue
 			out.append(evt)
 		else:
 			# Not in range: keep shooter ready without accumulating extra cooldown debt.
@@ -903,6 +974,12 @@ func _filter_events_in_range(events: Array[AttackEvent]) -> Array[AttackEvent]:
 				else:
 					state.enemy_cds = cds
 	return out
+
+func _is_key_threat(unit: Unit) -> bool:
+	if unit == null:
+		return false
+	var role: String = String(unit.get_primary_role()).strip_edges().to_lower()
+	return int(unit.cost) >= 3 or role == "assassin" or role == "marksman" or role == "mage"
 
 func _resolver_emit_projectile(team: String, source_index: int, target_index: int, damage: int, crit: bool) -> void:
 	emit_signal("projectile_fired", team, source_index, target_index, damage, crit)
@@ -942,6 +1019,9 @@ func _resolver_emit_amp_output_applied(source_team: String, source_index: int, b
 
 func _resolver_emit_damage_redirected(source_team: String, source_index: int, original_target_team: String, original_target_index: int, redirect_team: String, redirect_index: int, amount: int, kind: String) -> void:
 	emit_signal("damage_redirected", source_team, source_index, original_target_team, original_target_index, redirect_team, redirect_index, amount, kind)
+
+func _resolver_emit_redirected_damage_applied(source_team: String, source_index: int, original_target_team: String, original_target_index: int, redirect_team: String, redirect_index: int, dealt_damage: int, before_hp: int, after_hp: int, kind: String) -> void:
+	emit_signal("redirected_damage_applied", source_team, source_index, original_target_team, original_target_index, redirect_team, redirect_index, dealt_damage, before_hp, after_hp, kind)
 
 func _resolver_emit_redirect_semantic_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, duration_s: float, amount: float, risk_s: float) -> void:
 	emit_signal("redirect_semantic_applied", source_team, source_index, target_team, target_index, String(kind), max(0.0, float(duration_s)), max(0.0, float(amount)), max(0.0, float(risk_s)))

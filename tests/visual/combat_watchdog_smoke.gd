@@ -44,6 +44,10 @@ func _run_stalled_case(label: String, no_progress_timeout: float, absolute_timeo
 		if String(outcome.get("value", "")) == "":
 			outcome["value"] = "victory"
 	)
+	engine.tie.connect(func(_stage: int) -> void:
+		if String(outcome.get("value", "")) == "":
+			outcome["value"] = "tie"
+	)
 	engine.log_line.connect(func(text: String) -> void:
 		logs.append(String(text))
 	)
@@ -56,7 +60,7 @@ func _run_stalled_case(label: String, no_progress_timeout: float, absolute_timeo
 			break
 		engine.process(0.05)
 
-	_expect(String(outcome.get("value", "")) == "defeat", "%s case should force defeat outcome, got '%s'" % [label, String(outcome.get("value", ""))], failures)
+	_expect(String(outcome.get("value", "")) == "tie", "%s case should force tie/refund outcome, got '%s'" % [label, String(outcome.get("value", ""))], failures)
 	_expect(not state.battle_active, "%s case should stop battle after watchdog outcome" % label, failures)
 	_expect(_logs_contain(logs, expected_log), "%s case did not log expected watchdog message" % label, failures)
 	engine.teardown()

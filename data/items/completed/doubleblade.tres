@@ -12,4 +12,5 @@ stat_mods = {"pct_ad": 0.45}
 effects = ["doubleblade"]
 components = ["hammer", "hammer"]
 tags = PackedStringArray("assassin", "brawler")
+build_axes = PackedStringArray("attack_damage")
 

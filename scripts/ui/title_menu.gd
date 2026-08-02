@@ -1,11 +1,12 @@
 extends Control
 
-const SIGIL_TEXTURE: Texture2D = preload("res://assets/ui/gold icon.png")
+const SIGIL_TEXTURE_PATH: String = "res://assets/ui/gold icon.png"
 const UnitCatalogScript: GDScript = preload("res://scripts/game/shop/unit_catalog.gd")
 const PrimaryRoleScript: GDScript = preload("res://scripts/game/identity/primary_role.gd")
 const GoalCatalogScript: GDScript = preload("res://scripts/game/identity/goal_catalog.gd")
 const ApproachCatalogScript: GDScript = preload("res://scripts/game/identity/approach_catalog.gd")
 const AbilityCatalogScript: GDScript = preload("res://scripts/game/abilities/ability_catalog.gd")
+const ItemCatalog: GDScript = preload("res://scripts/game/items/item_catalog.gd")
 const TextureUtils: GDScript = preload("res://scripts/util/texture_utils.gd")
 const UnitFactoryScript: GDScript = preload("res://scripts/unit_factory.gd")
 const UnitTargetingText: GDScript = preload("res://scripts/ui/unit_targeting_text.gd")
@@ -15,6 +16,8 @@ const SECTION_HOME: String = "home"
 const SECTION_HOW_TO_PLAY: String = "how_to_play"
 const SECTION_UNITS: String = "units"
 const SECTION_RGA: String = "rga"
+const SECTION_TRAITS: String = "traits"
+const SECTION_ITEMS: String = "items"
 const SECTION_SETTINGS: String = "settings"
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
@@ -53,12 +56,18 @@ var _content_body: VBoxContainer = null
 var _section_title: Label = null
 var _section_hint: Label = null
 var _search_field: LineEdit = null
+var _back_button: Button = null
 var _unit_catalog: UnitCatalog = null
 var _unit_entries: Array[Dictionary] = []
 var _role_entries: Array[Dictionary] = []
 var _goal_entries: Array[Dictionary] = []
 var _approach_entries: Array[Dictionary] = []
+var _trait_entries: Array[Dictionary] = []
+var _item_entries: Array[Dictionary] = []
 var _nav_buttons: Array[Button] = []
+var _intro_tween: Tween = null
+var _bg_tween: Tween = null
+var _logo_tween: Tween = null
 
 func _ready() -> void:
 	_load_content_data()
@@ -78,6 +87,49 @@ func _ready() -> void:
 	_start_bg_loop()
 	_start_logo_float()
 
+func _exit_tree() -> void:
+	_kill_motion_tweens()
+	_release_runtime_resource_refs(self)
+	TextureUtils.clear_cache()
+	ItemCatalog.clear_cache()
+	AbilityCatalogScript.clear_caches()
+	UnitFactoryScript.clear_cache()
+	_unit_entries.clear()
+	_role_entries.clear()
+	_goal_entries.clear()
+	_approach_entries.clear()
+	_trait_entries.clear()
+	_item_entries.clear()
+	_nav_buttons.clear()
+	_unit_catalog = null
+
+func _release_runtime_resource_refs(root: Node) -> void:
+	if root == null:
+		return
+	for child: Node in root.get_children():
+		_release_runtime_resource_refs(child)
+	var texture_rect: TextureRect = root as TextureRect
+	if texture_rect != null:
+		texture_rect.texture = null
+	var control: Control = root as Control
+	if control != null:
+		for style_name: String in _theme_style_names():
+			control.remove_theme_stylebox_override(style_name)
+		control.theme = null
+
+func _theme_style_names() -> Array[String]:
+	return [
+		"panel",
+		"normal",
+		"hover",
+		"pressed",
+		"focus",
+		"disabled",
+		"slider",
+		"grabber_area",
+		"grabber_area_highlight",
+	]
+
 func _load_content_data() -> void:
 	_unit_catalog = UnitCatalogScript.new() as UnitCatalog
 	if _unit_catalog != null:
@@ -86,6 +138,8 @@ func _load_content_data() -> void:
 	_build_role_entries()
 	_build_goal_entries()
 	_build_approach_entries()
+	_build_trait_entries()
+	_build_item_entries()
 
 func _build_unit_entries() -> void:
 	_unit_entries.clear()
@@ -217,7 +271,79 @@ func _build_approach_entries() -> void:
 			"search": _join_search([approach_id, String(approach.name), String(approach.description), String(approach.category)]),
 		})
 
+func _build_trait_entries() -> void:
+	_trait_entries.clear()
+	var dir: DirAccess = DirAccess.open("res://data/traits")
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	while true:
+		var file_name: String = dir.get_next()
+		if file_name == "":
+			break
+		if dir.current_is_dir() or file_name.begins_with(".") or not file_name.ends_with(".tres"):
+			continue
+		var path: String = "res://data/traits/%s" % file_name
+		var trait_def: TraitDef = load(path) as TraitDef
+		if trait_def == null:
+			continue
+		var trait_id: String = file_name.get_basename()
+		var trait_name: String = String(trait_def.name).strip_edges()
+		if trait_name == "":
+			trait_name = _display_key(trait_id)
+		var thresholds: Array[String] = []
+		for threshold: int in trait_def.thresholds:
+			thresholds.append(str(threshold))
+		var units: Array[String] = _unit_names_for_trait(trait_id)
+		_trait_entries.append({
+			"id": trait_id,
+			"name": trait_name,
+			"description": String(trait_def.description),
+			"thresholds": thresholds,
+			"units": units,
+			"search": _join_search([trait_id, trait_name, String(trait_def.description), "trait traits threshold thresholds units", _join_string_array(thresholds, " "), _join_string_array(units, " ")]),
+		})
+	dir.list_dir_end()
+	_trait_entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return String(a.get("name", "")).nocasecmp_to(String(b.get("name", ""))) < 0
+	)
+
+func _build_item_entries() -> void:
+	_item_entries.clear()
+	for kind: String in ["component", "completed", "special"]:
+		var items: Array = ItemCatalog.by_type(kind)
+		for value: Variant in items:
+			var item: ItemDef = value as ItemDef
+			if item == null:
+				continue
+			var item_name: String = String(item.name).strip_edges()
+			if item_name == "":
+				item_name = _display_key(String(item.id))
+			var components: Array[String] = _packed_to_strings(item.components)
+			var tags: Array[String] = _packed_to_strings(item.tags)
+			var axes: Array[String] = _packed_to_strings(item.build_axes)
+			var effects: Array[String] = _packed_to_strings(item.effects)
+			var stat_text: String = _format_stat_mods(item.stat_mods)
+			_item_entries.append({
+				"id": String(item.id),
+				"name": item_name,
+				"type": kind,
+				"components": components,
+				"tags": tags,
+				"axes": axes,
+				"effects": effects,
+				"stats": stat_text,
+				"search": _join_search([String(item.id), item_name, kind, stat_text, _join_string_array(components, " "), _join_string_array(tags, " "), _join_string_array(axes, " "), _join_string_array(effects, " ")]),
+			})
+	_item_entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var type_cmp: int = String(a.get("type", "")).nocasecmp_to(String(b.get("type", "")))
+		if type_cmp != 0:
+			return type_cmp < 0
+		return String(a.get("name", "")).nocasecmp_to(String(b.get("name", ""))) < 0
+	)
+
 func _apply_gothic_layout() -> void:
+	var compact_height: bool = get_viewport_rect().size.y <= 760.0
 	if background != null:
 		background.color = COLOR_VOID
 	if bg_rect != null:
@@ -233,20 +359,20 @@ func _apply_gothic_layout() -> void:
 			mat.set_shader_parameter("mix_amount", 1.48)
 			mat.set_shader_parameter("vignette_strength", 0.92)
 	if center != null:
-		center.anchor_left = 0.045
-		center.anchor_top = 0.08
-		center.anchor_right = 0.34
-		center.anchor_bottom = 0.92
+		center.anchor_left = 0.055
+		center.anchor_top = 0.050
+		center.anchor_right = 0.945
+		center.anchor_bottom = 0.945
 		center.offset_left = 0.0
 		center.offset_top = 0.0
 		center.offset_right = 0.0
 		center.offset_bottom = 0.0
 	if center_vbox != null:
-		center_vbox.custom_minimum_size = Vector2(350.0, 0.0)
-		center_vbox.add_theme_constant_override("separation", 13)
+		center_vbox.custom_minimum_size = Vector2(620.0, 0.0)
+		center_vbox.add_theme_constant_override("separation", 7 if compact_height else 9)
 	if title_label != null:
 		title_label.text = "Gamble Battle"
-		title_label.add_theme_font_size_override("font_size", 64)
+		title_label.add_theme_font_size_override("font_size", 52 if compact_height else 56)
 		title_label.add_theme_color_override("font_color", COLOR_TEXT)
 		title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		title_label.add_theme_constant_override("outline_size", 5)
@@ -266,6 +392,8 @@ func _build_navigation() -> void:
 	_ensure_nav_button("HowToPlayButton", "How to Play", SECTION_HOW_TO_PLAY)
 	_ensure_nav_button("UnitsButton", "Units", SECTION_UNITS)
 	_ensure_nav_button("RGAGlossaryButton", "Combat Terms", SECTION_RGA)
+	_ensure_nav_button("TraitsButton", "Traits", SECTION_TRAITS)
+	_ensure_nav_button("ItemsButton", "Items", SECTION_ITEMS)
 	_ensure_nav_button("SettingsButton", "Settings", SECTION_SETTINGS)
 	if start_button != null:
 		start_button.text = "Start Run"
@@ -302,9 +430,9 @@ func _ensure_title_panel() -> void:
 			move_child(_title_panel, max(0, center.get_index()))
 	_title_panel.z_index = 2
 	_title_panel.anchor_left = 0.035
-	_title_panel.anchor_top = 0.115
-	_title_panel.anchor_right = 0.36
-	_title_panel.anchor_bottom = 0.895
+	_title_panel.anchor_top = 0.040
+	_title_panel.anchor_right = 0.965
+	_title_panel.anchor_bottom = 0.940
 	_title_panel.offset_left = 0.0
 	_title_panel.offset_top = 0.0
 	_title_panel.offset_right = 0.0
@@ -341,7 +469,7 @@ func _ensure_sigil() -> void:
 		_sigil.name = "TitleSigil"
 		_sigil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_sigil)
-	_sigil.texture = SIGIL_TEXTURE
+	_sigil.texture = TextureUtils.try_load_texture(SIGIL_TEXTURE_PATH)
 	_sigil.z_index = 2
 	_sigil.visible = false
 	_sigil.anchor_left = 0.00
@@ -388,10 +516,10 @@ func _ensure_content_panel() -> void:
 		_content_panel.name = "ContentPanel"
 		add_child(_content_panel)
 	_content_panel.z_index = 6
-	_content_panel.anchor_left = 0.38
-	_content_panel.anchor_top = 0.075
-	_content_panel.anchor_right = 0.965
-	_content_panel.anchor_bottom = 0.92
+	_content_panel.anchor_left = 0.045
+	_content_panel.anchor_top = 0.050
+	_content_panel.anchor_right = 0.955
+	_content_panel.anchor_bottom = 0.940
 	_content_panel.offset_left = 0.0
 	_content_panel.offset_top = 0.0
 	_content_panel.offset_right = 0.0
@@ -422,6 +550,24 @@ func _ensure_content_panel() -> void:
 		_content_stack.add_child(header)
 		_content_stack.move_child(header, 0)
 	header.add_theme_constant_override("separation", 8)
+
+	_back_button = header.get_node_or_null("BackButton") as Button
+	if _back_button == null:
+		_back_button = Button.new()
+		_back_button.name = "BackButton"
+		header.add_child(_back_button)
+		header.move_child(_back_button, 0)
+	_back_button.text = "Back"
+	_back_button.custom_minimum_size = Vector2(128.0, 38.0)
+	_back_button.focus_mode = Control.FOCUS_ALL
+	_back_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_back_button.add_theme_font_size_override("font_size", 16)
+	_back_button.add_theme_color_override("font_color", COLOR_TEXT)
+	_back_button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _make_button_style(Color(0.043, 0.037, 0.047, 0.96), Color(0.36, 0.30, 0.26, 0.96), 1)))
+	_back_button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _make_button_style(Color(0.120, 0.078, 0.090, 0.99), Color(1.0, 0.80, 0.43, 1.0), 1)))
+	_back_button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.86, 0.72, 0.68, 1.0)), _make_button_style(Color(0.20, 0.026, 0.044, 1.0), COLOR_GOLD, 2)))
+	if not _back_button.is_connected("pressed", Callable(self, "_on_back_pressed")):
+		_back_button.pressed.connect(_on_back_pressed)
 
 	_section_title = header.get_node_or_null("SectionTitle") as Label
 	if _section_title == null:
@@ -477,8 +623,23 @@ func _select_section(section: String, clear_search: bool = true) -> void:
 	_active_section = section
 	if clear_search and _search_field != null:
 		_search_field.text = ""
+	_sync_menu_visibility()
 	_render_active_section()
 	_update_nav_state()
+
+func _sync_menu_visibility() -> void:
+	var home_active: bool = _active_section == SECTION_HOME
+	if center != null:
+		center.visible = home_active
+	if _title_panel != null:
+		_title_panel.visible = home_active
+	if _content_panel != null:
+		_content_panel.visible = not home_active
+	if _back_button != null:
+		_back_button.visible = not home_active
+
+func _on_back_pressed() -> void:
+	_select_section(SECTION_HOME, true)
 
 func _render_active_section() -> void:
 	if _content_body == null:
@@ -493,6 +654,10 @@ func _render_active_section() -> void:
 			_render_units()
 		SECTION_RGA:
 			_render_rga()
+		SECTION_TRAITS:
+			_render_traits()
+		SECTION_ITEMS:
+			_render_items()
 		SECTION_SETTINGS:
 			_render_settings()
 		_:
@@ -549,6 +714,8 @@ func _add_home_route_grid() -> void:
 	_add_card_to_parent(grid, "Run Flow", "Pick a starter, survive the forced first fight, then build through shop offers, bench deployment, combines, items, traits, and betting decisions.", "Start Here", "run flow start starter shop bench combines items traits betting", COLOR_GOLD, false, "HomeRunFlow")
 	_add_card_to_parent(grid, "Roster Library", "Live unit cards include ability text, traits, cost, role, goal, and approaches, so roster study stays tied to current resources.", "Units", "units roster ability traits cost role goal approaches", COLOR_BLOOD_HOT, false, "HomeRoster")
 	_add_card_to_parent(grid, "Combat Terms", "Role, Goal, and Approach explain what a unit is trying to do and why it belongs on a board.", "Glossary", "combat terms role goal approach trait board", COLOR_BLUE, false, "HomeRGA")
+	_add_card_to_parent(grid, "Traits", "Browse each trait, its thresholds, and every unit that can contribute to it.", "Traits", "traits thresholds units board synergy", COLOR_GREEN, false, "HomeTraits")
+	_add_card_to_parent(grid, "Items", "Browse components, completed items, special tools, item tags, and what each item is built to support.", "Items", "items components completed special tags", COLOR_GOLD, false, "HomeItems")
 	_add_card_to_parent(grid, "Settings", "Runtime controls for master volume and fullscreen behavior in the current menu session.", "Local", "settings volume fullscreen", COLOR_GREEN, false, "HomeSettings")
 
 func _render_global_search_results() -> void:
@@ -557,6 +724,8 @@ func _render_global_search_results() -> void:
 	count += _render_role_cards(true)
 	count += _render_goal_cards(true, 8)
 	count += _render_approach_cards(true, 8)
+	count += _render_trait_cards(true, 8)
+	count += _render_item_cards(true, 8, "")
 	if count == 0:
 		_add_empty_state("No search results. Try a unit name, role, goal, approach, ability tag, or tutorial word.")
 
@@ -567,10 +736,11 @@ func _render_how_to_play() -> void:
 	_add_card("1. Pick a Starter", "Start Run opens the Unit Select screen. Pick one starter unit; that unit becomes your first board piece and anchors your opening plan.", "starter unit select start run board")
 	_add_card("2. Survive the Forced First Fight", "Chapter 1 Stage 1 begins as a forced opener. The shop is intentionally locked until you win that first fight, so focus on reading your unit and the battlefield.", "first fight forced opener chapter stage locked shop win")
 	_add_card("3. Spend Gold in the Shop", "After the opener, the shop offers five units. Buy affordable units, reroll when you need a different lane, lock when you want to preserve offers, and buy XP to raise shop odds.", "shop gold offers reroll lock xp odds buy unit")
-	_add_card("4. Use Bench and Board", "Bought units land on the bench. Drag bench units to highlighted board cells before the next fight. Three copies of the same unit and level combine into a stronger copy, up to level 3.", "bench board drag deploy combine three copies level")
-	_add_card("5. Read Items and Traits", "Items and traits are multipliers on a unit's job. Traits come from unit tags; items add scaling combat effects and should support the unit's role, goal, and approach.", "items traits tags scaling role goal approach")
+	_add_card("4. Use Bench and Board", "Bought units land on the bench. Drag bench units to highlighted board cells before the next fight. Three copies of the same unit and level combine into a stronger copy, up to level 4.", "bench board drag deploy combine three copies level")
+	_add_card("5. Read Items and Traits", "Items and traits are multipliers on a unit's plan. Traits come from unit tags; items add scaling combat effects and should support the unit's role, goal, and approach.", "items traits tags scaling role goal approach")
 	_add_card("6. Manage Bets and Health", "Planning purchases must preserve survival. Combat spending can borrow against the current bet, but bad spending can leave the next planning phase short on health or gold.", "bet health planning combat spending gold survival")
-	_add_card("7. Learn Roles Before Optimizing", "Tank, Brawler, Assassin, Marksman, Mage, and Support describe the broad combat job. Use the Units and Combat Terms pages to understand why two units in the same role can still play very differently.", "roles tank brawler assassin marksman mage support optimize")
+	_add_card("7. Learn Roles Before Optimizing", "Tank, Brawler, Assassin, Marksman, Mage, and Support describe broad combat archetypes. Use the Units and Combat Terms pages to understand why two units in the same role can still play very differently.", "roles tank brawler assassin marksman mage support optimize")
+	_add_card("8. Study Traits and Items", "The Traits and Items pages show current live resources, so planning does not depend on memory or old notes.", "traits items menu resources")
 
 func _render_units() -> void:
 	_set_content_header("Units", "Searchable roster cards built from current unit, ability, and identity resources.")
@@ -584,18 +754,37 @@ func _render_rga() -> void:
 	_set_content_header("Combat Terms", "Player-facing language for reading units, boards, and fights.")
 	if _search_field != null:
 		_search_field.placeholder_text = "Search terms: backline, peel, sustained, role..."
-	_add_card("Role", "The broad job a unit is built to perform: tank, brawler, assassin, marksman, mage, or support.", "role tank brawler assassin marksman mage support")
-	_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition")
+	_add_card("Role", "The broad combat archetype a unit belongs to: tank, brawler, assassin, marksman, mage, or support.", "role archetype tank brawler assassin marksman mage support")
+	_add_card("Goal", "The specific fight plan a unit is built around, such as protecting a carry, bursting a target, or winning through attrition.", "goal plan win condition protect burst attrition")
 	_add_card("Approach", "The toolkit a unit uses to reach its goal: peel, ramp, sustain, lockdown, dive, zone control, and similar combat patterns.", "approach toolkit peel ramp sustain lockdown dive zone")
-	_add_card("Active Trait", "A trait turns on when enough matching units are on your board. Active thresholds are highlighted on trait hover cards.", "trait active threshold board")
-	_add_card("Win Odds", "A quick read of current board strength. Use it as a warning light, not a promise.", "win odds board strength warning")
-	_add_card("Bench", "Bought units wait on the bench until you drag them to the board. Dropping a bench unit onto a board unit swaps their positions.", "bench drag swap positions")
 	_add_heading("Roles")
 	_render_role_cards(false)
 	_add_heading("Goals")
 	_render_goal_cards(false, 0)
 	_add_heading("Approaches")
 	_render_approach_cards(false, 0)
+
+func _render_traits() -> void:
+	_set_content_header("Traits", "Every live trait, its thresholds, and the units that can satisfy it.")
+	if _search_field != null:
+		_search_field.placeholder_text = "Search traits: Liaison, Arcanist, unit name, threshold..."
+	var count: int = _render_trait_cards(false, 0)
+	if count == 0:
+		_add_empty_state("No traits match the search.")
+
+func _render_items() -> void:
+	_set_content_header("Items", "Live item resources grouped by components, completed items, and special tools.")
+	if _search_field != null:
+		_search_field.placeholder_text = "Search items: armor, crit, component, support..."
+	var added: int = 0
+	_add_heading("Components")
+	added += _render_item_cards(false, 0, "component")
+	_add_heading("Completed Items")
+	added += _render_item_cards(false, 0, "completed")
+	_add_heading("Special")
+	added += _render_item_cards(false, 0, "special")
+	if added == 0:
+		_add_empty_state("No items match the search.")
 
 func _render_settings() -> void:
 	_set_content_header("Settings", "Local runtime controls for the title menu and current game window.")
@@ -657,6 +846,55 @@ func _render_approach_cards(compact: bool, limit: int) -> int:
 			continue
 		var kicker: String = "Approach: %s | %s" % [String(entry.get("id", "")), String(entry.get("category", "uncategorized"))]
 		_add_card(String(entry.get("name", "")), String(entry.get("description", "")), String(entry.get("search", "")), kicker, COLOR_BLUE, compact)
+		count += 1
+	return count
+
+func _render_trait_cards(compact: bool, limit: int) -> int:
+	var count: int = 0
+	for entry: Dictionary in _trait_entries:
+		if not _matches_query(String(entry.get("search", ""))):
+			continue
+		if limit > 0 and count >= limit:
+			continue
+		var thresholds: Array[String] = _array_to_strings(entry.get("thresholds", []))
+		var units: Array[String] = _array_to_strings(entry.get("units", []))
+		var kicker: String = "Trait: %s" % String(entry.get("id", ""))
+		if not thresholds.is_empty():
+			kicker += " | Thresholds: " + _join_string_array(thresholds, " / ")
+		var body: String = String(entry.get("description", ""))
+		if not units.is_empty():
+			body += "\nUnits: " + _join_string_array(units, ", ")
+		_add_card(String(entry.get("name", "")), body, String(entry.get("search", "")), kicker, COLOR_GREEN, compact)
+		count += 1
+	return count
+
+func _render_item_cards(compact: bool, limit: int, type_filter: String) -> int:
+	var count: int = 0
+	for entry: Dictionary in _item_entries:
+		var item_type: String = String(entry.get("type", ""))
+		if type_filter != "" and item_type != type_filter:
+			continue
+		if not _matches_query(String(entry.get("search", ""))):
+			continue
+		if limit > 0 and count >= limit:
+			continue
+		var details: Array[String] = []
+		var stats: String = String(entry.get("stats", ""))
+		if stats != "":
+			details.append(stats)
+		var components: Array[String] = _array_to_strings(entry.get("components", []))
+		if not components.is_empty():
+			details.append("Components: " + _join_display_keys(components))
+		var axes: Array[String] = _array_to_strings(entry.get("axes", []))
+		if not axes.is_empty():
+			details.append("Builds: " + _join_display_keys(axes))
+		var tags: Array[String] = _array_to_strings(entry.get("tags", []))
+		if not tags.is_empty():
+			details.append("Roles: " + _join_display_keys(tags))
+		var effects: Array[String] = _array_to_strings(entry.get("effects", []))
+		if not effects.is_empty():
+			details.append("Effects: " + _join_display_keys(effects))
+		_add_card(String(entry.get("name", "")), _join_string_array(details, "\n"), String(entry.get("search", "")), "%s item | %s" % [_display_key(item_type), String(entry.get("id", ""))], COLOR_GOLD, compact)
 		count += 1
 	return count
 
@@ -896,9 +1134,10 @@ func _make_badge(text: String, color: Color) -> PanelContainer:
 func _style_menu_button(button: Button, primary: bool) -> void:
 	if button == null:
 		return
-	button.custom_minimum_size = Vector2(320.0, 48.0)
+	var compact_height: bool = get_viewport_rect().size.y <= 760.0
+	button.custom_minimum_size = Vector2(320.0, 44.0 if compact_height else 48.0)
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.add_theme_font_size_override("font_size", 20 if primary else 17)
+	button.add_theme_font_size_override("font_size", (18 if primary else 16) if compact_height else (20 if primary else 17))
 	button.add_theme_color_override("font_color", COLOR_TEXT)
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.72, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.76, 0.55, 1.0))
@@ -998,7 +1237,8 @@ func _set_content_header(title: String, hint: String) -> void:
 
 func _clear_content_body() -> void:
 	for child: Node in _content_body.get_children():
-		child.queue_free()
+		_content_body.remove_child(child)
+		child.free()
 
 func _on_search_changed(_text: String) -> void:
 	_render_active_section()
@@ -1123,6 +1363,48 @@ func _load_role_profile(role_id: String) -> PrimaryRoleProfile:
 		return null
 	return ResourceLoader.load(path) as PrimaryRoleProfile
 
+func _unit_names_for_trait(trait_id: String) -> Array[String]:
+	var names: Array[String] = []
+	var clean_id: String = String(trait_id).strip_edges()
+	if clean_id == "":
+		return names
+	for entry: Dictionary in _unit_entries:
+		var traits: Array[String] = _array_to_strings(entry.get("traits", []))
+		if traits.has(clean_id):
+			names.append(String(entry.get("name", entry.get("id", ""))))
+	names.sort()
+	return names
+
+func _packed_to_strings(value: PackedStringArray) -> Array[String]:
+	var out: Array[String] = []
+	for item: String in value:
+		var clean: String = String(item).strip_edges()
+		if clean != "":
+			out.append(clean)
+	return out
+
+func _format_stat_mods(mods: Dictionary) -> String:
+	if mods.is_empty():
+		return ""
+	var parts: Array[String] = []
+	var keys: Array = mods.keys()
+	keys.sort()
+	for key_value: Variant in keys:
+		var key: String = String(key_value)
+		var value: Variant = mods.get(key_value)
+		parts.append("%s %s" % [_display_key(key), _format_stat_value(value)])
+	return "Stats: " + _join_string_array(parts, ", ")
+
+func _format_stat_value(value: Variant) -> String:
+	if typeof(value) == TYPE_INT:
+		return str(int(value))
+	if typeof(value) == TYPE_FLOAT:
+		var number: float = float(value)
+		if abs(number - round(number)) < 0.0001:
+			return str(int(round(number)))
+		return String.num(number, 2)
+	return String(value)
+
 func _array_to_strings(value: Variant) -> Array[String]:
 	var out: Array[String] = []
 	if value == null:
@@ -1175,6 +1457,7 @@ func _on_visibility_changed() -> void:
 		_apply_gothic_layout()
 		_build_navigation()
 		_ensure_content_panel()
+		_sync_menu_visibility()
 		_render_active_section()
 		_play_intro()
 
@@ -1182,6 +1465,8 @@ func _play_intro() -> void:
 	if not _motion_enabled:
 		_set_intro_alpha(1.0)
 		return
+	if _intro_tween != null and is_instance_valid(_intro_tween):
+		_intro_tween.kill()
 	_set_intro_alpha(0.0)
 	if title_label != null:
 		title_label.scale = Vector2(0.94, 0.94)
@@ -1191,6 +1476,7 @@ func _play_intro() -> void:
 		quit_button.scale = Vector2(0.98, 0.98)
 
 	var tween: Tween = create_tween()
+	_intro_tween = tween
 	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	if _title_panel != null:
 		tween.tween_property(_title_panel, "modulate:a", 1.0, 0.12)
@@ -1294,11 +1580,14 @@ func _on_ctrl_resized(ctrl: Control) -> void:
 func _start_bg_loop() -> void:
 	if not _motion_enabled:
 		return
+	if _bg_tween != null and is_instance_valid(_bg_tween):
+		_bg_tween.kill()
 	var mat: ShaderMaterial = null
 	if bg_rect != null and bg_rect.material is ShaderMaterial:
 		mat = bg_rect.material as ShaderMaterial
 	if mat != null:
 		var tween: Tween = create_tween()
+		_bg_tween = tween
 		tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		tween.tween_property(mat, "shader_parameter/warp_strength", 3.2, 6.0)
 		tween.parallel().tween_property(mat, "shader_parameter/mix_amount", 1.7, 6.0)
@@ -1306,13 +1595,50 @@ func _start_bg_loop() -> void:
 		tween.tween_property(mat, "shader_parameter/warp_strength", 2.8, 6.0)
 		tween.parallel().tween_property(mat, "shader_parameter/mix_amount", 1.4, 6.0)
 		tween.parallel().tween_property(mat, "shader_parameter/field_speed", 1.05, 6.0)
-		tween.finished.connect(_start_bg_loop)
+		tween.finished.connect(_on_bg_loop_finished)
 
 func _start_logo_float() -> void:
 	if not _motion_enabled or logo == null:
 		return
+	if _logo_tween != null and is_instance_valid(_logo_tween):
+		_logo_tween.kill()
 	var tween: Tween = create_tween()
+	_logo_tween = tween
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(logo, "scale", Vector2(1.02, 1.02), 2.0)
 	tween.tween_property(logo, "scale", Vector2.ONE, 2.0)
-	tween.finished.connect(_start_logo_float)
+	tween.finished.connect(_on_logo_float_finished)
+
+func _on_bg_loop_finished() -> void:
+	_bg_tween = null
+	if is_inside_tree() and visible:
+		_start_bg_loop()
+
+func _on_logo_float_finished() -> void:
+	_logo_tween = null
+	if is_inside_tree() and visible:
+		_start_logo_float()
+
+func _kill_motion_tweens() -> void:
+	if _intro_tween != null and is_instance_valid(_intro_tween):
+		_intro_tween.kill()
+	_intro_tween = null
+	if _bg_tween != null and is_instance_valid(_bg_tween):
+		_bg_tween.kill()
+	_bg_tween = null
+	if _logo_tween != null and is_instance_valid(_logo_tween):
+		_logo_tween.kill()
+	_logo_tween = null
+	_kill_button_hover_tween(start_button)
+	_kill_button_hover_tween(quit_button)
+	for nav_button: Button in _nav_buttons:
+		_kill_button_hover_tween(nav_button)
+
+func _kill_button_hover_tween(button: Button) -> void:
+	if button == null:
+		return
+	var tween: Tween = button.get_meta("hover_tween") as Tween if button.has_meta("hover_tween") else null
+	if tween != null and is_instance_valid(tween):
+		tween.kill()
+	if button.has_meta("hover_tween"):
+		button.remove_meta("hover_tween")

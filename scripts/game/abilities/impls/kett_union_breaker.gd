@@ -37,9 +37,10 @@ func cast(ctx: AbilityContext) -> bool:
 			_force_target_step(ctx, target_team, target_index)
 		if ctx.buff_system != null:
 			ctx.buff_system.push_source(ctx.caster_team, ctx.caster_index, "on_hit")
-			ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, "kett_union_breaker", {
-				"armor": -ARMOR_PER_HIT * float(hit_index + 1),
-				"attack_speed": ATTACK_SPEED_PER_HIT * float(hit_index + 1)
+			var debuff_label: String = "kett_union_breaker_%d" % (hit_index + 1)
+			ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, debuff_label, {
+				"armor": -ARMOR_PER_HIT,
+				"attack_speed": ATTACK_SPEED_PER_HIT
 			}, DEBUFF_DURATION)
 			ctx.buff_system.pop_source()
 		ctx.emit_ramp_state("kett_union_breaker", hit_index + 1, float(hit_index + 1), HIT_COUNT, DEBUFF_DURATION, "combo_hit")

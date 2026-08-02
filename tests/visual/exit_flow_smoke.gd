@@ -1,10 +1,12 @@
 extends Node
 
-const MainScene: PackedScene = preload("res://scenes/Main.tscn")
-const UnitFactory := preload("res://scripts/unit_factory.gd")
+const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/exit_menu_pass"
 const SYSTEM_BACKDROP_MAX_ALPHA: float = 0.62
 const SYSTEM_BACKDROP_MIN_ALPHA: float = 0.45
+const CLEANUP_DRAIN_FRAMES: int = 75
+const DUMP_ORPHAN_NODES: bool = false
 
 var _main: Control
 var _failures: Array[String] = []
@@ -20,13 +22,22 @@ func _run() -> void:
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
 
-	_main = MainScene.instantiate() as Control
-	add_child(_main)
+	_prepare_fresh_run()
+	_main = MAIN_SCENE.instantiate() as Control
+	if _main == null:
+		_expect(false, "Main scene failed to instantiate")
+		_finish(1)
+		return
+	get_tree().root.add_child(_main)
 	await _settle_frames(2)
 
-	_expect(_node_visible("TitleMenu"), "title menu should be visible on boot")
+	_expect(_node_visible("TitlePage"), "title page should be visible on boot")
+	_expect(not _node_visible("TitleMenu"), "title menu should wait behind the title page on boot")
 	_expect(not _button_visible("SystemMenuButton"), "system menu button should be hidden on title")
 
+	_press_title_enter()
+	await _settle_frames(2)
+	_expect(_node_visible("TitleMenu"), "title menu should be visible after entering title page")
 	_press_title_start()
 	await _settle_frames(2)
 	_expect(_node_visible("UnitSelect"), "unit select should be visible after start")
@@ -60,9 +71,10 @@ func _run() -> void:
 	_expect(_unit_select_reset(), "new run should clear unit select choice")
 
 	if _main.has_method("_on_unit_selected"):
-		_main.call("_on_unit_selected", "mortem")
-	await _settle_frames(6)
-	_expect(_node_visible("CombatView"), "combat view should be visible after selecting a unit")
+		_main.call("_on_unit_selected", "brute")
+	var combat: Control = await MainTransitionWait.for_combat_view(self, _main)
+	_disable_combat_auto_start()
+	_expect(combat != null and _node_visible("CombatView"), "combat view should be visible after selecting a unit")
 	_expect(_button_visible("SystemMenuButton"), "system menu button should be visible during combat")
 	_expect(not _embedded_combat_menu_visible(), "embedded combat menu button should be hidden")
 
@@ -75,7 +87,8 @@ func _run() -> void:
 	_press_button("ReturnTitleButton")
 	await _settle_frames(3)
 	_expect(not get_tree().paused, "return to title should unpause")
-	_expect(_node_visible("TitleMenu"), "return to title should show title menu")
+	_expect(_node_visible("TitlePage"), "return to title should show title page")
+	_expect(not _node_visible("TitleMenu"), "return to title should hide title menu until entered")
 	_expect(not _node_visible("CombatView"), "return to title should hide combat")
 	_expect(not _button_visible("SystemMenuButton"), "system menu button should hide on title")
 	_expect(GameState.phase == GameState.GamePhase.MENU, "return to title should set menu phase")
@@ -84,6 +97,8 @@ func _run() -> void:
 	fake_loss_layer.name = "LossOverlayLayer"
 	fake_loss_layer.layer = 100
 	get_tree().root.add_child(fake_loss_layer)
+	_press_title_enter()
+	await _settle_frames(2)
 	_press_title_start()
 	await _settle_frames(2)
 	_refresh_system_menu_state()
@@ -101,12 +116,25 @@ func _run() -> void:
 	_expect(_unit_select_reset(), "new run from overlay state should clear unit select choice")
 
 	UnitFactory.suppress_validation_warnings = _previous_suppress_validation_warnings
+	var exit_code: int = 0
 	if _failures.is_empty():
 		print("ExitFlowSmoke: OK")
 	else:
 		for failure: String in _failures:
 			push_error("ExitFlowSmoke: " + failure)
-	get_tree().quit()
+		exit_code = 1
+	_finish(exit_code)
+
+func _finish(exit_code: int) -> void:
+	_cleanup_runtime()
+	call_deferred("_quit_after_cleanup", exit_code, CLEANUP_DRAIN_FRAMES)
+
+func _press_title_enter() -> void:
+	var button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
+	if button == null:
+		_expect(false, "title page enter button missing")
+		return
+	button.pressed.emit()
 
 func _press_title_start() -> void:
 	var button: Button = _main.get_node_or_null("TitleMenu/Center/VBox/StartButton") as Button
@@ -135,6 +163,23 @@ func _request_new_run() -> void:
 		_main.call("request_new_run")
 		return
 	_expect(false, "main request_new_run missing")
+
+func _disable_combat_auto_start() -> void:
+	var combat_view: Node = _main.get_node_or_null("CombatView") if _main != null else null
+	if combat_view != null and combat_view.has_method("set_auto_start_battle_enabled"):
+		combat_view.call("set_auto_start_battle_enabled", false)
+
+func _prepare_fresh_run() -> void:
+	if get_tree().root.get_node_or_null("/root/Economy") != null:
+		Economy.reset_run()
+	if get_tree().root.get_node_or_null("/root/Shop") != null:
+		Shop.reset_run()
+	if get_tree().root.get_node_or_null("/root/Roster") != null and Roster.has_method("reset"):
+		Roster.reset()
+	if get_tree().root.get_node_or_null("/root/Items") != null and Items.has_method("reset_run"):
+		Items.reset_run()
+	if get_tree().root.get_node_or_null("/root/GameState") != null and GameState.has_method("reset_run"):
+		GameState.reset_run()
 
 func _button_exists(button_name: String) -> bool:
 	return _main.find_child(button_name, true, false) is Button
@@ -206,3 +251,49 @@ func _save_capture(filename: String) -> void:
 		print("ExitFlowSmoke: failed to save %s error=%d" % [ProjectSettings.globalize_path(path), int(err)])
 		return
 	print("ExitFlowSmoke: saved %s" % ProjectSettings.globalize_path(path))
+
+func _quit_after_cleanup(exit_code: int, frames_left: int) -> void:
+	if frames_left > 0:
+		get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, frames_left - 1), CONNECT_ONE_SHOT)
+		return
+	if DUMP_ORPHAN_NODES:
+		print("ExitFlowSmoke: orphan dump begin")
+		Node.print_orphan_nodes()
+		print("ExitFlowSmoke: orphan dump end")
+	get_tree().call_deferred("quit", exit_code)
+
+func _cleanup_runtime() -> void:
+	var root: Window = get_tree().root
+	var loss_layer: Node = root.get_node_or_null("LossOverlayLayer") if root != null else null
+	if loss_layer != null:
+		var loss_parent: Node = loss_layer.get_parent()
+		if loss_parent != null:
+			loss_parent.remove_child(loss_layer)
+		loss_layer.free()
+	var combat_view: Node = _main.get_node_or_null("CombatView") if _main != null and is_instance_valid(_main) else null
+	if combat_view != null and combat_view.has_method("_teardown"):
+		combat_view.call("_teardown")
+	if _main != null and is_instance_valid(_main) and _main.has_method("_reset_run_state"):
+		_main.call("_reset_run_state")
+	if Engine.has_singleton("Items") and Items.has_method("reset_run"):
+		Items.reset_run()
+	var sound: Node = root.get_node_or_null("Sound") if root != null else null
+	if sound != null and sound.has_method("clear_runtime"):
+		sound.call("clear_runtime")
+	var shop: Node = root.get_node_or_null("Shop") if root != null else null
+	if shop != null and shop.has_method("clear_runtime"):
+		shop.call("clear_runtime")
+	StageRuleRunner.clear_runtime()
+	AbilityCatalog.clear_caches()
+	RoleLibrary.clear_cache()
+	IdentityRegistry.clear_cache()
+	ItemCatalog.clear_cache()
+	TraitCompiler.clear_cache()
+	TextureUtils.clear_cache()
+	UnitFactory.clear_cache()
+	if _main != null and is_instance_valid(_main):
+		var main_parent: Node = _main.get_parent()
+		if main_parent != null:
+			main_parent.remove_child(_main)
+		_main.free()
+		_main = null

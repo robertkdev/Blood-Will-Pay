@@ -8,5 +8,5 @@ id = "marble_sanctuary_bolt"
 name = "Sanctuary Bolt"
 description = "Fires a long defensive bolt, shielding an ally and slowing a distant enemy."
 targeting_summary = "Lowest-health ally for shield; furthest enemy for the bolt."
-base_cost = 35
+base_cost = 55
 tags = ["damage", "long_range", "peel", "debuff"]

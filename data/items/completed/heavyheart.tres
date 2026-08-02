@@ -9,7 +9,8 @@ name = "Heavyheart"
 type = "completed"
 icon_path = "res://assets/items/heavy_heart_icon.png"
 stat_mods = {"flat_hp": 700}
-effects = []
+effects = ["heavyheart"]
 components = ["core", "core"]
 tags = PackedStringArray("tank")
+build_axes = PackedStringArray("health", "frontline")
 

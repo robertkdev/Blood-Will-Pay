@@ -8,5 +8,6 @@ id = "ivara_open_bid"
 name = "Open Bid"
 description = "Marks the highest-health enemy with a long-range bid shot that shreds defenses and starts focus."
 targeting_summary = "Highest-health enemy."
-base_cost = 35
+base_cost = 55
+starting_mana_bonus = 20
 tags = ["damage", "long_range", "debuff", "engage"]

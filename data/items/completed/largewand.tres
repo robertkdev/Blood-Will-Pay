@@ -9,7 +9,8 @@ name = "Largewand"
 type = "completed"
 icon_path = "res://assets/items/largewand_icon.png"
 stat_mods = {"flat_sp": 80.0}
-effects = []
+effects = ["largewand"]
 components = ["wand", "wand"]
 tags = PackedStringArray("mage")
+build_axes = PackedStringArray("spell_power")
 

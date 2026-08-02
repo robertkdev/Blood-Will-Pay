@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "bonko_bonk"
 name = "Bonk"
-description = "Smashes a single target for physical damage and stuns it. Deals bonus damage to already-stunned targets."
+description = "Empowers Bonko's next 3 basic attacks. Empowered hits deal +100% AD physical damage, heal Bonko for 20% missing HP, and do not grant mana while charges remain."
 targeting_summary = "Self-buff; next basic attacks keep using attack targeting."
 base_cost = 60
-tags = ["damage", "stun"]
+tags = ["damage", "on_hit_effect", "ramp", "sustain"]

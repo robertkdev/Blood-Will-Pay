@@ -7,6 +7,7 @@ const AD_RATIO: float = 1.65
 const LINE_LENGTH_TILES: float = 7.25
 const LINE_WIDTH_TILES: float = 0.7
 const SHRED_DURATION: float = 5.0
+const SELF_RANGE: int = 2
 const ARMOR_SHRED: float = 34.0
 const MR_SHRED: float = 26.0
 const ISOLATED_BONUS: float = 0.25
@@ -40,6 +41,10 @@ func cast(ctx: AbilityContext) -> bool:
 	var exile_bonus: float = float(ctx.exile_upgrade_level(ctx.caster_team, ctx.caster_index)) * 0.08
 	var bonus_mult: float = 1.0 + (ISOLATED_BONUS if isolated else 0.0) + exile_bonus
 	var damage: float = (float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage)) * bonus_mult
+	if ctx.buff_system != null:
+		ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, ctx.caster_index, "omenry_condemning_shot_range", {
+			"attack_range": SELF_RANGE
+		}, SHRED_DURATION)
 	for hit_index: int in hits:
 		ctx.damage_single(ctx.caster_team, ctx.caster_index, hit_index, damage, "physical")
 		if ctx.buff_system != null:
@@ -62,7 +67,7 @@ func _isolated_target(ctx: AbilityContext) -> int:
 	var best_depth: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var adjacent: int = _adjacent_count(ctx, index)
 		var depth: float = ctx.position_of(target_team, index).x * sign_x
@@ -93,7 +98,6 @@ func _reposition(ctx: AbilityContext) -> void:
 	var destination: Vector2 = start + Vector2(sign_x * REPOSITION_TILES * ctx.tile_size(), 0.0)
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
 		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
-	_set_caster_position(ctx, destination)
 
 func _set_caster_position(ctx: AbilityContext, destination: Vector2) -> void:
 	if ctx.engine == null:

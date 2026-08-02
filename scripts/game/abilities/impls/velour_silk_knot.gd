@@ -51,6 +51,8 @@ func _two_lowest_allies(ctx: AbilityContext) -> Array[int]:
 	var pairs: Array[Dictionary] = []
 	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
 	for index: int in range(allies.size()):
+		if index == ctx.caster_index:
+			continue
 		var ally: Unit = allies[index]
 		if ally == null or not ally.is_alive():
 			continue
@@ -66,11 +68,12 @@ func _two_lowest_allies(ctx: AbilityContext) -> Array[int]:
 
 func _lockdown_targets(ctx: AbilityContext) -> Array[int]:
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	var target_team: String = _enemy_team(ctx.caster_team)
 	var current_index: int = ctx.current_target(ctx.caster_team, ctx.caster_index)
 	var scored: Array[Dictionary] = []
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var score: float = float(enemy.attack_damage) + float(enemy.spell_power) * 0.65 + float(enemy.attack_speed) * 25.0
 		var role_id: String = String(enemy.primary_role).strip_edges().to_lower()

@@ -55,29 +55,12 @@ func evaluate_frame(frame_flags: Dictionary) -> String:
 func mark_emitted() -> void:
     outcome_sent = true
 
-func _outcome_from_board(player_team_defeated: bool, enemy_team_defeated: bool, totals: Dictionary) -> String:
+func _outcome_from_board(player_team_defeated: bool, enemy_team_defeated: bool, _totals: Dictionary) -> String:
     if player_team_defeated and enemy_team_defeated:
-        var p_dmg: int = int(totals.get("player", 0))
-        var e_dmg: int = int(totals.get("enemy", 0))
-        if p_dmg > e_dmg:
-            return "victory"
-        elif e_dmg > p_dmg:
-            return "defeat"
-        var p_cd: float = _first_cd(state.player_cds)
-        var e_cd: float = _first_cd(state.enemy_cds)
-        if p_cd < e_cd:
-            return "victory"
-        elif e_cd < p_cd:
-            return "defeat"
         return "tie"
     elif player_team_defeated:
         return "defeat"
     elif enemy_team_defeated:
         return "victory"
     return ""
-
-func _first_cd(cds: Array) -> float:
-    if cds.is_empty():
-        return 9999.0
-    return float(cds[0])
 
