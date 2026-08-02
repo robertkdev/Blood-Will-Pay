@@ -17,12 +17,15 @@ The canonical checkout's local `main` is at `2963d275219b7d882c779d96e0bf50fe7d0
 
 Do not reset, pull, switch, clean, or merge in that checkout until its working overlay has been deliberately reconciled. The cursor tip is already durable on `origin/codex/019fbbcc-0b0-task`.
 
+Before future cleanup, 482 meaningful dirty paths were preserved without changing the source branch, index, or working files on `origin/codex/autosave/2026-08/main-2963d275-pre-reconcile` at `d178046e97a78145a9e12558db52ece139102997`. Generated `.import`, `.uid`, and `.translation` churn was intentionally excluded. Two tracked Godot AI plugin files with trailing blank lines failed the snapshot's whitespace gate and remain only in the dirty checkout: `addons/godot_ai/handlers/texture_handler.gd` and `addons/godot_ai/utils/windows_port_reservation.gd`.
+
 ## Branch relationships
 
 - `origin/main` at reconciliation: `057f60b9161a2b4c2f3d13945387183fb803f0ab`
 - Current visual line: 36 commits ahead of `origin/main`, zero behind
 - Prior visual line: `origin/codex/019fb04f-bba-non-unit-visual-overhaul` at `ed08887f8ef7c76a5f54ad109fd15507273bde20`
 - Cursor line: `origin/codex/019fbbcc-0b0-task` at `2963d275219b7d882c779d96e0bf50fe7d0c873c`
+- Dirty-main shadow autosave: `origin/codex/autosave/2026-08/main-2963d275-pre-reconcile` at `d178046e97a78145a9e12558db52ece139102997`
 
 Recent unit-art branches are separately remote-backed and intentionally excluded from this non-unit visual line. Reconcile them as their own content history rather than treating any one of them as the general runtime baseline.
 
