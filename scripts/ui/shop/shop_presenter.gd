@@ -294,6 +294,16 @@ func _refresh_cards_state() -> void:
 func _on_card_clicked(slot_index: int) -> void:
 	if not _has_shop():
 		return
+	# A rapid click can arrive after the card was consumed and before the next
+	# offer render. Treat that stale UI event as a no-op instead of sending an
+	# empty id through the transaction/factory path.
+	if Shop.state == null or slot_index < 0 or slot_index >= Shop.state.offers.size():
+		_refresh_cards_state()
+		return
+	var offer_value: Variant = Shop.state.offers[slot_index]
+	if offer_value == null or String(offer_value.id).strip_edges() == "":
+		_refresh_cards_state()
+		return
 	if _is_forced_first_fight():
 		_show_message(OPENING_FIGHT_MESSAGE, 2.0)
 		return
