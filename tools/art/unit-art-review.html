@@ -959,10 +959,18 @@
 
 	<div id="toast" class="toast" role="status"></div>
 
-	<script src="./unit-art-history-data.js?v=20260803-creep-v6-kett-v2-nyxa-v1-pilfer-v1"></script>
+	<script src="./unit-art-history-data.js?v=20260803-archive-hydration-korath-v2"></script>
 	<script>
 		const ASSET_ROOT = "../../assets/units/";
 		const LOCAL_PROJECT_ASSET_ROOT = "../../";
+		const REVIEWER_ARCHIVE_PREFIX = "outputs/art_pipeline/style_validation/";
+		const REVIEWER_ARCHIVE_ROOT = "history/";
+		function bundledArchiveSrc(path) {
+			if (!path.startsWith(REVIEWER_ARCHIVE_PREFIX)) {
+				return encodeURI(LOCAL_PROJECT_ASSET_ROOT + path);
+			}
+			return encodeURI("./" + REVIEWER_ARCHIVE_ROOT + path.slice(REVIEWER_ARCHIVE_PREFIX.length));
+		}
 		const STORAGE_KEY = "blood-will-pay-unit-art-review-v1";
 		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
 		const COMMENTS_KEY = "blood-will-pay-unit-art-comments-v1";
@@ -1500,7 +1508,7 @@
 				contentKey: config.contentKey || "",
 				path: config.path,
 				id,
-				src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)
+				src: config.src || bundledArchiveSrc(config.path)
 			};
 		}
 
