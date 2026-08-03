@@ -56,6 +56,8 @@ var _black_ledger_system_button: Button
 var _black_ledger_layer: CanvasLayer
 var _black_ledger: Control
 var _ledger_previous_paused: bool = false
+var account_profile_path: String = "user://account_profile_v1.json"
+var account_journal_path: String = "user://omen_run_journal_v1.json"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -1198,7 +1200,18 @@ func _build_black_ledger_title_button() -> void:
 	if title_menu != null and title_menu.has_method("register_runtime_action_button"):
 		title_menu.call("register_runtime_action_button", _black_ledger_title_button, false)
 
-func open_black_ledger(account_profile_path: String = "user://account_profile_v1.json") -> void:
+func set_account_progression_paths(profile_path: String, journal_path: String) -> void:
+	account_profile_path = profile_path
+	account_journal_path = journal_path
+	if unit_select != null:
+		unit_select.set("account_profile_path", account_profile_path)
+	if combat_view != null and combat_view.has_method("set_account_progression_paths"):
+		combat_view.call("set_account_progression_paths", account_profile_path, account_journal_path)
+	var economy: Node = _get_autoload("Economy")
+	if economy != null:
+		economy.set("account_profile_path", account_profile_path)
+
+func open_black_ledger(requested_profile_path: String = "") -> void:
 	if _black_ledger != null and is_instance_valid(_black_ledger):
 		return
 	if _system_menu_open:
@@ -1212,7 +1225,8 @@ func open_black_ledger(account_profile_path: String = "user://account_profile_v1
 	_black_ledger = BlackLedgerScript.new() as Control
 	_black_ledger.name = "BlackLedger"
 	_black_ledger.process_mode = Node.PROCESS_MODE_ALWAYS
-	_black_ledger.call("configure", account_profile_path)
+	var resolved_profile_path: String = account_profile_path if requested_profile_path.strip_edges() == "" else requested_profile_path
+	_black_ledger.call("configure", resolved_profile_path)
 	_black_ledger_layer.add_child(_black_ledger)
 	_black_ledger.closed.connect(_close_black_ledger)
 	get_tree().paused = true

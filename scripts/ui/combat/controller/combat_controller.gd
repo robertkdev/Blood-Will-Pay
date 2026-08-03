@@ -324,6 +324,8 @@ class ResultAftermathPainter:
 
 # Parent scene (CombatView)
 var parent: Control
+var account_profile_path: String = "user://account_profile_v1.json"
+var account_journal_path: String = AccountProgressionScript.DEFAULT_JOURNAL_PATH
 
 # Nodes
 var log_label: RichTextLabel
@@ -1387,7 +1389,7 @@ func _on_menu_pressed() -> void:
 		main.call("go_to_menu")
 	else:
 		parent.visible = false
-		if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
+		if Engine.has_singleton("GameState") or (parent != null and parent.has_node("/root/GameState")):
 			GameState.set_phase(GameState.GamePhase.MENU)
 
 func _on_continue_pressed() -> void:
@@ -2223,7 +2225,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 		Economy.start_combat(locked_quote_multiplier)
 	var battle_snapshot: Dictionary = _build_account_victory_snapshot()
-	AccountProgressionScript.record_battle_start(battle_snapshot)
+	AccountProgressionScript.record_battle_start(battle_snapshot, account_journal_path)
 	if grid_placement and manager:
 		grid_placement.rebuild_enemy_views(manager.enemy_team)
 		enemy_views = grid_placement.get_enemy_views()
@@ -2552,8 +2554,21 @@ func _build_result_economy_detail(outcome: String, bounty_result: Dictionary = {
 		if raw_award is Dictionary:
 			var award: Dictionary = raw_award as Dictionary
 			omen_total += int(award.get("reward", 0))
-			titles.append(String(award.get("title", "Bounty")))
-	return "%s\nLEDGER +%d OMENS /// %s" % [result_line, omen_total, ", ".join(titles)]
+			if String(award.get("type", "bounty")) != "round":
+				titles.append(String(award.get("title", "Bounty")))
+	var rank_after: int = int(bounty_result.get("rank_after", 1))
+	var ledger_line: String = "LEDGER +%d OMEN%s /// RANK %02d" % [omen_total, "" if omen_total == 1 else "S", rank_after]
+	var writs_value: Variant = bounty_result.get("writs", [])
+	if writs_value is Array and not (writs_value as Array).is_empty():
+		var first_writ_value: Variant = (writs_value as Array)[0]
+		if first_writ_value is Dictionary:
+			var first_writ: Dictionary = first_writ_value as Dictionary
+			ledger_line += " /// %s %d/%d" % [String(first_writ.get("family", "writ")).to_upper(), int(first_writ.get("progress", 0)), int(first_writ.get("target", 1))]
+	if int(bounty_result.get("rank_after", rank_after)) > int(bounty_result.get("rank_before", rank_after)):
+		ledger_line += "\nRANK ADVANCED"
+	if not titles.is_empty():
+		ledger_line += "\nFILED /// %s" % ", ".join(titles)
+	return "%s\n%s" % [result_line, ledger_line]
 
 func clear_log() -> void:
 	if log_label:
@@ -2974,7 +2989,7 @@ func _evaluate_account_bounties() -> Dictionary:
 	if manager == null:
 		return {"ok": false, "error": "NO_MANAGER", "awards": []}
 	var snapshot: Dictionary = _build_account_victory_snapshot()
-	return AccountProgressionScript.evaluate_victory(snapshot)
+	return AccountProgressionScript.evaluate_victory(snapshot, account_profile_path, account_journal_path)
 
 func _build_account_victory_snapshot() -> Dictionary:
 	var chapter: int = int(GameState.chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else 1
@@ -3040,6 +3055,11 @@ func _build_account_victory_snapshot() -> Dictionary:
 	var shop: Node = _autoload_node("Shop")
 	var roster: Node = _autoload_node("Roster")
 	var run_id: String = String(economy.get("run_id")) if economy != null else ""
+	var ledger_loadout: Dictionary = {}
+	if economy != null:
+		var ledger_loadout_value: Variant = economy.get("ledger_loadout")
+		if ledger_loadout_value is Dictionary:
+			ledger_loadout = (ledger_loadout_value as Dictionary).duplicate(true)
 	var contract_families: Array[String] = []
 	var champion_fulfilled: bool = false
 	var pit_active: bool = false
@@ -3065,6 +3085,10 @@ func _build_account_victory_snapshot() -> Dictionary:
 		"battle_key": "%s:%d:%d" % [run_id, chapter, stage_in_chapter],
 		"chapter": chapter,
 		"stage": stage_in_chapter,
+		"global_round": int(GameState.stage) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else max(1, int(manager.stage)),
+		"red_ink_tier": int(ledger_loadout.get("red_ink_tier", 0)),
+		"equipped_edict_ids": ledger_loadout.get("equipped_edict_ids", []),
+		"active_writ_families": ledger_loadout.get("active_writ_families", ["blood"]),
 		"is_boss": RosterUtils.is_boss_stage(stage_in_chapter),
 		"multi_phase_boss": _encounter_escalations_seen > 0,
 		"units": units,

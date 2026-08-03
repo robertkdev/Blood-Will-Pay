@@ -5,6 +5,7 @@ signal closed()
 
 const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
 const BountyCatalogScript: GDScript = preload("res://scripts/game/account/bounty_catalog.gd")
+const LivingLedgerCatalogScript: GDScript = preload("res://scripts/game/account/living_ledger_catalog.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
@@ -24,6 +25,12 @@ var _title_label: Label = null
 var _witness_stamp_label: Label = null
 var _starter_list: VBoxContainer = null
 var _bounty_list: VBoxContainer = null
+var _writ_list: VBoxContainer = null
+var _edict_list: VBoxContainer = null
+var _red_ink_list: VBoxContainer = null
+var _rank_bar: ProgressBar = null
+var _rank_label: Label = null
+var _profile_error_label: Label = null
 var _status_label: Label = null
 var _close_button: Button = null
 var _panel: PanelContainer = null
@@ -87,7 +94,7 @@ func _sync_to_viewport() -> void:
 	if _ledger_frame != null:
 		_ledger_frame.add_theme_constant_override("separation", 6 if compact else 14)
 	if _page_scroll != null:
-		_page_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if compact or _sparse_content_record else ScrollContainer.SCROLL_MODE_DISABLED
+		_page_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		_page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		_page_scroll.get_v_scroll_bar().custom_minimum_size.x = 12.0 if compact else 8.0
 		_page_scroll.set_meta("compact_scroll_finish", "wide_vertical_track_no_horizontal_escape" if compact else "record_track")
@@ -141,6 +148,19 @@ func _sync_to_viewport() -> void:
 	_sync_compact_section_visibility(compact)
 	_sync_footer_status_copy(compact)
 	_sync_progress_metadata(compact)
+	if compact:
+		call_deferred("_refresh_compact_paint")
+
+func _refresh_compact_paint() -> void:
+	if _record_root == null or not is_instance_valid(_record_root):
+		return
+	_record_root.queue_redraw()
+	for raw_control: Node in _record_root.find_children("*", "Control", true, false):
+		var control: Control = raw_control as Control
+		if control != null:
+			control.queue_redraw()
+	if _page_scroll != null:
+		_page_scroll.queue_redraw()
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key_event: InputEventKey = event as InputEventKey
@@ -149,24 +169,39 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func refresh() -> void:
-	var current: Dictionary = AccountProgressionScript.profile(profile_path)
+	var summary: Dictionary = AccountProgressionScript.ledger_summary(profile_path)
+	var current: Dictionary = summary.get("profile", {}) as Dictionary
 	var balance: int = int(current.get("omens_balance", 0))
 	var lifetime: int = int(current.get("lifetime_omens", 0))
 	var completed: Array[String] = _string_array(current.get("completed_bounty_ids", []))
 	_displayable_starter_row_count = _count_displayable_starter_rows(current)
-	_sparse_content_record = _displayable_starter_row_count == 0
+	_sparse_content_record = false
 	_record_witnessed = not completed.is_empty()
 	_lifetime_omens = lifetime
 	if _balance_label != null:
 		_balance_label.text = "%d OMENS" % balance
+	var rank_data: Dictionary = summary.get("rank", {}) as Dictionary
+	var rank: int = int(rank_data.get("rank", 1))
+	if _rank_label != null:
+		_rank_label.text = "LEDGER RANK %02d / 99" % rank
+	if _rank_bar != null:
+		_rank_bar.max_value = max(1, int(rank_data.get("needed", 1)))
+		_rank_bar.value = float(int(rank_data.get("into_rank", 0))) if rank < LivingLedgerCatalogScript.MAX_RANK else float(_rank_bar.max_value)
+		_rank_bar.tooltip_text = "%d / %d XP toward Rank %d" % [int(rank_data.get("into_rank", 0)), int(rank_data.get("needed", 0)), mini(rank + 1, LivingLedgerCatalogScript.MAX_RANK)]
+	if _profile_error_label != null:
+		_profile_error_label.visible = current.has("load_error")
+		_profile_error_label.text = "PROFILE RECOVERY REQUIRED /// %s" % String(current.get("load_error", ""))
 	var next_requirement: int = BountyCatalogScript.next_circle_requirement(lifetime)
 	_next_circle_requirement = next_requirement
 	if _record_id_label != null:
-		_record_id_label.text = "FOLIO GB-%03d  /  CIRCLE %02d  /  COPY 04" % [lifetime, BountyCatalogScript.revealed_circle(lifetime)]
+		_record_id_label.text = "FOLIO GB-%d  /  RANK %02d  /  COPY 05" % [lifetime, rank]
 	if _witness_stamp_label != null:
 		_witness_stamp_label.text = "INK VERIFIED" if _record_witnessed else "UNWITNESSED"
 	_rebuild_starters(current)
 	_rebuild_bounties(current)
+	_rebuild_writs(current)
+	_rebuild_edicts(current)
+	_rebuild_red_ink(current)
 	if _status_label != null and _status_label.text == "":
 		_status_label.text = "NO NEW ENTRY  ///  RECORD REMAINS OPEN"
 	_sync_to_viewport()
@@ -175,19 +210,20 @@ func _sync_progress_metadata(compact: bool) -> void:
 	if _progress_label == null:
 		return
 	var next_seal_copy: String = "ALL SEALS WITNESSED" if _next_circle_requirement == 0 else "NEXT SEAL %03d" % _next_circle_requirement
+	var rank: int = LivingLedgerCatalogScript.rank_for_omens(_lifetime_omens)
 	var high_scale_compact: bool = compact and UserSettingsScript.get_ui_scale() >= 1.45
 	if high_scale_compact:
-		_progress_label.text = "LIFETIME OMENS %03d\n%s" % [_lifetime_omens, next_seal_copy]
+		_progress_label.text = "RANK %02d  //  LIFETIME %d\n%s" % [rank, _lifetime_omens, next_seal_copy]
 		_progress_label.custom_minimum_size.y = 46.0
 		_progress_label.add_theme_font_size_override("font_size", 16)
 		_progress_label.set_meta("responsive_layout", "two_row")
 	elif compact:
-		_progress_label.text = "LIFETIME %03d  //  %s" % [_lifetime_omens, next_seal_copy]
+		_progress_label.text = "RANK %02d  //  LIFETIME %d" % [rank, _lifetime_omens]
 		_progress_label.custom_minimum_size.y = 24.0
 		_progress_label.add_theme_font_size_override("font_size", 15)
 		_progress_label.set_meta("responsive_layout", "compressed_single_row")
 	else:
-		_progress_label.text = "LIFETIME OMENS %03d  ///  %s" % [_lifetime_omens, next_seal_copy]
+		_progress_label.text = "LEDGER RANK %02d  ///  LIFETIME OMENS %d  ///  %s" % [rank, _lifetime_omens, next_seal_copy]
 		_progress_label.custom_minimum_size.y = 0.0
 		_progress_label.add_theme_font_size_override("font_size", 18)
 		_progress_label.set_meta("responsive_layout", "single_row")
@@ -356,15 +392,49 @@ func _build_ui() -> void:
 	var rule: HSeparator = HSeparator.new()
 	rule.add_theme_stylebox_override("separator", _rule_style(COLOR_BLOOD.darkened(0.06), 2))
 	_record_root.add_child(rule)
+	_profile_error_label = Label.new()
+	_profile_error_label.name = "ProfileRecoveryError"
+	_profile_error_label.visible = false
+	_profile_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_profile_error_label.add_theme_font_size_override("font_size", 17)
+	_profile_error_label.add_theme_color_override("font_color", Color(0.96, 0.30, 0.24, 1.0))
+	VisualTypeSystem.set_utility_bold(_profile_error_label)
+	_record_root.add_child(_profile_error_label)
 	_columns = GridContainer.new()
 	_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_columns.add_theme_constant_override("h_separation", 22)
 	_columns.add_theme_constant_override("v_separation", 14)
 	_record_root.add_child(_columns)
-	_unlock_column = _make_column("STARTER DEBTS", "Spend Omens on any revealed starter. Shop and enemy appearances are never sealed.")
+	_unlock_column = _make_column("THE LIVING LEDGER", "Track one repeatable Writ at first. Rank unlocks more simultaneous work; Edicts and Red Ink apply on your next run.")
 	_unlock_column.name = "StarterDebtsColumn"
 	_columns.add_child(_unlock_column)
+	_rank_label = Label.new()
+	_rank_label.name = "LedgerRankLabel"
+	_rank_label.add_theme_font_size_override("font_size", 18)
+	_rank_label.add_theme_color_override("font_color", COLOR_GOLD)
+	VisualTypeSystem.set_utility_bold(_rank_label)
+	_unlock_column.add_child(_rank_label)
+	_rank_bar = ProgressBar.new()
+	_rank_bar.name = "LedgerRankProgress"
+	_rank_bar.custom_minimum_size = Vector2(0.0, 22.0)
+	_rank_bar.show_percentage = false
+	_unlock_column.add_child(_rank_bar)
+	_add_section_heading(_unlock_column, "REPEATABLE WRITS", "Qualifying victories persist across runs. Completing a Writ repeats it until rank opens the next tier.")
+	_writ_list = VBoxContainer.new()
+	_writ_list.name = "ActiveWritList"
+	_writ_list.add_theme_constant_override("separation", 8)
+	_unlock_column.add_child(_writ_list)
+	_add_section_heading(_unlock_column, "RED INK", "Voluntary pressure and Writ bonus are frozen when a new run begins.")
+	_red_ink_list = VBoxContainer.new()
+	_red_ink_list.name = "RedInkList"
+	_unlock_column.add_child(_red_ink_list)
+	_add_section_heading(_unlock_column, "EDICT LOADOUT", "Permanent unlocks. Equipped seals affect the next run; passive seals say so explicitly.")
+	_edict_list = VBoxContainer.new()
+	_edict_list.name = "EdictList"
+	_edict_list.add_theme_constant_override("separation", 6)
+	_unlock_column.add_child(_edict_list)
+	_add_section_heading(_unlock_column, "STARTER DEBTS", "Spend Omens on revealed starters. Shop and enemy appearances are never sealed.")
 	_starter_scroll = ScrollContainer.new()
 	_starter_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_starter_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -405,7 +475,7 @@ func _build_section_navigator() -> void:
 	_section_navigator.add_child(row)
 	_starter_nav_button = Button.new()
 	_starter_nav_button.name = "StarterDebtsNavigation"
-	_starter_nav_button.text = "STARTER DEBTS"
+	_starter_nav_button.text = "LIVING LEDGER"
 	_starter_nav_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_starter_nav_button.focus_mode = Control.FOCUS_ALL
 	_starter_nav_button.set_meta("navigation_target", "starter_debts")
@@ -427,7 +497,7 @@ func _sync_compact_navigation_state(active_section: String) -> void:
 	if _starter_nav_button == null or _bounty_nav_button == null:
 		return
 	var starter_active: bool = active_section == "starter_debts"
-	_starter_nav_button.text = "ACTIVE // STARTER DEBTS" if starter_active else "STARTER DEBTS"
+	_starter_nav_button.text = "ACTIVE // LIVING LEDGER" if starter_active else "LIVING LEDGER"
 	_bounty_nav_button.text = "ACTIVE // BOUNTIES" if not starter_active else "BOUNTIES"
 	for button: Button in [_starter_nav_button, _bounty_nav_button]:
 		var is_active: bool = button == _starter_nav_button if starter_active else button == _bounty_nav_button
@@ -596,6 +666,204 @@ func _make_column(title_text: String, detail_text: String) -> VBoxContainer:
 	rule.add_theme_stylebox_override("separator", _rule_style(Color(0.43, 0.31, 0.20, 0.82), 1))
 	column.add_child(rule)
 	return column
+
+func _add_section_heading(parent: VBoxContainer, heading_text: String, detail_text: String) -> void:
+	var heading: Label = Label.new()
+	heading.text = heading_text
+	heading.add_theme_font_size_override("font_size", 18)
+	heading.add_theme_color_override("font_color", COLOR_GOLD)
+	VisualTypeSystem.set_action(heading)
+	parent.add_child(heading)
+	var detail: Label = Label.new()
+	detail.text = detail_text
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_theme_font_size_override("font_size", 15)
+	detail.add_theme_color_override("font_color", COLOR_MUTED)
+	VisualTypeSystem.set_utility(detail)
+	parent.add_child(detail)
+
+func _rebuild_writs(current: Dictionary) -> void:
+	if _writ_list == null:
+		return
+	_clear_children(_writ_list)
+	var writs: Array[Dictionary] = AccountProgressionScript.active_writs(current)
+	var active: Array[String] = _string_array(current.get("active_writ_families", []))
+	var slots: int = AccountProgressionScript.writ_slot_count(current)
+	for slot: int in range(slots):
+		var writ_data: Dictionary = writs[slot] if slot < writs.size() else {}
+		var family: String = String(writ_data.get("family", active[slot] if slot < active.size() else ""))
+		var row: PanelContainer = PanelContainer.new()
+		row.name = "WritSlot%d" % (slot + 1)
+		row.add_theme_stylebox_override("panel", _row_style(true, false, slot))
+		_writ_list.add_child(row)
+		var copy: VBoxContainer = VBoxContainer.new()
+		copy.add_theme_constant_override("separation", 3)
+		row.add_child(copy)
+		var title: Label = Label.new()
+		title.text = "SLOT %d  ///  %s  ///  +%d OMENS" % [slot + 1, String(writ_data.get("tier_name", "UNASSIGNED")), int(writ_data.get("reward", 0))]
+		title.add_theme_font_size_override("font_size", 16)
+		title.add_theme_color_override("font_color", COLOR_GOLD)
+		VisualTypeSystem.set_utility_bold(title)
+		copy.add_child(title)
+		var requirement: Label = Label.new()
+		requirement.text = "%s\n%s" % [String(writ_data.get("name", "Choose a Writ")), String(writ_data.get("requirement", "Select a family to begin tracking."))]
+		requirement.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		requirement.add_theme_font_size_override("font_size", 15)
+		requirement.add_theme_color_override("font_color", COLOR_BONE)
+		VisualTypeSystem.set_utility(requirement)
+		copy.add_child(requirement)
+		var progress: ProgressBar = ProgressBar.new()
+		progress.name = "WritProgress%d" % (slot + 1)
+		progress.custom_minimum_size = Vector2(0.0, 20.0)
+		progress.max_value = max(1, int(writ_data.get("target", 1)))
+		progress.value = int(writ_data.get("progress", 0))
+		progress.show_percentage = false
+		progress.tooltip_text = "%d / %d qualifying victories" % [int(writ_data.get("progress", 0)), int(writ_data.get("target", 1))]
+		copy.add_child(progress)
+		var progress_copy: Label = Label.new()
+		progress_copy.name = "WritProgressCopy%d" % (slot + 1)
+		progress_copy.text = "%d / %d QUALIFYING WINS" % [int(writ_data.get("progress", 0)), int(writ_data.get("target", 1))]
+		progress_copy.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		progress_copy.add_theme_font_size_override("font_size", 14)
+		progress_copy.add_theme_color_override("font_color", COLOR_MUTED)
+		VisualTypeSystem.set_utility_bold(progress_copy)
+		copy.add_child(progress_copy)
+		var selector: OptionButton = OptionButton.new()
+		selector.name = "WritSelector%d" % (slot + 1)
+		selector.custom_minimum_size = Vector2(0.0, 40.0)
+		for family_option: String in LivingLedgerCatalogScript.WRIT_FAMILIES:
+			var definition: Dictionary = LivingLedgerCatalogScript.writ(family_option)
+			selector.add_item(String(definition.get("name", family_option.capitalize())))
+			selector.set_item_metadata(selector.item_count - 1, family_option)
+			if family_option == family:
+				selector.select(selector.item_count - 1)
+		selector.item_selected.connect(_select_writ_option.bind(slot, selector))
+		_style_button(selector, true)
+		copy.add_child(selector)
+	var rank: int = LivingLedgerCatalogScript.rank_for_omens(int(current.get("lifetime_omens", 0)))
+	if rank < 15:
+		_add_milestone_copy(_writ_list, "SECOND WRIT SLOT OPENS AT RANK 15")
+	elif rank < 30:
+		_add_milestone_copy(_writ_list, "THIRD WRIT SLOT OPENS AT RANK 30")
+
+func _rebuild_edicts(current: Dictionary) -> void:
+	if _edict_list == null:
+		return
+	_clear_children(_edict_list)
+	var balance: int = int(current.get("omens_balance", 0))
+	var rank: int = LivingLedgerCatalogScript.rank_for_omens(int(current.get("lifetime_omens", 0)))
+	var owned: Array[String] = _string_array(current.get("unlocked_edict_ids", []))
+	var equipped: Array[String] = _string_array(current.get("equipped_edict_ids", []))
+	var slot_copy: Label = Label.new()
+	slot_copy.text = "EQUIPPED %d / %d" % [equipped.size(), AccountProgressionScript.max_edict_slots(current)]
+	slot_copy.add_theme_font_size_override("font_size", 15)
+	slot_copy.add_theme_color_override("font_color", COLOR_MUTED)
+	VisualTypeSystem.set_utility_bold(slot_copy)
+	_edict_list.add_child(slot_copy)
+	for index: int in range(LivingLedgerCatalogScript.EDICTS.size()):
+		var definition: Dictionary = LivingLedgerCatalogScript.EDICTS[index]
+		var edict_id: String = String(definition.get("id", ""))
+		var row: PanelContainer = PanelContainer.new()
+		row.add_theme_stylebox_override("panel", _row_style(rank >= int(definition.get("rank", 1)), equipped.has(edict_id), index))
+		_edict_list.add_child(row)
+		var content: HBoxContainer = HBoxContainer.new()
+		content.add_theme_constant_override("separation", 8)
+		row.add_child(content)
+		var copy: VBoxContainer = VBoxContainer.new()
+		copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.add_child(copy)
+		var name_label: Label = Label.new()
+		name_label.text = "%s  ///  RANK %d" % [String(definition.get("name", edict_id)), int(definition.get("rank", 1))]
+		name_label.add_theme_font_size_override("font_size", 15)
+		name_label.add_theme_color_override("font_color", COLOR_BONE if rank >= int(definition.get("rank", 1)) else COLOR_MUTED)
+		VisualTypeSystem.set_utility_bold(name_label)
+		copy.add_child(name_label)
+		var effect: Label = Label.new()
+		effect.text = String(definition.get("effect", ""))
+		effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		effect.add_theme_font_size_override("font_size", 14)
+		effect.add_theme_color_override("font_color", COLOR_MUTED)
+		VisualTypeSystem.set_utility(effect)
+		copy.add_child(effect)
+		var action: Button = Button.new()
+		action.name = "EdictAction_%s" % edict_id
+		action.custom_minimum_size = Vector2(112.0, 40.0)
+		if owned.has(edict_id):
+			if edict_id == "iron_memory":
+				action.text = "PASSIVE"
+				action.disabled = true
+			else:
+				action.text = "UNEQUIP" if equipped.has(edict_id) else "EQUIP"
+				action.pressed.connect(_toggle_edict.bind(edict_id))
+		else:
+			action.text = "%d OMENS" % int(definition.get("cost", 0)) if rank >= int(definition.get("rank", 1)) else "SEALED"
+			action.disabled = rank < int(definition.get("rank", 1)) or balance < int(definition.get("cost", 0))
+			action.pressed.connect(_purchase_edict.bind(edict_id))
+		_style_button(action, true)
+		content.add_child(action)
+
+func _rebuild_red_ink(current: Dictionary) -> void:
+	if _red_ink_list == null:
+		return
+	_clear_children(_red_ink_list)
+	var selected_tier: int = int(current.get("selected_red_ink", 0))
+	var max_tier: int = int(current.get("max_red_ink", 0))
+	var selector: OptionButton = OptionButton.new()
+	selector.name = "RedInkSelector"
+	selector.custom_minimum_size = Vector2(0.0, 42.0)
+	for tier: int in range(max_tier + 1):
+		var definition: Dictionary = LivingLedgerCatalogScript.red_ink(tier)
+		selector.add_item(String(definition.get("name", "RED INK %d" % tier)))
+		selector.set_item_metadata(selector.item_count - 1, tier)
+		if tier == selected_tier:
+			selector.select(selector.item_count - 1)
+	selector.item_selected.connect(_select_red_ink_option.bind(selector))
+	_style_button(selector, true)
+	_red_ink_list.add_child(selector)
+	var selected: Dictionary = LivingLedgerCatalogScript.red_ink(selected_tier)
+	var detail: Label = Label.new()
+	if max_tier >= LivingLedgerCatalogScript.RED_INK_TIERS.size() - 1:
+		detail.text = "%s\nNEXT RUN LOADOUT /// MAXIMUM RED INK PROVED" % String(selected.get("description", ""))
+	else:
+		detail.text = "%s\nNEXT RUN LOADOUT /// Clear Chapter %d at your highest Ink to open the next tier." % [String(selected.get("description", "")), LivingLedgerCatalogScript.RED_INK_UNLOCK_CHAPTERS[max_tier]]
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_theme_font_size_override("font_size", 14)
+	detail.add_theme_color_override("font_color", COLOR_MUTED)
+	VisualTypeSystem.set_utility(detail)
+	_red_ink_list.add_child(detail)
+
+func _add_milestone_copy(parent: VBoxContainer, text: String) -> void:
+	var label: Label = Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", COLOR_BLOOD.lightened(0.28))
+	VisualTypeSystem.set_utility_bold(label)
+	parent.add_child(label)
+
+func _select_writ_option(index: int, slot: int, selector: OptionButton) -> void:
+	var family: String = String(selector.get_item_metadata(index))
+	var result: Dictionary = AccountProgressionScript.select_writ(slot, family, profile_path)
+	_set_action_status(result, "WRIT SLOT %d NOW TRACKS %s" % [slot + 1, family.to_upper()])
+
+func _select_red_ink_option(index: int, selector: OptionButton) -> void:
+	var tier: int = int(selector.get_item_metadata(index))
+	var result: Dictionary = AccountProgressionScript.set_red_ink(tier, profile_path)
+	_set_action_status(result, "RED INK %d STAMPED FOR NEXT RUN" % tier)
+
+func _purchase_edict(edict_id: String) -> void:
+	var result: Dictionary = AccountProgressionScript.purchase_edict(edict_id, profile_path)
+	_set_action_status(result, "EDICT PURCHASED /// %s" % edict_id.to_upper())
+
+func _toggle_edict(edict_id: String) -> void:
+	var result: Dictionary = AccountProgressionScript.toggle_edict(edict_id, profile_path)
+	var verb: String = "EQUIPPED" if bool(result.get("equipped", false)) else "UNEQUIPPED"
+	_set_action_status(result, "%s FOR NEXT RUN /// %s" % [verb, edict_id.to_upper()])
+
+func _set_action_status(result: Dictionary, success_text: String) -> void:
+	if _status_label != null:
+		_status_label.text = success_text if bool(result.get("ok", false)) else "ENTRY DENIED /// %s" % String(result.get("error", "UNKNOWN"))
+	refresh()
 
 func _rebuild_starters(current: Dictionary) -> void:
 	_clear_children(_starter_list)

@@ -26,25 +26,25 @@ scenarios:
     max_iterations: 2
     telegram_context: "Blood Will Pay non-unit visual overhaul"
   - id: black-ledger
-    title: Ledger
+    title: Living Black Ledger progression
     adapter: godot
-    objective: Verify readable fresh and veteran account progression in Main.
+    objective: Verify readable fresh and veteran farming progression, repeatable Writs, rank, Red Ink, persistent controls, and compact Living Ledger/Bounties navigation in the authoritative Godot game framebuffer.
     capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/Capture-BlackLedgerEvidence.ps1"]
     capture_manifest: "outputs/visual_debug/black_ledger/captures.json"
     required_groups: [ledger]
     runtime_provenance:
       entrypoint: "Godot 4.5 editor game framebuffer"
-      scene: "Black Ledger capture hosts instantiating res://scenes/Main.tscn"
-      build: "current Black Ledger integration worktree"
+      scene: "BlackLedgerSmoke and BlackLedgerCompactSmoke player-facing runtime scenes"
+      build: "current Living Black Ledger task worktree"
     evidence:
       required_cameras: [player]
       required_layers: [final]
       required_states: [fresh, veteran]
-      required_viewports: [desktop-1920x1080]
-      required_events: [f, v]
+      required_viewports: [desktop-1920x1080, compact-1280x720]
+      required_events: [fresh_open, veteran_open, compact_living_open, compact_bounties_open, fresh_compact_open]
       require_runtime_provenance: true
       required_runtime_fields: [entrypoint, scene, build]
-      max_source_age_seconds: 300
+      max_source_age_seconds: 600
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 3
     telegram_context: "Blood Will Pay Black Ledger"
