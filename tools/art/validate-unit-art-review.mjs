@@ -7,8 +7,10 @@ const toolRoot = path.resolve(process.argv[2] || ".");
 const projectRoot = path.resolve(process.argv[3] || process.cwd());
 const htmlPath = path.join(toolRoot, "unit-art-review.html");
 const dataPath = path.join(toolRoot, "unit-art-history-data.js");
+const serverPath = path.join(toolRoot, "serve_unit_art_review.py");
 const html = fs.readFileSync(htmlPath, "utf8");
 const dataSource = fs.readFileSync(dataPath, "utf8");
+const serverSource = fs.readFileSync(serverPath, "utf8");
 const context = { window: {} };
 vm.runInNewContext(dataSource, context, { filename: dataPath });
 
@@ -16,6 +18,9 @@ const manifest = context.window.GAMBLE_BATTLE_UNIT_ART_HISTORY;
 const fail = (message) => { throw new Error(message); };
 const requireText = (value) => {
 	if (!html.includes(value)) fail(`Missing tool behavior: ${value}`);
+};
+const requireServerText = (value) => {
+	if (!serverSource.includes(value)) fail(`Missing persistence server behavior: ${value}`);
 };
 const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 
@@ -101,13 +106,19 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"const LEGACY_COMMENTS_KEY",
 	"const LEGACY_PINS_KEY",
 	"const LEGACY_DEFAULTS_KEY",
+	"const STATE_API_URL = \"/api/unit-art-review-state\"",
+	"const STATE_FILE_LABEL = \"tools/art/unit-art-review-state.json\"",
 	"const MAX_PINS = 5",
 	"<button id=\"set-default\" class=\"action primary\" type=\"button\">Set as Default</button>",
 	"function itemIdentity(item)",
 	"function defaultItemForUnit(unit)",
 	"function setCurrentAsDefault()",
 	"state.defaults[unit] = identity",
-	"function loadDefaults()",
+	"function loadLegacyReviewState()",
+	"function mergeLegacyIntoDocument(document, legacy)",
+	"function initializePersistence()",
+	"function queuePersistenceSave()",
+	"async function flushPersistenceSave()",
 	"function saveDefaults()",
 	"addEventListener(\"contextmenu\"",
 	"function configurePreviewContext(items, selectedItem)",
@@ -136,10 +147,23 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()"
 ].forEach(requireText);
 
+[
+	"STATE_API_PATHS",
+	"REVIEW_PAGE_PATHS",
+	"unit-art-review-state.json",
+	"class ReviewStateStore",
+	"os.replace(temporary_path, self.state_path)",
+	"STATE_FILE_MALFORMED",
+	"STATE_CONFLICT",
+	"expected_revision",
+	"def do_POST(self)"
+].forEach(requireServerText);
+
 if (html.includes("Six pins maximum") || html.includes("0 / 6")) fail("The comparison tool still exposes the old six-pin limit.");
 if (html.includes("src: config.src || encodeURI(\"../../\" + config.path)")) fail("Candidate and remembered art must load from the main project asset server.");
 if (html.includes("padding: clamp(10px, 2vw, 30px)")) fail("Comparison artwork still wastes card area on the old oversized padding.");
 if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use the full available review workspace.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
+if (html.includes("localStorage.setItem")) fail("The durable review file must be the only writable source of truth; browser storage is migration-only.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=34 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=34 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
