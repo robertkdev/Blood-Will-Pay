@@ -26,7 +26,7 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 34) fail(`Expected curated history with 34 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 36) fail(`Expected curated history with 36 entries, got ${manifest.items.length}.`);
 const creepHistory = manifest.items.filter((item) => item.unit === "creep");
 if (creepHistory.length !== 4 || creepHistory.map((item) => item.version).join("|") !== "V3|V4|V5|V6") fail("Creep review history must preserve V3 through V6 in chronological order.");
 if (creepHistory.some((item) => item.version === "V6" && item.current)) fail("Creep V6 portrait crop must not replace the default.");
@@ -66,11 +66,27 @@ if (pilferReviews.some((item) => item.current)) fail("Pilfer review history must
 if (!pilferReviews[0].status.includes("Latest review candidate") || pilferReviews[0].label !== "Feral transfusion assassin") fail("Pilfer's feral transfusion concept must remain the newest review candidate.");
 if (!/\{ unit: "pilfer"[^}]*version: "P2-02"[^}]*current: true[^}]*path: "units\/pilfer\.png" \}/.test(html)) fail("Pilfer's existing P2-02 default is missing or was changed.");
 
+const korathReviews = manifest.items.filter((item) => item.unit === "korath");
+if (korathReviews.length !== 2 || korathReviews.map((item) => item.version).join("|") !== "Review V1|Review V2") fail("Korath review candidates are missing or out of order.");
+if (korathReviews.some((item) => item.current)) fail("Korath review candidates must not replace the default.");
+if (!korathReviews[0].label.includes("Gold-light") || !korathReviews[1].label.includes("Violet-ivory")) fail("Korath review candidate labels are incorrect.");
+
 for (const item of manifest.items) {
 	if (!item.local_path) fail(`Curated history entry is not bundled locally: ${item.path}`);
 	const filePath = path.join(toolRoot, item.local_path);
 	if (!fs.existsSync(filePath)) fail(`Missing history image: ${item.path}`);
 	if (fs.statSync(filePath).size < 1024) fail(`History image is not hydrated: ${item.path}`);
+}
+
+const archivePrefix = "outputs/art_pipeline/style_validation/";
+const htmlArchivePaths = [...html.matchAll(/path: "([^"]+)"/g)]
+	.map((match) => match[1])
+	.filter((itemPath) => itemPath.startsWith(archivePrefix));
+const uniqueArchivePaths = [...new Set(htmlArchivePaths)];
+if (uniqueArchivePaths.length !== 111) fail(`Expected 111 hydrated reviewer archive references, got ${uniqueArchivePaths.length}.`);
+for (const itemPath of uniqueArchivePaths) {
+	const bundledPath = path.join(toolRoot, "history", itemPath.slice(archivePrefix.length));
+	if (!fs.existsSync(bundledPath) || fs.statSync(bundledPath).size < 1024) fail(`Missing hydrated reviewer archive: ${itemPath}`);
 }
 
 const liveCreep = path.join(projectRoot, "assets/units/creep.png");
@@ -140,7 +156,9 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"return (1 + (index - 3) * 3) + \" / span 3\"",
 	"comparison-grid",
 	"Active review + pinned references",
-	"src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)",
+	"const REVIEWER_ARCHIVE_PREFIX = \"outputs/art_pipeline/style_validation/\"",
+	"function bundledArchiveSrc(path)",
+	"src: config.src || bundledArchiveSrc(config.path)",
 	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
 	"history: [...PHASE2_ART, ...HISTORICAL_ART]",
 	"function versionsForUnit(unit)",
@@ -166,4 +184,4 @@ if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use th
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 if (html.includes("localStorage.setItem")) fail("The durable review file must be the only writable source of truth; browser storage is migration-only.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=34 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=36 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
