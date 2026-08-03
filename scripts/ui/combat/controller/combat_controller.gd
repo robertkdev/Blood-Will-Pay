@@ -74,7 +74,10 @@ const PHASE_TRANSITION_HOLD_SECONDS: float = 0.62
 const PHASE_TRANSITION_FADE_SECONDS: float = 0.16
 const BOSS_PREP_MIN_GOLD: int = 4
 const EARLY_RETRY_RECOVERY_MAX_CHAPTER: int = 2
-const EARLY_RETRY_RECOVERY_MIN_GOLD: int = 4
+# Preserve a meaningful next decision after an early non-broke loss. Six gold
+# buys one level-up (4g) and still leaves the one-gold betting reserve, so a
+# full board with a bench can actually unlock the next deployment slot.
+const EARLY_RETRY_RECOVERY_MIN_GOLD: int = 6
 
 class ResultAftermathPainter:
 	extends Control
@@ -1046,7 +1049,11 @@ func _update_board_status() -> void:
 		else:
 			var player_rating: float = TeamOddsEstimator.team_rating(manager.player_team)
 			var enemy_rating: float = TeamOddsEstimator.team_rating(manager.enemy_team)
-			var odds: int = TeamOddsEstimator.estimate_from_ratings(player_rating, enemy_rating)
+			var boss_preview_factor: float = 1.0
+			if (Engine.has_singleton("GameState") or (parent != null and parent.has_node("/root/GameState"))) and RosterUtils.is_boss_stage(int(GameState.stage_in_chapter)):
+				boss_preview_factor = TeamOddsEstimator.BOSS_ESCALATION_PREVIEW_FACTOR
+			var odds_enemy_rating: float = TeamOddsEstimator.preview_enemy_power(enemy_rating, boss_preview_factor)
+			var odds: int = TeamOddsEstimator.estimate_from_ratings(player_rating, enemy_rating, boss_preview_factor)
 			var economy_node: Node = _autoload_node("Economy")
 			var gross_multiplier: float = 2.0
 			var quoted_payout: int = 0
@@ -1059,7 +1066,7 @@ func _update_board_status() -> void:
 				if economy_node.has_method("quoted_payout"):
 					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
 			win_odds_label.text = "Win Odds %d%%" % odds
-			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f. Quote: %dg -> %dg gross (%.2fx)." % [player_rating, enemy_rating, quoted_bet, quoted_payout, gross_multiplier]
+			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f%s. Quote: %dg -> %dg gross (%.2fx)." % [player_rating, odds_enemy_rating, " (escalation-adjusted)" if boss_preview_factor > 1.0 else "", quoted_bet, quoted_payout, gross_multiplier]
 	if economy_ui != null:
 		economy_ui.refresh()
 	_sync_contract_market_overlay()

@@ -49,18 +49,18 @@ func _run() -> void:
 	var campaign_failure_start: int = _failures.size()
 	_recorder = PacingRecorder.new()
 	_recorder.begin(_main, {
-		"id": "natural_campaign_bonko",
+		"id": _flow_sample_id(),
 		"scope": "campaign",
 		"starter": PACING_STARTER_ID,
 		"seed": PACING_SHOP_SEED,
-		"target_stage": PACING_TARGET_STAGE,
+		"target_stage": _flow_target_stage(),
 		"time_scale": Engine.time_scale,
 		"entrypoint": "scenes/Main.tscn",
 	})
 	_awaiting_opening_decision = true
 	await _run_campaign_sample()
 	var campaign_target_reached: bool = _reached_two_stage_target()
-	_recorder.finish("target_reached" if campaign_target_reached else "campaign_stopped", PACING_TARGET_STAGE)
+	_recorder.finish("target_reached" if campaign_target_reached else "campaign_stopped", _flow_target_stage())
 	_campaign_report = _recorder.build_report()
 	_campaign_report["run"] = _with_technical_failures(_campaign_report.get("run", {}), campaign_failure_start)
 	_recorder.stop()
@@ -238,6 +238,12 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 func _flow_smoke_name() -> String:
 	return PACING_SMOKE_NAME
 
+func _flow_sample_id() -> String:
+	return "natural_campaign_bonko"
+
+func _flow_output_stem() -> String:
+	return "longitudinal_pacing"
+
 func _flow_starter_id() -> String:
 	return PACING_STARTER_ID
 
@@ -252,6 +258,9 @@ func _flow_round_timeout() -> float:
 
 func _flow_max_battles() -> int:
 	return PACING_MAX_BATTLES
+
+func _flow_target_stage() -> int:
+	return PACING_TARGET_STAGE
 
 func _flow_target_chapter() -> int:
 	return PACING_TARGET_CHAPTER
@@ -287,8 +296,9 @@ func _wait_for_shop_ready(timeout_seconds: float) -> bool:
 func _write_outputs(suite: Dictionary[String, Variant], analysis: Dictionary[String, Variant]) -> void:
 	var output_dir: String = ProjectSettings.globalize_path("user://pacing")
 	DirAccess.make_dir_recursive_absolute(output_dir)
-	var json_path: String = "user://pacing/longitudinal_pacing_suite.json"
-	var markdown_path: String = "user://pacing/longitudinal_pacing_report.md"
+	var output_stem: String = _flow_output_stem()
+	var json_path: String = "user://pacing/%s_suite.json" % output_stem
+	var markdown_path: String = "user://pacing/%s_report.md" % output_stem
 	var json_file: FileAccess = FileAccess.open(json_path, FileAccess.WRITE)
 	if json_file != null:
 		json_file.store_string(JSON.stringify(suite, "\t"))

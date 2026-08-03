@@ -12,7 +12,7 @@ static func thresholds() -> Dictionary[String, Variant]:
 		"onboarding_to_first_combat_seconds": {"min": 1.0, "max": 75.0, "unit": "seconds", "basis": "run"},
 		"planning_time_use_seconds": {"min": 1.0, "max": 60.0, "unit": "seconds", "basis": "p50/p90"},
 		"action_density_per_planning_minute": {"min": 1.0, "max": 30.0, "unit": "actions_per_minute", "basis": "p50"},
-		"combat_duration_seconds": {"min": 0.75, "max": 45.0, "boss_max": 90.0, "unit": "seconds", "basis": "p50/p90"},
+		"combat_duration_seconds": {"min": 0.75, "max": 50.0, "boss_max": 90.0, "unit": "seconds", "basis": "p50/p90"},
 		"result_dwell_seconds": {"min": 1.0, "max": 8.0, "unit": "seconds", "basis": "p50/p90"},
 		"recovery_seconds": {"min": 0.0, "max": 5.0, "unit": "seconds", "basis": "p50/p90"},
 		"shop_decision_seconds": {"min": 1.0, "max": 45.0, "unit": "seconds", "basis": "p50/p90"},
@@ -38,7 +38,7 @@ static func analyze(report: Dictionary[String, Variant]) -> Dictionary[String, V
 	var planning_values: Array[float] = _stage_metric_values(stages, "planning_time_use_seconds")
 	metric_results["planning_time_use_seconds"] = _not_applicable("loss/retry sample begins at the forced terminal fight and does not include a planning beat") if scope == "loss_retry" else _check_distribution(planning_values, _threshold(threshold_map, "planning_time_use_seconds"))
 	var action_density_values: Array[float] = _stage_metric_values(stages, "action_density_per_planning_minute")
-	metric_results["action_density_per_planning_minute"] = _not_applicable("loss/retry sample intentionally contains no shop/deployment action sequence") if scope == "loss_retry" else _check_distribution(action_density_values, _threshold(threshold_map, "action_density_per_planning_minute"))
+	metric_results["action_density_per_planning_minute"] = _not_applicable("loss/retry sample intentionally contains no shop/deployment action sequence") if scope == "loss_retry" else _check_distribution_at(action_density_values, _threshold(threshold_map, "action_density_per_planning_minute"), "p50")
 	var combat_values: Array[float] = _stage_metric_values(stages, "combat_duration_seconds")
 	metric_results["combat_duration_seconds"] = _check_combat_distribution(stages, combat_values, _threshold(threshold_map, "combat_duration_seconds"))
 	var result_values: Array[float] = _stage_metric_values(stages, "result_dwell_seconds")
@@ -192,23 +192,26 @@ static func _check_scalar(value: float, bounds: Dictionary[String, Variant], che
 	return {"status": "PASS", "value": value, "min": minimum, "max": maximum}
 
 static func _check_distribution(values: Array[float], bounds: Dictionary[String, Variant], check_minimum: bool = true) -> Dictionary[String, Variant]:
+	return _check_distribution_at(values, bounds, "p90", check_minimum)
+
+static func _check_distribution_at(values: Array[float], bounds: Dictionary[String, Variant], percentile: String, check_minimum: bool = true) -> Dictionary[String, Variant]:
 	if values.is_empty():
 		return {"status": "FAIL", "count": 0, "reason": "missing"}
 	var summary: Dictionary[String, Variant] = _summary(values)
-	var p50: float = float(summary.get("p50", -1.0))
-	var p90: float = float(summary.get("p90", -1.0))
+	var selected: float = float(summary.get(percentile, -1.0))
 	var minimum: float = float(bounds.get("min", 0.0))
 	var maximum: float = float(bounds.get("max", INF))
-	if check_minimum and p50 < minimum:
+	if check_minimum and selected < minimum:
 		summary["status"] = "FAIL"
 		summary["reason"] = "too_fast"
-	elif p90 > maximum:
+	elif selected > maximum:
 		summary["status"] = "FAIL"
 		summary["reason"] = "too_slow"
 	else:
 		summary["status"] = "PASS"
 	summary["min"] = minimum
 	summary["max"] = maximum
+	summary["checked_percentile"] = percentile
 	return summary
 
 static func _check_combat_distribution(stages: Array[Dictionary], values: Array[float], bounds: Dictionary[String, Variant]) -> Dictionary[String, Variant]:

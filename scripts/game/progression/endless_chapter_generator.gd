@@ -128,7 +128,10 @@ static func target_rating_for(chapter: int, stage_index: int) -> int:
 		ProgressionConfig.BOSS_STAGE:
 			multiplier = 2.65
 			if procedural_index == 1:
-				multiplier = 2.15
+				# The preview quote accounts for the live boss escalation phases.
+				# Keep the raw opening target at the level-1 runway baseline so a
+				# four-unit prepared board sees a fair, escalation-adjusted quote.
+				multiplier = 1.00
 		ProgressionConfig.MIRROR_STAGE:
 			multiplier = 2.65
 		_:

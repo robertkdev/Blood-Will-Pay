@@ -43,6 +43,13 @@ displayed odds were high. Higher targets add units within the normal board
 capacity; this is a composition rule derived from the calibration rows, not a
 boss-only odds exception.
 
+Boss previews account for the live escalation phases through the shared
+`TeamOddsEstimator.BOSS_ESCALATION_PREVIEW_FACTOR` (`1.25`). The first
+procedural boss keeps a raw generator multiplier of `1.00` so the quoted odds
+are not double-counted; later bosses use the authored `2.65` target. The
+runtime, generator, lockstep simulator, and player-facing label all use this
+same stage-aware contract.
+
 ## Fresh calibration evidence
 
 The probe summaries are written to `user://team_odds_calibration.json` and
@@ -63,12 +70,17 @@ make the model pass.
 ### Boss stages
 
 The historical 36-row diagnostic produced only 6 wins (16.7%), with predicted
-13.1% and Brier 0.155. The final combined-build stratified dataset has 108 rows
+13.1% and Brier 0.155. The fresh boss-aware stratified dataset has 108 rows
 across four chapters, three seeds, and low/mid/high preparation teams. It
-produced 54 wins (50.0%), predicted 58.25%, Brier 0.1769, an 8.25-point overall
-gap, and zero timeouts. Preparation win rates were 25.0% / 47.22% / 77.78%.
-This proves bosses are difficult but beatable across a meaningful preparation
-gradient without allowing the aggregate to hide an impossible case.
+produced 63 wins (58.33%), predicted 56.92%, Brier 0.12868, a 1.42-point
+overall gap, and zero simulation timeouts. Preparation win rates were
+33.33% / 63.89% / 77.78%; the tiers remain ordered and no tier is impossible.
+This is the skill-plus-luck balance proof: better preparation raises the chance
+of winning by 44.45 percentage points, while the low tier still wins sometimes
+and the high tier still loses sometimes. Boss balance therefore does not depend
+on forcing a campaign to an arbitrary late stage; the calibrated prediction,
+ordered preparation gradient, and non-deterministic outcomes are the acceptance
+gate.
 
 The boss probe gates overall calibration, each preparation slice, and
 hard-but-beatable bounds. The normal probe owns the broad odds-bucket gate;
@@ -89,7 +101,8 @@ boss satisfies the four-unit minimum and carries the combat model version.
 Validated through Godot MCP on Godot 4.5:
 
 - `TeamOddsCalibrationProbe.tscn`: PASS, 144 rows, 0 timeouts.
-- `BossStageCalibrationProbe.tscn`: PASS, 108 rows, 0 timeouts.
+- `BossStageCalibrationProbe.tscn`: PASS, 108 rows, 0 simulation timeouts;
+  56.92% predicted versus 58.33% observed, Brier 0.12868.
 - `EndlessChapterGenerationProbe.tscn`: PASS, 1,200 boards.
 - `EndlessRuntimeIntegrationProbe.tscn`: PASS; generated chapter 1 stage 1
   advanced through the real `StageRuleRunner` path.
@@ -102,11 +115,12 @@ Validated through Godot MCP on Godot 4.5:
   53%` and `Board 1/3`; a 1280x720 MCP capture showed the active arena and
   Team Metrics panel with no runtime error log entries.
 
-The longitudinal pacing campaign remains deliberately red: its natural Bonko
-route reaches the first boss at stage 4 and loses with a four-unit board and
-zero gold. That result does not invalidate the stratified boss calibration,
-but it does prevent a stage-9/two-boss pacing claim and remains the next
-balance-and-player-policy investigation.
+The natural Bonko campaign is still retained as a deliberately honest baseline
+and can lose at the first boss when it spends its runway. A separate competent
+policy run through the same Main.tscn entrypoint reached stage 10, observed
+bosses at stages 4 and 9, and resolved the second boss. That is optional
+longitudinal/stress evidence, not the balance gate and not a claim that every
+starter or policy is equally prepared.
 
 ## Regression entrypoints
 

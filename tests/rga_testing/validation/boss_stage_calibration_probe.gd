@@ -82,7 +82,7 @@ func _record_sample(samples: Array[Dictionary], player_ids: Array[String], playe
 	var player_stage_spec: Dictionary = _uniform_level_spec(player_ids, player_level)
 	var player_team: Array[Unit] = _spawn_and_apply(player_ids, player_stage_spec, chapter, int(ProgressionConfig.BOSS_STAGE))
 	var enemy_team: Array[Unit] = _spawn_and_apply(boss_ids, boss_spec, chapter, int(ProgressionConfig.BOSS_STAGE))
-	var predicted_percent: int = TeamOddsEstimator.estimate_win_percent(player_team, enemy_team)
+	var predicted_percent: int = TeamOddsEstimator.estimate_win_percent(player_team, enemy_team, TeamOddsEstimator.BOSS_ESCALATION_PREVIEW_FACTOR)
 	var job: DataModels.SimJob = _make_job(player_ids, boss_ids, player_stage_spec, boss_spec, chapter, sim_seed, sim_index)
 	var simulator: LockstepSimulator = LockstepSimulator.new()
 	var result: Dictionary = simulator.run(job, false, null)

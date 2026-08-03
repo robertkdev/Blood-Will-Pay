@@ -7,14 +7,21 @@ const MIN_PERCENT: int = 1
 const MAX_PERCENT: int = 99
 const EMPTY_TEAM_RATING: float = 1.0
 const ODDS_EXPONENT: float = CombatPowerModel.ODDS_EXPONENT
+# Boss previews are shown before the live encounter escalation can trigger.
+# This factor is the calibrated equivalent for the default heal/revive/attack
+# phases; it keeps the player-facing quote aligned with the fight it will run.
+const BOSS_ESCALATION_PREVIEW_FACTOR: float = 1.25
 
-static func estimate_win_percent(player_team: Array[Unit], enemy_team: Array[Unit]) -> int:
+static func estimate_win_percent(player_team: Array[Unit], enemy_team: Array[Unit], enemy_power_multiplier: float = 1.0) -> int:
 	var player_rating: float = team_rating(player_team)
 	var enemy_rating: float = team_rating(enemy_team)
-	return estimate_from_ratings(player_rating, enemy_rating)
+	return estimate_from_ratings(player_rating, enemy_rating, enemy_power_multiplier)
 
-static func estimate_from_ratings(player_rating: float, enemy_rating: float) -> int:
-	return CombatPowerModel.estimate_from_powers(player_rating, enemy_rating)
+static func estimate_from_ratings(player_rating: float, enemy_rating: float, enemy_power_multiplier: float = 1.0) -> int:
+	return CombatPowerModel.estimate_from_powers(player_rating, preview_enemy_power(enemy_rating, enemy_power_multiplier))
+
+static func preview_enemy_power(enemy_rating: float, enemy_power_multiplier: float = 1.0) -> float:
+	return max(CombatPowerModel.MIN_POWER, float(enemy_rating) * max(1.0, float(enemy_power_multiplier)))
 
 static func team_rating(team: Array[Unit]) -> float:
 	return CombatPowerModel.team_power(team)
