@@ -39,6 +39,8 @@ var _teardown_done: bool = false
 var stage_progress_top_bar: Control
 var _compact_resource_strip: Label = null
 var _shop_bottom_gutter: Control = null
+var account_profile_path: String = "user://account_profile_v1.json"
+var account_journal_path: String = "user://omen_run_journal_v1.json"
 
 var player_name: String = "Hero"
 
@@ -71,6 +73,9 @@ func _ready() -> void:
 		controller = _controller_script.new()
 	else:
 		controller = null
+	if controller != null:
+		controller.account_profile_path = account_profile_path
+		controller.account_journal_path = account_journal_path
 	if not resized.is_connected(Callable(self, "_apply_responsive_layout")):
 		resized.connect(_apply_responsive_layout)
 	_ensure_stage_progress_top_bar()
@@ -143,6 +148,13 @@ func _auto_start_battle() -> void:
 func set_auto_start_battle_enabled(enabled: bool) -> void:
 	if controller != null:
 		controller.set_auto_start_battle_enabled(enabled)
+
+func set_account_progression_paths(profile_path: String, journal_path: String) -> void:
+	account_profile_path = profile_path
+	account_journal_path = journal_path
+	if controller != null:
+		controller.account_profile_path = account_profile_path
+		controller.account_journal_path = account_journal_path
 
 func _refresh_economy_ui() -> void:
 	controller.economy_ui.refresh()

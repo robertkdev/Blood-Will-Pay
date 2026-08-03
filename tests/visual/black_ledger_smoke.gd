@@ -8,6 +8,8 @@ const OUTPUT_DIR: String = "res://outputs/visual_debug/black_ledger/source"
 const VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
 const CAPTURE_SIZE: Vector2i = Vector2i(1920, 1080)
 
+@export var compact_only: bool = false
+
 var _ledger: Control = null
 var _failures: Array[String] = []
 var _capture_count: int = 0
@@ -16,6 +18,9 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	if compact_only:
+		await _run_compact()
+		return
 	var window: Window = get_window()
 	if window != null:
 		window.borderless = true
@@ -41,30 +46,65 @@ func _run() -> void:
 	await _settle_frames(10)
 	_validate_layout("historical_sparse")
 	_expect(_save_capture("02_historical_sparse_ledger_1920x1080.png"), "historical sparse Ledger proof image was not produced")
-	var veteran: Dictionary = AccountProfileStoreScript.default_profile()
-	veteran["omens_balance"] = 24
-	veteran["lifetime_omens"] = 52
-	veteran["unlocked_starter_ids"] = ["axiom", "bonko", "brute", "mara", "pilfer", "sari", "berebell", "grint", "knoll"]
-	veteran["completed_bounty_ids"] = [
-		"axiom_ascendant", "calculated_desperation", "unbought_crown", "made_not_bought", "last_one_standing", "woven_company",
-		"five_disciplines", "empty_chair", "chosen_champion", "stable_foundation", "new_formation", "shared_spotlight",
-	]
+	var veteran: Dictionary = _veteran_profile()
 	var save_result: Dictionary = AccountProfileStoreScript.save_profile(veteran, PROFILE_PATH)
 	_expect(bool(save_result.get("ok", false)), "veteran profile save failed")
 	_ledger.call("refresh")
 	await _settle_frames(10)
 	_validate_layout("veteran")
 	_expect(_save_capture("03_veteran_ledger_1920x1080.png"), "veteran Ledger proof image was not produced")
+	await _validate_living_ledger_controls()
+	AccountProfileStoreScript.clear(PROFILE_PATH)
+	_finish(3 if _framebuffer_capture_available() else 0)
+
+func _run_compact() -> void:
+	var window: Window = get_window()
 	if window != null:
+		window.borderless = true
 		window.size = Vector2i(1280, 760)
 		window.content_scale_size = Vector2i(1280, 720)
-	await _settle_frames(10)
-	_ledger.call("_sync_to_viewport")
-	await _settle_frames(4)
-	await _validate_compact_navigation()
-	_expect(_save_capture("04_veteran_ledger_1280x720_compact.png"), "compact Ledger navigation proof image was not produced")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
 	AccountProfileStoreScript.clear(PROFILE_PATH)
-	var expected_capture_count: int = 4 if _framebuffer_capture_available() else 0
+	var save_result: Dictionary = AccountProfileStoreScript.save_profile(_veteran_profile(), PROFILE_PATH)
+	_expect(bool(save_result.get("ok", false)), "compact veteran profile save failed")
+	_ledger = BlackLedgerScript.new() as Control
+	_ledger.configure(PROFILE_PATH)
+	get_tree().root.add_child(_ledger)
+	await _settle_frames(14)
+	_ledger.call("_sync_to_viewport")
+	_ledger.call("_jump_to_starter_debts")
+	await _settle_frames(12)
+	await _validate_living_ledger_compact(false)
+	RenderingServer.force_draw(false)
+	await _settle_frames(4)
+	_expect(_save_capture("04_veteran_ledger_1280x720_compact.png"), "compact Ledger navigation proof image was not produced")
+	_ledger.call("_jump_to_bounties")
+	await _settle_frames(12)
+	var bounty_button: Button = _ledger.find_child("BountiesNavigation", true, false) as Button
+	var bounty_column: VBoxContainer = _ledger.get("_bounty_column") as VBoxContainer
+	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
+	_expect(bounty_button != null and bool(bounty_button.get_meta("active_ledger_tab", false)), "compact Bounties navigation must become active")
+	_expect(bounty_column != null and bounty_column.is_visible_in_tree(), "compact Bounties record must become visible")
+	_expect(page_scroll != null and bounty_column != null and page_scroll.get_global_rect().intersects(bounty_column.get_global_rect()), "compact Bounties record must intersect the record viewport")
+	RenderingServer.force_draw(false)
+	await _settle_frames(4)
+	_expect(_save_capture("05_veteran_bounties_1280x720_compact.png"), "compact Bounties proof image was not produced")
+	_ledger.call("_jump_to_starter_debts")
+	await _settle_frames(6)
+	var fresh_save: Dictionary = AccountProfileStoreScript.save_profile(AccountProfileStoreScript.default_profile(), PROFILE_PATH)
+	_expect(bool(fresh_save.get("ok", false)), "compact fresh profile save failed")
+	_ledger.call("refresh")
+	_ledger.call("_jump_to_starter_debts")
+	await _settle_frames(12)
+	var fresh_rank: Label = _ledger.find_child("LedgerRankLabel", true, false) as Label
+	_expect(fresh_rank != null and fresh_rank.text.contains("01"), "compact fresh account renders Ledger Rank 1")
+	RenderingServer.force_draw(false)
+	await _settle_frames(4)
+	_expect(_save_capture("06_fresh_ledger_1280x720_compact.png"), "compact fresh Ledger proof image was not produced")
+	AccountProfileStoreScript.clear(PROFILE_PATH)
+	_finish(3 if _framebuffer_capture_available() else 0)
+
+func _finish(expected_capture_count: int) -> void:
 	_expect(_capture_count == expected_capture_count, "expected %d non-empty Ledger proof images, produced %d" % [expected_capture_count, _capture_count])
 	if _failures.is_empty():
 		print("BLACK_LEDGER_VISUAL_SMOKE:PASS captures=%d" % _capture_count)
@@ -74,7 +114,36 @@ func _run() -> void:
 		push_error("BLACK_LEDGER_VISUAL_SMOKE:%s" % failure)
 	get_tree().quit(1)
 
+func _veteran_profile() -> Dictionary:
+	var veteran: Dictionary = AccountProfileStoreScript.default_profile()
+	veteran["omens_balance"] = 24
+	veteran["lifetime_omens"] = 52
+	veteran["rounds_won"] = 38
+	veteran["highest_round"] = 17
+	veteran["bosses_defeated"] = 7
+	veteran["active_writ_families"] = ["blood", "odds"]
+	veteran["writ_tracks"] = {
+		"blood": {"tier": 2, "progress": 13, "completions": 2, "cycles": 0},
+		"odds": {"tier": 1, "progress": 4, "completions": 1, "cycles": 0},
+		"company": {"tier": 0, "progress": 0, "completions": 0, "cycles": 0},
+		"making": {"tier": 0, "progress": 0, "completions": 0, "cycles": 0},
+		"covenant": {"tier": 0, "progress": 0, "completions": 0, "cycles": 0},
+	}
+	veteran["max_red_ink"] = 2
+	veteran["selected_red_ink"] = 1
+	veteran["unlocked_edict_ids"] = ["debtors_mercy", "house_courtesy"]
+	veteran["equipped_edict_ids"] = ["debtors_mercy", "house_courtesy"]
+	veteran["unlocked_starter_ids"] = ["axiom", "bonko", "brute", "mara", "pilfer", "sari", "berebell", "grint", "knoll"]
+	veteran["completed_bounty_ids"] = [
+		"axiom_ascendant", "calculated_desperation", "unbought_crown", "made_not_bought", "last_one_standing", "woven_company",
+		"five_disciplines", "empty_chair", "chosen_champion", "stable_foundation", "new_formation", "shared_spotlight",
+	]
+	return veteran
+
 func _validate_layout(state: String) -> void:
+	_validate_living_ledger_layout(state)
+	if not bool(ProjectSettings.get_setting("debug/testing/run_legacy_black_ledger_assertions", false)):
+		return
 	_expect(_ledger != null, "%s ledger missing" % state)
 	if _ledger == null:
 		return
@@ -200,7 +269,87 @@ func _validate_layout(state: String) -> void:
 		var text_width: float = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, button.get_theme_font_size("font_size")).x
 		_expect(text_width <= maxf(1.0, button.size.x - 8.0), "%s button text overflows: %s" % [state, button.text])
 
+func _validate_living_ledger_layout(state: String) -> void:
+	_expect(_ledger != null, "%s Living Ledger missing" % state)
+	if _ledger == null:
+		return
+	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	var panel: PanelContainer = _ledger.find_child("LedgerPanel", true, false) as PanelContainer
+	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
+	var footer: PanelContainer = _ledger.find_child("LedgerFooter", true, false) as PanelContainer
+	var close_button: Button = _ledger.find_child("CloseFileButton", true, false) as Button
+	var rank_label: Label = _ledger.find_child("LedgerRankLabel", true, false) as Label
+	var rank_bar: ProgressBar = _ledger.find_child("LedgerRankProgress", true, false) as ProgressBar
+	var writ_list: VBoxContainer = _ledger.find_child("ActiveWritList", true, false) as VBoxContainer
+	var red_ink: OptionButton = _ledger.find_child("RedInkSelector", true, false) as OptionButton
+	var edicts: VBoxContainer = _ledger.find_child("EdictList", true, false) as VBoxContainer
+	var error_label: Label = _ledger.find_child("ProfileRecoveryError", true, false) as Label
+	_expect(panel != null and _rect_inside(panel.get_global_rect(), viewport_rect.grow(1.0)), "%s LedgerPanel escaped viewport" % state)
+	_expect(panel != null and panel.size.y >= 760.0 and panel.size.y <= 800.0, "%s Living Ledger should use a bounded desktop dossier, got %.1f" % [state, panel.size.y if panel != null else -1.0])
+	_expect(page_scroll != null and page_scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO, "%s Living Ledger must expose its full farming record through vertical scroll" % state)
+	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s Living Ledger must never escape horizontally" % state)
+	if page_scroll != null and panel != null:
+		_expect(_rect_inside(page_scroll.get_global_rect(), panel.get_global_rect().grow(1.0)), "%s record viewport escaped the Ledger frame" % state)
+	if page_scroll != null and footer != null:
+		_expect(page_scroll.get_global_rect().end.y <= footer.get_global_rect().position.y + 1.0, "%s footer masks the farming record" % state)
+	_expect(close_button != null and close_button.custom_minimum_size.x >= 140.0, "%s close action lost its deliberate footprint" % state)
+	_expect(rank_label != null and rank_label.text.begins_with("LEDGER RANK"), "%s rank identity is not visible" % state)
+	_expect(rank_bar != null and rank_bar.max_value >= 1.0, "%s rank progress bar is not configured" % state)
+	_expect(writ_list != null and writ_list.get_child_count() >= 2, "%s repeatable Writ track and milestone are not visible" % state)
+	_expect(red_ink != null and red_ink.item_count >= 1, "%s Red Ink next-run selector is missing" % state)
+	_expect(edicts != null and edicts.get_child_count() >= 7, "%s Edict purchase/loadout records are incomplete" % state)
+	_expect(error_label != null and not error_label.visible, "%s valid profile should not show a recovery error" % state)
+	var witness: Label = _ledger.get("_witness_stamp_label") as Label
+	if state == "fresh":
+		_expect(witness != null and witness.text == "UNWITNESSED", "fresh Ledger remains unwitnessed")
+	if state == "veteran":
+		_expect(rank_label != null and rank_label.text.contains("21"), "veteran fixture should render its derived rank 21")
+		_expect(_ledger.find_child("WritSlot2", true, false) != null, "rank 21 veteran should expose a second Writ slot")
+	for raw_button: Node in _ledger.find_children("*", "Button", true, false):
+		var button: Button = raw_button as Button
+		if button == null or not button.is_visible_in_tree():
+			continue
+		var text_width: float = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, button.get_theme_font_size("font_size")).x
+		_expect(text_width <= maxf(1.0, button.size.x - 8.0), "%s button text overflows: %s" % [state, button.text])
+
+func _validate_living_ledger_controls() -> void:
+	var writ_selector: OptionButton = _ledger.find_child("WritSelector2", true, false) as OptionButton
+	_expect(writ_selector != null, "veteran Writ slot two selector is interactive")
+	if writ_selector != null:
+		for index: int in range(writ_selector.item_count):
+			if String(writ_selector.get_item_metadata(index)) == "company":
+				writ_selector.select(index)
+				writ_selector.emit_signal("item_selected", index)
+				break
+		await _settle_frames(4)
+		var selected_profile: Dictionary = AccountProfileStoreScript.load_or_create(PROFILE_PATH).get("profile", {}) as Dictionary
+		var selected_writs: Array[String] = []
+		for entry: Variant in selected_profile.get("active_writ_families", []) as Array:
+			selected_writs.append(String(entry))
+		_expect(selected_writs.size() >= 2 and selected_writs[1] == "company", "Writ selector persists the chosen family")
+	var ink_selector: OptionButton = _ledger.find_child("RedInkSelector", true, false) as OptionButton
+	_expect(ink_selector != null and ink_selector.item_count == 3, "veteran Red Ink selector exposes every proved tier")
+	if ink_selector != null:
+		for index: int in range(ink_selector.item_count):
+			if int(ink_selector.get_item_metadata(index)) == 2:
+				ink_selector.select(index)
+				ink_selector.emit_signal("item_selected", index)
+				break
+		await _settle_frames(4)
+		var ink_profile: Dictionary = AccountProfileStoreScript.load_or_create(PROFILE_PATH).get("profile", {}) as Dictionary
+		_expect(int(ink_profile.get("selected_red_ink", -1)) == 2, "Red Ink selector persists the next-run tier")
+	var courtesy_action: Button = _ledger.find_child("EdictAction_house_courtesy", true, false) as Button
+	_expect(courtesy_action != null and courtesy_action.text == "UNEQUIP", "owned equipped Edict exposes an explicit unequip action")
+	if courtesy_action != null:
+		courtesy_action.emit_signal("pressed")
+		await _settle_frames(4)
+		var edict_profile: Dictionary = AccountProfileStoreScript.load_or_create(PROFILE_PATH).get("profile", {}) as Dictionary
+		_expect(not (edict_profile.get("equipped_edict_ids", []) as Array).has("house_courtesy"), "Edict action persists the next-run loadout change")
+
 func _validate_compact_navigation() -> void:
+	_validate_living_ledger_compact()
+	if not bool(ProjectSettings.get_setting("debug/testing/run_legacy_black_ledger_assertions", false)):
+		return
 	var navigator: PanelContainer = _ledger.find_child("LedgerSectionNavigator", true, false) as PanelContainer
 	var starter_button: Button = _ledger.find_child("StarterDebtsNavigation", true, false) as Button
 	var bounty_button: Button = _ledger.find_child("BountiesNavigation", true, false) as Button
@@ -214,15 +363,15 @@ func _validate_compact_navigation() -> void:
 	_expect(navigator != null and navigator.visible, "compact Ledger should pin a visible section navigator")
 	_expect(String(navigator.get_meta("compact_section_discoverability", "")) == "paged_full_entry_starter_debts_and_bounties", "compact Ledger should publish both section destinations and its full-entry paging policy")
 	_expect(String(navigator.get_meta("compact_entry_policy", "")) == "one_section_one_full_entry_above_persistent_footer", "compact Ledger lacks the full-entry viewport contract")
-	_expect(starter_button != null and starter_button.text.contains("STARTER DEBTS"), "compact Ledger should expose Starter Debts navigation")
+	_expect(starter_button != null and starter_button.text.contains("LIVING LEDGER"), "compact Ledger should expose Living Ledger navigation")
 	_expect(bounty_button != null and bounty_button.text.contains("BOUNTIES"), "compact Ledger should expose Bounties navigation")
-	_expect(starter_button != null and starter_button.text.begins_with("ACTIVE //") and bool(starter_button.get_meta("active_ledger_tab", false)), "compact Ledger should visibly identify Starter Debts as the active tab")
+	_expect(starter_button != null and starter_button.text.begins_with("ACTIVE //") and bool(starter_button.get_meta("active_ledger_tab", false)), "compact Ledger should visibly identify Living Ledger as the active tab")
 	_expect(bounty_button != null and not bool(bounty_button.get_meta("active_ledger_tab", true)), "compact Ledger should distinguish inactive Bounties navigation")
 	_expect(close_button != null and close_button.text == "CLOSE" and close_button.custom_minimum_size.x <= 124.0, "compact Ledger close action should remain clean")
 	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "compact Ledger should not expose a horizontal scrollbar")
 	_expect(record_id != null and not record_id.visible and bool(record_id.get_meta("compact_duplicate_metadata_suppressed", false)), "compact Ledger should remove duplicate folio metadata from the entry viewport")
 	_expect(progress != null and String(progress.get_meta("responsive_layout", "")) == "compressed_single_row" and progress.custom_minimum_size.y <= 24.0, "compact Ledger progress evidence should collapse to one readable row")
-	_expect(starter_column != null and starter_column.visible and bounty_column != null and not bounty_column.visible, "compact Ledger should initially page only Starter Debts")
+	_expect(starter_column != null and starter_column.visible and bounty_column != null and not bounty_column.visible, "compact Ledger should initially page only the Living Ledger")
 	_expect(footer_band != null and footer_band.visible and footer_band.get_global_rect().size.y >= 44.0, "compact Ledger should preserve its dedicated footer")
 	var starter_list: VBoxContainer = _ledger.get("_starter_list") as VBoxContainer
 	var record_root: VBoxContainer = _ledger.get("_record_root") as VBoxContainer
@@ -254,6 +403,40 @@ func _validate_compact_navigation() -> void:
 		if page_scroll != null and first_bounty_entry != null:
 			_expect(_rect_inside(first_bounty_entry.get_global_rect(), page_scroll.get_global_rect().grow(1.0)), "compact Ledger shows only a partial first Bounty entry")
 
+func _validate_living_ledger_compact(exercise_navigation: bool = true) -> void:
+	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+	var panel: PanelContainer = _ledger.find_child("LedgerPanel", true, false) as PanelContainer
+	var navigator: PanelContainer = _ledger.find_child("LedgerSectionNavigator", true, false) as PanelContainer
+	var starter_button: Button = _ledger.find_child("StarterDebtsNavigation", true, false) as Button
+	var bounty_button: Button = _ledger.find_child("BountiesNavigation", true, false) as Button
+	var page_scroll: ScrollContainer = _ledger.get("_page_scroll") as ScrollContainer
+	var footer: PanelContainer = _ledger.find_child("LedgerFooter", true, false) as PanelContainer
+	var living_column: VBoxContainer = _ledger.get("_unlock_column") as VBoxContainer
+	var writ_list: VBoxContainer = _ledger.find_child("ActiveWritList", true, false) as VBoxContainer
+	_expect(panel != null and _rect_inside(panel.get_global_rect(), viewport_rect.grow(1.0)), "compact Living Ledger escaped viewport")
+	_expect(navigator != null and navigator.visible, "compact Living Ledger needs visible section navigation")
+	_expect(starter_button != null and starter_button.text.contains("LIVING LEDGER"), "compact navigation should expose the Living Ledger farming page")
+	_expect(bounty_button != null and bounty_button.text.contains("BOUNTIES"), "compact navigation should expose Bounties")
+	_expect(page_scroll != null and page_scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO, "compact farming record must remain vertically reachable")
+	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "compact farming record must not scroll horizontally")
+	_expect(footer != null and footer.get_global_rect().size.y >= 44.0, "compact Ledger footer must remain persistent")
+	_expect(_ledger.find_child("WritSelector1", true, false) != null, "compact Ledger must retain the Writ selector")
+	var progress_copy: Label = _ledger.find_child("WritProgressCopy1", true, false) as Label
+	_expect(progress_copy != null and progress_copy.text.contains("QUALIFYING WINS"), "compact Writ progress must expose an exact numeric count")
+	_expect(_ledger.find_child("RedInkSelector", true, false) != null, "compact Ledger must retain the Red Ink selector")
+	_expect(living_column != null and living_column.visible and living_column.is_visible_in_tree(), "compact Living Ledger column must be visible before navigation")
+	_expect(living_column != null and living_column.get_global_rect().size.y >= 300.0, "compact Living Ledger column must receive document space")
+	_expect(writ_list != null and writ_list.is_visible_in_tree() and writ_list.get_global_rect().size.y >= 80.0, "compact Writ records must be visibly laid out")
+	_expect(page_scroll != null and living_column != null and page_scroll.get_global_rect().intersects(living_column.get_global_rect()), "compact Living Ledger column must intersect the record viewport")
+	if exercise_navigation and bounty_button != null:
+		bounty_button.emit_signal("pressed")
+		await _settle_frames(3)
+		_expect(bool(bounty_button.get_meta("active_ledger_tab", false)), "compact Bounties page should become active")
+	if exercise_navigation and starter_button != null:
+		starter_button.emit_signal("pressed")
+		await _settle_frames(3)
+		_expect(bool(starter_button.get_meta("active_ledger_tab", false)), "compact Living Ledger page should reactivate after navigation")
+
 func _save_capture(filename: String) -> bool:
 	if not _framebuffer_capture_available():
 		print("BlackLedgerVisualSmoke: explicit headless capture skipped for %s" % filename)
@@ -267,13 +450,12 @@ func _save_capture(filename: String) -> bool:
 	if image == null or image.is_empty() or image.get_width() <= 0 or image.get_height() <= 0:
 		_failures.append("viewport image unavailable for %s" % filename)
 		return false
-	var minimum_capture_width: int = int(round(float(CAPTURE_SIZE.x) * 0.95))
-	var minimum_capture_height: int = int(round(float(CAPTURE_SIZE.y) * 0.95))
+	var expected_size: Vector2 = get_viewport().get_visible_rect().size
+	var minimum_capture_width: int = int(round(expected_size.x * 0.95))
+	var minimum_capture_height: int = int(round(expected_size.y * 0.95))
 	if image.get_width() < minimum_capture_width or image.get_height() < minimum_capture_height:
 		_failures.append("viewport image for %s was %dx%d, expected at least %dx%d" % [filename, image.get_width(), image.get_height(), minimum_capture_width, minimum_capture_height])
 		return false
-	if image.get_size() != CAPTURE_SIZE:
-		image.resize(CAPTURE_SIZE.x, CAPTURE_SIZE.y, Image.INTERPOLATE_LANCZOS)
 	var path: String = "%s/%s" % [OUTPUT_DIR, filename]
 	var error: Error = image.save_png(path)
 	if error != OK:

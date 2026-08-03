@@ -45,6 +45,21 @@ func _seed(veteran: bool) -> Dictionary:
 	if veteran:
 		seeded["omens_balance"] = 24
 		seeded["lifetime_omens"] = 52
+		seeded["rounds_won"] = 38
+		seeded["highest_round"] = 17
+		seeded["bosses_defeated"] = 7
+		seeded["active_writ_families"] = ["blood", "odds"]
+		seeded["writ_tracks"] = {
+			"blood": {"tier": 2, "progress": 13, "completions": 2, "cycles": 0},
+			"odds": {"tier": 1, "progress": 4, "completions": 1, "cycles": 0},
+			"company": {"tier": 0, "progress": 0, "completions": 0, "cycles": 0},
+			"making": {"tier": 0, "progress": 0, "completions": 0, "cycles": 0},
+			"covenant": {"tier": 0, "progress": 0, "completions": 0, "cycles": 0},
+		}
+		seeded["max_red_ink"] = 2
+		seeded["selected_red_ink"] = 1
+		seeded["unlocked_edict_ids"] = ["debtors_mercy", "house_courtesy"]
+		seeded["equipped_edict_ids"] = ["debtors_mercy", "house_courtesy"]
 		seeded["unlocked_starter_ids"] = ["axiom", "bonko", "brute", "mara", "pilfer", "sari", "berebell", "grint", "knoll"]
 		seeded["completed_bounty_ids"] = [
 			"axiom_ascendant", "calculated_desperation", "unbought_crown", "made_not_bought", "last_one_standing", "woven_company",

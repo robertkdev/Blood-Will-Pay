@@ -6,6 +6,7 @@ const RuleProvider := preload("res://scripts/game/progression/rules/rule_provide
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
 const UnitScaler := preload("res://scripts/game/units/unit_scaler.gd")
+const LivingLedgerCatalogScript: GDScript = preload("res://scripts/game/account/living_ledger_catalog.gd")
 const MAX_ITEMS_PER_UNIT := 3
 
 static var _item_warning_logged: bool = false
@@ -27,6 +28,7 @@ static func post_spawn(units: Array, spec: Dictionary, ch: int, sic: int) -> voi
 	_apply_stat_overrides(units, spec)
 	_apply_item_overrides(units, spec)
 	apply_enemy_multiplier(units, _current_contract_enemy_multiplier())
+	apply_red_ink_multiplier(units, _current_red_ink_enemy_multiplier())
 
 static func pre_engine_config(state: Variant, engine: Variant, spec: Dictionary, ch: int, sic: int) -> void:
 	var p: Variant = _provider_for(spec, ch)
@@ -159,6 +161,20 @@ static func apply_enemy_multiplier(units: Array, multiplier: float) -> void:
 		unit.armor = max(0.0, unit.armor * factor)
 		unit.magic_resist = max(0.0, unit.magic_resist * factor)
 
+static func apply_red_ink_multiplier(units: Array, multiplier: float) -> void:
+	var factor: float = sqrt(max(1.0, float(multiplier)))
+	if factor <= 1.0:
+		return
+	for raw_unit: Variant in units:
+		var unit: Unit = raw_unit as Unit
+		if unit == null:
+			continue
+		unit.max_hp = max(1, int(round(float(unit.max_hp) * factor)))
+		unit.hp = unit.max_hp
+		unit.attack_damage = max(0.0, unit.attack_damage * factor)
+		unit.spell_power = max(0.0, unit.spell_power * factor)
+		unit.true_damage = max(0.0, unit.true_damage * factor)
+
 static func _current_contract_enemy_multiplier() -> float:
 	var loop: MainLoop = Engine.get_main_loop()
 	if loop == null or not loop.has_method("get_root"):
@@ -170,6 +186,21 @@ static func _current_contract_enemy_multiplier() -> float:
 	if shop != null and shop.has_method("get_contract_enemy_multiplier"):
 		return max(1.0, float(shop.call("get_contract_enemy_multiplier")))
 	return 1.0
+
+static func _current_red_ink_enemy_multiplier() -> float:
+	var loop: MainLoop = Engine.get_main_loop()
+	if loop == null or not loop.has_method("get_root"):
+		return 1.0
+	var root: Window = loop.get_root()
+	if root == null:
+		return 1.0
+	var economy: Node = root.get_node_or_null("/root/Economy")
+	if economy == null:
+		return 1.0
+	var loadout_value: Variant = economy.get("ledger_loadout")
+	if not loadout_value is Dictionary:
+		return 1.0
+	return LivingLedgerCatalogScript.red_ink_enemy_multiplier(int((loadout_value as Dictionary).get("red_ink_tier", 0)))
 
 static func _current_contract_battle_config() -> Dictionary:
 	var loop: MainLoop = Engine.get_main_loop()

@@ -1,17 +1,26 @@
 # Black Ledger account progression
 
-The Black Ledger is Blood Will Pay's local-profile progression layer. It rewards demonstrated mastery with permanent starter options while leaving combat power, odds, shop power, and starting bankroll unchanged. The current implementation persists on this installation; it does not yet synchronize through Steam, a server account, or cloud storage.
+The Black Ledger is Blood Will Pay's permanent, local-profile farming layer. Every victorious round advances the account, while deeper runs, repeatable Writs, optional Red Ink pressure, and permanent Edicts make later runs more productive. It is active progression rather than offline accumulation: the player earns by playing fights.
+
+The detailed numbers and balancing contract live in [black_ledger_progression.md](black_ledger_progression.md).
 
 ## Core rules
 
-- A fresh account can choose Axiom, Bonko, Brute, Mara, Pilfer, or Sari as its opening starter.
-- Locked starters still appear normally in shops and enemy teams. Only the opening starter picker is filtered.
-- Omens come only from one-time Bounties. Runs completed, offline time, lifetime gold, and other passive totals never award Omens.
-- Every revealed Bounty is active. There is no Bounty-selection or equipment step.
-- Several Bounties may resolve after one victory, but each can pay only once and every combat event is finalized idempotently.
-- Spending reduces the current Omen balance. Circle and starter access use lifetime Omens, which spending never reduces.
-- A profile is stored atomically at `user://account_profile_v1.json`; its run-local Bounty journal is `user://omen_run_journal_v1.json`.
-- Existing career records are left intact. Creating a profile grants no retroactive Omens.
+- Every unique victorious round pays at least **1 Omen** immediately. A replayed or duplicated victory event pays nothing.
+- Omens are both spendable currency and permanent experience: spending changes `omens_balance`, never `lifetime_omens` or Ledger Rank.
+- Ledger Rank 1–99 uses the exact RuneScape experience curve at 100 XP per lifetime Omen.
+- Repeatable Writs persist across runs. A qualifying victory advances every selected Writ; completion pays Omens, then the Writ repeats or advances when its rank gate is open.
+- One Writ slot is available at Rank 1, a second at Rank 15, and a third at Rank 30. The Third Margin Edict can add a fourth.
+- Red Ink is optional next-run pressure. Its tier and the player's Writ/Edict loadout are frozen when a new run begins, so the player cannot switch after seeing a matchup.
+- The 22 original Bounties remain one-time first-clear bonuses. Every revealed unfinished Bounty is active without an equipment step.
+- A fresh account can choose Axiom, Bonko, Brute, Mara, Pilfer, or Sari as its opening starter. Locked starters still appear in shops and enemy teams.
+- Starter purchases and Edicts spend current Omens. Rank, circle access, and lifetime thresholds never fall when Omens are spent.
+
+## Persistence and recovery
+
+The schema-v2 profile remains at `user://account_profile_v1.json` so existing installations migrate in place. It keeps a checksummed primary file and backup, preserves the old starter/Bounty state, and adds rank inputs, Writ tracks, Edicts, Red Ink, and per-run victory high-water marks. The run-local sequential-Bounty journal remains `user://omen_run_journal_v1.json`.
+
+Corrupt primary profiles recover from a valid backup. If neither copy is valid, the Ledger displays a recovery error instead of silently pretending the account is fresh.
 
 ## Starter debts
 
@@ -22,21 +31,10 @@ The Black Ledger is Blood Will Pay's local-profile progression layer. It rewards
 | 48 | Morrak, Korath | 12 |
 | 72 | Repo, Mortem | 15 |
 
-Accessible starters can be bought in any order. The Ledger foreshadows sealed identities before revealing their names.
-
-## Bounty circles
-
-Circle I is visible immediately and pays 3 Omens per Bounty. It teaches combining, traits, boss preparation, survivor margins, and serious wagering.
-
-Circle II appears at 6 lifetime Omens and pays 4 each. It asks for role breadth, unused capacity, Champion and Stable contracts, formation changes, and different damage carries.
-
-Circle III appears at 24 lifetime Omens and pays 6 each. It covers Pit contracts, Command consistency, CAPITAL recruits, level-4 Legacies, and clean multi-phase boss execution.
-
-Circle IV appears at 48 lifetime Omens and pays 8 each. It combines the learned systems: all three contract families, all six roles plus four traits, consecutive underdog wagers, a purchase-free Chapter 1, and a one-survivor multi-phase boss wager.
-
-The catalog is defined in `scripts/game/account/bounty_catalog.gd`. Evaluation is driven by authoritative post-combat facts in `scripts/game/account/account_progression.gd`; paid shop-action counters persist inside the active-run shop snapshot.
+Accessible starters can be bought in any order. These unlocks are options, not raw combat-stat purchases.
 
 ## Validation
 
-- `tests/rga_testing/validation/AccountProgressionProbe.tscn` checks fresh-profile initialization, exactly six base starters, one-time/idempotent awards, lifetime-vs-balance spending, permanent purchases, and circle gating.
-- `tests/visual/BlackLedgerSmoke.tscn` captures fresh and progressed Ledger states from the editor-game framebuffer and checks clipping and button text fit in the Windows client area.
+- `tests/rga_testing/validation/AccountProgressionProbe.tscn` verifies migration, exact rank thresholds, one-Omen victories, repeatable Writ payouts, first-clear Bounties, purchases, Red Ink unlock gates, backup recovery, and replay protection.
+- `tests/rga_testing/validation/LivingLedgerRuntimeProbe.tscn` verifies real Economy/Shop integration, run-start loadout freezing, starting-gold/free-reroll Edicts, Red Ink stat pressure, and save/resume preservation.
+- `tests/visual/BlackLedgerSmoke.tscn` and `tests/visual/BlackLedgerCompactSmoke.tscn` verify desktop and compact dossier rendering, navigation, controls, scrolling, and text fit from the real Godot framebuffer.

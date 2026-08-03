@@ -13,6 +13,7 @@ const MAX_GROSS_PAYOUT_MULTIPLIER: float = 4.0
 const REROLL_STAKE_UNITS: int = 2
 const PROGRESSION_STAKE_UNITS: int = 4
 const StakesMarket := preload("res://scripts/game/economy/stakes_market.gd")
+const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
 
 var gold: int = STARTING_GOLD
 var current_bet: int = 1
@@ -27,6 +28,8 @@ var projected_win_probability: float = DEFAULT_PROJECTED_WIN_PROBABILITY
 var quoted_gross_multiplier: float = 2.0
 var payout_modifier: float = 1.0
 var run_id: String = ""
+var ledger_loadout: Dictionary = {}
+var account_profile_path: String = "user://account_profile_v1.json"
 
 # Combat credit tracking
 var combat_active: bool = false
@@ -44,7 +47,8 @@ func _ready() -> void:
 	reset_run()
 
 func reset_run() -> void:
-	gold = STARTING_GOLD
+	ledger_loadout = AccountProgressionScript.ledger_run_loadout(account_profile_path)
+	gold = STARTING_GOLD + (1 if has_ledger_edict("debtors_mercy") else 0)
 	current_bet = min(1, gold)
 	preferred_bet = current_bet
 	peak_bankroll = gold
@@ -68,6 +72,15 @@ func reset_run() -> void:
 	bet_changed.emit(current_bet)
 	stake_changed.emit(stake_unit, stake_rank)
 	_emit_score()
+
+func has_ledger_edict(edict_id: String) -> bool:
+	var equipped_value: Variant = ledger_loadout.get("equipped_edict_ids", [])
+	if not equipped_value is Array:
+		return false
+	for entry: Variant in equipped_value as Array:
+		if String(entry).strip_edges().to_lower() == edict_id.strip_edges().to_lower():
+			return true
+	return false
 
 func set_projected_win_probability(probability: float) -> void:
 	projected_win_probability = clampf(float(probability), 0.01, 1.0)
@@ -227,6 +240,7 @@ func snapshot_run_record() -> Dictionary:
 		"projected_win_probability": projected_win_probability,
 		"payout_modifier": payout_modifier,
 		"run_id": run_id,
+		"ledger_loadout": ledger_loadout.duplicate(true),
 	}
 
 func restore_run_record(record: Dictionary) -> void:
@@ -245,6 +259,8 @@ func restore_run_record(record: Dictionary) -> void:
 	projected_win_probability = clampf(float(record.get("projected_win_probability", DEFAULT_PROJECTED_WIN_PROBABILITY)), 0.01, 1.0)
 	payout_modifier = max(1.0, float(record.get("payout_modifier", 1.0)))
 	run_id = String(record.get("run_id", "%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_msec()]))
+	var ledger_value: Variant = record.get("ledger_loadout", {})
+	ledger_loadout = (ledger_value as Dictionary).duplicate(true) if ledger_value is Dictionary else {}
 	quoted_gross_multiplier = gross_payout_multiplier(projected_win_probability)
 	_locked_gross_multiplier = quoted_gross_multiplier
 	combat_active = false
