@@ -41,6 +41,8 @@ func _run_two_stage_flow() -> void:
 	await _select_starter(_flow_starter_id())
 	await _settle_frames(4)
 	_expect(_node_visible("CombatView"), "CombatView did not open for natural two-stage flow")
+	if _flow_account_profile_path() != "":
+		_apply_isolated_combat_account_paths(_flow_account_profile_path(), _flow_account_journal_path())
 	var repositioned: bool = await _reposition_first_board_unit("natural two-stage opener reposition")
 	_expect(repositioned, "starter did not reposition before natural two-stage opener")
 	if not _technical_failures().is_empty():
@@ -634,6 +636,12 @@ func _flow_smoke_name() -> String:
 
 func _flow_starter_id() -> String:
 	return TWO_STAGE_STARTER_ID
+
+func _flow_account_profile_path() -> String:
+	return ""
+
+func _flow_account_journal_path() -> String:
+	return ""
 
 func _flow_shop_seed() -> int:
 	return TWO_STAGE_SHOP_SEED

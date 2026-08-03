@@ -1,6 +1,7 @@
 extends "res://tests/visual/actual_run_loop_smoke.gd"
 
 const UnitCatalogLib: Script = preload("res://scripts/game/shop/unit_catalog.gd")
+const AccountProfileStoreScript: GDScript = preload("res://scripts/game/account/account_profile_store.gd")
 const SMOKE_NAME: String = "FirstShopChoiceQualitySmoke"
 const TARGET_STARTERS: Array[String] = ["axiom", "bo", "bonko", "mara", "korath", "morrak", "mortem", "repo", "sari"]
 const TARGET_HELPERS: Dictionary = {
@@ -216,6 +217,39 @@ func _start_main_scene() -> void:
 	_main.offset_right = 0.0
 	_main.offset_bottom = 0.0
 	get_tree().root.add_child(_main)
+
+func _seed_isolated_account_profile(profile_path: String, unlocked_starter_ids: Array[String]) -> bool:
+	AccountProfileStoreScript.clear(profile_path)
+	var profile: Dictionary = AccountProfileStoreScript.default_profile()
+	profile["unlocked_starter_ids"] = unlocked_starter_ids.duplicate()
+	var saved: Dictionary = AccountProfileStoreScript.save_profile(profile, profile_path)
+	return bool(saved.get("ok", false))
+
+func _apply_isolated_account_profile(profile_path: String) -> void:
+	var select: UnitSelect = _main.get_node_or_null("UnitSelect") as UnitSelect if _main != null else null
+	if select == null:
+		_expect(false, "isolated account profile could not find UnitSelect")
+		return
+	_flush_synthetic_input()
+	select.account_profile_path = profile_path
+	select.call("_populate_units")
+	select.reset_selection()
+	await _settle_frames(8)
+
+func _apply_isolated_combat_account_paths(profile_path: String, journal_path: String) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	if combat == null:
+		return
+	var controller_value: Variant = combat.get("controller")
+	if controller_value is Object:
+		var controller: Object = controller_value as Object
+		controller.set("account_profile_path", profile_path)
+		controller.set("account_journal_path", journal_path)
+
+func _clear_isolated_account_profile(profile_path: String, journal_path: String) -> void:
+	AccountProfileStoreScript.clear(profile_path)
+	if FileAccess.file_exists(journal_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(journal_path))
 
 func _wait_for_first_result(timeout_seconds: float) -> String:
 	var deadline: int = Time.get_ticks_msec() + int(timeout_seconds * 1000.0)

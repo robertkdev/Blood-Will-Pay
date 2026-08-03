@@ -1,6 +1,8 @@
 extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const ALL_SMOKE_NAME: String = "AllStarterMainFlowSmoke"
+const ALL_STARTER_PROFILE_PATH: String = "user://all_starter_main_flow_account_profile.json"
+const ALL_STARTER_JOURNAL_PATH: String = "user://all_starter_main_flow_omen_journal.json"
 
 var _starter_results: Array[Dictionary] = []
 
@@ -23,6 +25,7 @@ func _run() -> void:
 	print("%s: starters=%s" % [_smoke_name(), ",".join(starter_ids)])
 	_expect(not starter_ids.is_empty(), "starter catalog should not be empty")
 	for starter_id: String in starter_ids:
+		_expect(_seed_isolated_account_profile(ALL_STARTER_PROFILE_PATH, starter_ids), "all-starter smoke profile should save")
 		var result: Dictionary = await _run_starter_main_flow(starter_id, catalog)
 		_starter_results.append(result)
 		_assert_starter_main_flow(result)
@@ -65,6 +68,7 @@ func _finish_all_starters() -> void:
 			push_error("%s: %s" % [_smoke_name(), failure])
 		exit_code = 1
 	_cleanup_runtime()
+	_clear_isolated_account_profile(ALL_STARTER_PROFILE_PATH, ALL_STARTER_JOURNAL_PATH)
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
 
 func _smoke_name() -> String:
@@ -98,10 +102,12 @@ func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Diction
 	await _settle_frames(4)
 	var unit_select_started_reset: bool = _unit_select_reset()
 	await _ensure_unit_select()
+	await _apply_isolated_account_profile(ALL_STARTER_PROFILE_PATH)
 	await _select_starter(starter_id)
 	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	var board_repositioned: bool = false
 	if combat_opened:
+		_apply_isolated_combat_account_paths(ALL_STARTER_PROFILE_PATH, ALL_STARTER_JOURNAL_PATH)
 		_prepare_opener_planning(starter_id)
 		await _press_continue(true, "starter %s opening fight" % starter_id)
 	var first_result: String = await _wait_for_first_result(_first_fight_timeout_seconds())
