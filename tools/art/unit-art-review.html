@@ -966,8 +966,11 @@
 		const STORAGE_KEY = "blood-will-pay-unit-art-review-v1";
 		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
 		const COMMENTS_KEY = "blood-will-pay-unit-art-comments-v1";
+		const LEGACY_COMMENTS_KEY = "gamble-battle-unit-art-comments-v1";
 		const PINS_KEY = "blood-will-pay-unit-art-pins-v1";
+		const LEGACY_PINS_KEY = "gamble-battle-unit-art-pins-v1";
 		const DEFAULTS_KEY = "blood-will-pay-unit-art-defaults-v1";
+		const LEGACY_DEFAULTS_KEY = "gamble-battle-unit-art-defaults-v1";
 		const MAX_PINS = 5;
 		const LIVE_ART = [
 			"axiom.png",
@@ -2068,11 +2071,16 @@
 
 		function loadComments() {
 			try {
-				const raw = localStorage.getItem(COMMENTS_KEY);
+				const current = localStorage.getItem(COMMENTS_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_COMMENTS_KEY);
+				const raw = current || legacy;
 				if (!raw) {
 					return {};
 				}
 				const parsed = JSON.parse(raw);
+				if (!current && legacy) {
+					localStorage.setItem(COMMENTS_KEY, JSON.stringify(parsed));
+				}
 				return parsed && typeof parsed === "object" ? parsed : {};
 			} catch (error) {
 				return {};
@@ -2085,14 +2093,20 @@
 
 		function loadPins() {
 			try {
-				const raw = localStorage.getItem(PINS_KEY);
+				const current = localStorage.getItem(PINS_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_PINS_KEY);
+				const raw = current || legacy;
 				if (!raw) {
 					return [];
 				}
 				const parsed = JSON.parse(raw);
-				return Array.isArray(parsed)
+				const pins = Array.isArray(parsed)
 					? [...new Set(parsed.filter((value) => typeof value === "string"))].slice(0, MAX_PINS)
 					: [];
+				if (!current && legacy) {
+					localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+				}
+				return pins;
 			} catch (error) {
 				return [];
 			}
@@ -2104,12 +2118,18 @@
 
 		function loadDefaults() {
 			try {
-				const raw = localStorage.getItem(DEFAULTS_KEY);
+				const current = localStorage.getItem(DEFAULTS_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_DEFAULTS_KEY);
+				const raw = current || legacy;
 				if (!raw) {
 					return {};
 				}
 				const parsed = JSON.parse(raw);
-				return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+				const defaults = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+				if (!current && legacy) {
+					localStorage.setItem(DEFAULTS_KEY, JSON.stringify(defaults));
+				}
+				return defaults;
 			} catch (error) {
 				return {};
 			}

@@ -87,7 +87,7 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 }
 
 [
-	"Gamble Battle Unit Art Comparison Tool",
+	"Blood Will Pay Unit Art Comparison Tool",
 	"<button type=\"button\" data-set=\"phase2\">Phase 2</button>",
 	"unit: file === \"cashmere.png\" ? \"mara\"",
 	"{ unit: \"mara\", role: \"Mage\"",
@@ -98,6 +98,9 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"ALL_UNIT_ART.push(CANONICAL_CURRENT.get(unit) || PHASE2_CURRENT.get(unit) || item)",
 	"const PINS_KEY",
 	"const DEFAULTS_KEY",
+	"const LEGACY_COMMENTS_KEY",
+	"const LEGACY_PINS_KEY",
+	"const LEGACY_DEFAULTS_KEY",
 	"const MAX_PINS = 5",
 	"<button id=\"set-default\" class=\"action primary\" type=\"button\">Set as Default</button>",
 	"function itemIdentity(item)",
