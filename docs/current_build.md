@@ -6,11 +6,12 @@ Updated: 2026-08-03
 
 - Shared playable line: `origin/main` in `robertkdev/Blood-Will-Pay`.
 - Recovery baseline: `326e559e7061b546c2a971164ddddaeaaeac9de7`.
+- Recovered build payload: `6eb173c4de77fbba8a68171f1d9986b69ac06ad3`, integrated by verified fast-forward on 2026-08-03.
 - Recovery owner branch: `codex/019fc82a-68c-shared-line-recovery` (retained after integration).
 - Intended recovered surface: Blood Will Pay Unit Art Comparison Tool with Phase 2, 34 curated history entries, canonical Mara, five-pin plus active comparison, persistent defaults, and the current Malachor/Veyra review cards.
 - Clean-checkout runtime: the masked `ItemCatalog` startup reference is repaired; Mara rename, role-matrix, and main-scene MCP checks pass after a normal import.
 
-The exact verified remote-main SHA is recorded in the canonical Gamble Battle brain and the recovery handoff after the controlled fast-forward.
+The integration controller preserved the prior shared head on `codex/integration-backups/main/20260803T104029-gamble-battle-shared-lin`. The exact final remote-main SHA, including any documentation-only follow-up, is recorded in the canonical Gamble Battle brain and recovery handoff.
 
 ## Ready or represented
 
@@ -28,4 +29,4 @@ The exact verified remote-main SHA is recorded in the canonical Gamble Battle br
 
 ## Next integration action
 
-Validate the recovery branch, push and verify it, apply the exact approved fast-forward plan to `origin/main`, record reviewed source-branch receipts, then refresh only a clean shared checkout with `tools/Refresh-SharedBuildCheckout.ps1`.
+The recovery payload is integrated and its Phase 2/Creep source receipts are `integrated-reviewed`. Keep active tasks deferred, review terminal receipts in the one-owner queue, and refresh only a marked clean shared checkout with `tools/Refresh-SharedBuildCheckout.ps1`. Held art branches remain pending until an explicit product decision.

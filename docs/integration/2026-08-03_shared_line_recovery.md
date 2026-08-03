@@ -55,3 +55,10 @@ The isolated checkout exposed one real cold-start parser defect that the long-li
 - Independent visual review: PASS, hash-bound baseline `shared-line-recovery-8637ad0400`; no blocking clipping or occlusion. Evidence is under `C:\Users\Flipm\.codex\visualizations\2026\08\03\019fc82a-68c1-7831-8a60-01f79e56a909`.
 - Godot 4.5 MCP validation after a clean import: `MaraRenameContractSmoke: PASS`, `RoleMatrixProbe(brute): PASS (failed=0, skipped=0, errors=0)`, and `scenes/Main.tscn` started without a script assertion or engine error. Existing GDScript warnings remain outside this recovery scope.
 - Final Git SHA and remote-main verification are recorded in the final recovery handoff and canonical brain after completion.
+
+## Controlled integration result
+
+- The approved controller fast-forwarded `origin/main` from `326e559e7061b546c2a971164ddddaeaaeac9de7` to recovered payload `6eb173c4de77fbba8a68171f1d9986b69ac06ad3` without force.
+- Recovery ref `codex/integration-backups/main/20260803T104029-gamble-battle-shared-lin` preserves the prior shared head; the recovery source branch remains remotely available.
+- Phase 2 and Creep V6 source receipts are recorded as `integrated-reviewed` with `reviewed-cherry-pick` strategy.
+- The user's normal checkout remains on `2963d275219b7d882c779d96e0bf50fe7d0c873c`, dirty and untouched; it is intentionally not the clean shared-build checkout.
