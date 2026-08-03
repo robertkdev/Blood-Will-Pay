@@ -12,4 +12,5 @@ stat_mods = {"pct_ad": 0.20, "flat_start_mana": 20}
 effects = ["mind_siphon"]
 components = ["hammer", "orb"]
 tags = PackedStringArray("assassin", "brawler")
+build_axes = PackedStringArray("attack_damage", "mana", "tempo")
 

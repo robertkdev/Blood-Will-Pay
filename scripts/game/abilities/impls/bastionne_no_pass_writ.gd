@@ -9,6 +9,10 @@ const GATE_DURATION: float = 4.5
 const GATE_ARMOR: float = 40.0
 const GATE_MR: float = 40.0
 const GATE_DR: float = 0.18
+const SELF_GATE_STAT_SCALE: float = 0.5
+const SELF_GATE_DR: float = 0.08
+const SELF_GATE_SHIELD_SCALE: float = 0.45
+const SELF_IMMUNITY_SCALE: float = 0.5
 const IMMUNITY_DURATION: float = 1.4
 const MAX_ALLIES: int = 4
 
@@ -44,11 +48,12 @@ func cast(ctx: AbilityContext) -> bool:
 
 func _priority_lockdown_target(ctx: AbilityContext) -> int:
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	var target_team: String = _enemy_team(ctx.caster_team)
 	var best_index: int = -1
 	var best_score: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var score: float = float(enemy.attack_damage) + float(enemy.spell_power) * 0.5
 		var role_id: String = String(enemy.primary_role).strip_edges().to_lower()
@@ -75,13 +80,19 @@ func _raise_gate(ctx: AbilityContext, level_index: int) -> void:
 		var ally: Unit = allies[index]
 		if ally == null or not ally.is_alive():
 			continue
+		var is_self: bool = index == ctx.caster_index
+		var armor_bonus: float = GATE_ARMOR * SELF_GATE_STAT_SCALE if is_self else GATE_ARMOR
+		var mr_bonus: float = GATE_MR * SELF_GATE_STAT_SCALE if is_self else GATE_MR
+		var dr_bonus: float = SELF_GATE_DR if is_self else GATE_DR
+		var shield_amount: int = int(round(float(SHIELD_BASE[level_index]) * SELF_GATE_SHIELD_SCALE)) if is_self else SHIELD_BASE[level_index]
+		var immunity_duration: float = IMMUNITY_DURATION * SELF_IMMUNITY_SCALE if is_self else IMMUNITY_DURATION
 		ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, index, "bastionne_no_pass_gate", {
-			"armor": GATE_ARMOR,
-			"magic_resist": GATE_MR,
-			"damage_reduction": GATE_DR
+			"armor": armor_bonus,
+			"magic_resist": mr_bonus,
+			"damage_reduction": dr_bonus
 		}, GATE_DURATION)
-		ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, index, SHIELD_BASE[level_index], GATE_DURATION)
-		ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, index, BuffTags.TAG_CC_IMMUNE, IMMUNITY_DURATION, {
+		ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, index, shield_amount, GATE_DURATION)
+		ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, index, BuffTags.TAG_CC_IMMUNE, immunity_duration, {
 			"block_mana_gain": true
 		})
 		applied += 1

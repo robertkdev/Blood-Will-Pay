@@ -1,36 +1,6 @@
 extends RefCounted
 class_name CombatController
 
-const Trace := preload("res://scripts/util/trace.gd")
-const UI := preload("res://scripts/constants/ui_constants.gd")
-const G := preload("res://scripts/constants/gameplay_constants.gd")
-const TextureUtils := preload("res://scripts/util/texture_utils.gd")
-const Debug := preload("res://scripts/util/debug.gd")
-const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
-const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
-
-const ArenaBridge := preload("res://scripts/ui/combat/arena_bridge.gd")
-const GridPlacement := preload("res://scripts/ui/combat/grid_placement.gd")
-const BenchPlacement := preload("res://scripts/ui/combat/bench_placement.gd")
-const UnitEffectPlayer := preload("res://scripts/ui/vfx/unit_effect_player.gd")
-const MoveRouter := preload("res://scripts/ui/combat/move_router.gd")
-const ProjectileBridge := preload("res://scripts/ui/combat/projectile_bridge.gd")
-const EconomyUI := preload("res://scripts/ui/combat/economy_ui.gd")
-const IntermissionController := preload("res://scripts/ui/combat/intermission_controller.gd")
-const ShopPresenter := preload("res://scripts/ui/shop/shop_presenter.gd")
-const SellZone := preload("res://scripts/ui/shop/sell_zone.gd") # legacy; no longer used visually
-const SelectionService := preload("res://scripts/ui/combat/stats/selection_service.gd")
-const StatsTracker := preload("res://scripts/ui/combat/stats/stats_tracker.gd")
-const ItemsPresenter := preload("res://scripts/ui/items/items_presenter.gd")
-const ItemRuntime := preload("res://scripts/game/items/item_runtime.gd")
-const ItemDragRouter := preload("res://scripts/ui/items/item_drag_router.gd")
-const TraitsPresenter := preload("res://scripts/ui/traits/traits_presenter.gd")
-const LogSchema := preload("res://scripts/util/log_schema.gd")
-const ProgressionService := preload("res://scripts/game/progression/progression_service.gd")
-const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
-const RosterUtils := preload("res://scripts/game/progression/roster_utils.gd")
-const TeamOddsEstimator := preload("res://scripts/game/combat/team_odds_estimator.gd")
-
 const START_BATTLE_TEXT: String = "Start Battle"
 const START_FORCED_FIGHT_TEXT: String = "Start Opening Fight"
 const BATTLE_LOCKED_TEXT: String = "Battle in progress"
@@ -121,11 +91,13 @@ var move_router
 
 # Auto-battle
 var auto_combat: bool = true
+var auto_start_battle: bool = true
 var _auto_loop_running: bool = false
 var turn_delay: float = 0.6
 
 # Other state
 var _post_combat_outcome: String = ""
+var _post_combat_stage_was_mirror: bool = false
 var _pending_continue: bool = false
 var view_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _beam_overlay: Control = null
@@ -143,7 +115,7 @@ var _combat_resolving_watchdog_seen: bool = false
 var _hud_snapshot_signature: String = ""
 var _result_banner: PanelContainer = null
 var _bottom_combat_visibility_state: int = -1
-var _layout_tile_size: int = UI.TILE_SIZE
+var _layout_tile_size: int = UIConstants.TILE_SIZE
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -222,18 +194,12 @@ func teardown() -> void:
 	if item_runtime != null:
 		if item_runtime.has_method("teardown"):
 			item_runtime.teardown()
-		if item_runtime.is_inside_tree():
-			item_runtime.queue_free()
-		else:
-			item_runtime.free()
+		_free_owned_node(item_runtime)
 	item_runtime = null
 	if stats_tracker != null:
 		if stats_tracker.has_method("teardown"):
 			stats_tracker.teardown()
-		if stats_tracker.is_inside_tree():
-			stats_tracker.queue_free()
-		else:
-			stats_tracker.free()
+		_free_owned_node(stats_tracker)
 	stats_tracker = null
 	if economy_ui != null and economy_ui.has_method("teardown"):
 		economy_ui.teardown()
@@ -268,10 +234,10 @@ func teardown() -> void:
 			selection.clear()
 	selection = null
 	if _beam_overlay != null and is_instance_valid(_beam_overlay):
-		_beam_overlay.queue_free()
+		_free_owned_node(_beam_overlay)
 	_beam_overlay = null
 	if _result_banner != null and is_instance_valid(_result_banner):
-		_result_banner.queue_free()
+		_free_owned_node(_result_banner)
 	_result_banner = null
 	_bottom_combat_visibility_state = -1
 	player_views.clear()
@@ -280,8 +246,46 @@ func teardown() -> void:
 	enemy_grid_helper = null
 	bench_grid_helper = null
 	sell_grid_helper = null
+	_clear_node_refs()
 	manager = null
 	parent = null
+
+func _free_owned_node(node: Node) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	var node_parent: Node = node.get_parent()
+	if node_parent != null:
+		node_parent.remove_child(node)
+	node.free()
+
+func _clear_node_refs() -> void:
+	log_label = null
+	player_stats_label = null
+	enemy_stats_label = null
+	stage_label = null
+	stage_progress_top_bar = null
+	player_sprite = null
+	enemy_sprite = null
+	player_grid = null
+	enemy_grid = null
+	bench_grid = null
+	shop_grid = null
+	sell_zone = null
+	arena_container = null
+	arena_background = null
+	arena_units = null
+	planning_area = null
+	attack_button = null
+	continue_button = null
+	menu_button = null
+	gold_label = null
+	bet_slider = null
+	bet_value = null
+	stats_panel = null
+	board_status_row = null
+	board_timer_label = null
+	board_capacity_label = null
+	win_odds_label = null
 
 func _disconnect_controller_signals() -> void:
 	if manager != null and is_instance_valid(manager):
@@ -297,17 +301,21 @@ func _disconnect_controller_signals() -> void:
 		_disconnect_signal(manager, "victory", "_on_victory")
 		_disconnect_signal(manager, "defeat", "_on_defeat")
 		_disconnect_signal(manager, "tie", "_on_tie")
-	if Engine.has_singleton("Items") and Items.is_connected("action_log", Callable(self, "_on_items_action_log")):
-		Items.action_log.disconnect(_on_items_action_log)
-	if Engine.has_singleton("Roster") and Roster.is_connected("bench_changed", Callable(self, "_on_bench_changed")):
-		Roster.bench_changed.disconnect(_on_bench_changed)
-	if Engine.has_singleton("GameState"):
-		if GameState.is_connected("chapter_changed", Callable(self, "_on_gs_chapter_changed")):
-			GameState.chapter_changed.disconnect(_on_gs_chapter_changed)
-		if GameState.is_connected("stage_changed", Callable(self, "_on_gs_stage_changed")):
-			GameState.stage_changed.disconnect(_on_gs_stage_changed)
-	if Engine.has_singleton("Roster") and Roster.is_connected("max_team_size_changed", Callable(self, "_on_roster_max_team_size_changed")):
-		Roster.max_team_size_changed.disconnect(_on_roster_max_team_size_changed)
+	var items_node: Node = _autoload_node("Items")
+	if items_node != null and items_node.is_connected("action_log", Callable(self, "_on_items_action_log")):
+		items_node.disconnect("action_log", Callable(self, "_on_items_action_log"))
+	var roster_node: Node = _autoload_node("Roster")
+	if roster_node != null:
+		if roster_node.is_connected("bench_changed", Callable(self, "_on_bench_changed")):
+			roster_node.disconnect("bench_changed", Callable(self, "_on_bench_changed"))
+		if roster_node.is_connected("max_team_size_changed", Callable(self, "_on_roster_max_team_size_changed")):
+			roster_node.disconnect("max_team_size_changed", Callable(self, "_on_roster_max_team_size_changed"))
+	var game_state_node: Node = _autoload_node("GameState")
+	if game_state_node != null:
+		if game_state_node.is_connected("chapter_changed", Callable(self, "_on_gs_chapter_changed")):
+			game_state_node.disconnect("chapter_changed", Callable(self, "_on_gs_chapter_changed"))
+		if game_state_node.is_connected("stage_changed", Callable(self, "_on_gs_stage_changed")):
+			game_state_node.disconnect("stage_changed", Callable(self, "_on_gs_stage_changed"))
 	if attack_button != null and is_instance_valid(attack_button) and attack_button.is_connected("pressed", Callable(self, "_on_attack_pressed")):
 		attack_button.pressed.disconnect(_on_attack_pressed)
 	if continue_button != null and is_instance_valid(continue_button) and continue_button.is_connected("pressed", Callable(self, "_on_continue_pressed")):
@@ -323,6 +331,18 @@ func _disconnect_controller_signals() -> void:
 	if shop_presenter != null and _shop_grid_updated_cb.is_valid() and shop_presenter.is_connected("grid_updated", _shop_grid_updated_cb):
 		shop_presenter.grid_updated.disconnect(_shop_grid_updated_cb)
 	_shop_grid_updated_cb = Callable()
+
+func _autoload_node(autoload_name: String) -> Node:
+	var root: Node = null
+	if parent != null and parent.get_tree() != null:
+		root = parent.get_tree().root
+	if root == null:
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		if tree != null:
+			root = tree.root
+	if root == null:
+		return null
+	return root.get_node_or_null("/root/%s" % String(autoload_name))
 
 func _disconnect_signal(emitter: Object, signal_name: String, method_name: String) -> void:
 	if emitter == null or not is_instance_valid(emitter):
@@ -612,6 +632,7 @@ func _ensure_board_status_row() -> void:
 	if win_odds_label == null:
 		win_odds_label = _make_board_status_label("WinOddsLabel")
 		board_status_row.add_child(win_odds_label)
+	win_odds_label.visible = false
 	_update_board_status()
 
 func _ensure_board_status_backplate(host: Control) -> void:
@@ -669,15 +690,7 @@ func _update_board_status() -> void:
 		board_capacity_label.text = "Board %d/%d" % [board_count, board_cap]
 		board_capacity_label.tooltip_text = "Deployed units / board slots. Buy XP to add slots."
 	if win_odds_label != null:
-		if manager == null or manager.player_team.is_empty() or manager.enemy_team.is_empty():
-			win_odds_label.text = "Win Odds --"
-			win_odds_label.tooltip_text = "Preview odds appear when both teams are visible."
-		else:
-			var player_rating: float = TeamOddsEstimator.team_rating(manager.player_team)
-			var enemy_rating: float = TeamOddsEstimator.team_rating(manager.enemy_team)
-			var odds: int = TeamOddsEstimator.estimate_from_ratings(player_rating, enemy_rating)
-			win_odds_label.text = "Win Odds %d%%" % odds
-			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f." % [player_rating, enemy_rating]
+		win_odds_label.visible = false
 
 func set_board_timer_text(text: String, active: bool = true) -> void:
 	_ensure_board_status_row()
@@ -704,13 +717,13 @@ func _current_board_cap() -> int:
 
 func _responsive_tile_size() -> int:
 	if parent == null:
-		return int(UI.TILE_SIZE)
+		return int(UIConstants.TILE_SIZE)
 	var viewport_size: Vector2 = parent.get_viewport_rect().size
 	if viewport_size.y <= 760.0:
 		return 56
 	if viewport_size.y <= 900.0 or viewport_size.x <= 1440.0:
 		return 68
-	return int(UI.TILE_SIZE)
+	return int(UIConstants.TILE_SIZE)
 
 func _apply_grid_dimensions(tile: int) -> void:
 	# Compute desired grid size from constants and theme separations
@@ -722,7 +735,7 @@ func _apply_grid_dimensions(tile: int) -> void:
 	var vsep: int = enemy_grid.get_theme_constant("v_separation", "GridContainer")
 	var grid_w: int = tile * cols + hsep * (cols - 1)
 	var grid_h: int = tile * rows + vsep * (rows - 1)
-	var enemy_top_pad: float = 28.0
+	var enemy_top_pad: float = 54.0
 	var player_top_pad: float = 36.0
 	var player_bottom_pad: float = 8.0
 
@@ -747,7 +760,7 @@ func _apply_grid_dimensions(tile: int) -> void:
 	# Make sure the containers holding the grids are tall enough
 	var top_area: Control = enemy_grid.get_parent() as Control
 	if top_area:
-		top_area.custom_minimum_size.y = float(grid_h) + enemy_top_pad
+		top_area.custom_minimum_size.y = float(grid_h) + enemy_top_pad + 14.0
 	var bottom_area: Control = player_grid.get_parent() as Control
 	if bottom_area:
 		bottom_area.custom_minimum_size.y = player_top_pad + float(grid_h) + player_bottom_pad
@@ -802,8 +815,7 @@ func _init_game() -> void:
 	if is_instance_valid(player_sprite):
 		player_sprite.visible = false
 	if grid_placement and manager:
-		grid_placement.rebuild_enemy_views(manager.enemy_team)
-		enemy_views = grid_placement.get_enemy_views()
+		_rebuild_enemy_views_from_manager()
 		refresh_all_views()
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.PREVIEW)
@@ -915,13 +927,24 @@ func _make_first_deploy_bench_style() -> StyleBoxFlat:
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.5)
 	return style
 
+func _rebuild_enemy_views_from_manager() -> void:
+	if grid_placement == null or manager == null:
+		return
+	var preferred_positions: Array = []
+	if grid_placement.has_method("default_enemy_positions_for"):
+		preferred_positions = grid_placement.default_enemy_positions_for(manager.enemy_team)
+	if manager.has_method("preview_enemy_positions_for"):
+		preferred_positions = manager.preview_enemy_positions_for(preferred_positions)
+	grid_placement.rebuild_enemy_views(manager.enemy_team, preferred_positions)
+	enemy_views = grid_placement.get_enemy_views()
+
 func refresh_all_views() -> void:
 	if selection != null and selection.has_method("reset_bindings"):
 		selection.reset_bindings()
 	# Rebuild player and bench views and rewire drag drop targets (KISS/DRY)
 	if grid_placement and manager:
 		# Ensure enemy preview reflects the latest manager.enemy_team (e.g., creep rounds)
-		grid_placement.rebuild_enemy_views(manager.enemy_team)
+		_rebuild_enemy_views_from_manager()
 		grid_placement.rebuild_player_views(manager.player_team, true)
 		player_views = grid_placement.get_player_views()
 		for pv in player_views:
@@ -994,7 +1017,7 @@ func _on_continue_pressed() -> void:
 			return
 		var bet_val: int = int(bet_slider.value) if bet_slider else int(Economy.current_bet)
 		# Auto-bump bet to 1 when player has gold but slider is 0 (post-combat edge)
-		if bet_val <= 0 and (Engine.has_singleton("Economy") and int(Economy.gold) > 0):
+		if bet_val <= 0 and int(Economy.gold) > 0:
 			bet_val = 1
 			if bet_slider:
 				bet_slider.value = 1
@@ -1067,7 +1090,12 @@ func _on_continue_pressed() -> void:
 		if Debug.enabled:
 			print("[CombatView] Economy not found")
 		return
-	var bet_ok2: bool = Economy.set_bet(int(bet_slider.value))
+	var continue_bet_val: int = int(bet_slider.value) if bet_slider else int(Economy.current_bet)
+	if continue_bet_val <= 0 and int(Economy.gold) > 0:
+		continue_bet_val = 1
+		if bet_slider:
+			bet_slider.value = 1
+	var bet_ok2: bool = Economy.set_bet(continue_bet_val)
 	if not bet_ok2:
 		if Debug.enabled:
 			print("[CombatView] Place a bet > 0 to continue")
@@ -1293,11 +1321,16 @@ func _on_unit_dropped_any(target_grid, _tile_idx: int, uv: UnitView) -> void:
 func _auto_start_battle() -> void:
 	if not auto_combat:
 		return
+	if not auto_start_battle:
+		return
 	if continue_button and not _is_continue_start_text():
 		_set_continue_to_start_text()
 	if Debug.enabled:
 		print("[CombatView] Auto-starting battle")
 	_on_continue_pressed()
+
+func set_auto_start_battle_enabled(enabled: bool) -> void:
+	auto_start_battle = enabled
 
 func _on_bet_changed(val: float) -> void:
 	if economy_ui:
@@ -1318,8 +1351,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 		Economy.start_combat()
 	if grid_placement and manager:
-		grid_placement.rebuild_enemy_views(manager.enemy_team)
-		enemy_views = grid_placement.get_enemy_views()
+		_rebuild_enemy_views_from_manager()
 		grid_placement.rebuild_player_views(manager.player_team, false)
 		player_views = grid_placement.get_player_views()
 	Trace.step("CombatView._on_battle_started: enter arena")
@@ -1565,27 +1597,45 @@ func _on_victory(_stage: int) -> void:
 	if attack_button:
 		attack_button.disabled = true
 	_end_combat_resolving_feedback()
+	_post_combat_stage_was_mirror = _outcome_stage_is_mirror(_stage)
 	_post_combat_outcome = "victory"
-	_show_result_banner("WON", Color(0.12, 0.22, 0.15, 0.96), Color(0.78, 0.98, 0.70, 1.0))
+	_show_result_banner(
+		"VICTORY",
+		"Round secured. Preparing your next decision.",
+		Color(0.58, 0.72, 0.38, 1.0),
+		Color(0.86, 0.94, 0.74, 1.0)
+	)
 	_auto_loop_running = false
-	_start_intermission(2.0)
+	_start_intermission(2.4)
 
 func _on_defeat(_stage: int) -> void:
 	if attack_button:
 		attack_button.disabled = true
 	_end_combat_resolving_feedback()
+	_post_combat_stage_was_mirror = _outcome_stage_is_mirror(_stage)
 	_post_combat_outcome = "defeat"
-	_show_result_banner("LOST", Color(0.28, 0.035, 0.050, 0.96), Color(1.0, 0.62, 0.55, 1.0))
-	_start_intermission(2.0)
+	_show_result_banner(
+		"DEFEAT",
+		"Round lost. Resolving the aftermath.",
+		Color(0.74, 0.20, 0.16, 1.0),
+		Color(1.0, 0.69, 0.60, 1.0)
+	)
+	_start_intermission(2.4)
 	_auto_loop_running = false
 
 func _on_tie(_stage: int) -> void:
 	if attack_button:
 		attack_button.disabled = true
 	_end_combat_resolving_feedback()
+	_post_combat_stage_was_mirror = _outcome_stage_is_mirror(_stage)
 	_post_combat_outcome = "tie"
-	_show_result_banner("TIE - BET REFUNDED", Color(0.12, 0.10, 0.16, 0.96), Color(0.92, 0.82, 1.0, 1.0))
-	_start_intermission(2.0)
+	_show_result_banner(
+		"STALEMATE",
+		"Wager returned. Preparing your next decision.",
+		Color(0.48, 0.38, 0.66, 1.0),
+		Color(0.90, 0.84, 1.0, 1.0)
+	)
+	_start_intermission(2.4)
 	_auto_loop_running = false
 
 func clear_log() -> void:
@@ -1604,6 +1654,7 @@ func _start_intermission(seconds: float = 5.0) -> void:
 	intermission.start(seconds, Callable(self, "_on_intermission_finished"))
 
 func _on_intermission_finished() -> void:
+	_hide_result_banner()
 	if arena_container and arena_container.visible:
 		_exit_combat_arena()
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
@@ -1613,7 +1664,8 @@ func _on_intermission_finished() -> void:
 	if manager and manager.has_method("finalize_post_combat"):
 		manager.finalize_post_combat()
 		# Advance progression on victory so planning shows the upcoming enemy
-		var win2: bool = (_post_combat_outcome == "victory")
+		var mirror_tie_advances: bool = _post_combat_outcome == "tie" and _post_combat_stage_was_mirror
+		var win2: bool = (_post_combat_outcome == "victory") or mirror_tie_advances
 		if win2 and (Engine.has_singleton("GameState") or parent.has_node("/root/GameState")):
 			GameState.advance_after_victory()
 		# Build a fresh preview for the next attempt (next stage on win, same stage on defeat)
@@ -1621,15 +1673,14 @@ func _on_intermission_finished() -> void:
 			manager.setup_stage_preview()
 			# Force enemy grid to reflect upcoming round immediately (e.g., creeps)
 			if grid_placement and manager:
-				grid_placement.rebuild_enemy_views(manager.enemy_team)
-				enemy_views = grid_placement.get_enemy_views()
+				_rebuild_enemy_views_from_manager()
 			# Ensure HUD labels reflect the previewed enemy immediately
 			_refresh_stats()
 		# Rebuild UI after state changes
 		refresh_all_views()
 		if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 			if _post_combat_outcome != "":
-				var win: bool = (_post_combat_outcome == "victory")
+				var win: bool = (_post_combat_outcome == "victory") or mirror_tie_advances
 				if _post_combat_outcome == "tie" and Economy.has_method("resolve_tie"):
 					Economy.resolve_tie()
 				else:
@@ -1645,7 +1696,7 @@ func _on_intermission_finished() -> void:
 				economy_ui.set_bet_editable(true)
 	# Optional: add layout prints here when debugging sizes
 			# Auto-refresh the shop after combat ends (respect lock; free refresh)
-			if _post_combat_outcome != "tie" and (Engine.has_singleton("Shop") or parent.has_node("/root/Shop")):
+			if (_post_combat_outcome != "tie" or mirror_tie_advances) and (Engine.has_singleton("Shop") or parent.has_node("/root/Shop")):
 				var locked: bool = (bool(Shop.state.locked) if Shop and Shop.state else false)
 				if not locked:
 					Shop.add_free_rerolls(1)
@@ -1704,6 +1755,16 @@ func _on_intermission_finished() -> void:
 			continue_button.visible = true
 	_pending_continue = false
 	_post_combat_outcome = ""
+	_post_combat_stage_was_mirror = false
+
+func _stage_value_is_mirror(stage_value: int) -> bool:
+	var mapping: Dictionary = ProgressionService.from_global_stage(max(1, int(stage_value)))
+	return int(mapping.get("stage_in_chapter", 0)) == int(ProgressionConfig.MIRROR_STAGE)
+
+func _outcome_stage_is_mirror(stage_value: int) -> bool:
+	if _stage_value_is_mirror(stage_value):
+		return true
+	return int(GameState.stage_in_chapter) == int(ProgressionConfig.MIRROR_STAGE)
 
 func _apply_first_boss_prep_gold_floor(win: bool) -> void:
 	if not win:
@@ -1998,15 +2059,24 @@ func _set_root_control_visible(node_name: String, visible_state: bool) -> void:
 	if control != null:
 		control.visible = visible_state
 
-func _show_result_banner(text: String, bg_color: Color, text_color: Color) -> void:
+func _show_result_banner(title: String, detail: String, accent_color: Color, title_color: Color) -> void:
 	var banner: PanelContainer = _ensure_result_banner()
 	if banner == null:
 		return
-	var label: Label = banner.get_node_or_null("Margin/Label") as Label
-	if label != null:
-		label.text = text
-		label.add_theme_color_override("font_color", text_color)
-	banner.add_theme_stylebox_override("panel", _make_result_banner_style(bg_color, text_color))
+	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer
+	var title_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/OutcomeLabel") as Label
+	var detail_label: Label = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/DetailLabel") as Label
+	var accent_rule: ColorRect = banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/AccentRule") as ColorRect
+	if title_label != null:
+		title_label.text = title
+		title_label.add_theme_color_override("font_color", title_color)
+	if detail_label != null:
+		detail_label.text = detail
+	if accent_rule != null:
+		accent_rule.color = Color(accent_color.r, accent_color.g, accent_color.b, 0.86)
+	if card != null:
+		card.add_theme_stylebox_override("panel", _make_result_card_style(accent_color))
+	banner.add_theme_stylebox_override("panel", _make_result_scrim_style())
 	banner.visible = true
 
 func _hide_result_banner() -> void:
@@ -2027,48 +2097,93 @@ func _ensure_result_banner() -> PanelContainer:
 	_result_banner.visible = false
 	_result_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_result_banner.z_as_relative = false
-	_result_banner.z_index = 160
-	_result_banner.anchor_left = 0.5
-	_result_banner.anchor_right = 0.5
-	_result_banner.anchor_top = 0.070
-	_result_banner.anchor_bottom = 0.070
-	_result_banner.offset_left = -260.0
-	_result_banner.offset_right = 260.0
+	_result_banner.z_index = 158
+	_result_banner.anchor_left = 0.0
+	_result_banner.anchor_right = 1.0
+	_result_banner.anchor_top = 0.0
+	_result_banner.anchor_bottom = 1.0
+	_result_banner.offset_left = 0.0
+	_result_banner.offset_right = 0.0
 	_result_banner.offset_top = 0.0
-	_result_banner.offset_bottom = 58.0
+	_result_banner.offset_bottom = 0.0
+	var center: CenterContainer = CenterContainer.new()
+	center.name = "Center"
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.offset_top = -34.0
+	center.offset_bottom = -34.0
+	_result_banner.add_child(center)
+	var card: PanelContainer = PanelContainer.new()
+	card.name = "BattleResultCard"
+	card.custom_minimum_size = Vector2(560.0, 176.0)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(card)
 	var margin: MarginContainer = MarginContainer.new()
-	margin.name = "Margin"
-	margin.add_theme_constant_override("margin_left", 18)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_right", 18)
-	margin.add_theme_constant_override("margin_bottom", 10)
-	_result_banner.add_child(margin)
-	var label: Label = Label.new()
-	label.name = "Label"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 28)
-	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
-	label.add_theme_constant_override("outline_size", 2)
-	margin.add_child(label)
+	margin.name = "CardMargin"
+	margin.add_theme_constant_override("margin_left", 34)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_right", 34)
+	margin.add_theme_constant_override("margin_bottom", 22)
+	card.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.name = "Content"
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+	var kicker: Label = Label.new()
+	kicker.name = "KickerLabel"
+	kicker.text = "BATTLE OUTCOME"
+	kicker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	kicker.add_theme_font_size_override("font_size", 13)
+	kicker.add_theme_color_override("font_color", Color(0.72, 0.61, 0.45, 1.0))
+	content.add_child(kicker)
+	var title_label: Label = Label.new()
+	title_label.name = "OutcomeLabel"
+	title_label.custom_minimum_size = Vector2(0.0, 46.0)
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 36)
+	title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
+	title_label.add_theme_constant_override("outline_size", 2)
+	content.add_child(title_label)
+	var accent_rule: ColorRect = ColorRect.new()
+	accent_rule.name = "AccentRule"
+	accent_rule.custom_minimum_size = Vector2(0.0, 1.0)
+	accent_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(accent_rule)
+	var detail_label: Label = Label.new()
+	detail_label.name = "DetailLabel"
+	detail_label.custom_minimum_size = Vector2(0.0, 24.0)
+	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	detail_label.add_theme_font_size_override("font_size", 16)
+	detail_label.add_theme_color_override("font_color", Color(0.82, 0.79, 0.75, 1.0))
+	content.add_child(detail_label)
 	parent.add_child(_result_banner)
 	return _result_banner
 
-func _make_result_banner_style(bg_color: Color, text_color: Color) -> StyleBoxFlat:
+func _make_result_scrim_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.border_color = Color(text_color.r, text_color.g, text_color.b, 0.88)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_right = 6
-	style.corner_radius_bottom_left = 6
-	style.shadow_size = 16
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.56)
+	style.bg_color = Color(0.006, 0.005, 0.008, 0.46)
 	return style
+
+func _make_result_card_style(accent_color: Color) -> StyleBox:
+	var fallback: StyleBoxFlat = StyleBoxFlat.new()
+	fallback.bg_color = Color(0.026, 0.022, 0.030, 0.98)
+	fallback.border_color = Color(accent_color.r, accent_color.g, accent_color.b, 0.88)
+	fallback.border_width_left = 1
+	fallback.border_width_top = 1
+	fallback.border_width_right = 1
+	fallback.border_width_bottom = 1
+	fallback.corner_radius_top_left = 7
+	fallback.corner_radius_top_right = 7
+	fallback.corner_radius_bottom_right = 7
+	fallback.corner_radius_bottom_left = 7
+	fallback.shadow_size = 18
+	fallback.shadow_color = Color(0.0, 0.0, 0.0, 0.72)
+	return GothicUIAssets.style_or_fallback(
+		GothicUIAssets.wide_panel_style(Color(0.86, 0.82, 0.74, 0.98)),
+		fallback
+	)
 
 func _is_continue_start_text() -> bool:
 	if continue_button == null:

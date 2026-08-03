@@ -51,11 +51,12 @@ func cast(ctx: AbilityContext) -> bool:
 
 func _highest_hp_enemy(ctx: AbilityContext) -> int:
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	var target_team: String = _enemy_team(ctx.caster_team)
 	var best_index: int = -1
 	var best_hp: int = -1
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		if int(enemy.hp) > best_hp:
 			best_hp = int(enemy.hp)
@@ -65,5 +66,4 @@ func _highest_hp_enemy(ctx: AbilityContext) -> int:
 func _refund_mana(ctx: AbilityContext, caster: Unit) -> void:
 	if int(caster.mana_max) <= 0:
 		return
-	caster.mana = min(int(caster.mana_max), int(caster.mana) + MANA_REFUND)
-	ctx.engine._resolver_emit_unit_stat(ctx.caster_team, ctx.caster_index, {"mana": caster.mana})
+	ctx.request_post_cast_mana_refund(MANA_REFUND)

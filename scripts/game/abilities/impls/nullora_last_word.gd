@@ -28,10 +28,9 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var target: Unit = ctx.unit_at(target_team, target_index)
-	if target == null or not target.is_alive():
+	if target == null or not ctx.is_targetable(target_team, target_index):
 		return false
-	if ctx.engine.has_method("_resolver_emit_targetability_window"):
-		ctx.engine._resolver_emit_targetability_window(ctx.caster_team, ctx.caster_index, false, VANISH_DURATION, "nullora_last_word")
+	ctx.apply_untargetable(VANISH_DURATION, "nullora_last_word")
 	_blink_to_backline(ctx, target_team, target_index)
 	if ctx.engine.has_signal("target_start"):
 		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, target_team, target_index)
@@ -42,20 +41,10 @@ func cast(ctx: AbilityContext) -> bool:
 	if target_after != null and target_after.is_alive():
 		var hp_pct: float = float(target_after.hp) / max(1.0, float(target_after.max_hp))
 		if hp_pct <= ARM_THRESHOLD:
-			if hp_pct > EXECUTE_THRESHOLD:
-				var threshold_hp: int = max(1, int(floor(float(target_after.max_hp) * EXECUTE_THRESHOLD)))
-				var setup_damage: float = _damage_for_effective_amount(target_after, max(0.0, float(target_after.hp - threshold_hp - 1)))
-				if setup_damage > 0.0:
-					ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, setup_damage, "true")
-					target_after = ctx.unit_at(target_team, target_index)
-					if target_after != null and target_after.is_alive():
-						hp_pct = float(target_after.hp) / max(1.0, float(target_after.max_hp))
 			if target_after != null and target_after.is_alive() and hp_pct <= EXECUTE_THRESHOLD:
 				var execute_damage: float = _damage_for_effective_amount(target_after, float(target_after.hp) + 1.0)
 				ctx.emit_execute_bonus(target_team, target_index, base_damage, execute_damage, EXECUTE_THRESHOLD, hp_pct, "nullora_last_word")
 				result = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, execute_damage, "true")
-	if ctx.engine.has_method("_resolver_emit_targetability_threat_interaction"):
-		ctx.engine._resolver_emit_targetability_threat_interaction(target_team, target_index, ctx.caster_team, ctx.caster_index, "last_word_vanish", 5.0, true, true)
 	_reposition_after_word(ctx)
 	ctx.log("Last Word: reached and judged enemy carry %d" % target_index)
 	return bool(result.get("processed", false))
@@ -68,7 +57,7 @@ func _enemy_carry_target(ctx: AbilityContext) -> int:
 	var max_depth: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var depth: float = ctx.position_of(target_team, index).x * sign_x
 		min_depth = min(min_depth, depth)
@@ -80,7 +69,7 @@ func _enemy_carry_target(ctx: AbilityContext) -> int:
 	var best_score: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var depth: float = ctx.position_of(target_team, index).x * sign_x
 		if depth < backline_depth:
@@ -99,8 +88,6 @@ func _enemy_carry_target(ctx: AbilityContext) -> int:
 func _blink_to_backline(ctx: AbilityContext, target_team: String, target_index: int) -> void:
 	var destination: Vector2 = _enemy_backline_position(ctx, target_team, target_index)
 	var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
 	_set_caster_position(ctx, destination)
 
 func _enemy_backline_position(ctx: AbilityContext, target_team: String, target_index: int) -> Vector2:
@@ -127,8 +114,6 @@ func _reposition_after_word(ctx: AbilityContext) -> void:
 	var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
 	var sign_x: float = -1.0 if ctx.caster_team == "player" else 1.0
 	var destination: Vector2 = start + Vector2(sign_x * 2.8 * ctx.tile_size(), 0.0)
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
 	_set_caster_position(ctx, destination)
 
 func _set_caster_position(ctx: AbilityContext, destination: Vector2) -> void:

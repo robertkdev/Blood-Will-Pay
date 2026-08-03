@@ -36,81 +36,88 @@ Unit and creep ratings:
 
 - Playable unit: `round((6 + cost * 6) * 1.45^(level - 1))`
 - Creep: `round(EASIEST_REFERENCE_RATING * 1.35^(level - 1))`
-- `EASIEST_REFERENCE_RATING = 100`, so Chapter 1 Round 1 starts from a fixed runway Beegle opener that preserves the old easiest creep-fight stat overrides.
+- `EASIEST_REFERENCE_RATING = 100` anchors the target curve; Chapter 1 Round 1 is generated from the same creep stage rule as later chapters.
 
 Chapter target:
 
-- `chapter_base = 100 + (chapter - 1) * 32 + floor((chapter - 1) / 5) * 55`
+- `chapter_base = 100 + (chapter - 1) * 18 + floor((chapter - 1) / 5) * 35`
 - Round multipliers:
-  - creep: `1.00`
-  - first RGA: `1.90`
-  - second RGA: `2.25`
-  - boss: `2.65`
-  - chapter 1 boss: `2.15`
-  - mirror: `2.65`
-- Chapter 1 boss levels are capped at `2` so the first boss is a runway spike, not a late-run scaling check.
+  - creep: `0.35`
+  - first RGA: `0.70`
+  - second RGA: `0.80`
+  - boss: `0.85`
+  - mirror: `1.05`
+
+Creep stages contain at least two lowercase creep reward enemies, then compare raw creep rating against the stage target. If the raw creep board overshoots the target, the generator emits `rules.stat_scale`; `StageRuleRunner` applies that target-derived scale to spawned creep combat stats. This keeps starter-safe reward rounds procedural while allowing multiple per-kill component reward chances instead of hardcoding a single Chapter 1 creep or stat override.
+
+Boss stages keep the one-featured-enemy shape, but the generator now caps boss stat inflation. The first boss may scale at most `2.25x`; later caps rise slowly by target band and selected unit cost, with a hard cap of `3.25x`. If a capped single boss cannot honestly reach the requested curve budget, `target_rating` is lowered to the effective playable rating and `requested_target_rating` records the original budget for audit context.
 
 Generated normal/boss board difficulty now includes:
 
 - `unit_rating`: sum of selected unit level ratings,
 - `trait_pressure_rating`: active enemy trait pressure from trait thresholds,
-- `difficulty_rating = unit_rating + trait_pressure_rating`.
+- `item_pressure_rating`: pressure from generated completed-item enemy loadouts,
+- `difficulty_rating = unit_rating + trait_pressure_rating + item_pressure_rating`.
 
 ## Trait pressure
 
 The generator prices only active trait tiers. It uses the same trait thresholds as `TraitCompiler` by loading `data/traits/<Trait>.tres`.
 
-Current estimate:
+Current estimate source:
 
-```text
-trait_pressure = unit_rating * (0.06 + tier * 0.04)
-               + active_threshold * 4
-               + trait_count * 2
-```
+- `scripts/game/progression/difficulty_rating_model.gd`
+- `DifficultyRatingModel.MODEL_VERSION = trait-item-coefficients-v1`
+- `TRAIT_COEFFICIENTS` contains explicit per-trait pressure coefficients for all 22 trait resources.
 
-This is intentionally conservative. It catches the main problem where a board with apparently fair raw unit rating becomes unfair because it also activates Chronomancer, Bulwark, Mentor, Exile, or another threshold trait.
+The model still uses a compact shape per trait: a board-rating scale, base percentage, tier step, threshold flat value, and count flat value. The important change is that the values are now named coefficients per trait instead of one hidden formula for every trait. This keeps Chronomancer, Cartel, Harmony, Titan, economy traits, and support traits separately tunable as combat telemetry improves.
 
 ## Items
 
-Generated procedural boards do not currently assign enemy items, so item pressure is audit-visible but not part of generated board difficulty yet.
+Generated normal and boss boards can assign completed enemy item loadouts once the target rating crosses the item thresholds. The generator emits `rules.items`, `rules.item_pressure_rating`, and `rules.item_loadout_summary`; `StageRuleRunner` applies those loadouts during enemy spawning.
 
-The audit estimates item pressure from `ItemDef.stat_mods` plus a flat runtime-effect premium:
+The generator and audit estimate item pressure from `DifficultyRatingModel`:
 
-- flat durability stats: HP, armor, MR,
-- offensive stats: AD%, AS%, crit, spell power,
-- timing stats: start mana and mana regen,
-- defensive multipliers: damage reduction, tenacity, lifesteal,
-- runtime effects: `+18` rating per effect id until effect-specific coefficients are calibrated.
+- stat weights for the supported item stat keys,
+- explicit effect ratings for all 36 completed-item runtime effect IDs,
+- total completed-item rating = stat pressure + effect pressure.
 
-When generated enemies start receiving items, the generator should add `item_pressure_rating` to `difficulty_rating` and should expose `item_rating` in each StageSpec the same way it now exposes `unit_rating` and `trait_pressure_rating`.
+Latest audit read: 36 completed items range from rating `48` to `118`, average `67.58`. Low examples include `hemothorn` at `48` and `relay`/`conductor` at `50`; high examples include `stone` at `118`, `lifetaker` at `101`, and `wardheart` at `88`.
 
 ## Balance gates
 
 Use these as acceptance gates before tuning by feel:
 
-1. `DifficultyRatingAudit.tscn` passes and writes a report.
-2. `EndlessChapterGenerationProbe.tscn` passes with normal/boss max relative error under `0.17`.
-3. `EndlessRuntimeIntegrationProbe.tscn` passes for Chapter 1 default procedural runtime and top-bar naming.
-4. `EndlessEntryMainFlowSmoke.tscn` passes: real entry flow, Chapter 1 Round 1 generated at `100/100`, win into Chapter 1 Round 2.
-5. A broad first-chapter natural-flow smoke should confirm every starter reaches first shop, can buy/deploy a first-shop helper, and resolves the second fight without the first generated RGA boards overpopulating or trait-spiking.
-6. Once enemy items are enabled, add item-pressure assertions to `DifficultyRatingAudit.tscn` and rerun the Main-flow smoke with at least one item-bearing generated board.
+1. `DifficultyCoefficientGate.tscn` passes. This is the coefficient coverage gate: all trait resources need explicit trait coefficients, every completed item stat/effect needs a priced coefficient, no priced effect may be unused, generated specs must carry the active `difficulty_model_version`, and recomputed unit + trait + item pressure must match `rules.difficulty_rating`.
+2. `DifficultyRatingAudit.tscn` passes and writes a report.
+3. `CompletedItemEffectRegistrySmoke.tscn` passes with all completed-item effect IDs registered.
+4. `CompletedItemRuntimeEffectsProbe.tscn` passes with all completed item effects producing runtime-visible state changes.
+5. `EndlessChapterGenerationProbe.tscn` passes with normal/boss max relative error under `0.17`.
+6. `EndlessRuntimeIntegrationProbe.tscn` passes for Chapter 1 default procedural runtime, top-bar naming, and generated loadout application.
+7. `EndlessEntryMainFlowSmoke.tscn` passes: real entry flow, Chapter 1 generated preview, opening combat, and progression into Chapter 1 Round 2.
+8. A broad first-chapter natural-flow smoke should confirm every starter reaches first shop, can buy/deploy a first-shop helper, and resolves the second fight without the first generated RGA boards overpopulating or trait-spiking.
+9. `NaturalRepresentativeCampaignMainFlowSmoke.tscn` passes to Chapter 6 Round 1 for representative starters `axiom`, `brute`, `cashmere`, `repo`, `sari`, and `bonko` with no shop or technical failures.
 
 ## Current balance read
 
-Latest audit after trait-aware scoring and the Chapter 1 runway patch:
+Latest audit after shared trait/item coefficient pricing:
 
-- Chapter 1 Round 1 sample: fixed Beegle runway opener, target `100`, difficulty `100`.
-- Chapter 1 Round 2 sample: starter-safe RGA director runway spec, with `target_rating` set to its measured `difficulty_rating`.
-- Chapter 1 Round 3 sample: starter-safe RGA director runway spec, with `target_rating` set to its measured `difficulty_rating`.
-- Chapter 1 boss sample: target `215` with authored level cap `2`; refresh `DifficultyRatingAudit.tscn` after the UI pass for exact post-cap sample rows.
+- `DifficultyCoefficientGate.tscn`: PASS, model `trait-item-coefficients-v1`, 22 trait coefficients, 36 item-effect coefficients.
+- `DifficultyRatingAudit.tscn`: PASS, 51 playable units, 4 creeps, 45 items, 120 sample boards.
+- `GeneratedCampaignSpecProbe.tscn`: PASS, 150 sampled generated campaign rows.
+- `EndlessChapterGenerationProbe.tscn`: PASS, 6 seeds, 240 chapters, 1200 boards, 720 non-creep boards, mean absolute error `17.50`, max absolute error `95`, max relative error `0.161`.
+- `EndlessRuntimeIntegrationProbe.tscn`: PASS for procedural Chapter 1 runtime mapping, generated loadouts, target-scaled creep opener rules, and exact procedural mirror copies.
+- `MirrorBoardProbe.tscn`: PASS, preserving exact-copy mirror behavior for stats, items, snapshot positions, and enemy-side formation mapping.
+- `NaturalRepresentativeCampaignMainFlowSmoke.tscn`: PASS, 6/6 representative starters reached Chapter 6 Round 1 through the real Main flow with no shop or technical failures.
+- `CompletedItemEffectRegistrySmoke.tscn`: PASS, 36 completed items with runtime effect IDs, 36 registered handlers.
+- `CompletedItemRuntimeEffectsProbe.tscn`: PASS, 36 completed items.
 
-The important change is that trait pressure now pulls generated levels downward instead of silently stacking on top of a near-target raw unit board. The Chapter 1 runway also keeps the first two RGA rounds authored around starter readability before the budgeted generator takes over.
+The important change is that creep, trait, item, and boss pressure now flow through target/stage rules. Trait and item pressure use one shared coefficient source and pull generated levels downward instead of silently stacking on top of a near-target raw unit board; creep pressure uses target-derived `stat_scale`; generated mirrors exactly copy the last boss-entry board, including items and formation. The generator emits `difficulty_model_version` so stale specs and stale audit math fail visibly.
 
 ## Next balancing work
 
-- Calibrate trait coefficients against RGA combat telemetry instead of treating the current formula as final.
-- Add role-specific item coefficients once generated enemies can receive items.
-- Keep the first-chapter natural progression smoke broad enough to fail if any starter repeatedly loses before the player has meaningful shop agency.
+- Calibrate the explicit trait coefficients against RGA combat telemetry instead of treating the first coefficient table as final.
+- Calibrate item coefficients by role and carrier fit once enough item-bearing generated combat telemetry exists.
+- Keep the natural progression smokes broad enough to fail if any starter repeatedly loses before the player has meaningful shop agency.
 - Track per-stage win/loss bands by chapter:
   - Chapter 1 Round 1 should be nearly guaranteed after starter selection.
   - Chapter 1 RGA rounds should teach board reading, not punish missing hidden trait math.

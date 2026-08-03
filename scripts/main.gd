@@ -1,16 +1,18 @@
 extends Control
 
-@onready var combat_view: Node = $CombatView
 @onready var unit_select: Node = $UnitSelect
 @onready var title_menu: Control = $TitleMenu
 @onready var start_button: Button = $TitleMenu/Center/VBox/StartButton
 @onready var quit_button: Button = $TitleMenu/Center/VBox/QuitButton
+@onready var title_logo: TextureRect = $TextureRect
 
 const Debug := preload("res://scripts/util/debug.gd")
 const AuditPanelScene: GDScript = preload("res://scripts/ui/audit/audit_panel.gd")
+const COMBAT_VIEW_SCENE_PATH: String = "res://scenes/CombatView.tscn"
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
-const TITLE_SIGIL: Texture2D = preload("res://assets/ui/gold icon.png")
+const TextureUtils: GDScript = preload("res://scripts/util/texture_utils.gd")
+const TITLE_SIGIL_PATH: String = "res://assets/ui/gold icon.png"
 
 const DEBUG_AUTO_START := false
 const DEBUG_TRACE := true
@@ -19,6 +21,7 @@ const LOSS_OVERLAY_LAYER_NAME := "LossOverlayLayer"
 const SYSTEM_LAYER_INDEX := 220
 const SYSTEM_MENU_BACKDROP_COLOR: Color = Color(0.015, 0.01, 0.012, 0.54)
 
+var combat_view: Node = null
 var _system_layer: CanvasLayer
 var _system_menu_button: Button
 var _system_overlay: Control
@@ -29,10 +32,17 @@ var _quit_game_button: Button
 var _audit_panel: CanvasLayer
 var _system_menu_open: bool = false
 var _title_page: Control
+var _combat_scene_load_requested: bool = false
+var _combat_scene_resource: PackedScene = null
+var _combat_prewarm_started_us: int = 0
+var _combat_prewarm_ready_us: int = 0
+var _combat_prewarm_failed: bool = false
+var _pending_starter_unit_id: String = ""
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	Debug.set_enabled(false)
+	combat_view = get_node_or_null("CombatView")
 	var trace_script: Variant = load("res://scripts/util/trace.gd")
 	if trace_script and trace_script.has_method("set_enabled"):
 		trace_script.set_enabled(OS.is_debug_build() and DEBUG_TRACE)
@@ -46,16 +56,31 @@ func _ready() -> void:
 		unit_select.process_mode = Node.PROCESS_MODE_PAUSABLE
 	if title_menu:
 		title_menu.process_mode = Node.PROCESS_MODE_PAUSABLE
+	if title_logo != null:
+		title_logo.texture = TextureUtils.try_load_texture(TITLE_SIGIL_PATH)
 	_build_system_menu()
 	_disable_embedded_menu_buttons()
 	_build_title_page()
 	_show_title_page()
 	if unit_select and not unit_select.is_connected("unit_selected", Callable(self, "_on_unit_selected")):
 		unit_select.unit_selected.connect(_on_unit_selected)
+	_request_combat_view_prewarm()
 	if OS.is_debug_build() and DEBUG_AUTO_START:
 		if Debug.enabled:
 			print("[Main] Debug auto-start enabled; starting game")
 		call_deferred("_on_start")
+
+func _process(_delta: float) -> void:
+	_poll_combat_view_prewarm()
+	_try_complete_pending_starter_transition()
+
+func _exit_tree() -> void:
+	_kill_system_menu_tweens()
+	_clear_combat_view()
+	if title_logo != null:
+		title_logo.texture = null
+	_release_runtime_resource_refs(self)
+	TextureUtils.clear_cache()
 
 func _set_menu_visible(show_menu: bool) -> void:
 	if show_menu:
@@ -82,6 +107,7 @@ func _on_start() -> void:
 		unit_select.call("show_screen")
 	if unit_select:
 		unit_select.set_process(true)
+	_request_combat_view_prewarm()
 	_sync_system_menu_button()
 
 func _on_quit() -> void:
@@ -92,6 +118,33 @@ func go_to_menu() -> void:
 	request_return_to_title()
 
 func _on_unit_selected(unit_id: String) -> void:
+	if _pending_starter_unit_id != "":
+		return
+	_pending_starter_unit_id = unit_id
+	if unit_select != null and unit_select.has_method("set_transition_pending"):
+		unit_select.call("set_transition_pending", true)
+	_request_combat_view_prewarm()
+	_try_complete_pending_starter_transition()
+
+func _try_complete_pending_starter_transition() -> void:
+	if _pending_starter_unit_id == "":
+		return
+	if combat_view == null or not is_instance_valid(combat_view):
+		# The player-facing path must never wait on ResourceLoader's blocking
+		# threaded_get call. Keep the selection screen responsive until polling
+		# has produced the prewarmed CombatView.
+		if not _combat_prewarm_failed:
+			return
+		_ensure_combat_view()
+	if combat_view == null or not is_instance_valid(combat_view):
+		return
+	var unit_id: String = _pending_starter_unit_id
+	_pending_starter_unit_id = ""
+	if unit_select != null and unit_select.has_method("set_transition_pending"):
+		unit_select.call("set_transition_pending", false)
+	_complete_unit_selection(unit_id)
+
+func _complete_unit_selection(unit_id: String) -> void:
 	if unit_select and unit_select.has_method("hide_screen"):
 		unit_select.call("hide_screen")
 	if unit_select:
@@ -110,6 +163,110 @@ func _on_unit_selected(unit_id: String) -> void:
 	GameState.set_phase(GameState.GamePhase.PREVIEW)
 	if combat_view and combat_view.has_method("_auto_start_battle"):
 		combat_view.call_deferred("_auto_start_battle")
+
+func _ensure_combat_view() -> void:
+	if combat_view != null and is_instance_valid(combat_view):
+		return
+	var scene: PackedScene = _take_threaded_combat_scene()
+	if scene == null:
+		scene = ResourceLoader.load(COMBAT_VIEW_SCENE_PATH, "PackedScene") as PackedScene
+	if scene == null:
+		push_error("Main: failed to load CombatView scene")
+		return
+	_combat_scene_resource = scene
+	_instantiate_combat_view(scene)
+
+func _instantiate_combat_view(scene: PackedScene) -> void:
+	if scene == null or (combat_view != null and is_instance_valid(combat_view)):
+		return
+	combat_view = scene.instantiate()
+	combat_view.name = "CombatView"
+	combat_view.process_mode = Node.PROCESS_MODE_PAUSABLE
+	var control: Control = combat_view as Control
+	if control != null:
+		control.set_anchors_preset(Control.PRESET_FULL_RECT)
+		control.offset_left = 0.0
+		control.offset_top = 0.0
+		control.offset_right = 0.0
+		control.offset_bottom = 0.0
+		control.visible = false
+	add_child(combat_view)
+	combat_view.set_process(false)
+	_combat_prewarm_ready_us = Time.get_ticks_usec()
+	_disable_embedded_menu_buttons()
+
+func _request_combat_view_prewarm() -> void:
+	if combat_view != null and is_instance_valid(combat_view):
+		return
+	if _combat_scene_resource != null:
+		_instantiate_combat_view(_combat_scene_resource)
+		return
+	if _combat_scene_load_requested:
+		return
+	var error: Error = ResourceLoader.load_threaded_request(COMBAT_VIEW_SCENE_PATH, "PackedScene")
+	if error != OK:
+		_combat_prewarm_failed = true
+		push_warning("Main: combat prewarm request failed (%d); selection will use the synchronous fallback" % int(error))
+		return
+	_combat_prewarm_failed = false
+	_combat_scene_load_requested = true
+	_combat_prewarm_started_us = Time.get_ticks_usec()
+
+func _poll_combat_view_prewarm() -> void:
+	if not _combat_scene_load_requested or _combat_scene_resource != null:
+		return
+	var status: int = int(ResourceLoader.load_threaded_get_status(COMBAT_VIEW_SCENE_PATH))
+	if status == int(ResourceLoader.THREAD_LOAD_IN_PROGRESS):
+		return
+	if status == int(ResourceLoader.THREAD_LOAD_LOADED):
+		var resource: Resource = ResourceLoader.load_threaded_get(COMBAT_VIEW_SCENE_PATH)
+		_combat_scene_load_requested = false
+		_combat_scene_resource = resource as PackedScene
+		if _combat_scene_resource != null:
+			_instantiate_combat_view(_combat_scene_resource)
+		else:
+			push_warning("Main: threaded combat prewarm returned a non-PackedScene resource")
+		return
+	_combat_scene_load_requested = false
+	_combat_prewarm_failed = true
+	push_warning("Main: threaded combat prewarm failed with status %d" % status)
+
+func _take_threaded_combat_scene() -> PackedScene:
+	if _combat_scene_resource != null:
+		return _combat_scene_resource
+	if not _combat_scene_load_requested:
+		return null
+	var resource: Resource = ResourceLoader.load_threaded_get(COMBAT_VIEW_SCENE_PATH)
+	_combat_scene_load_requested = false
+	_combat_scene_resource = resource as PackedScene
+	return _combat_scene_resource
+
+func combat_prewarm_diagnostics() -> Dictionary[String, Variant]:
+	var elapsed_ms: float = -1.0
+	if _combat_prewarm_started_us > 0 and _combat_prewarm_ready_us >= _combat_prewarm_started_us:
+		elapsed_ms = float(_combat_prewarm_ready_us - _combat_prewarm_started_us) / 1000.0
+	return {
+		"requested": _combat_prewarm_started_us > 0,
+		"ready": combat_view != null and is_instance_valid(combat_view),
+		"pending_selection": _pending_starter_unit_id != "",
+		"load_failed": _combat_prewarm_failed,
+		"elapsed_ms": elapsed_ms,
+	}
+
+func _clear_combat_view() -> void:
+	_pending_starter_unit_id = ""
+	if unit_select != null and unit_select.has_method("set_transition_pending"):
+		unit_select.call("set_transition_pending", false)
+	if combat_view == null or not is_instance_valid(combat_view):
+		combat_view = null
+		return
+	if combat_view.has_method("_teardown"):
+		combat_view.call("_teardown")
+	var parent: Node = combat_view.get_parent()
+	if parent != null:
+		parent.remove_child(combat_view)
+	combat_view.free()
+	combat_view = null
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _is_audit_panel_event(event):
@@ -148,12 +305,15 @@ func enable_audit_panel_for_test() -> CanvasLayer:
 func request_return_to_title() -> void:
 	_close_system_menu()
 	_remove_runtime_overlays()
+	_clear_combat_view()
 	_reset_run_state()
 	_show_title_page()
+	call_deferred("_request_combat_view_prewarm")
 
 func request_new_run() -> void:
 	_close_system_menu()
 	_remove_runtime_overlays()
+	_clear_combat_view()
 	_reset_run_state()
 	_set_menu_visible(false)
 	if unit_select and unit_select.has_method("show_screen"):
@@ -161,6 +321,7 @@ func request_new_run() -> void:
 	if unit_select:
 		unit_select.set_process(true)
 	_sync_system_menu_button()
+	call_deferred("_request_combat_view_prewarm")
 
 func _build_system_menu() -> void:
 	_system_layer = CanvasLayer.new()
@@ -273,7 +434,7 @@ func _build_title_page() -> void:
 	_title_page.add_child(background)
 	var sigil: TextureRect = TextureRect.new()
 	sigil.name = "Sigil"
-	sigil.texture = TITLE_SIGIL
+	sigil.texture = TextureUtils.try_load_texture(TITLE_SIGIL_PATH)
 	sigil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sigil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	sigil.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -350,6 +511,8 @@ func _on_title_page_gui_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _disable_embedded_menu_buttons() -> void:
+	if combat_view == null:
+		return
 	var embedded_combat_menu: Button = combat_view.get_node_or_null("TopBar/MenuButton") as Button
 	if embedded_combat_menu == null:
 		return
@@ -375,10 +538,10 @@ func _apply_button_style(button: Button, compact: bool) -> void:
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.88, 0.58))
 	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.72, 0.48))
 	button.add_theme_font_size_override("font_size", 15 if compact else 21)
-	# The fixed top-right Menu control must not move into the viewport edge or
-	# adjacent HUD when hovered. Full-size modal actions keep their subtle scale.
-	if not compact:
-		_wire_system_button_hover(button, compact)
+	# Container-managed controls keep their assigned rect in every interaction
+	# state; the textured hover/focus styles provide emphasis without overflow.
+	button.scale = Vector2.ONE
+	button.set_meta("hover_scale", Vector2.ONE)
 
 func _make_system_button_style(compact: bool, modulate: Color) -> StyleBox:
 	var fallback: StyleBoxFlat = StyleBoxFlat.new()
@@ -429,6 +592,7 @@ func _close_system_menu() -> void:
 	_system_menu_open = false
 	if _system_overlay != null:
 		_system_overlay.visible = false
+	_kill_system_menu_tweens()
 	get_tree().paused = false
 	_sync_system_menu_button()
 
@@ -481,6 +645,49 @@ func _apply_system_button_motion(button: Button, active: bool) -> void:
 func _sync_system_button_pivot(button: Button) -> void:
 	if button != null:
 		button.pivot_offset = button.size * 0.5 if button.size != Vector2.ZERO else button.custom_minimum_size * 0.5
+
+func _kill_system_menu_tweens() -> void:
+	_kill_system_button_hover_tween(_system_menu_button)
+	_kill_system_button_hover_tween(_resume_button)
+	_kill_system_button_hover_tween(_new_run_button)
+	_kill_system_button_hover_tween(_return_title_button)
+	_kill_system_button_hover_tween(_quit_game_button)
+
+func _kill_system_button_hover_tween(button: Button) -> void:
+	if button == null:
+		return
+	var tween: Tween = button.get_meta("hover_tween") as Tween if button.has_meta("hover_tween") else null
+	if tween != null and is_instance_valid(tween):
+		tween.kill()
+	if button.has_meta("hover_tween"):
+		button.remove_meta("hover_tween")
+
+func _release_runtime_resource_refs(root: Node) -> void:
+	if root == null:
+		return
+	for child: Node in root.get_children():
+		_release_runtime_resource_refs(child)
+	var texture_rect: TextureRect = root as TextureRect
+	if texture_rect != null:
+		texture_rect.texture = null
+	var control: Control = root as Control
+	if control != null:
+		for style_name: String in _theme_style_names():
+			control.remove_theme_stylebox_override(style_name)
+		control.theme = null
+
+func _theme_style_names() -> Array[String]:
+	return [
+		"panel",
+		"normal",
+		"hover",
+		"pressed",
+		"focus",
+		"disabled",
+		"slider",
+		"grabber_area",
+		"grabber_area_highlight",
+	]
 
 func _is_system_menu_event(event: InputEvent) -> bool:
 	if event.is_action_pressed("ui_cancel"):

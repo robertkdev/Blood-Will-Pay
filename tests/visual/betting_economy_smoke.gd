@@ -58,6 +58,9 @@ func _run() -> void:
 	await _start_and_verify_locked_max_bet()
 	_finish()
 
+func _uses_manual_opening_continue() -> bool:
+	return true
+
 func _verify_direct_economy_contract() -> void:
 	if get_tree().root.get_node_or_null("/root/Economy") == null:
 		_expect(false, "Economy autoload missing")

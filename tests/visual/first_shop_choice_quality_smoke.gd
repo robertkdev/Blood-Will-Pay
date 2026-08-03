@@ -67,6 +67,9 @@ func _finish_choice_quality() -> void:
 	_cleanup_runtime()
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
 
+func _uses_manual_opening_continue() -> bool:
+	return true
+
 func _run_starter_choice_sweep(starter_id: String) -> Dictionary:
 	var snapshot: Dictionary = await _capture_first_shop_snapshot(starter_id)
 	var result: Dictionary = {

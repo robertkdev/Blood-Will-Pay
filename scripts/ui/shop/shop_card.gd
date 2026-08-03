@@ -40,6 +40,7 @@ var _tooltip_title: String = ""
 var _tooltip_subtitle: String = ""
 var _tooltip_lines: Array[String] = []
 var _status_tip: String = ""
+var _card_cost: int = 0
 
 func _resolve_child(paths: Array) -> Node:
 	for p in paths:
@@ -52,6 +53,7 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
 	toggle_mode = false
 	clip_text = false
+	clip_contents = true
 	tooltip_text = ""
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -67,6 +69,7 @@ func set_data(props: Dictionary) -> void:
 	offer_id = String(props.get("id", ""))
 	var title := String(props.get("name", "?"))
 	var price_i := int(props.get("price", props.get("cost", 0)))
+	_card_cost = price_i
 	var img_path := String(props.get("image_path", props.get("sprite_path", "")))
 	var roles: Array = _coerce_array(props.get("roles", []))
 	var traits: Array = _coerce_array(props.get("traits", []))
@@ -319,10 +322,11 @@ func _apply_static_style() -> void:
 	if _icon:
 		_icon.z_index = 2
 		_icon.modulate = Color(1.0, 0.93, 0.82, 1.0)
+		_icon.custom_minimum_size = Vector2.ZERO
 		_icon.anchor_left = 0.12
-		_icon.anchor_top = 0.21
+		_icon.anchor_top = 0.18
 		_icon.anchor_right = 0.88
-		_icon.anchor_bottom = 0.78
+		_icon.anchor_bottom = 0.80
 		_icon.offset_left = 0.0
 		_icon.offset_top = 0.0
 		_icon.offset_right = 0.0
@@ -364,15 +368,15 @@ func _apply_static_style() -> void:
 
 func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = COLOR_PANEL
-	style.border_color = COLOR_IRON
+	style.bg_color = _cost_bg_color(_card_cost)
+	style.border_color = _cost_border_color(_card_cost)
 	var modulate: Color = Color.WHITE
 	if highlighted:
-		style.bg_color = Color(0.092, 0.054, 0.062, 0.99)
+		style.bg_color = _cost_bg_color(_card_cost).lightened(0.16)
 		style.border_color = COLOR_GOLD
 		modulate = Color(1.14, 1.05, 0.92, 1.0)
 	if pressed_state:
-		style.bg_color = Color(0.13, 0.026, 0.040, 0.98)
+		style.bg_color = _cost_bg_color(_card_cost).darkened(0.12)
 		style.border_color = COLOR_BLOOD
 		modulate = Color(0.92, 0.82, 0.78, 1.0)
 	if disabled_state:
@@ -390,6 +394,36 @@ func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bo
 	style.shadow_size = 12 if highlighted else 8
 	style.shadow_color = Color(0.58, 0.18, 0.060, 0.30) if highlighted else Color(0.0, 0.0, 0.0, 0.46)
 	return GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(modulate), style)
+
+func _cost_bg_color(cost: int) -> Color:
+	match int(cost):
+		1:
+			return Color(0.035, 0.052, 0.044, 0.97)
+		2:
+			return Color(0.036, 0.047, 0.070, 0.97)
+		3:
+			return Color(0.070, 0.052, 0.030, 0.97)
+		4:
+			return Color(0.074, 0.030, 0.042, 0.97)
+		5:
+			return Color(0.057, 0.040, 0.075, 0.97)
+		_:
+			return COLOR_PANEL
+
+func _cost_border_color(cost: int) -> Color:
+	match int(cost):
+		1:
+			return Color(0.36, 0.52, 0.38, 0.94)
+		2:
+			return Color(0.38, 0.48, 0.72, 0.94)
+		3:
+			return Color(0.72, 0.52, 0.24, 0.94)
+		4:
+			return Color(0.76, 0.32, 0.36, 0.94)
+		5:
+			return Color(0.64, 0.46, 0.82, 0.94)
+		_:
+			return COLOR_IRON
 
 func _wire_hover() -> void:
 	if not is_connected("mouse_entered", Callable(self, "_on_hover_entered")):

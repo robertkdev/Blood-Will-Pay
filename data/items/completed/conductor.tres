@@ -9,7 +9,8 @@ name = "Conductor"
 type = "completed"
 icon_path = "res://assets/items/conductor_icon.png"
 stat_mods = {"flat_start_mana": 20, "flat_mana_regen": 10}
-effects = []
+effects = ["conductor"]
 components = ["orb", "orb"]
 tags = PackedStringArray("support", "mage")
+build_axes = PackedStringArray("mana", "tempo", "amp")
 

@@ -9,7 +9,8 @@ name = "Dagger"
 type = "completed"
 icon_path = "res://assets/items/dagger_icon.png"
 stat_mods = {"pct_ad": 0.25, "pct_as": 0.25}
-effects = []
+effects = ["dagger"]
 components = ["hammer", "crystal"]
 tags = PackedStringArray("marksman", "assassin")
+build_axes = PackedStringArray("attack_damage", "attack_speed")
 

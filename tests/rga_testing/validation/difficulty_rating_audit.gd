@@ -1,6 +1,7 @@
 extends Node
 
 const EndlessChapterGenerator := preload("res://scripts/game/progression/endless_chapter_generator.gd")
+const DifficultyRatingModel := preload("res://scripts/game/progression/difficulty_rating_model.gd")
 const ItemCatalog := preload("res://scripts/game/items/item_catalog.gd")
 const ItemDef := preload("res://scripts/game/items/item_def.gd")
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
@@ -18,24 +19,6 @@ const UNIT_ROOTS: Dictionary[String, String] = {
 const SAMPLE_SEEDS: Array[int] = [730711, 730712, 830711]
 const SAMPLE_CHAPTERS: int = 8
 const RATING_LEVELS: Array[int] = [1, 2, 3, 4, 5, 10]
-const STAT_RATING_WEIGHTS: Dictionary[String, float] = {
-	"flat_hp": 0.05,
-	"flat_armor": 0.60,
-	"flat_mr": 0.60,
-	"flat_sp": 0.55,
-	"pct_ad": 110.0,
-	"pct_as": 90.0,
-	"pct_crit_chance": 80.0,
-	"flat_crit_damage": 100.0,
-	"pct_mana_regen": 80.0,
-	"flat_mana_regen": 1.20,
-	"flat_start_mana": 0.80,
-	"pct_damage_reduction": 180.0,
-	"pct_tenacity": 50.0,
-	"pct_lifesteal": 120.0,
-}
-const EFFECT_RATING_PREMIUM: int = 18
-
 func _ready() -> void:
 	call_deferred("_run")
 
@@ -80,10 +63,11 @@ func _build_report(failures: Array[String]) -> Dictionary:
 	return {
 		"summary": summary,
 		"model": {
+			"version": DifficultyRatingModel.MODEL_VERSION,
 			"generator_unit_rating": "playable: round((6 + cost * 6) * 1.45^(level - 1)); creep: round(100 * 1.35^(level - 1))",
-			"target_rating": "chapter_base * stage_multiplier, where chapter_base starts at EASIEST_REFERENCE_RATING and adds 32 per chapter plus 55 every 5 chapters",
-			"trait_pressure_rating": "active TraitCompiler tier pressure; now included in generated procedural difficulty_rating when rules.trait_pressure_rating is present",
-			"item_rating": "audit-only estimate from ItemDef.stat_mods plus a flat premium per runtime effect id; not yet used by the procedural generator",
+			"target_rating": "chapter_base * stage_multiplier, where chapter_base starts at EASIEST_REFERENCE_RATING and adds 18 per chapter plus 35 every 5 chapters",
+			"trait_pressure_rating": "active TraitCompiler tier pressure from DifficultyRatingModel per-trait coefficients; included in generated procedural difficulty_rating when rules.trait_pressure_rating is present",
+			"item_rating": "estimate from ItemDef.stat_mods plus DifficultyRatingModel per-effect ratings; included in generated procedural difficulty_rating when rules.item_pressure_rating is present",
 		},
 		"unit_ratings": unit_rows,
 		"item_ratings": item_rows,
@@ -201,7 +185,7 @@ func _item_row(item_def: ItemDef) -> Dictionary:
 		var clean_effect: String = String(effect_id).strip_edges()
 		if clean_effect != "":
 			effect_ids.append(clean_effect)
-	var effect_rating: int = effect_ids.size() * EFFECT_RATING_PREMIUM
+	var effect_rating: int = DifficultyRatingModel.item_effect_rating_total(item_def.effects)
 	var tags: Array[String] = []
 	for tag: String in item_def.tags:
 		var clean_tag: String = String(tag).strip_edges()
@@ -217,7 +201,7 @@ func _item_row(item_def: ItemDef) -> Dictionary:
 		"stat_rating_estimate": stat_rating,
 		"effect_rating_estimate": effect_rating,
 		"total_item_rating_estimate": stat_rating + effect_rating,
-		"used_by_generator_rating": false,
+		"used_by_generator_rating": String(item_def.type) == "completed",
 	}
 
 func _sample_board_rows(failures: Array[String]) -> Array[Dictionary]:
@@ -246,10 +230,13 @@ func _sample_board_row(seed: int, chapter: int, stage_index: int, spec: Dictiona
 		trait_rows = _active_trait_rows(compiled_traits, generator_rating)
 	var trait_pressure: int = int(rules.get("trait_pressure_rating", _sum_trait_pressure(trait_rows)))
 	var item_rows: Array[Dictionary] = _board_item_rows(rules)
-	var item_pressure: int = _sum_item_pressure(item_rows)
-	var adjusted_rating: int = generator_rating + item_pressure
+	var generator_includes_items: bool = rules.has("item_pressure_rating")
+	var item_pressure: int = int(rules.get("item_pressure_rating", _sum_item_pressure(item_rows)))
+	var adjusted_rating: int = generator_rating
 	if not generator_includes_traits:
 		adjusted_rating += trait_pressure
+	if not generator_includes_items:
+		adjusted_rating += item_pressure
 	return {
 		"seed": seed,
 		"chapter": chapter,
@@ -258,10 +245,15 @@ func _sample_board_row(seed: int, chapter: int, stage_index: int, spec: Dictiona
 		"ids": ids,
 		"levels": rules.get("levels", {}),
 		"target_rating": target_rating,
+		"requested_target_rating": int(rules.get("requested_target_rating", target_rating)),
 		"generator_difficulty_rating": generator_rating,
 		"generator_rating_error": generator_rating - target_rating,
 		"generator_unit_rating": int(rules.get("unit_rating", generator_rating)),
+		"raw_unit_rating": int(rules.get("raw_unit_rating", rules.get("unit_rating", generator_rating))),
+		"stat_scale": float(rules.get("stat_scale", 1.0)),
+		"boss_stat_scale_cap": float(rules.get("boss_stat_scale_cap", 0.0)),
 		"generator_includes_traits": generator_includes_traits,
+		"generator_includes_items": generator_includes_items,
 		"active_traits": trait_rows,
 		"trait_pressure_estimate": trait_pressure,
 		"items": item_rows,
@@ -311,7 +303,7 @@ func _active_trait_rows(compiled: Dictionary, generator_rating: int) -> Array[Di
 		var threshold: int = count
 		if tier >= 0 and tier < threshold_values.size():
 			threshold = int(threshold_values[tier])
-		var pressure: int = _trait_pressure_rating(generator_rating, count, tier, threshold)
+		var pressure: int = _trait_pressure_rating(trait_id, generator_rating, count, tier, threshold)
 		rows.append({
 			"id": trait_id,
 			"count": count,
@@ -334,9 +326,9 @@ func _board_item_rows(rules: Dictionary) -> Array[Dictionary]:
 		for item_id: String in ids:
 			var item_def: ItemDef = ItemCatalog.get_def(item_id)
 			if item_def != null:
-				slot_rating += _score_item_stats(item_def.stat_mods) + (item_def.effects.size() * EFFECT_RATING_PREMIUM)
+				slot_rating += DifficultyRatingModel.item_rating(item_def)
 		rows.append({
-			"slot": String(slot_key),
+			"slot": str(slot_key),
 			"ids": ids,
 			"rating_estimate": slot_rating,
 		})
@@ -344,18 +336,10 @@ func _board_item_rows(rules: Dictionary) -> Array[Dictionary]:
 	return rows
 
 func _score_item_stats(stat_mods: Dictionary) -> int:
-	var total: float = 0.0
-	for key_variant: Variant in stat_mods.keys():
-		var key: String = String(key_variant)
-		var value: float = float(stat_mods[key_variant])
-		total += absf(value) * float(STAT_RATING_WEIGHTS.get(key, 0.0))
-	return int(round(total))
+	return DifficultyRatingModel.score_item_stats(stat_mods)
 
-func _trait_pressure_rating(generator_rating: int, count: int, tier: int, threshold: int) -> int:
-	var base_scale: float = 0.06 + float(tier) * 0.04
-	var board_pressure: float = float(generator_rating) * base_scale
-	var activation_pressure: float = float(max(1, threshold)) * 4.0 + float(max(1, count)) * 2.0
-	return int(round(board_pressure + activation_pressure))
+func _trait_pressure_rating(trait_id: String, generator_rating: int, count: int, tier: int, threshold: int) -> int:
+	return DifficultyRatingModel.trait_pressure_rating(trait_id, generator_rating, count, tier, threshold)
 
 func _sum_trait_pressure(rows: Array[Dictionary]) -> int:
 	var total: int = 0

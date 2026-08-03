@@ -8,6 +8,10 @@ const BattleState = preload("res://scripts/game/combat/battle_state.gd")
 const CombatEngine = preload("res://scripts/game/combat/combat_engine.gd")
 const TraitRuntimeLib = preload("res://scripts/game/traits/runtime/trait_runtime.gd")
 const MentorLink = preload("res://scripts/game/traits/runtime/mentor_link.gd")
+const ItemCatalog = preload("res://scripts/game/items/item_catalog.gd")
+const EffectRegistry = preload("res://scripts/game/items/effects/effect_registry.gd")
+
+var _item_effect_dispatch_depth: int = 0
 
 # Runs a single SimJob through the CombatEngine in deterministic lockstep.
 # Optionally accepts a base stats collector that will be attached and ticked during the run.
@@ -25,8 +29,14 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	var state: BattleState = BattleState.new()
 	state.reset()
 	state.stage = 1
+	var uses_item_loadouts: bool = meta_root.has("team_a_items") or meta_root.has("team_b_items")
+	if uses_item_loadouts:
+		_reset_items_autoload()
 	var scen: OpenFieldScenario = OpenFieldScenario.new()
 	var info: Dictionary = scen.make(state, job.team_a_ids, job.team_b_ids, job.map_params)
+	if uses_item_loadouts:
+		_apply_item_loadouts(state.player_team, meta_root.get("team_a_items", []))
+		_apply_item_loadouts(state.enemy_team, meta_root.get("team_b_items", []))
 
 	# Engine setup
 	var engine: CombatEngine = CombatEngine.new()
@@ -68,6 +78,9 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	engine.set_arena(tile_size, ppos, epos, bounds)
 	state.player_pupil_map = MentorLink.compute_for_team(state.player_team, ppos)
 	state.enemy_pupil_map = MentorLink.compute_for_team(state.enemy_team, epos)
+	var item_effect_runtime: Dictionary = {}
+	if uses_item_loadouts:
+		item_effect_runtime = _wire_item_effect_runtime(engine, state)
 
 	# Optional projectile->hit bridging with simulated flight time (maps to UI projectile speed)
 	var pending_hits: Array = []
@@ -110,6 +123,7 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	var outcome_ref: Dictionary = {"value": ""}
 	engine.victory.connect(func(_stage: int): if String(outcome_ref.get("value", "")) == "": outcome_ref["value"] = "team_a")
 	engine.defeat.connect(func(_stage: int): if String(outcome_ref.get("value", "")) == "": outcome_ref["value"] = "team_b")
+	engine.tie.connect(func(_stage: int): if String(outcome_ref.get("value", "")) == "": outcome_ref["value"] = "tie")
 
 	# Optional event capture
 	var events: Array = []
@@ -194,12 +208,20 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 			perf_margin_tiles = float(jmeta_root.get("perf_margin_tiles", perf_margin_tiles))
 	var collect_target_group_diagnostics: bool = bool(jmeta_root.get("perf_target_group_diagnostics", false))
 	var target_group_diagnostics: Dictionary = _new_target_group_diagnostics()
+	var max_wall_clock_ms: int = max(0, int(jmeta_root.get("max_wall_clock_ms", 0)))
+	var wall_started_ms: int = Time.get_ticks_msec()
+	var wall_timeout: bool = false
 	# Attach collector if provided (player side corresponds to team A in this simulator)
 	if collector != null and collector.has_method("attach"):
 		collector.attach(engine, state, true)
 	engine.start()
 	trait_runtime.on_battle_start()
+	if not item_effect_runtime.is_empty():
+		_dispatch_item_combat_started(item_effect_runtime, state)
 	while String(outcome_ref.get("value", "")) == "" and sim_time < float(job.timeout_s):
+		if max_wall_clock_ms > 0 and Time.get_ticks_msec() - wall_started_ms >= max_wall_clock_ms:
+			wall_timeout = true
+			break
 		var dt_used: float = delta_s
 		if perf_adaptive:
 			var try_dt: float = perf_fast_dt
@@ -263,17 +285,17 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 			_record_target_group_diagnostics(target_group_diagnostics, state.player_team, state.enemy_team, state.player_targets, state.enemy_targets)
 		var a_alive: int = _alive_count(state.player_team)
 		var b_alive: int = _alive_count(state.enemy_team)
-		if a_alive <= 0:
-			outcome_ref["value"] = "team_b"
-			break
-		if b_alive <= 0:
-			outcome_ref["value"] = "team_a"
+		var board_outcome: String = board_outcome_from_alive_counts(a_alive, b_alive)
+		if board_outcome != "":
+			outcome_ref["value"] = board_outcome
 			break
 
 	# Outcome and survivors
 	var outcome: DataModels.EngineOutcome = DataModels.EngineOutcome.new()
 	var outcome_str: String = String(outcome_ref.get("value", ""))
-	if outcome_str == "":
+	if wall_timeout:
+		outcome.result = "wall_timeout"
+	elif outcome_str == "":
 		outcome.result = "timeout"
 	else:
 		outcome.result = outcome_str
@@ -285,6 +307,8 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 		result["movement_diagnostics"] = engine.arena_state.diagnostics_snapshot()
 	if collect_target_group_diagnostics:
 		result["target_group_diagnostics"] = target_group_diagnostics.duplicate(true)
+	result["wall_timeout"] = wall_timeout
+	result["wall_elapsed_ms"] = Time.get_ticks_msec() - wall_started_ms
 
 	# Derive capabilities actually present (from engine signals and attached kernels)
 	var caps_present: PackedStringArray = _derive_caps_present(engine, collector)
@@ -328,15 +352,217 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 		collector.detach()
 	if trait_runtime != null:
 		trait_runtime.unwire_signals()
+	if not item_effect_runtime.is_empty():
+		_clear_item_effect_runtime(item_effect_runtime)
 	_disconnect_engine_connections(engine)
 	if engine != null and engine.has_method("teardown"):
 		engine.teardown()
 	pending_hits.clear()
+	if uses_item_loadouts:
+		_reset_items_autoload()
 
 	result["context"] = ctx
 	result["engine_outcome"] = outcome
 	result["events"] = (events if collect_events else [])
 	return result
+
+static func board_outcome_from_alive_counts(team_a_alive: int, team_b_alive: int) -> String:
+	if team_a_alive <= 0 and team_b_alive <= 0:
+		return "tie"
+	if team_a_alive <= 0:
+		return "team_b"
+	if team_b_alive <= 0:
+		return "team_a"
+	return ""
+
+func _apply_item_loadouts(team: Array, loadouts_value: Variant) -> void:
+	if team.is_empty() or loadouts_value == null:
+		return
+	var items_node: Node = _items_autoload()
+	if items_node == null or not items_node.has_method("force_set_equipped"):
+		push_warning("LockstepSimulator: Items autoload unavailable; item loadouts skipped")
+		return
+	for index in range(team.size()):
+		var unit_value: Variant = team[index]
+		var unit: Unit = unit_value as Unit
+		if unit == null:
+			continue
+		var item_ids: Array[String] = _loadout_at(loadouts_value, index)
+		if item_ids.is_empty():
+			continue
+		items_node.call("force_set_equipped", unit, item_ids)
+		unit.hp = int(unit.max_hp)
+		unit.mana = min(int(unit.mana_max), int(unit.mana_start))
+
+func _loadout_at(loadouts_value: Variant, index: int) -> Array[String]:
+	var out: Array[String] = []
+	if loadouts_value is PackedStringArray:
+		if index == 0:
+			for item_id: String in loadouts_value:
+				out.append(String(item_id))
+		return out
+	if not (loadouts_value is Array):
+		return out
+	var loadouts: Array = loadouts_value as Array
+	if index < 0 or index >= loadouts.size():
+		return out
+	var raw_loadout: Variant = loadouts[index]
+	if raw_loadout is PackedStringArray:
+		for packed_item_id: String in raw_loadout:
+			out.append(String(packed_item_id))
+	elif raw_loadout is Array:
+		for item_id_value: Variant in raw_loadout:
+			out.append(String(item_id_value))
+	elif typeof(raw_loadout) == TYPE_STRING:
+		out.append(String(raw_loadout))
+	return out
+
+func _reset_items_autoload() -> void:
+	var items_node: Node = _items_autoload()
+	if items_node != null and items_node.has_method("reset_run"):
+		items_node.call("reset_run")
+
+func _items_autoload() -> Node:
+	var loop: MainLoop = Engine.get_main_loop()
+	if loop == null or not loop.has_method("get_root"):
+		return null
+	var root: Window = loop.get_root()
+	if root == null:
+		return null
+	return root.get_node_or_null("/root/Items")
+
+func _wire_item_effect_runtime(engine: CombatEngine, state: BattleState) -> Dictionary:
+	if engine == null or state == null:
+		return {}
+	var effects_by_unit: Dictionary = _collect_item_effects_by_unit(state)
+	if effects_by_unit.is_empty():
+		return {}
+	var registry: EffectRegistry = EffectRegistry.new()
+	registry.configure(null, engine, engine.buff_system)
+	engine.hit_applied.connect(func(team: String, source_index: int, target_index: int, rolled: int, dealt: int, crit: bool, before_hp: int, after_hp: int, _pcd: float, _ecd: float):
+		var source: Unit = _item_unit_at_state(state, team, source_index)
+		_dispatch_item_effects(registry, effects_by_unit, source, "hit_dealt", {
+			"team": team,
+			"source_index": source_index,
+			"target_index": target_index,
+			"rolled": rolled,
+			"dealt": dealt,
+			"crit": crit,
+			"before_hp": before_hp,
+			"after_hp": after_hp,
+		})
+		var target_team: String = _item_other_team(team)
+		var target: Unit = _item_unit_at_state(state, target_team, target_index)
+		_dispatch_item_effects(registry, effects_by_unit, target, "hit_taken", {
+			"attacker_team": team,
+			"attacker_index": source_index,
+			"target_index": target_index,
+			"dealt": dealt,
+			"crit": crit,
+			"before_hp": before_hp,
+			"after_hp": after_hp,
+		})
+	)
+	engine.unit_stat_changed.connect(func(team: String, index: int, fields: Dictionary):
+		var unit: Unit = _item_unit_at_state(state, team, index)
+		_dispatch_item_effects(registry, effects_by_unit, unit, "unit_stat_changed", {
+			"team": team,
+			"index": index,
+			"fields": fields,
+		})
+	)
+	if engine.has_signal("ability_cast"):
+		engine.ability_cast.connect(func(team: String, index: int, target_team: String, target_index: int, position: Vector2):
+			var unit: Unit = _item_unit_at_state(state, team, index)
+			_dispatch_item_effects(registry, effects_by_unit, unit, "ability_cast", {
+				"team": team,
+				"index": index,
+				"ability_id": "",
+				"target_team": target_team,
+				"target_index": target_index,
+				"target_point": position,
+			})
+		)
+	return {
+		"registry": registry,
+		"effects_by_unit": effects_by_unit,
+	}
+
+func _collect_item_effects_by_unit(state: BattleState) -> Dictionary:
+	var effects_by_unit: Dictionary = {}
+	var items_node: Node = _items_autoload()
+	if state == null or items_node == null or not items_node.has_method("get_equipped"):
+		return effects_by_unit
+	for unit_value: Variant in state.player_team + state.enemy_team:
+		var unit: Unit = unit_value as Unit
+		if unit == null:
+			continue
+		var effect_ids: Array[String] = []
+		var equipped_value: Variant = items_node.call("get_equipped", unit)
+		for item_id: String in _loadout_at([equipped_value], 0):
+			var def: ItemDef = ItemCatalog.get_def(item_id)
+			if def == null:
+				continue
+			for effect_id: String in def.effects:
+				var clean_id: String = String(effect_id).strip_edges()
+				if clean_id != "":
+					effect_ids.append(clean_id)
+		if not effect_ids.is_empty():
+			effects_by_unit[unit] = effect_ids
+	return effects_by_unit
+
+func _dispatch_item_combat_started(runtime: Dictionary, state: BattleState) -> void:
+	if runtime.is_empty() or state == null:
+		return
+	var registry: EffectRegistry = runtime.get("registry", null) as EffectRegistry
+	var effects_by_unit: Dictionary = runtime.get("effects_by_unit", {})
+	if registry == null or effects_by_unit.is_empty():
+		return
+	for unit_value: Variant in state.player_team + state.enemy_team:
+		var unit: Unit = unit_value as Unit
+		if unit != null:
+			_dispatch_item_effects(registry, effects_by_unit, unit, "combat_started", {"stage": state.stage})
+
+func _dispatch_item_effects(registry: EffectRegistry, effects_by_unit: Dictionary, unit: Unit, event: String, data: Dictionary) -> void:
+	if registry == null or unit == null or effects_by_unit.is_empty():
+		return
+	if _item_effect_dispatch_depth > 0:
+		return
+	var effect_ids: Array[String] = _string_array_from_variant(effects_by_unit.get(unit, []))
+	_item_effect_dispatch_depth += 1
+	for effect_id: String in effect_ids:
+		registry.dispatch(effect_id, unit, event, data)
+	_item_effect_dispatch_depth -= 1
+
+func _clear_item_effect_runtime(runtime: Dictionary) -> void:
+	if runtime.is_empty():
+		return
+	var registry: EffectRegistry = runtime.get("registry", null) as EffectRegistry
+	if registry != null:
+		registry.clear()
+
+func _item_unit_at_state(state: BattleState, team: String, index: int) -> Unit:
+	if state == null or index < 0:
+		return null
+	var units: Array = state.player_team if team == "player" else state.enemy_team
+	if index >= units.size():
+		return null
+	return units[index] as Unit
+
+func _item_other_team(team: String) -> String:
+	return "enemy" if team == "player" else "player"
+
+func _string_array_from_variant(value: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if value is Array:
+		for entry: Variant in value:
+			out.append(String(entry))
+	elif value is PackedStringArray:
+		for entry_string: String in value:
+			out.append(String(entry_string))
+	elif typeof(value) == TYPE_STRING:
+		out.append(String(value))
+	return out
 
 # --- capability derivation -----------------------------------------------
 

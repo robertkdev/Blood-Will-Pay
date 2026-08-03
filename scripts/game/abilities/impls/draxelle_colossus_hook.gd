@@ -63,7 +63,7 @@ func _furthest_enemy(ctx: AbilityContext) -> int:
 	var best_distance: float = -1.0
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var distance: float = caster_position.distance_to(ctx.position_of(target_team, index))
 		if distance > best_distance:
@@ -80,7 +80,6 @@ func _engage_toward(ctx: AbilityContext, target_position: Vector2) -> void:
 	_emit_position(ctx, ctx.caster_team, ctx.caster_index, start)
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
 		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
-	_set_unit_position(ctx, ctx.caster_team, ctx.caster_index, destination)
 
 func _hook_target_toward_caster(ctx: AbilityContext, target_team: String, target_index: int) -> void:
 	var target_position: Vector2 = ctx.position_of(target_team, target_index)
@@ -92,7 +91,6 @@ func _hook_target_toward_caster(ctx: AbilityContext, target_team: String, target
 	_emit_position(ctx, target_team, target_index, target_position)
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
 		ctx.engine.arena_state.notify_forced_movement(target_team, target_index, destination - target_position, MOVE_DURATION)
-	_set_unit_position(ctx, target_team, target_index, destination)
 
 func _set_unit_position(ctx: AbilityContext, team: String, index: int, destination: Vector2) -> void:
 	if ctx.engine == null:

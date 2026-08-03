@@ -12,4 +12,5 @@ stat_mods = {"flat_mr": 30}
 effects = []
 components = []
 tags = PackedStringArray("support", "tank")
+build_axes = PackedStringArray("magic_resist", "anti_control")
 

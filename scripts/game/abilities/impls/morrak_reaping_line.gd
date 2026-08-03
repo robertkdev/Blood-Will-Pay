@@ -4,7 +4,7 @@ extends AbilityImplBase
 # On cast: gains Armor & MR for 3s (25/35/45 by level).
 # Cleaves in a line through the current target for physical damage:
 #   D = BaseByLevel + 0.9 * AD + 12 * StrikerStacks + 10 * ExecutionerStacks
-# Execute enemies under threshold T = min(0.40, 0.12 + 0.02 * ExecutionerStacks).
+# Execute enemies under threshold T = min(0.40, 0.35 + 0.02 * ExecutionerStacks).
 # On execute: heal Morrak for 30% Max HP.
 
 const BUFF_DURATION := 3.0
@@ -36,9 +36,30 @@ func _stack(bs, state: BattleState, team: String, index: int, key: String) -> in
     return int(bs.get_stack(state, team, index, key))
 
 func _execute_threshold(exec_stacks: int) -> float:
-    var base_t: float = 0.12
+    var base_t: float = 0.35
     var inc: float = 0.02 * float(max(0, exec_stacks))
     return clamp(base_t + inc, 0.0, 0.40)
+
+func _preferred_target(ctx: AbilityContext, execute_threshold: float) -> int:
+    var target_team: String = ctx._other_team(ctx.caster_team)
+    var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+    var best_index: int = -1
+    var best_hp_pct: float = INF
+    var best_hp: int = 1 << 30
+    for index: int in range(enemies.size()):
+        var enemy: Unit = enemies[index]
+        if enemy == null or not ctx.is_targetable(target_team, index):
+            continue
+        var hp_pct: float = float(enemy.hp) / max(1.0, float(enemy.max_hp))
+        if hp_pct > execute_threshold:
+            continue
+        if hp_pct < best_hp_pct or (is_equal_approx(hp_pct, best_hp_pct) and int(enemy.hp) < best_hp):
+            best_index = index
+            best_hp_pct = hp_pct
+            best_hp = int(enemy.hp)
+    if best_index >= 0:
+        return best_index
+    return ctx.current_target(ctx.caster_team, ctx.caster_index)
 
 func _heal_on_execute(ctx: AbilityContext, amount: int) -> void:
     var caster: Unit = ctx.unit_at(ctx.caster_team, ctx.caster_index)
@@ -58,7 +79,11 @@ func cast(ctx: AbilityContext) -> bool:
     if caster == null or not caster.is_alive():
         return false
 
-    var target_idx: int = ctx.current_target(ctx.caster_team, ctx.caster_index)
+    # Stacks (trait-ready; default 0 until traits wire them in)
+    var striker: int = _stack(bs, ctx.state, ctx.caster_team, ctx.caster_index, STRIKER_KEY)
+    var execs: int = _stack(bs, ctx.state, ctx.caster_team, ctx.caster_index, EXECUTIONER_KEY)
+    var exec_thresh: float = _execute_threshold(execs)
+    var target_idx: int = _preferred_target(ctx, exec_thresh)
     if target_idx < 0:
         return false
 
@@ -66,10 +91,6 @@ func cast(ctx: AbilityContext) -> bool:
     var li: int = _level_index(caster)
     var buff_val: int = BUFF_BY_LEVEL[li]
     bs.apply_stats_buff(ctx.state, ctx.caster_team, ctx.caster_index, {"armor": buff_val, "magic_resist": buff_val}, BUFF_DURATION)
-
-    # Stacks (trait-ready; default 0 until traits wire them in)
-    var striker: int = _stack(bs, ctx.state, ctx.caster_team, ctx.caster_index, STRIKER_KEY)
-    var execs: int = _stack(bs, ctx.state, ctx.caster_team, ctx.caster_index, EXECUTIONER_KEY)
 
     # Damage formula
     var base_dmg: int = BASE_BY_LEVEL[li]
@@ -80,7 +101,6 @@ func cast(ctx: AbilityContext) -> bool:
 
     # Select line targets
     var hits: Array[int] = ctx.enemies_in_line(ctx.caster_team, ctx.caster_index, target_idx, LINE_LENGTH_TILES, LINE_WIDTH_TILES)
-    var exec_thresh: float = _execute_threshold(execs)
     var executes: int = 0
     var target_team: String = ctx._other_team(ctx.caster_team)
     for idx in hits:

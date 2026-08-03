@@ -167,14 +167,10 @@ func rebuild(force: bool = true) -> void:
 
 func _current_trait_signature() -> String:
 	var board_team: Array = (manager.player_team if manager else [])
-	var counts: Dictionary = {}
-	for unit_value in board_team:
-		if not (unit_value is Unit):
-			continue
-		var current_unit: Unit = unit_value as Unit
-		for trait_value in current_unit.traits:
-			var trait_id: String = String(trait_value)
-			counts[trait_id] = int(counts.get(trait_id, 0)) + 1
+	var compiled: Dictionary = {}
+	if TraitCompiler and board_team is Array:
+		compiled = TraitCompiler.compile(board_team)
+	var counts: Dictionary = compiled.get("counts", {})
 	var keys: Array = counts.keys()
 	keys.sort()
 	var parts: PackedStringArray = PackedStringArray()

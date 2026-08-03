@@ -1,6 +1,7 @@
 extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
+const EndlessChapterGenerator := preload("res://scripts/game/progression/endless_chapter_generator.gd")
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
@@ -62,7 +63,8 @@ func _validate_default_preview() -> void:
 	_expect(chapter_label != null, "procedural default chapter label missing")
 	if chapter_label != null:
 		_expect(String(chapter_label.text) == "Chapter 1", "procedural default chapter label expected Chapter 1 got %s" % chapter_label.text)
-		_expect(String(chapter_label.tooltip_text).contains("RGA:"), "procedural default chapter hover should preview RGA challenges")
+		_expect(String(chapter_label.tooltip_text) == "", "procedural default chapter label should suppress native tooltip")
+		_expect(String(chapter_label.get_meta("stage_hover_text", "")).contains("RGA:"), "procedural default chapter hover should preview RGA challenges")
 	var board_capacity_label: Label = _main.find_child("BoardCapacityLabel", true, false) as Label
 	_expect(board_capacity_label != null, "procedural default board capacity label missing")
 	if board_capacity_label != null:
@@ -72,17 +74,20 @@ func _validate_default_preview() -> void:
 	if win_odds_label != null:
 		_expect(String(win_odds_label.text).begins_with("Win Odds "), "procedural default odds label should show Win Odds, got %s" % win_odds_label.text)
 	var spec: Dictionary = RosterCatalog.get_spec(FIRST_CHAPTER, FIRST_ROUND)
+	var ids: Array = spec.get(StageTypes.KEY_IDS, []) if spec.get(StageTypes.KEY_IDS, []) is Array else []
 	var rules: Dictionary = spec.get(StageTypes.KEY_RULES, {})
 	_expect(String(spec.get(StageTypes.KEY_KIND, "")) == StageTypes.KIND_CREEPS, "opening round should be generated creeps")
+	_expect(ids.size() >= EndlessChapterGenerator.MIN_CREEP_STAGE_UNITS, "opening round should have multiple creep reward enemies, got %s" % JSON.stringify(ids))
 	_expect(bool(rules.get("procedural", false)), "opening preview spec should carry procedural marker")
-	_expect(int(rules.get("target_rating", 0)) == int(ProgressionConfig.EASIEST_REFERENCE_RATING), "opening target rating should match easiest reference")
-	_expect(int(rules.get("difficulty_rating", 0)) == int(ProgressionConfig.EASIEST_REFERENCE_RATING), "opening difficulty rating should match easiest reference")
+	var opener_target: int = EndlessChapterGenerator.target_rating_for(FIRST_CHAPTER, FIRST_ROUND)
+	_expect(int(rules.get("target_rating", 0)) == opener_target, "opening target rating should match generated creep target")
+	_expect(int(rules.get("difficulty_rating", 0)) == opener_target, "opening difficulty rating should match generated creep target")
 	var controller: Variant = _combat_controller()
 	var manager: Variant = controller.get("manager") if controller != null else null
 	_expect(manager != null, "procedural default manager missing for preview validation")
 	if manager != null:
 		var preview_enemy_ids: Array[String] = _enemy_ids(manager)
-		_expect(not preview_enemy_ids.is_empty(), "opening preview should show generated enemies")
+		_expect(preview_enemy_ids.size() >= EndlessChapterGenerator.MIN_CREEP_STAGE_UNITS, "opening preview should show multiple generated creep enemies, got %s" % JSON.stringify(preview_enemy_ids))
 		print("%s: preview chapter=%d round=%d enemy=%s spec=%s" % [SMOKE_TITLE, FIRST_CHAPTER, FIRST_ROUND, JSON.stringify(preview_enemy_ids), JSON.stringify(_spec_summary(spec))])
 
 func _play_first_procedural_round() -> void:

@@ -9,8 +9,9 @@ name = "Vengeance"
 type = "completed"
 icon_path = "res://assets/items/vengeance_icon.png"
 stat_mods = {"pct_crit_chance": 0.20, "flat_mr": 40, "pct_tenacity": 0.30}
-effects = []
+effects = ["vengeance"]
 components = ["spike", "veil"]
 tags = PackedStringArray("assassin", "brawler")
+build_axes = PackedStringArray("crit", "magic_resist", "anti_control", "tenacity")
 
 

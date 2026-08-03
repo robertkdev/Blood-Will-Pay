@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "support"
 primary_goal = "support.formation_breaking"
 approaches = ["zone", "disrupt", "redirect"]
-alt_goals = []
+alt_goals = ["support.initiate_fight", "mage.pick_burst"]

@@ -11,6 +11,11 @@ var _scanned: bool = false
 var _cost_to_ids: Dictionary = {}        # int cost -> Array[String] ids
 var _meta_by_id: Dictionary = {}          # id -> { name, sprite_path, cost, roles, traits, identity, flags }
 
+func clear_runtime() -> void:
+	_scanned = false
+	_cost_to_ids.clear()
+	_meta_by_id.clear()
+
 func refresh() -> void:
 	_scanned = false
 	_cost_to_ids.clear()

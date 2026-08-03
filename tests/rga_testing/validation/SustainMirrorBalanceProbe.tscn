@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/sustain_mirror_balance_probe.gd" id="1"]
+
+[node name="SustainMirrorBalanceProbe" type="Node"]
+script = ExtResource("1")
+seeds_per_case = 2
+timeout_s = 105.0
+enforce_thresholds = true

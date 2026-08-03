@@ -26,6 +26,11 @@ const KORATH_RELEASE_PRIMARY_DAMAGE_PCT: float = 0.55
 const KORATH_RELEASE_SECONDARY_DAMAGE_PCT: float = 0.35
 const KORATH_RELEASE_MAX_DAMAGE_TARGETS: int = 2
 const KORATH_RELEASE_STUN_DURATION: float = 0.45
+const KORATH_RELEASE_BASE_HP_PCT: float = 0.12
+const KORATH_RELEASE_POOL_EFFICIENCY: float = 0.45
+const KORATH_RELEASE_POOL_HEAL_CAP_HP_PCT: float = 0.22
+const KORATH_RELEASE_TOTAL_HEAL_CAP_HP_PCT: float = 0.40
+const KORATH_RELEASE_STACK_HEAL: int = 4
 
 func configure(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGenerator, _buffs: BuffSystem = null) -> void:
 	engine = _engine
@@ -34,6 +39,30 @@ func configure(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGen
 	buff_system = _buffs
 	cost_adapter = null
 	_cooldowns.clear()
+	_apply_starting_mana_bonuses()
+
+func _apply_starting_mana_bonuses() -> void:
+	if state == null:
+		return
+	var applied_units: Dictionary[Unit, bool] = {}
+	_apply_starting_mana_bonus_to_team(state.player_team, applied_units)
+	_apply_starting_mana_bonus_to_team(state.enemy_team, applied_units)
+
+func _apply_starting_mana_bonus_to_team(units: Array[Unit], applied_units: Dictionary[Unit, bool]) -> void:
+	for unit: Unit in units:
+		if unit == null or applied_units.has(unit):
+			continue
+		applied_units[unit] = true
+		var ability_id: String = String(unit.ability_id).strip_edges()
+		if ability_id == "" or int(unit.mana_max) <= 0:
+			continue
+		var ability_def: AbilityDef = AbilityCatalog.get_def(ability_id)
+		if ability_def == null:
+			continue
+		var bonus: int = max(0, int(ability_def.starting_mana_bonus))
+		if bonus <= 0:
+			continue
+		unit.mana = clampi(int(unit.mana) + bonus, 0, int(unit.mana_max))
 
 func teardown() -> void:
 	engine = null
@@ -111,14 +140,11 @@ func _team_has_debuff(team: String) -> bool:
 	return false
 
 func _autocast_totem_if_needed(team: String, index: int) -> void:
-	# Require Exile trait active on team (count > 0)
+	# Require the exact-count Exile upgrade tag (active only at 1/3/5 Exiles).
 	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
 	ctx.buff_system = buff_system
 	var ability_id: String = "totem_cleanse"
-	var exile_count: int = 0
-	if ctx.has_method("trait_count"):
-		exile_count = ctx.trait_count(team, "Exile")
-	if exile_count <= 0:
+	if ctx.exile_upgrade_level(team, index) <= 0:
 		return
 	# Check if any ally is currently debuffed
 	if not _team_has_debuff(team):
@@ -165,6 +191,8 @@ func _handle_event(evt: Dictionary) -> void:
 			_handle_creep_eaves_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
 		"cinder_fuse_tick":
 			_handle_cinder_fuse_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+		"vesper_late_fee_resolve":
+			_handle_vesper_late_fee_resolve(source_team, source_index, evt.get("data", {}))
 		"planned_area_tick":
 			_handle_planned_area_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
 		"bo_wos_dash_tick":
@@ -181,6 +209,19 @@ func _handle_event(evt: Dictionary) -> void:
 			pass
 	if pushed:
 		_pop_buff_source()
+
+func _handle_vesper_late_fee_resolve(team: String, index: int, data: Dictionary) -> void:
+	if state == null or engine == null:
+		return
+	var caster: Unit = _unit_at(team, index)
+	if caster == null or not caster.is_alive():
+		return
+	var impl: Variant = AbilityCatalog.new_instance("vesper_late_fee")
+	if impl == null or not impl.has_method("resolve_delayed"):
+		return
+	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
+	ctx.buff_system = buff_system
+	impl.resolve_delayed(ctx, data)
 
 func _handle_creep_eaves_tick(team: String, index: int, data: Dictionary) -> void:
 	if state == null or engine == null:
@@ -284,8 +325,9 @@ func _handle_planned_area_tick(team: String, index: int, data: Dictionary) -> vo
 	if state == null or engine == null:
 		return
 	var caster: Unit = _unit_at(team, index)
-	if caster == null or not caster.is_alive():
+	if caster == null:
 		return
+	var caster_alive: bool = caster.is_alive()
 	var ticks_left: int = int(data.get("ticks_left", 0))
 	if ticks_left <= 0:
 		return
@@ -307,9 +349,9 @@ func _handle_planned_area_tick(team: String, index: int, data: Dictionary) -> vo
 	if target_index >= 0 and ctx.is_alive(target_team, target_index):
 		victims.append(target_index)
 	else:
-		var center_value: Variant = data.get("center", Vector2.ZERO)
-		var center: Vector2 = center_value if (center_value is Vector2) else Vector2.ZERO
-		if radius > 0.0:
+		var center_value: Variant = data.get("center", null)
+		if radius > 0.0 and center_value is Vector2:
+			var center: Vector2 = center_value as Vector2
 			victims = ctx.enemies_in_radius_at(team, center, radius)
 	for victim_index: int in victims:
 		var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, victim_index, damage, damage_type)
@@ -325,7 +367,7 @@ func _handle_planned_area_tick(team: String, index: int, data: Dictionary) -> vo
 				buff_system.apply_stats_labeled(state, target_team, victim_index, debuff_label, debuff_fields, debuff_duration)
 			else:
 				buff_system.apply_stats_buff(state, target_team, victim_index, debuff_fields, debuff_duration)
-		if self_heal_pct > 0.0 and dealt_amount > 0:
+		if caster_alive and self_heal_pct > 0.0 and dealt_amount > 0:
 			ctx.heal_single(team, index, float(dealt_amount) * self_heal_pct)
 	ticks_left -= 1
 	if ticks_left > 0:
@@ -367,9 +409,13 @@ func _handle_korath_release(team: String, index: int, data: Dictionary) -> void:
 	if best_idx < 0:
 		return
 	var tgt_team: String = team
-	var heal_base: int = int(floor(0.20 * float(caster.max_hp)))
-	var heal_amt: int = max(0, int(pool) + heal_base + 4 * int(stacks_at_cast))
-	var release_payload: int = heal_amt
+	var heal_base: int = int(floor(KORATH_RELEASE_BASE_HP_PCT * float(caster.max_hp)))
+	var pool_heal_cap: int = int(floor(KORATH_RELEASE_POOL_HEAL_CAP_HP_PCT * float(caster.max_hp)))
+	var pool_heal: int = min(pool_heal_cap, int(floor(float(pool) * KORATH_RELEASE_POOL_EFFICIENCY)))
+	var uncapped_heal: int = max(0, heal_base + pool_heal + KORATH_RELEASE_STACK_HEAL * int(stacks_at_cast))
+	var heal_cap: int = int(floor(KORATH_RELEASE_TOTAL_HEAL_CAP_HP_PCT * float(caster.max_hp)))
+	var heal_amt: int = min(uncapped_heal, heal_cap)
+	var release_payload: int = max(pool_heal, int(floor(float(caster.max_hp) * 0.08)))
 	# Use context helper so healing includes source metadata
 	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
 	ctx.buff_system = buff_system
@@ -389,15 +435,16 @@ func _handle_korath_release(team: String, index: int, data: Dictionary) -> void:
 				release_damage_total += int(max(0, int(damage_result.get("dealt", dmg_amt))))
 				# Brief stun to create a window to capitalize
 				AbilityEffects.stun(buff_system, engine, state, ("enemy" if team == "player" else "player"), enemy_idx, KORATH_RELEASE_STUN_DURATION, team, index)
-	engine._resolver_emit_log("Absorb & Release: healed %d (pool=%d, base=%d, stacks=%d, release_damage=%d targets=%d)" % [heal_amt, pool, heal_base, stacks_at_cast, release_damage_total, damaged_targets])
+	engine._resolver_emit_log("Absorb & Release: healed %d (stored=%d, converted=%d, cap=%d, stacks=%d, release_damage=%d targets=%d)" % [heal_amt, pool, pool_heal, heal_cap, stacks_at_cast, release_damage_total, damaged_targets])
 
 func _korath_release_damage_targets(ctx: AbilityContext, team: String, index: int) -> Array[int]:
 	var enemies: Array[Unit] = ctx.enemy_team_array(team)
+	var target_team: String = "enemy" if team == "player" else "player"
 	var ranked: Array[Dictionary] = []
 	var current_target: int = ctx.current_target(team, index)
 	for enemy_index: int in range(enemies.size()):
 		var enemy: Unit = enemies[enemy_index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, enemy_index):
 			continue
 		var score: float = _korath_release_threat_score(enemy, enemy_index == current_target)
 		_insert_korath_release_target(ranked, enemy_index, score)
@@ -648,6 +695,9 @@ func try_cast(team: String, index: int) -> Dictionary:
 	if ability_id == "":
 		result.reason = "no_ability"
 		return result
+	if ability_id == "korath_absorb_release" and buff_system != null and buff_system.has_tag(state, team, index, BuffTags.TAG_KORATH):
+		result.reason = "absorb_release_active"
+		return result
 	# Cooldown check
 	if _cooldowns.get(unit, 0.0) > 0.0:
 		result.reason = "on_cooldown"
@@ -691,6 +741,9 @@ func try_cast(team: String, index: int) -> Dictionary:
 	_log_ability_cast(team, index, ability_id)
 	# Success: reset mana and start cooldown (if present)
 	unit.mana = 0
+	var post_cast_mana_refund: int = ctx.consume_post_cast_mana_refund()
+	if post_cast_mana_refund > 0 and int(unit.mana_max) > 0:
+		unit.mana = min(int(unit.mana_max), post_cast_mana_refund)
 	var cd_s: float = 0.0
 	if cd_s > 0.0:
 		_cooldowns[unit] = cd_s

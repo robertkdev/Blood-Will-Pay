@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "marksman"
 primary_goal = "marksman.backline_siege"
 approaches = ["long_range", "ramp", "aoe"]
-alt_goals = []
+alt_goals = ["marksman.sustained_dps", "mage.sustained_dps"]

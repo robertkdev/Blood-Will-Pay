@@ -7,6 +7,8 @@ const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
 const UnitScaler := preload("res://scripts/game/units/unit_scaler.gd")
 const MAX_ITEMS_PER_UNIT := 3
+const MAX_UNIT_LEVEL := 4
+const MAX_STAT_SCALE: float = 24.0
 
 static var _item_warning_logged: bool = false
 
@@ -25,6 +27,7 @@ static func post_spawn(units: Array, spec: Dictionary, ch: int, sic: int) -> voi
 	# Common rule: per-unit level overrides via spec.rules.levels
 	_apply_level_overrides(units, spec)
 	_apply_stat_overrides(units, spec)
+	_apply_stat_scales(units, spec)
 	_apply_item_overrides(units, spec)
 
 static func pre_engine_config(state, engine, spec: Dictionary, ch: int, sic: int) -> void:
@@ -109,7 +112,7 @@ static func _apply_level_to_unit(unit: Unit, target_level: int) -> void:
 	if unit == null:
 		return
 	var current_level: int = max(1, int(unit.level))
-	var chosen_level: int = max(1, int(target_level))
+	var chosen_level: int = clampi(int(target_level), 1, MAX_UNIT_LEVEL)
 	if chosen_level <= current_level:
 		unit.level = chosen_level
 		unit.hp = min(unit.hp, unit.max_hp)
@@ -181,6 +184,60 @@ static func _apply_stat_override_map(unit: Unit, stats: Dictionary) -> void:
 				unit.attack_range = max(1, int(round(float(raw_value))))
 	if not stats.has("max_hp"):
 		unit.hp = min(unit.hp, unit.max_hp)
+
+static func _apply_stat_scales(units: Array, spec: Dictionary) -> void:
+	if typeof(spec) != TYPE_DICTIONARY or not spec.has(StageTypes.KEY_RULES):
+		return
+	var rules: Dictionary = spec[StageTypes.KEY_RULES]
+	if typeof(rules) != TYPE_DICTIONARY:
+		return
+	if not rules.has("stat_scale") and not rules.has("stat_scales"):
+		return
+	var global_scale: float = 1.0
+	if rules.has("stat_scale"):
+		global_scale = float(rules["stat_scale"])
+	var raw_scales: Variant = rules.get("stat_scales", {})
+	var scales: Dictionary = raw_scales if typeof(raw_scales) == TYPE_DICTIONARY else {}
+	var by_index: Dictionary = scales.get("index", {}) if typeof(scales.get("index", {})) == TYPE_DICTIONARY else {}
+	var by_id: Dictionary = scales.get("id", {}) if typeof(scales.get("id", {})) == TYPE_DICTIONARY else {}
+	for i in range(units.size()):
+		var unit: Unit = units[i]
+		if unit == null:
+			continue
+		var scale: float = global_scale
+		if by_index.has(i):
+			scale *= float(by_index[i])
+		elif by_index.has(str(i)):
+			scale *= float(by_index[str(i)])
+		elif by_id.has(String(unit.id).strip_edges().to_lower()):
+			scale *= float(by_id[String(unit.id).strip_edges().to_lower()])
+		if absf(scale - 1.0) < 0.001:
+			continue
+		_apply_unit_stat_scale(unit, scale)
+
+static func _apply_unit_stat_scale(unit: Unit, scale: float) -> void:
+	if unit == null:
+		return
+	var safe_scale: float = clampf(float(scale), 0.05, MAX_STAT_SCALE)
+	unit.max_hp = max(1, int(round(float(unit.max_hp) * safe_scale)))
+	unit.hp = unit.max_hp
+	unit.hp_regen = max(0.0, float(unit.hp_regen) * safe_scale)
+	unit.attack_damage = max(0.0, float(unit.attack_damage) * safe_scale)
+	unit.spell_power = max(0.0, float(unit.spell_power) * safe_scale)
+	unit.true_damage = max(0.0, float(unit.true_damage) * safe_scale)
+	unit.armor = max(0.0, float(unit.armor) * safe_scale)
+	unit.magic_resist = max(0.0, float(unit.magic_resist) * safe_scale)
+	unit.block_chance = clampf(float(unit.block_chance) * safe_scale, 0.0, 1.0)
+	unit.damage_reduction = clampf(float(unit.damage_reduction) * safe_scale, 0.0, 0.95)
+	unit.damage_reduction_flat = max(0.0, float(unit.damage_reduction_flat) * safe_scale)
+	unit.lifesteal = clampf(float(unit.lifesteal) * safe_scale, 0.0, 0.9)
+	unit.attack_speed = clampf(float(unit.attack_speed) * safe_scale, 0.05, 4.0)
+	if safe_scale < 1.0:
+		unit.attack_range = max(1, int(floor(float(unit.attack_range) * safe_scale)))
+	unit.mana_start = clampi(int(round(float(unit.mana_start) * safe_scale)), 0, int(unit.mana_max))
+	unit.mana = clampi(int(round(float(unit.mana) * safe_scale)), 0, int(unit.mana_max))
+	unit.mana_regen = max(0.0, float(unit.mana_regen) * safe_scale)
+	unit.mana_gain_per_attack = max(0, int(round(float(unit.mana_gain_per_attack) * safe_scale)))
 
 static func _apply_item_overrides(units: Array, spec: Dictionary) -> void:
 	if typeof(spec) != TYPE_DICTIONARY or not spec.has(StageTypes.KEY_RULES):

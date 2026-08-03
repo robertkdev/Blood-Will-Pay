@@ -9,7 +9,8 @@ name = "Piercing Gear"
 type = "completed"
 icon_path = "res://assets/items/piercing_gear_icon.png"
 stat_mods = {"pct_as": 0.25, "flat_mr": 30}
-effects = []
+effects = ["piercing_gear"]
 components = ["crystal", "veil"]
 tags = PackedStringArray("marksman")
+build_axes = PackedStringArray("attack_speed", "magic_resist", "anti_control")
 

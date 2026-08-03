@@ -24,10 +24,9 @@ func cast(ctx: AbilityContext) -> bool:
 	if caster == null or not caster.is_alive():
 		return false
 	var pupil_index: int = _pupil_index(ctx)
-	if pupil_index < 0:
-		return false
 	var level_index: int = _level_index(caster)
-	_apply_exam_buffs(ctx, pupil_index, level_index)
+	if pupil_index >= 0:
+		_apply_exam_buffs(ctx, pupil_index, level_index)
 	var target_index: int = ctx.current_target(ctx.caster_team, ctx.caster_index)
 	if target_index < 0:
 		target_index = ctx.lowest_hp_enemy(ctx.caster_team)
@@ -36,8 +35,11 @@ func cast(ctx: AbilityContext) -> bool:
 		if ctx.engine.has_method("_resolver_emit_reset_triggered"):
 			ctx.engine._resolver_emit_reset_triggered(ctx.caster_team, ctx.caster_index, target_team, target_index, "quillith_final_exam_recast", 2, 0.0, 0.55)
 		ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, float(RECAST_DAMAGE[level_index]) + 0.35 * float(caster.spell_power), "magic")
-	ctx.log("Final Exam: named pupil %d and forced a reduced recast" % pupil_index)
-	return true
+	if pupil_index >= 0:
+		ctx.log("Final Exam: named pupil %d and forced a reduced recast" % pupil_index)
+	else:
+		ctx.log("Final Exam: no pupil available; forced reduced recast only")
+	return pupil_index >= 0 or target_index >= 0
 
 func _pupil_index(ctx: AbilityContext) -> int:
 	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
@@ -56,7 +58,7 @@ func _pupil_index(ctx: AbilityContext) -> int:
 		if score > best_score:
 			best_score = score
 			best_index = index
-	return best_index if best_index >= 0 else ctx.lowest_hp_ally(ctx.caster_team)
+	return best_index
 
 func _apply_exam_buffs(ctx: AbilityContext, pupil_index: int, level_index: int) -> void:
 	if ctx.buff_system == null:
@@ -95,5 +97,6 @@ func _apply_exam_buffs(ctx: AbilityContext, pupil_index: int, level_index: int) 
 				"mana": int(round(float(mana_grant) * 0.5))
 			}, float(TEAM_SHIELD[level_index]), AMP_DURATION)
 		if index != ctx.caster_index and int(ally.mana_max) > 0:
-			ally.mana = min(int(ally.mana_max), int(ally.mana) + mana_grant)
+			var ally_mana_grant: int = mana_grant if index == pupil_index else int(round(float(mana_grant) * 0.5))
+			ally.mana = min(int(ally.mana_max), int(ally.mana) + ally_mana_grant)
 	ctx.buff_system.pop_source()

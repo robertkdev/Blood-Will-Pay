@@ -1,12 +1,19 @@
 extends Node
 
-const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MAIN_SCENE_PATH: String = "res://scenes/Main.tscn"
+
+var _main_scene: PackedScene = null
 
 func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	var main: Control = MAIN_SCENE.instantiate()
+	_main_scene = ResourceLoader.load(MAIN_SCENE_PATH, "PackedScene", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as PackedScene
+	if _main_scene == null:
+		push_error("TitleMenuSmoke: Main scene failed to load")
+		get_tree().quit(1)
+		return
+	var main: Control = _main_scene.instantiate()
 	add_child(main)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -44,14 +51,20 @@ func _run() -> void:
 		var how_to_play_button: Button = title_menu.get_node_or_null("Center/VBox/HowToPlayButton") as Button
 		var units_button: Button = title_menu.get_node_or_null("Center/VBox/UnitsButton") as Button
 		var rga_button: Button = title_menu.get_node_or_null("Center/VBox/RGAGlossaryButton") as Button
+		var traits_button: Button = title_menu.get_node_or_null("Center/VBox/TraitsButton") as Button
+		var items_button: Button = title_menu.get_node_or_null("Center/VBox/ItemsButton") as Button
 		var settings_button: Button = title_menu.get_node_or_null("Center/VBox/SettingsButton") as Button
 		_expect(how_to_play_button != null, "HowToPlayButton missing", failures)
 		_expect(units_button != null, "UnitsButton missing", failures)
 		_expect(rga_button != null, "RGAGlossaryButton missing", failures)
+		_expect(traits_button != null, "TraitsButton missing", failures)
+		_expect(items_button != null, "ItemsButton missing", failures)
 		_expect(settings_button != null, "SettingsButton missing", failures)
 		_expect_button_states(how_to_play_button, "HowToPlayButton", failures)
 		_expect_button_states(units_button, "UnitsButton", failures)
 		_expect_button_states(rga_button, "RGAGlossaryButton", failures)
+		_expect_button_states(traits_button, "TraitsButton", failures)
+		_expect_button_states(items_button, "ItemsButton", failures)
 		_expect_button_states(settings_button, "SettingsButton", failures)
 		if units_button != null and search_field != null:
 			units_button.emit_signal("pressed")
@@ -68,12 +81,32 @@ func _run() -> void:
 		if rga_button != null and search_field != null:
 			rga_button.emit_signal("pressed")
 			await get_tree().process_frame
+			search_field.text = "role"
+			search_field.emit_signal("text_changed", "role")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "Role") != null, "Combat terms search did not expose Role terminology", failures)
+			_expect(_find_label_containing_text(title_menu, "archetype") != null, "Combat terms should define role as archetype", failures)
+			_expect(_find_label_containing_text(title_menu, "PASS / LEAN / FAIL") == null, "Combat terms should not expose backend verdict terminology", failures)
+			_expect(_find_label_containing_text(title_menu, "Active Trait") == null, "Combat terms should not include Active Trait", failures)
+			_expect(_find_label_containing_text(title_menu, "Win Odds") == null, "Combat terms should not include Win Odds", failures)
+			_expect_content_panels_generated(title_menu, "Combat terms cards should use generated texture styling", failures)
+		if traits_button != null and search_field != null:
+			traits_button.emit_signal("pressed")
+			await get_tree().process_frame
 			search_field.text = "threshold"
 			search_field.emit_signal("text_changed", "threshold")
 			await get_tree().process_frame
-			_expect(_find_label_containing_text(title_menu, "Active Trait") != null, "Combat terms search did not expose player-facing trait terminology", failures)
-			_expect(_find_label_containing_text(title_menu, "PASS / LEAN / FAIL") == null, "Combat terms should not expose backend verdict terminology", failures)
-			_expect_content_panels_generated(title_menu, "RGA cards should use generated texture styling", failures)
+			_expect(_find_label_containing_text(title_menu, "Thresholds:") != null, "Traits page search did not expose thresholds", failures)
+			_expect(_find_label_containing_text(title_menu, "Units:") != null, "Traits page should list units by trait", failures)
+			_expect_content_panels_generated(title_menu, "Traits page cards should use generated texture styling", failures)
+		if items_button != null and search_field != null:
+			items_button.emit_signal("pressed")
+			await get_tree().process_frame
+			search_field.text = "dagger"
+			search_field.emit_signal("text_changed", "dagger")
+			await get_tree().process_frame
+			_expect(_find_label_containing_text(title_menu, "Dagger") != null, "Items page search did not expose dagger", failures)
+			_expect_content_panels_generated(title_menu, "Items page cards should use generated texture styling", failures)
 		if how_to_play_button != null and search_field != null:
 			how_to_play_button.emit_signal("pressed")
 			await get_tree().process_frame
@@ -109,6 +142,7 @@ func _run() -> void:
 	if failures.size() > 0:
 		remove_child(main)
 		main.free()
+		_main_scene = null
 		await get_tree().process_frame
 		for failure: String in failures:
 			push_error("TitleMenuSmoke: " + failure)
@@ -117,6 +151,7 @@ func _run() -> void:
 
 	remove_child(main)
 	main.free()
+	_main_scene = null
 	await get_tree().process_frame
 	print("TitleMenuSmoke: OK")
 	get_tree().quit(0)

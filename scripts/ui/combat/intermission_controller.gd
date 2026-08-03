@@ -30,7 +30,7 @@ func _ensure_bar() -> void:
     _bar.offset_right = 240.0
     _bar.offset_top = 142.0
     _bar.offset_bottom = 148.0
-    _bar.z_index = 150
+    _bar.z_index = 170
     _bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _bar.min_value = 0.0
     _bar.max_value = 1.0

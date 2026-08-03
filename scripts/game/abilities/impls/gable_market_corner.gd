@@ -7,8 +7,10 @@ const LINE_WIDTH_TILES: float = 0.8
 const SHOT_DURATION: float = 5.0
 const SELF_AS: float = 0.22
 const SELF_AD: float = 26.0
+const SELF_RANGE: int = 2
 const SHRED: float = 22.0
 const AMP_PCT: float = 0.12
+const VULNERABILITY_DEFENSE_REDUCTION: float = AMP_PCT * 100.0
 
 func _level_index(unit: Unit) -> int:
 	var level: int = int(unit.level) if unit != null else 1
@@ -38,7 +40,8 @@ func cast(ctx: AbilityContext) -> bool:
 	if ctx.buff_system != null:
 		ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, ctx.caster_index, "gable_market_corner_book", {
 			"attack_speed": SELF_AS,
-			"attack_damage": SELF_AD
+			"attack_damage": SELF_AD,
+			"attack_range": SELF_RANGE
 		}, SHOT_DURATION)
 	var board_value: int = _board_investment(ctx)
 	var damage: float = float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage) + float(board_value * 18)
@@ -55,9 +58,12 @@ func cast(ctx: AbilityContext) -> bool:
 			elif order % 3 == 1:
 				ctx.buff_system.apply_tag(ctx.state, target_team, hit_index, "root", 0.35, {})
 			else:
-				ctx.buff_system.apply_tag(ctx.state, target_team, hit_index, "gable_market_amp_window", SHOT_DURATION, {
-					"damage_amp_pct": AMP_PCT
-				})
+				var vulnerability_fields: Dictionary = {
+					"armor": -VULNERABILITY_DEFENSE_REDUCTION,
+					"magic_resist": -VULNERABILITY_DEFENSE_REDUCTION
+				}
+				ctx.buff_system.apply_stats_labeled(ctx.state, target_team, hit_index, "gable_market_vulnerability", vulnerability_fields, SHOT_DURATION)
+				ctx.buff_system.record_debuff(ctx.state, target_team, hit_index, "gable_market_vulnerability", vulnerability_fields, VULNERABILITY_DEFENSE_REDUCTION, SHOT_DURATION)
 			ctx.buff_system.pop_source()
 	ctx.emit_ramp_state("market_corner", max(2, board_value), float(board_value * 18), 8, SHOT_DURATION, "high_cost_board_context")
 	ctx.log("Market Corner: rotated on-hit shots through %d targets" % hits.size())
@@ -65,11 +71,12 @@ func cast(ctx: AbilityContext) -> bool:
 
 func _highest_hp_enemy(ctx: AbilityContext) -> int:
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	var target_team: String = _enemy_team(ctx.caster_team)
 	var best_index: int = -1
 	var best_hp: int = -1
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		if int(enemy.hp) > best_hp:
 			best_hp = int(enemy.hp)

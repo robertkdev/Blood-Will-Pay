@@ -9,7 +9,7 @@ const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
 
 const SUPPORTED_FIELDS := [
 	"armor", "magic_resist", "damage_reduction",
-	"attack_damage", "spell_power", "attack_speed",
+	"attack_damage", "spell_power", "attack_speed", "attack_range",
 	"crit_chance", "crit_damage",
 	"mana_regen",
 	"max_hp", "move_speed", "lifesteal", "lifesteel", # support both spellings
@@ -94,6 +94,17 @@ func record_debuff(state: BattleState, team: String, index: int, kind: String, f
 	_emit_debuff_presence(team, index, kind, fields if fields != null else {}, float(magnitude), float(duration_s))
 	return {"processed": true}
 
+func record_on_hit_proc(state: BattleState, source_team: String, source_index: int, target_team: String, target_index: int, kind: String, fields: Dictionary = {}, magnitude: float = 0.0) -> Dictionary:
+	var source: Unit = _unit_at(state, source_team, source_index)
+	var target: Unit = _unit_at(state, target_team, target_index)
+	if source == null or target == null:
+		return {"processed": false}
+	var copied_fields: Dictionary = {}
+	if fields != null:
+		copied_fields = fields.duplicate(true)
+	emit_signal("on_hit_proc", String(source_team), int(source_index), String(target_team), int(target_index), String(kind), copied_fields, float(magnitude))
+	return {"processed": true}
+
 func tick(_state: BattleState, delta: float) -> void:
 	if delta <= 0.0:
 		return
@@ -162,14 +173,33 @@ func apply_shield(state: BattleState, team: String, index: int, amount: int, dur
 	if u == null or amount <= 0 or duration_s <= 0.0:
 		return {"processed": false}
 	var amt: int = int(max(0, amount))
-	# Apply shield strength multiplier from active healing mods tag if present
+	# Positive sustain and temporary anti-sustain use separate tags so neither
+	# overwrites the other. Their shield modifiers combine additively.
 	const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
+	var shield_strength_pct: float = 0.0
 	if has_tag(state, team, index, BuffTags.TAG_HEALING_MODS):
-		var data: Dictionary = get_tag_data(state, team, index, BuffTags.TAG_HEALING_MODS)
+		var positive_data: Dictionary = get_tag_data(state, team, index, BuffTags.TAG_HEALING_MODS)
+		if positive_data != null:
+			shield_strength_pct = float(positive_data.get("shield_strength_pct", 0.0))
+	var reduction_tags: Array[String] = [
+		BuffTags.TAG_HEALING_REDUCTION,
+		BuffTags.TAG_HEALING_REDUCTION_JUNO,
+		BuffTags.TAG_HEALING_REDUCTION_RAVEL,
+		BuffTags.TAG_HEALING_REDUCTION_HEXEON,
+	]
+	var strongest_reduction: float = 0.0
+	for tag: String in reduction_tags:
+		if not has_tag(state, team, index, tag):
+			continue
+		var data: Dictionary = get_tag_data(state, team, index, tag)
 		if data != null:
-			var mult: float = 1.0 + float(data.get("shield_strength_pct", 0.0))
-			if mult != 1.0:
-				amt = int(max(0.0, round(float(amt) * max(0.0, mult))))
+			strongest_reduction = min(strongest_reduction, float(data.get("shield_strength_pct", 0.0)))
+	shield_strength_pct += strongest_reduction
+	var sustain_effectiveness: float = clamp(float(state.sustain_effectiveness), 0.0, 1.0)
+	var mult: float = max(0.0, 1.0 + shield_strength_pct) * sustain_effectiveness
+	amt = int(max(0.0, round(float(amt) * mult)))
+	if amt <= 0:
+		return {"processed": true, "shield": 0, "duration": duration_s}
 	var buff: Dictionary = {"kind": "shield", "shield": int(amt), "remaining": duration_s}
 	_add_buff(u, buff)
 	_recompute_ui_shield(u)
@@ -256,6 +286,12 @@ func has_tag(state: BattleState, team: String, index: int, tag: String) -> bool:
 		if String(b.get("kind", "")) == "tag" and String(b.get("tag", "")) == tag and float(b.get("remaining", 0.0)) > 0.0:
 			return true
 	return false
+
+func is_targetable(state: BattleState, team: String, index: int) -> bool:
+	var unit: Unit = _unit_at(state, team, index)
+	if unit == null or not unit.is_alive():
+		return false
+	return not has_tag(state, team, index, BuffTags.TAG_UNTARGETABLE)
 
 func get_tag(state: BattleState, team: String, index: int, tag: String) -> Dictionary:
 	var u: Unit = _unit_at(state, team, index)
@@ -520,9 +556,11 @@ func _apply_fields(u: Unit, fields: Dictionary, sign: int) -> void:
 		var delta: float = float(v) * float(sign)
 		match String(k):
 			"damage_reduction":
-				u.damage_reduction = clamp(u.damage_reduction + delta, 0.0, 0.9)
+				u.damage_reduction = clamp(u.damage_reduction + delta, -0.9, 0.9)
 			"attack_speed":
 				u.attack_speed = clamp(u.attack_speed + delta, 0.01, MAX_ATTACK_SPEED)
+			"attack_range":
+				u.attack_range = max(1, int(round(float(u.attack_range) + delta)))
 			"lifesteal":
 				u.lifesteal = clamp(u.lifesteal + delta, 0.0, 0.9)
 			"lifesteel": # alias
@@ -548,7 +586,9 @@ func _apply_fields(u: Unit, fields: Dictionary, sign: int) -> void:
 				var cur: Variant = u.get(k)
 				if typeof(cur) == TYPE_FLOAT or typeof(cur) == TYPE_INT:
 					var nv: float = float(cur) + delta
-					if k in ["armor", "magic_resist", "armor_pen_flat", "mr_pen_flat"]:
+					if k in ["armor", "magic_resist"]:
+						nv = clamp(nv, -99.0, 999.0)
+					elif k in ["armor_pen_flat", "mr_pen_flat"]:
 						nv = max(0.0, nv)
 					u.set(k, nv)
 

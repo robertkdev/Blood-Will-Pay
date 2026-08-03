@@ -15,7 +15,8 @@ Key Constants
 - `FIRST_SHOP_BLOCKED_HELPERS_BY_STARTER`: starter-specific known-bad helper suppression for the first level-1 post-opener shop only.
 - `REROLL_COST`: gold cost per shop refresh.
 - `BUY_XP_COST` / `XP_PER_BUY`: gold cost and XP gain for XP purchases.
-- `STARTING_LEVEL`, `MIN_LEVEL`, `MAX_LEVEL`: player level band.
+- `STARTING_LEVEL`, `MIN_LEVEL`, `MAX_LEVEL`: player level band. The current cap is level 14.
+- `DEFAULT_BOARD_CAPACITY` / `MAX_BOARD_CAPACITY`: board slots start at 3 and grow by exactly +1 per level-up, ending at 16 slots at level 14.
 - `XP_TO_REACH_LEVEL`: XP needed to go from (level-1) -> level.
 - Lock rules:
   - `LOCK_PERSISTS_ACROSS_INTERMISSION`
@@ -25,20 +26,18 @@ Key Constants
 - `ODDS_BY_LEVEL`: map of level -> { cost -> probability }, sums to 1.0 per level.
 - `DEFAULT_ROLL_LEVEL`: fallback for undefined levels.
 
-Odds & Costs (Initial)
-- Costs present: 1-cost foundations, 2-cost premium kits, and 3-cost capstones.
+Odds & Costs
+- Costs present: 1-cost foundations through 5-cost capstones.
 - Reroll cost: 2g; Buy XP: 4g for +4 XP.
+- XP thresholds by target level: L2 4, L3 8, L4 14, L5 24, L6 40, L7 64, L8 100, L9 154, L10 232, L11 344, L12 504, L13 728, L14 1040.
 - Odds by level:
   - L1: 100% 1-cost
   - L2: 80% 1-cost, 20% 2-cost
   - L3: 65% 1-cost, 30% 2-cost, 5% 3-cost
-  - L4: 50% 1-cost, 40% 2-cost, 10% 3-cost
-  - L5: 40% 1-cost, 45% 2-cost, 15% 3-cost
-  - L6: 30% 1-cost, 50% 2-cost, 20% 3-cost
-
-Minimal Odds (Initial Content)
-- Project currently contains mostly 1-cost and 2-cost units with a small capstone tier.
-- `ODDS_BY_LEVEL` reflects that; extend as additional cost tiers (4/5) are added.
+  - L4: 50% 1-cost, 35% 2-cost, 13% 3-cost, 2% 4-cost
+  - L5: 36% 1-cost, 38% 2-cost, 20% 3-cost, 5% 4-cost, 1% 5-cost
+  - L6: 25% 1-cost, 32% 2-cost, 27% 3-cost, 13% 4-cost, 3% 5-cost
+  - L7-L14: keep shifting weight from cheap units into 3/4/5-cost units; use `ODDS_BY_LEVEL` as the authority.
 
 Change Guidelines
 - DRY/KISS: change values here; avoid scattering numbers in code.

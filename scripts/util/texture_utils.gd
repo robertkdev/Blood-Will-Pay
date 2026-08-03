@@ -82,7 +82,7 @@ static func try_load_texture(path: String) -> Texture2D:
     if ResourceLoader.exists(normalized_path, "Texture2D"):
         if diagnostics_enabled:
             diagnostic_resource_load_attempts += 1
-        var resource: Resource = ResourceLoader.load(normalized_path, "Texture2D")
+        var resource: Resource = ResourceLoader.load(normalized_path, "Texture2D", ResourceLoader.CACHE_MODE_IGNORE)
         var imported_texture: Texture2D = resource as Texture2D
         if imported_texture != null:
             _texture_cache[normalized_path] = imported_texture

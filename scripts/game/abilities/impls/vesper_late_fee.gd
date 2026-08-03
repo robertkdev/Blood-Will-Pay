@@ -29,12 +29,31 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var target: Unit = ctx.unit_at(target_team, target_index)
-	if target == null or not target.is_alive():
+	if target == null or not ctx.is_targetable(target_team, target_index):
 		return false
-	if ctx.engine.has_method("_resolver_emit_targetability_window"):
-		ctx.engine._resolver_emit_targetability_window(ctx.caster_team, ctx.caster_index, false, VANISH_DURATION, "vesper_late_fee")
 	ctx.emit_zone_exposure(target_team, target_index, "vesper_late_fee_delay", MARK_STUN, 0.0, 0.25)
 	ctx.stun(target_team, target_index, MARK_STUN)
+	if ctx.engine.ability_system == null:
+		return false
+	ctx.engine.ability_system.schedule_event("vesper_late_fee_resolve", ctx.caster_team, ctx.caster_index, MARK_STUN, {
+		"target_team": target_team,
+		"target_index": target_index,
+	})
+	ctx.log("Late Fee: marked target %d for collection in %.2fs" % [target_index, MARK_STUN])
+	return true
+
+func resolve_delayed(ctx: AbilityContext, data: Dictionary) -> bool:
+	if ctx == null or ctx.engine == null or ctx.state == null:
+		return false
+	var caster: Unit = ctx.unit_at(ctx.caster_team, ctx.caster_index)
+	if caster == null or not caster.is_alive():
+		return false
+	var target_team: String = String(data.get("target_team", _enemy_team(ctx.caster_team)))
+	var target_index: int = int(data.get("target_index", -1))
+	var target: Unit = ctx.unit_at(target_team, target_index)
+	if target == null or not ctx.is_targetable(target_team, target_index):
+		ctx.log("Late Fee: marked target unavailable before collection")
+		return false
 	_blink_to_target(ctx, target_team, target_index)
 	if ctx.engine.has_signal("target_start"):
 		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, target_team, target_index)
@@ -45,14 +64,6 @@ func cast(ctx: AbilityContext) -> bool:
 	if target_after != null and target_after.is_alive():
 		var hp_pct: float = float(target_after.hp) / max(1.0, float(target_after.max_hp))
 		if hp_pct <= ARM_THRESHOLD:
-			if hp_pct > EXECUTE_THRESHOLD:
-				var threshold_hp: int = max(1, int(floor(float(target_after.max_hp) * EXECUTE_THRESHOLD)))
-				var setup_damage: float = _damage_for_effective_amount(target_after, max(0.0, float(target_after.hp - threshold_hp - 1)))
-				if setup_damage > 0.0:
-					ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, setup_damage, "true")
-					target_after = ctx.unit_at(target_team, target_index)
-					if target_after != null and target_after.is_alive():
-						hp_pct = float(target_after.hp) / max(1.0, float(target_after.max_hp))
 			if target_after != null and target_after.is_alive() and hp_pct <= EXECUTE_THRESHOLD:
 				var execute_damage: float = _damage_for_effective_amount(target_after, float(target_after.hp) + 1.0)
 				ctx.emit_execute_bonus(target_team, target_index, base_damage, execute_damage, EXECUTE_THRESHOLD, hp_pct, "vesper_late_fee")
@@ -60,8 +71,9 @@ func cast(ctx: AbilityContext) -> bool:
 	if bool(result.get("processed", false)) and not ctx.is_alive(target_team, target_index):
 		if ctx.engine.has_method("_resolver_emit_reset_triggered"):
 			ctx.engine._resolver_emit_reset_triggered(ctx.caster_team, ctx.caster_index, target_team, target_index, "vesper_late_fee_reset", 1, 0.0, 0.75)
+		ctx.apply_untargetable(VANISH_DURATION, "vesper_late_fee_reset")
 		_reposition_after_reset(ctx)
-	ctx.log("Late Fee: marked and collected target %d" % target_index)
+	ctx.log("Late Fee: collected marked target %d" % target_index)
 	return bool(result.get("processed", false))
 
 func _cleanup_target(ctx: AbilityContext) -> int:
@@ -72,7 +84,7 @@ func _cleanup_target(ctx: AbilityContext) -> int:
 	var max_depth: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var enemy_position: Vector2 = ctx.position_of(target_team, index)
 		var depth: float = enemy_position.x * sign_x
@@ -85,7 +97,7 @@ func _cleanup_target(ctx: AbilityContext) -> int:
 	var best_hp_pct: float = INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var enemy_position: Vector2 = ctx.position_of(target_team, index)
 		var depth: float = enemy_position.x * sign_x
@@ -99,9 +111,6 @@ func _cleanup_target(ctx: AbilityContext) -> int:
 
 func _blink_to_target(ctx: AbilityContext, target_team: String, target_index: int) -> void:
 	var destination: Vector2 = _enemy_backline_position(ctx, target_team, target_index)
-	var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
 	_set_caster_position(ctx, destination)
 
 func _enemy_backline_position(ctx: AbilityContext, target_team: String, target_index: int) -> Vector2:
@@ -122,14 +131,12 @@ func _enemy_backline_position(ctx: AbilityContext, target_team: String, target_i
 			backline_x = max(backline_x, enemy_position.x)
 		else:
 			backline_x = min(backline_x, enemy_position.x)
-	return Vector2(backline_x + sign_x * BACKLINE_OVERSHOOT_TILES * ctx.tile_size(), 0.0)
+	return Vector2(backline_x + sign_x * BACKLINE_OVERSHOOT_TILES * ctx.tile_size(), target_position.y)
 
 func _reposition_after_reset(ctx: AbilityContext) -> void:
 	var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
 	var sign_x: float = -1.0 if ctx.caster_team == "player" else 1.0
 	var destination: Vector2 = start + Vector2(sign_x * 2.4 * ctx.tile_size(), 0.0)
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
 	_set_caster_position(ctx, destination)
 
 func _set_caster_position(ctx: AbilityContext, destination: Vector2) -> void:
