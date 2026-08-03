@@ -187,7 +187,7 @@ func _aggregate_mods(equipped: Array[String]) -> Dictionary:
 		ItemModSchema.FLAT_CRIT_DAMAGE: 0.0,
 	}
 	for id in equipped:
-		var def = ItemCatalog.get_def(String(id))
+		var def = ItemCatalogLib.get_def(String(id))
 		if def == null:
 			continue
 		var mods: Dictionary = def.stat_mods

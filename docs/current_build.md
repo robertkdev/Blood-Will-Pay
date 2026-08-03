@@ -8,6 +8,7 @@ Updated: 2026-08-03
 - Recovery baseline: `326e559e7061b546c2a971164ddddaeaaeac9de7`.
 - Recovery owner branch: `codex/019fc82a-68c-shared-line-recovery` (retained after integration).
 - Intended recovered surface: Blood Will Pay Unit Art Comparison Tool with Phase 2, 34 curated history entries, canonical Mara, five-pin plus active comparison, persistent defaults, and the current Malachor/Veyra review cards.
+- Clean-checkout runtime: the masked `ItemCatalog` startup reference is repaired; Mara rename, role-matrix, and main-scene MCP checks pass after a normal import.
 
 The exact verified remote-main SHA is recorded in the canonical Gamble Battle brain and the recovery handoff after the controlled fast-forward.
 
