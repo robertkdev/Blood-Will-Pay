@@ -91,6 +91,9 @@ func _prepare_first_shop_planning(_result: Dictionary) -> void:
 func _require_opener_board_reposition() -> bool:
 	return false
 
+func _uses_manual_opening_continue() -> bool:
+	return false
+
 func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Dictionary:
 	var failure_start: int = _failures.size()
 	var shop_error_start: int = _shop_errors.size()
@@ -101,9 +104,6 @@ func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Diction
 	await _select_starter(starter_id)
 	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	var board_repositioned: bool = false
-	if combat_opened:
-		_prepare_opener_planning(starter_id)
-		await _press_continue(true, "starter %s opening fight" % starter_id)
 	var first_result: String = await _wait_for_first_result(_first_fight_timeout_seconds())
 	var result: Dictionary = {
 		"id": starter_id,
@@ -154,6 +154,8 @@ func _exercise_first_shop(result: Dictionary) -> void:
 		result["second_fight_result"] = _second_fight_result(second_resolved)
 		result["stage_after_second"] = int(GameState.stage_in_chapter)
 		result["gold_after_second"] = int(Economy.gold)
+		if not second_resolved:
+			result["second_timeout_state"] = _state_snapshot()
 		if get_tree().root.get_node_or_null("LossOverlayLayer") != null:
 			result["loss_reset_ok"] = await _reset_from_loss()
 	else:
@@ -180,7 +182,7 @@ func _assert_starter_main_flow(result: Dictionary) -> void:
 	_expect(bool(result.get("shop_buy_clicked", false)), "%s should buy an affordable first-shop card" % starter_id)
 	_expect(bool(result.get("deploy_prompt_visible", false)), "%s first-shop buy should show deploy prompt" % starter_id)
 	_expect(bool(result.get("moved_to_board", false)), "%s first-shop helper should move to board" % starter_id)
-	_expect(bool(result.get("second_fight_resolved", false)), "%s second fight should resolve" % starter_id)
+	_expect(bool(result.get("second_fight_resolved", false)), "%s second fight should resolve; state=%s" % [starter_id, JSON.stringify(result.get("second_timeout_state", {}))])
 
 func _offers_have_good_first_shop_helper(starter_id: String, offers: Array[Dictionary]) -> bool:
 	var good_helpers: Array[String] = _good_first_shop_helpers_for(starter_id)
@@ -243,13 +245,38 @@ func _reset_from_loss() -> bool:
 	return get_tree().root.get_node_or_null("LossOverlayLayer") == null and _node_visible("UnitSelect") and _unit_select_reset()
 
 func _state_snapshot() -> Dictionary:
+	var continue_button: Button = _main.find_child("ContinueButton", true, false) as Button if _main != null else null
+	var controller: Variant = _combat_controller()
+	var manager: Variant = controller.get("manager") if controller != null else null
 	return {
 		"stage": int(GameState.stage),
 		"stage_in_chapter": int(GameState.stage_in_chapter),
 		"phase": int(GameState.phase),
+		"combat_active": bool(Economy.combat_active),
+		"current_bet": int(Economy.current_bet),
 		"gold": int(Economy.gold),
 		"shop_level": int(Shop.get_level()),
 		"shop_xp": int(Shop.get_xp()),
+		"continue_text": String(continue_button.text) if continue_button != null else "",
+		"continue_disabled": bool(continue_button.disabled) if continue_button != null else true,
+		"player_team": manager.player_team.size() if manager != null else -1,
+		"enemy_team": manager.enemy_team.size() if manager != null else -1,
+		"player_units": _unit_snapshots(manager.player_team) if manager != null else [],
+		"enemy_units": _unit_snapshots(manager.enemy_team) if manager != null else [],
 		"bench": _bench_ids(),
 		"board": _board_ids(),
 	}
+
+func _unit_snapshots(units: Array[Unit]) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for unit: Unit in units:
+		if unit == null:
+			continue
+		rows.append({
+			"id": String(unit.id),
+			"level": int(unit.level),
+			"hp": int(unit.hp),
+			"max_hp": int(unit.max_hp),
+			"alive": bool(unit.is_alive()),
+		})
+	return rows

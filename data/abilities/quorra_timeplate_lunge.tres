@@ -6,7 +6,8 @@
 script = ExtResource( 1 )
 id = "quorra_timeplate_lunge"
 name = "Timeplate Lunge"
-description = "Blinks to a backline enemy, slips out of targetability, and leaves a ticking timeplate wound."
+description = "Opens by blinking to a backline enemy, briefly gains Armor and Magic Resist, slips out of targetability, slows the target's attacks, and leaves a ticking timeplate wound."
 targeting_summary = "Backline enemy."
 base_cost = 55
+starting_mana_bonus = 55
 tags = ["damage", "access_backline", "dot", "untargetable"]

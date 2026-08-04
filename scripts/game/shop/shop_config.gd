@@ -12,7 +12,7 @@ const FIRST_SHOP_HELPERS_BY_STARTER: Dictionary = {
     "axiom": ["sari"],
     "bo": ["berebell", "grint"],
     "bonko": ["morrak", "grint", "mortem"],
-    "mara": ["brute", "bonko"],
+    "cashmere": ["brute", "bonko"],
     "korath": ["bonko", "sari", "morrak", "berebell"],
     "knoll": ["sari", "brute", "grint", "bonko", "morrak"],
     "morrak": ["berebell", "sari", "bonko"],
@@ -22,35 +22,31 @@ const FIRST_SHOP_HELPERS_BY_STARTER: Dictionary = {
     "sari": ["bonko", "grint", "brute", "berebell", "morrak"],
 }
 const FIRST_SHOP_BLOCKED_HELPERS_BY_STARTER: Dictionary = {
-    "axiom": ["axiom", "repo", "grint", "korath", "brute", "bo", "bonko", "morrak", "berebell", "mortem", "mara"],
-    "bo": ["mara", "brute", "axiom"],
+    "axiom": ["axiom", "repo", "grint", "korath", "brute", "bo", "bonko", "morrak", "berebell", "mortem", "cashmere"],
+    "bo": ["cashmere", "brute", "axiom"],
     "bonko": ["axiom", "repo", "korath"],
-    "mara": ["korath", "repo", "axiom"],
+    "cashmere": ["korath", "repo", "axiom"],
     "korath": ["brute", "axiom"],
     "knoll": ["axiom", "knoll", "pilfer"],
     "morrak": ["repo", "brute", "korath", "grint"],
     "mortem": ["brute", "axiom"],
     "pilfer": ["axiom", "knoll", "pilfer"],
-    "repo": ["axiom", "mortem", "korath", "brute", "mara", "grint", "repo"],
+    "repo": ["axiom", "mortem", "korath", "brute", "cashmere", "grint", "repo"],
     "sari": ["axiom"],
 }
 
-# Reroll and XP/Command costs are expressed in current Stakes units.
-const REROLL_STAKE_UNITS: int = 2
-const PROGRESSION_STAKE_UNITS: int = 4
-# Compatibility aliases for early-game tests where U = 1.
-const REROLL_COST: int = REROLL_STAKE_UNITS
-const BUY_XP_COST: int = PROGRESSION_STAKE_UNITS
+# Reroll and XP costs
+const REROLL_COST := 2                            # Gold per reroll
+const BUY_XP_COST := 4                            # Gold per XP purchase
 const XP_PER_BUY := 4                             # XP granted per purchase
-const COMMAND_POINTS_PER_BUY: int = 1
-const OPENING_HELPER_GUARDED_SHOPS := 1           # Guarantee the first post-opener helper, then return to normal variety
+const OPENING_HELPER_GUARDED_SHOPS := 1           # Guarantee the first post-opener helper, then return to normal shop variety
 
 # Player level band
 const STARTING_LEVEL := 1
 const MIN_LEVEL := 1
 const MAX_LEVEL := 14                             # 3 starting slots + 13 level-ups = 16 max board slots
 const DEFAULT_BOARD_CAPACITY := 3                 # New runs start with three usable board slots
-const MAX_BOARD_CAPACITY: int = 16                # Physical/readability ceiling; contracts cannot exceed it
+const MAX_BOARD_CAPACITY := 16
 const POST_OPENING_MIN_TEAM_SIZE := DEFAULT_BOARD_CAPACITY
 const POST_OPENING_TEAM_SIZE_BONUS := 0           # Board slots now come from DEFAULT_BOARD_CAPACITY + player levels
 const EARLY_RUN_CAP_FLOOR_STAGE := 3              # By the second shop, bought bench units should be deployable

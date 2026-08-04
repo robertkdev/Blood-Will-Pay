@@ -49,11 +49,6 @@ func _run() -> void:
 	var action_log_callable: Callable = Callable(self, "_on_item_action_log")
 	if not Items.is_connected("action_log", action_log_callable):
 		Items.connect("action_log", action_log_callable)
-	var combat_started: bool = await _start_combat()
-	_expect(combat_started, "opening fight should enter active combat before item checks")
-	if not combat_started:
-		_finish()
-		return
 
 	Items.add_to_inventory("hammer", 1)
 	await _settle_frames(6)
@@ -63,15 +58,11 @@ func _run() -> void:
 		_finish()
 		return
 	var unit: Unit = _manager.player_team[0] as Unit
-	var target_position: Vector2 = _first_combat_actor_center()
-	if target_position.x < 0.0:
-		_fail("combat hammer check needs a live player arena actor")
-		_finish()
-		return
+	var target_position: Vector2 = _first_board_unit_center()
 	_drag_card_to_position(hammer_card, target_position)
 	await _settle_frames(6)
 	var equipped: Array = Items.get_equipped(unit)
-	_expect(equipped.has("hammer"), "hammer should equip when released on a player actor during combat")
+	_expect(equipped.has("hammer"), "hammer should equip when released on a board unit")
 
 	Items.add_to_inventory("crystal", 1)
 	await _settle_frames(6)
@@ -85,6 +76,11 @@ func _run() -> void:
 	_expect(_inventory_contains("crystal"), "invalid release should leave crystal in inventory")
 	_expect(not bool(crystal_card.get("_dragging")), "invalid release should end the item drag")
 
+	var combat_started: bool = await _start_combat()
+	_expect(combat_started, "Start Battle should enter an active combat before combat item checks")
+	if not combat_started:
+		_finish()
+		return
 	await _settle_frames(2)
 	if not _combat_is_active():
 		_fail("combat ended before the combat unit-drop check")
@@ -210,8 +206,6 @@ func _combat_is_active() -> bool:
 	return int(GameState.phase) == int(GameState.GamePhase.COMBAT) and bool(Economy.combat_active)
 
 func _start_combat() -> bool:
-	if _combat_is_active():
-		return true
 	if _view == null or not _view.has_method("_on_continue_pressed"):
 		return false
 	_view.call("_on_continue_pressed")

@@ -23,10 +23,7 @@ func _level_index(u: Unit) -> int:
 func _exile_active(ctx: AbilityContext) -> bool:
 	if ctx == null:
 		return false
-	var c: int = 0
-	if ctx.has_method("trait_count"):
-		c = ctx.trait_count(ctx.caster_team, "Exile")
-	return c > 0
+	return ctx.exile_upgrade_level(ctx.caster_team, ctx.caster_index) > 0
 
 func _other(team: String) -> String:
 	return "enemy" if team == "player" else "player"
@@ -86,7 +83,7 @@ func _priority_backline_enemy(ctx: AbilityContext) -> int:
 	var candidates: Array[Dictionary] = []
 	for enemy_index: int in range(enemies.size()):
 		var enemy: Unit = enemies[enemy_index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, enemy_index):
 			continue
 		var position: Vector2 = ctx.position_of(target_team, enemy_index)
 		candidates.append({
@@ -145,29 +142,12 @@ func _dash_to_enemy_backline(ctx: AbilityContext, target_team: String, target_in
 			backline_x = min(backline_x, enemy_pos.x)
 	var tile: float = ctx.tile_size()
 	var destination: Vector2 = Vector2(backline_x + sign_x * DASH_OVERSHOOT_TILES * tile, target_pos.y)
-	var delta: Vector2 = destination - start
+	var clamped: Vector2 = destination
+	if ctx.engine.arena_state != null and ctx.engine.arena_state.data != null:
+		clamped = MovementMath.clamp_to_rect(destination, ctx.engine.arena_state.data.arena_bounds)
+	var delta: Vector2 = clamped - start
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement") and delta.length() > 0.001:
 		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, delta, MOVE_DURATION)
-	return _set_position(ctx, destination)
-
-func _set_position(ctx: AbilityContext, destination: Vector2) -> Vector2:
-	if ctx.engine == null:
-		return destination
-	if ctx.engine.arena_state == null:
-		_emit_position(ctx, destination)
-		return destination
-	var movement_data: Variant = ctx.engine.arena_state.data
-	if movement_data == null:
-		_emit_position(ctx, destination)
-		return destination
-	var clamped: Vector2 = MovementMath.clamp_to_rect(destination, movement_data.arena_bounds)
-	if ctx.caster_team == "player":
-		if ctx.caster_index >= 0 and ctx.caster_index < movement_data.player_positions.size():
-			movement_data.player_positions[ctx.caster_index] = clamped
-	else:
-		if ctx.caster_index >= 0 and ctx.caster_index < movement_data.enemy_positions.size():
-			movement_data.enemy_positions[ctx.caster_index] = clamped
-	_emit_position(ctx, clamped)
 	return clamped
 
 func _emit_position(ctx: AbilityContext, position: Vector2) -> void:

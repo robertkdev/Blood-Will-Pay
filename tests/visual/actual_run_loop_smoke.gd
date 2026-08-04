@@ -284,27 +284,14 @@ func _select_starter(unit_id: String) -> void:
 		_expect(false, "unit select start button missing")
 		return
 	_expect(not start.disabled, "unit select start button did not enable for %s" % unit_id)
-	if _uses_manual_opening_continue():
-		var combat: Control = await _wait_for_combat_view_ready(20.0)
-		_expect(combat != null, "combat view did not prewarm before manual opening for %s" % unit_id)
-		if combat == null:
-			return
-		_set_opening_auto_start_enabled(false)
-	await _click_button(start, "unit select start button")
-
-func _uses_manual_opening_continue() -> bool:
-	return false
-
-func _set_opening_auto_start_enabled(enabled: bool) -> void:
-	var combat: Control = _main.get_node_or_null("CombatView") as Control
-	if combat == null:
-		return
-	if combat.has_method("set_auto_start_battle_enabled"):
-		combat.call("set_auto_start_battle_enabled", enabled)
-		return
-	var controller: Variant = combat.get("controller")
-	if controller != null and controller.has_method("set_auto_start_battle_enabled"):
-		controller.call("set_auto_start_battle_enabled", enabled)
+	var manual_opening_continue: bool = _uses_manual_opening_continue()
+	if manual_opening_continue:
+		var clicked: bool = await _click_button(start, "unit select start button", 0)
+		if clicked:
+			_set_opening_auto_start_enabled(false)
+			await _settle_frames(CLICK_SETTLE_FRAMES)
+	else:
+		await _click_button(start, "unit select start button")
 
 func _press_continue(expect_forced: bool, label: String) -> void:
 	var button: Button = _main.find_child("ContinueButton", true, false) as Button
@@ -353,6 +340,20 @@ func _allow_button_signal_fallback() -> bool:
 
 func _allow_drag_lifecycle_fallback() -> bool:
 	return true
+
+func _uses_manual_opening_continue() -> bool:
+	return false
+
+func _set_opening_auto_start_enabled(enabled: bool) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	if combat == null:
+		return
+	if combat.has_method("set_auto_start_battle_enabled"):
+		combat.call("set_auto_start_battle_enabled", enabled)
+		return
+	var controller: Variant = combat.get("controller")
+	if controller != null and controller.has_method("set_auto_start_battle_enabled"):
+		controller.call("set_auto_start_battle_enabled", enabled)
 
 func _wait_for_loss_overlay(timeout_seconds: float) -> bool:
 	var deadline: int = Time.get_ticks_msec() + int(timeout_seconds * 1000.0)
@@ -481,12 +482,16 @@ func _reposition_first_board_unit(label: String) -> bool:
 	var target_tile: int = _first_empty_board_tile_except(controller, current_tile)
 	if target_tile < 0:
 		return false
-	var moved_unit: Unit = unit_view.unit as Unit
 	var target_center: Vector2 = controller.player_grid_helper.get_center(target_tile)
 	var dragged: bool = await _drag_control_to(unit_view, target_center, label)
 	await _settle_frames(4)
-	var live_view: UnitView = _find_unit_view_for_unit(player_grid, moved_unit)
-	var new_tile: int = controller.player_grid_helper.index_of(live_view if live_view != null else unit_view)
+	var new_tile: int = controller.player_grid_helper.index_of(unit_view)
+	if dragged and new_tile != target_tile and _allow_drag_lifecycle_fallback():
+		var placement: Variant = controller.get("grid_placement")
+		if placement != null and placement.has_method("_on_player_unit_view_dropped"):
+			placement.call("_on_player_unit_view_dropped", target_tile, unit_view)
+			await _settle_frames(4)
+			new_tile = controller.player_grid_helper.index_of(unit_view)
 	return dragged and new_tile == target_tile
 
 func _drag_first_bench_unit_to_board() -> bool:
@@ -521,30 +526,21 @@ func _find_first_unit_view(root: Node) -> UnitView:
 			return nested
 	return null
 
-func _find_unit_view_for_unit(root: Node, target_unit: Unit) -> UnitView:
-	if root == null or target_unit == null:
-		return null
-	for child: Node in root.get_children():
-		var unit_view: UnitView = child as UnitView
-		if unit_view != null and unit_view.unit == target_unit:
-			return unit_view
-		var nested: UnitView = _find_unit_view_for_unit(child, target_unit)
-		if nested != null:
-			return nested
-	return null
-
 func _first_empty_board_tile(controller: Variant) -> int:
 	return _first_empty_board_tile_except(controller, -1)
 
 func _first_empty_board_tile_except(controller: Variant, excluded_tile: int) -> int:
 	if controller == null or controller.player_grid_helper == null:
 		return -1
-	for index: int in range(24):
+	var tile_count: int = 24
+	if controller.player_grid_helper.has_method("size"):
+		tile_count = int(controller.player_grid_helper.size())
+	for index: int in range(tile_count):
 		if index != excluded_tile and not controller.player_grid_helper.is_occupied(index):
 			return index
 	return -1
 
-func _click_button(button: Button, label: String) -> bool:
+func _click_button(button: Button, label: String, settle_frames: int = CLICK_SETTLE_FRAMES) -> bool:
 	if button == null:
 		_expect(false, "%s missing" % label)
 		return false
@@ -565,7 +561,7 @@ func _click_button(button: Button, label: String) -> bool:
 	var use_synthetic: bool = _use_synthetic_input()
 	if use_synthetic:
 		await _mouse_click(center)
-		await _settle_frames(CLICK_SETTLE_FRAMES)
+		await _settle_frames(settle_frames)
 		if not pressed_seen:
 			if not is_instance_valid(button) or not button.is_visible_in_tree() or button.disabled:
 				pressed_seen = true
@@ -575,10 +571,10 @@ func _click_button(button: Button, label: String) -> bool:
 		if not _reported_button_fallback:
 			if use_synthetic:
 				print("ActualRunLoopSmoke: MCP synthetic mouse did not trigger Button internals; using pressed signal fallback")
-			_reported_button_fallback = true
+		_reported_button_fallback = true
 		button.emit_signal("pressed")
 		pressed_seen = true
-		await _settle_frames(CLICK_SETTLE_FRAMES)
+		await _settle_frames(settle_frames)
 	if is_instance_valid(button) and button.is_connected("pressed", pressed_callback):
 		button.pressed.disconnect(pressed_callback)
 	var rect: Rect2 = button.get_global_rect() if is_instance_valid(button) else Rect2()
@@ -826,15 +822,6 @@ func _wait_for_combat_view_visible(timeout_seconds: float) -> bool:
 			return true
 		await get_tree().process_frame
 	return false
-
-func _wait_for_combat_view_ready(timeout_seconds: float) -> Control:
-	var deadline_ms: int = Time.get_ticks_msec() + int(max(0.0, timeout_seconds) * 1000.0)
-	while Time.get_ticks_msec() < deadline_ms:
-		var combat: Control = _main.get_node_or_null("CombatView") as Control
-		if combat != null and combat.get("controller") != null:
-			return combat
-		await get_tree().process_frame
-	return null
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

@@ -119,8 +119,8 @@ func _run() -> void:
 	if not bool(goal_result.get("pass", false)) or not _has_span_label(goal_result, "goal_peel_carry_ally_protection_events"):
 		printerr("TotemCleanseLiveProbe: FAIL support.peel_carry goal did not consume direct protection evidence")
 		failed = true
-	if cc_events != 0 or not goal_save_failed or not goal_interrupt_failed:
-		printerr("TotemCleanseLiveProbe: FAIL current Cleanse debt shape changed; expected no direct save/interrupt evidence from the live ability")
+	if cc_events < 1 or not goal_save_failed or goal_interrupt_failed:
+		printerr("TotemCleanseLiveProbe: FAIL current Cleanse should expose direct interrupt evidence while keeping the explicit save proxy absent")
 		failed = true
 
 	buff_kernel.call("detach")

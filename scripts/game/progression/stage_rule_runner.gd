@@ -7,7 +7,8 @@ const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
 const UnitScaler := preload("res://scripts/game/units/unit_scaler.gd")
 const MAX_ITEMS_PER_UNIT := 3
-const MAX_STAT_SCALE: float = 4.0
+const MAX_UNIT_LEVEL := 4
+const MAX_STAT_SCALE: float = 24.0
 
 static var _item_warning_logged: bool = false
 
@@ -28,14 +29,11 @@ static func post_spawn(units: Array, spec: Dictionary, ch: int, sic: int) -> voi
 	_apply_stat_overrides(units, spec)
 	_apply_stat_scales(units, spec)
 	_apply_item_overrides(units, spec)
-	apply_enemy_multiplier(units, _current_contract_enemy_multiplier())
 
-static func pre_engine_config(state: Variant, engine: Variant, spec: Dictionary, ch: int, sic: int) -> void:
+static func pre_engine_config(state, engine, spec: Dictionary, ch: int, sic: int) -> void:
 	var p: Variant = _provider_for(spec, ch)
 	if p and p.has_method("on_pre_engine_config"):
 		p.on_pre_engine_config(state, engine, spec, int(ch), int(sic))
-	if engine != null and engine.has_method("configure_contract_battle"):
-		engine.configure_contract_battle(_current_contract_battle_config())
 
 static func on_battle_start(state, engine, spec: Dictionary, ch: int, sic: int) -> void:
 	var p: Variant = _provider_for(spec, ch)
@@ -114,7 +112,7 @@ static func _apply_level_to_unit(unit: Unit, target_level: int) -> void:
 	if unit == null:
 		return
 	var current_level: int = max(1, int(unit.level))
-	var chosen_level: int = max(1, int(target_level))
+	var chosen_level: int = clampi(int(target_level), 1, MAX_UNIT_LEVEL)
 	if chosen_level <= current_level:
 		unit.level = chosen_level
 		unit.hp = min(unit.hp, unit.max_hp)
@@ -143,48 +141,6 @@ static func _apply_level_to_unit(unit: Unit, target_level: int) -> void:
 					unit.true_damage = max(0.0, current_value)
 	unit.level = chosen_level
 	unit.hp = unit.max_hp
-
-static func apply_enemy_multiplier(units: Array, multiplier: float) -> void:
-	var factor: float = max(1.0, float(multiplier))
-	if factor <= 1.0:
-		return
-	for raw_unit: Variant in units:
-		var unit: Unit = raw_unit as Unit
-		if unit == null:
-			continue
-		unit.max_hp = max(1, int(round(float(unit.max_hp) * factor)))
-		unit.hp = unit.max_hp
-		unit.hp_regen = max(0.0, unit.hp_regen * factor)
-		unit.attack_damage = max(0.0, unit.attack_damage * factor)
-		unit.spell_power = max(0.0, unit.spell_power * factor)
-		unit.true_damage = max(0.0, unit.true_damage * factor)
-		unit.armor = max(0.0, unit.armor * factor)
-		unit.magic_resist = max(0.0, unit.magic_resist * factor)
-
-static func _current_contract_enemy_multiplier() -> float:
-	var loop: MainLoop = Engine.get_main_loop()
-	if loop == null or not loop.has_method("get_root"):
-		return 1.0
-	var root: Window = loop.get_root()
-	if root == null:
-		return 1.0
-	var shop: Node = root.get_node_or_null("/root/Shop")
-	if shop != null and shop.has_method("get_contract_enemy_multiplier"):
-		return max(1.0, float(shop.call("get_contract_enemy_multiplier")))
-	return 1.0
-
-static func _current_contract_battle_config() -> Dictionary:
-	var loop: MainLoop = Engine.get_main_loop()
-	if loop == null or not loop.has_method("get_root"):
-		return {}
-	var root: Window = loop.get_root()
-	if root == null:
-		return {}
-	var shop: Node = root.get_node_or_null("/root/Shop")
-	if shop != null and shop.has_method("get_contract_battle_config"):
-		var value: Variant = shop.call("get_contract_battle_config")
-		return (value as Dictionary).duplicate(true) if value is Dictionary else {}
-	return {}
 
 static func _apply_stat_overrides(units: Array, spec: Dictionary) -> void:
 	if typeof(spec) != TYPE_DICTIONARY or not spec.has(StageTypes.KEY_RULES):
@@ -233,15 +189,31 @@ static func _apply_stat_scales(units: Array, spec: Dictionary) -> void:
 	if typeof(spec) != TYPE_DICTIONARY or not spec.has(StageTypes.KEY_RULES):
 		return
 	var rules: Dictionary = spec[StageTypes.KEY_RULES]
-	if typeof(rules) != TYPE_DICTIONARY or not rules.has("stat_scale"):
+	if typeof(rules) != TYPE_DICTIONARY:
 		return
-	var global_scale: float = clampf(float(rules.get("stat_scale", 1.0)), 0.05, MAX_STAT_SCALE)
-	if absf(global_scale - 1.0) < 0.001:
+	if not rules.has("stat_scale") and not rules.has("stat_scales"):
 		return
-	for unit_value: Variant in units:
-		var unit: Unit = unit_value as Unit
-		if unit != null:
-			_apply_unit_stat_scale(unit, global_scale)
+	var global_scale: float = 1.0
+	if rules.has("stat_scale"):
+		global_scale = float(rules["stat_scale"])
+	var raw_scales: Variant = rules.get("stat_scales", {})
+	var scales: Dictionary = raw_scales if typeof(raw_scales) == TYPE_DICTIONARY else {}
+	var by_index: Dictionary = scales.get("index", {}) if typeof(scales.get("index", {})) == TYPE_DICTIONARY else {}
+	var by_id: Dictionary = scales.get("id", {}) if typeof(scales.get("id", {})) == TYPE_DICTIONARY else {}
+	for i in range(units.size()):
+		var unit: Unit = units[i]
+		if unit == null:
+			continue
+		var scale: float = global_scale
+		if by_index.has(i):
+			scale *= float(by_index[i])
+		elif by_index.has(str(i)):
+			scale *= float(by_index[str(i)])
+		elif by_id.has(String(unit.id).strip_edges().to_lower()):
+			scale *= float(by_id[String(unit.id).strip_edges().to_lower()])
+		if absf(scale - 1.0) < 0.001:
+			continue
+		_apply_unit_stat_scale(unit, scale)
 
 static func _apply_unit_stat_scale(unit: Unit, scale: float) -> void:
 	if unit == null:

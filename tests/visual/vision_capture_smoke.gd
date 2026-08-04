@@ -33,7 +33,7 @@ func _run() -> void:
 	get_tree().root.add_child(_main)
 	await _settle_frames(6)
 
-	await _capture("01_title", ["BLOOD WILL PAY"])
+	await _capture("01_title", ["GAMBLE BATTLE"])
 	_call_main("_on_start")
 	await _settle_frames(6)
 	await _capture("02_unit_select", ["NO CHAMPION CHOSEN", "START GAME"])

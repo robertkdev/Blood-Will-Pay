@@ -1,8 +1,6 @@
 extends RefCounted
 class_name IntermissionController
 
-const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
-
 const COLOR_PANEL_DEEP: Color = Color(0.025, 0.020, 0.028, 0.92)
 const COLOR_BLOOD: Color = Color(0.50, 0.025, 0.050, 0.98)
 const COLOR_GOLD: Color = Color(0.88, 0.56, 0.22, 0.88)
@@ -31,15 +29,15 @@ func _ensure_bar() -> void:
     _bar.offset_left = -240.0
     _bar.offset_right = 240.0
     _bar.offset_top = 142.0
-    _bar.offset_bottom = 150.0
-    _bar.z_index = 150
+    _bar.offset_bottom = 148.0
+    _bar.z_index = 170
     _bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _bar.min_value = 0.0
     _bar.max_value = 1.0
     _bar.value = 0.0
     _bar.show_percentage = false
-    _bar.add_theme_stylebox_override("background", HardcoreUIAssets.intermission_track_style())
-    _bar.add_theme_stylebox_override("fill", HardcoreUIAssets.intermission_fill_style())
+    _bar.add_theme_stylebox_override("background", _make_bar_background_style())
+    _bar.add_theme_stylebox_override("fill", _make_bar_fill_style())
     _bar.visible = false
 
 func _make_bar_background_style() -> StyleBoxFlat:

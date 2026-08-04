@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="UnitIdentity" load_steps=2]
+
+[ext_resource path="res://scripts/game/identity/unit_identity.gd" type="Script" id=1]
+
+[resource]
+script = ExtResource( 1 )
+primary_role = "mage"
+primary_goal = "mage.pick_burst"
+approaches = ["burst"]
+alt_goals = ["mage.wombo_combo_burst", "support.team_amplification"]

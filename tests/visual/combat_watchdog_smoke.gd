@@ -11,8 +11,8 @@ func _ready() -> void:
 
 func _run() -> void:
 	var failures: Array[String] = []
-	_run_stalled_case("no-progress", 0.25, 5.0, "Combat no-progress timeout", "tie", failures)
-	_run_stalled_case("absolute", 0.0, 0.25, "Combat timeout", "tie", failures)
+	_run_stalled_case("no-progress", 0.25, 5.0, "Combat no-progress timeout", failures)
+	_run_stalled_case("absolute", 0.0, 0.25, "Combat timeout", failures)
 	if failures.size() > 0:
 		for failure: String in failures:
 			push_error("CombatWatchdogSmoke: " + failure)
@@ -21,7 +21,7 @@ func _run() -> void:
 	print("CombatWatchdogSmoke: OK")
 	get_tree().quit(0)
 
-func _run_stalled_case(label: String, no_progress_timeout: float, absolute_timeout: float, expected_log: String, expected_outcome: String, failures: Array[String]) -> void:
+func _run_stalled_case(label: String, no_progress_timeout: float, absolute_timeout: float, expected_log: String, failures: Array[String]) -> void:
 	var state: BattleState = BattleStateLib.new()
 	state.reset()
 	var player: Unit = _make_stalled_unit("watchdog_player")
@@ -60,7 +60,7 @@ func _run_stalled_case(label: String, no_progress_timeout: float, absolute_timeo
 			break
 		engine.process(0.05)
 
-	_expect(String(outcome.get("value", "")) == expected_outcome, "%s case should force %s outcome, got '%s'" % [label, expected_outcome, String(outcome.get("value", ""))], failures)
+	_expect(String(outcome.get("value", "")) == "tie", "%s case should force tie/refund outcome, got '%s'" % [label, String(outcome.get("value", ""))], failures)
 	_expect(not state.battle_active, "%s case should stop battle after watchdog outcome" % label, failures)
 	_expect(_logs_contain(logs, expected_log), "%s case did not log expected watchdog message" % label, failures)
 	engine.teardown()

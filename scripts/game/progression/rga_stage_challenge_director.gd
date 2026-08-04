@@ -9,7 +9,7 @@ static var _choices: Dictionary = {}
 
 static var _pools: Dictionary = {
 	1: [
-		{"id": "frontline_lesson", "label": "Frontline Lesson", "ids": ["brute", "mara"], "puzzle": "Break a simple front line before its support stabilizes."},
+		{"id": "frontline_lesson", "label": "Frontline Lesson", "ids": ["brute", "cashmere"], "puzzle": "Break a simple front line before its support stabilizes."},
 		{"id": "range_pressure", "label": "Range Pressure", "ids": ["luna", "grint"], "puzzle": "Reach or outlast protected ranged pressure."},
 		{"id": "pick_access", "label": "Pick Access", "ids": ["bo", "bonko"], "puzzle": "Protect fragile units from early backline access."},
 		{"id": "attrition_intro", "label": "Attrition Intro", "ids": ["berebell", "morrak"], "puzzle": "Close the fight before attrition healing wins."},
@@ -90,12 +90,45 @@ static func _spec_from_template(template: Dictionary, ch: int, sic: int, tier: i
 			"id": String(template.get("id", "")),
 			"label": String(template.get("label", "")),
 			"puzzle": String(template.get("puzzle", "")),
+			"formation": String(template.get("formation", "role_based")),
+			"targeting_focus": String(template.get("targeting_focus", _targeting_focus_for_id(String(template.get("id", ""))))),
+			"positioning_purpose": String(template.get("positioning_purpose", _positioning_purpose_for_id(String(template.get("id", ""))))),
 			"tier": int(tier),
 			"choice_index": int(choice_index),
 			"runtime_seed": int(_runtime_seed),
 		},
 	}
 	return StageTypes.make_spec(unit_ids, StageTypes.KIND_NORMAL, rules)
+
+static func _targeting_focus_for_id(template_id: String) -> String:
+	var id: String = String(template_id).strip_edges()
+	if id.find("dive") >= 0 or id.find("assassin") >= 0 or id.find("pick") >= 0:
+		return "backline_access"
+	if id.find("range") >= 0 or id.find("siege") >= 0:
+		return "breach_siege_line"
+	if id.find("formation") >= 0 or id.find("wide") >= 0:
+		return "clump_and_source_pressure"
+	if id.find("lockdown") >= 0 or id.find("execute") >= 0 or id.find("reset") >= 0:
+		return "priority_threat_control"
+	if id.find("attrition") >= 0 or id.find("fortress") >= 0 or id.find("frontline") >= 0:
+		return "closest_accessible_frontline"
+	return "role_goal_priority"
+
+static func _positioning_purpose_for_id(template_id: String) -> String:
+	var focus: String = _targeting_focus_for_id(template_id)
+	match focus:
+		"backline_access":
+			return "Protect carries with screens, peel, or baited access lanes."
+		"breach_siege_line":
+			return "Close distance or break the ranged line before scaling wins."
+		"clump_and_source_pressure":
+			return "Spread against area pressure or expose the formation breaker."
+		"priority_threat_control":
+			return "Place bait, carries, and cleanse tools so control lands on the intended target."
+		"closest_accessible_frontline":
+			return "Frontline placement should decide who is reachable first."
+		_:
+			return "Unit placement should change target access and fight timing."
 
 static func _tier_for_chapter(ch: int) -> int:
 	var c: int = max(1, int(ch))

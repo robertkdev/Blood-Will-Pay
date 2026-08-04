@@ -35,7 +35,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var target_index: int = int(far_targets[0])
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var target: Unit = ctx.unit_at(target_team, target_index)
-	if target == null or not target.is_alive():
+	if target == null or not ctx.is_targetable(target_team, target_index):
 		return false
 
 	_emit_target_drop(ctx, target_team, target_index)
@@ -66,35 +66,31 @@ func cast(ctx: AbilityContext) -> bool:
 	return true
 
 func _emit_target_drop(ctx: AbilityContext, target_team: String, target_index: int) -> void:
-	if ctx.engine.has_method("_resolver_emit_targetability_window"):
-		ctx.engine._resolver_emit_targetability_window(ctx.caster_team, ctx.caster_index, false, VANISH_DURATION, "pilfer_pocket_swap")
-	if ctx.engine.has_method("_resolver_emit_targetability_threat_interaction"):
-		ctx.engine._resolver_emit_targetability_threat_interaction(target_team, target_index, ctx.caster_team, ctx.caster_index, "pocket_swap_vanish", 4.0, true, true)
+	ctx.apply_untargetable(VANISH_DURATION, "pilfer_pocket_swap")
 
 func _dash_to_enemy_backline(ctx: AbilityContext, target_team: String, target_index: int) -> void:
 	var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
 	var target_pos: Vector2 = ctx.position_of(target_team, target_index)
 	var sign_x: float = 1.0 if ctx.caster_team == "player" else -1.0
-	var enemy_depth_x: float = abs(target_pos.x) * sign_x
+	var enemy_depth_x: float = target_pos.x
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
 	for enemy_index: int in range(enemies.size()):
 		var enemy: Unit = enemies[enemy_index]
 		if enemy == null or not enemy.is_alive():
 			continue
 		var enemy_pos: Vector2 = ctx.position_of(target_team, enemy_index)
-		var projected_enemy_x: float = abs(enemy_pos.x) * sign_x
+		var projected_enemy_x: float = enemy_pos.x
 		if sign_x > 0.0:
 			enemy_depth_x = max(enemy_depth_x, projected_enemy_x)
 		else:
 			enemy_depth_x = min(enemy_depth_x, projected_enemy_x)
 	var tile: float = ctx.tile_size()
-	var destination: Vector2 = Vector2(enemy_depth_x + sign_x * DASH_OVERSHOOT_TILES * tile, 0.0)
+	var destination: Vector2 = Vector2(enemy_depth_x + sign_x * DASH_OVERSHOOT_TILES * tile, target_pos.y)
 	var delta: Vector2 = destination - start
 	if delta.length() <= 0.001:
 		delta = Vector2(sign_x * tile, 0.0)
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
 		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, delta, MOVE_DURATION)
-	_set_position(ctx, destination)
 
 func _set_position(ctx: AbilityContext, destination: Vector2) -> void:
 	if ctx.engine == null:

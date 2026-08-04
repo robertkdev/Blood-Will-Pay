@@ -12,4 +12,5 @@ stat_mods = {"pct_as": 0.25}
 effects = []
 components = []
 tags = PackedStringArray("marksman")
+build_axes = PackedStringArray("attack_speed")
 

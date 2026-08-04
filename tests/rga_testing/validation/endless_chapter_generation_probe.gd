@@ -4,7 +4,6 @@ const EndlessChapterGenerator := preload("res://scripts/game/progression/endless
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
-const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
 
 const START_CHAPTER := 1
 const CHAPTERS_PER_SEED := 40
@@ -61,6 +60,7 @@ func _ready() -> void:
 		recent_signatures.clear()
 	UnitFactory.suppress_validation_warnings = previous_suppress_validation_warnings
 	var mean_abs_error: float = float(total_abs_error) / float(max(1, total_non_creep_boards))
+	_expect(max_level <= 4, "generated unit levels should cap at 4, got max_level=%d" % max_level, failures)
 	if not failures.is_empty():
 		for failure: String in failures:
 			push_error(failure)
@@ -104,10 +104,19 @@ func _validate_spec(seed: int, chapter: int, stage_index: int, spec: Dictionary,
 	_expect(rules.has("levels"), "seed %d chapter %d stage %d missing levels" % [seed, chapter, stage_index], failures)
 	_expect(rules.has("target_rating"), "seed %d chapter %d stage %d missing target rating" % [seed, chapter, stage_index], failures)
 	_expect(rules.has("difficulty_rating"), "seed %d chapter %d stage %d missing difficulty rating" % [seed, chapter, stage_index], failures)
-	if kind == StageTypes.KIND_NORMAL or kind == StageTypes.KIND_BOSS:
-		_expect(String(rules.get("combat_power_model_version", "")) == CombatPowerModel.MODEL_VERSION, "seed %d chapter %d stage %d missing combat power model metadata" % [seed, chapter, stage_index], failures)
 	if kind == StageTypes.KIND_CREEPS:
 		_expect(rules.has("rewards"), "seed %d chapter %d creep stage missing rewards" % [seed, chapter], failures)
+		_expect(ids.size() >= EndlessChapterGenerator.MIN_CREEP_STAGE_UNITS, "seed %d chapter %d creep stage should have at least %d reward enemies, got %d ids=%s" % [seed, chapter, EndlessChapterGenerator.MIN_CREEP_STAGE_UNITS, ids.size(), JSON.stringify(ids)], failures)
+		var rewards: Dictionary = rules.get("rewards", {}) if typeof(rules.get("rewards", {})) == TYPE_DICTIONARY else {}
+		_expect(int(rewards.get("rolls_per_kill", 0)) >= 1, "seed %d chapter %d creep rewards should roll at least once per kill" % [seed, chapter], failures)
+	if kind == StageTypes.KIND_NORMAL or kind == StageTypes.KIND_BOSS:
+		_expect(rules.has("item_pressure_rating"), "seed %d chapter %d stage %d generated board missing item pressure rating" % [seed, chapter, stage_index], failures)
+		var expected_rating: int = int(rules.get("unit_rating", 0)) + int(rules.get("trait_pressure_rating", 0)) + int(rules.get("item_pressure_rating", 0))
+		_expect(int(rules.get("difficulty_rating", 0)) == expected_rating, "seed %d chapter %d stage %d difficulty should equal unit+trait+item rating expected=%d got=%d" % [seed, chapter, stage_index, expected_rating, int(rules.get("difficulty_rating", 0))], failures)
+		var item_start: int = int(EndlessChapterGenerator.BOSS_ITEM_START_TARGET) if kind == StageTypes.KIND_BOSS else int(EndlessChapterGenerator.NORMAL_ITEM_START_TARGET)
+		if int(rules.get("target_rating", 0)) >= item_start:
+			_expect(_item_count_from_rules(rules) > 0, "seed %d chapter %d stage %d target crossed item threshold but generated no loadout" % [seed, chapter, stage_index], failures)
+			_expect(int(rules.get("item_pressure_rating", 0)) > 0, "seed %d chapter %d stage %d generated item loadout should add pressure" % [seed, chapter, stage_index], failures)
 	for id_value: Variant in ids:
 		var unit_id: String = String(id_value).strip_edges()
 		_expect(unit_id != "", "seed %d chapter %d stage %d blank unit id" % [seed, chapter, stage_index], failures)
@@ -118,7 +127,30 @@ func _validate_spec(seed: int, chapter: int, stage_index: int, spec: Dictionary,
 	if kind == StageTypes.KIND_NORMAL:
 		_expect(rules.has("rga_challenge"), "seed %d chapter %d stage %d normal board missing RGA challenge metadata" % [seed, chapter, stage_index], failures)
 	if kind == StageTypes.KIND_BOSS:
-		_expect(ids.size() >= 4, "seed %d chapter %d boss should have at least 4 units" % [seed, chapter], failures)
+		_expect(ids.size() == 1, "seed %d chapter %d boss should be exactly one bad guy, got %d ids=%s" % [seed, chapter, ids.size(), JSON.stringify(ids)], failures)
+		var stat_scale: float = float(rules.get("stat_scale", 1.0))
+		var scale_cap: float = float(rules.get("boss_stat_scale_cap", EndlessChapterGenerator.MAX_BOSS_STAT_SCALE))
+		_expect(stat_scale <= scale_cap + 0.001, "seed %d chapter %d boss stat_scale %.3f exceeded cap %.3f" % [seed, chapter, stat_scale, scale_cap], failures)
+		if int(chapter) == int(ProgressionConfig.PROCEDURAL_START_CHAPTER):
+			_expect(stat_scale <= EndlessChapterGenerator.FIRST_BOSS_STAT_SCALE_CAP + 0.001, "seed %d first boss stat_scale %.3f should not exceed first-boss cap %.3f" % [seed, stat_scale, EndlessChapterGenerator.FIRST_BOSS_STAT_SCALE_CAP], failures)
+		if bool(rules.get("boss_target_capped", false)):
+			_expect(int(rules.get("requested_target_rating", 0)) > int(rules.get("target_rating", 0)), "seed %d chapter %d capped boss should preserve requested target metadata" % [seed, chapter], failures)
+			_expect(int(rules.get("difficulty_rating", 0)) == int(rules.get("target_rating", 0)), "seed %d chapter %d capped boss should report effective target matching difficulty" % [seed, chapter], failures)
+
+func _item_count_from_rules(rules: Dictionary) -> int:
+	var total: int = 0
+	var items_value: Variant = rules.get("items", {})
+	if typeof(items_value) != TYPE_DICTIONARY:
+		return total
+	var items: Dictionary = items_value
+	for key: Variant in items.keys():
+		var raw: Variant = items[key]
+		if raw is Array:
+			var raw_items: Array = raw
+			total += raw_items.size()
+		elif raw != null:
+			total += 1
+	return total
 
 func _validate_recent_signature(seed: int, chapter: int, stage_index: int, ids: Array, recent_signatures: Array[String], failures: Array[String]) -> void:
 	var signature_ids: Array[String] = []

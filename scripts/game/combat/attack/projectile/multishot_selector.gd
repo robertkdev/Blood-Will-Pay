@@ -3,10 +3,12 @@ class_name MultishotSelector
 
 var rng: RandomNumberGenerator = null
 var hooks
+var buff_system: BuffSystem = null
 
-func configure(_rng: RandomNumberGenerator, _hooks) -> void:
+func configure(_rng: RandomNumberGenerator, _hooks, _buff_system: BuffSystem = null) -> void:
     rng = _rng
     hooks = _hooks
+    buff_system = _buff_system
 
 func _enemy_team_name(team: String) -> String:
     return "enemy" if team == "player" else "player"
@@ -20,6 +22,8 @@ func _alive_indices(state: BattleState, team: String) -> Array[int]:
     for i in range(enemies.size()):
         var u: Unit = enemies[i]
         if u != null and u.is_alive():
+            if buff_system != null and not buff_system.is_targetable(state, _enemy_team_name(team), i):
+                continue
             arr.append(i)
     return arr
 

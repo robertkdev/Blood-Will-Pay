@@ -229,36 +229,6 @@ func force_set_equipped(unit, ids) -> Dictionary:
 	result["items"] = deduped.duplicate()
 	return result
 
-func get_equipped_base_snapshot(unit) -> Dictionary:
-	if _equip_service == null or not _equip_service.has_method("get_base_snapshot"):
-		return {}
-	return _equip_service.get_base_snapshot(unit)
-
-func restore_equipped_snapshot(unit, ids: Array[String], base_snapshot: Dictionary) -> Dictionary:
-	_cleanup_invalid_units()
-	var result: Dictionary = {"ok": false, "reason": ""}
-	if unit == null:
-		result["reason"] = "no_unit"
-		return result
-	var restored_ids: Array[String] = []
-	for raw_id: String in ids:
-		var item_id: String = String(raw_id).strip_edges()
-		if item_id == "" or ItemCatalog.get_def(item_id) == null:
-			result["reason"] = "unknown_item"
-			return result
-		restored_ids.append(item_id)
-	if restored_ids.size() > MAX_SLOTS:
-		result["reason"] = "too_many_items"
-		return result
-	_equipped[unit] = restored_ids.duplicate()
-	_watch_unit(unit)
-	if _equip_service != null:
-		_equip_service.restore_base_snapshot(unit, base_snapshot)
-		_equip_service.recompute_for(unit)
-	equipped_changed.emit(unit)
-	result["ok"] = true
-	return result
-
 func get_equipped(unit) -> Array:
 	_cleanup_invalid_units()
 	var eq: Array = _equipped.get(unit, [])
@@ -273,18 +243,6 @@ func slot_count(_unit = null) -> int:
 func get_inventory_snapshot() -> Dictionary:
 	# Return a shallow copy for UI display
 	return _inventory.duplicate()
-
-func restore_run_snapshot(inventory: Dictionary, inventory_slots: Array[String]) -> void:
-	_clear_runtime_state()
-	for raw_id: Variant in inventory.keys():
-		var item_id: String = String(raw_id).strip_edges()
-		var count: int = max(0, int(inventory[raw_id]))
-		if item_id == "" or count <= 0 or ItemCatalog.get_def(item_id) == null:
-			continue
-		_inventory[item_id] = count
-	_inventory_slots = inventory_slots.duplicate()
-	_ensure_inventory_slots()
-	inventory_changed.emit()
 
 # Combine two components directly in inventory (no unit involved)
 func try_combine_in_inventory(a: String, b: String, a_slot: int = -1, b_slot: int = -1, result_slot: int = -1) -> Dictionary:

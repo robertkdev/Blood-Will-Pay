@@ -6,24 +6,15 @@ static var _snapshots_by_chapter: Dictionary = {}
 static func clear_runtime() -> void:
 	_snapshots_by_chapter.clear()
 
-static func snapshot_runtime() -> Dictionary:
-	return _snapshots_by_chapter.duplicate(true)
-
-static func restore_runtime(snapshot: Dictionary) -> void:
-	_snapshots_by_chapter.clear()
-	for raw_key: Variant in snapshot.keys():
-		var chapter: int = int(raw_key)
-		var value: Variant = snapshot[raw_key]
-		if chapter > 0 and value is Array:
-			_snapshots_by_chapter[chapter] = (value as Array).duplicate(true)
-
-static func capture_boss_board(ch: int, units: Array[Unit]) -> void:
+static func capture_boss_board(ch: int, units: Array[Unit], positions: Array = []) -> void:
 	var c: int = max(1, int(ch))
 	var captured: Array[Dictionary] = []
-	for unit: Unit in units:
+	for i: int in range(units.size()):
+		var unit: Unit = units[i]
 		if unit == null:
 			continue
-		captured.append(_snapshot_unit(unit))
+		var position_value: Variant = positions[i] if i < positions.size() else null
+		captured.append(_snapshot_unit(unit, position_value))
 	if not captured.is_empty():
 		_snapshots_by_chapter[c] = captured
 
@@ -45,6 +36,20 @@ static func snapshot_ids(ch: int) -> Array[String]:
 			out.append(unit_id)
 	return out
 
+static func snapshot_positions(ch: int) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var c: int = max(1, int(ch))
+	var snapshots: Array = _snapshots_by_chapter.get(c, [])
+	for snapshot_value: Variant in snapshots:
+		if not (snapshot_value is Dictionary):
+			continue
+		var snapshot: Dictionary = snapshot_value
+		var position_value: Variant = snapshot.get("position", null)
+		if typeof(position_value) == TYPE_VECTOR2:
+			var position: Vector2 = position_value
+			out.append(position)
+	return out
+
 static func apply_snapshot_to_units(ch: int, units: Array) -> void:
 	var c: int = max(1, int(ch))
 	var snapshots: Array = _snapshots_by_chapter.get(c, [])
@@ -56,8 +61,8 @@ static func apply_snapshot_to_units(ch: int, units: Array) -> void:
 			continue
 		_apply_snapshot(unit, snapshot_value as Dictionary)
 
-static func _snapshot_unit(unit: Unit) -> Dictionary:
-	return {
+static func _snapshot_unit(unit: Unit, position_value: Variant = null) -> Dictionary:
+	var snapshot: Dictionary = {
 		"id": String(unit.id),
 		"level": int(unit.level),
 		"max_hp": int(unit.max_hp),
@@ -88,6 +93,9 @@ static func _snapshot_unit(unit: Unit) -> Dictionary:
 		"mana_gain_per_attack": int(unit.mana_gain_per_attack),
 		"items": _equipped_items_for(unit),
 	}
+	if typeof(position_value) == TYPE_VECTOR2:
+		snapshot["position"] = position_value
+	return snapshot
 
 static func _apply_snapshot(unit: Unit, snapshot: Dictionary) -> void:
 	_force_items(unit, _to_string_array(snapshot.get("items", [])))
@@ -130,7 +138,7 @@ static func _equipped_items_for(unit: Unit) -> Array[String]:
 	return _to_string_array(raw_items)
 
 static func _force_items(unit: Unit, items: Array[String]) -> void:
-	if unit == null or items.is_empty():
+	if unit == null:
 		return
 	var items_node: Variant = _items_singleton()
 	if items_node == null or not items_node.has_method("force_set_equipped"):

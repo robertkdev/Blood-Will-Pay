@@ -34,9 +34,7 @@ func _run() -> void:
 		_finish(1)
 		return
 	var active_combat_seen: bool = await _wait_for_active_combat()
-	var diagnostics: Variant = {"architecture": "embedded_combat_view"}
-	if _main.has_method("combat_prewarm_diagnostics"):
-		diagnostics = _main.call("combat_prewarm_diagnostics")
+	var diagnostics: Variant = _main.call("combat_prewarm_diagnostics")
 	print("PerfFirstCombatTransition: handler_ms=%.3f ready_ms=%.3f active=%s prewarm=%s" % [handler_ms, ready_ms, str(active_combat_seen), str(diagnostics)])
 	if not active_combat_seen:
 		push_error("PerfFirstCombatTransition: deferred starter transition never entered active combat")

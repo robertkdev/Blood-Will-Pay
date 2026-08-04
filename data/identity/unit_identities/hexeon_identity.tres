@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "assassin"
 primary_goal = "assassin.backline_elimination"
 approaches = ["access_backline", "burst", "execute"]
-alt_goals = []
+alt_goals = ["assassin.cleanup_execution", "mage.pick_burst"]

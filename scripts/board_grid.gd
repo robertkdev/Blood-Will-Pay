@@ -72,6 +72,7 @@ func clear() -> void:
 			continue
 		for child in tile.get_children():
 			if child is Node:
+				tile.remove_child(child)
 				child.queue_free()
 	_occupants.clear()
 	for i in range(_tiles.size()):

@@ -1,5 +1,6 @@
 extends "res://tests/visual/random_later_shop_progression_smoke.gd"
 
+const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const ShopAffordabilityLib: Script = preload("res://scripts/game/shop/affordability.gd")
 const TWO_STAGE_SMOKE_NAME: String = "NaturalBonkoTwoStageMainFlowSmoke"
 const TWO_STAGE_STARTER_ID: String = "bonko"
@@ -41,13 +42,14 @@ func _run_two_stage_flow() -> void:
 	await _select_starter(_flow_starter_id())
 	await _settle_frames(4)
 	_expect(_node_visible("CombatView"), "CombatView did not open for natural two-stage flow")
-	var repositioned: bool = await _reposition_first_board_unit("natural two-stage opener reposition")
-	_expect(repositioned, "starter did not reposition before natural two-stage opener")
+	if _flow_require_opener_reposition():
+		var repositioned: bool = await _reposition_first_board_unit("natural two-stage opener reposition")
+		_expect(repositioned, "starter did not reposition before natural two-stage opener")
 	if not _technical_failures().is_empty():
 		return
 
 	_set_planning_timer_safe()
-	await _press_continue(true, "natural two-stage opener")
+	await _start_opening_fight_if_waiting()
 	var first_result: String = await _wait_for_first_result(_flow_first_fight_timeout())
 	_expect(first_result == "shop", "natural opener should win into first shop, got %s state=%s" % [first_result, JSON.stringify(_two_stage_state())])
 	if first_result != "shop":
@@ -121,7 +123,12 @@ func _play_two_stage_round() -> Dictionary:
 			_two_stage_buy_xp_clicks += 1
 		await _deploy_until_blocked()
 
-	var preferred_swaps: int = await _field_best_available_units("chapter %d round %d natural fielding" % [chapter_before, round_before])
+	var preferred_swaps: int = 0
+	if round_before != int(ProgressionConfig.MIRROR_STAGE):
+		preferred_swaps = await _field_best_available_units("chapter %d round %d natural fielding" % [chapter_before, round_before])
+	var mirror_adjustments: int = 0
+	if round_before == int(ProgressionConfig.MIRROR_STAGE):
+		mirror_adjustments = await _apply_mirror_outplay_adjustment("chapter %d mirror outplay" % chapter_before)
 
 	if chapter_before == 1 and round_before == 2:
 		_expect(_board_ids().size() >= 2, "first shop should buy and deploy a second unit naturally; state=%s" % JSON.stringify(_two_stage_state()))
@@ -136,6 +143,7 @@ func _play_two_stage_round() -> Dictionary:
 	result["board_after_shop"] = _board_ids()
 	result["bench_after_shop"] = _bench_ids()
 	result["preferred_swaps"] = preferred_swaps
+	result["mirror_adjustments"] = mirror_adjustments
 
 	_set_planning_timer_safe()
 	await _press_continue(false, "natural two-stage chapter %d round %d" % [chapter_before, round_before])
@@ -215,8 +223,22 @@ func _can_retry_after_same_stage(round_result: Dictionary) -> bool:
 		return false
 	return int(Economy.gold) > 0
 
+func _start_opening_fight_if_waiting() -> void:
+	if GameState.phase == GameState.GamePhase.COMBAT or bool(Economy.combat_active):
+		return
+	var button: Button = _button_with_text("Start Opening Fight")
+	if button != null and not button.disabled:
+		await _press_continue(true, "natural two-stage opener")
+		return
+	var in_progress: Button = _button_with_text("Battle in progress")
+	if in_progress != null and in_progress.disabled:
+		return
+	_expect(false, "natural two-stage opener was neither active nor startable; state=%s" % JSON.stringify(_two_stage_state()))
+
 func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	if int(Economy.gold) < _flow_safe_buy_xp_gold():
+		return false
+	if int(GameState.stage_in_chapter) == int(ProgressionConfig.MIRROR_STAGE) and not _buy_xp_would_expand_current_board():
 		return false
 	if before_buys and _should_buy_upgrade_before_xp():
 		return false
@@ -307,6 +329,33 @@ func _should_buy_upgrade_before_xp() -> bool:
 		return false
 	var gold_after_xp: int = int(Economy.gold) - int(SHOP_CONFIG.BUY_XP_COST)
 	return gold_after_xp < best_upgrade_cost + 1
+
+func _buy_xp_would_expand_current_board() -> bool:
+	var current_cap: int = _roster_max_team_size()
+	if current_cap < 0:
+		return false
+	var current_level: int = int(Shop.get_level())
+	var current_xp: int = int(Shop.get_xp())
+	var projected_level: int = _level_after_xp_purchase(current_level, current_xp)
+	if projected_level <= current_level:
+		return false
+	return _level_board_capacity(projected_level) > current_cap
+
+func _level_after_xp_purchase(current_level: int, current_xp: int) -> int:
+	var projected_level: int = clampi(int(current_level), int(SHOP_CONFIG.MIN_LEVEL), int(SHOP_CONFIG.MAX_LEVEL))
+	var projected_xp: int = max(0, int(current_xp)) + int(SHOP_CONFIG.XP_PER_BUY)
+	while projected_level < int(SHOP_CONFIG.MAX_LEVEL):
+		var target_level: int = projected_level + 1
+		var xp_needed: int = int(SHOP_CONFIG.XP_TO_REACH_LEVEL.get(target_level, 0))
+		if xp_needed <= 0 or projected_xp < xp_needed:
+			break
+		projected_xp -= xp_needed
+		projected_level += 1
+	return projected_level
+
+func _level_board_capacity(level: int) -> int:
+	var level_delta: int = max(0, int(level) - int(SHOP_CONFIG.STARTING_LEVEL))
+	return int(SHOP_CONFIG.DEFAULT_BOARD_CAPACITY) + level_delta
 
 func _best_upgrade_offer_cost() -> int:
 	var best_cost: int = 0
@@ -498,6 +547,58 @@ func _field_preferred_units(field_ids: Array[String], bench_out_ids: Array[Strin
 		swaps += 1
 	return swaps
 
+func _apply_mirror_outplay_adjustment(label: String) -> int:
+	var changes: int = 0
+	var swapped: bool = await _swap_mirror_bench_candidate(label)
+	if swapped:
+		changes += 1
+	var repositioned: bool = await _reposition_first_board_unit("%s reposition" % label)
+	if repositioned:
+		changes += 1
+	return changes
+
+func _swap_mirror_bench_candidate(label: String) -> bool:
+	var candidate_id: String = _mirror_bench_candidate_id()
+	if candidate_id == "":
+		return false
+	var bench_out_id: String = _mirror_bench_out_id(candidate_id)
+	if bench_out_id == "":
+		return false
+	var benched: bool = await _drag_board_unit_id_to_bench(bench_out_id, "%s bench %s" % [label, bench_out_id])
+	if not benched:
+		return false
+	return await _drag_bench_unit_id_to_board(candidate_id, "%s field %s" % [label, candidate_id])
+
+func _mirror_bench_candidate_id() -> String:
+	var bench: Array[String] = _bench_ids()
+	var best_id: String = ""
+	var best_score: int = -999999
+	for unit_id: String in bench:
+		var score: int = _field_score(unit_id)
+		if _is_frontline_unit(unit_id) or _is_damage_unit(unit_id):
+			score += 10
+		if score > best_score:
+			best_score = score
+			best_id = unit_id
+	return best_id
+
+func _mirror_bench_out_id(candidate_id: String) -> String:
+	var board: Array[String] = _board_ids()
+	if candidate_id == "":
+		return ""
+	var bench_out_id: String = ""
+	var bench_out_score: int = 999999
+	for unit_id: String in board:
+		if unit_id == _flow_starter_id():
+			continue
+		var score: int = _field_score(unit_id)
+		if score < bench_out_score:
+			bench_out_score = score
+			bench_out_id = unit_id
+	if bench_out_id == "":
+		return ""
+	return bench_out_id
+
 func _next_board_swap_id(field_ids: Array[String], bench_out_ids: Array[String]) -> String:
 	var board: Array[String] = _board_ids()
 	var desired_counts: Dictionary = _id_counts(field_ids)
@@ -611,6 +712,10 @@ func _should_reserve_gold_for_round_four_gate(chapter_before: int, round_before:
 	return int(Economy.gold) < _flow_safe_buy_xp_gold() + 1
 
 func _max_natural_buys_for_round(chapter_before: int, round_before: int) -> int:
+	if round_before == int(ProgressionConfig.MIRROR_STAGE):
+		if int(Economy.gold) >= 4:
+			return 1
+		return 1 if _bench_ids().is_empty() and int(Economy.gold) > 2 else 0
 	if chapter_before == 1 and round_before <= 4:
 		return 1
 	return _flow_max_buys_per_shop()
@@ -644,6 +749,9 @@ func _flow_first_fight_timeout() -> float:
 func _flow_round_timeout() -> float:
 	return TWO_STAGE_ROUND_TIMEOUT
 
+func _flow_require_opener_reposition() -> bool:
+	return false
+
 func _flow_verbose_round_logs() -> bool:
 	return true
 
@@ -671,7 +779,7 @@ func _button_with_text(text: String) -> Button:
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and (String(button.text) == text or String(button.text).begins_with(text + " ")):
+		if button != null and String(button.text) == text:
 			return button
 	return null
 

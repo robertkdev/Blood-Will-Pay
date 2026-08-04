@@ -7,7 +7,7 @@ const GoalPrimaryTest := preload("res://tests/rga_testing/metrics/goal/goal_prim
 
 const SUBJECT_ID: String = "brute"
 const ALLY_ID: String = "bonko"
-const ENEMY_ID: String = "mara"
+const ENEMY_ID: String = "cashmere"
 
 @export var do_quit_on_finish: bool = true
 
@@ -16,16 +16,19 @@ func _ready() -> void:
 
 func _run() -> void:
 	var full_result: Dictionary = _run_case("full_body_block", true, true, 35.0)
+	var redirect_only_result: Dictionary = _run_case("redirect_only", true, false, 35.0)
 	var event_only_result: Dictionary = _run_case("event_only", false, true, 35.0)
 	var damage_only_result: Dictionary = _run_case("damage_only", true, false, 0.0)
 	var weak_result: Dictionary = _run_case("weak_body_block", true, true, 10.0)
 
 	var full_rec: Dictionary = full_result.get("rec", {})
 	var full_goal: Dictionary = full_result.get("goal", {})
+	var redirect_only_goal: Dictionary = redirect_only_result.get("goal", {})
 	var event_only_goal: Dictionary = event_only_result.get("goal", {})
 	var damage_only_goal: Dictionary = damage_only_result.get("goal", {})
 	var weak_goal: Dictionary = weak_result.get("goal", {})
 	var full_pass: bool = bool(full_goal.get("pass", false))
+	var redirect_only_pass: bool = bool(redirect_only_goal.get("pass", false))
 	var event_only_pass: bool = bool(event_only_goal.get("pass", false))
 	var damage_only_pass: bool = bool(damage_only_goal.get("pass", false))
 	var weak_pass: bool = bool(weak_goal.get("pass", false))
@@ -34,6 +37,9 @@ func _run() -> void:
 	var redirected_prevented: float = float(full_rec.get("redirected_damage_prevented", 0.0))
 	var full_event_span: bool = _has_span(full_goal, "goal_frontline_absorb_body_block_events", true)
 	var full_prevented_span: bool = _has_span(full_goal, "goal_frontline_absorb_body_block_damage_prevented", true)
+	var redirect_only_event_diagnostic: bool = _has_diagnostic_span(redirect_only_goal, "goal_frontline_absorb_body_block_events", "direct_redirect_semantic")
+	var redirect_only_damage_diagnostic: bool = _has_diagnostic_span(redirect_only_goal, "goal_frontline_absorb_body_block_damage_prevented", "direct_redirect_semantic")
+	var redirect_only_prevented_span: bool = _has_span(redirect_only_goal, "goal_frontline_absorb_ally_damage_prevented", true)
 	var event_only_prevented_span: bool = _has_span(event_only_goal, "goal_frontline_absorb_ally_damage_prevented", true)
 	var damage_only_event_span: bool = _has_span(damage_only_goal, "goal_frontline_absorb_body_block_events", true)
 	var weak_prevented_span: bool = _has_span(weak_goal, "goal_frontline_absorb_body_block_damage_prevented", true)
@@ -44,6 +50,9 @@ func _run() -> void:
 		" redirected_prevented=", redirected_prevented,
 		" full_event_span=", full_event_span,
 		" full_prevented_span=", full_prevented_span,
+		" redirect_only_pass=", redirect_only_pass,
+		" redirect_only_event_diagnostic=", redirect_only_event_diagnostic,
+		" redirect_only_damage_diagnostic=", redirect_only_damage_diagnostic,
 		" event_only_pass=", event_only_pass,
 		" damage_only_pass=", damage_only_pass,
 		" weak_pass=", weak_pass)
@@ -57,6 +66,12 @@ func _run() -> void:
 		failed = true
 	if not full_event_span or not full_prevented_span:
 		printerr("FrontlineBodyBlockGoalProbe: FAIL full case did not emit passing body-block goal spans")
+		failed = true
+	if not redirect_only_pass or not redirect_only_prevented_span:
+		printerr("FrontlineBodyBlockGoalProbe: FAIL redirect-only absorb telemetry did not pass the frontline absorb goal")
+		failed = true
+	if not redirect_only_event_diagnostic or not redirect_only_damage_diagnostic:
+		printerr("FrontlineBodyBlockGoalProbe: FAIL redirect-only absorb telemetry was not kept distinct from physical body-block spans")
 		failed = true
 	if event_only_pass or damage_only_pass or weak_pass:
 		printerr("FrontlineBodyBlockGoalProbe: FAIL a missing/weak body-block control passed")
@@ -198,6 +213,17 @@ func _has_span(metric_result: Dictionary, label_prefix: String, required_ok: boo
 		var span: Dictionary = span_value as Dictionary
 		var label: String = String(span.get("label", ""))
 		if label.begins_with(label_prefix) and bool(span.get("ok", false)) == required_ok:
+			return true
+	return false
+
+func _has_diagnostic_span(metric_result: Dictionary, label_prefix: String, reason: String) -> bool:
+	var spans: Array = metric_result.get("spans", []) if (metric_result is Dictionary) else []
+	for span_value in spans:
+		if not (span_value is Dictionary):
+			continue
+		var span: Dictionary = span_value as Dictionary
+		var label: String = String(span.get("label", ""))
+		if label.begins_with(label_prefix) and not span.has("ok") and String(span.get("reason", "")) == reason:
 			return true
 	return false
 

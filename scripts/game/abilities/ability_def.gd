@@ -6,4 +6,5 @@ class_name AbilityDef
 @export var description: String = ""
 @export var targeting_summary: String = ""
 @export var base_cost: int = 0
+@export var starting_mana_bonus: int = 0
 @export var tags: Array[String] = [] # e.g., ["damage", "shield"]

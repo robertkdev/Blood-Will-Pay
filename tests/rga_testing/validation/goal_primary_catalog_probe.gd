@@ -82,6 +82,16 @@ func _run() -> void:
 		if not span_ok:
 			printerr("GoalPrimaryCatalogProbe: FAIL expected goal span prefix missing for ", goal_id)
 			failed = true
+	var soft_disrupt_subject: String = _subject_id("assassin.disrupt_and_escape")
+	_install_probe_identity(soft_disrupt_subject, "assassin.disrupt_and_escape")
+	var soft_disrupt_result: Dictionary = _run_goal(_soft_disrupt_payload(soft_disrupt_subject, 0.24, 4.0))
+	var weak_slow_result: Dictionary = _run_goal(_soft_disrupt_payload(soft_disrupt_subject, 0.10, 4.0))
+	if not bool(soft_disrupt_result.get("pass", false)):
+		printerr("GoalPrimaryCatalogProbe: FAIL direct attack-speed slow did not satisfy disruption evidence")
+		failed = true
+	if bool(weak_slow_result.get("pass", false)):
+		printerr("GoalPrimaryCatalogProbe: FAIL weak attack-speed slow satisfied disruption evidence")
+		failed = true
 	RoleCommon.clear_identity_cache()
 	if failed:
 		_quit(1)
@@ -185,8 +195,10 @@ func _positive_payload(goal_id: String, subject_id: String) -> Dictionary:
 			subject_fields = _subject_fields({"damage": 80.0, "incoming": 5.0, "time_alive_s": 10.0})
 			team_damage = 200.0
 			extra_allies = [_ally_unit("probe_ally_frontline", 0.0, 100.0)]
-			_add_subject_kernel(kernels, "per_unit_kpis", subject_id, {"attacks_over_2_tiles_pct": 0.70})
-			_add_ramp_kernel(kernels, subject_id)
+			_add_subject_kernel(kernels, "per_unit_kpis", subject_id, {
+				"attacks_over_2_tiles_pct": 0.70,
+				"damage_to_frontline_pct": 0.30
+			})
 		"marksman.tank_shredding":
 			subject_fields = _subject_fields({"damage": 220.0, "time_alive_s": 10.0})
 			team_damage = 300.0
@@ -265,6 +277,22 @@ func _positive_payload(goal_id: String, subject_id: String) -> Dictionary:
 
 func _negative_payload(subject_id: String) -> Dictionary:
 	return _base_payload(subject_id, _subject_fields({}), {}, 100.0, [], {})
+
+func _soft_disrupt_payload(subject_id: String, slow_magnitude: float, slow_duration_s: float) -> Dictionary:
+	var kernels: Dictionary = {}
+	_add_subject_kernel(kernels, "buff_presence", subject_id, {
+		"enemy_attack_speed_slow_events": 1,
+		"enemy_attack_speed_slow_magnitude": slow_magnitude,
+		"enemy_attack_speed_slow_duration_s": slow_duration_s
+	})
+	_add_subject_kernel(kernels, "targetability", subject_id, {
+		"untargetable_windows": 1,
+		"untargetable_frames_pct": 0.10,
+		"key_threats_faced": 0,
+		"key_threats_dodged": 0,
+		"cooldown_trade_s": 0.0
+	})
+	return _base_payload(subject_id, _subject_fields({"time_alive_s": 10.0}), kernels, 100.0, [], {})
 
 func _base_payload(subject_id: String, subject_fields: Dictionary, kernels: Dictionary, team_damage: float, extra_allies: Array[Dictionary], derived: Dictionary) -> Dictionary:
 	var subject_unit: Dictionary = _subject_fields(subject_fields)

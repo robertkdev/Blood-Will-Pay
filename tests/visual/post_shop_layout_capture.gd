@@ -36,6 +36,10 @@ func _build_post_shop_state() -> void:
 	if unit_select != null:
 		unit_select.visible = false
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	if combat == null and _main.has_method("_ensure_combat_view"):
+		_main.call("_ensure_combat_view")
+		await _settle_frames(4)
+		combat = _main.get_node_or_null("CombatView") as Control
 	_expect(combat != null, "CombatView missing")
 	if combat == null:
 		return

@@ -1,6 +1,5 @@
 extends Node
 
-const Unit := preload("res://scripts/unit.gd")
 const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
 const STARTING_TEAM_SIZE: int = ShopConfig.DEFAULT_BOARD_CAPACITY
@@ -68,8 +67,9 @@ func reset(clear_max_team: bool = true) -> void:
 	for i in range(bench_slots.size()):
 		var u: Unit = bench_slots[i]
 		if u != null:
-			if Engine.has_singleton("Items") and Items.has_method("remove_all"):
-				Items.remove_all(u)
+			var items: Node = _items_singleton()
+			if items != null and items.has_method("remove_all"):
+				items.call("remove_all", u)
 		bench_slots[i] = null
 	if clear_max_team:
 		var prev: int = max_team_size
@@ -86,6 +86,16 @@ func set_max_team_size(value: int) -> int:
 	max_team_size = target
 	max_team_size_changed.emit(old, max_team_size)
 	return max_team_size
+
+func _items_singleton() -> Node:
+	if Engine.has_singleton("Items"):
+		return Items
+	var loop: MainLoop = Engine.get_main_loop()
+	if loop is SceneTree:
+		var tree: SceneTree = loop as SceneTree
+		if tree.root != null:
+			return tree.root.get_node_or_null("/root/Items")
+	return null
 
 # Returns a union of current on-board team and bench (no duplicates, preserve order: team first).
 func owned_units(current_team: Array = []) -> Array[Unit]:

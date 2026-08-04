@@ -1,6 +1,7 @@
 extends Node
 
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
+const EndlessChapterGenerator := preload("res://scripts/game/progression/endless_chapter_generator.gd")
 const EnemySpawner := preload("res://scripts/game/combat/enemy_spawner.gd")
 const LogSchema := preload("res://scripts/util/log_schema.gd")
 const MirrorBoardStore := preload("res://scripts/game/progression/mirror_board_store.gd")
@@ -35,6 +36,7 @@ func _run() -> void:
 	_validate_procedural_catalog_specs(failures)
 	_validate_seed_variation(failures)
 	_validate_spawner_and_rules(failures)
+	_validate_generated_item_runtime(failures)
 	_validate_mirror_runtime(failures)
 
 	UnitFactory.suppress_validation_warnings = previous_suppress_validation_warnings
@@ -69,19 +71,22 @@ func _validate_chapter_top_bar(failures: Array[String]) -> void:
 	_expect(chapter_label != null, "chapter top bar should create chapter label", failures)
 	if chapter_label != null:
 		_expect(String(chapter_label.text) == "Chapter 1", "chapter top bar label should read Chapter 1, got %s" % chapter_label.text, failures)
-		_expect(String(chapter_label.tooltip_text).contains("Challenge:"), "chapter summary hover should expose upcoming challenge details", failures)
-		_expect(String(chapter_label.tooltip_text).contains("Round 4"), "chapter summary hover should expose later boss round details", failures)
+		_expect(String(chapter_label.tooltip_text) == "", "chapter summary should suppress native tooltip text", failures)
+		_expect(_stage_hover_text(chapter_label).contains("RGA:"), "chapter summary hover should expose upcoming RGA challenge details", failures)
+		_expect(_stage_hover_text(chapter_label).contains("Stage 4"), "chapter summary hover should expose later boss stage details", failures)
 	for stage_index: int in range(1, int(ProgressionConfig.STAGES_PER_CHAPTER) + 1):
 		var icon: TextureRect = top_bar.find_child("StageIcon%d" % stage_index, true, false) as TextureRect
 		_expect(icon != null, "chapter top bar missing stage icon %d" % stage_index, failures)
 		if icon == null:
 			continue
 		_expect(icon.visible, "chapter top bar stage icon %d should be visible" % stage_index, failures)
-		_expect(String(icon.tooltip_text).begins_with(_expected_tooltip_for(stage_index)), "chapter top bar stage %d tooltip mismatch: %s" % [stage_index, icon.tooltip_text], failures)
-		_expect(String(icon.tooltip_text).contains("Enemy:"), "chapter top bar stage %d tooltip should preview enemies: %s" % [stage_index, icon.tooltip_text], failures)
+		var hover_text: String = _stage_hover_text(icon)
+		_expect(String(icon.tooltip_text) == "", "chapter top bar stage %d should suppress native tooltip text" % stage_index, failures)
+		_expect(hover_text.begins_with(_expected_tooltip_for(stage_index)), "chapter top bar stage %d tooltip mismatch: %s" % [stage_index, hover_text], failures)
+		_expect(hover_text.contains("Enemy:"), "chapter top bar stage %d tooltip should preview enemies: %s" % [stage_index, hover_text], failures)
 		if stage_index == int(ProgressionConfig.FIRST_RGA_STAGE) or stage_index == int(ProgressionConfig.SECOND_RGA_STAGE):
-			_expect(String(icon.tooltip_text).contains("Challenge:"), "challenge round %d tooltip should include the challenge label: %s" % [stage_index, icon.tooltip_text], failures)
-			_expect(String(icon.tooltip_text).contains("Plan:"), "RGA stage %d tooltip should include planning puzzle text: %s" % [stage_index, icon.tooltip_text], failures)
+			_expect(hover_text.contains("RGA:"), "RGA stage %d tooltip should include RGA challenge label: %s" % [stage_index, hover_text], failures)
+			_expect(hover_text.contains("Plan:"), "RGA stage %d tooltip should include planning puzzle text: %s" % [stage_index, hover_text], failures)
 		if stage_index == int(ProgressionConfig.SECOND_RGA_STAGE):
 			_expect(icon.texture != null, "chapter top bar selected stage icon should have a texture", failures)
 			if icon.texture != null:
@@ -95,48 +100,18 @@ func _validate_board_capacity_and_odds(failures: Array[String]) -> void:
 	_expect(game_state_node != null, "GameState autoload missing for board capacity probe", failures)
 	_expect(roster_node != null, "Roster autoload missing for board capacity probe", failures)
 	_expect(shop_node != null, "Shop autoload missing for board capacity probe", failures)
-	if game_state_node == null or roster_node == null or shop_node == null:
-		return
-	var original_stage: int = int(game_state_node.get("stage"))
-	var original_chapter: int = int(game_state_node.get("chapter"))
-	var original_stage_in_chapter: int = int(game_state_node.get("stage_in_chapter"))
-	var original_shop_level: int = int(shop_node.call("get_level")) if shop_node.has_method("get_level") else int(ShopConfig.STARTING_LEVEL)
-	var original_shop_snapshot: Dictionary = {}
-	var has_shop_snapshot: bool = shop_node.has_method("snapshot_run_state") and shop_node.has_method("restore_run_state")
-	if has_shop_snapshot:
-		var snapshot_value: Variant = shop_node.call("snapshot_run_state")
-		if snapshot_value is Dictionary:
-			original_shop_snapshot.assign(snapshot_value as Dictionary)
-	var original_max_team_size: int = int(roster_node.get("max_team_size"))
-	var original_bench_slots: Array[Unit] = []
-	var bench_slots_value: Variant = roster_node.get("bench_slots")
-	if bench_slots_value is Array:
-		for unit_value: Variant in bench_slots_value:
-			original_bench_slots.append(unit_value as Unit)
-	if game_state_node.has_method("set_chapter_and_stage"):
+	if game_state_node != null and game_state_node.has_method("set_chapter_and_stage"):
 		game_state_node.call("set_chapter_and_stage", 1, 1)
-	if roster_node.has_method("reset"):
+	if roster_node != null and roster_node.has_method("reset"):
 		roster_node.call("reset")
-	if shop_node.has_method("reset_run"):
+	if shop_node != null and shop_node.has_method("reset_run"):
 		shop_node.call("reset_run")
-	_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY), "new run board cap should start at %d, got %d" % [int(ShopConfig.DEFAULT_BOARD_CAPACITY), int(roster_node.get("max_team_size"))], failures)
-	if shop_node.has_method("set_level"):
+	if roster_node != null:
+		_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY), "new run board cap should start at %d, got %d" % [int(ShopConfig.DEFAULT_BOARD_CAPACITY), int(roster_node.get("max_team_size"))], failures)
+	if shop_node != null and shop_node.has_method("set_level"):
 		shop_node.call("set_level", int(ShopConfig.STARTING_LEVEL) + 1)
-	_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY) + 1, "leveling should add one board slot, got cap %d" % int(roster_node.get("max_team_size")), failures)
-	if shop_node.has_method("set_level"):
-		shop_node.call("set_level", int(ShopConfig.STARTING_LEVEL))
-	var capacity_floor_cases: Array[Dictionary] = [
-		{"stage": int(ShopConfig.CHAPTER_TWO_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_TWO_CAP_FLOOR_TEAM_SIZE)},
-		{"stage": int(ShopConfig.CHAPTER_THREE_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_THREE_CAP_FLOOR_TEAM_SIZE)},
-		{"stage": int(ShopConfig.CHAPTER_FOUR_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_FOUR_CAP_FLOOR_TEAM_SIZE)},
-		{"stage": int(ShopConfig.CHAPTER_FIVE_CAP_FLOOR_STAGE), "expected": int(ShopConfig.CHAPTER_FIVE_CAP_FLOOR_TEAM_SIZE)},
-	]
-	for capacity_case: Dictionary in capacity_floor_cases:
-		var floor_stage: int = int(capacity_case.get("stage", 0))
-		var expected_capacity: int = int(capacity_case.get("expected", 0))
-		game_state_node.call("set_stage", floor_stage)
-		var observed_capacity: int = int(roster_node.get("max_team_size"))
-		_expect(observed_capacity == expected_capacity, "global stage %d should apply exact automatic board capacity %d, got %d" % [floor_stage, expected_capacity, observed_capacity], failures)
+	if roster_node != null:
+		_expect(int(roster_node.get("max_team_size")) == int(ShopConfig.DEFAULT_BOARD_CAPACITY) + 1, "leveling should add one board slot, got cap %d" % int(roster_node.get("max_team_size")), failures)
 	var player: Unit = UnitFactory.spawn("bonko")
 	var enemy: Unit = UnitFactory.spawn("beegle")
 	_expect(player != null and enemy != null, "odds probe should spawn bonko and beegle", failures)
@@ -145,23 +120,13 @@ func _validate_board_capacity_and_odds(failures: Array[String]) -> void:
 		var enemy_team: Array[Unit] = [enemy]
 		var evenish_odds: int = TeamOddsEstimator.estimate_win_percent(player_team, enemy_team)
 		_expect(evenish_odds > 0 and evenish_odds < 100, "odds should be bounded 1..99, got %d" % evenish_odds, failures)
-		var level_spec: Dictionary = StageTypes.make_spec(["bonko"], StageTypes.KIND_NORMAL, {"levels": {0: 4, "bonko": 4}})
-		StageRuleRunner.post_spawn(player_team, level_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.FIRST_RGA_STAGE)
+		player.level = 4
 		var stronger_odds: int = TeamOddsEstimator.estimate_win_percent(player_team, enemy_team)
 		_expect(stronger_odds > evenish_odds, "unit level should improve displayed odds, before=%d after=%d" % [evenish_odds, stronger_odds], failures)
-	if game_state_node.has_method("set_chapter_and_stage"):
-		game_state_node.call("set_chapter_and_stage", original_chapter, original_stage_in_chapter)
-	elif game_state_node.has_method("set_stage"):
-		game_state_node.call("set_stage", original_stage)
-	if has_shop_snapshot:
-		shop_node.call("restore_run_state", original_shop_snapshot)
-	elif shop_node.has_method("set_level"):
-		shop_node.call("set_level", original_shop_level)
-	roster_node.set("bench_slots", original_bench_slots)
-	if roster_node.has_method("set_max_team_size"):
-		roster_node.call("set_max_team_size", original_max_team_size)
-	else:
-		roster_node.set("max_team_size", original_max_team_size)
+	if shop_node != null and shop_node.has_method("reset_run"):
+		shop_node.call("reset_run")
+	if roster_node != null and roster_node.has_method("reset"):
+		roster_node.call("reset")
 
 func _autoload_node(autoload_name: String) -> Node:
 	var root: Window = get_tree().root
@@ -176,9 +141,17 @@ func _validate_procedural_catalog_specs(failures: Array[String]) -> void:
 		_expect(_specs_equivalent(first_spec, second_spec), "procedural spec should be stable for repeated catalog calls chapter=%d stage=%d" % [FIRST_PROCEDURAL_CHAPTER, stage_index], failures)
 		_validate_generated_spec(FIRST_PROCEDURAL_CHAPTER, stage_index, first_spec, failures)
 	var opener: Dictionary = RosterCatalog.get_spec(FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.CREEP_STAGE)
+	var opener_ids: Array = opener.get(StageTypes.KEY_IDS, []) if opener.get(StageTypes.KEY_IDS, []) is Array else []
 	var opener_rules: Dictionary = opener.get(StageTypes.KEY_RULES, {})
-	_expect(int(opener_rules.get("target_rating", 0)) == int(ProgressionConfig.EASIEST_REFERENCE_RATING), "chapter 1 round 1 target rating should use easiest reference", failures)
-	_expect(int(opener_rules.get("difficulty_rating", 0)) == int(ProgressionConfig.EASIEST_REFERENCE_RATING), "chapter 1 round 1 difficulty rating should match easiest reference", failures)
+	_expect(opener_ids.size() >= EndlessChapterGenerator.MIN_CREEP_STAGE_UNITS, "chapter 1 round 1 should spawn multiple creep reward enemies, got %s" % JSON.stringify(opener_ids), failures)
+	var opener_target: int = EndlessChapterGenerator.target_rating_for(FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.CREEP_STAGE)
+	_expect(int(opener_rules.get("target_rating", 0)) == opener_target, "chapter 1 round 1 target rating should use generated creep target, got %s" % JSON.stringify(opener_rules), failures)
+	_expect(int(opener_rules.get("difficulty_rating", 0)) == opener_target, "chapter 1 round 1 difficulty rating should match generated creep target, got %s" % JSON.stringify(opener_rules), failures)
+	if int(opener_rules.get("raw_unit_rating", 0)) > opener_target:
+		_expect(float(opener_rules.get("stat_scale", 1.0)) < 1.0, "chapter 1 round 1 should scale raw creep pressure down to target, got %s" % JSON.stringify(opener_rules), failures)
+	var first_boss: Dictionary = RosterCatalog.get_spec(FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.BOSS_STAGE)
+	var first_boss_rules: Dictionary = first_boss.get(StageTypes.KEY_RULES, {}) if typeof(first_boss.get(StageTypes.KEY_RULES, {})) == TYPE_DICTIONARY else {}
+	_expect(float(first_boss_rules.get("stat_scale", 1.0)) <= EndlessChapterGenerator.FIRST_BOSS_STAT_SCALE_CAP + 0.001, "chapter 1 boss stat_scale should stay under first-boss cap, got %s" % JSON.stringify(first_boss_rules), failures)
 	_validate_generated_spec(FIRST_PROCEDURAL_CHAPTER + 1, ProgressionConfig.SECOND_RGA_STAGE, RosterCatalog.get_spec(FIRST_PROCEDURAL_CHAPTER + 1, ProgressionConfig.SECOND_RGA_STAGE), failures)
 
 func _validate_seed_variation(failures: Array[String]) -> void:
@@ -224,6 +197,22 @@ func _validate_spawner_and_rules(failures: Array[String]) -> void:
 		for unit: Unit in units:
 			_expect(unit != null, "spawner returned null unit for procedural stage %d" % stage_index, failures)
 
+func _validate_generated_item_runtime(failures: Array[String]) -> void:
+	var chapter: int = FIRST_PROCEDURAL_CHAPTER + 8
+	var stage_index: int = ProgressionConfig.BOSS_STAGE
+	var spec: Dictionary = RosterCatalog.get_spec(chapter, stage_index)
+	var rules: Dictionary = spec.get(StageTypes.KEY_RULES, {}) if typeof(spec.get(StageTypes.KEY_RULES, {})) == TYPE_DICTIONARY else {}
+	_expect(int(rules.get("item_pressure_rating", 0)) > 0, "later generated boss should include item pressure", failures)
+	_expect(_item_count_from_rules(rules) > 0, "later generated boss should include item loadouts", failures)
+	var spawner: EnemySpawner = EnemySpawner.new()
+	StageRuleRunner.pre_spawn(spec, chapter, stage_index)
+	var units: Array[Unit] = spawner.build_for_spec(spec, chapter, stage_index)
+	StageRuleRunner.post_spawn(units, spec, chapter, stage_index)
+	var equipped_count: int = 0
+	for unit: Unit in units:
+		equipped_count += _equipped_items(unit).size()
+	_expect(equipped_count == _item_count_from_rules(rules), "generated item loadouts should equip through StageRuleRunner expected=%d got=%d" % [_item_count_from_rules(rules), equipped_count], failures)
+
 func _validate_mirror_runtime(failures: Array[String]) -> void:
 	var source_units: Array[Unit] = []
 	var first: Unit = UnitFactory.spawn("sari")
@@ -234,23 +223,32 @@ func _validate_mirror_runtime(failures: Array[String]) -> void:
 		first.level = 4
 		first.max_hp = 777
 		first.hp = first.max_hp
+		_force_items(first, ["hammer", "crystal"])
 		source_units.append(first)
 	if second != null:
 		second.level = 3
 		second.max_hp = 555
 		second.hp = second.max_hp
+		_force_items(second, ["plate"])
 		source_units.append(second)
-	MirrorBoardStore.capture_boss_board(FIRST_PROCEDURAL_CHAPTER, source_units)
+	var source_positions: Array[Vector2] = [Vector2(80.0, 120.0), Vector2(144.0, 184.0)]
+	MirrorBoardStore.capture_boss_board(FIRST_PROCEDURAL_CHAPTER, source_units, source_positions)
+	_expect(_same_vectors(MirrorBoardStore.snapshot_positions(FIRST_PROCEDURAL_CHAPTER), source_positions), "procedural mirror should preserve boss-entry snapshot positions", failures)
 	var mirror_spec: Dictionary = RosterCatalog.get_spec(FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
 	StageRuleRunner.pre_spawn(mirror_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
 	_expect(_same_strings(_spec_ids(mirror_spec), ["sari", "paisley"]), "procedural mirror pre-spawn should use boss-entry snapshot ids", failures)
+	var mirror_rules: Dictionary = mirror_spec.get(StageTypes.KEY_RULES, {}) if typeof(mirror_spec.get(StageTypes.KEY_RULES, {})) == TYPE_DICTIONARY else {}
+	_expect(not mirror_rules.has("mirror_power_scale"), "procedural mirror should not tune copied board power", failures)
+	_expect(not mirror_rules.has("mirror_copy_items"), "procedural mirror should not override copied item loadouts", failures)
 	var spawner: EnemySpawner = EnemySpawner.new()
 	var enemies: Array[Unit] = spawner.build_for_spec(mirror_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
 	StageRuleRunner.post_spawn(enemies, mirror_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
 	_expect(enemies.size() == 2, "procedural mirror should spawn snapshot enemy count", failures)
 	if enemies.size() >= 2:
-		_expect(String(enemies[0].id) == "sari" and int(enemies[0].level) == 4 and int(enemies[0].max_hp) == 777, "procedural mirror first unit did not copy snapshot stats", failures)
-		_expect(String(enemies[1].id) == "paisley" and int(enemies[1].level) == 3 and int(enemies[1].max_hp) == 555, "procedural mirror second unit did not copy snapshot stats", failures)
+		_expect(String(enemies[0].id) == "sari" and int(enemies[0].level) == 4 and int(enemies[0].max_hp) == 777, "procedural mirror first unit did not exactly copy snapshot stats", failures)
+		_expect(String(enemies[1].id) == "paisley" and int(enemies[1].level) == 3 and int(enemies[1].max_hp) == 555, "procedural mirror second unit did not exactly copy snapshot stats", failures)
+		_expect(_same_strings(_equipped_items(enemies[0]), ["hammer", "crystal"]), "procedural mirror first unit should copy item loadout", failures)
+		_expect(_same_strings(_equipped_items(enemies[1]), ["plate"]), "procedural mirror second unit should copy item loadout", failures)
 
 func _expected_kind_for(stage_index: int) -> String:
 	if stage_index == int(ProgressionConfig.CREEP_STAGE):
@@ -263,16 +261,21 @@ func _expected_kind_for(stage_index: int) -> String:
 
 func _expected_tooltip_for(stage_index: int) -> String:
 	if stage_index == int(ProgressionConfig.CREEP_STAGE):
-		return "Round 1: Creeps"
+		return "Stage 1: Creeps"
 	if stage_index == int(ProgressionConfig.FIRST_RGA_STAGE):
-		return "Round 2: Challenge"
+		return "Stage 2: Challenge"
 	if stage_index == int(ProgressionConfig.SECOND_RGA_STAGE):
-		return "Round 3: Challenge"
+		return "Stage 3: Challenge"
 	if stage_index == int(ProgressionConfig.BOSS_STAGE):
-		return "Round 4: Boss"
+		return "Stage 4: Boss"
 	if stage_index == int(ProgressionConfig.MIRROR_STAGE):
-		return "Round 5: Mirror"
+		return "Stage 5: Mirror"
 	return ""
+
+func _stage_hover_text(control: Control) -> String:
+	if control == null:
+		return ""
+	return String(control.get_meta("stage_hover_text", ""))
 
 func _chapter_signature(chapter: int) -> String:
 	var parts: Array[String] = []
@@ -315,6 +318,44 @@ func _same_strings(left: Array[String], right: Array[String]) -> bool:
 		if String(left[i]) != String(right[i]):
 			return false
 	return true
+
+func _same_vectors(left: Array[Vector2], right: Array[Vector2]) -> bool:
+	if left.size() != right.size():
+		return false
+	for i: int in range(left.size()):
+		if not left[i].is_equal_approx(right[i]):
+			return false
+	return true
+
+func _item_count_from_rules(rules: Dictionary) -> int:
+	var total: int = 0
+	var items_value: Variant = rules.get("items", {})
+	if typeof(items_value) != TYPE_DICTIONARY:
+		return total
+	var items: Dictionary = items_value
+	for key: Variant in items.keys():
+		var raw: Variant = items[key]
+		if raw is Array:
+			var raw_items: Array = raw
+			total += raw_items.size()
+		elif raw != null:
+			total += 1
+	return total
+
+func _force_items(unit: Unit, ids: Array[String]) -> void:
+	var items: Variant = _autoload_node("Items")
+	if items != null and items.has_method("force_set_equipped"):
+		items.call("force_set_equipped", unit, ids)
+
+func _equipped_items(unit: Unit) -> Array[String]:
+	var out: Array[String] = []
+	var items: Variant = _autoload_node("Items")
+	if items != null and items.has_method("get_equipped"):
+		var raw: Variant = items.call("get_equipped", unit)
+		if raw is Array:
+			for item_id: Variant in raw:
+				out.append(String(item_id))
+	return out
 
 func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:

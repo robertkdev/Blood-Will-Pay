@@ -89,7 +89,7 @@ func _run() -> void:
 
 func _audit_all_starter_geometries(layout_name: String) -> void:
 	var buttons: Array[Button] = _all_unit_buttons()
-	_expect(not buttons.is_empty(), "%s audit expected at least one currently available starter button" % layout_name)
+	_expect(buttons.size() == 14, "%s audit expected 14 starter buttons, got %d" % [layout_name, buttons.size()])
 	for button: Button in buttons:
 		button.emit_signal("mouse_entered")
 		await _settle_frames(2)
@@ -122,7 +122,7 @@ func _expect_neutral_preview(context: String) -> void:
 	var identity_panel: Control = _identity_panel()
 	var start_button: Button = _start_button()
 	_expect(_view != null and _view.selected_id == "", "%s Unit Select should not have a selected unit" % context)
-	_expect(selected_label != null and String(selected_label.text) == "No starter chosen", "%s preview title should be neutral" % context)
+	_expect(selected_label != null and String(selected_label.text) == "No champion chosen", "%s preview title should be neutral" % context)
 	_expect(details_label != null and String(details_label.text) == "Hover a unit to preview", "%s preview help should be neutral" % context)
 	_expect(preview_art != null and preview_art.texture == null, "%s preview art should be empty" % context)
 	_expect(identity_panel != null and identity_panel.visible, "%s identity summary slot should remain reserved" % context)
@@ -152,7 +152,7 @@ func _expect_selected_preview() -> void:
 	var identity_panel: Control = _identity_panel()
 	var start_button: Button = _start_button()
 	_expect(_view != null and _view.selected_id != "", "selected preview should set selected_id")
-	_expect(selected_label != null and String(selected_label.text) != "No starter chosen", "selected preview should show chosen unit title")
+	_expect(selected_label != null and String(selected_label.text) != "No champion chosen", "selected preview should show chosen unit title")
 	_expect(selected_label != null and not String(selected_label.text).begins_with("Inspecting "), "selected preview should not use inspecting copy")
 	_expect(details_label != null and String(details_label.text).find("Attack:") >= 0, "selected preview should show attack details")
 	_expect(details_label != null and String(details_label.text).find("Ability:") >= 0, "selected preview should show ability details")

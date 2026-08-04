@@ -34,11 +34,24 @@ static func _coerced_thresholds(def: TraitDef) -> Array[int]:
 # Returns { counts: {trait->count}, tiers: {trait->tierIndex}, thresholds: {trait->thresholds(Array[int])} }
 static func compile(units: Array[Unit]) -> Dictionary:
 	var counts: Dictionary = {}                # Dictionary[String, int]
-	for u in units:
+	var seen_by_trait: Dictionary = {}         # Dictionary[String, Dictionary[String, bool]]
+	for unit_index: int in range(units.size()):
+		var u: Unit = units[unit_index]
 		if u == null:
 			continue
+		var unit_key: String = String(u.id).strip_edges()
+		if unit_key == "":
+			unit_key = "instance_%d" % u.get_instance_id()
 		for t in u.traits:
-			var key := String(t)
+			var key: String = String(t)
+			if key == "":
+				continue
+			if not seen_by_trait.has(key):
+				seen_by_trait[key] = {}
+			var seen_units: Dictionary = seen_by_trait[key]
+			if seen_units.has(unit_key):
+				continue
+			seen_units[unit_key] = true
 			counts[key] = int(counts.get(key, 0)) + 1
 
 	var tiers: Dictionary = {}                 # Dictionary[String, int]

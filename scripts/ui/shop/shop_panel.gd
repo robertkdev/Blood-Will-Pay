@@ -5,11 +5,11 @@ signal first_fight_placeholder_pressed()
 
 const UI := preload("res://scripts/constants/ui_constants.gd")
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
-const SHOP_CARD_SCENE_PATH: String = "res://scenes/ui/shop/ShopCard.tscn"
+const ShopCardScene := preload("res://scenes/ui/shop/ShopCard.tscn")
 const ShopOffer := preload("res://scripts/game/shop/shop_offer.gd")
-const EmptySigilTexture: Texture2D = preload("res://assets/ui/gold icon.png")
+const TextureUtils: GDScript = preload("res://scripts/util/texture_utils.gd")
+const EMPTY_SIGIL_TEXTURE_PATH: String = "res://assets/ui/gold icon.png"
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
-const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const OPENING_FIGHT_MESSAGE: String = "Opening fight is fixed. Win it to unlock the shop."
 const NORMAL_GRID_MIN_SIZE: Vector2 = Vector2(790.0, 124.0)
 const OPENING_GRID_MIN_SIZE: Vector2 = Vector2(560.0, 108.0)
@@ -22,8 +22,6 @@ var _cards: Array = []
 var _empty_label_text: String = "LEDGER"
 var _empty_hint_text: String = "Reroll to reveal"
 var _single_empty_state: bool = false
-var _shop_card_scene: PackedScene = null
-var _safe_gutter_layout_queued: bool = false
 
 func configure(grid: GridContainer, slot_count: int = ShopConfig.SLOT_COUNT) -> void:
     _grid = grid
@@ -32,22 +30,14 @@ func configure(grid: GridContainer, slot_count: int = ShopConfig.SLOT_COUNT) -> 
     if _grid and _grid.has_method("set"):
         _grid.columns = _slot_count
         _grid.custom_minimum_size = Vector2(max(_grid.custom_minimum_size.x, NORMAL_GRID_MIN_SIZE.x), _normal_grid_height())
-        var resize_callable: Callable = Callable(self, "_queue_safe_gutter_layout")
-        if not _grid.resized.is_connected(resize_callable):
-            _grid.resized.connect(resize_callable)
 
 func get_host_container() -> Container:
     return _host_container
 
 func clear() -> void:
     if _grid != null and is_instance_valid(_grid):
-        var resize_callable: Callable = Callable(self, "_queue_safe_gutter_layout")
-        if _grid.resized.is_connected(resize_callable):
-            _grid.resized.disconnect(resize_callable)
         for c in _grid.get_children():
             if c is Node:
-                if c.has_method("clear_transient_state"):
-                    c.call("clear_transient_state")
                 _grid.remove_child(c)
                 c.free()
     _cards.clear()
@@ -66,8 +56,6 @@ func set_offers(offers: Array) -> void:
         return
     for c in _grid.get_children():
         if c is Node:
-            if c.has_method("clear_transient_state"):
-                c.call("clear_transient_state")
             c.queue_free()
     _cards.clear()
     _grid.columns = 1 if _single_empty_state and offers.is_empty() else _slot_count
@@ -99,9 +87,7 @@ func set_offers(offers: Array) -> void:
                 props = {
                     "id": String(off.id),
                     "name": String(off.name),
-                    "price": int(off.price) if int(off.price) > 0 else int(off.cost),
-                    "package_level": int(off.package_level),
-                    "package_kind": String(off.package_kind),
+                    "price": int(off.cost),
                     "image_path": String(off.sprite_path),
                     "role": _role_text(roles, primary_role),
                     "roles": roles,
@@ -133,63 +119,11 @@ func set_offers(offers: Array) -> void:
 
     if opening_state:
         _grid.add_child(_make_empty())
-        _queue_safe_gutter_layout()
         return
 
     while shown < _slot_count:
         _grid.add_child(_make_empty())
         shown += 1
-    _queue_safe_gutter_layout()
-
-func _queue_safe_gutter_layout() -> void:
-    if _grid == null or _safe_gutter_layout_queued:
-        return
-    _safe_gutter_layout_queued = true
-    call_deferred("_defer_safe_gutter_layout")
-
-func _defer_safe_gutter_layout() -> void:
-    call_deferred("_apply_safe_gutter_layout")
-
-func _apply_safe_gutter_layout() -> void:
-    _safe_gutter_layout_queued = false
-    if _grid == null or not is_instance_valid(_grid):
-        return
-    var viewport_size: Vector2 = _grid.get_viewport_rect().size
-    var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
-    var compact: bool = viewport_size.y <= 1080.0 or viewport_size.x <= 1400.0
-    var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0 or (ui_scale >= 1.25 and viewport_size.y <= 720.0)
-    var card_height: float = 54.0 if tight_compact else 80.0 if compact else 122.0
-    var safe_gutter: float = 8.0 if compact else 16.0
-    _grid.add_theme_constant_override("h_separation", 6 if tight_compact else 12 if compact else 16)
-    if _host_container is VBoxContainer:
-        (_host_container as VBoxContainer).add_theme_constant_override("separation", 6 if tight_compact else 10)
-    for child: Node in _grid.get_children():
-        var card: Control = child as Control
-        if card == null:
-            continue
-        if bool(card.get_meta("opening_fight_placeholder", false)):
-            card.custom_minimum_size.y = 42.0 if tight_compact else 72.0 if compact else 92.0
-        else:
-            card.custom_minimum_size.y = card_height
-        card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-        card.set_meta("shop_safe_bottom_gutter", safe_gutter)
-    _grid.set_meta("safe_bottom_gutter", safe_gutter)
-    _grid.set_meta("shop_cards_reflowed", true)
-    _grid.queue_sort()
-    call_deferred("_clamp_shop_backplate")
-
-func _clamp_shop_backplate() -> void:
-    if _grid == null or not is_instance_valid(_grid) or _grid.get_tree() == null:
-        return
-    var plate: Control = _grid.get_tree().root.find_child("GothicShopPlate", true, false) as Control
-    if plate == null or not plate.visible:
-        return
-    var viewport_rect: Rect2 = _grid.get_viewport().get_visible_rect()
-    var plate_rect: Rect2 = plate.get_global_rect()
-    var bottom_overflow: float = plate_rect.end.y - viewport_rect.end.y
-    if bottom_overflow > 0.0:
-        plate.size.y = maxf(0.0, plate.size.y - bottom_overflow)
-        plate.set_meta("viewport_bottom_clamped", true)
 
 func _normal_grid_height() -> float:
     if _grid == null:
@@ -203,11 +137,10 @@ func _is_compact_viewport() -> bool:
     return viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
 
 func _make_card(offer, index: int) -> Control:
-    var shop_card_scene: PackedScene = _get_shop_card_scene()
-    if shop_card_scene != null:
+    if ShopCardScene:
         if offer is ShopOffer and String(offer.id) == "":
             return _make_sold()
-        var card: Control = shop_card_scene.instantiate() as Control
+        var card: Control = ShopCardScene.instantiate() as Control
         if card and card.has_method("set_slot_index"):
             card.set_slot_index(index)
         return card
@@ -215,11 +148,6 @@ func _make_card(offer, index: int) -> Control:
     placeholder.custom_minimum_size = Vector2(UI.TILE_SIZE * 2, UI.TILE_SIZE + 24)
     placeholder.color = Color(0.1, 0.1, 0.12, 0.4)
     return placeholder
-
-func _get_shop_card_scene() -> PackedScene:
-    if _shop_card_scene == null:
-        _shop_card_scene = ResourceLoader.load(SHOP_CARD_SCENE_PATH, "PackedScene") as PackedScene
-    return _shop_card_scene
 
 func _make_empty() -> Control:
     return _make_placeholder(false)
@@ -256,7 +184,7 @@ func _make_placeholder(sold: bool) -> Control:
     wrap.add_child(stack)
 
     var icon: TextureRect = TextureRect.new()
-    icon.texture = EmptySigilTexture
+    icon.texture = TextureUtils.try_load_texture(EMPTY_SIGIL_TEXTURE_PATH)
     icon.custom_minimum_size = Vector2(38.0, 38.0) if first_fight_placeholder or compact else Vector2(44.0, 44.0)
     icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

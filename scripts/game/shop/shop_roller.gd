@@ -12,6 +12,10 @@ func configure(catalog: UnitCatalog, rng: ShopRng) -> void:
 	_catalog = catalog
 	_rng = rng
 
+func clear_runtime() -> void:
+	_catalog = null
+	_rng = null
+
 func roll(level: int, count: int = ShopConfig.SLOT_COUNT) -> Array[ShopOffer]:
 	# Generate up to `count` offers using odds by level and the unit catalog.
 	var out: Array[ShopOffer] = []
@@ -61,20 +65,23 @@ func roll_opening_for_starter(starter_id: String, level: int, count: int = ShopC
 		return offers
 	_replace_blocked_opening_helpers(starter_id, offers, helper_ids)
 	var existing_index: int = _index_of_any_offer(offers, helper_ids)
+	if existing_index == 0:
+		return offers
 	if existing_index > 0:
 		var existing_helper: ShopOffer = offers[existing_index]
 		offers[existing_index] = offers[0]
 		offers[0] = existing_helper
-	elif existing_index == -1:
-		var helper_id: String = _pick_opening_helper_id(helper_ids)
-		if helper_id != "":
-			var helper_offer: ShopOffer = _offer_for_id(helper_id)
-			if helper_offer != null:
-				if offers.size() < int(count):
-					offers.insert(0, helper_offer)
-				else:
-					offers[0] = helper_offer
-	_ensure_opening_choice_diversity(starter_id, offers, helper_ids)
+		return offers
+	var helper_id: String = _pick_opening_helper_id(helper_ids)
+	if helper_id == "":
+		return offers
+	var helper_offer: ShopOffer = _offer_for_id(helper_id)
+	if helper_offer == null:
+		return offers
+	if offers.size() < int(count):
+		offers.insert(0, helper_offer)
+	else:
+		offers[0] = helper_offer
 	return offers
 
 func _replace_blocked_opening_helpers(starter_id: String, offers: Array[ShopOffer], helper_ids: Array[String]) -> void:
@@ -85,99 +92,10 @@ func _replace_blocked_opening_helpers(starter_id: String, offers: Array[ShopOffe
 		var offer: ShopOffer = offers[index]
 		if offer == null or not blocked_ids.has(String(offer.id)):
 			continue
-		var replacement_id: String = _pick_opening_replacement_id(starter_id, int(offer.cost), helper_ids, offers)
+		var replacement_id: String = _pick_opening_helper_id(helper_ids)
 		var replacement_offer: ShopOffer = _offer_for_id(replacement_id)
 		if replacement_offer != null:
 			offers[index] = replacement_offer
-
-func _ensure_opening_choice_diversity(starter_id: String, offers: Array[ShopOffer], helper_ids: Array[String]) -> void:
-	if offers.size() < 2:
-		return
-	var unique_ids: Array[String] = _unique_offer_ids(offers)
-	if unique_ids.size() >= 2:
-		return
-	var repeated_id: String = unique_ids[0] if not unique_ids.is_empty() else ""
-	if repeated_id == "":
-		return
-	var repeated_offer: ShopOffer = offers[0]
-	if repeated_offer == null:
-		return
-	var candidate_ids: Array[String] = _opening_non_helper_ids(starter_id, int(repeated_offer.cost), helper_ids, repeated_id)
-	if candidate_ids.is_empty():
-		candidate_ids = _opening_alternative_ids(starter_id, int(repeated_offer.cost), repeated_id)
-	if candidate_ids.is_empty():
-		return
-	var replacement_id: String = _pick_lowest_usage_id(candidate_ids, offers)
-	var replacement_offer: ShopOffer = _offer_for_id(replacement_id)
-	if replacement_offer == null:
-		return
-	for index: int in range(1, offers.size()):
-		var offer: ShopOffer = offers[index]
-		if offer != null and String(offer.id) == repeated_id:
-			offers[index] = replacement_offer
-			return
-
-func _pick_opening_replacement_id(starter_id: String, cost: int, helper_ids: Array[String], offers: Array[ShopOffer]) -> String:
-	var blocked_ids: Array[String] = _opening_blocked_helper_ids(starter_id)
-	var preferred_ids: Array[String] = []
-	var fallback_ids: Array[String] = []
-	for candidate_id: String in _catalog.get_ids_by_cost(cost):
-		if blocked_ids.has(candidate_id):
-			continue
-		fallback_ids.append(candidate_id)
-		if not helper_ids.has(candidate_id) or _offer_id_count(offers, candidate_id) == 0:
-			preferred_ids.append(candidate_id)
-	var candidates: Array[String] = preferred_ids if not preferred_ids.is_empty() else fallback_ids
-	return _pick_lowest_usage_id(candidates, offers)
-
-func _opening_non_helper_ids(starter_id: String, cost: int, helper_ids: Array[String], excluded_id: String) -> Array[String]:
-	var blocked_ids: Array[String] = _opening_blocked_helper_ids(starter_id)
-	var candidates: Array[String] = []
-	for candidate_id: String in _catalog.get_ids_by_cost(cost):
-		if candidate_id == excluded_id or blocked_ids.has(candidate_id) or helper_ids.has(candidate_id):
-			continue
-		candidates.append(candidate_id)
-	return candidates
-
-func _opening_alternative_ids(starter_id: String, cost: int, excluded_id: String) -> Array[String]:
-	var blocked_ids: Array[String] = _opening_blocked_helper_ids(starter_id)
-	var candidates: Array[String] = []
-	for candidate_id: String in _catalog.get_ids_by_cost(cost):
-		if candidate_id == excluded_id or blocked_ids.has(candidate_id):
-			continue
-		candidates.append(candidate_id)
-	return candidates
-
-func _pick_lowest_usage_id(candidate_ids: Array[String], offers: Array[ShopOffer]) -> String:
-	if candidate_ids.is_empty():
-		return ""
-	var min_count: int = 2147483647
-	var least_used_ids: Array[String] = []
-	for candidate_id: String in candidate_ids:
-		var usage_count: int = _offer_id_count(offers, candidate_id)
-		if usage_count < min_count:
-			min_count = usage_count
-			least_used_ids.clear()
-			least_used_ids.append(candidate_id)
-		elif usage_count == min_count:
-			least_used_ids.append(candidate_id)
-	if _rng != null:
-		return String(_rng.pick(least_used_ids))
-	return least_used_ids[0]
-
-func _offer_id_count(offers: Array[ShopOffer], candidate_id: String) -> int:
-	var count: int = 0
-	for offer: ShopOffer in offers:
-		if offer != null and String(offer.id) == candidate_id:
-			count += 1
-	return count
-
-func _unique_offer_ids(offers: Array[ShopOffer]) -> Array[String]:
-	var unique_ids: Array[String] = []
-	for offer: ShopOffer in offers:
-		if offer != null and not unique_ids.has(String(offer.id)):
-			unique_ids.append(String(offer.id))
-	return unique_ids
 
 func _pick_id_for_cost(cost: int, allow_dupes: bool, used: Dictionary) -> String:
 	var ids: Array[String] = _catalog.get_ids_by_cost(cost)

@@ -168,13 +168,6 @@ func _refresh_progress() -> void:
 		if Shop and Shop.has_method("get_xp_to_next"):
 			need = int(Shop.get_xp_to_next())
 	_buttons.set_progress(lvl, xp, need)
-	var reroll_price: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
-	var progression_price: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
-	var progression_mode: String = String(Shop.get_progression_mode()) if _has_shop() and Shop.has_method("get_progression_mode") else "xp"
-	var command_rank: int = int(Shop.get_command_rank()) if _has_shop() and Shop.has_method("get_command_rank") else 0
-	_buttons.set_action_prices(reroll_price, progression_price, progression_mode, command_rank)
-	var progression_available: bool = bool(Shop.can_purchase_progression()) if _has_shop() and Shop.has_method("can_purchase_progression") else true
-	_buttons.set_progression_available(progression_available, progression_mode)
 
 func _on_economy_changed(_v := 0) -> void:
 	_refresh_cards_state()
@@ -226,11 +219,10 @@ func _refresh_cards_state() -> void:
 		if c is ShopCard:
 			var sc: ShopCard = c
 			# affordability tint only
-			var price: int = 0
+			var price := 0
 			if Shop and Shop.state and idx < Shop.state.offers.size():
-				var off: Variant = Shop.state.offers[idx]
-				if off != null:
-					price = int(off.price) if int(off.price) > 0 else int(off.cost)
+				var off = Shop.state.offers[idx]
+				price = int(off.cost) if off != null else 0
 			var aff := ShopAffordability.can_afford(gold, bet, price, in_combat, spent)
 			var affordable: bool = bool(aff.get("ok", false))
 			sc.set_affordable(affordable)
@@ -263,7 +255,7 @@ func _refresh_cards_state() -> void:
 	if forced_first_fight or in_combat:
 		return
 	if _buttons:
-		var r_cost: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
+		var r_cost: int = int(ShopConfig.REROLL_COST)
 		var aff_r := ShopAffordability.can_afford(gold, bet, r_cost, in_combat, spent)
 		var msg_r := ""
 		if not bool(aff_r.get("ok", false)):
@@ -277,7 +269,7 @@ func _refresh_cards_state() -> void:
 				msg_r = "Not enough gold"
 		_buttons.set_reroll_tooltip(msg_r)
 
-		var x_cost: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
+		var x_cost: int = int(ShopConfig.BUY_XP_COST)
 		var aff_x := ShopAffordability.can_afford(gold, bet, x_cost, in_combat, spent)
 		var msg_x := ""
 		if not bool(aff_x.get("ok", false)):
@@ -293,16 +285,6 @@ func _refresh_cards_state() -> void:
 
 func _on_card_clicked(slot_index: int) -> void:
 	if not _has_shop():
-		return
-	# A rapid click can arrive after the card was consumed and before the next
-	# offer render. Treat that stale UI event as a no-op instead of sending an
-	# empty id through the transaction/factory path.
-	if Shop.state == null or slot_index < 0 or slot_index >= Shop.state.offers.size():
-		_refresh_cards_state()
-		return
-	var offer_value: Variant = Shop.state.offers[slot_index]
-	if offer_value == null or String(offer_value.id).strip_edges() == "":
-		_refresh_cards_state()
 		return
 	if _is_forced_first_fight():
 		_show_message(OPENING_FIGHT_MESSAGE, 2.0)
@@ -414,13 +396,32 @@ func get_button_bar() -> HBoxContainer:
 func _ensure_message_label() -> void:
 	if _message_label and is_instance_valid(_message_label):
 		return
-	var host := (_panel.get_host_container() if _panel else null)
+	var host: Control = _parent as Control
+	if host == null and _panel != null:
+		host = _panel.get_host_container()
 	if host == null:
 		return
 	_message_label = Label.new()
+	_message_label.name = "ShopMessageOverlay"
 	_message_label.modulate = Color(1,0.6,0.6,0.95)
+	_message_label.visible = false
+	_message_label.z_index = 175
+	_message_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_message_label.anchor_left = 0.5
+	_message_label.anchor_right = 0.5
+	_message_label.anchor_top = 1.0
+	_message_label.anchor_bottom = 1.0
+	_message_label.offset_left = -260.0
+	_message_label.offset_right = 260.0
+	_message_label.offset_top = -214.0
+	_message_label.offset_bottom = -174.0
+	_message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_message_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_message_label.add_theme_font_size_override("font_size", 15)
+	_message_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.56, 0.98))
+	_message_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
+	_message_label.add_theme_constant_override("outline_size", 2)
 	host.add_child(_message_label)
-	host.move_child(_message_label, 1) # below buttons
 	if _message_timer == null or not is_instance_valid(_message_timer):
 		_message_timer = Timer.new()
 		_message_timer.one_shot = true
