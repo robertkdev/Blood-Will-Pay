@@ -186,7 +186,7 @@ func _apply_display_mode() -> void:
 		sprite.offset_top = 14.0 if _bench_mode else 0.0
 		sprite.offset_right = -7.0 if _bench_mode else 0.0
 		sprite.offset_bottom = -5.0 if _bench_mode else 0.0
-		sprite.modulate = Color(0.94, 0.90, 0.82, 1.0) if _bench_mode else Color(1.0, 1.0, 1.0, 1.0)
+		sprite.modulate = Color(0.94, 0.90, 0.82, 1.0) if _bench_mode else Color(1.16, 1.12, 1.06, 1.0)
 	_set_bars_visible(_bench_mode)
 
 func _set_bars_visible(visible_bars: bool) -> void:

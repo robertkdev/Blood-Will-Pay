@@ -11,7 +11,7 @@ const ROUND_PLANS: Array[Dictionary] = [
 		"label": "round_2_frontline_pair",
 		"offers": ["morrak", "grint", "mortem", "korath", "sari"],
 		"buy_xp": 1,
-		"buy": ["morrak"],
+		"buy": ["morrak", "grint"],
 		"gold": 16,
 		"min_stage_after": 3,
 	},
@@ -19,7 +19,7 @@ const ROUND_PLANS: Array[Dictionary] = [
 		"label": "round_3_body_width",
 		"offers": ["sari", "brute", "berebell", "bo", "cashmere"],
 		"buy_xp": 1,
-		"buy": ["sari"],
+		"buy": ["sari", "brute"],
 		"gold": 16,
 		"min_stage_after": 4,
 	},
@@ -27,7 +27,7 @@ const ROUND_PLANS: Array[Dictionary] = [
 		"label": "round_4_boss_gate",
 		"offers": ["berebell", "bo", "cashmere", "repo", "korath"],
 		"buy_xp": 3,
-		"buy": ["berebell"],
+		"buy": ["berebell", "bo"],
 		"gold": 24,
 		"min_stage_after": 5,
 	},
@@ -683,4 +683,7 @@ func _finish_mid_run_progression() -> void:
 		print("%s: results=%s" % [MID_RUN_SMOKE_NAME, JSON.stringify(_mid_run_results)])
 		exit_code = 1
 	_cleanup_runtime()
-	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+	# Keep terminal evidence available long enough for the MCP runner to collect it,
+	# even when the debug process is running with uncapped frame rate.
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	get_tree().quit(exit_code)

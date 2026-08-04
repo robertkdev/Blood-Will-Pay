@@ -12,6 +12,9 @@ const OPENING_FIGHT_MESSAGE: String = "Opening fight is fixed. Win it to unlock 
 var _saved_captures: int = 0
 var _finished_opening_smoke: bool = false
 
+func _uses_manual_opening_continue() -> bool:
+	return true
+
 func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	var window: Window = get_window()

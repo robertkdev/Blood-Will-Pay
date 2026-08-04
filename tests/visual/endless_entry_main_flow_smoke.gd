@@ -70,9 +70,10 @@ func _validate_default_preview() -> void:
 	if board_capacity_label != null:
 		_expect(String(board_capacity_label.text).ends_with("/3"), "procedural default board capacity should start at x/3, got %s" % board_capacity_label.text)
 	var win_odds_label: Label = _main.find_child("WinOddsLabel", true, false) as Label
-	_expect(win_odds_label != null, "procedural default win odds label missing")
+	# The canonical design uses a fixed 2x wager payout; dynamic team odds are not
+	# part of the live Economy/UI flow. Keep the dormant label hidden if present.
 	if win_odds_label != null:
-		_expect(String(win_odds_label.text).begins_with("Win Odds "), "procedural default odds label should show Win Odds, got %s" % win_odds_label.text)
+		_expect(not win_odds_label.visible, "procedural default should not display dynamic win odds")
 	var spec: Dictionary = RosterCatalog.get_spec(FIRST_CHAPTER, FIRST_ROUND)
 	var ids: Array = spec.get(StageTypes.KEY_IDS, []) if spec.get(StageTypes.KEY_IDS, []) is Array else []
 	var rules: Dictionary = spec.get(StageTypes.KEY_RULES, {})
@@ -156,4 +157,7 @@ func _finish_procedural_entry() -> void:
 			push_error("%s: %s" % [SMOKE_TITLE, failure])
 		exit_code = 1
 	_cleanup_runtime()
-	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+	# Keep terminal evidence available long enough for the MCP runner to collect it,
+	# even when the debug process is running with uncapped frame rate.
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	get_tree().quit(exit_code)

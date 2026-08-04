@@ -429,10 +429,10 @@ func _apply_responsive_layout() -> void:
 	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
 	if margin != null:
-		margin.add_theme_constant_override("margin_left", 10 if compact else 20)
+		margin.add_theme_constant_override("margin_left", 16 if compact else 20)
 		margin.add_theme_constant_override("margin_top", 8 if compact else 14)
-		margin.add_theme_constant_override("margin_right", 10 if compact else 20)
-		margin.add_theme_constant_override("margin_bottom", 8 if compact else 18)
+		margin.add_theme_constant_override("margin_right", 16 if compact else 20)
+		margin.add_theme_constant_override("margin_bottom", 12 if compact else 18)
 	_set_minimum_size("MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea", Vector2(0.0, 408.0 if compact else 604.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(288.0 if compact else 340.0, 408.0 if compact else 596.0))
@@ -478,7 +478,7 @@ func _set_box_separation(path: String, separation: int) -> void:
 		box.add_theme_constant_override("separation", separation)
 
 func _apply_shop_compact_layout(compact: bool) -> void:
-	var card_size: Vector2 = Vector2(120.0, 94.0) if compact else Vector2(144.0, 124.0)
+	var card_size: Vector2 = Vector2(120.0, 88.0) if compact else Vector2(144.0, 124.0)
 	if shop_grid != null:
 		shop_grid.add_theme_constant_override("h_separation", 10 if compact else 16)
 		shop_grid.add_theme_constant_override("v_separation", 6 if compact else 10)

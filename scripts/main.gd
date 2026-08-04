@@ -203,14 +203,21 @@ func _request_combat_view_prewarm() -> void:
 		return
 	if _combat_scene_load_requested:
 		return
-	var error: Error = ResourceLoader.load_threaded_request(COMBAT_VIEW_SCENE_PATH, "PackedScene")
-	if error != OK:
-		_combat_prewarm_failed = true
-		push_warning("Main: combat prewarm request failed (%d); selection will use the synchronous fallback" % int(error))
-		return
-	_combat_prewarm_failed = false
 	_combat_scene_load_requested = true
 	_combat_prewarm_started_us = Time.get_ticks_usec()
+	# CombatView pulls in the shop, item, and trait UI script graph. Compiling that
+	# graph through ResourceLoader's background thread is load-order sensitive in
+	# Godot 4.5 and can leave the first transition without a usable PackedScene.
+	# Prewarm on the main thread while the title/selection UI is already visible;
+	# subsequent transitions reuse the cached scene and remain immediate.
+	var resource: Resource = ResourceLoader.load(COMBAT_VIEW_SCENE_PATH, "PackedScene")
+	_combat_scene_load_requested = false
+	_combat_scene_resource = resource as PackedScene
+	_combat_prewarm_failed = _combat_scene_resource == null
+	if _combat_scene_resource == null:
+		push_error("Main: combat prewarm failed to load CombatView")
+		return
+	_instantiate_combat_view(_combat_scene_resource)
 
 func _poll_combat_view_prewarm() -> void:
 	if not _combat_scene_load_requested or _combat_scene_resource != null:

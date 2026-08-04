@@ -308,7 +308,7 @@ func _apply_static_style() -> void:
 	tooltip_text = ""
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var compact: bool = viewport_size.y <= 760.0 or viewport_size.x <= 1400.0
-	custom_minimum_size = Vector2(120.0, 94.0) if compact else Vector2(150.0, 138.0)
+	custom_minimum_size = Vector2(120.0, 88.0) if compact else Vector2(150.0, 138.0)
 	add_theme_stylebox_override("normal", _make_card_style(false, false))
 	add_theme_stylebox_override("hover", _make_card_style(false, true))
 	add_theme_stylebox_override("pressed", _make_card_style(true, true))
@@ -324,9 +324,9 @@ func _apply_static_style() -> void:
 		_icon.modulate = Color(1.0, 0.93, 0.82, 1.0)
 		_icon.custom_minimum_size = Vector2.ZERO
 		_icon.anchor_left = 0.12
-		_icon.anchor_top = 0.18
+		_icon.anchor_top = 0.20 if compact else 0.18
 		_icon.anchor_right = 0.88
-		_icon.anchor_bottom = 0.80
+		_icon.anchor_bottom = 0.68 if compact else 0.80
 		_icon.offset_left = 0.0
 		_icon.offset_top = 0.0
 		_icon.offset_right = 0.0
@@ -347,7 +347,7 @@ func _apply_static_style() -> void:
 	if _legacy_role_label:
 		_legacy_role_label.visible = false
 	if _role_badge:
-		_role_badge.add_theme_font_size_override("font_size", 11)
+		_role_badge.add_theme_font_size_override("font_size", 10 if compact else 11)
 		_role_badge.add_theme_color_override("font_color", COLOR_GOLD)
 		_role_badge.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.70))
 		_role_badge.add_theme_constant_override("outline_size", 1)
@@ -355,13 +355,20 @@ func _apply_static_style() -> void:
 		_goal_label.add_theme_color_override("font_color", COLOR_MUTED)
 	if _name_label:
 		_name_label.z_index = 6
-		_name_label.add_theme_font_size_override("font_size", 13)
+		_name_label.add_theme_font_size_override("font_size", 11 if compact else 13)
+		_name_label.offset_left = 5.0 if compact else 8.0
+		_name_label.offset_top = -25.0
+		_name_label.offset_right = -2.0 if compact else -4.0
+		_name_label.offset_bottom = -5.0
 		_name_label.add_theme_color_override("font_color", COLOR_TEXT)
 		_name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_name_label.add_theme_constant_override("outline_size", 1)
 	if _price_label:
 		_price_label.z_index = 6
-		_price_label.add_theme_font_size_override("font_size", 13)
+		_price_label.add_theme_font_size_override("font_size", 11 if compact else 13)
+		_price_label.offset_top = -25.0
+		_price_label.offset_right = -5.0 if compact else -8.0
+		_price_label.offset_bottom = -5.0
 		_price_label.add_theme_color_override("font_color", COLOR_GOLD)
 		_price_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_price_label.add_theme_constant_override("outline_size", 1)

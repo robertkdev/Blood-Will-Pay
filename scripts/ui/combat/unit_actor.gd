@@ -205,6 +205,9 @@ func _ensure_sprite() -> void:
 	sprite.offset_top = 0.0
 	sprite.offset_right = 0.0
 	sprite.offset_bottom = 0.0
+	# Most unit paintings use a deliberately low-key gothic palette. A restrained
+	# lift keeps their silhouettes readable on the already-dark battle surfaces.
+	sprite.modulate = Color(1.16, 1.12, 1.06, 1.0)
 	sprite.z_index = 4
 	add_child(sprite)
 	_update_effect_player_sprite()
