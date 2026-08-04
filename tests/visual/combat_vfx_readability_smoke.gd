@@ -92,6 +92,7 @@ func _run() -> void:
 	_expect(bridge.get("_bound_manager") == _manager, "CombatVfxBridge signal manager should be bound")
 	_expect(bridge.get("_bound_engine") == engine, "CombatVfxBridge signal engine should be bound")
 
+	_exercise_ready_telegraph(bridge)
 	_exercise_ability_signatures(bridge)
 	_exercise_line_cap(bridge, arena_container)
 	_exercise_burst_cap(bridge)
@@ -104,6 +105,30 @@ func _run() -> void:
 	var cleared_bursts: Array[Dictionary] = bridge.get("_bursts") as Array[Dictionary]
 	_expect(cleared_lines.is_empty() and cleared_bursts.is_empty(), "CombatVfxBridge should clear queued effects when the arena hides")
 	await _finish()
+
+func _exercise_ready_telegraph(bridge: CombatVfxBridge) -> void:
+	var unit: Unit = _manager.player_team[0] if _manager != null and not _manager.player_team.is_empty() else null
+	_expect(unit != null, "ready-telegraph exercise requires the player unit")
+	if unit == null:
+		return
+	unit.mana = int(ceil(float(unit.mana_max) * 0.80))
+	var candidates_value: Variant = bridge.call("_ready_telegraph_candidates")
+	var candidates: Array[Dictionary] = []
+	if candidates_value is Array:
+		for candidate_value: Variant in candidates_value as Array:
+			if candidate_value is Dictionary:
+				candidates.append(candidate_value as Dictionary)
+	_expect(candidates.size() == 1, "80% mana should expose one pre-cast telegraph candidate")
+	if candidates.size() != 1:
+		return
+	var candidate: Dictionary[String, Variant] = {}
+	candidate.assign(candidates[0])
+	var style: Dictionary[String, Variant] = {}
+	var style_value: Variant = candidate.get("style", {})
+	if style_value is Dictionary:
+		style.assign(style_value)
+	_expect(String(style.get("shape", "")) == "poultice", "near-ready telegraph should preserve Saffron's poultice signature")
+	_expect(bool(candidate.get("target_found", false)), "near-ready telegraph should preview Saffron's current target")
 
 func _exercise_ability_signatures(bridge: CombatVfxBridge) -> void:
 	bridge.clear()

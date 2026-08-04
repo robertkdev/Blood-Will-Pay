@@ -6,7 +6,10 @@ const UnitFactory := preload("res://scripts/unit_factory.gd")
 const UnitCatalogScript := preload("res://scripts/game/shop/unit_catalog.gd")
 
 const OUTPUT_PATH: String = "res://outputs/visual_iter/attack_visuals_pass/unit_attack_signature_sheet.png"
-const ROW_COUNT: int = 17
+const COLUMN_COUNT: int = 4
+const ROW_COUNT: int = 13
+const CELL_WIDTH: float = 468.0
+const ROW_HEIGHT: float = 76.0
 
 var _projectile_manager: ProjectileManager
 var _labels: Array[Label] = []
@@ -17,11 +20,16 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1440))
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://outputs/visual_iter/attack_visuals_pass"))
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
 	_playable_ids = _all_playable_ids()
+	if _playable_ids.size() > COLUMN_COUNT * ROW_COUNT:
+		push_error("AttackVisualSignatureSheet: %d units exceed %dx%d atlas capacity" % [_playable_ids.size(), COLUMN_COUNT, ROW_COUNT])
+		UnitFactory.suppress_validation_warnings = _previous_suppress_validation_warnings
+		get_tree().quit(1)
+		return
 	_build_labels()
 	_fire_unit_signatures()
 	queue_redraw()
@@ -42,10 +50,10 @@ func _draw() -> void:
 	for index: int in range(_playable_ids.size()):
 		var row: int = index % ROW_COUNT
 		var column: int = floori(float(index) / float(ROW_COUNT))
-		var base_x: float = 62.0 + float(column) * 620.0
-		var base_y: float = 92.0 + float(row) * 77.0
-		var start_pos: Vector2 = Vector2(base_x + 154.0, base_y)
-		var end_pos: Vector2 = Vector2(base_x + 506.0, base_y)
+		var base_x: float = 30.0 + float(column) * CELL_WIDTH
+		var base_y: float = 78.0 + float(row) * ROW_HEIGHT
+		var start_pos: Vector2 = Vector2(base_x + 130.0, base_y)
+		var end_pos: Vector2 = Vector2(base_x + 420.0, base_y)
 		draw_line(start_pos, end_pos, Color(0.48, 0.33, 0.20, 0.32), 1.5, true)
 		draw_circle(start_pos, 4.0, Color(0.24, 0.72, 1.0, 0.70))
 		draw_circle(end_pos, 7.0, Color(1.0, 0.28, 0.18, 0.50))
@@ -61,10 +69,12 @@ func _build_labels() -> void:
 		var row: int = index % ROW_COUNT
 		var column: int = floori(float(index) / float(ROW_COUNT))
 		var label: Label = Label.new()
-		label.text = id.capitalize()
-		label.position = Vector2(38.0 + float(column) * 620.0, 72.0 + float(row) * 77.0)
-		label.size = Vector2(136.0, 36.0)
-		label.add_theme_font_size_override("font_size", 16)
+		var unit: Unit = UnitFactory.spawn(id)
+		var style: Dictionary[String, Variant] = AttackVisualCatalog.style_for(unit, "player", false)
+		label.text = "%s\n[%s]" % [id.capitalize(), String(style.get("shape", "orb"))]
+		label.position = Vector2(34.0 + float(column) * CELL_WIDTH, 52.0 + float(row) * ROW_HEIGHT)
+		label.size = Vector2(118.0, 46.0)
+		label.add_theme_font_size_override("font_size", 13)
 		label.add_theme_color_override("font_color", Color(0.92, 0.86, 0.72, 1.0))
 		add_child(label)
 		_labels.append(label)
@@ -81,10 +91,10 @@ func _fire_unit_signatures() -> void:
 			continue
 		var row: int = index % ROW_COUNT
 		var column: int = floori(float(index) / float(ROW_COUNT))
-		var base_x: float = 62.0 + float(column) * 620.0
-		var base_y: float = 92.0 + float(row) * 77.0
-		var start_pos: Vector2 = Vector2(base_x + 154.0, base_y)
-		var end_pos: Vector2 = Vector2(base_x + 506.0, base_y)
+		var base_x: float = 30.0 + float(column) * CELL_WIDTH
+		var base_y: float = 78.0 + float(row) * ROW_HEIGHT
+		var start_pos: Vector2 = Vector2(base_x + 130.0, base_y)
+		var end_pos: Vector2 = Vector2(base_x + 420.0, base_y)
 		var style: Dictionary[String, Variant] = AttackVisualCatalog.style_for(unit, "player", false)
 		_projectile_manager.fire_basic(
 			"player",
@@ -93,14 +103,34 @@ func _fire_unit_signatures() -> void:
 			end_pos,
 			0,
 			false,
-			520.0,
-			7.0,
+			360.0,
+			8.5,
 			Color(0.25, 0.80, 1.0, 1.0),
 			null,
 			index,
 			null,
 			float(style.get("arc_curve", 0.0)),
 			float(style.get("arc_freq", 6.0)),
+			false,
+			style
+		)
+		# A second, short flight reaches the target early enough to leave the
+		# shape-specific impact signature visible beside the in-flight projectile.
+		_projectile_manager.fire_basic(
+			"player",
+			index,
+			end_pos - Vector2(170.0, 0.0),
+			end_pos,
+			0,
+			false,
+			760.0,
+			8.5,
+			Color(0.25, 0.80, 1.0, 1.0),
+			null,
+			index,
+			null,
+			0.0,
+			6.0,
 			false,
 			style
 		)

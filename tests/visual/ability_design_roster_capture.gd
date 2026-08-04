@@ -73,12 +73,15 @@ func _capture_group(group: Dictionary) -> void:
 		return
 	_make_durable(_manager.player_team)
 	_make_durable(_manager.enemy_team)
+	_manager.set_process(false)
+	_set_player_mana_ratio(0.88)
 	# Capture the readable pre-cast board after the short combat-entry strip clears.
 	await _settle(0.75)
 	_save_capture(group, "setup")
-	var expected_casts: Array[String] = _expected_player_abilities()
 	_force_player_mana()
-	await _wait_for_casts(expected_casts, 2.5)
+	if _current_group == "cost2_c":
+		_place_enemies_near_first_player()
+	_force_player_casts()
 	await _settle(0.05)
 	_save_capture(group, "impact")
 	await _settle(0.52)
@@ -95,43 +98,47 @@ func _make_durable(units: Array[Unit]) -> void:
 		unit.spell_power = min(unit.spell_power, 30.0)
 
 func _force_player_mana() -> void:
+	_set_player_mana_ratio(1.0)
+
+func _set_player_mana_ratio(ratio: float) -> void:
 	if _manager == null:
 		return
+	var safe_ratio: float = clampf(ratio, 0.0, 1.0)
 	for unit: Unit in _manager.player_team:
 		if unit == null or not unit.is_alive():
 			continue
-		unit.mana = unit.mana_max
+		unit.mana = int(round(float(unit.mana_max) * safe_ratio))
 
-func _expected_player_abilities() -> Array[String]:
-	var ability_ids: Array[String] = []
+func _force_player_casts() -> void:
 	if _manager == null:
-		return ability_ids
-	for unit: Unit in _manager.player_team:
-		if unit == null:
+		return
+	var engine: CombatEngine = _manager.get_engine() as CombatEngine
+	if engine == null or engine.ability_system == null:
+		return
+	for player_index: int in range(_manager.player_team.size()):
+		var unit: Unit = _manager.player_team[player_index]
+		if unit == null or not unit.is_alive() or String(unit.ability_id).is_empty():
 			continue
-		var ability_id: String = String(unit.ability_id).strip_edges()
-		if ability_id != "" and not ability_ids.has(ability_id):
-			ability_ids.append(ability_id)
-	return ability_ids
+		var cast_result: Dictionary = engine.ability_system.try_cast("player", player_index)
+		if not bool(cast_result.get("cast", false)):
+			_failures.append("%s direct cast failed for %s: %s" % [_current_group, String(unit.ability_id), String(cast_result.get("reason", "unknown"))])
 
-func _wait_for_casts(expected_casts: Array[String], timeout_seconds: float) -> void:
-	var elapsed: float = 0.0
-	while not _contains_all(_seen_casts, expected_casts) and elapsed < timeout_seconds:
-		await get_tree().process_frame
-		var delta: float = max(0.001, get_process_delta_time())
-		elapsed += delta
-	if not _contains_all(_seen_casts, expected_casts):
-		var missing: Array[String] = []
-		for ability_id: String in expected_casts:
-			if not _seen_casts.has(ability_id):
-				missing.append(ability_id)
-		_failures.append("%s missing forced casts: %s" % [_current_group, ", ".join(missing)])
-
-func _contains_all(actual: Array[String], expected: Array[String]) -> bool:
-	for value: String in expected:
-		if not actual.has(value):
-			return false
-	return true
+func _place_enemies_near_first_player() -> void:
+	if _manager == null:
+		return
+	var engine: CombatEngine = _manager.get_engine() as CombatEngine
+	if engine == null or engine.arena_state == null or engine.arena_state.data == null:
+		return
+	var movement_data: Variant = engine.arena_state.data
+	if movement_data.player_positions.is_empty() or movement_data.enemy_positions.is_empty():
+		return
+	var origin: Vector2 = movement_data.player_positions[0]
+	var tile_size: float = maxf(0.1, float(engine.arena_state.tile_size()))
+	for enemy_index: int in range(movement_data.enemy_positions.size()):
+		var destination: Vector2 = origin + Vector2(tile_size * 0.8, float(enemy_index - 1) * tile_size * 0.08)
+		movement_data.enemy_positions[enemy_index] = destination
+		if engine.has_signal("position_updated"):
+			engine.emit_signal("position_updated", "enemy", enemy_index, destination.x, destination.y)
 
 func _on_ability_cast(source_team: String, _source_index: int, ability_id: String, _target_team: String, _target_index: int, _target_point: Vector2) -> void:
 	if source_team != "player":
@@ -191,6 +198,8 @@ func _write_manifest() -> void:
 	file.store_string(JSON.stringify(payload, "  "))
 
 func _teardown_view() -> void:
+	if _manager != null and is_instance_valid(_manager):
+		_manager.set_process(true)
 	if _manager != null and _manager.ability_cast.is_connected(_on_ability_cast):
 		_manager.ability_cast.disconnect(_on_ability_cast)
 	if _view != null and is_instance_valid(_view) and _view.has_method("_teardown"):

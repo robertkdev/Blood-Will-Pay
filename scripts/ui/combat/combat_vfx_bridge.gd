@@ -6,6 +6,8 @@ const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.
 
 const MAX_ACTIVE_BURSTS: int = 16
 const MAX_ACTIVE_LINES: int = 10
+const MAX_READY_TELEGRAPHS: int = 4
+const READY_MANA_THRESHOLD: float = 0.75
 const READABILITY_MODULATE: Color = Color(0.92, 0.86, 0.82, 0.82)
 
 const KIND_ABILITY: String = "ability"
@@ -138,13 +140,15 @@ func _fill_parent_rect() -> void:
 func _process(delta: float) -> void:
 	_clock += max(0.0, float(delta))
 	_fill_parent_rect()
-	if _bursts.is_empty() and _lines.is_empty():
-		return
-	_update_effect_list(_bursts, delta)
-	_update_effect_list(_lines, delta)
-	queue_redraw()
+	if not _bursts.is_empty():
+		_update_effect_list(_bursts, delta)
+	if not _lines.is_empty():
+		_update_effect_list(_lines, delta)
+	if manager != null or not _bursts.is_empty() or not _lines.is_empty():
+		queue_redraw()
 
 func _draw() -> void:
+	_draw_ready_telegraphs()
 	for line: Dictionary[String, Variant] in _lines:
 		_draw_effect_line(line)
 	for burst: Dictionary[String, Variant] in _bursts:
@@ -184,7 +188,7 @@ func _on_ability_cast(source_team: String, source_index: int, ability_id: String
 				String(style.get("shape", "rune"))
 			)
 
-func _on_heal_applied(source_team: String, source_index: int, target_team: String, target_index: int, healed: int, overheal: int, _before_hp: int, _after_hp: int) -> void:
+func _on_heal_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, healed: int, overheal: int, _before_hp: int, _after_hp: int) -> void:
 	if int(healed) <= 0 and int(overheal) <= 0:
 		return
 	var key: String = "heal:%s:%d" % [target_team, target_index]
@@ -194,7 +198,6 @@ func _on_heal_applied(source_team: String, source_index: int, target_team: Strin
 		"magnitude": float(max(healed, overheal)),
 		"duration": 1.15,
 	})
-	_add_source_link(source_team, source_index, target_team, target_index, Color(0.58, 1.0, 0.64, 0.72), 2.2, 0.30, "heal")
 
 func _on_shield_absorbed(target_team: String, target_index: int, absorbed: int) -> void:
 	if int(absorbed) <= 0:
@@ -219,7 +222,7 @@ func _on_hit_mitigated(_source_team: String, _source_index: int, target_team: St
 		"duration": 0.72,
 	})
 
-func _on_cc_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, duration: float) -> void:
+func _on_cc_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, kind: String, duration: float) -> void:
 	if float(duration) <= 0.0:
 		return
 	var key: String = "cc:%s:%d:%s" % [target_team, target_index, kind]
@@ -230,9 +233,8 @@ func _on_cc_applied(source_team: String, source_index: int, target_team: String,
 		"magnitude": float(duration),
 		"duration": 1.15,
 	})
-	_add_source_link(source_team, source_index, target_team, target_index, Color(0.92, 0.72, 1.0, 0.72), 2.4, 0.30, "cc")
 
-func _on_buff_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, _fields: Variant, magnitude: float, duration: float) -> void:
+func _on_buff_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, kind: String, _fields: Variant, magnitude: float, duration: float) -> void:
 	var lowered: String = String(kind).strip_edges().to_lower()
 	var burst_kind: String = KIND_SHIELD if lowered == "shield" or lowered.contains("shield") else KIND_BUFF
 	var debounce_s: float = 0.16 if burst_kind == KIND_SHIELD else 0.28
@@ -244,11 +246,8 @@ func _on_buff_applied(source_team: String, source_index: int, target_team: Strin
 		"magnitude": float(magnitude),
 		"duration": max(0.70, min(1.35, float(duration) * 0.18 + 0.58)),
 	})
-	if source_team != target_team or source_index != target_index:
-		var link_color: Color = Color(0.50, 0.86, 1.0, 0.66) if burst_kind == KIND_SHIELD else Color(1.0, 0.82, 0.34, 0.58)
-		_add_source_link(source_team, source_index, target_team, target_index, link_color, 1.8, 0.24, burst_kind)
 
-func _on_debuff_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, _fields: Variant, magnitude: float, duration: float) -> void:
+func _on_debuff_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, kind: String, _fields: Variant, magnitude: float, duration: float) -> void:
 	var lowered: String = String(kind).strip_edges().to_lower()
 	if lowered == "stun" or lowered == "root" or lowered == "rooted":
 		return
@@ -261,7 +260,6 @@ func _on_debuff_applied(source_team: String, source_index: int, target_team: Str
 		"magnitude": float(magnitude),
 		"duration": max(0.68, min(1.25, float(duration) * 0.16 + 0.52)),
 	})
-	_add_source_link(source_team, source_index, target_team, target_index, Color(0.92, 0.24, 1.0, 0.58), 1.8, 0.22, burst_kind)
 
 func _on_dot_tick_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, amount: int, kind: String) -> void:
 	if int(amount) <= 0:
@@ -275,7 +273,7 @@ func _on_dot_tick_applied(_source_team: String, _source_index: int, target_team:
 		"duration": 0.68,
 	})
 
-func _on_execute_bonus_applied(source_team: String, source_index: int, target_team: String, target_index: int, _base_damage: int, bonus_damage: int, _threshold_pct: float, _target_hp_pct: float, kind: String) -> void:
+func _on_execute_bonus_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, _base_damage: int, bonus_damage: int, _threshold_pct: float, _target_hp_pct: float, kind: String) -> void:
 	if int(bonus_damage) <= 0:
 		return
 	_add_burst(KIND_EXECUTE, target_team, target_index, {
@@ -283,19 +281,19 @@ func _on_execute_bonus_applied(source_team: String, source_index: int, target_te
 		"magnitude": float(bonus_damage),
 		"duration": 1.0,
 	})
-	_add_source_link(source_team, source_index, target_team, target_index, Color(1.0, 0.18, 0.28, 0.72), 3.0, 0.22, "execute")
 
-func _on_cleanse_applied(source_team: String, source_index: int, target_team: String, target_index: int, removed: int) -> void:
+func _on_cleanse_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, removed: int) -> void:
 	if int(removed) <= 0:
 		return
 	_add_burst(KIND_CLEANSE, target_team, target_index, {
 		"magnitude": float(removed),
 		"duration": 1.0,
 	})
-	_add_source_link(source_team, source_index, target_team, target_index, Color(0.95, 1.0, 0.80, 0.72), 2.4, 0.30, "cleanse")
 
-func _on_zone_exposure_applied(_source_team: String, _source_index: int, target_team: String, target_index: int, kind: String, duration_s: float, damage: float, radius_tiles: float) -> void:
-	var key: String = "zone:%s:%d:%s" % [target_team, target_index, kind]
+func _on_zone_exposure_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, duration_s: float, damage: float, radius_tiles: float) -> void:
+	# A zone may report exposure once per affected unit. Draw one footprint for the
+	# cast, not an overlapping circle on every unit caught inside it.
+	var key: String = "zone:%s:%d:%s" % [source_team, source_index, kind]
 	if not _debounced(key, 0.42):
 		return
 	var tile_size: float = _tile_size()
@@ -306,7 +304,7 @@ func _on_zone_exposure_applied(_source_team: String, _source_index: int, target_
 		"duration": max(0.38, min(0.85, float(duration_s))),
 	})
 
-func _on_on_hit_proc(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, _fields: Variant, magnitude: float) -> void:
+func _on_on_hit_proc(source_team: String, source_index: int, _target_team: String, _target_index: int, kind: String, _fields: Variant, magnitude: float) -> void:
 	var key: String = "on_hit:%s:%d:%s" % [source_team, source_index, kind]
 	if not _debounced(key, 0.18):
 		return
@@ -315,7 +313,6 @@ func _on_on_hit_proc(source_team: String, source_index: int, target_team: String
 		"magnitude": float(magnitude),
 		"duration": 0.70,
 	})
-	_add_source_link(source_team, source_index, target_team, target_index, Color(1.0, 0.76, 0.32, 0.58), 1.6, 0.20, "on_hit")
 
 func _on_targetability_window(team: String, index: int, is_targetable: bool, duration: float, reason: String) -> void:
 	if is_targetable or duration <= 0.0:
@@ -395,6 +392,90 @@ func _hide_pressure_banner() -> void:
 	if _pressure_banner != null and is_instance_valid(_pressure_banner):
 		_pressure_banner.visible = false
 
+func _draw_ready_telegraphs() -> void:
+	var candidates: Array[Dictionary] = _ready_telegraph_candidates()
+	candidates.sort_custom(Callable(self, "_telegraph_more_ready"))
+	var draw_count: int = mini(MAX_READY_TELEGRAPHS, candidates.size())
+	for candidate_index: int in range(draw_count):
+		var candidate: Dictionary[String, Variant] = {}
+		candidate.assign(candidates[candidate_index])
+		_draw_ready_telegraph(candidate)
+
+func _ready_telegraph_candidates() -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	if manager == null:
+		return candidates
+	for team: String in ["player", "enemy"]:
+		var units: Array[Unit] = manager.player_team if team == "player" else manager.enemy_team
+		for index: int in range(units.size()):
+			var unit: Unit = units[index]
+			if unit == null or not unit.is_alive() or unit.ability_id.is_empty() or unit.mana_max <= 0:
+				continue
+			var mana_ratio: float = clamp(float(unit.mana) / float(unit.mana_max), 0.0, 1.0)
+			if mana_ratio < READY_MANA_THRESHOLD:
+				continue
+			var source_info: Dictionary[String, Variant] = _actor_position(team, index)
+			if not bool(source_info.get("found", false)):
+				continue
+			var target_index: int = _current_target_index(team, index)
+			var target_team: String = "enemy" if team == "player" else "player"
+			var target_info: Dictionary[String, Variant] = _actor_position(target_team, target_index)
+			var candidate: Dictionary[String, Variant] = {
+				"team": team,
+				"index": index,
+				"ratio": mana_ratio,
+				"source": _local_from_global(source_info.get("position", Vector2.ZERO)),
+				"target_found": bool(target_info.get("found", false)),
+				"target": _local_from_global(target_info.get("position", Vector2.ZERO)),
+				"style": _style_for(team, index),
+			}
+			candidates.append(candidate)
+	return candidates
+
+func _telegraph_more_ready(left: Dictionary[String, Variant], right: Dictionary[String, Variant]) -> bool:
+	return float(left.get("ratio", 0.0)) > float(right.get("ratio", 0.0))
+
+func _current_target_index(team: String, index: int) -> int:
+	if _bound_engine == null or not is_instance_valid(_bound_engine):
+		return -1
+	var target_controller_value: Variant = _bound_engine.get("target_controller")
+	if target_controller_value == null or not target_controller_value.has_method("current_target"):
+		return -1
+	return int(target_controller_value.call("current_target", team, index))
+
+func _draw_ready_telegraph(candidate: Dictionary[String, Variant]) -> void:
+	var style_value: Variant = candidate.get("style", {})
+	var style: Dictionary[String, Variant] = {}
+	if style_value is Dictionary:
+		style.assign(style_value)
+	var source_pos: Vector2 = candidate.get("source", Vector2.ZERO)
+	var mana_ratio: float = float(candidate.get("ratio", READY_MANA_THRESHOLD))
+	var readiness: float = inverse_lerp(READY_MANA_THRESHOLD, 1.0, mana_ratio)
+	var pulse: float = 0.5 + 0.5 * sin(_clock * (5.0 + readiness * 2.0))
+	var core: Color = _effect_color(style, "core_color", Color(0.88, 0.96, 1.0, 0.96))
+	var edge: Color = _effect_color(style, "edge_color", Color(0.72, 0.92, 1.0, 0.92))
+	var accent: Color = _effect_color(style, "accent_color", Color(1.0, 0.90, 0.46, 0.94))
+	var shape: String = String(style.get("shape", "rune"))
+	var radius: float = 18.0 + readiness * 5.0
+	var alpha: float = 0.24 + readiness * 0.24 + pulse * 0.10
+	draw_arc(source_pos, radius + pulse * 2.0, -PI * 0.5, -PI * 0.5 + TAU * mana_ratio, 30, Color(edge.r, edge.g, edge.b, alpha), 2.2, true)
+	_draw_signature_glyph(source_pos, radius * 0.42, shape, _clock * 0.8, core, edge, accent, alpha)
+	if not bool(candidate.get("target_found", false)):
+		return
+	var target_pos: Vector2 = candidate.get("target", Vector2.ZERO)
+	_draw_preview_path(source_pos, target_pos, edge, alpha * 0.42)
+	_draw_signature_glyph(target_pos, 7.0 + readiness * 2.0, shape, -_clock * 0.55, core, edge, accent, alpha * 0.62)
+
+func _draw_preview_path(from_pos: Vector2, to_pos: Vector2, color: Color, alpha: float) -> void:
+	const SEGMENTS: int = 5
+	for segment_index: int in range(SEGMENTS):
+		var start_t: float = float(segment_index) / float(SEGMENTS)
+		var end_t: float = min(1.0, start_t + 0.10)
+		var start_pos: Vector2 = from_pos.lerp(to_pos, start_t)
+		var end_pos: Vector2 = from_pos.lerp(to_pos, end_t)
+		draw_line(start_pos, end_pos, Color(color.r, color.g, color.b, alpha), 1.2, true)
+	draw_arc(to_pos, 11.0, 0.0, TAU, 20, Color(color.r, color.g, color.b, alpha * 1.35), 1.4, true)
+
 func _add_burst(kind: String, team: String, index: int, options_value: Variant = null) -> void:
 	var options: Dictionary[String, Variant] = {}
 	if options_value is Dictionary:
@@ -428,22 +509,22 @@ func _add_burst(kind: String, team: String, index: int, options_value: Variant =
 		_bursts.pop_front()
 	queue_redraw()
 
-func _add_source_link(source_team: String, source_index: int, target_team: String, target_index: int, color: Color, width: float, duration: float, kind: String) -> void:
-	if source_team == "" or source_index < 0:
-		return
-	if source_team == target_team and source_index == target_index:
-		return
-	var source_info: Dictionary[String, Variant] = _actor_position(source_team, source_index)
-	var target_info: Dictionary[String, Variant] = _actor_position(target_team, target_index)
-	if not bool(source_info.get("found", false)) or not bool(target_info.get("found", false)):
-		return
-	_add_line(source_info.get("position", Vector2.ZERO), target_info.get("position", Vector2.ZERO), color, width, duration, kind)
-
 func _add_line(start_global: Vector2, end_global: Vector2, color: Color, width: float, duration: float, kind: String, ability_id: String = "", shape: String = "") -> void:
+	var local_start: Vector2 = _local_from_global(start_global)
+	var local_end: Vector2 = _local_from_global(end_global)
+	for existing: Dictionary[String, Variant] in _lines:
+		if String(existing.get("kind", "")) != kind or String(existing.get("ability_id", "")) != ability_id:
+			continue
+		var existing_start: Vector2 = existing.get("from", Vector2.ZERO)
+		var existing_end: Vector2 = existing.get("to", Vector2.ZERO)
+		if existing_start.distance_squared_to(local_start) <= 0.25 and existing_end.distance_squared_to(local_end) <= 0.25:
+			existing["elapsed"] = 0.0
+			existing["duration"] = max(float(existing.get("duration", 0.0)), duration)
+			return
 	var line: Dictionary[String, Variant] = {
 		"kind": String(kind),
-		"from": _local_from_global(start_global),
-		"to": _local_from_global(end_global),
+		"from": local_start,
+		"to": local_end,
 		"color": color,
 		"width": max(1.0, float(width)),
 		"elapsed": 0.0,
