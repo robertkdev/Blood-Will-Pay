@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "sable_footnote_piercer"
 name = "Footnote Piercer"
-description = "Fires a line shot that repeatedly shreds defenses as an on-hit scholar mark."
-targeting_summary = "Highest-health enemy in a line; can also catch nearby enemies."
+description = "Fires through the highest-health enemy, damaging and shredding only actual line victims. A true two-target line refunds exactly 34 mana."
+targeting_summary = "Highest-health enemy anchors the line; non-collinear enemies are never added and a single hit grants no refund."
 base_cost = 50
 tags = ["damage", "long_range", "debuff", "on_hit_effect"]

@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource( 1 )
 id = "sari_default"
-name = "Strike"
-description = "Basic strike ability."
+name = "Marked Shot"
+description = "Shoots and marks one enemy. Sari's next 3 basic attacks against that enemy stack Armor shred."
 targeting_summary = "Current attack target."
 base_cost = 60
-tags = ["damage"]
+tags = ["damage", "mark", "armor_shred"]

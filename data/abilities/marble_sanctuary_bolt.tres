@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "marble_sanctuary_bolt"
 name = "Sanctuary Bolt"
-description = "Fires a long defensive bolt, shielding an ally and slowing a distant enemy."
-targeting_summary = "Lowest-health ally for shield; furthest enemy for the bolt."
+description = "Fires one sanctuary bolt at the farthest enemy. It shields the lowest-health ally intersecting its path, then damages and slows the enemy."
+targeting_summary = "Farthest enemy; an ally is shielded only when physically intersecting the visible firing line."
 base_cost = 35
 tags = ["damage", "long_range", "peel", "debuff"]

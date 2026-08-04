@@ -273,7 +273,7 @@
     },
     {
       "unit_id": "nyxa", "ability_id": "nyxa_chaos_volley", "cost": 2,
-      "traits": ["Sanguine", "Chronomancer"], "primary_role": "marksman", "primary_goal": "marksman.backline_siege", "approaches": ["long_range", "ramp", "aoe"],
+      "traits": ["Sanguine", "Chronomancer"], "primary_role": "marksman", "primary_goal": "marksman.sustained_dps", "approaches": ["long_range", "ramp", "on_hit_effect"],
       "core_promise": "Ramp the number of arrows fired during a four-attack volley.", "player_explanation": "Nyxa fires random opening shots, adds arrows to four attacks, gains Attack Damage, locks mana, and stacks post-cap damage.",
       "effect_families": ["damage", "offensive_buff", "resource"],
       "team_utility": "Should create visible sustained multi-target pressure.", "signature_moment": "An arrow counter grows from two to four over repeated volleys.",
@@ -284,7 +284,7 @@
     },
     {
       "unit_id": "paisley", "ability_id": "paisley_bubbles", "cost": 2,
-      "traits": ["Arcanist", "Kaleidoscope", "Blessed"], "primary_role": "mage", "primary_goal": "mage.wombo_combo_burst", "approaches": ["aoe", "peel"],
+      "traits": ["Arcanist", "Kaleidoscope", "Blessed"], "primary_role": "support", "primary_goal": "support.peel_carry", "approaches": ["aoe", "peel"],
       "core_promise": "Shield two allies and separately strike two enemies.", "player_explanation": "Paisley shields two weak allies, then damages and stuns up to two nearby enemies.",
       "effect_families": ["ally_defense", "damage", "hard_cc"],
       "team_utility": "Provides multi-ally protection and a small enemy interruption.", "signature_moment": "Protected bubbles should pop into local retaliatory bursts.",
@@ -306,7 +306,7 @@
     },
     {
       "unit_id": "teller", "ability_id": "teller_margin_call", "cost": 2,
-      "traits": ["Exile", "Mogul"], "primary_role": "marksman", "primary_goal": "marksman.sustained_dps", "approaches": ["long_range", "burst", "aoe"],
+      "traits": ["Exile", "Mogul"], "primary_role": "marksman", "primary_goal": "marksman.backline_siege", "approaches": ["long_range", "burst", "aoe"],
       "core_promise": "Collect on two farthest targets through body-blockable contract shots.", "player_explanation": "Teller fires two long shots with overflow, can gain a third from Exile, and may earn currency on kills.",
       "effect_families": ["damage", "economy"],
       "team_utility": "Threatens distant carries while rewarding precise kill timing.", "signature_moment": "Two red contract lines appear before separate collection shots and one possible coin payout.",
@@ -317,7 +317,7 @@
     },
     {
       "unit_id": "totem", "ability_id": "totem_cleanse", "cost": 2,
-      "traits": ["Bulwark", "Exile"], "primary_role": "support", "primary_goal": "support.peel_carry", "approaches": ["peel", "cc_immunity", "amp"],
+      "traits": ["Bulwark", "Exile"], "primary_role": "support", "primary_goal": "support.peel_carry", "approaches": ["peel", "damage_reduction", "sustain"],
       "core_promise": "Cleanse and protect the team's carry.", "player_explanation": "Totem cleanses, shields, immunizes and amplifies the damage leader, attacks an enemy, and may auto-cast repeatedly from unrelated debuffs.",
       "effect_families": ["ally_defense", "offensive_buff", "damage", "execute_reset"], "complexity_breach": "Four families exceed the tier, and unrestricted automatic recasts can be triggered by the wrong ally.",
       "team_utility": "Should provide one reliable carry save.", "signature_moment": "One debuff visibly shatters off the carry as a single ward forms.",

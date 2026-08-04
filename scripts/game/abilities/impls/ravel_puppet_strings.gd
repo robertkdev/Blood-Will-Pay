@@ -2,23 +2,10 @@ extends AbilityImplBase
 
 const MovementMath = preload("res://scripts/game/combat/movement/math.gd")
 
-const DAMAGE_BASE: Array[int] = [150, 225, 340]
-const LINK_SHIELD: Array[int] = [170, 255, 385]
-const LINK_AD: float = 28.0
-const LINK_SP: float = 28.0
-const LINK_DR: float = 0.18
-const LINK_DURATION: float = 5.0
-const DISRUPT_RADIUS_TILES: float = 2.45
-const STUN_DURATION: float = 0.75
-const ENGAGE_TILES: float = 2.2
-const FORMATION_PULL_TILES: float = 2.25
-const FORMATION_FAN_STEP_TILES: float = 1.0
-const FORMATION_FAN_MAX_TILES: float = 4.25
+const STRING_WIDTH_TILES: float = 0.8
+const YANK_TILES: float = 2.25
 const MOVE_DURATION: float = 0.18
-
-func _level_index(unit: Unit) -> int:
-	var level: int = int(unit.level) if unit != null else 1
-	return clamp(level - 1, 0, 2)
+const LINK_DURATION: float = 3.0
 
 func _enemy_team(team: String) -> String:
 	return "enemy" if team == "player" else "player"
@@ -29,116 +16,78 @@ func cast(ctx: AbilityContext) -> bool:
 	var caster: Unit = ctx.unit_at(ctx.caster_team, ctx.caster_index)
 	if caster == null or not caster.is_alive():
 		return false
-	var level_index: int = _level_index(caster)
 	var allies: Array[int] = _linked_allies(ctx)
-	for ally_index: int in allies:
-		if ctx.buff_system != null:
-			ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, ally_index, "ravel_puppet_link", {
-				"attack_damage": LINK_AD,
-				"spell_power": LINK_SP,
-				"damage_reduction": LINK_DR
-			}, LINK_DURATION)
-			ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, ally_index, LINK_SHIELD[level_index], LINK_DURATION)
-			ctx.buff_system.record_buff(ctx.state, ctx.caster_team, ally_index, "ravel_pupil_link", {
-				"linked_allies": allies.size()
-			}, float(LINK_SHIELD[level_index]), LINK_DURATION)
-		_engage_toward_enemy(ctx, ally_index)
-	_engage_toward_enemy(ctx, ctx.caster_index)
-	var target_index: int = ctx.current_target(ctx.caster_team, ctx.caster_index)
-	if target_index < 0:
-		target_index = ctx.lowest_hp_enemy(ctx.caster_team)
-	if target_index < 0:
-		return not allies.is_empty()
-	var target_team: String = _enemy_team(ctx.caster_team)
-	var center: Vector2 = ctx.position_of(target_team, target_index)
-	var victims: Array[int] = ctx.enemies_in_radius_at(ctx.caster_team, center, DISRUPT_RADIUS_TILES)
-	if victims.is_empty():
-		victims.append(target_index)
+	if allies.size() < 2:
+		return false
+	var start: Vector2 = ctx.position_of(ctx.caster_team, allies[0])
+	var finish: Vector2 = ctx.position_of(ctx.caster_team, allies[1])
+	if start.distance_to(finish) <= 0.001:
+		return false
+	if ctx.buff_system != null:
+		for ally_index: int in allies:
+			ctx.buff_system.record_buff(ctx.state, ctx.caster_team, ally_index, "ravel_puppet_string", {"partner": allies[1] if ally_index == allies[0] else allies[0]}, 1.0, LINK_DURATION)
+	if ctx.engine.has_signal("vfx_beam_line"):
+		ctx.engine.emit_signal("vfx_beam_line", start, finish, Color(0.78, 0.32, 0.86, 1.0), 5.0, LINK_DURATION)
+	var victims: Array[int] = _enemies_crossing_string(ctx, start, finish)
 	for order: int in range(victims.size()):
-		var victim_index: int = victims[order]
-		ctx.damage_single(ctx.caster_team, ctx.caster_index, victim_index, float(DAMAGE_BASE[level_index]), "magic")
-		ctx.stun(target_team, victim_index, STUN_DURATION)
-		ctx.emit_redirect_semantic(target_team, victim_index, "puppet_focus_redirection", STUN_DURATION, 1.0, 0.55)
-		_pull_enemy_off_line(ctx, target_team, victim_index, center, order)
-	ctx.log("Puppet Strings: linked %d allies and broke %d enemy positions" % [allies.size(), victims.size()])
+		_yank_off_string(ctx, victims[order], start, finish, order)
+	ctx.log("Puppet Strings: linked two allies and yanked %d crossing enemies" % victims.size())
 	return true
 
 func _linked_allies(ctx: AbilityContext) -> Array[int]:
-	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
 	var output: Array[int] = []
 	var pupil_index: int = ctx.pupil_for(ctx.caster_team, ctx.caster_index)
 	if pupil_index >= 0:
 		var pupil: Unit = ctx.unit_at(ctx.caster_team, pupil_index)
 		if pupil != null and pupil.is_alive() and pupil_index != ctx.caster_index:
 			output.append(pupil_index)
-	for index: int in range(allies.size()):
+	for index: int in range(ctx.ally_team_array(ctx.caster_team).size()):
 		if output.size() >= 2:
 			break
 		if index == ctx.caster_index or output.has(index):
 			continue
-		var ally: Unit = allies[index]
-		if ally == null or not ally.is_alive():
-			continue
-		output.append(index)
-	if output.is_empty():
-		var fallback: int = ctx.lowest_hp_ally(ctx.caster_team)
-		if fallback >= 0 and fallback != ctx.caster_index:
-			output.append(fallback)
+		var ally: Unit = ctx.unit_at(ctx.caster_team, index)
+		if ally != null and ally.is_alive():
+			output.append(index)
 	return output
 
-func _engage_toward_enemy(ctx: AbilityContext, ally_index: int) -> void:
-	if ctx.engine.arena_state == null or not ctx.engine.arena_state.has_method("notify_forced_movement"):
-		return
-	var target_index: int = ctx.current_target(ctx.caster_team, ally_index)
-	if target_index < 0:
-		target_index = ctx.lowest_hp_enemy(ctx.caster_team)
-	if target_index < 0:
-		return
-	var start: Vector2 = ctx.position_of(ctx.caster_team, ally_index)
-	var target: Vector2 = ctx.position_of(_enemy_team(ctx.caster_team), target_index)
-	var delta: Vector2 = target - start
-	if delta.length() <= 0.001:
-		return
-	var destination: Vector2 = start + delta.normalized() * ENGAGE_TILES * ctx.tile_size()
-	_emit_position(ctx, ctx.caster_team, ally_index, start)
-	ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ally_index, destination - start, MOVE_DURATION)
-	_set_unit_position(ctx, ctx.caster_team, ally_index, destination)
+func _enemies_crossing_string(ctx: AbilityContext, start: Vector2, finish: Vector2) -> Array[int]:
+	var output: Array[int] = []
+	var line: Vector2 = finish - start
+	var line_length_squared: float = line.length_squared()
+	var target_team: String = _enemy_team(ctx.caster_team)
+	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	for index: int in range(enemies.size()):
+		var enemy: Unit = enemies[index]
+		if enemy == null or not enemy.is_alive():
+			continue
+		var point: Vector2 = ctx.position_of(target_team, index)
+		var t: float = clamp((point - start).dot(line) / line_length_squared, 0.0, 1.0)
+		var closest: Vector2 = start + line * t
+		if point.distance_to(closest) <= STRING_WIDTH_TILES * ctx.tile_size():
+			output.append(index)
+	return output
 
-func _pull_enemy_off_line(ctx: AbilityContext, target_team: String, target_index: int, center: Vector2, order: int) -> void:
+func _yank_off_string(ctx: AbilityContext, target_index: int, start: Vector2, finish: Vector2, order: int) -> void:
+	var target_team: String = _enemy_team(ctx.caster_team)
 	var current: Vector2 = ctx.position_of(target_team, target_index)
-	var from_center: Vector2 = current - center
-	var forward_sign: float = 1.0 if target_team == "enemy" else -1.0
-	var lane_number: int = int(order / 2) + 1
-	var lane_sign: float = -1.0 if (order % 2) == 0 else 1.0
-	var lateral_tiles: float = min(FORMATION_FAN_MAX_TILES, FORMATION_PULL_TILES + FORMATION_FAN_STEP_TILES * float(lane_number - 1))
-	var lane_offset: Vector2 = Vector2(forward_sign * 0.5 * ctx.tile_size(), lane_sign * lateral_tiles * ctx.tile_size())
-	if from_center.length_squared() > 0.001:
-		lane_offset += from_center.normalized() * 0.75 * ctx.tile_size()
-	var destination: Vector2 = current + lane_offset
-	_emit_position(ctx, target_team, target_index, current)
+	var line_direction: Vector2 = (finish - start).normalized()
+	var perpendicular: Vector2 = Vector2(-line_direction.y, line_direction.x)
+	var side: float = -1.0 if order % 2 == 0 else 1.0
+	var destination: Vector2 = current + perpendicular * side * YANK_TILES * ctx.tile_size()
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
 		ctx.engine.arena_state.notify_forced_movement(target_team, target_index, destination - current, MOVE_DURATION)
 	_set_unit_position(ctx, target_team, target_index, destination)
+	ctx.emit_redirect_semantic(target_team, target_index, "puppet_string_yank", MOVE_DURATION, YANK_TILES, 0.55)
 
 func _set_unit_position(ctx: AbilityContext, team: String, index: int, destination: Vector2) -> void:
-	if ctx.engine == null:
-		return
-	if ctx.engine.arena_state == null:
-		_emit_position(ctx, team, index, destination)
+	if ctx.engine.arena_state == null or ctx.engine.arena_state.data == null:
 		return
 	var movement_data: Variant = ctx.engine.arena_state.data
-	if movement_data == null:
-		_emit_position(ctx, team, index, destination)
-		return
 	var clamped: Vector2 = MovementMath.clamp_to_rect(destination, movement_data.arena_bounds)
-	if team == "player":
-		if index >= 0 and index < movement_data.player_positions.size():
-			movement_data.player_positions[index] = clamped
-	else:
-		if index >= 0 and index < movement_data.enemy_positions.size():
-			movement_data.enemy_positions[index] = clamped
-	_emit_position(ctx, team, index, clamped)
-
-func _emit_position(ctx: AbilityContext, team: String, index: int, position: Vector2) -> void:
+	if team == "player" and index >= 0 and index < movement_data.player_positions.size():
+		movement_data.player_positions[index] = clamped
+	elif team == "enemy" and index >= 0 and index < movement_data.enemy_positions.size():
+		movement_data.enemy_positions[index] = clamped
 	if ctx.engine.has_signal("position_updated"):
-		ctx.engine.emit_signal("position_updated", team, index, position.x, position.y)
+		ctx.engine.emit_signal("position_updated", team, index, clamped.x, clamped.y)

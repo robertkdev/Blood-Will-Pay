@@ -29,7 +29,9 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 	var end: Vector2 = ctx.position_of(("enemy" if ctx.caster_team == "player" else "player"), target_idx)
 	var dir: Vector2 = (end - start)
 	var fwd: Vector2 = (dir.normalized() if dir.length() > 0.0 else Vector2.RIGHT)
-	var scored: Array = []
+	if ctx.engine.has_method("_resolver_emit_vfx_beam_line"):
+		ctx.engine._resolver_emit_vfx_beam_line(start, start + fwd * LINE_LEN_TILES * ctx.tile_size(), Color(0.35, 0.95, 0.72, 0.9), 3.0, 0.28)
+	var scored: Array[Dictionary] = []
 	for i in hits:
 		var p: Vector2 = ctx.position_of(("enemy" if ctx.caster_team == "player" else "player"), int(i))
 		var rel: Vector2 = p - start

@@ -134,8 +134,9 @@ func apply_projectile_hit(source_team: String, source_index: int, target_index: 
 			_events.hit_overkill(source_team, source_index, tgt_team, target_index, overkill)
 		var redirected: int = int(response.get("redirected", 0))
 		if redirected > 0:
-			_events.damage_redirected(source_team, source_index, tgt_team, target_index, tgt_team, target_index, redirected, "absorb_redirect")
-			_events.redirect_semantic_applied(tgt_team, target_index, source_team, source_index, "body_block_absorb_redirect", 0.0, float(redirected), _redirect_risk_window_s(tgt_team, target_index))
+			var redirect_index: int = int(response.get("redirect_index", target_index))
+			_events.damage_redirected(source_team, source_index, tgt_team, target_index, tgt_team, redirect_index, redirected, "absorb_redirect")
+			_events.redirect_semantic_applied(tgt_team, redirect_index, tgt_team, target_index, "body_block_absorb_redirect", 0.0, float(redirected), _redirect_risk_window_s(tgt_team, redirect_index))
 		var cphys: int = int(response.get("comp_phys", 0))
 		var cmag: int = int(response.get("comp_mag", 0))
 		var ctrue: int = int(response.get("comp_true", 0))
@@ -196,8 +197,9 @@ func apply_ability_damage(source_team: String, source_index: int, target_index: 
 			_events.hit_overkill(source_team, source_index, tgt_team, target_index, overkill)
 		var redirected: int = int(response.get("redirected", 0))
 		if redirected > 0:
-			_events.damage_redirected(source_team, source_index, tgt_team, target_index, tgt_team, target_index, redirected, "absorb_redirect")
-			_events.redirect_semantic_applied(tgt_team, target_index, source_team, source_index, "body_block_absorb_redirect", 0.0, float(redirected), _redirect_risk_window_s(tgt_team, target_index))
+			var redirect_index: int = int(response.get("redirect_index", target_index))
+			_events.damage_redirected(source_team, source_index, tgt_team, target_index, tgt_team, redirect_index, redirected, "absorb_redirect")
+			_events.redirect_semantic_applied(tgt_team, redirect_index, tgt_team, target_index, "body_block_absorb_redirect", 0.0, float(redirected), _redirect_risk_window_s(tgt_team, redirect_index))
 		var cphys: int = int(response.get("comp_phys", 0))
 		var cmag: int = int(response.get("comp_mag", 0))
 		var ctrue: int = int(response.get("comp_true", 0))

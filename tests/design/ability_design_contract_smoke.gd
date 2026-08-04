@@ -1,6 +1,8 @@
 extends Node
 
 const UnitCatalogScript := preload("res://scripts/game/shop/unit_catalog.gd")
+const UnitFactoryScript := preload("res://scripts/unit_factory.gd")
+const AttackVisualCatalogScript := preload("res://scripts/ui/combat/attack_visual_catalog.gd")
 
 const CONTRACT_PATH: String = "res://tests/design/unit_ability_quality_contract_v1.json"
 const SCORE_FIELDS: Array[String] = [
@@ -60,6 +62,7 @@ func _validate_contract() -> Array[String]:
 	var expected_ids: Array[String] = _playable_ids(catalog)
 	var seen: Dictionary[String, bool] = {}
 	var seen_test_ids: Dictionary[String, bool] = {}
+	var signature_shapes: Dictionary[String, bool] = {}
 	for entry_value: Variant in entries:
 		if not entry_value is Dictionary:
 			failures.append("unit entry must be an object")
@@ -74,6 +77,7 @@ func _validate_contract() -> Array[String]:
 			continue
 		seen[unit_id] = true
 		_validate_entry(entry, unit_id, catalog, budgets, seen_test_ids, failures)
+		_validate_visual_signature(unit_id, signature_shapes, failures)
 	for expected_id: String in expected_ids:
 		if not seen.has(expected_id):
 			failures.append("missing playable unit %s" % expected_id)
@@ -82,7 +86,23 @@ func _validate_contract() -> Array[String]:
 			failures.append("unexpected or non-playable unit %s" % seen_id)
 	if entries.size() != expected_ids.size():
 		failures.append("contract count %d does not match playable roster %d" % [entries.size(), expected_ids.size()])
+	if signature_shapes.size() < 20:
+		failures.append("playable roster needs at least 20 distinct visual motifs, got %d" % signature_shapes.size())
 	return failures
+
+func _validate_visual_signature(unit_id: String, signature_shapes: Dictionary[String, bool], failures: Array[String]) -> void:
+	var unit: Unit = UnitFactoryScript.spawn(unit_id)
+	if unit == null:
+		failures.append("%s could not spawn for visual signature validation" % unit_id)
+		return
+	var style: Dictionary[String, Variant] = AttackVisualCatalogScript.style_for(unit, "player", false)
+	if not bool(style.get("signature_overridden", false)):
+		failures.append("%s has no explicit visual signature" % unit_id)
+	var shape: String = String(style.get("shape", "")).strip_edges()
+	if shape == "":
+		failures.append("%s visual signature has no shape" % unit_id)
+		return
+	signature_shapes[shape] = true
 
 func _read_contract(failures: Array[String]) -> Dictionary:
 	var file: FileAccess = FileAccess.open(CONTRACT_PATH, FileAccess.READ)

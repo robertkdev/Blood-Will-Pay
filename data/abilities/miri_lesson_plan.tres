@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "miri_lesson_plan"
 name = "Lesson Plan"
-description = "Names a Student, grants mana, shield, damage amp, and steps the lesson group into a protected opener."
-targeting_summary = "Ally without shared traits, or first ally fallback; also stuns lowest-health enemy."
+description = "Shields Miri's Student, sends only the Student forward, and stuns the enemy at the arrival point."
+targeting_summary = "Linked Student ally and one destination enemy."
 base_cost = 30
-tags = ["support", "shield", "amp", "engage", "cc"]
+tags = ["shield", "ally_movement", "stun"]

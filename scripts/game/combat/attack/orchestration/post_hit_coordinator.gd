@@ -112,12 +112,14 @@ func apply(source_team: String, source_index: int, target_team: String, target_i
 	return flags
 
 func _apply_sari_on_hit(buff_system: BuffSystem, source_team: String, source_index: int, target_team: String, target_index: int, dealt: int) -> void:
-	var target: Unit = TeamUtils.unit_at(state, target_team, target_index)
-	if target == null or not target.is_alive():
-		return
 	var meta: Dictionary = buff_system.get_tag_data(state, source_team, source_index, BuffTags.TAG_SARI_ON_HIT)
 	if meta.is_empty():
 		return
+	var marked_target: int = int(meta.get("marked_target", -1))
+	var hits_left: int = int(meta.get("hits_left", 0))
+	if target_index != marked_target or hits_left <= 0:
+		return
+	var target: Unit = TeamUtils.unit_at(state, target_team, target_index)
 	var armor_shred: float = max(0.0, float(meta.get("armor_shred", 0.0)))
 	var duration: float = max(0.1, float(meta.get("duration", 3.0)))
 	var magnitude_pct: float = max(0.0, float(meta.get("magnitude_pct", 0.0)))
@@ -125,9 +127,19 @@ func _apply_sari_on_hit(buff_system: BuffSystem, source_team: String, source_ind
 	var fields: Dictionary = {}
 	if armor_shred > 0.0:
 		fields["armor"] = -armor_shred
-	buff_system.push_source(source_team, source_index, "on_hit")
-	if fields.is_empty():
-		buff_system.record_debuff(state, target_team, target_index, "sari_on_hit", {"magnitude": magnitude}, magnitude, duration)
-	else:
-		buff_system.apply_stats_labeled(state, target_team, target_index, "sari_on_hit_shred", fields, duration)
-	buff_system.pop_source()
+	if target != null and target.is_alive():
+		buff_system.push_source(source_team, source_index, "on_hit")
+		if fields.is_empty():
+			buff_system.record_debuff(state, target_team, target_index, "sari_on_hit", {"magnitude": magnitude}, magnitude, duration)
+		else:
+			# Each of the three marked hits is a separate timed shred layer.
+			buff_system.apply_stats_buff(state, target_team, target_index, fields, duration)
+		buff_system.pop_source()
+	var active_tag: Dictionary = buff_system.get_tag(state, source_team, source_index, BuffTags.TAG_SARI_ON_HIT)
+	if active_tag.is_empty():
+		return
+	var updated_meta: Dictionary = meta.duplicate(true)
+	updated_meta["hits_left"] = max(0, hits_left - 1)
+	active_tag["data"] = updated_meta
+	if int(updated_meta["hits_left"]) <= 0:
+		active_tag["remaining"] = 0.0

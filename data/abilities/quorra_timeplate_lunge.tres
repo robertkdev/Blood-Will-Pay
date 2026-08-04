@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "quorra_timeplate_lunge"
 name = "Timeplate Lunge"
-description = "Blinks to a backline enemy, slips out of targetability, and leaves a ticking timeplate wound."
-targeting_summary = "Backline enemy."
+description = "Leaves a time anchor, blinks to the deepest enemy, and attaches a four-tick wound. If the wound completes while Quorra lives, she rewinds to the anchor."
+targeting_summary = "Deepest living enemy; cleansing the wound cancels remaining ticks, and killing Quorra prevents the rewind."
 base_cost = 55
-tags = ["damage", "access_backline", "dot", "untargetable"]
+tags = ["damage", "access_backline", "dot", "rewind"]

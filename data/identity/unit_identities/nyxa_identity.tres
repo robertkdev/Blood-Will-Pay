@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource( 1 )
 primary_role = "marksman"
-primary_goal = "marksman.backline_siege"
-approaches = ["long_range", "ramp", "aoe"]
+primary_goal = "marksman.sustained_dps"
+approaches = ["long_range", "ramp", "on_hit_effect"]
 alt_goals = []

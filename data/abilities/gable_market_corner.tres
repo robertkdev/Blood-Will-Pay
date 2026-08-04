@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "gable_market_corner"
 name = "Market Corner"
-description = "Fires long-range rotating on-hit shots and ramps with protected high-cost board context."
-targeting_summary = "Highest-health enemy; line shot can also catch furthest enemies."
+description = "Marks the highest-value enemy. Gable's attacks against the mark ricochet to the nearest other enemy."
+targeting_summary = "Highest-cost and highest-output enemy; ricochets reward sustained focus on that mark."
 base_cost = 55
-tags = ["damage", "long_range", "on_hit_effect", "ramp"]
+tags = ["damage", "mark", "on_hit_effect", "sustained_dps"]

@@ -6,7 +6,7 @@ const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.
 
 const MAX_ACTIVE_BURSTS: int = 16
 const MAX_ACTIVE_LINES: int = 10
-const READABILITY_MODULATE: Color = Color(0.74, 0.62, 0.54, 0.42)
+const READABILITY_MODULATE: Color = Color(0.92, 0.86, 0.82, 0.82)
 
 const KIND_ABILITY: String = "ability"
 const KIND_HEAL: String = "heal"
@@ -43,7 +43,7 @@ func _ready() -> void:
 	z_as_relative = true
 	z_index = 5
 	self_modulate = READABILITY_MODULATE
-	set_meta("gothic_readability_profile", "v2")
+	set_meta("gothic_readability_profile", "v3_ability_signatures")
 	_fill_parent_rect()
 	set_process(true)
 
@@ -157,19 +157,31 @@ func _on_ability_cast(source_team: String, source_index: int, ability_id: String
 		var ability_options: Dictionary[String, Variant] = _options_from_style(style)
 		ability_options["ability_id"] = String(ability_id)
 		ability_options["shape"] = String(style.get("shape", "rune"))
+		ability_options["phase"] = "source"
+		ability_options["duration"] = 0.72
 		_add_burst(KIND_ABILITY, source_team, source_index, ability_options)
 	var target_info: Dictionary[String, Variant] = _actor_position(target_team, target_index)
 	if not bool(target_info.get("found", false)) and target_point != Vector2.ZERO:
 		target_info = {"found": true, "position": target_point}
 	if bool(source_info.get("found", false)) and bool(target_info.get("found", false)):
 		if source_team != target_team or source_index != target_index:
+			if target_index >= 0:
+				var target_options: Dictionary[String, Variant] = _options_from_style(style)
+				target_options["ability_id"] = String(ability_id)
+				target_options["shape"] = String(style.get("shape", "rune"))
+				target_options["phase"] = "target"
+				target_options["duration"] = 0.86
+				target_options["radius"] = max(20.0, float(style.get("impact_radius", 26.0)) * 0.86)
+				_add_burst(KIND_ABILITY, target_team, target_index, target_options)
 			_add_line(
 				source_info.get("position", Vector2.ZERO),
 				target_info.get("position", Vector2.ZERO),
 				_effect_color(style, "edge_color", Color(0.80, 0.95, 1.0, 0.92)),
-				2.6,
-				0.28,
-				"ability"
+				3.2,
+				0.48,
+				"ability",
+				String(ability_id),
+				String(style.get("shape", "rune"))
 			)
 
 func _on_heal_applied(source_team: String, source_index: int, target_team: String, target_index: int, healed: int, overheal: int, _before_hp: int, _after_hp: int) -> void:
@@ -409,6 +421,7 @@ func _add_burst(kind: String, team: String, index: int, options_value: Variant =
 		"magnitude": float(options.get("magnitude", 0.0)),
 		"kind_label": String(options.get("kind_label", "")),
 		"ability_id": String(options.get("ability_id", "")),
+		"phase": String(options.get("phase", "impact")),
 	}
 	_bursts.append(effect)
 	while _bursts.size() > MAX_ACTIVE_BURSTS:
@@ -426,7 +439,7 @@ func _add_source_link(source_team: String, source_index: int, target_team: Strin
 		return
 	_add_line(source_info.get("position", Vector2.ZERO), target_info.get("position", Vector2.ZERO), color, width, duration, kind)
 
-func _add_line(start_global: Vector2, end_global: Vector2, color: Color, width: float, duration: float, kind: String) -> void:
+func _add_line(start_global: Vector2, end_global: Vector2, color: Color, width: float, duration: float, kind: String, ability_id: String = "", shape: String = "") -> void:
 	var line: Dictionary[String, Variant] = {
 		"kind": String(kind),
 		"from": _local_from_global(start_global),
@@ -435,6 +448,8 @@ func _add_line(start_global: Vector2, end_global: Vector2, color: Color, width: 
 		"width": max(1.0, float(width)),
 		"elapsed": 0.0,
 		"duration": max(0.05, float(duration)),
+		"ability_id": String(ability_id),
+		"shape": String(shape),
 	}
 	_lines.append(line)
 	while _lines.size() > MAX_ACTIVE_LINES:
@@ -454,6 +469,10 @@ func _draw_effect_line(line: Dictionary[String, Variant]) -> void:
 	draw_line(from_pos, to_pos, Color(color.r, color.g, color.b, color.a * inv), width, true)
 	var marker_pos: Vector2 = from_pos.lerp(to_pos, clamp(t * 1.25, 0.0, 1.0))
 	draw_circle(marker_pos, width * 1.7, Color(color.r, color.g, color.b, color.a * 0.92 * inv))
+	if String(line.get("ability_id", "")) != "":
+		var signature_alpha: float = max(0.28, inv)
+		_draw_signature_glyph(marker_pos, width * 3.2, String(line.get("shape", "rune")), t * TAU, color, color.lightened(0.24), Color.WHITE, signature_alpha)
+		draw_arc(to_pos, width * (3.6 + 1.8 * t), 0.0, TAU, 24, Color(color.r, color.g, color.b, 0.72 * inv), max(1.0, width * 0.62), true)
 
 func _draw_effect_burst(effect: Dictionary[String, Variant]) -> void:
 	var kind: String = String(effect.get("kind", ""))
@@ -468,7 +487,7 @@ func _draw_effect_burst(effect: Dictionary[String, Variant]) -> void:
 	var accent: Color = effect.get("accent_color", Color.WHITE)
 	match kind:
 		KIND_ABILITY:
-			_draw_ability(pos, radius, t, inv, String(effect.get("shape", "rune")), core, edge, accent)
+			_draw_ability(pos, radius, t, inv, String(effect.get("shape", "rune")), String(effect.get("phase", "impact")), core, edge, accent)
 		KIND_HEAL:
 			_draw_heal(pos, radius, t, inv, core, edge, accent)
 		KIND_SHIELD:
@@ -496,11 +515,20 @@ func _draw_effect_burst(effect: Dictionary[String, Variant]) -> void:
 		_:
 			_draw_buff(pos, radius, t, inv, core, edge, accent)
 
-func _draw_ability(pos: Vector2, radius: float, t: float, inv: float, shape: String, core: Color, edge: Color, accent: Color) -> void:
+func _draw_ability(pos: Vector2, radius: float, t: float, inv: float, shape: String, phase: String, core: Color, edge: Color, accent: Color) -> void:
 	var ring_radius: float = lerp(radius * 0.52, radius * 1.18, t)
-	draw_circle(pos, radius * 0.98, Color(core.r, core.g, core.b, 0.26 * inv))
-	draw_arc(pos, ring_radius, -PI * 0.15, TAU * 0.82, 48, Color(edge.r, edge.g, edge.b, 1.0 * inv), max(1.5, 5.0 * inv), true)
-	draw_arc(pos, radius * 0.62, PI * 0.18 + t * TAU, PI * 1.52 + t * TAU, 32, Color(accent.r, accent.g, accent.b, 0.96 * inv), max(1.4, 3.4 * inv), true)
+	var fill_alpha: float = 0.12 if phase == "target" else 0.26
+	var outer_width: float = 3.2 if phase == "target" else 5.0
+	draw_circle(pos, radius * 0.98, Color(core.r, core.g, core.b, fill_alpha * inv))
+	draw_arc(pos, ring_radius, -PI * 0.15, TAU * 0.82, 48, Color(edge.r, edge.g, edge.b, 1.0 * inv), max(1.5, outer_width * inv), true)
+	if phase == "target":
+		for quadrant: int in range(4):
+			var angle: float = TAU * float(quadrant) / 4.0
+			var inner: Vector2 = pos + Vector2(cos(angle), sin(angle)) * radius * 0.66
+			var outer: Vector2 = pos + Vector2(cos(angle), sin(angle)) * radius * 1.05
+			draw_line(inner, outer, Color(accent.r, accent.g, accent.b, 0.96 * inv), max(1.5, 3.2 * inv), true)
+	else:
+		draw_arc(pos, radius * 0.62, PI * 0.18 + t * TAU, PI * 1.52 + t * TAU, 32, Color(accent.r, accent.g, accent.b, 0.96 * inv), max(1.4, 3.4 * inv), true)
 	_draw_signature_glyph(pos, radius * 0.42, shape, t * TAU, core, edge, accent, inv)
 
 func _draw_phase(pos: Vector2, radius: float, t: float, inv: float, core: Color, edge: Color, accent: Color) -> void:
@@ -642,6 +670,46 @@ func _draw_signature_glyph(pos: Vector2, radius: float, shape: String, spin: flo
 			draw_circle(pos, radius * 0.30, c_core)
 		"star":
 			_draw_star(pos, radius, spin, c_edge, c_core)
+		"hammer", "fist":
+			draw_line(pos + Vector2(-radius * 0.62, radius * 0.70), pos + Vector2(radius * 0.28, -radius * 0.36), c_edge, max(1.0, radius * 0.18), true)
+			draw_rect(Rect2(pos + Vector2(-radius * 0.18, -radius * 0.82), Vector2(radius * 1.10, radius * 0.56)), c_accent, false, max(1.0, radius * 0.16), true)
+		"chain", "flesh_chain", "knot":
+			draw_arc(pos + Vector2(-radius * 0.28, 0.0), radius * 0.46, -PI * 0.72, PI * 0.72, 18, c_edge, max(1.0, radius * 0.16), true)
+			draw_arc(pos + Vector2(radius * 0.28, 0.0), radius * 0.46, PI * 0.28, PI * 1.72, 18, c_accent, max(1.0, radius * 0.16), true)
+		"paper", "receipt", "lesson", "exam", "footnote":
+			draw_rect(Rect2(pos - Vector2(radius * 0.62, radius * 0.78), Vector2(radius * 1.24, radius * 1.56)), c_edge, false, max(1.0, radius * 0.14), true)
+			for row: int in range(3):
+				var y: float = pos.y - radius * 0.36 + float(row) * radius * 0.34
+				draw_line(Vector2(pos.x - radius * 0.36, y), Vector2(pos.x + radius * 0.36, y), c_accent, max(1.0, radius * 0.08), true)
+		"blood", "poultice":
+			var drop: PackedVector2Array = PackedVector2Array([pos + Vector2(0.0, -radius), pos + Vector2(radius * 0.68, radius * 0.34), pos + Vector2(0.0, radius), pos + Vector2(-radius * 0.68, radius * 0.34)])
+			draw_polygon(drop, PackedColorArray([c_edge, c_accent, c_core, c_accent]))
+		"ribbon", "puppet", "constellation":
+			var ribbon: PackedVector2Array = PackedVector2Array([pos + Vector2(-radius, -radius * 0.44), pos + Vector2(-radius * 0.30, radius * 0.42), pos + Vector2(radius * 0.30, -radius * 0.42), pos + Vector2(radius, radius * 0.44)])
+			draw_polyline(ribbon, c_edge, max(1.0, radius * 0.16), true)
+			_draw_star(pos, radius * 0.28, spin, c_accent, c_core)
+		"spark", "static", "fuse":
+			var bolt: PackedVector2Array = PackedVector2Array([pos + Vector2(-radius * 0.30, -radius), pos + Vector2(radius * 0.22, -radius * 0.18), pos + Vector2(-radius * 0.08, -radius * 0.18), pos + Vector2(radius * 0.34, radius), pos + Vector2(-radius * 0.38, radius * 0.12), pos + Vector2(-radius * 0.06, radius * 0.12)])
+			draw_polyline(bolt, c_edge, max(1.0, radius * 0.18), true)
+		"swap", "exit", "late_fee", "last_word":
+			draw_line(pos + Vector2(-radius, -radius * 0.40), pos + Vector2(radius, -radius * 0.40), c_edge, max(1.0, radius * 0.14), true)
+			draw_line(pos + Vector2(radius, -radius * 0.40), pos + Vector2(radius * 0.52, -radius * 0.78), c_edge, max(1.0, radius * 0.14), true)
+			draw_line(pos + Vector2(radius, -radius * 0.40), pos + Vector2(radius * 0.52, -radius * 0.02), c_edge, max(1.0, radius * 0.14), true)
+			draw_line(pos + Vector2(radius, radius * 0.42), pos + Vector2(-radius, radius * 0.42), c_accent, max(1.0, radius * 0.14), true)
+		"crater", "gate", "sanctuary":
+			draw_arc(pos, radius, 0.0, TAU, 28, c_edge, max(1.0, radius * 0.15), true)
+			draw_arc(pos, radius * 0.58, PI, TAU, 18, c_accent, max(1.0, radius * 0.16), true)
+		"prism", "spectrum":
+			var prism: PackedVector2Array = PackedVector2Array([pos + Vector2(0.0, -radius), pos + Vector2(radius * 0.86, radius * 0.70), pos + Vector2(-radius * 0.86, radius * 0.70), pos + Vector2(0.0, -radius)])
+			draw_polyline(prism, c_edge, max(1.0, radius * 0.15), true)
+			draw_line(pos + Vector2(-radius * 0.76, radius * 0.12), pos + Vector2(radius * 0.76, radius * 0.12), c_accent, max(1.0, radius * 0.12), true)
+		"timeplate", "debt", "market", "bid":
+			draw_arc(pos, radius, 0.0, TAU, 32, c_edge, max(1.0, radius * 0.15), true)
+			draw_line(pos, pos + Vector2(cos(spin), sin(spin)) * radius * 0.72, c_accent, max(1.0, radius * 0.14), true)
+			draw_circle(pos, radius * 0.16, c_core)
+		"hook", "isolate":
+			draw_arc(pos, radius * 0.72, -PI * 0.20, PI * 1.22, 24, c_edge, max(1.0, radius * 0.18), true)
+			draw_line(pos + Vector2(-radius * 0.66, radius * 0.42), pos + Vector2(-radius * 0.10, radius), c_accent, max(1.0, radius * 0.16), true)
 		_:
 			draw_arc(pos, radius, spin, spin + TAU * 0.76, 30, c_edge, max(1.0, radius * 0.16), true)
 			draw_arc(pos, radius * 0.58, -spin, -spin + TAU * 0.68, 24, c_accent, max(1.0, radius * 0.12), true)

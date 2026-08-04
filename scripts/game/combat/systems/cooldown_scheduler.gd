@@ -101,6 +101,11 @@ func _collect_events(team: String, units: Array[Unit], cds: Array[float], delta:
 			if cds[idx] < 0.0:
 				cds[idx] = 0.0
 			continue
+		# Disarm prevents basic attacks without blocking movement or ability casts.
+		if buff_system != null and buff_system.has_tag(state, team, idx, "disarm"):
+			if cds[idx] < 0.0:
+				cds[idx] = 0.0
+			continue
 		var cooldown: float = _compute_cooldown(unit)
 		var max_shots: int = clamp(int(ceil(delta / max(0.01, cooldown))) + 2, 1, 100)
 		var shots: int = 0
@@ -143,8 +148,8 @@ func _order_for(team: String, count: int) -> Array[int]:
 	return _enemy_order.slice(0, count)
 
 func _refresh_orders() -> void:
-	var p_size := (state.player_team.size() if state else 0)
-	var e_size := (state.enemy_team.size() if state else 0)
+	var p_size: int = state.player_team.size() if state else 0
+	var e_size: int = state.enemy_team.size() if state else 0
 	_player_order.clear()
 	_enemy_order.clear()
 	for i in range(p_size): _player_order.append(i)
@@ -152,21 +157,21 @@ func _refresh_orders() -> void:
 	if rng != null:
 		if _player_order.size() > 1:
 			for k in range(_player_order.size() - 1, 0, -1):
-				var r := int(rng.randi() % (k + 1))
-				var tmp := _player_order[k]
+				var r: int = int(rng.randi() % (k + 1))
+				var tmp: int = _player_order[k]
 				_player_order[k] = _player_order[r]
 				_player_order[r] = tmp
 		if _enemy_order.size() > 1:
 			for k2 in range(_enemy_order.size() - 1, 0, -1):
-				var r2 := int(rng.randi() % (k2 + 1))
-				var tmp2 := _enemy_order[k2]
+				var r2: int = int(rng.randi() % (k2 + 1))
+				var tmp2: int = _enemy_order[k2]
 				_enemy_order[k2] = _enemy_order[r2]
 				_enemy_order[r2] = tmp2
 
 func _ensure_order_sizes() -> void:
 	# Append new indices at the end if team sizes grew (e.g., summons)
-	var p_size := (state.player_team.size() if state else 0)
-	var e_size := (state.enemy_team.size() if state else 0)
+	var p_size: int = state.player_team.size() if state else 0
+	var e_size: int = state.enemy_team.size() if state else 0
 	while _player_order.size() < p_size:
 		_player_order.append(_player_order.size())
 	while _enemy_order.size() < e_size:

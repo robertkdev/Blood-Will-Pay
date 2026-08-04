@@ -73,10 +73,12 @@ func _capture_group(group: Dictionary) -> void:
 		return
 	_make_durable(_manager.player_team)
 	_make_durable(_manager.enemy_team)
-	await _settle(0.16)
+	# Capture the readable pre-cast board after the short combat-entry strip clears.
+	await _settle(0.75)
 	_save_capture(group, "setup")
+	var expected_casts: Array[String] = _expected_player_abilities()
 	_force_player_mana()
-	await _wait_for_cast(1.5)
+	await _wait_for_casts(expected_casts, 2.5)
 	await _settle(0.05)
 	_save_capture(group, "impact")
 	await _settle(0.52)
@@ -100,14 +102,36 @@ func _force_player_mana() -> void:
 			continue
 		unit.mana = unit.mana_max
 
-func _wait_for_cast(timeout_seconds: float) -> void:
+func _expected_player_abilities() -> Array[String]:
+	var ability_ids: Array[String] = []
+	if _manager == null:
+		return ability_ids
+	for unit: Unit in _manager.player_team:
+		if unit == null:
+			continue
+		var ability_id: String = String(unit.ability_id).strip_edges()
+		if ability_id != "" and not ability_ids.has(ability_id):
+			ability_ids.append(ability_id)
+	return ability_ids
+
+func _wait_for_casts(expected_casts: Array[String], timeout_seconds: float) -> void:
 	var elapsed: float = 0.0
-	while _seen_casts.is_empty() and elapsed < timeout_seconds:
+	while not _contains_all(_seen_casts, expected_casts) and elapsed < timeout_seconds:
 		await get_tree().process_frame
 		var delta: float = max(0.001, get_process_delta_time())
 		elapsed += delta
-	if _seen_casts.is_empty():
-		_failures.append("%s produced no player ability cast after forced mana" % _current_group)
+	if not _contains_all(_seen_casts, expected_casts):
+		var missing: Array[String] = []
+		for ability_id: String in expected_casts:
+			if not _seen_casts.has(ability_id):
+				missing.append(ability_id)
+		_failures.append("%s missing forced casts: %s" % [_current_group, ", ".join(missing)])
+
+func _contains_all(actual: Array[String], expected: Array[String]) -> bool:
+	for value: String in expected:
+		if not actual.has(value):
+			return false
+	return true
 
 func _on_ability_cast(source_team: String, _source_index: int, ability_id: String, _target_team: String, _target_index: int, _target_point: Vector2) -> void:
 	if source_team != "player":
@@ -135,6 +159,7 @@ func _save_capture(group: Dictionary, event: String) -> void:
 		return
 	_captures.append({
 		"id": "%s_%s" % [_current_group, event],
+		"group": _current_group,
 		"path": ProjectSettings.globalize_path(resource_path),
 		"camera": "player",
 		"layer": "final",

@@ -29,11 +29,6 @@ func cast(ctx: AbilityContext) -> bool:
 	var hits: Array[int] = ctx.enemies_in_line(ctx.caster_team, ctx.caster_index, target_index, LINE_LENGTH_TILES, LINE_WIDTH_TILES)
 	if not hits.has(target_index):
 		hits.append(target_index)
-	for extra_index: int in ctx.two_nearest_enemies(ctx.caster_team):
-		if hits.size() >= 2:
-			break
-		if not hits.has(extra_index):
-			hits.append(extra_index)
 	var damage: float = float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage)
 	for hit_index: int in hits:
 		ctx.damage_single(ctx.caster_team, ctx.caster_index, hit_index, damage, "physical")
