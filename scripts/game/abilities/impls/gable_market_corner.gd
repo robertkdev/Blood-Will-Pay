@@ -1,18 +1,12 @@
 extends AbilityImplBase
 
-const DAMAGE_BASE: Array[int] = [250, 375, 565]
-const AD_RATIO: float = 1.45
-const LINE_LENGTH_TILES: float = 7.0
-const LINE_WIDTH_TILES: float = 0.8
-const SHOT_DURATION: float = 5.0
-const SELF_AS: float = 0.22
-const SELF_AD: float = 26.0
-const SHRED: float = 22.0
-const AMP_PCT: float = 0.12
+const MARK_DURATION: float = 6.0
+const RICOCHET_RATIO: float = 0.55
 
-func _level_index(unit: Unit) -> int:
-	var level: int = int(unit.level) if unit != null else 1
-	return clamp(level - 1, 0, 2)
+var _active_ctx: AbilityContext = null
+var _marked_team: String = ""
+var _marked_index: int = -1
+var _resolving_ricochet: bool = false
 
 func _enemy_team(team: String) -> String:
 	return "enemy" if team == "player" else "player"
@@ -23,64 +17,77 @@ func cast(ctx: AbilityContext) -> bool:
 	var caster: Unit = ctx.unit_at(ctx.caster_team, ctx.caster_index)
 	if caster == null or not caster.is_alive():
 		return false
-	var target_index: int = _highest_hp_enemy(ctx)
+	var target_index: int = _highest_value_enemy(ctx)
 	if target_index < 0:
 		return false
-	var target_team: String = _enemy_team(ctx.caster_team)
-	var hits: Array[int] = ctx.enemies_in_line(ctx.caster_team, ctx.caster_index, target_index, LINE_LENGTH_TILES, LINE_WIDTH_TILES)
-	if not hits.has(target_index):
-		hits.append(target_index)
-	for extra_index: int in ctx.two_furthest_enemies(ctx.caster_team):
-		if hits.size() >= 2:
-			break
-		if not hits.has(extra_index):
-			hits.append(extra_index)
+	_active_ctx = ctx
+	_marked_team = _enemy_team(ctx.caster_team)
+	_marked_index = target_index
 	if ctx.buff_system != null:
-		ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, ctx.caster_index, "gable_market_corner_book", {
-			"attack_speed": SELF_AS,
-			"attack_damage": SELF_AD
-		}, SHOT_DURATION)
-	var board_value: int = _board_investment(ctx)
-	var damage: float = float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage) + float(board_value * 18)
-	for order: int in range(hits.size()):
-		var hit_index: int = hits[order]
-		ctx.damage_single(ctx.caster_team, ctx.caster_index, hit_index, damage, "physical")
-		if ctx.buff_system != null:
-			ctx.buff_system.push_source(ctx.caster_team, ctx.caster_index, "on_hit")
-			if order % 3 == 0:
-				ctx.buff_system.apply_stats_labeled(ctx.state, target_team, hit_index, "gable_market_shred", {
-					"armor": -SHRED,
-					"magic_resist": -SHRED
-				}, SHOT_DURATION)
-			elif order % 3 == 1:
-				ctx.buff_system.apply_tag(ctx.state, target_team, hit_index, "root", 0.35, {})
-			else:
-				ctx.buff_system.apply_tag(ctx.state, target_team, hit_index, "gable_market_amp_window", SHOT_DURATION, {
-					"damage_amp_pct": AMP_PCT
-				})
-			ctx.buff_system.pop_source()
-	ctx.emit_ramp_state("market_corner", max(2, board_value), float(board_value * 18), 8, SHOT_DURATION, "high_cost_board_context")
-	ctx.log("Market Corner: rotated on-hit shots through %d targets" % hits.size())
+		ctx.buff_system.record_debuff(ctx.state, _marked_team, target_index, "gable_market_corner_mark", {"ricochet_ratio": RICOCHET_RATIO}, RICOCHET_RATIO, MARK_DURATION)
+	var hit_callback: Callable = Callable(self, "_on_hit_applied")
+	if not ctx.engine.hit_applied.is_connected(hit_callback):
+		ctx.engine.hit_applied.connect(hit_callback)
+	_schedule_expiry()
+	if ctx.engine.has_signal("target_start"):
+		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, _marked_team, target_index)
+	ctx.log("Market Corner: marked high-value enemy %d for ricocheting attacks" % target_index)
 	return true
 
-func _highest_hp_enemy(ctx: AbilityContext) -> int:
+func _highest_value_enemy(ctx: AbilityContext) -> int:
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
 	var best_index: int = -1
-	var best_hp: int = -1
+	var best_score: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
 		if enemy == null or not enemy.is_alive():
 			continue
-		if int(enemy.hp) > best_hp:
-			best_hp = int(enemy.hp)
+		var score: float = float(enemy.cost * 250) + float(enemy.attack_damage) + float(enemy.spell_power)
+		if score > best_score:
+			best_score = score
 			best_index = index
 	return best_index
 
-func _board_investment(ctx: AbilityContext) -> int:
-	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
-	var value: int = 0
-	for ally: Unit in allies:
-		if ally == null or not ally.is_alive():
+func _on_hit_applied(source_team: String, source_index: int, target_index: int, _rolled_damage: int, dealt_damage: int, _crit: bool, _before_hp: int, _after_hp: int, _player_cd: float, _enemy_cd: float) -> void:
+	if _resolving_ricochet or _active_ctx == null or dealt_damage <= 0:
+		return
+	if source_team != _active_ctx.caster_team or source_index != _active_ctx.caster_index or target_index != _marked_index:
+		return
+	var next_index: int = _nearest_other_enemy(_active_ctx, _marked_index)
+	if next_index < 0:
+		return
+	_resolving_ricochet = true
+	_active_ctx.damage_single(source_team, source_index, next_index, float(dealt_damage) * RICOCHET_RATIO, "physical")
+	_resolving_ricochet = false
+
+func _nearest_other_enemy(ctx: AbilityContext, excluded_index: int) -> int:
+	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	var marked_position: Vector2 = ctx.position_of(_marked_team, excluded_index)
+	var best_index: int = -1
+	var best_distance: float = INF
+	for index: int in range(enemies.size()):
+		if index == excluded_index:
 			continue
-		value += max(1, int(ally.cost))
-	return clamp(value / 2, 2, 8)
+		var enemy: Unit = enemies[index]
+		if enemy == null or not enemy.is_alive():
+			continue
+		var distance: float = marked_position.distance_to(ctx.position_of(_marked_team, index))
+		if distance < best_distance:
+			best_distance = distance
+			best_index = index
+	return best_index
+
+func _schedule_expiry() -> void:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	tree.create_timer(MARK_DURATION).timeout.connect(Callable(self, "_expire_mark"), CONNECT_ONE_SHOT)
+
+func _expire_mark() -> void:
+	if _active_ctx != null and _active_ctx.engine != null:
+		var hit_callback: Callable = Callable(self, "_on_hit_applied")
+		if _active_ctx.engine.hit_applied.is_connected(hit_callback):
+			_active_ctx.engine.hit_applied.disconnect(hit_callback)
+	_active_ctx = null
+	_marked_team = ""
+	_marked_index = -1

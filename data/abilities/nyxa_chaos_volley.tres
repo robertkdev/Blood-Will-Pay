@@ -1,12 +1,12 @@
 [gd_resource type="Resource" script_class="AbilityDef" load_steps=2 format=3 uid="uid://dm87cmkegmt38"]
 
-[ext_resource type="Script" uid="uid://c6oi01wpbnkvs" path="res://scripts/game/abilities/ability_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/game/abilities/ability_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 id = "nyxa_chaos_volley"
 name = "Chaos Volley"
-description = "Fires random arrows for the next four attacks, gaining +1 arrow per cast."
-targeting_summary = "Initial volley hits random living enemies; empowered attacks keep using attack targeting."
+description = "Empowers the next 4 attacks with extra arrows. Each cast adds one arrow, up to 4 total arrows per attack."
+targeting_summary = "Self-buff; empowered attacks use normal attack targeting."
 base_cost = 50
-tags = Array[String](["damage", "multishot"])
+tags = Array[String](["multishot", "ramp"])

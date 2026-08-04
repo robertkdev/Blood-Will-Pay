@@ -24,8 +24,8 @@ func make(state: BattleState, teamA_ids: Array[String], teamB_ids: Array[String]
     _populate_team(state.enemy_team, teamB_ids)
     _apply_initial_unit_overrides(state, teamA_ids, teamB_ids, map_params)
 
-    var tuned = _derive_params(map_params, state)
-    var center_raw = tuned.get("center", Vector2.ZERO)
+    var tuned: Dictionary = _derive_params(map_params, state)
+    var center_raw: Variant = tuned.get("center", Vector2.ZERO)
     var center_tiles: Vector2 = (center_raw as Vector2) if center_raw is Vector2 else Vector2.ZERO
     var half_width_tiles: float = float(tuned.get("half_width", 6.0))
     var half_height_tiles: float = float(tuned.get("half_height", 5.0))
@@ -43,9 +43,9 @@ func make(state: BattleState, teamA_ids: Array[String], teamB_ids: Array[String]
     var spawn_x_px: float = spawn_x_tiles * tile_size
     var row_spacing_px: float = row_spacing_tiles * tile_size
 
-    var bounds = Rect2(center_px - Vector2(half_width_px, half_height_px), Vector2(half_width_px * 2.0, half_height_px * 2.0))
+    var bounds: Rect2 = Rect2(center_px - Vector2(half_width_px, half_height_px), Vector2(half_width_px * 2.0, half_height_px * 2.0))
 
-    var count = max(state.player_team.size(), state.enemy_team.size())
+    var count: int = max(state.player_team.size(), state.enemy_team.size())
     var formation: String = String(map_params.get("formation", "grid")).strip_edges().to_lower()
     var depth_gap_tiles: float = float(map_params.get("depth_gap", 1.2))
     var depth_gap_px: float = depth_gap_tiles * tile_size
@@ -100,6 +100,11 @@ func _apply_initial_unit_overrides(state: BattleState, _teamA_ids: Array[String]
         var subject_mana_pct: float = float(map_params.get("team_a_subject_initial_mana_pct", 0.0))
         if subject_id != "":
             _apply_subject_initial_mana_pct(state.player_team, subject_id, subject_mana_pct)
+    if map_params.has("team_a_initial_mana_ids"):
+        var mana_ids: Array = map_params.get("team_a_initial_mana_ids", [])
+        var team_mana_pct: float = float(map_params.get("team_a_initial_mana_pct", 1.0))
+        for mana_id_value: Variant in mana_ids:
+            _apply_subject_initial_mana_pct(state.player_team, String(mana_id_value), team_mana_pct)
 
 func _apply_team_initial_hp_pct(team: Array, hp_pct: float) -> void:
     var pct: float = clamp(float(hp_pct), 0.01, 1.0)
@@ -128,7 +133,7 @@ func _derive_params(map_params: Dictionary, state: BattleState) -> Dictionary:
     var obstacle_density: float = clamp(float(map_params.get("obstacle_density", 0.25)), 0.0, 1.0)
     var artillery_range: float = max(4.0, float(map_params.get("artillery_range", 8.0)))
     var tile_size: float = float(map_params.get("tile_size", 1.0))
-    var center_raw = map_params.get("center", Vector2.ZERO)
+    var center_raw: Variant = map_params.get("center", Vector2.ZERO)
     var center: Vector2 = (center_raw as Vector2) if center_raw is Vector2 else Vector2.ZERO
 
     var half_width_base: float = 6.0

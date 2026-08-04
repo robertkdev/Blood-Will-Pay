@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "malachor_debt_of_flesh"
 name = "Debt of Flesh"
-description = "Pins a priority enemy, hardens through incoming damage, heals himself, and leaves a flesh-debt clock."
+description = "Chains one priority enemy. Malachor absorbs part of the damage it deals, then snaps the chain for the stored amount."
 targeting_summary = "Priority threat, favoring assassins, marksmen, mages, burst units, and backline goals."
 base_cost = 35
-tags = ["damage", "lockdown", "sustain", "dot"]
+tags = ["lockdown", "redirect", "damage", "sustain"]

@@ -20,6 +20,7 @@ var cost_adapter: Variant = null
 var _cooldowns: Dictionary = {} # Unit -> float
 var _events: Array = [] # Array[Dictionary]: { name, team, index, t, data }
 var _casting: Dictionary = {} # Unit -> bool reentrancy guard
+var _totem_autocast_used: Dictionary = {} # Unit -> bool, once per combat
 var emit_ability_logs: bool = false
 const LOG_PREFIX_ABILITY := "ABILITY"
 const KORATH_RELEASE_PRIMARY_DAMAGE_PCT: float = 0.55
@@ -32,10 +33,15 @@ func configure(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGen
 	state = _state
 	rng = _rng
 	buff_system = _buffs
+	if buff_system != null and not buff_system.shield_ended.is_connected(_on_shield_ended):
+		buff_system.shield_ended.connect(_on_shield_ended)
 	cost_adapter = null
 	_cooldowns.clear()
+	_totem_autocast_used.clear()
 
 func teardown() -> void:
+	if buff_system != null and buff_system.shield_ended.is_connected(_on_shield_ended):
+		buff_system.shield_ended.disconnect(_on_shield_ended)
 	engine = null
 	state = null
 	rng = null
@@ -44,6 +50,7 @@ func teardown() -> void:
 	_cooldowns.clear()
 	_events.clear()
 	_casting.clear()
+	_totem_autocast_used.clear()
 
 func tick(delta: float) -> void:
 	if delta <= 0.0:
@@ -99,17 +106,6 @@ func _autocast_watchers() -> void:
 		if String(e.ability_id) == "totem_cleanse":
 			_autocast_totem_if_needed("enemy", j)
 
-func _team_has_debuff(team: String) -> bool:
-	if buff_system == null:
-		return false
-	var arr: Array[Unit] = (state.player_team if team == "player" else state.enemy_team)
-	for idx in range(arr.size()):
-		var u: Unit = arr[idx]
-		if u != null and u.is_alive():
-			if buff_system.is_debuffed(state, team, idx):
-				return true
-	return false
-
 func _autocast_totem_if_needed(team: String, index: int) -> void:
 	# Require Exile trait active on team (count > 0)
 	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
@@ -120,26 +116,26 @@ func _autocast_totem_if_needed(team: String, index: int) -> void:
 		exile_count = ctx.trait_count(team, "Exile")
 	if exile_count <= 0:
 		return
-	# Check if any ally is currently debuffed
-	if not _team_has_debuff(team):
+	var unit: Unit = _unit_at(team, index)
+	if unit == null or bool(_totem_autocast_used.get(unit, false)):
 		return
-	# Gate: simple per-unit cooldown to avoid spamming
-	if _cooldowns.get(state.player_team[index] if team == "player" else state.enemy_team[index], 0.0) > 0.0:
+	var impl: Variant = AbilityCatalog.new_instance(ability_id)
+	if impl == null or not impl.has_method("cast") or not impl.has_method("carry_index"):
+		return
+	var carry_index: int = int(impl.carry_index(state, team, index))
+	if carry_index < 0 or buff_system == null or not buff_system.is_debuffed(state, team, carry_index):
 		return
 	var cast_info: Dictionary = _emit_ability_cast_event(team, index, ability_id, ctx, team, index)
 	# Attempt to cast immediately, ignoring mana threshold; consume mana on success
-	var impl: Variant = AbilityCatalog.new_instance(ability_id)
-	if impl == null or not impl.has_method("cast"):
-		return
 	var pushed: bool = _push_buff_source(team, index, "autocast")
 	var ok: bool = bool(impl.cast(ctx))
 	if pushed:
 		_pop_buff_source()
 	if not ok:
 		return
+	_totem_autocast_used[unit] = true
 	_log_ability_cast(team, index, ability_id)
 	# Consume mana and start a brief cooldown
-	var unit: Unit = _unit_at(team, index)
 	var committed_cooldown_s: float = 0.5
 	if unit != null:
 		unit.mana = 0
@@ -163,10 +159,20 @@ func _handle_event(evt: Dictionary) -> void:
 			_handle_kythera_siphon_end(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
 		"creep_eaves_tick":
 			_handle_creep_eaves_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+		"egress_exit_wound_strike":
+			_handle_egress_exit_wound_strike(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+		"kett_union_breaker_hit":
+			_handle_kett_union_breaker_hit(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+		"prisma_color_field_tick":
+			_handle_prisma_color_field_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+		"quorra_timeplate_tick":
+			_handle_quorra_timeplate_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
 		"cinder_fuse_tick":
 			_handle_cinder_fuse_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
 		"planned_area_tick":
 			_handle_planned_area_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+		"rooket_brace_fire":
+			_handle_rooket_brace_fire(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
 		"bo_wos_dash_tick":
 			_handle_bo_wos_dash_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
 		"bo_wos_land":
@@ -182,11 +188,68 @@ func _handle_event(evt: Dictionary) -> void:
 	if pushed:
 		_pop_buff_source()
 
+func _on_shield_ended(target_team: String, target_index: int, reason: String, data: Dictionary) -> void:
+	if String(data.get("kind", "")) != "paisley_bubble_pop" or state == null or engine == null:
+		return
+	var source_team: String = String(data.get("source_team", target_team))
+	var source_index: int = int(data.get("source_index", -1))
+	if source_index < 0 or target_index < 0:
+		return
+	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, source_team, source_index)
+	ctx.buff_system = buff_system
+	var center: Vector2 = ctx.position_of(target_team, target_index)
+	var radius: float = max(0.1, float(data.get("radius_tiles", 1.0)))
+	var damage: float = max(0.0, float(data.get("damage", 0.0)))
+	var stun_duration: float = max(0.0, float(data.get("stun_duration", 0.0)))
+	var target_enemy_team: String = "enemy" if source_team == "player" else "player"
+	var victims: Array[int] = ctx.enemies_in_radius_at(source_team, center, radius)
+	for victim_index: int in victims:
+		if damage > 0.0:
+			AbilityEffects.damage_single(engine, state, source_team, source_index, victim_index, damage, "magic")
+		if stun_duration > 0.0:
+			AbilityEffects.stun(buff_system, engine, state, target_enemy_team, victim_index, stun_duration, source_team, source_index)
+	engine._resolver_emit_log("Bubbles: %s pop at ally %d hit %d nearby enemies" % [reason, target_index, victims.size()])
+
+func _handle_rooket_brace_fire(team: String, index: int, data: Dictionary) -> void:
+	if state == null or engine == null or buff_system == null:
+		return
+	var caster: Unit = _unit_at(team, index)
+	if caster == null or not caster.is_alive():
+		return
+	var target_index: int = int(data.get("target_index", -1))
+	var target_team: String = "enemy" if team == "player" else "player"
+	var target: Unit = _unit_at(target_team, target_index)
+	if target == null or not target.is_alive():
+		engine._resolver_emit_log("Brace Shot: target escaped before the shot")
+		return
+	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
+	ctx.buff_system = buff_system
+	var line_length: float = max(0.1, float(data.get("line_length_tiles", 6.0)))
+	var line_width: float = max(0.1, float(data.get("line_width_tiles", 0.75)))
+	var damage: float = max(0.0, float(data.get("damage", 0.0)))
+	var shred_duration: float = max(0.1, float(data.get("shred_duration", 4.0)))
+	var armor_shred: float = max(0.0, float(data.get("armor_shred", 0.0)))
+	var attack_speed_slow: float = min(0.0, float(data.get("attack_speed_slow", 0.0)))
+	var hits: Array[int] = ctx.enemies_in_line(team, index, target_index, line_length, line_width)
+	if not hits.has(target_index):
+		hits.append(target_index)
+	for hit_index: int in hits:
+		ctx.damage_single(team, index, hit_index, damage, "physical")
+		buff_system.apply_stats_labeled(state, target_team, hit_index, "rooket_brace_shot_shred", {
+			"armor": -armor_shred,
+			"attack_speed": attack_speed_slow
+		}, shred_duration)
+	engine._resolver_emit_log("Brace Shot: windup completed and pierced %d targets" % hits.size())
+
 func _handle_creep_eaves_tick(team: String, index: int, data: Dictionary) -> void:
 	if state == null or engine == null:
 		return
 	var caster: Unit = _unit_at(team, index)
 	if caster == null or not caster.is_alive():
+		return
+	# NPC Creep's immunity prevents control from landing. Playable Creep has no
+	# immunity, so a successful stun interrupts the remaining spin and chase.
+	if buff_system != null and buff_system.is_stunned(caster):
 		return
 	# Pull ticking meta
 	var ticks_left: int = int(data.get("ticks_left", 0))
@@ -230,6 +293,7 @@ func _handle_creep_eaves_tick(team: String, index: int, data: Dictionary) -> voi
 		var next_idx: int = ctx.lowest_hp_enemy(team)
 		if next_idx >= 0:
 			center = ctx.position_of(tgt_team, next_idx)
+			_set_scheduled_position(team, index, center, max(0.05, interval))
 			data["center"] = center
 			data["chase_used"] = true
 			engine._resolver_emit_log("Eavesdropping: chase")
@@ -238,6 +302,172 @@ func _handle_creep_eaves_tick(team: String, index: int, data: Dictionary) -> voi
 	if ticks_left > 0:
 		data["ticks_left"] = ticks_left
 		schedule_event("creep_eaves_tick", team, index, max(0.0, interval), data)
+
+func _handle_egress_exit_wound_strike(team: String, index: int, data: Dictionary) -> void:
+	if state == null or engine == null or buff_system == null:
+		return
+	var caster: Unit = _unit_at(team, index)
+	if caster == null or not caster.is_alive():
+		return
+	var target_team: String = String(data.get("target_team", "enemy" if team == "player" else "player"))
+	var target_index: int = int(data.get("target_index", -1))
+	var target: Unit = _unit_at(target_team, target_index)
+	var mark_tag: String = String(data.get("mark_tag", "egress_exit_wound_mark"))
+	if target == null or not target.is_alive() or not buff_system.has_tag(state, target_team, target_index, mark_tag):
+		return
+	var move_duration: float = max(0.05, float(data.get("move_duration", 0.18)))
+	var target_position: Vector2 = engine.get_enemy_position(target_index) if target_team == "enemy" else engine.get_player_position(target_index)
+	_set_scheduled_position(team, index, target_position, move_duration)
+	var execute_threshold: float = clamp(float(data.get("execute_threshold", 0.30)), 0.0, 1.0)
+	var hp_pct_at_strike: float = float(target.hp) / max(1.0, float(target.max_hp))
+	var execute_armed: bool = hp_pct_at_strike <= execute_threshold
+	var damage: float = max(0.0, float(data.get("damage", 0.0)))
+	var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, target_index, damage, "physical")
+	target = _unit_at(target_team, target_index)
+	if execute_armed and target != null and target.is_alive():
+		var execute_damage: float = float(target.hp) + 1.0
+		var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
+		ctx.buff_system = buff_system
+		ctx.emit_execute_bonus(target_team, target_index, damage, execute_damage, execute_threshold, hp_pct_at_strike, "egress_exit_wound")
+		result = AbilityEffects.damage_single(engine, state, team, index, target_index, execute_damage, "true")
+	target = _unit_at(target_team, target_index)
+	if bool(result.get("processed", false)) and (target == null or not target.is_alive()) and bool(data.get("retreat_on_kill", true)):
+		var sign_x: float = -1.0 if team == "player" else 1.0
+		var current: Vector2 = engine.get_player_position(index) if team == "player" else engine.get_enemy_position(index)
+		var retreat: Vector2 = Vector2(sign_x * 4.5 * _tile_size(), current.y)
+		_set_scheduled_position(team, index, retreat, move_duration)
+		engine._resolver_emit_log("Exit Wound: kill confirmed; Egress retreated")
+
+func _handle_kett_union_breaker_hit(team: String, index: int, data: Dictionary) -> void:
+	if state == null or engine == null:
+		return
+	var caster: Unit = _unit_at(team, index)
+	if caster == null or not caster.is_alive():
+		return
+	var interrupted_tag: String = "kett_union_breaker_interrupted"
+	if buff_system != null and buff_system.has_tag(state, team, index, interrupted_tag):
+		return
+	if buff_system != null and buff_system.is_stunned(caster):
+		buff_system.apply_tag(state, team, index, interrupted_tag, 1.0, {})
+		engine._resolver_emit_log("Union Breaker: combo interrupted")
+		return
+	var target_team: String = String(data.get("target_team", "enemy" if team == "player" else "player"))
+	var target_index: int = int(data.get("target_index", -1))
+	var target: Unit = _unit_at(target_team, target_index)
+	if target == null or not target.is_alive():
+		return
+	var hit_number: int = clampi(int(data.get("hit_number", 1)), 1, 3)
+	var damage: float = max(0.0, float(data.get("damage", 0.0)))
+	var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, target_index, damage, "physical")
+	if not bool(result.get("processed", false)):
+		return
+	if buff_system != null:
+		var armor_shred: float = max(0.0, float(data.get("armor_shred", 0.0)))
+		var debuff_duration: float = max(0.05, float(data.get("debuff_duration", 4.5)))
+		buff_system.apply_stats_labeled(state, target_team, target_index, "kett_union_breaker_hit_%d" % hit_number, {"armor": -armor_shred}, debuff_duration)
+	target = _unit_at(target_team, target_index)
+	if hit_number == 3 and target != null and target.is_alive():
+		var stun_duration: float = max(0.0, float(data.get("finisher_stun", 0.35)))
+		AbilityEffects.stun(buff_system, engine, state, target_team, target_index, stun_duration, team, index)
+		var target_position: Vector2 = engine.get_enemy_position(target_index) if target_team == "enemy" else engine.get_player_position(target_index)
+		var push_sign: float = 1.0 if target_team == "enemy" else -1.0
+		var push_tiles: float = max(0.0, float(data.get("finisher_push_tiles", 0.9)))
+		_set_scheduled_position(target_team, target_index, target_position + Vector2(push_sign * push_tiles * _tile_size(), 0.0), 0.16)
+	engine._resolver_emit_ramp_state_changed(team, index, "kett_union_breaker", hit_number, float(hit_number), 3, float(data.get("debuff_duration", 4.5)), "combo_hit")
+
+func _handle_prisma_color_field_tick(team: String, index: int, data: Dictionary) -> void:
+	if state == null or engine == null:
+		return
+	var caster: Unit = _unit_at(team, index)
+	if caster == null or not caster.is_alive():
+		return
+	var ticks_left: int = int(data.get("ticks_left", 0))
+	if ticks_left <= 0:
+		return
+	var interval: float = max(0.05, float(data.get("interval", 0.20)))
+	var center_value: Variant = data.get("center", Vector2.ZERO)
+	var center: Vector2 = center_value if center_value is Vector2 else Vector2.ZERO
+	var radius: float = max(0.1, float(data.get("radius", 2.35)))
+	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
+	ctx.buff_system = buff_system
+	var target_team: String = "enemy" if team == "player" else "player"
+	var occupants: Array[int] = ctx.enemies_in_radius_at(team, center, radius)
+	var damage_applied: bool = bool(data.get("damage_applied", false))
+	var damage: float = max(0.0, float(data.get("damage", 0.0)))
+	var mana_block_tag: String = String(data.get("mana_block_tag", "prisma_color_field_lock"))
+	for target_index: int in occupants:
+		if not damage_applied:
+			AbilityEffects.damage_single(engine, state, team, index, target_index, damage, "magic")
+		if buff_system != null:
+			buff_system.apply_tag(state, target_team, target_index, mana_block_tag, interval * 1.25, {
+				"block_mana_gain": true,
+				"is_debuff": true,
+				"cleanseable": true
+			})
+		ctx.emit_zone_exposure(target_team, target_index, "prisma_color_field", interval, 0.0, radius)
+	data["damage_applied"] = true
+	ticks_left -= 1
+	if ticks_left > 0:
+		data["ticks_left"] = ticks_left
+		schedule_event("prisma_color_field_tick", team, index, interval, data)
+
+func _handle_quorra_timeplate_tick(team: String, index: int, data: Dictionary) -> void:
+	if state == null or engine == null or buff_system == null:
+		return
+	var caster: Unit = _unit_at(team, index)
+	if caster == null or not caster.is_alive():
+		return
+	var target_team: String = String(data.get("target_team", "enemy" if team == "player" else "player"))
+	var target_index: int = int(data.get("target_index", -1))
+	var target: Unit = _unit_at(target_team, target_index)
+	var wound_tag: String = String(data.get("wound_tag", "quorra_timeplate_wound"))
+	if target == null or not target.is_alive() or not buff_system.has_tag(state, target_team, target_index, wound_tag):
+		return
+	var ticks_left: int = int(data.get("ticks_left", 0))
+	if ticks_left <= 0:
+		return
+	var damage: float = max(0.0, float(data.get("damage", 0.0)))
+	var damage_type: String = String(data.get("damage_type", "magic"))
+	var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, target_index, damage, damage_type)
+	if bool(result.get("processed", false)) and engine.has_method("_resolver_emit_dot_tick_applied"):
+		engine._resolver_emit_dot_tick_applied(team, index, target_team, target_index, int(max(0, int(result.get("dealt", damage)))), "quorra_timeplate_clock")
+	ticks_left -= 1
+	if ticks_left > 0:
+		data["ticks_left"] = ticks_left
+		schedule_event("quorra_timeplate_tick", team, index, max(0.05, float(data.get("interval", 0.45))), data)
+		return
+	if caster.is_alive():
+		var origin_value: Variant = data.get("origin", Vector2.ZERO)
+		var origin: Vector2 = origin_value if origin_value is Vector2 else Vector2.ZERO
+		_set_scheduled_position(team, index, origin, max(0.05, float(data.get("rewind_duration", 0.18))))
+		engine._resolver_emit_log("Timeplate Lunge: wound completed; Quorra rewound")
+
+func _set_scheduled_position(team: String, index: int, requested: Vector2, duration: float) -> void:
+	if engine == null:
+		return
+	var current: Vector2 = engine.get_player_position(index) if team == "player" else engine.get_enemy_position(index)
+	var destination: Vector2 = requested
+	if engine.arena_state != null and engine.arena_state.data != null:
+		var bounds_value: Variant = engine.arena_state.data.arena_bounds
+		if bounds_value is Rect2:
+			var bounds: Rect2 = bounds_value
+			destination.x = clamp(destination.x, bounds.position.x, bounds.end.x)
+			destination.y = clamp(destination.y, bounds.position.y, bounds.end.y)
+		if engine.arena_state.has_method("notify_forced_movement"):
+			engine.arena_state.notify_forced_movement(team, index, destination - current, max(0.0, duration))
+		if team == "player":
+			if index >= 0 and index < engine.arena_state.data.player_positions.size():
+				engine.arena_state.data.player_positions[index] = destination
+		else:
+			if index >= 0 and index < engine.arena_state.data.enemy_positions.size():
+				engine.arena_state.data.enemy_positions[index] = destination
+	if engine.has_signal("position_updated"):
+		engine.emit_signal("position_updated", team, index, destination.x, destination.y)
+
+func _tile_size() -> float:
+	if engine != null and engine.arena_state != null:
+		return float(engine.arena_state.tile_size())
+	return 1.0
 
 func _handle_cinder_fuse_tick(team: String, index: int, data: Dictionary) -> void:
 	if state == null or engine == null:
@@ -374,6 +604,9 @@ func _handle_korath_release(team: String, index: int, data: Dictionary) -> void:
 	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
 	ctx.buff_system = buff_system
 	ctx.heal_single(tgt_team, best_idx, heal_amt)
+	if bool(meta.get("heal_only", false)):
+		engine._resolver_emit_log("Absorb & Release: healed %d (pool=%d, base=%d, stacks=%d)" % [heal_amt, pool, heal_base, stacks_at_cast])
+		return
 	# Offensive conversion: release stored pressure back into the threats trying to bypass the line.
 	var damaged_targets: int = 0
 	var release_damage_total: int = 0
@@ -509,27 +742,41 @@ func _handle_kythera_siphon_tick(team: String, index: int, data: Dictionary) -> 
 			meta["drained_total"] = drained_total
 			tag["data"] = meta
 
-func _handle_kythera_siphon_end(team: String, index: int, _data: Dictionary) -> void:
+func _handle_kythera_siphon_end(team: String, index: int, data: Dictionary) -> void:
 	if state == null or engine == null:
 		return
 	var caster: Unit = _unit_at(team, index)
 	if caster == null or not caster.is_alive():
 		return
-	var gain_total: int = 0
+	var gain_total: int = int(max(0, round(float(data.get("drained_total", 0.0)))))
+	var share_radius_tiles: float = float(data.get("share_radius_tiles", 0.0))
 	if buff_system != null:
 		if buff_system.has_tag(state, team, index, BuffTags.TAG_KYTHERA):
 			var tag: Dictionary = buff_system.get_tag(state, team, index, BuffTags.TAG_KYTHERA)
 			var meta: Dictionary = tag.get("data", {})
 			var drained_total: float = float(meta.get("drained_total", 0.0))
 			gain_total = int(max(0, round(drained_total)))
+			share_radius_tiles = float(meta.get("share_radius_tiles", share_radius_tiles))
 			# Clear remaining time on tag
 			tag["remaining"] = 0.0
 	if gain_total <= 0:
 		engine._resolver_emit_log("Siphon ended: no MR gained.")
 		return
+	var shared_count: int = 0
 	if buff_system != null and buff_system.has_method("add_stack"):
-		buff_system.add_stack(state, team, index, "kythera_siphon_mr", 1, {"magic_resist": float(gain_total)})
-	engine._resolver_emit_log("Siphon: +%d Magic Resist (permanent)" % gain_total)
+		var allies: Array[Unit] = state.player_team if team == "player" else state.enemy_team
+		var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
+		var caster_position: Vector2 = ctx.position_of(team, index)
+		var radius_world: float = max(0.0, share_radius_tiles) * ctx.tile_size()
+		for ally_index: int in range(allies.size()):
+			var ally: Unit = allies[ally_index]
+			if ally == null or not ally.is_alive():
+				continue
+			if ally_index != index and caster_position.distance_to(ctx.position_of(team, ally_index)) > radius_world:
+				continue
+			buff_system.add_stack(state, team, ally_index, "kythera_siphon_mr", 1, {"magic_resist": float(gain_total)})
+			shared_count += 1
+	engine._resolver_emit_log("Siphon: shared +%d Magic Resist with %d nearby allies" % [gain_total, shared_count])
 
 func _handle_bo_wos_dash_tick(team: String, index: int, data: Dictionary) -> void:
 	if state == null or engine == null:

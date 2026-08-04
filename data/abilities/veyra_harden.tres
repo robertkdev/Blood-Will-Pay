@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "veyra_harden"
 name = "Harden"
-description = "Gains 40 + (Aegis stacks) flat damage reduction for 4s; then gains (Aegis stacks)% Max HP until end of combat."
+description = "Grants Veyra and nearby allies temporary damage reduction and crowd-control immunity."
 targeting_summary = "Self and allies within 2 tiles."
 base_cost = 60
-tags = ["mitigation", "stacking"]
+tags = ["team_defense", "mitigation", "cc_immunity"]

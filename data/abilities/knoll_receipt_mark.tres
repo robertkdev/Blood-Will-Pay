@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "knoll_receipt_mark"
 name = "Receipt Mark"
-description = "Marks one enemy with a stun, armor and magic-resist shred, and a ledger strike."
-targeting_summary = "Current attack target, or lowest-health enemy if none."
+description = "Briefly stuns one enemy and shreds both Armor and Magic Resist for 4 seconds."
+targeting_summary = "Current attack target, or lowest-Health enemy."
 base_cost = 50
-tags = ["damage", "control", "debuff"]
+tags = ["stun", "defense_shred"]

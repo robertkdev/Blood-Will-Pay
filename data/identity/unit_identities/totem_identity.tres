@@ -6,5 +6,5 @@
 script = ExtResource( 1 )
 primary_role = "support"
 primary_goal = "support.peel_carry"
-approaches = ["peel", "cc_immunity", "amp"]
+approaches = ["peel", "damage_reduction", "sustain"]
 alt_goals = []
