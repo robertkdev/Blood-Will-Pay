@@ -1,0 +1,638 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-08-04",
+  "effect_family_budgets": {"1": 2, "2": 3, "3": 4, "4": 4, "5": 5},
+  "units": [
+    {
+      "unit_id": "axiom", "ability_id": "axiom_mentors_reserve", "cost": 1,
+      "traits": ["Scholar", "Mentor"], "primary_role": "support", "primary_goal": "support.team_amplification", "approaches": ["amp", "peel", "sustain"],
+      "core_promise": "Feed one chosen Pupil's next power spike.",
+      "player_explanation": "Axiom grants their Pupil mana and empowers the Pupil's damage for a short time, while shielding themself.",
+      "effect_families": ["resource", "offensive_buff", "self_defense"], "complexity_breach": "Three families exceed the cost-1 ceiling; the self-shield removes the intended support pressure point.",
+      "team_utility": "Accelerates the team's chosen carry.", "signature_moment": "One mentor tether delivers a mana pulse and ignites the Pupil's attacks.",
+      "counterplay": {"levers": ["eliminate or disable the Pupil", "control fragile Axiom", "force the Pupil to waste the amp window"], "failure_state": "No living Pupil means no cast; capped mana reduces the payoff."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "The self-shield is a removable third job, and the live approaches overclaim peel and sustain.",
+      "direction": "Remove Axiom's self-shield; keep Pupil mana plus one unified damage amp and narrow the approaches.",
+      "test_cases": [
+        {"id": "axiom_pupil_contract", "type": "rga", "assertions": ["only the living Pupil gains mana and one amp", "Axiom gains no shield", "no Pupil causes a clean failed cast"]},
+        {"id": "axiom_pupil_temporal", "type": "visual", "assertions": ["setup identifies the Pupil", "impact shows one Axiom-to-Pupil pulse", "aftermath has no Axiom shield overlay"]}
+      ]
+    },
+    {
+      "unit_id": "berebell", "ability_id": "berebell_unstable", "cost": 1,
+      "traits": ["Sanguine", "Striker"], "primary_role": "brawler", "primary_goal": "brawler.attrition_dps", "approaches": ["sustain", "reposition", "burst"],
+      "core_promise": "Become more dangerous and harder to finish while wounded.",
+      "player_explanation": "Berebell smashes, gains offensive stats and a shield, then heals through wounded-target attacks.",
+      "effect_families": ["damage", "offensive_buff", "sustain", "self_defense"], "complexity_breach": "Four families double the cost-1 ceiling and reposition is not meaningfully expressed.",
+      "team_utility": "Occupies the frontline through attack-dependent attrition.", "signature_moment": "A wounded frenzy should turn connected blood-red hits into visible recovery.",
+      "counterplay": {"levers": ["stun or kite during frenzy", "apply anti-heal", "burst before an empowered attack connects"], "failure_state": "No landed attacks during frenzy should mean no recovery."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "Immediate damage, AS, AD, missing-HP damage, healing, and shielding bury the wounded attrition promise.",
+      "direction": "Keep wounded-target attack damage and attack-earned healing; remove the smash, generic steroids, and shield.",
+      "test_cases": [
+        {"id": "berebell_frenzy_contract", "type": "counterplay", "assertions": ["connected basics earn healing", "zero landed basics earn zero ability healing", "anti-heal reduces recovery"]},
+        {"id": "berebell_frenzy_temporal", "type": "visual", "assertions": ["one frenzy state is readable", "each empowered hit returns one blood pulse", "no shield or separate stat aura appears"]}
+      ]
+    },
+    {
+      "unit_id": "bo", "ability_id": "bo_writ_of_severance", "cost": 1,
+      "traits": ["Fortified", "Executioner"], "primary_role": "brawler", "primary_goal": "brawler.skirmish_dive", "approaches": ["disrupt", "reposition"],
+      "core_promise": "Charge a line and knock enemies out of formation.",
+      "player_explanation": "Bo throws through a line, dashes after the weapon, damages twice, knocks enemies up, and becomes protected during travel.",
+      "effect_families": ["damage", "movement", "hard_cc", "self_defense"], "complexity_breach": "Four families give a one-cost premium engager density.",
+      "team_utility": "Opens a path and disrupts a compact formation.", "signature_moment": "A telegraphed lane erupts as Bo barrels through crossed enemies.",
+      "counterplay": {"levers": ["spread off the lane", "interrupt the wind-up", "punish Bo's landing position"], "failure_state": "No path means no charge; displacement immunity denies knock-up while Bo still commits."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 2, "counterplay": 1, "cost_fit": 0},
+      "problem": "Two damage passes, dash, knock-up, immunity, reduction, and retargeting exceed the tier.",
+      "direction": "Collapse the cast into one telegraphed charge and knock-up; remove damage, protection, and automatic retargeting.",
+      "test_cases": [
+        {"id": "bo_charge_contract", "type": "counterplay", "assertions": ["only crossed enemies are knocked up", "off-line enemies remain unaffected", "displacement immunity creates partial denial"]},
+        {"id": "bo_charge_temporal", "type": "visual", "assertions": ["setup shows the full lane", "impact tracks one traversal", "aftermath exposes Bo at the landing point"]}
+      ]
+    },
+    {
+      "unit_id": "bonko", "ability_id": "bonko_bonk", "cost": 1,
+      "traits": ["Cartel", "Chronomancer"], "primary_role": "brawler", "primary_goal": "brawler.attrition_dps", "approaches": ["sustain", "ramp"],
+      "core_promise": "Bonk one enemy very hard.",
+      "player_explanation": "Bonko empowers three attacks with extra damage, wounded-target healing, and mana lock instead of performing the documented bonk.",
+      "effect_families": ["damage", "sustain", "resource"], "complexity_breach": "The live three-hit package exceeds the simple cost-1 contract and contradicts the resource description.",
+      "team_utility": "Should provide simple single-target interruption and follow-up on allied control.", "signature_moment": "One oversized Tom-and-Jerry mallet impact with a stun starburst.",
+      "counterplay": {"levers": ["CC immunity or cleanse", "bait the cast onto a tank", "control Bonko before impact"], "failure_state": "No target means no cast; CC immunity should deny stun but not damage."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 0, "counterplay": 1, "cost_fit": 2},
+      "problem": "The excellent one-bonk description and the empowered-attack implementation are different abilities.",
+      "direction": "Restore one direct damage-and-stun impact; remove the three-hit empowerment and healing, with bonus damage only against already-stunned targets.",
+      "test_cases": [
+        {"id": "bonko_bonk_contract", "type": "counterplay", "assertions": ["exactly one target takes damage and stun", "already-stunned targets take the conditional bonus", "Bonko gains no healing or persistent buff"]},
+        {"id": "bonko_bonk_temporal", "type": "visual", "assertions": ["one wind-up is readable", "one oversized impact hits one enemy", "no persistent empowerment aura remains"]}
+      ]
+    },
+    {
+      "unit_id": "brute", "ability_id": "brute_slam", "cost": 1,
+      "traits": ["Titan", "Fortified"], "primary_role": "tank", "primary_goal": "tank.frontline_absorb", "approaches": ["engage", "damage_reduction", "lockdown"],
+      "core_promise": "Leap into a cluster and briefly knock it airborne.",
+      "player_explanation": "Brute leaps, pulls, damages, knocks up, breaks shields, heals, shields, gains resistances, and gains damage reduction.",
+      "effect_families": ["damage", "movement", "hard_cc", "sustain", "self_defense", "enemy_debuff"], "complexity_breach": "Six families triple the cost-1 ceiling.",
+      "team_utility": "Should be a cheap, readable area engage.", "signature_moment": "A heavy leap creates one crater and lifts nearby enemies together.",
+      "counterplay": {"levers": ["spread the formation", "interrupt the leap wind-up", "focus Brute after landing"], "failure_state": "No enemy in range means no cast; spread limits the knock-up to one target."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 2, "counterplay": 0, "cost_fit": 0},
+      "problem": "One cast acts as engager, tank steroid, healer, shield breaker, pull, and AoE control.",
+      "direction": "Keep leap plus area knock-up only; let traits and base stats supply durability.",
+      "test_cases": [
+        {"id": "brute_leap_contract", "type": "counterplay", "assertions": ["clustered enemies are knocked up", "spread enemies are untouched", "Brute gains no healing, shield, or defense buff"]},
+        {"id": "brute_leap_temporal", "type": "visual", "assertions": ["setup circle matches the radius", "impact shows one crater", "airborne response is distinct from defensive VFX"]}
+      ]
+    },
+    {
+      "unit_id": "grint", "ability_id": "grint_body_check", "cost": 1,
+      "traits": ["Cartel", "Harmony"], "primary_role": "tank", "primary_goal": "tank.initiate_fight", "approaches": ["engage", "debuff", "damage_reduction"],
+      "core_promise": "Carry one enemy out of position with a body check.",
+      "player_explanation": "Grint dashes, knocks back one enemy, deals three damage layers, buffs Attack Damage, and shreds Armor.",
+      "effect_families": ["damage", "movement", "hard_cc", "offensive_buff", "enemy_debuff"], "complexity_breach": "Five families obscure a simple displacement job and do not express damage reduction.",
+      "team_utility": "Isolates one frontline target or peels one diver.", "signature_moment": "Grint and the victim travel together and end in a heavy skid.",
+      "counterplay": {"levers": ["offer a low-value bait target", "interrupt startup", "use displacement immunity or edge positioning"], "failure_state": "An anchored target stays put while Grint still commits."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 2, "counterplay": 1, "cost_fit": 0},
+      "problem": "The body check carries a second hit, true shock, stat buff, and shred unrelated to its clearest utility.",
+      "direction": "Replace the damage package with one carry displacement; narrow approaches to engage and disrupt.",
+      "test_cases": [
+        {"id": "grint_carry_contract", "type": "counterplay", "assertions": ["Grint and one target move together", "other enemies remain unaffected", "anchored target creates a partial commit failure"]},
+        {"id": "grint_carry_temporal", "type": "visual", "assertions": ["setup shows both destinations", "impact moves both silhouettes together", "no secondary damage or shred effects appear"]}
+      ]
+    },
+    {
+      "unit_id": "knoll", "ability_id": "knoll_receipt_mark", "cost": 1,
+      "traits": ["Trader", "Harmony"], "primary_role": "support", "primary_goal": "support.enemy_lockdown", "approaches": ["lockdown", "debuff", "disrupt"],
+      "core_promise": "Stamp one enemy as the team's focus target.",
+      "player_explanation": "Knoll damages, stuns, and applies several defense and speed taxes to one current target.",
+      "effect_families": ["damage", "hard_cc", "enemy_debuff"], "complexity_breach": "Three families exceed the cost-1 ceiling and the damage is not needed for the support job.",
+      "team_utility": "Creates a clean focus-fire window.", "signature_moment": "A giant receipt seal stamps one target and tears open its defenses.",
+      "counterplay": {"levers": ["tenacity or cleanse", "bait a tank as current target", "control Knoll before casting"], "failure_state": "CC immunity denies stun; cleanse removes the remaining mark."},
+      "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 1, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 1},
+      "problem": "Damage and three simultaneous debuffs make the receipt harder to read than its strong focus-mark premise.",
+      "direction": "Remove damage and attack-speed tax; keep brief stun plus one unified Armor/Magic Resist shred.",
+      "test_cases": [
+        {"id": "knoll_receipt_contract", "type": "counterplay", "assertions": ["one target is stunned then shredded", "cleanse removes shred", "CC immunity denies only stun"]},
+        {"id": "knoll_receipt_temporal", "type": "visual", "assertions": ["one receipt stamp identifies the target", "impact shows one stun beat", "aftermath shows one defense-break state"]}
+      ]
+    },
+    {
+      "unit_id": "korath", "ability_id": "korath_absorb_release", "cost": 1,
+      "traits": ["Titan", "Blessed"], "primary_role": "tank", "primary_goal": "tank.frontline_absorb", "approaches": ["damage_reduction", "engage", "redirect"],
+      "core_promise": "Bodyguard allies, then turn absorbed pain into one rescue.",
+      "player_explanation": "Korath redirects allied damage, then heals an ally while damaging and stunning a threat-ranked enemy.",
+      "effect_families": ["ally_defense", "sustain", "damage", "hard_cc"], "complexity_breach": "Four families attach an offensive finisher to a clean bodyguard contract.",
+      "team_utility": "Protects allies from focused damage and rewards surviving the window.", "signature_moment": "Damage streams into Korath, stores visibly, and releases as one allied heal.",
+      "counterplay": {"levers": ["stop hitting tethered allies", "focus Korath", "apply anti-heal before release"], "failure_state": "Korath dying before release loses the stored charge; no wounded ally wastes the heal."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 0},
+      "problem": "Delayed hostile damage and stun obscure the redirect-to-rescue fantasy, while engage wording is not performed.",
+      "direction": "Retain redirect-to-heal only; remove hostile release, stun, threat ranking, and engage wording.",
+      "test_cases": [
+        {"id": "korath_bodyguard_contract", "type": "counterplay", "assertions": ["nearby ally damage is redirected and stored", "release heals one wounded ally", "Korath death cancels release"]},
+        {"id": "korath_bodyguard_temporal", "type": "visual", "assertions": ["setup tethers protected allies", "stored pressure is visible on Korath", "aftermath releases exactly one heal"]}
+      ]
+    },
+    {
+      "unit_id": "mara", "ability_id": "mara_arcane_ledger", "cost": 1,
+      "traits": ["Arcanist", "Mogul"], "primary_role": "mage", "primary_goal": "mage.pick_burst", "approaches": ["burst"],
+      "core_promise": "Convert a precisely timed kill into combat economy.",
+      "player_explanation": "Mara blasts one enemy and has a hidden chance to bank currency when the blast kills.",
+      "effect_families": ["damage", "economy"],
+      "team_utility": "Provides an early economy gamble through kill timing.", "signature_moment": "A kill stamps the Arcane Ledger and sends one coin into the Stake meter.",
+      "counterplay": {"levers": ["shield or heal the intended victim", "deny Mara the last hit", "control Mara before casting"], "failure_state": "A nonlethal blast grants no economy; a deterministic cap should prevent farming."},
+      "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 1, "player_clarity": 2, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 2},
+      "problem": "The current 25 percent kill lottery is opaque and uncapped despite a strong two-family concept.",
+      "direction": "Keep blast-on-kill economy but make one Stake deterministic and capped once per combat.",
+      "test_cases": [
+        {"id": "mara_ledger_contract", "type": "counterplay", "assertions": ["one lethal cast grants one Stake once", "nonlethal casts grant none", "later kills cannot farm more"]},
+        {"id": "mara_ledger_temporal", "type": "visual", "assertions": ["lethal impact stamps the ledger", "one coin travels to the meter", "nonlethal impact shows no economy cue"]}
+      ]
+    },
+    {
+      "unit_id": "morrak", "ability_id": "morrak_reaping_line", "cost": 1,
+      "traits": ["Striker", "Executioner"], "primary_role": "brawler", "primary_goal": "brawler.attrition_dps", "approaches": ["damage_reduction", "execute", "aoe"],
+      "core_promise": "Reap a line and finish enemies already near death.",
+      "player_explanation": "Morrak gains defenses, cleaves a line, executes weak enemies, and heals after any execution.",
+      "effect_families": ["damage", "execute_reset", "self_defense", "sustain"], "complexity_breach": "Four families double the cost-1 ceiling.",
+      "team_utility": "Punishes lined-up, already-wounded enemies.", "signature_moment": "A broad reaper sweep crosses a line and severs a low-health target.",
+      "counterplay": {"levers": ["spread out", "heal or shield above threshold", "control Morrak before casting"], "failure_state": "Poor alignment hits one target; above-threshold enemies are not executed."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 1, "player_clarity": 1, "visual_satisfaction": 2, "counterplay": 2, "cost_fit": 0},
+      "problem": "Resistance gain and execution healing erase the clean line-reap denial pattern.",
+      "direction": "Remove resistance gain and execution healing; keep line cleave plus honest threshold execution.",
+      "test_cases": [
+        {"id": "morrak_reap_contract", "type": "counterplay", "assertions": ["only intersecting enemies are hit", "only below-threshold enemies execute", "Morrak gains no defense or healing"]},
+        {"id": "morrak_reap_temporal", "type": "visual", "assertions": ["setup line matches victims", "execute has a distinct sever beat", "no armor aura or heal pulse appears"]}
+      ]
+    },
+    {
+      "unit_id": "mortem", "ability_id": "mortem_blood_feast", "cost": 1,
+      "traits": ["Sanguine", "Vindicator"], "primary_role": "brawler", "primary_goal": "brawler.attrition_dps", "approaches": ["reposition", "burst", "disrupt"],
+      "core_promise": "Cycle through three unrelated attacks.",
+      "player_explanation": "Mortem alternates a dash strike, a knock-up strike, and a cone strike without the healing promised by the ability name.",
+      "effect_families": ["damage", "movement", "hard_cc"], "complexity_breach": "Three families and three mini-abilities exceed the one-cost clarity ceiling.",
+      "team_utility": "Should provide predictable attrition pressure with a disruptible third-hit payoff.", "signature_moment": "Two blood pips fill before a wide third feast strike and heal.",
+      "counterplay": {"levers": ["control or mana-delay before cast three", "spread away from the third cleave", "apply anti-heal to the proposed payoff"], "failure_state": "Death or combat reset clears the sequence; missing cast three denies payoff."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 2, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 0},
+      "problem": "The player must learn three mini-abilities and the live behavior contradicts both the name and attrition identity.",
+      "direction": "Make casts one and two simple slashes; cast three cleaves and heals. Remove dash and knock-up.",
+      "test_cases": [
+        {"id": "mortem_feast_contract", "type": "counterplay", "assertions": ["counter advances one to three", "first two casts hit one target", "third cleaves, heals, and resets"]},
+        {"id": "mortem_feast_temporal", "type": "visual", "assertions": ["one two three pips are readable", "third impact is clearly larger", "aftermath has one heal pulse"]}
+      ]
+    },
+    {
+      "unit_id": "pilfer", "ability_id": "pilfer_pocket_swap", "cost": 1,
+      "traits": ["Catalyst", "Cartel"], "primary_role": "assassin", "primary_goal": "assassin.disrupt_and_escape", "approaches": ["access_backline", "untargetable", "reposition"],
+      "core_promise": "Swap the farthest enemy out of safety.",
+      "player_explanation": "Pilfer dashes to the backline, stuns, damages, steals Attack Damage, gains protection and immunity, drops targetability, and stores Catalyst charge.",
+      "effect_families": ["damage", "movement", "hard_cc", "self_defense", "offensive_buff", "enemy_debuff", "resource"], "complexity_breach": "Seven families make this the most overloaded cost-1 cast.",
+      "team_utility": "Should extract one backliner for the team at personal risk.", "signature_moment": "Pilfer and one protected carry exchange through mirrored coin portals.",
+      "counterplay": {"levers": ["put a tank farthest back", "interrupt before cast", "use displacement immunity", "punish Pilfer's destination"], "failure_state": "Displacement immunity should prevent the swap; cleanse should remove the disarm."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 2, "counterplay": 0, "cost_fit": 0},
+      "problem": "Access, control, damage, theft, protection, immunity, hidden target drop, and charge leave no clean answer.",
+      "direction": "Implement the name literally as a position swap plus brief disarm; remove every other rider.",
+      "test_cases": [
+        {"id": "pilfer_swap_contract", "type": "counterplay", "assertions": ["Pilfer and the farthest enemy exchange positions", "only that enemy is disarmed", "anchored target denies the swap"]},
+        {"id": "pilfer_swap_temporal", "type": "visual", "assertions": ["setup highlights both endpoints", "impact crosses both silhouettes", "aftermath exposes Pilfer with no protection aura"]}
+      ]
+    },
+    {
+      "unit_id": "repo", "ability_id": "repo_writ_of_severance", "cost": 1,
+      "traits": ["Vindicator", "Executioner"], "primary_role": "tank", "primary_goal": "tank.frontline_absorb", "approaches": ["damage_reduction"],
+      "core_promise": "Slash and heal, with a tank bonus and kill recast.",
+      "player_explanation": "Repo heals, slashes for bonus damage against tanks, and recasts on a new target after a kill at zero mana cost.",
+      "effect_families": ["damage", "sustain", "execute_reset"], "complexity_breach": "Three families exceed the tier and contradict Repo's frontline tank identity.",
+      "team_utility": "Should soften a frontline target while making Repo harder to remove.", "signature_moment": "Enemy defenses should rip away and lock onto Repo in one visible transfer.",
+      "counterplay": {"levers": ["cleanse the target", "wait out a timed transfer", "focus Repo to end the stolen defense"], "failure_state": "Cleanse or Repo's death should end both halves of a defense transfer."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 0, "team_utility": 0, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "The ability duplicates Bo's name, costs zero mana, and behaves like an execution brawler rather than a tank.",
+      "direction": "Rename to Repossession and replace slash, heal, bonus, and recast with one timed Armor/Magic Resist transfer.",
+      "test_cases": [
+        {"id": "repo_repossession_contract", "type": "counterplay", "assertions": ["one target loses the defenses Repo gains", "cleanse or death restores both", "no damage, heal, or recast occurs"]},
+        {"id": "repo_repossession_temporal", "type": "visual", "assertions": ["one defense-transfer arc connects both actors", "stolen plates persist for the window", "expiry visibly returns or breaks them"]}
+      ]
+    },
+    {
+      "unit_id": "sari", "ability_id": "sari_default", "cost": 1,
+      "traits": ["Exile", "Scholar"], "primary_role": "marksman", "primary_goal": "marksman.sustained_dps", "approaches": ["long_range", "on_hit_effect", "ramp"],
+      "core_promise": "Mark one target and shred it through sustained fire.",
+      "player_explanation": "Sari hits twice, gains Attack Speed and Attack Damage, shreds Armor, and reapplies shred through empowered basics.",
+      "effect_families": ["damage", "offensive_buff", "enemy_debuff"], "complexity_breach": "Three families exceed the cost-1 ceiling and the resource calls it only a basic strike.",
+      "team_utility": "Provides a cheap focus-fire marksman.", "signature_moment": "Each follow-up arrow fills one notch on a three-step fracture mark.",
+      "counterplay": {"levers": ["dive or control Sari", "cleanse or kill the marked target", "force a target switch before full stacks"], "failure_state": "No follow-up attacks means the mark never matures; target death clears stacks."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 0, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 0},
+      "problem": "Follow-up burst and two steroids hide the more specific on-hit Armor ramp identity.",
+      "direction": "Initial shot marks; the next three basics stack Armor shred. Remove follow-up burst and both stat buffs.",
+      "test_cases": [
+        {"id": "sari_mark_contract", "type": "counterplay", "assertions": ["initial shot creates one mark", "next three basics add one shred stack each", "switching target prevents further stacks"]},
+        {"id": "sari_mark_temporal", "type": "visual", "assertions": ["one three-notch mark identifies the target", "each basic fills one notch", "death or expiry clears the mark"]}
+      ]
+    },
+    {
+      "unit_id": "cinder", "ability_id": "cinder_fuse_spark", "cost": 2,
+      "traits": ["Overload", "Arcanist"], "primary_role": "mage", "primary_goal": "mage.area_denial_zone", "approaches": ["zone", "aoe", "dot"],
+      "core_promise": "Burn one fixed area and deny mana inside it.", "player_explanation": "Cinder burns an area, ticks repeatedly, taxes offensive stats, and blocks mana gain.",
+      "effect_families": ["damage", "enemy_debuff", "resource", "zone"], "complexity_breach": "Four families exceed the cost-2 ceiling and hidden stat taxes dilute the zone.",
+      "team_utility": "Denies a compact area to divers and clustered enemies.", "signature_moment": "A fuse countdown ignites a persistent, bounded burning ring.",
+      "counterplay": {"levers": ["spread before the cast", "leave the fixed zone", "cleanse the mana lock", "kill Cinder to stop scheduled ticks"], "failure_state": "Enemies outside the ring avoid later ticks and denial."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 0},
+      "problem": "Attack Damage and Attack Speed taxes are hidden, and the generic zone bursts do not show a persistent boundary.", "direction": "Keep damage plus mana denial inside a visible fuse zone; remove both stat taxes.",
+      "test_cases": [{"id": "cinder_zone_contract", "type": "counterplay", "assertions": ["occupants take ticks and cannot gain mana", "exiting stops future ticks", "Cinder death stops scheduled ticks"]}, {"id": "cinder_zone_temporal", "type": "visual", "assertions": ["setup shows countdown and boundary", "impact ignites the ring", "aftermath keeps occupancy readable"]}]
+    },
+    {
+      "unit_id": "kythera", "ability_id": "kythera_siphon", "cost": 2,
+      "traits": ["Aegis", "Vindicator"], "primary_role": "tank", "primary_goal": "tank.team_fortification", "approaches": ["damage_reduction", "debuff"],
+      "core_promise": "Drain resistance from one enemy and fortify with it.", "player_explanation": "Kythera damages and drains Magic Resist in ticks, then permanently keeps resistance for herself.",
+      "effect_families": ["damage", "enemy_debuff", "self_defense"],
+      "team_utility": "Should convert an enemy resistance into shared local fortification.", "signature_moment": "A resistance stream visibly flows from the target into Kythera and nearby allies.",
+      "counterplay": {"levers": ["kill target or Kythera during channel", "cleanse the temporary drain", "offer a low-resistance target"], "failure_state": "An interrupted channel grants partial or no fortification."},
+      "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 1, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 1},
+      "problem": "The declared team-fortification goal is false because only Kythera receives the quiet permanent gain.", "direction": "Remove tick damage and share the completed resistance siphon with nearby allies, or relabel the RGA goal.",
+      "test_cases": [{"id": "kythera_siphon_contract", "type": "rga", "assertions": ["a full channel transfers exact resistance", "nearby allies share the completed gain", "interruption grants partial or no gain"]}, {"id": "kythera_siphon_temporal", "type": "visual", "assertions": ["setup links one target", "flow shows resistance direction", "aftermath distinguishes completed from broken channel"]}]
+    },
+    {
+      "unit_id": "luna", "ability_id": "luna_moon_beam", "cost": 2,
+      "traits": ["Liaison", "Kaleidoscope"], "primary_role": "mage", "primary_goal": "mage.wombo_combo_burst", "approaches": ["aoe", "burst", "long_range"],
+      "core_promise": "Pierce every enemy aligned in one moon beam.", "player_explanation": "Luna fires one long beam through every enemy aligned with her target.",
+      "effect_families": ["damage"],
+      "team_utility": "Punishes lined-up formations with a clean wombo payoff.", "signature_moment": "A thin aim line flashes into one brilliant full-board beam.",
+      "counterplay": {"levers": ["spread perpendicular to the line", "flank to manipulate the firing angle", "interrupt before release"], "failure_state": "Poor alignment turns the beam into a single-target cast."},
+      "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 2, "counterplay": 2, "cost_fit": 2},
+      "problem": "The mechanics are clean; only the pre-fire tell needs stronger runtime readability.", "direction": "Keep mechanics and add a short aim line plus impact flash.",
+      "test_cases": [{"id": "luna_beam_contract", "type": "counterplay", "assertions": ["collinear enemies all take one hit", "perpendicular spread yields one hit", "interrupt before release yields none"]}, {"id": "luna_beam_temporal", "type": "visual", "assertions": ["setup shows endpoints", "impact is one beam", "aftermath does not leave generic status clutter"]}]
+    },
+    {
+      "unit_id": "miri", "ability_id": "miri_lesson_plan", "cost": 2,
+      "traits": ["Mentor", "Trader"], "primary_role": "support", "primary_goal": "support.initiate_fight", "approaches": ["engage", "amp", "peel"],
+      "core_promise": "Send the Student into the fight under protection.", "player_explanation": "Miri shields, fuels, amplifies, and moves a Student, moves herself, then stuns a different enemy.",
+      "effect_families": ["movement", "ally_defense", "resource", "offensive_buff", "hard_cc"], "complexity_breach": "Five families and three target decisions overwhelm cost 2.",
+      "team_utility": "Should turn one Mentor relationship into a protected engage.", "signature_moment": "Miri points and the Student charges the marked low-health enemy under one shield.",
+      "counterplay": {"levers": ["use CC immunity on the destination", "kill or disable the Student", "bait the lowest-health target"], "failure_state": "CC immunity denies the arrival stun while movement and shield still occur."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "Mana, dual amp, two movements, shield, and stun obscure an excellent teacher-sends-student fantasy.", "direction": "Move only the Student under a shield and stun on arrival; remove mana, amp, and Miri movement.",
+      "test_cases": [{"id": "miri_student_contract", "type": "counterplay", "assertions": ["one eligible Student charges", "CC immunity denies only arrival stun", "Miri does not move or grant mana"]}, {"id": "miri_student_temporal", "type": "visual", "assertions": ["setup identifies Student and destination", "impact shows one charge", "aftermath shows one shield and no buff clutter"]}]
+    },
+    {
+      "unit_id": "nyxa", "ability_id": "nyxa_chaos_volley", "cost": 2,
+      "traits": ["Sanguine", "Chronomancer"], "primary_role": "marksman", "primary_goal": "marksman.backline_siege", "approaches": ["long_range", "ramp", "aoe"],
+      "core_promise": "Ramp the number of arrows fired during a four-attack volley.", "player_explanation": "Nyxa fires random opening shots, adds arrows to four attacks, gains Attack Damage, locks mana, and stacks post-cap damage.",
+      "effect_families": ["damage", "offensive_buff", "resource"],
+      "team_utility": "Should create visible sustained multi-target pressure.", "signature_moment": "An arrow counter grows from two to four over repeated volleys.",
+      "counterplay": {"levers": ["disarm or slow before four attacks complete", "kill Nyxa during the volley", "deny repeated casts"], "failure_state": "Unused volley attacks expire when Nyxa is disabled or killed."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 1},
+      "problem": "The opening volley, steroid, mana lock, and post-cap stack hide the arrow-count identity and random targeting does not prove backline siege.", "direction": "Keep only four empowered attacks whose arrow count rises per cast; relabel sustained DPS or target furthest enemies.",
+      "test_cases": [{"id": "nyxa_volley_contract", "type": "rga", "assertions": ["casts produce two three then four arrows", "exactly four attacks consume a volley", "disarm or death leaves attacks unused"]}, {"id": "nyxa_volley_temporal", "type": "visual", "assertions": ["setup shows arrow count", "impact separates simultaneous arrows", "aftermath preserves remaining-shot count"]}]
+    },
+    {
+      "unit_id": "paisley", "ability_id": "paisley_bubbles", "cost": 2,
+      "traits": ["Arcanist", "Kaleidoscope", "Blessed"], "primary_role": "mage", "primary_goal": "mage.wombo_combo_burst", "approaches": ["aoe", "peel"],
+      "core_promise": "Shield two allies and separately strike two enemies.", "player_explanation": "Paisley shields two weak allies, then damages and stuns up to two nearby enemies.",
+      "effect_families": ["ally_defense", "damage", "hard_cc"],
+      "team_utility": "Provides multi-ally protection and a small enemy interruption.", "signature_moment": "Protected bubbles should pop into local retaliatory bursts.",
+      "counterplay": {"levers": ["anti-shield effects", "CC immunity", "spacing to reduce pop targets"], "failure_state": "Separated enemies turn each bubble pop into a small or empty retaliation."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 1},
+      "problem": "Four actors receive two unrelated halves, and the RGA says burst while the behavior reads peel.", "direction": "Shield the two weakest allies; each bubble pops locally on break or expiry for damage and brief stun. Relabel to peel.",
+      "test_cases": [{"id": "paisley_bubble_contract", "type": "counterplay", "assertions": ["two weakest allies get unique bubbles", "break and expiry each pop once", "spacing and immunity separately deny AoE and stun"]}, {"id": "paisley_bubble_temporal", "type": "visual", "assertions": ["setup shows two bubble owners", "impact is triggered by break or expiry", "aftermath shows local not global radius"]}]
+    },
+    {
+      "unit_id": "rooket", "ability_id": "rooket_brace_shot", "cost": 2,
+      "traits": ["Bulwark", "Fortified"], "primary_role": "marksman", "primary_goal": "marksman.tank_shredding", "approaches": ["damage_reduction", "debuff", "cc_immunity"],
+      "core_promise": "Brace against disruption, then fire one tank-shredding line shot.", "player_explanation": "Rooket gains temporary protection and immunity, then pierces a line and shreds Armor and Attack Speed.",
+      "effect_families": ["self_defense", "damage", "enemy_debuff"],
+      "team_utility": "Holds a firing lane and softens multiple tanks.", "signature_moment": "A locked-facing brace windup releases one heavy piercing bolt.",
+      "counterplay": {"levers": ["flank or spread off the line", "cleanse the shred", "attack after brace expires"], "failure_state": "A poor firing line hits only one target; post-brace control lands normally."},
+      "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 2},
+      "problem": "The immediate shot gives opponents little chance to read the protected setup.", "direction": "Keep the package but add a locked-facing windup; fire at completion and shorten protection afterward.",
+      "test_cases": [{"id": "rooket_brace_contract", "type": "counterplay", "assertions": ["collinear tanks are hit and shredded", "spread yields one hit", "CC during brace is denied but post-brace CC lands"]}, {"id": "rooket_brace_temporal", "type": "visual", "assertions": ["setup locks facing and shows line", "impact is one piercing bolt", "aftermath clearly ends protection"]}]
+    },
+    {
+      "unit_id": "teller", "ability_id": "teller_margin_call", "cost": 2,
+      "traits": ["Exile", "Mogul"], "primary_role": "marksman", "primary_goal": "marksman.sustained_dps", "approaches": ["long_range", "burst", "aoe"],
+      "core_promise": "Collect on two farthest targets through body-blockable contract shots.", "player_explanation": "Teller fires two long shots with overflow, can gain a third from Exile, and may earn currency on kills.",
+      "effect_families": ["damage", "economy"],
+      "team_utility": "Threatens distant carries while rewarding precise kill timing.", "signature_moment": "Two red contract lines appear before separate collection shots and one possible coin payout.",
+      "counterplay": {"levers": ["body-block with a durable frontliner", "offset the formation", "deny the killing blow"], "failure_state": "A blocked nonlethal shot grants no currency and may not reach the carry."},
+      "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 2},
+      "problem": "The kit is burst/backline siege, not sustained DPS or true AoE, and generic VFX hide the multiple contracts.", "direction": "Keep mechanics, relabel backline siege with long-range and burst, and expose both shot paths before firing.",
+      "test_cases": [{"id": "teller_margin_contract", "type": "rga", "assertions": ["body-block limits overflow", "Exile counts one three five add exactly one shot", "only ability kills can award currency"]}, {"id": "teller_margin_temporal", "type": "visual", "assertions": ["setup shows two contract lines", "impact resolves separate shots", "coin payout is tied to the lethal target"]}]
+    },
+    {
+      "unit_id": "totem", "ability_id": "totem_cleanse", "cost": 2,
+      "traits": ["Bulwark", "Exile"], "primary_role": "support", "primary_goal": "support.peel_carry", "approaches": ["peel", "cc_immunity", "amp"],
+      "core_promise": "Cleanse and protect the team's carry.", "player_explanation": "Totem cleanses, shields, immunizes and amplifies the damage leader, attacks an enemy, and may auto-cast repeatedly from unrelated debuffs.",
+      "effect_families": ["ally_defense", "offensive_buff", "damage", "execute_reset"], "complexity_breach": "Four families exceed the tier, and unrestricted automatic recasts can be triggered by the wrong ally.",
+      "team_utility": "Should provide one reliable carry save.", "signature_moment": "One debuff visibly shatters off the carry as a single ward forms.",
+      "counterplay": {"levers": ["bait the one automatic save", "burst through the resulting shield", "eliminate Totem first"], "failure_state": "A debuff on a non-carry should not trigger a cleanse on a clean carry."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 0, "counterplay": 0, "cost_fit": 0},
+      "problem": "Trigger and recipient can differ, causing repeated half-second casts with protection, amp, and damage while the original debuff remains.", "direction": "Active cleanse and shield the carry; Exile auto-casts once per combat when that carry is first debuffed. Remove damage and amp.",
+      "test_cases": [{"id": "totem_cleanse_contract", "type": "counterplay", "assertions": ["a debuffed carry triggers exactly one auto-cleanse", "a debuffed non-carry does not trigger it", "Totem death prevents the save"]}, {"id": "totem_cleanse_temporal", "type": "visual", "assertions": ["setup identifies the carry debuff", "impact removes it once", "aftermath shows one ward without damage or amp clutter"]}]
+    },
+    {
+      "unit_id": "velour", "ability_id": "velour_silk_knot", "cost": 2,
+      "traits": ["Liaison", "Blessed"], "primary_role": "support", "primary_goal": "support.enemy_lockdown", "approaches": ["lockdown", "peel", "sustain"],
+      "core_promise": "Protect several allies while separately locking several enemies.", "player_explanation": "Velour heals and shields two allies and herself, then damages and stuns up to two globally selected threats.",
+      "effect_families": ["sustain", "ally_defense", "damage", "hard_cc"], "complexity_breach": "Four families can affect five actors and ignore Liaison's spatial identity.",
+      "team_utility": "Should bind one protected ally to one controlled threat.", "signature_moment": "One visible silk knot tethers a wounded ally to a rooted enemy.",
+      "counterplay": {"levers": ["force separation to break the knot", "use anti-heal", "use CC immunity"], "failure_state": "Breaking range ends both the remaining heal and root."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 0, "counterplay": 1, "cost_fit": 0},
+      "problem": "Global multi-target healing, shielding, self-protection, damage, and stun have no single causal relationship.", "direction": "Tie one threat to one low-health ally; root the threat and heal the ally while the visible knot holds. Remove every other effect.",
+      "test_cases": [{"id": "velour_knot_contract", "type": "counterplay", "assertions": ["one threat and one ally are selected", "forced separation breaks both ongoing effects", "immunity and anti-heal deny their respective halves"]}, {"id": "velour_knot_temporal", "type": "visual", "assertions": ["setup shows both tether endpoints", "impact forms one knot", "aftermath exposes range and break"]}]
+    },
+    {
+      "unit_id": "veyra", "ability_id": "veyra_harden", "cost": 2,
+      "traits": ["Aegis", "Bulwark"], "primary_role": "tank", "primary_goal": "tank.team_fortification", "approaches": ["damage_reduction", "cc_immunity", "ramp"],
+      "core_promise": "Harden a nearby formation against damage and control.", "player_explanation": "Veyra reduces her own damage, grants nearby allies CC immunity, then may permanently gain hidden Max HP.",
+      "effect_families": ["self_defense", "ally_defense", "offensive_buff"],
+      "team_utility": "Creates a four-second anti-control formation shell.", "signature_moment": "Veyra and nearby allies share one visible stone-shell state.",
+      "counterplay": {"levers": ["spread outside the radius before cast", "wait out four seconds", "kill Veyra before delayed gain"], "failure_state": "Late entrants receive nothing; outsiders remain vulnerable."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 1, "player_clarity": 1, "visual_satisfaction": 0, "counterplay": 2, "cost_fit": 1},
+      "problem": "Team fortification is mostly a personal stat package, the permanent gain is hidden, and the copy omits allied immunity.", "direction": "Grant nearby allies the same temporary damage reduction and CC immunity; remove delayed permanent Max HP.",
+      "test_cases": [{"id": "veyra_shell_contract", "type": "counterplay", "assertions": ["only allies inside two tiles at cast gain shell", "late entrants do not", "all effects end cleanly after four seconds"]}, {"id": "veyra_shell_temporal", "type": "visual", "assertions": ["setup exposes the radius", "impact shells snapshot targets", "aftermath has one shared expiry cue"]}]
+    },
+    {
+      "unit_id": "volt", "ability_id": "volt_arc_lock", "cost": 2,
+      "traits": ["Scholar", "Overload"], "primary_role": "mage", "primary_goal": "mage.pick_burst", "approaches": ["burst", "lockdown"],
+      "core_promise": "Lock one current target with one lightning strike.", "player_explanation": "Volt damages and stuns exactly one current target.",
+      "effect_families": ["damage", "hard_cc"],
+      "team_utility": "Provides a simple ranged pick and interruption.", "signature_moment": "One arc windup snaps into a one-target lightning cage.",
+      "counterplay": {"levers": ["frontline target manipulation", "CC immunity", "interrupt before release"], "failure_state": "CC immunity removes the stun but not the damage."},
+      "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 2},
+      "problem": "Mechanics are clean; the generic cast line needs a character-specific lock visual.", "direction": "Keep exact mechanics and add one arc windup plus target cage; add no chaining or riders.",
+      "test_cases": [{"id": "volt_lock_contract", "type": "counterplay", "assertions": ["only current target is hit", "CC immunity denies stun only", "interrupt before release yields no effect"]}, {"id": "volt_lock_temporal", "type": "visual", "assertions": ["setup identifies one target", "impact is one lightning lock", "aftermath keeps stun readable without extra effects"]}]
+    },
+    {
+      "unit_id": "vykos", "ability_id": "vykos_blood_feast", "cost": 2,
+      "traits": ["Sanguine", "Fortified"], "primary_role": "brawler", "primary_goal": "brawler.attrition_dps", "approaches": ["sustain", "burst", "damage_reduction"],
+      "core_promise": "Feast on enemies caught in one cone.", "player_explanation": "Vykos cleaves a cone, heals with a guaranteed floor, gains defenses per victim, and gains lifesteal after a kill.",
+      "effect_families": ["damage", "sustain", "self_defense", "offensive_buff"], "complexity_breach": "Four families plus matching traits erase denial at cost 2.",
+      "team_utility": "Should provide attack-dependent frontline attrition.", "signature_moment": "One cone telegraph becomes a blood sweep whose return flow exactly matches damage dealt.",
+      "counterplay": {"levers": ["spread outside the cone", "mitigate or shield the damage", "apply anti-heal", "kill before cast"], "failure_state": "Low real damage should produce low healing and no guaranteed floor."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "Minimum healing, resistance per target, and on-kill lifesteal duplicate both traits and weaken every nonnumeric answer.", "direction": "Rename uniquely and keep cone damage plus healing from actual damage dealt only.",
+      "test_cases": [{"id": "vykos_feast_contract", "type": "counterplay", "assertions": ["healing scales with real damage dealt", "mitigation and anti-heal reduce recovery", "outside-cone enemies are unaffected"]}, {"id": "vykos_feast_temporal", "type": "visual", "assertions": ["setup shows the exact cone", "impact hits only occupants", "one blood return communicates earned healing"]}]
+    },
+    {
+      "unit_id": "caldera", "ability_id": "caldera_molten_core", "cost": 3,
+      "traits": ["Titan", "Catalyst"], "primary_role": "tank", "primary_goal": "tank.initiate_fight", "approaches": ["engage", "zone", "aoe"],
+      "core_promise": "Crash into a formation and leave a molten hazard.", "player_explanation": "Caldera charges, hardens, bursts, stuns, and leaves a damaging floor.",
+      "effect_families": ["movement", "self_defense", "damage", "hard_cc", "zone"], "complexity_breach": "Five families exceed cost 3; the stun is removable from an already complete crash-and-floor pattern.",
+      "team_utility": "Starts fights and creates a temporary area the enemy formation wants to leave.", "signature_moment": "A charge line becomes a crater and persistent molten floor.",
+      "counterplay": {"levers": ["spread before the charge", "bait the chosen angle", "leave or fight outside the floor"], "failure_state": "A poor angle hits one enemy and the floor controls little space."},
+      "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 2, "counterplay": 2, "cost_fit": 0},
+      "problem": "Charge, defense, burst, stun, and zone slightly exceed the tier despite strong cohesion.", "direction": "Remove the stun; retain charge, impact damage, temporary defense, and molten floor.",
+      "test_cases": [{"id": "caldera_crash_contract", "type": "counterplay", "assertions": ["spread reduces impact victims", "leaving floor stops later ticks", "no hard stun is applied"]}, {"id": "caldera_crash_temporal", "type": "visual", "assertions": ["setup shows charge path", "impact creates one crater", "aftermath keeps floor boundary readable"]}]
+    },
+    {
+      "unit_id": "creep", "ability_id": "creep_playable_eavesdropping", "cost": 3,
+      "traits": ["Exile", "Executioner"], "primary_role": "assassin", "primary_goal": "assassin.backline_elimination", "approaches": ["access_backline", "aoe", "damage_reduction"],
+      "core_promise": "Commit to the backline and spin through a cluster.", "player_explanation": "Creep dashes, spins, gains immunity and reduction, shreds, scales the spin, and chases after a first kill.",
+      "effect_families": ["movement", "damage", "self_defense", "enemy_debuff", "execute_reset"], "complexity_breach": "Five families exceed the tier and combine access, safety, snowball, and debuff.",
+      "team_utility": "Punishes a clustered backline through an AoE assassin commitment.", "signature_moment": "A landing reticle leads into discrete, countable spin ticks.",
+      "counterplay": {"levers": ["bait the lowest-health backliner", "spread the backline", "zone the landing point", "peel after landing"], "failure_state": "No first kill means no Exile chase; a spread formation limits spin victims."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 2, "counterplay": 0, "cost_fit": 0},
+      "problem": "CC immunity plus damage reduction plus shred plus first-kill chase denies retaliation after guaranteed access.", "direction": "Keep dash and spin; choose reduction or immunity, remove shred, and allow only one first-kill chase.",
+      "test_cases": [{"id": "creep_spin_contract", "type": "counterplay", "assertions": ["lowest back-half bait determines landing", "spread reduces victims", "without first kill no chase occurs"]}, {"id": "creep_spin_temporal", "type": "visual", "assertions": ["setup marks landing", "impact shows discrete spin ticks", "aftermath exposes the committed position"]}]
+    },
+    {
+      "unit_id": "egress", "ability_id": "egress_exit_wound", "cost": 3,
+      "traits": ["Exile", "Executioner"], "primary_role": "assassin", "primary_goal": "assassin.cleanup_execution", "approaches": ["execute", "reset_mechanic", "untargetable"],
+      "core_promise": "Execute an already-wounded backliner and retreat.", "player_explanation": "Egress blinks, forces most survivors down to an execute threshold, kills them, breaks shields, and retreats under vanish telemetry.",
+      "effect_families": ["movement", "damage", "execute_reset", "self_defense"],
+      "team_utility": "Should finish a genuinely wounded backliner and leave without chaining.", "signature_moment": "A readable mark precedes one strike and a retreat trail.",
+      "counterplay": {"levers": ["keep the marked target above threshold", "shield or peel during the tell", "deny the cast before blink"], "failure_state": "A target above the honest execute threshold survives; no kill means no retreat."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 2, "counterplay": 0, "cost_fit": 0},
+      "problem": "The 85-percent arming rule forcibly creates its own execute condition and bypasses defensive answers.", "direction": "Execute only targets already below 30 percent after a readable tell; on kill retreat, with no forced setup, shield break, or untargetability claim.",
+      "test_cases": [{"id": "egress_exit_contract", "type": "counterplay", "assertions": ["a 31-percent target survives absent normal lethal damage", "shields can deny the execute", "kill retreats but never recasts"]}, {"id": "egress_exit_temporal", "type": "visual", "assertions": ["setup marks one victim", "impact is one strike", "aftermath retreats only on kill"]}]
+    },
+    {
+      "unit_id": "hexeon", "ability_id": "hexeon_prismatic_guillotine", "cost": 3,
+      "traits": ["Kaleidoscope", "Executioner"], "primary_role": "assassin", "primary_goal": "assassin.backline_elimination", "approaches": ["access_backline", "burst", "execute"],
+      "core_promise": "Guillotine a wounded backliner and earn one weaker recast.", "player_explanation": "Hexeon reaches a backliner, forces targets below a threshold, executes, and performs a real reduced recast.",
+      "effect_families": ["movement", "damage", "execute_reset"],
+      "team_utility": "Provides the roster's first-kill-gated chain execution.", "signature_moment": "A large threshold mark closes into one guillotine beat before a weaker follow-up.",
+      "counterplay": {"levers": ["keep the first target above threshold", "lock Hexeon before access", "deny the first kill"], "failure_state": "No first kill means no recast; above-threshold targets are not forced down."},
+      "verdict": "redesign", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 2, "counterplay": 0, "cost_fit": 1},
+      "problem": "Current forced threshold and real recast give too little first-kill denial, while copy claims absent anti-heal.", "direction": "Require the victim already be under the trait threshold; preserve exactly one 70-percent recast and delete anti-heal copy.",
+      "test_cases": [{"id": "hexeon_guillotine_contract", "type": "counterplay", "assertions": ["above-threshold targets are never forced down", "one below-threshold kill produces one reduced recast", "denied first kill gives no recast"]}, {"id": "hexeon_guillotine_temporal", "type": "visual", "assertions": ["setup shows threshold state", "impact is a guillotine beat", "aftermath distinguishes the weaker recast"]}]
+    },
+    {
+      "unit_id": "ivara", "ability_id": "ivara_open_bid", "cost": 3,
+      "traits": ["Trader", "Mogul"], "primary_role": "marksman", "primary_goal": "marksman.tank_shredding", "approaches": ["long_range", "debuff", "engage"],
+      "core_promise": "Open bidding on the highest-health enemy and focus it down.", "player_explanation": "Ivara fires at the healthiest enemy, gains a large steroid, shreds defenses, stuns, and starts a focus event.",
+      "effect_families": ["damage", "offensive_buff", "enemy_debuff", "hard_cc"],
+      "team_utility": "Creates a single-target focus contract against a tank.", "signature_moment": "An auction seal and focus beam stay on one high-health target.",
+      "counterplay": {"levers": ["offer a high-health bait", "cleanse the mark", "control Ivara during focus"], "failure_state": "A cleansed or lost marked target removes the conditional focus advantage."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 1},
+      "problem": "Generic self AD and stun stack guarantees onto dual shred and overlap Sable.", "direction": "Remove stun and generic steroid; make any bonus conditional on continuing to attack the visible marked target.",
+      "test_cases": [{"id": "ivara_bid_contract", "type": "counterplay", "assertions": ["highest-health target receives the mark", "cleanse removes shred", "other targets cannot receive focus bonus"]}, {"id": "ivara_bid_temporal", "type": "visual", "assertions": ["setup stamps the auction seal", "impact links Ivara to the mark", "aftermath keeps focus ownership readable"]}]
+    },
+    {
+      "unit_id": "juno_vale", "ability_id": "juno_vale_constellation_math", "cost": 3,
+      "traits": ["Liaison", "Scholar"], "primary_role": "support", "primary_goal": "support.formation_breaking", "approaches": ["zone", "disrupt", "redirect"],
+      "core_promise": "Link two unlike allies and use their line to break formation.", "player_explanation": "Juno fuels and shields linked allies, then separately damages, stuns, and scatters enemies around another target.",
+      "effect_families": ["resource", "ally_defense", "damage", "hard_cc", "movement"], "complexity_breach": "Five families join two unrelated abilities and exceed cost 3.",
+      "team_utility": "Should turn Liaison geometry into a formation-breaking line.", "signature_moment": "A constellation line between two allies pulses and pushes intersecting enemies away.",
+      "counterplay": {"levers": ["spread away from the link", "use displacement immunity", "kill or separate a linked ally"], "failure_state": "Enemies outside the link are not moved; immunity blocks displacement while ally mana still applies."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "Ally mana and shields have no causal relationship to the global AoE damage, stun, and scatter.", "direction": "Link two no-shared-trait allies; pulse their line to move enemies off it and grant linked allies mana. Remove shields, generic AoE, and stun.",
+      "test_cases": [{"id": "juno_constellation_contract", "type": "counterplay", "assertions": ["a no-shared-trait pair is preferred", "only enemies crossing the line move", "immunity blocks movement but not linked mana"]}, {"id": "juno_constellation_temporal", "type": "visual", "assertions": ["setup draws one constellation", "impact pulses along that geometry", "aftermath shows displaced enemies and linked allies"]}]
+    },
+    {
+      "unit_id": "kett", "ability_id": "kett_union_breaker", "cost": 3,
+      "traits": ["Striker", "Cartel"], "primary_role": "brawler", "primary_goal": "brawler.frontline_disruption", "approaches": ["on_hit_effect", "ramp", "debuff"],
+      "core_promise": "Build a three-punch combo into one disruptive finisher.", "player_explanation": "Kett lands three escalating punches with repeated control and debuffs, ending in a shove.",
+      "effect_families": ["damage", "hard_cc", "movement", "enemy_debuff"],
+      "team_utility": "Creates predictable frontline disruption with an interruptible payoff.", "signature_moment": "A visible one-two-three count ends in an oversized shove.",
+      "counterplay": {"levers": ["interrupt before hit three", "use CC immunity", "peel Kett away from the target"], "failure_state": "Breaking the sequence after hit two denies the finisher."},
+      "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 2, "counterplay": 2, "cost_fit": 1},
+      "problem": "Every punch stuns and applies two debuff tracks, weakening response between beats.", "direction": "Keep the combo; first two build visible Armor shred and the third shoves and briefly stuns. Remove early stuns and Attack Speed slow.",
+      "test_cases": [{"id": "kett_combo_contract", "type": "counterplay", "assertions": ["interrupt after hit two denies finisher", "immunity denies final stun only", "Armor shred rises once per landed punch"]}, {"id": "kett_combo_temporal", "type": "visual", "assertions": ["setup displays combo count", "each impact escalates", "third hit has a unique shove silhouette"]}]
+    },
+    {
+      "unit_id": "marble", "ability_id": "marble_sanctuary_bolt", "cost": 3,
+      "traits": ["Fortified", "Blessed"], "primary_role": "marksman", "primary_goal": "marksman.backline_siege", "approaches": ["long_range", "peel", "debuff"],
+      "core_promise": "Thread one sanctuary bolt through an ally into a distant enemy.", "player_explanation": "Marble shields one weak ally, buffs herself, then damages, shreds, and slows a far enemy.",
+      "effect_families": ["ally_defense", "offensive_buff", "damage", "enemy_debuff"],
+      "team_utility": "Uses one firing line to protect an ally and pressure a backliner.", "signature_moment": "One projectile visibly passes through a protected ally and continues into the enemy.",
+      "counterplay": {"levers": ["separate the ally from the firing lane", "dive Marble", "cleanse the slow"], "failure_state": "No allied intersection means no shield; no line means only the enemy half resolves."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 1},
+      "problem": "Independent self AD and Armor shred turn a strong thread-through-ally idea into another premium bolt package.", "direction": "Make one projectile shield an intersecting low-HP ally then damage and slow the farthest enemy; remove self AD and shred.",
+      "test_cases": [{"id": "marble_thread_contract", "type": "counterplay", "assertions": ["an aligned ally gains shield", "no allied intersection gives no shield", "cleanse removes slow only"]}, {"id": "marble_thread_temporal", "type": "visual", "assertions": ["setup shows ally-to-enemy path", "impact crosses both actors", "aftermath distinguishes shield and slow"]}]
+    },
+    {
+      "unit_id": "noxley", "ability_id": "noxley_red_static", "cost": 3,
+      "traits": ["Sanguine", "Overload"], "primary_role": "mage", "primary_goal": "mage.sustained_dps", "approaches": ["dot", "sustain", "ramp"],
+      "core_promise": "Pay blood for chained static whose ticks heal the caster.", "player_explanation": "Noxley pays health, chains damage, applies six ticks, heals from every hit, shreds resistance, and emits extra zone and ramp semantics.",
+      "effect_families": ["resource", "damage", "sustain", "enemy_debuff"],
+      "team_utility": "Provides sustained anti-cluster magic pressure at personal risk.", "signature_moment": "A blood payment branches into red lightning and six countable returns.",
+      "counterplay": {"levers": ["burst before ticks repay health", "apply anti-heal", "control which enemies are nearest"], "failure_state": "If ticks are denied or healing reduced, the blood payment remains costly."},
+      "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 1},
+      "problem": "MR shred and fake zone/ramp bookkeeping are unnecessary beside the clear health-for-lightning loop.", "direction": "Keep blood cost, two-target chain, six ticks, and healing; remove MR shred and false zone/ramp semantics.",
+      "test_cases": [{"id": "noxley_static_contract", "type": "counterplay", "assertions": ["cast pays seven percent without self-kill", "two nearest targets are deterministic", "anti-heal reduces recovery while ticks remain"]}, {"id": "noxley_static_temporal", "type": "visual", "assertions": ["setup shows blood payment", "impact branches to two targets", "aftermath counts six tick returns"]}]
+    },
+    {
+      "unit_id": "prisma", "ability_id": "prisma_color_theory", "cost": 3,
+      "traits": ["Kaleidoscope", "Harmony"], "primary_role": "mage", "primary_goal": "mage.area_denial_zone", "approaches": ["zone", "amp", "aoe"],
+      "core_promise": "Paint an anti-diver prism field.", "player_explanation": "Prisma amplifies the whole team, bursts a smart cluster, taxes two stats, and blocks mana.",
+      "effect_families": ["offensive_buff", "damage", "enemy_debuff", "resource", "zone"], "complexity_breach": "Five families exceed the tier and duplicate the roster's crowded global amplification niche.",
+      "team_utility": "Should deny a positional area to divers and engagers.", "signature_moment": "A persistent prism field refracts around invading enemies and exposes its boundary.",
+      "counterplay": {"levers": ["spread before placement", "leave the field", "attack from long range", "kill Prisma"], "failure_state": "Enemies outside the field gain mana normally and avoid its denial."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "A global dual amp is stapled to a full enemy burst, stat tax, and mana lock.", "direction": "Remove team amp; create one persistent field that damages once and blocks mana only while enemies remain inside.",
+      "test_cases": [{"id": "prisma_field_contract", "type": "counterplay", "assertions": ["divers are priority targets", "exiting ends mana denial", "spread reduces occupants"]}, {"id": "prisma_field_temporal", "type": "visual", "assertions": ["setup previews the field", "impact paints one prism area", "aftermath keeps occupancy and denial readable"]}]
+    },
+    {
+      "unit_id": "quorra", "ability_id": "quorra_timeplate_lunge", "cost": 3,
+      "traits": ["Aegis", "Chronomancer"], "primary_role": "assassin", "primary_goal": "assassin.disrupt_and_escape", "approaches": ["access_backline", "dot", "untargetable"],
+      "core_promise": "Lunge, attach a ticking timeplate, then rewind to safety.", "player_explanation": "Quorra blinks to the deepest enemy, deals damage and ticks, slows Attack Speed, and emits unenforced untargetability without escaping.",
+      "effect_families": ["movement", "damage", "enemy_debuff", "self_defense"],
+      "team_utility": "Should disrupt a backliner through a counterable timed wound and real escape.", "signature_moment": "A cast-origin time anchor connects to a ticking wound before a visible snap-back.",
+      "counterplay": {"levers": ["bait the deepest target", "peel the landing", "cleanse the wound", "kill Quorra before rewind"], "failure_state": "Cleanse cancels future ticks; death before the last tick prevents rewind."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 2, "counterplay": 1, "cost_fit": 1},
+      "problem": "The ability claims escape and untargetability but supplies neither, while extra slow overlaps other dive assassins.", "direction": "Blink, attach a ticking timeplate, and rewind to origin after the final tick; remove untargetability and Attack Speed slow.",
+      "test_cases": [{"id": "quorra_rewind_contract", "type": "counterplay", "assertions": ["deepest target is deterministic", "cleanse cancels remaining ticks", "survival to final tick rewinds but death prevents it"]}, {"id": "quorra_rewind_temporal", "type": "visual", "assertions": ["setup leaves an origin anchor", "impact attaches a wound clock", "aftermath snaps back on completion"]}]
+    },
+    {
+      "unit_id": "sable", "ability_id": "sable_footnote_piercer", "cost": 3,
+      "traits": ["Vindicator", "Scholar"], "primary_role": "marksman", "primary_goal": "marksman.tank_shredding", "approaches": ["long_range", "debuff", "on_hit_effect"],
+      "core_promise": "Pierce the highest-health enemy and refund mana for a true multi-hit line.", "player_explanation": "Sable fires through the highest-health target, shreds all victims, synthesizes extra victims when needed, and refunds mana for two hits.",
+      "effect_families": ["damage", "enemy_debuff", "resource"],
+      "team_utility": "Rewards geometric tank-shredding lines with faster repeat casts.", "signature_moment": "A pre-shot line becomes a page-rip trail through actual victims.",
+      "counterplay": {"levers": ["spread off the line", "kill Sable before firing", "cleanse the shred"], "failure_state": "A true single-target line gives no mana refund."},
+      "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 2},
+      "problem": "Appending nearby enemies when the line catches fewer destroys formation counterplay.", "direction": "Only actual line victims are hit and shredded; refund mana only for a true two-plus line.",
+      "test_cases": [{"id": "sable_pierce_contract", "type": "counterplay", "assertions": ["non-collinear enemies are never hit", "two-plus line refunds exactly 34 mana", "one hit gives no refund"]}, {"id": "sable_pierce_temporal", "type": "visual", "assertions": ["setup line matches actual victims", "impact follows one page-rip path", "aftermath ties refund to multi-hit"]}]
+    },
+    {
+      "unit_id": "bastionne", "ability_id": "bastionne_no_pass_writ", "cost": 4,
+      "traits": ["Aegis", "Bulwark"], "primary_role": "tank", "primary_goal": "tank.single_target_lockdown", "approaches": ["lockdown", "redirect", "cc_immunity"],
+      "core_promise": "Lock one priority threat behind a protective gate.", "player_explanation": "Bastionne damages and roots one priority enemy while shielding and fortifying up to four allies with control immunity.",
+      "effect_families": ["damage", "hard_cc", "ally_defense"],
+      "team_utility": "Stops one dangerous threat and creates a temporary anti-dive shelter.", "signature_moment": "A physical gate divides the locked threat from visibly sheltered allies.",
+      "counterplay": {"levers": ["bait the priority selection", "cleanse or use tenacity", "wait out the gate", "attack from outside the protected group"], "failure_state": "A low-value lock or sparse allied group wastes much of the cast."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 0, "counterplay": 1, "cost_fit": 1},
+      "problem": "The gate is a global shield, Armor, MR, DR, and immunity package rather than a spatial wall, while the target also receives hard lockdown.", "direction": "Make the gate spatial and narrow protection to allies behind it; cut redundant defense layers or the full root.",
+      "test_cases": [{"id": "bastionne_gate_contract", "type": "counterplay", "assertions": ["priority bait changes the lock", "cleanse shortens control", "only allies behind the gate receive protection"]}, {"id": "bastionne_gate_temporal", "type": "visual", "assertions": ["setup previews gate placement", "impact separates threat and allies", "aftermath shows the exact protected side"]}]
+    },
+    {
+      "unit_id": "draxelle", "ability_id": "draxelle_colossus_hook", "cost": 4,
+      "traits": ["Titan", "Striker"], "primary_role": "brawler", "primary_goal": "brawler.frontline_disruption", "approaches": ["engage", "disrupt", "ramp"],
+      "core_promise": "Hook the farthest enemy into one brutal cleave.", "player_explanation": "Draxelle moves forward, pulls and roots the farthest enemy, cleaves a cluster, stuns bystanders, and gains offensive stats.",
+      "effect_families": ["movement", "hard_cc", "damage", "offensive_buff"],
+      "team_utility": "Extracts one distant carry into the frontline brawl.", "signature_moment": "A visible hook connects, drags one silhouette, and ends in one cleave.",
+      "counterplay": {"levers": ["place bait farthest back", "use displacement immunity", "spread around the hook victim", "punish Draxelle's commitment"], "failure_state": "An anchored target or sparse landing area removes most of the payoff."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 2, "counterplay": 1, "cost_fit": 1},
+      "problem": "Double movement, root/stun, cleave, and generic AD/AS ramp compete with the excellent hook identity.", "direction": "Keep pull, one brief control, and cleave; remove self ramp and either Draxelle's forward move or the extra bystander stun.",
+      "test_cases": [{"id": "draxelle_hook_contract", "type": "counterplay", "assertions": ["farthest bait is deterministic", "immunity denies pull", "spread reduces cleave victims"]}, {"id": "draxelle_hook_temporal", "type": "visual", "assertions": ["setup shows hook target and path", "impact visibly drags one enemy", "aftermath ends in one readable cleave"]}]
+    },
+    {
+      "unit_id": "gable", "ability_id": "gable_market_corner", "cost": 4,
+      "traits": ["Trader", "Cartel"], "primary_role": "marksman", "primary_goal": "marksman.sustained_dps", "approaches": ["long_range", "on_hit_effect", "ramp"],
+      "core_promise": "Convert expensive board context into rotating on-hit shots.", "player_explanation": "Gable buffs himself, fires at high health, scales from board cost, and rotates shred, root, and vulnerability by hit order.",
+      "effect_families": ["offensive_buff", "damage", "enemy_debuff", "hard_cc"],
+      "team_utility": "Should pressure one valuable enemy through a market-themed sustained contract.", "signature_moment": "A marked premium target accumulates visible contract stacks under repeated fire.",
+      "counterplay": {"levers": ["offer a high-health bait", "cleanse the mark", "kill Gable before sustained attacks", "change the premium target"], "failure_state": "Losing the marked target ends the ramp and forces a new contract."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 1, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 0, "counterplay": 1, "cost_fit": 0},
+      "problem": "Invisible board-value math and hit-order-dependent shred, root, and vulnerability make the cast impossible to predict.", "direction": "Mark one highest-value enemy; Gable's attacks against that mark ricochet or ramp. Remove rotating debuffs and generic self steroids.",
+      "test_cases": [{"id": "gable_contract_contract", "type": "counterplay", "assertions": ["one premium target is marked", "only attacks on that mark ramp", "cleanse or target death resets the contract"]}, {"id": "gable_contract_temporal", "type": "visual", "assertions": ["setup displays one price seal", "impact increments one stack language", "aftermath never rotates unexplained status icons"]}]
+    },
+    {
+      "unit_id": "omenry", "ability_id": "omenry_condemning_shot", "cost": 4,
+      "traits": ["Exile", "Vindicator"], "primary_role": "marksman", "primary_goal": "marksman.backline_siege", "approaches": ["long_range", "on_hit_effect", "reposition"],
+      "core_promise": "Punish the most isolated enemy with a shredding line shot and backstep.", "player_explanation": "Omenry fires through the most isolated enemy, deals bonus damage and defense shred, then steps backward.",
+      "effect_families": ["damage", "enemy_debuff", "movement"],
+      "team_utility": "Punishes isolated backliners and opens them to team follow-up.", "signature_moment": "An isolation reticle, long shot line, and crisp recoil step form one sniper beat.",
+      "counterplay": {"levers": ["group the intended target", "offer an isolated bait", "cleanse shred", "dive after the backstep"], "failure_state": "No isolated target removes the bonus and may redirect the shot to bait."},
+      "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 2},
+      "problem": "The mechanics are strong and readable; only the generic line needs a more specific isolation tell.", "direction": "Keep mechanics; add a visible isolation mark and recoil path, with no new riders.",
+      "test_cases": [{"id": "omenry_isolation_contract", "type": "counterplay", "assertions": ["fewest-neighbor target is selected", "grouping removes isolation bonus", "cleanse removes shred"]}, {"id": "omenry_isolation_temporal", "type": "visual", "assertions": ["setup marks isolation", "impact shows full shot line", "aftermath clearly shows the backstep"]}]
+    },
+    {
+      "unit_id": "orielle", "ability_id": "orielle_spell_debt", "cost": 4,
+      "traits": ["Arcanist", "Overload"], "primary_role": "mage", "primary_goal": "mage.area_denial_zone", "approaches": ["zone", "disrupt", "ramp"],
+      "core_promise": "Turn allied mana pressure into a delayed enemy timing-debt zone.", "player_explanation": "Orielle instantly bursts a cluster, slows mana, briefly stuns the main target, then deals five fixed-area ticks.",
+      "effect_families": ["damage", "zone", "resource", "hard_cc"],
+      "team_utility": "Delays enemy spell timing in one contested area.", "signature_moment": "Visible debt pips count down into a persistent zone detonation.",
+      "counterplay": {"levers": ["spread before target selection", "move out during the telegraph", "cleanse mana slow", "cast before debt lands"], "failure_state": "Leaving the marked area avoids future ticks and timing tax."},
+      "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 2},
+      "problem": "Instant burst, stun, slow, and ticks offer little response despite a strong delayed-debt concept.", "direction": "Add a visible delayed detonation and persistent boundary; remove the instant stun or make it the avoidable detonation payoff.",
+      "test_cases": [{"id": "orielle_debt_contract", "type": "counterplay", "assertions": ["mana pressure sets debt count", "leaving before detonation avoids later ticks", "cleanse removes mana slow"]}, {"id": "orielle_debt_temporal", "type": "visual", "assertions": ["setup shows debt and area", "impact occurs after the tell", "aftermath keeps the zone boundary visible"]}]
+    },
+    {
+      "unit_id": "ravel", "ability_id": "ravel_puppet_strings", "cost": 4,
+      "traits": ["Mentor", "Liaison"], "primary_role": "support", "primary_goal": "support.formation_breaking", "approaches": ["disrupt", "redirect", "engage"],
+      "core_promise": "Use two allied puppets to pull an enemy formation apart.", "player_explanation": "Ravel shields, buffs, and moves two allies, then damages, stuns, moves, and fans out several enemies.",
+      "effect_families": ["ally_defense", "offensive_buff", "movement", "damage", "hard_cc"], "complexity_breach": "Five families exceed cost 4 and split attention between ally amplification and enemy disruption.",
+      "team_utility": "Should break one formation using a clearly authored ally-link geometry.", "signature_moment": "Two puppet strings cross and yank enemies away from their shared center.",
+      "counterplay": {"levers": ["spread away from the string geometry", "use displacement immunity", "kill or separate a linked ally", "punish moved allies"], "failure_state": "If the strings catch no enemies, the formation remains intact."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "Shield, AD, SP, DR, ally movement, AoE damage, stun, and enemy scatter are two complete casts stapled together.", "direction": "Link two allies and use their strings to yank intersecting enemies apart; remove all stat buffs, shields, and generic damage.",
+      "test_cases": [{"id": "ravel_strings_contract", "type": "counterplay", "assertions": ["exactly two allies define the geometry", "only intersecting enemies move", "immunity denies displacement"]}, {"id": "ravel_strings_temporal", "type": "visual", "assertions": ["setup draws two strings", "impact visibly yanks caught enemies", "aftermath shows the broken formation"]}]
+    },
+    {
+      "unit_id": "saffron", "ability_id": "saffron_golden_poultice", "cost": 4,
+      "traits": ["Blessed", "Catalyst"], "primary_role": "support", "primary_goal": "support.peel_carry", "approaches": ["peel", "sustain", "damage_reduction"],
+      "core_promise": "Save the most threatened ally with one golden treatment.", "player_explanation": "Saffron heals, shields, reduces damage, grants Catalyst charge, shields the team, damages an enemy, and slows Attack Speed.",
+      "effect_families": ["sustain", "ally_defense", "resource", "damage", "enemy_debuff"], "complexity_breach": "Five families exceed cost 4 and turn one carry save into a team and enemy package.",
+      "team_utility": "Should provide one legible emergency save for the carry under greatest pressure.", "signature_moment": "A golden poultice closes over one ally and converts visible overheal into the same ally's shield.",
+      "counterplay": {"levers": ["apply anti-heal", "retarget another ally", "burst through the finite protection", "kill Saffron first"], "failure_state": "Low missing health creates little heal and little converted shield."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 1, "cost_fit": 0},
+      "problem": "Carry heal, shield, DR, Catalyst, global shield, enemy damage, and slow leave no single cause-and-effect beat.", "direction": "Heal one threatened ally and convert its overheal into its shield; remove team shield, enemy effects, and charge rider.",
+      "test_cases": [{"id": "saffron_save_contract", "type": "counterplay", "assertions": ["one most-threatened ally is selected", "anti-heal reduces both heal and overheal shield", "other allies receive no package"]}, {"id": "saffron_save_temporal", "type": "visual", "assertions": ["setup highlights one threatened ally", "impact applies one poultice", "aftermath shows heal-to-shield conversion"]}]
+    },
+    {
+      "unit_id": "vesper", "ability_id": "vesper_late_fee", "cost": 4,
+      "traits": ["Chronomancer", "Executioner"], "primary_role": "assassin", "primary_goal": "assassin.cleanup_execution", "approaches": ["execute", "reset_mechanic", "untargetable"],
+      "core_promise": "Collect a delayed execution from an already-wounded backliner.", "player_explanation": "Vesper stuns, blinks, forces targets under an execute threshold, kills, retreats, and emits vanish and reset telemetry.",
+      "effect_families": ["hard_cc", "movement", "damage", "execute_reset", "self_defense"], "complexity_breach": "Five families exceed cost 4 and combine access, kill certainty, safe exit, and reset language.",
+      "team_utility": "Should finish one telegraphed wounded target at a committed risk.", "signature_moment": "A late-fee mark counts down before one blink and execution attempt.",
+      "counterplay": {"levers": ["heal or shield during the tell", "use a backline bait", "peel the landing", "deny the kill"], "failure_state": "A target above the honest threshold survives; no kill means Vesper stays committed."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 1, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 2, "counterplay": 0, "cost_fit": 0},
+      "problem": "Forced threshold setup plus blink, stun, escape, and phase language collapses all assassin tradeoffs.", "direction": "Mark and delay, then blink and execute only if already below threshold; remove stun and forced setup, and either stay or retreat only on kill.",
+      "test_cases": [{"id": "vesper_fee_contract", "type": "counterplay", "assertions": ["healing above threshold denies execute", "backline bait changes target", "denied kill prevents retreat"]}, {"id": "vesper_fee_temporal", "type": "visual", "assertions": ["setup shows countdown mark", "impact is one blink attempt", "aftermath exposes failed or successful outcome"]}]
+    },
+    {
+      "unit_id": "malachor", "ability_id": "malachor_debt_of_flesh", "cost": 5,
+      "traits": ["Titan", "Fortified", "Sanguine"], "primary_role": "tank", "primary_goal": "tank.single_target_lockdown", "approaches": ["lockdown", "sustain", "dot"],
+      "core_promise": "Bind one priority enemy and turn absorbed pain into a delayed debt.", "player_explanation": "Malachor damages and roots one threat while self-damaging, healing, shielding, gaining defenses, applying ticks, shredding, and healing again.",
+      "effect_families": ["damage", "hard_cc", "self_defense", "sustain", "enemy_debuff"],
+      "team_utility": "Should lock one threat and absorb its pressure for the team.", "signature_moment": "A flesh chain visibly links Malachor to one threat and stores pressure before snapping.",
+      "counterplay": {"levers": ["cleanse or break the chain", "focus Malachor", "stop feeding damage into the link", "apply anti-heal"], "failure_state": "A broken chain ends storage and delayed payoff; Malachor remains exposed."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 1, "counterplay": 0, "cost_fit": 0},
+      "problem": "Root, nuke, self-cost, heal, DR, Armor, MR, shield, DoT, shred, and tick healing form several complete defensive and offensive packages.", "direction": "Chain one target, redirect part of its damage to Malachor, then snap for stored damage. Keep only minimal sustain required by the chain.",
+      "test_cases": [{"id": "malachor_chain_contract", "type": "counterplay", "assertions": ["one priority threat is linked", "cleanse breaks storage", "anti-heal and focus can kill Malachor during the link"]}, {"id": "malachor_chain_temporal", "type": "visual", "assertions": ["setup identifies one chain", "impact redirects visible pressure", "aftermath snaps or visibly breaks"]}]
+    },
+    {
+      "unit_id": "meridian", "ability_id": "meridian_full_spectrum_treaty", "cost": 5,
+      "traits": ["Kaleidoscope", "Liaison", "Catalyst"], "primary_role": "mage", "primary_goal": "mage.wombo_combo_burst", "approaches": ["aoe", "burst", "amp"],
+      "core_promise": "Turn allied trait diversity into one prismatic team wombo.", "player_explanation": "Meridian gives every ally stats and two damage amps plus Catalyst charge, then bursts and stuns a large cluster.",
+      "effect_families": ["offensive_buff", "resource", "damage", "hard_cc"],
+      "team_utility": "Rewards a diverse composition with a synchronized burst window.", "signature_moment": "Each unique allied trait contributes one visible ray to a shared prism detonation.",
+      "counterplay": {"levers": ["kill Meridian before mana", "spread the enemy formation", "reduce living trait diversity", "survive the telegraphed treaty window"], "failure_state": "Few living unique traits create fewer rays and a weaker, smaller payoff."},
+      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 0, "counterplay": 1, "cost_fit": 1},
+      "problem": "Invisible AD, SP, basic amp, ability amp, and Catalyst bookkeeping compete with the AoE detonation.", "direction": "Convert each unique trait directly into a visible ray or shared burst contribution; remove generic stat piles and redundant amp layers.",
+      "test_cases": [{"id": "meridian_treaty_contract", "type": "rga", "assertions": ["unique traits produce countable contributions", "dead allies reduce contribution", "spread reduces detonation victims"]}, {"id": "meridian_treaty_temporal", "type": "visual", "assertions": ["setup shows trait rays", "impact converges into one prism", "aftermath avoids generic team-wide buff clutter"]}]
+    },
+    {
+      "unit_id": "nullora", "ability_id": "nullora_last_word", "cost": 5,
+      "traits": ["Executioner", "Exile", "Harmony"], "primary_role": "assassin", "primary_goal": "assassin.backline_elimination", "approaches": ["access_backline", "execute", "untargetable"],
+      "core_promise": "Mark the enemy carry, blink behind it, and execute only if it remains wounded.", "player_explanation": "Nullora vanishes, selects the best backliner, blinks, forces survivors under 34 percent, executes, and retreats before retaliation.",
+      "effect_families": ["movement", "damage", "execute_reset", "self_defense"],
+      "team_utility": "Provides a capstone carry hunt with a visible response window.", "signature_moment": "A Last Word mark hangs over one carry before the backline strike lands.",
+      "counterplay": {"levers": ["heal or shield the marked carry", "use a lower-value backline bait", "peel the landing", "focus Nullora after commitment"], "failure_state": "A target above the real threshold survives and Nullora remains in the backline."},
+      "verdict": "redesign", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 2, "counterplay": 0, "cost_fit": 0},
+      "problem": "Guaranteed access, forced kill setup, untargetability, and automatic escape own all four prohibited assassin advantages.", "direction": "Mark for 1.5 seconds, then blink and execute only if already below 34 percent; remove forced setup, untargetability, and automatic retreat.",
+      "test_cases": [{"id": "nullora_last_word_contract", "type": "counterplay", "assertions": ["healing above threshold prevents execute", "bait can change target", "Nullora remains committed after the strike"]}, {"id": "nullora_last_word_temporal", "type": "visual", "assertions": ["setup marks one carry", "impact occurs after a response window", "aftermath exposes Nullora in the backline"]}]
+    },
+    {
+      "unit_id": "quillith", "ability_id": "quillith_final_exam", "cost": 5,
+      "traits": ["Scholar", "Overload", "Mentor"], "primary_role": "support", "primary_goal": "support.team_amplification", "approaches": ["amp", "reset_mechanic", "peel"],
+      "core_promise": "Let one chosen Pupil immediately repeat their defining ability at reduced power.", "player_explanation": "Quillith grants one Pupil shields, mana, regeneration, stats and two amps, shields and fuels the team, then damages an enemy under recast telemetry.",
+      "effect_families": ["ally_defense", "resource", "offensive_buff", "damage", "execute_reset"],
+      "team_utility": "Should convert one Mentor relationship into a spectacular second cast.", "signature_moment": "Quillith names one Pupil and a second, clearly weaker echo of that Pupil's ability immediately follows.",
+      "counterplay": {"levers": ["kill or disable Quillith", "kill or disable the chosen Pupil", "force selection onto a low-impact Pupil", "save protection for the echoed cast"], "failure_state": "No living eligible Pupil means no cast; an interrupted Pupil produces no echo."},
+      "verdict": "redesign", "scores": {"cohesion": 0, "uniqueness": 2, "team_utility": 2, "player_clarity": 0, "visual_satisfaction": 0, "counterplay": 0, "cost_fit": 0},
+      "problem": "Five families contain numerous hidden sub-effects, and the promised ally recast is currently only telemetry plus Quillith's unrelated damage.", "direction": "Make Final Exam do exactly one thing: the chosen Pupil immediately recasts its own ability at reduced power. Remove shields, stats, amps, team mana, and Quillith damage.",
+      "test_cases": [{"id": "quillith_exam_contract", "type": "counterplay", "assertions": ["one strongest eligible Pupil is selected", "that Pupil performs one real reduced recast", "no shields stats team mana or Quillith damage occur"]}, {"id": "quillith_exam_temporal", "type": "visual", "assertions": ["setup names one Pupil", "impact clearly echoes that Pupil's signature", "aftermath identifies the echo as reduced not a generic buff storm"]}]
+    }
+  ]
+}
