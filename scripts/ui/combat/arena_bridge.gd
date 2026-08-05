@@ -8,7 +8,9 @@ const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.
 const ACTOR_EXTRA_HORIZONTAL: float = 18.0
 const ACTOR_EXTRA_TOP: float = 32.0
 const ACTOR_EXTRA_BOTTOM: float = 18.0
-const COMBAT_ACTOR_SIZE_SCALE: float = 1.62
+# Keep combatants large enough to read as the encounter's subjects at a glance.
+# This is presentation scale only; unit art, animation, and behavior are untouched.
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.65
 
 var arena: ArenaController = null
 var arena_container: Control

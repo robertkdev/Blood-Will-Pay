@@ -7,7 +7,9 @@ const Strings := preload("res://scripts/util/strings.gd")
 # Keep the rendered fighter footprint legible inside the authored combat cells.
 # This changes the presentation scale only; unit art, animation, and behavior
 # remain untouched.
-const COMBAT_ACTOR_SIZE_SCALE: float = 1.62
+# Keep combatants large enough to read as the encounter's subjects at a glance.
+# This is presentation scale only; unit art, animation, and behavior are untouched.
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.65
 
 var arena_container: Control
 var arena_units: Control

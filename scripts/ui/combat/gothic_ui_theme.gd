@@ -363,23 +363,39 @@ class PlanningFieldPainter:
 class CombatFocusPainter:
 	extends Control
 
-	var focus_rect: Rect2 = Rect2(0.17, 0.08, 0.66, 0.82)
+	var focus_rect: Rect2 = Rect2(0.21, 0.11, 0.58, 0.76)
+	var engagement_rect: Rect2 = Rect2(0.30, 0.24, 0.40, 0.52)
 	var pressure_phase: int = 0
 	var reduced_motion: bool = false
+	var elapsed_seconds: float = 0.0
 
 	func configure(next_phase: int, next_reduced_motion: bool) -> void:
 		pressure_phase = clampi(next_phase, 0, 2)
 		reduced_motion = next_reduced_motion
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_process(not reduced_motion)
 		set_meta("focus_frame_mode", "combat_cluster_frame")
 		set_meta("focus_frame_phase", pressure_phase)
 		set_meta("focus_frame_reduced_motion", reduced_motion)
-		set_meta("focus_frame_purpose", "tighten_attention_around_live_engagement")
+		set_meta("focus_frame_purpose", "tighten_attention_around_live_engagement_with_contact_lane")
+		set_meta("contact_zone_role", "live_actor_cluster_lift_with_team_separation")
+		set_meta("combat_readability_layer", "high_value_cell_seams_plus_static_pressure_marks")
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		if reduced_motion:
+			return
+		elapsed_seconds = fposmod(elapsed_seconds + maxf(0.0, delta), 8.0)
 		queue_redraw()
 
 	func set_focus_rect(next_rect: Rect2) -> void:
 		focus_rect = next_rect
 		set_meta("focus_frame_rect", focus_rect)
+		queue_redraw()
+
+	func set_engagement_rect(next_rect: Rect2) -> void:
+		engagement_rect = next_rect
+		set_meta("engagement_rect", engagement_rect)
 		queue_redraw()
 
 	func _draw() -> void:
@@ -388,7 +404,7 @@ class CombatFocusPainter:
 		var frame_position: Vector2 = Vector2(focus_rect.position.x * size.x, focus_rect.position.y * size.y)
 		var frame_size: Vector2 = Vector2(focus_rect.size.x * size.x, focus_rect.size.y * size.y)
 		var frame_rect: Rect2 = Rect2(frame_position, frame_size)
-		var edge_alpha: float = 0.20 if reduced_motion else 0.24 + float(pressure_phase) * 0.08
+		var edge_alpha: float = 0.32 if reduced_motion else 0.38 + float(pressure_phase) * 0.09
 		var shadow: Color = Color(0.0, 0.0, 0.0, edge_alpha)
 		if frame_rect.position.y > 0.0:
 			draw_rect(Rect2(0.0, 0.0, size.x, frame_rect.position.y), shadow, true)
@@ -398,8 +414,78 @@ class CombatFocusPainter:
 			draw_rect(Rect2(0.0, frame_rect.position.y, frame_rect.position.x, frame_rect.size.y), shadow, true)
 		if frame_rect.end.x < size.x:
 			draw_rect(Rect2(frame_rect.end.x, frame_rect.position.y, size.x - frame_rect.end.x, frame_rect.size.y), shadow, true)
-		var frame_color: Color = Color(0.80, 0.18, 0.075, 0.22 + float(pressure_phase) * 0.08)
-		var line_width: float = 2.0 if reduced_motion else 2.5 + float(pressure_phase) * 0.7
+		# Lift the live engagement just enough to separate fighters and cell seams
+		# from the near-black horror surface. The wash stays inside the authored
+		# focus frame, so the perimeter remains threatening rather than becoming a
+		# bright UI panel.
+		var focus_wash_alpha: float = 0.27 if reduced_motion else 0.31 + float(pressure_phase) * 0.045
+		draw_rect(frame_rect.grow(-4.0), Color(0.30, 0.13, 0.065, focus_wash_alpha), true)
+		var spotlight_alpha: float = 0.145 if reduced_motion else 0.175 + float(pressure_phase) * 0.022
+		draw_circle(frame_rect.get_center(), minf(frame_rect.size.x, frame_rect.size.y) * 0.44, Color(0.46, 0.22, 0.10, spotlight_alpha), true)
+		# Anchor the physical contact read to the live actor cluster rather than to
+		# the frame midpoint. The broken scar and irregular ring are environmental
+		# evidence, not a diagnostic crosshair: the fight should read as a wound in
+		# the ground, even when the two combatants have not reached one another yet.
+		var engagement_center: Vector2 = Vector2(
+			(engagement_rect.position.x + engagement_rect.size.x * 0.5) * size.x,
+			(engagement_rect.position.y + engagement_rect.size.y * 0.5) * size.y
+		)
+		var engagement_extent: Vector2 = Vector2(
+			maxf(96.0, engagement_rect.size.x * size.x),
+			maxf(128.0, engagement_rect.size.y * size.y)
+		)
+		# A low, irregular pool of light separates the live pair from the black
+		# field before the viewer parses any grid seam. The split amber/red pools
+		# are environmental contact lighting, not unit or ability art.
+		var zone_radius: float = clampf(minf(engagement_extent.x, engagement_extent.y) * 0.34, 132.0, 224.0)
+		var zone_alpha: float = 0.18 if reduced_motion else 0.23 + float(pressure_phase) * 0.028
+		var team_offset: float = clampf(engagement_extent.x * 0.24, 56.0, 118.0)
+		draw_circle(engagement_center, zone_radius, Color(0.46, 0.18, 0.075, zone_alpha), true)
+		# The two pools differ in value and silhouette as well as hue: the pale
+		# survival pool stays readable for low-vision players while the hostile pool
+		# is a denser, darker wound in the ground.
+		draw_circle(engagement_center + Vector2(-team_offset, 0.0), zone_radius * 0.56, Color(0.78, 0.56, 0.25, zone_alpha * 0.84), true)
+		draw_circle(engagement_center + Vector2(team_offset, 0.0), zone_radius * 0.56, Color(0.38, 0.035, 0.025, zone_alpha * 0.98), true)
+		draw_arc(engagement_center + Vector2(-team_offset, 0.0), zone_radius * 0.56, PI * 0.12, PI * 0.88, 12, Color(0.96, 0.82, 0.54, zone_alpha * 1.25), 2.4, true)
+		draw_arc(engagement_center + Vector2(team_offset, 0.0), zone_radius * 0.56, -PI * 0.88, -PI * 0.12, 12, Color(0.92, 0.16, 0.08, zone_alpha * 1.15), 2.4, true)
+		# Give the actual clash a readable stage inside the dark board. This is a
+		# broken, irregular contact frame rather than a targeting reticle: it is
+		# environmental lighting and remains locked in place for reduced motion.
+		var contact_half_size: Vector2 = Vector2(
+			clampf(engagement_extent.x * 0.40, 240.0, 340.0),
+			clampf(engagement_extent.y * 0.30, 132.0, 178.0)
+		)
+		var plate_alpha: float = 0.14 if reduced_motion else 0.17 + float(pressure_phase) * 0.020
+		var plate_points: PackedVector2Array = PackedVector2Array([
+			engagement_center + Vector2(-contact_half_size.x * 0.92, -contact_half_size.y * 0.86),
+			engagement_center + Vector2(contact_half_size.x * 0.84, -contact_half_size.y),
+			engagement_center + Vector2(contact_half_size.x, contact_half_size.y * 0.78),
+			engagement_center + Vector2(-contact_half_size.x * 0.78, contact_half_size.y * 0.94),
+		])
+		draw_colored_polygon(plate_points, Color(0.38, 0.105, 0.038, plate_alpha))
+		var contact_frame_alpha: float = 0.46 if reduced_motion else 0.52 + float(pressure_phase) * 0.050
+		_draw_contact_frame(engagement_center, contact_half_size, Color(0.96, 0.48, 0.16, contact_frame_alpha), 4.2 if reduced_motion else 4.6)
+		# Two asymmetric pressure slashes are the only kinetic cue that survives
+		# reduced motion. They sit in the ground contact zone, not on a combatant.
+		var pressure_color: Color = Color(1.0, 0.68, 0.32, 0.42 if reduced_motion else 0.50 + float(pressure_phase) * 0.05)
+		draw_line(engagement_center + Vector2(-58.0, 12.0), engagement_center + Vector2(-24.0, 5.0), pressure_color, 3.0, true)
+		draw_line(engagement_center + Vector2(22.0, -8.0), engagement_center + Vector2(68.0, -18.0), pressure_color, 3.0, true)
+		_draw_contact_scar(engagement_center, engagement_extent)
+		var contact_radius: float = clampf(minf(frame_rect.size.x, frame_rect.size.y) * 0.105, 72.0, 124.0)
+		var contact_alpha: float = 0.25 if reduced_motion else 0.31 + float(pressure_phase) * 0.060
+		var contact_color: Color = Color(0.92, 0.24, 0.10, contact_alpha)
+		var contact_pulse: float = 1.0 if reduced_motion else 1.0 + sin(elapsed_seconds * 2.8) * 0.035
+		contact_radius *= contact_pulse
+		for hook_spec: Dictionary in [
+			{"offset": Vector2(-0.42, -0.10), "start": -0.84, "end": -0.24, "radius": 0.92},
+			{"offset": Vector2(0.38, 0.16), "start": 2.20, "end": 2.78, "radius": 0.78},
+		]:
+			var hook_offset: Vector2 = hook_spec.get("offset", Vector2.ZERO) as Vector2
+			var hook_center: Vector2 = engagement_center + hook_offset * contact_radius
+			var hook_radius: float = contact_radius * float(hook_spec.get("radius", 1.0))
+			draw_arc(hook_center, hook_radius, float(hook_spec.get("start", 0.0)), float(hook_spec.get("end", 1.0)), 8, contact_color, 2.2, true)
+		var frame_color: Color = Color(0.88, 0.20, 0.080, 0.32 + float(pressure_phase) * 0.09)
+		var line_width: float = 2.5 if reduced_motion else 3.0 + float(pressure_phase) * 0.8
 		var top_left: Vector2 = frame_rect.position
 		var top_right: Vector2 = Vector2(frame_rect.end.x, frame_rect.position.y)
 		var bottom_left: Vector2 = Vector2(frame_rect.position.x, frame_rect.end.y)
@@ -414,6 +500,67 @@ class CombatFocusPainter:
 		draw_line(bottom_left - Vector2(0.0, frame_rect.size.y * 0.22), bottom_left - Vector2(0.0, side_gap), frame_color, line_width, true)
 		draw_line(top_right, top_right + Vector2(0.0, frame_rect.size.y * 0.22), frame_color, line_width, true)
 		draw_line(bottom_right - Vector2(0.0, frame_rect.size.y * 0.22), bottom_right - Vector2(0.0, side_gap), frame_color, line_width, true)
+
+	func _draw_contact_frame(center: Vector2, half_size: Vector2, color: Color, line_width: float) -> void:
+		var corner_x: float = half_size.x * 0.30
+		var corner_y: float = half_size.y * 0.34
+		var points: Array[PackedVector2Array] = [
+			PackedVector2Array([
+				center + Vector2(-half_size.x, -half_size.y * 0.86),
+				center + Vector2(-half_size.x + corner_x, -half_size.y * 0.92),
+				center + Vector2(-half_size.x + corner_x * 1.05, -half_size.y * 0.72),
+			]),
+			PackedVector2Array([
+				center + Vector2(half_size.x * 0.78, -half_size.y),
+				center + Vector2(half_size.x * 0.96, -half_size.y * 0.86),
+				center + Vector2(half_size.x * 0.94 - corner_x, -half_size.y * 0.84),
+			]),
+			PackedVector2Array([
+				center + Vector2(-half_size.x * 0.94, half_size.y * 0.78),
+				center + Vector2(-half_size.x * 0.98, half_size.y * 0.92),
+				center + Vector2(-half_size.x * 0.72, half_size.y * 0.98),
+			]),
+			PackedVector2Array([
+				center + Vector2(half_size.x * 0.76, half_size.y * 0.94),
+				center + Vector2(half_size.x * 0.98, half_size.y * 0.82),
+				center + Vector2(half_size.x, half_size.y * 0.58),
+			]),
+		]
+		for corner: PackedVector2Array in points:
+			draw_polyline(corner, color, line_width, true)
+		# A short, broken inner seam makes the frame read as a wound in the ground,
+		# not as a second UI border around the arena.
+		var seam_color: Color = Color(color.r, color.g * 0.78, color.b * 0.66, color.a * 0.72)
+		draw_line(center + Vector2(-half_size.x * 0.20, 0.0), center + Vector2(-half_size.x * 0.07, 2.0), seam_color, maxf(2.0, line_width * 0.62), true)
+		draw_line(center + Vector2(half_size.x * 0.08, -2.0), center + Vector2(half_size.x * 0.22, 0.0), seam_color, maxf(2.0, line_width * 0.62), true)
+
+	func _draw_contact_scar(center: Vector2, extent: Vector2) -> void:
+		var pulse: float = 1.0 if reduced_motion else 1.0 + sin(elapsed_seconds * 2.35 + 0.6) * 0.045
+		var half_width: float = clampf(extent.x * 0.42, 72.0, 170.0) * pulse
+		var half_height: float = clampf(extent.y * 0.11, 58.0, 100.0) * pulse
+		var points: PackedVector2Array = PackedVector2Array()
+		for point_index: int in range(14):
+			var angle: float = TAU * float(point_index) / 14.0
+			var irregularity: float = 1.0 + 0.14 * sin(angle * 3.0 + 0.4) + 0.07 * sin(angle * 5.0 - 0.9)
+			points.append(center + Vector2(cos(angle) * half_width, sin(angle) * half_height) * irregularity)
+		var scar_alpha: float = 0.20 if reduced_motion else 0.24 + float(pressure_phase) * 0.040
+		draw_colored_polygon(points, Color(0.42, 0.055, 0.025, scar_alpha))
+		var edge_points: PackedVector2Array = points.duplicate()
+		edge_points.append(points[0])
+		draw_polyline(edge_points, Color(0.82, 0.17, 0.065, scar_alpha * 0.42), 1.6, true)
+		var fleck_count: int = 3 + pressure_phase
+		for fleck_index: int in range(fleck_count):
+			var angle: float = TAU * float(fleck_index) / float(fleck_count) + 0.36
+			var distance: float = half_width * (0.72 + float(fleck_index % 3) * 0.12)
+			var fleck_center: Vector2 = center + Vector2(cos(angle), sin(angle)) * Vector2(distance, half_height * (1.10 + float(fleck_index % 2) * 0.26))
+			draw_circle(fleck_center, 3.0 + float(fleck_index % 2) * 1.5, Color(0.78, 0.16, 0.055, scar_alpha * 0.58), true)
+		# Short, uneven drag strokes imply force and aftermath without introducing
+		# straight ruler marks or unit/ability-specific VFX.
+		for stroke_index: int in range(2 + pressure_phase):
+			var side: float = -1.0 if stroke_index % 2 == 0 else 1.0
+			var stroke_origin: Vector2 = center + Vector2(side * half_width * (0.52 + float(stroke_index) * 0.07), -half_height * (0.34 - float(stroke_index % 2) * 0.22))
+			var stroke_finish: Vector2 = stroke_origin + Vector2(side * (24.0 + float(stroke_index) * 7.0), 9.0 + float(stroke_index % 2) * 11.0)
+			draw_line(stroke_origin, stroke_finish, Color(0.62, 0.12, 0.045, scar_alpha * 0.52), 2.0 + float(pressure_phase) * 0.5, true)
 
 
 class ArenaPressurePainter:
@@ -936,6 +1083,7 @@ static func _apply_named_nodes(root: Control) -> void:
 	var actions_row: Control = root.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as Control
 	if actions_row != null:
 		_ensure_backplate_on_control(actions_row, "PlanningCommandRecordPlate", _hard_panel_style(Color(0.020, 0.016, 0.022, 0.96), Color(0.68, 0.055, 0.085, 0.88), true), -5)
+		_ensure_external_backplate(root, "MarginContainer/VBoxContainer/ActionsRow", "GothicCommitRailPlate", _hard_panel_style(Color(0.026, 0.016, 0.020, 0.92), Color(0.78, 0.18, 0.10, 0.88), true), -6, 7.0)
 	var wager_controls: Control = root.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow/BetRow") as Control
 	if wager_controls != null:
 		wager_controls.set_meta("visual_role", "planning_utility_group")
@@ -945,6 +1093,7 @@ static func _apply_named_nodes(root: Control) -> void:
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.032, 0.038, 0.036, 0.07), Color(0.72, 0.68, 0.58, 0.82), 2, 1), -5)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.42, 0.40, 0.38, 0.72), false), 0, 8.0)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.56, 0.52, 0.46, 0.62), false), 0, 8.0)
+	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea", "GothicPlanningSpinePlate", _hard_panel_style(Color(0.020, 0.015, 0.018, 0.34), Color(0.74, 0.17, 0.12, 0.74), false), -1, 5.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.42, 0.40, 0.38, 0.68), false), -2)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BenchArea/BenchGrid", "GothicBenchPlate", _hard_panel_style(Color(0.018, 0.016, 0.020, 0.88), Color(0.72, 0.64, 0.52, 0.64), false), 0, 8.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/ActionsRow/GoldLabel", "GothicGoldPlate", _style(Color(0.085, 0.061, 0.033, 0.74), Color(0.78, 0.48, 0.20, 0.72), 1, 4), -5)
@@ -1502,7 +1651,7 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	directive.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	directive.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	directive.z_index = 4
-	directive.add_theme_font_size_override("font_size", 18)
+	directive.add_theme_font_size_override("font_size", 19)
 	directive.add_theme_color_override("font_color", Color(0.96, 0.90, 0.79, 1.0))
 	var directive_style: StyleBoxFlat = StyleBoxFlat.new()
 	directive_style.bg_color = Color(0.018, 0.014, 0.018, 0.96)
@@ -1682,6 +1831,7 @@ static func _ensure_arena_zone_guides(root: Control) -> void:
 	_ensure_arena_threat_boundary(arena)
 	_ensure_arena_field_label(arena, "EnemyFieldLabel", "HOSTILE GROUND", true)
 	_ensure_arena_field_label(arena, "PlayerFieldLabel", "HOLD THE LINE", false)
+	_ensure_reduced_motion_ribbon(arena)
 	_suppress_procedural_arena_overlays(arena)
 
 static func _ensure_arena_exposure_lift(arena: Control) -> void:
@@ -1782,11 +1932,11 @@ static func _ensure_arena_threat_boundary(arena: Control) -> void:
 	objective.anchor_right = 0.5
 	objective.anchor_top = 0.0
 	objective.anchor_bottom = 0.0
-	objective.offset_left = -150.0
-	objective.offset_right = 150.0
+	objective.offset_left = -210.0
+	objective.offset_right = 210.0
 	objective.offset_top = 12.0
 	objective.offset_bottom = 42.0
-	objective.text = "SURVIVE"
+	objective.text = "CONTACT // SURVIVE"
 	objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	objective.add_theme_font_size_override("font_size", 26)
 	objective.add_theme_color_override("font_color", Color(0.98, 0.90, 0.78, 1.0))
@@ -2444,15 +2594,19 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		var enemy_side: bool = row_index <= 2
 		var major_seam: bool = row_index == 2 or column_index == 3
 		var alternating_cell: bool = (row_index + column_index) % 2 == 0
-		# Lift the tactical plane just enough to keep placement readable over the
-		# authored mud texture. The seam remains subordinate to the fighters and
-		# horror dressing, but no longer disappears at a real 1080p play distance.
-		seam_style.bg_color = Color(0.10, 0.028, 0.020, 0.045 if alternating_cell else 0.020) if enemy_side else Color(0.10, 0.085, 0.060, 0.045 if alternating_cell else 0.020)
-		seam_style.border_color = Color(0.60, 0.23, 0.12, 0.38 if major_seam else 0.20) if enemy_side else Color(0.66, 0.57, 0.40, 0.40 if major_seam else 0.22)
-		seam_style.border_width_right = 2 if column_index == 3 else 1
-		seam_style.border_width_bottom = 2 if row_index == 2 else 1
-		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.30)
-		seam_style.shadow_size = 1
+		var local_arena_cell: bool = row_index >= 1 and row_index <= 4 and column_index >= 1 and column_index <= 6
+		# The center six-by-four cells are the playable read. Keep their value
+		# separation high enough for placement and contact, while letting the outer
+		# horror field recede so a full-screen grid cannot compete with silhouettes.
+		var cell_alpha: float = (0.115 if local_arena_cell else 0.030) if alternating_cell else (0.058 if local_arena_cell else 0.014)
+		var major_border_alpha: float = 0.76 if local_arena_cell else 0.24
+		var minor_border_alpha: float = 0.42 if local_arena_cell else 0.12
+		seam_style.bg_color = Color(0.10, 0.028, 0.020, cell_alpha) if enemy_side else Color(0.10, 0.085, 0.060, cell_alpha)
+		seam_style.border_color = Color(0.60, 0.23, 0.12, major_border_alpha if major_seam else minor_border_alpha) if enemy_side else Color(0.66, 0.57, 0.40, major_border_alpha if major_seam else minor_border_alpha)
+		seam_style.border_width_right = 4 if column_index == 3 else 2
+		seam_style.border_width_bottom = 4 if row_index == 2 else 2
+		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.44)
+		seam_style.shadow_size = 2
 		seam_style.shadow_offset = Vector2(1.0, 1.0)
 		cell.add_theme_stylebox_override("panel", seam_style)
 	seams.set_meta("major_seam_non_color_weight", 2)
@@ -2461,6 +2615,8 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 	seams.set_meta("alternating_material_cell_wash", true)
 	seams.set_meta("side_separation", "enemy_oxblood_player_bone_with_black_understroke")
 	seams.set_meta("debug_graph_grid_suppressed", true)
+	seams.set_meta("outer_grid_suppressed", true)
+	seams.set_meta("local_arena_contrast_revision", "loop41_center_lift_outer_recede")
 
 static func _ensure_arena_field_label(arena: Control, node_name: String, copy: String, enemy_side: bool) -> void:
 	var label: Label = arena.get_node_or_null(node_name) as Label
@@ -2479,20 +2635,67 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 	label.offset_top = 10.0 if enemy_side else -40.0
 	label.offset_bottom = 40.0 if enemy_side else -10.0
 	label.text = "▲ %s // BREACH" % copy if enemy_side else "■ %s // SURVIVE" % copy
-	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", Color(0.88, 0.48, 0.38, 0.76) if enemy_side else Color(0.82, 0.76, 0.62, 0.74))
+	label.add_theme_font_size_override("font_size", 19)
+	label.add_theme_color_override("font_color", Color(0.94, 0.56, 0.44, 0.88) if enemy_side else Color(0.92, 0.84, 0.68, 0.86))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
 	label.add_theme_constant_override("outline_size", 2)
 	var label_backing: StyleBoxFlat = StyleBoxFlat.new()
-	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.60)
-	label_backing.border_color = Color(0.48, 0.16, 0.10, 0.64) if enemy_side else Color(0.46, 0.39, 0.28, 0.58)
-	label_backing.border_width_left = 2
+	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.70)
+	label_backing.border_color = Color(0.48, 0.16, 0.10, 0.78) if enemy_side else Color(0.46, 0.39, 0.28, 0.72)
+	label_backing.border_width_left = 3
 	label_backing.content_margin_left = 8.0
 	label_backing.content_margin_right = 8.0
 	label.add_theme_stylebox_override("normal", label_backing)
 	label.set_meta("non_color_zone_cue", "triangle_breach" if enemy_side else "square_survival")
 	label.set_meta("persistent_copy_uses_utility_face", true)
 	VisualTypeSystem.set_utility_bold(label)
+
+static func _ensure_reduced_motion_ribbon(arena: Control) -> void:
+	var ribbon: PanelContainer = arena.get_node_or_null("ReducedMotionStateRibbon") as PanelContainer
+	if ribbon == null:
+		ribbon = PanelContainer.new()
+		ribbon.name = "ReducedMotionStateRibbon"
+		ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ribbon.z_index = 4
+		arena.add_child(ribbon)
+	var ribbon_style: StyleBoxFlat = StyleBoxFlat.new()
+	ribbon_style.bg_color = Color(0.018, 0.028, 0.036, 0.96)
+	ribbon_style.border_color = Color(0.48, 0.78, 0.88, 0.92)
+	ribbon_style.border_width_left = 5
+	ribbon_style.border_width_top = 2
+	ribbon_style.border_width_right = 2
+	ribbon_style.border_width_bottom = 2
+	ribbon_style.content_margin_left = 12.0
+	ribbon_style.content_margin_right = 12.0
+	ribbon_style.content_margin_top = 4.0
+	ribbon_style.content_margin_bottom = 4.0
+	ribbon.add_theme_stylebox_override("panel", ribbon_style)
+	ribbon.anchor_left = 0.34
+	ribbon.anchor_top = 0.88
+	ribbon.anchor_right = 0.66
+	ribbon.anchor_bottom = 0.88
+	ribbon.offset_left = 0.0
+	ribbon.offset_top = 0.0
+	ribbon.offset_right = 0.0
+	ribbon.offset_bottom = 32.0
+	var label: Label = ribbon.get_node_or_null("Label") as Label
+	if label == null:
+		label = Label.new()
+		label.name = "Label"
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ribbon.add_child(label)
+	label.text = "REDUCED MOTION // FIELD LOCKED"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(0.78, 0.94, 0.98, 1.0))
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
+	label.add_theme_constant_override("outline_size", 2)
+	VisualTypeSystem.set_utility_bold(label)
+	ribbon.visible = false
+	ribbon.set_meta("visual_role", "persistent_reduced_motion_state_cue")
+	ribbon.set_meta("non_color_state_cue", "signal_blue_left_rule_and_locked_copy")
+	ribbon.set_meta("persistent_state_cue", true)
 
 static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

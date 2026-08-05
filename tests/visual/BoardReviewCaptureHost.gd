@@ -32,6 +32,8 @@ const EXPECTED_FILES: Array[String] = [
 	"14_active_combat_onset_1920x1080.png",
 	"15_active_combat_midfight_1920x1080.png",
 	"16_active_combat_reduced_motion_1920x1080.png",
+	"34_active_combat_reduced_motion_temporal_a_1920x1080.png",
+	"35_active_combat_reduced_motion_temporal_b_1920x1080.png",
 	"17_victory_entry_1920x1080.png",
 	"18_victory_hold_1920x1080.png",
 	"19_stalemate_hold_1920x1080.png",
@@ -66,6 +68,7 @@ var _output_dir: String = ""
 var _manifest_path: String = ""
 var _settings_path: String = ""
 var _profile_path: String = ""
+var _temporal_probe_verdict: Dictionary[String, Variant] = {}
 
 
 func _ready() -> void:
@@ -138,6 +141,7 @@ func _run() -> void:
 		var settings_focus_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("focus") as StyleBoxFlat
 		var settings_pressed_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("pressed") as StyleBoxFlat
 		_expect(settings_focus_style != null and settings_pressed_style != null and settings_focus_style.border_color != settings_pressed_style.border_color, "settings selector focus must be visibly distinct from pressed")
+		_assert_settings_focus_surface_contract(title_menu, settings_state_button)
 		await _capture("29_settings_focus_hover_1920x1080.png", "settings_focus_hover", DESKTOP_SIZE)
 		settings_state_button.release_focus()
 		DisplayServer.warp_mouse(Vector2(1.0, 1.0))
@@ -147,7 +151,12 @@ func _run() -> void:
 		settings_state_button.toggle_mode = true
 		settings_state_button.button_pressed = true
 		await _settle_frames(3)
-		await _capture("30_settings_pressed_1920x1080.png", "settings_pressed", DESKTOP_SIZE)
+		if title_menu.has_method("ensure_settings_surface_visible"):
+			title_menu.call("ensure_settings_surface_visible")
+		await _settle_frames(2)
+		_assert_settings_pressed_surface_contract(title_menu, settings_state_button)
+		var settings_pressed_frame: Image = await _capture("30_settings_pressed_1920x1080.png", "settings_pressed", DESKTOP_SIZE)
+		_assert_settings_pressed_pixels(settings_pressed_frame, title_menu)
 		settings_state_button.button_pressed = false
 		settings_state_button.toggle_mode = previous_toggle_mode
 		settings_state_button.disabled = true
@@ -317,7 +326,15 @@ func _run() -> void:
 		controller.call("_update_environmental_pressure", 0.0)
 	await _settle_frames(8)
 	_assert_combat_environment_contract(combat, "reduced_motion_static_midfight", true)
-	await _capture("16_active_combat_reduced_motion_1920x1080.png", "active_combat_reduced_motion", DESKTOP_SIZE)
+	var reduced_motion_frame: Image = await _capture("16_active_combat_reduced_motion_1920x1080.png", "active_combat_reduced_motion", DESKTOP_SIZE)
+	_assert_reduced_motion_surface_pixels(reduced_motion_frame, "active reduced-motion combat")
+	var temporal_probe_started_at: int = Time.get_ticks_msec()
+	var reduced_motion_temporal_frame_a: Image = await _capture("34_active_combat_reduced_motion_temporal_a_1920x1080.png", "active_combat_reduced_motion_temporal_a", DESKTOP_SIZE)
+	await get_tree().create_timer(1.0, true, false, true).timeout
+	var reduced_motion_frame_b: Image = await _capture("35_active_combat_reduced_motion_temporal_b_1920x1080.png", "active_combat_reduced_motion_temporal_b", DESKTOP_SIZE)
+	_assert_reduced_motion_surface_pixels(reduced_motion_temporal_frame_a, "reduced-motion temporal A")
+	_assert_reduced_motion_surface_pixels(reduced_motion_frame_b, "reduced-motion temporal B")
+	_assert_temporal_stability(reduced_motion_temporal_frame_a, reduced_motion_frame_b, "reduced motion combat", Time.get_ticks_msec() - temporal_probe_started_at)
 	USER_SETTINGS_SCRIPT.set_reduced_motion(false)
 
 	_expect(controller != null and controller.has_method("_show_result_banner"), "combat result presenter missing")
@@ -628,6 +645,7 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	var collapse: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/CollapseAftermathGeometry") as Control
 	var reduced_lock: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ReducedMotionGrimeLock") as Control
 	var pressure_painter: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaWarAftermath/ArenaPressurePainter") as Control
+	var reduced_motion_ribbon: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ReducedMotionStateRibbon") as Control
 	var cell_seams: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCellSeams") as GridContainer
 	var arena_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
 	var pressure_surface: TextureRect = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as TextureRect
@@ -637,7 +655,9 @@ func _assert_combat_environment_contract(combat: Control, expected_phase: String
 	_expect(arena != null and String(arena.get_meta("battlefield_material_source", "")) == "persistent_base_plus_aligned_raster_and_physical_evidence", "%s capture is not sourced from the stable field plus visible physical evidence" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("stable_base_location", false)), "%s capture does not preserve one tactical location" % expected_phase)
 	_expect(arena != null and bool(arena.get_meta("procedural_environment_geometry_suppressed", false)), "%s capture retained procedural environment geometry" % expected_phase)
-	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "%s capture does not prioritize cell readability" % expected_phase)
+	_expect(arena != null and String(arena.get_meta("battlefield_grid_priority", "")) == "local_focus_arena_then_muted_outer_grid", "%s capture does not prioritize the local arena over the outer grid" % expected_phase)
+	_expect(reduced_motion_ribbon != null and reduced_motion_ribbon.visible == reduced_motion, "%s capture lost its persistent reduced-motion state ribbon" % expected_phase)
+	_expect(reduced_motion_ribbon != null and bool(reduced_motion_ribbon.get_meta("persistent_state_cue", false)), "%s capture reduced-motion ribbon lacks its persistent-state contract" % expected_phase)
 	var expects_physical_evidence: bool = true
 	_expect(aftermath != null and aftermath.visible == expects_physical_evidence, "%s capture has the wrong physical evidence visibility" % expected_phase)
 	_expect(onset != null and not onset.visible and midfight != null and not midfight.visible and collapse != null and not collapse.visible and reduced_lock != null and not reduced_lock.visible, "%s capture leaked a procedural evidence group over the authored field" % expected_phase)
@@ -701,6 +721,49 @@ func _assert_settings_rail_contract() -> void:
 		visible_navigation_labels += 1
 		_expect(button.modulate.a >= 0.99 and button.self_modulate.a >= 0.99, "desktop Settings navigation action %s remained faded" % String(button.name))
 	_expect(visible_navigation_labels >= 6, "desktop Settings navigation rail exposes too few readable actions")
+
+func _assert_settings_pressed_surface_contract(title_menu: Control, selector: Button) -> void:
+	# A pressed-state screenshot is only useful if it preserves the real command
+	# surface. Guard against a transient menu fade or a selector-only frame being
+	# mistaken for an interaction-state proof.
+	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	_expect(title_menu != null and title_menu.is_visible_in_tree(), "settings pressed proof lost the command surface")
+	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "settings pressed proof lost the settings content panel")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings pressed proof lost the UI scale card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings pressed proof lost its readable scale heading")
+	_expect(selector != null and selector.is_visible_in_tree() and selector.button_pressed, "settings pressed proof did not retain the pressed selector")
+
+func _assert_settings_pressed_pixels(image: Image, title_menu: Control) -> void:
+	if image == null or image.is_empty() or title_menu == null:
+		_expect(false, "settings pressed pixel proof did not receive a full framebuffer")
+		return
+	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control
+	var content_rect: Rect2 = content_panel.get_global_rect() if content_panel != null else Rect2(0.0, 0.0, float(image.get_width()), float(image.get_height()))
+	var scan_rect: Rect2i = Rect2i(content_rect).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+	var lit_samples: int = 0
+	for sample_y: int in range(18):
+		for sample_x: int in range(24):
+			var px: int = clampi(scan_rect.position.x + int((float(sample_x) + 0.5) / 24.0 * float(maxi(1, scan_rect.size.x))), 0, image.get_width() - 1)
+			var py: int = clampi(scan_rect.position.y + int((float(sample_y) + 0.5) / 18.0 * float(maxi(1, scan_rect.size.y))), 0, image.get_height() - 1)
+			var color: Color = image.get_pixel(px, py)
+			if color.r + color.g + color.b >= 0.24:
+				lit_samples += 1
+	_expect(lit_samples >= 36, "settings pressed framebuffer lost its full readable content shell: lit_samples=%d" % lit_samples)
+
+
+func _assert_settings_focus_surface_contract(title_menu: Control, selector: Button) -> void:
+	# Focus/hover evidence must retain the full settings shell; a selector-only
+	# composite is not a valid interaction-state review even if the focus flag is set.
+	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	_expect(title_menu != null and title_menu.is_visible_in_tree(), "settings focus proof lost the command surface")
+	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "settings focus proof lost the settings content panel")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings focus proof lost the UI scale card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings focus proof lost its readable scale heading")
+	_expect(selector != null and selector.is_visible_in_tree() and selector.has_focus(), "settings focus proof did not retain the focused selector")
 
 
 func _assert_compact_settings_finish() -> void:
@@ -958,18 +1021,20 @@ func _rect_contract(rect: Rect2) -> Dictionary[String, float]:
 	}
 
 
-func _capture(filename: String, state: String, expected_size: Vector2i) -> void:
+func _capture(filename: String, state: String, expected_size: Vector2i) -> Image:
 	await _settle_frames(2)
 	if not _framebuffer_capture_available():
 		_expect(false, "%s blocked: real framebuffer unavailable" % filename)
-		return
+		return null
 	RenderingServer.force_draw(false)
 	await get_tree().process_frame
 	var texture: ViewportTexture = get_viewport().get_texture()
 	if texture == null or not texture.get_rid().is_valid():
 		_expect(false, "%s blocked: viewport texture unavailable" % filename)
-		return
-	_record_capture_image(texture.get_image(), filename, state, expected_size)
+		return null
+	var image: Image = texture.get_image()
+	_record_capture_image(image, filename, state, expected_size)
+	return image
 
 
 func _capture_now(filename: String, state: String, expected_size: Vector2i) -> void:
@@ -982,6 +1047,60 @@ func _capture_now(filename: String, state: String, expected_size: Vector2i) -> v
 		_expect(false, "%s blocked: viewport texture unavailable" % filename)
 		return
 	_record_capture_image(texture.get_image(), filename, state, expected_size)
+
+func _assert_reduced_motion_surface_pixels(image: Image, context: String) -> void:
+	if image == null or image.is_empty():
+		_expect(false, "%s lost its framebuffer" % context)
+		return
+	var scan_rect: Rect2i = Rect2i(
+		Vector2i(int(float(image.get_width()) * 0.22), int(float(image.get_height()) * 0.16)),
+		Vector2i(int(float(image.get_width()) * 0.56), int(float(image.get_height()) * 0.70))
+	)
+	var populated_samples: int = 0
+	for sample_y: int in range(18):
+		for sample_x: int in range(24):
+			var px: int = clampi(scan_rect.position.x + int((float(sample_x) + 0.5) / 24.0 * float(maxi(1, scan_rect.size.x))), 0, image.get_width() - 1)
+			var py: int = clampi(scan_rect.position.y + int((float(sample_y) + 0.5) / 18.0 * float(maxi(1, scan_rect.size.y))), 0, image.get_height() - 1)
+			var color: Color = image.get_pixel(px, py)
+			if color.r + color.g + color.b >= 0.20:
+				populated_samples += 1
+	_expect(populated_samples >= 42, "%s lost the persistent combat field or fighters: populated_samples=%d" % [context, populated_samples])
+
+
+func _assert_temporal_stability(first: Image, second: Image, context: String, sample_gap_msec: int) -> void:
+	_expect(first != null and second != null and not first.is_empty() and not second.is_empty(), "%s temporal probe did not produce two images" % context)
+	if first == null or second == null or first.is_empty() or second.is_empty():
+		return
+	var sample_count: int = 0
+	var accumulated_difference: float = 0.0
+	for sample_y: int in range(8):
+		for sample_x: int in range(12):
+			var x: int = mini(first.get_width() - 1, maxi(0, int(float(sample_x) / 11.0 * float(first.get_width() - 1))))
+			var y: int = mini(first.get_height() - 1, maxi(0, int(float(sample_y) / 7.0 * float(first.get_height() - 1))))
+			var first_pixel: Color = first.get_pixel(x, y)
+			var second_pixel: Color = second.get_pixel(mini(second.get_width() - 1, x), mini(second.get_height() - 1, y))
+			accumulated_difference += absf(first_pixel.r - second_pixel.r) + absf(first_pixel.g - second_pixel.g) + absf(first_pixel.b - second_pixel.b)
+			sample_count += 1
+	var mean_difference: float = accumulated_difference / maxf(1.0, float(sample_count) * 3.0)
+	var first_path: String = "%s/%s" % [_output_dir, "34_active_combat_reduced_motion_temporal_a_1920x1080.png"]
+	var second_path: String = "%s/%s" % [_output_dir, "35_active_combat_reduced_motion_temporal_b_1920x1080.png"]
+	var first_bytes: PackedByteArray = FileAccess.get_file_as_bytes(first_path) if FileAccess.file_exists(first_path) else PackedByteArray()
+	var second_bytes: PackedByteArray = FileAccess.get_file_as_bytes(second_path) if FileAccess.file_exists(second_path) else PackedByteArray()
+	var byte_identical: bool = not first_bytes.is_empty() and first_bytes == second_bytes
+	var stable: bool = mean_difference <= 0.012 and sample_gap_msec >= 900
+	_temporal_probe_verdict = {
+		"context": context,
+		"status": "stable_reduced_motion" if stable else "unstable_reduced_motion",
+		"sample_a": "34_active_combat_reduced_motion_temporal_a_1920x1080.png",
+		"sample_b": "35_active_combat_reduced_motion_temporal_b_1920x1080.png",
+		"sample_gap_msec": sample_gap_msec,
+		"mean_pixel_delta": mean_difference,
+		"threshold": 0.012,
+		"byte_identical": byte_identical,
+		"evidence": "two settled framebuffer samples separated by an explicit one-second wait; identical output is expected while reduced motion locks the scene",
+	}
+	_expect(sample_gap_msec >= 900, "%s temporal probe did not span the required settled interval: %dms" % [context, sample_gap_msec])
+	_expect(mean_difference <= 0.012, "%s temporal probe drifted while reduced motion was enabled: mean pixel delta %.4f" % [context, mean_difference])
 
 
 func _record_capture_image(image: Image, filename: String, state: String, expected_size: Vector2i) -> void:
@@ -1016,10 +1135,12 @@ func _record_capture_image(image: Image, filename: String, state: String, expect
 		"state": state,
 		"viewport": {"width": image.get_width(), "height": image.get_height()},
 		"requested_viewport": {"width": expected_size.x, "height": expected_size.y},
-		"event": "settled_runtime_state",
+		"event": "temporal_reduced_motion_probe" if state.begins_with("active_combat_reduced_motion_temporal_") else "settled_runtime_state",
+		"temporal_pair": "reduced_motion_combat" if state.begins_with("active_combat_reduced_motion_temporal_") else "",
 		"camera": "player_view",
 		"layer": "final_composite",
 		"timestamp": Time.get_datetime_string_from_system(false, true),
+		"ticks_msec": Time.get_ticks_msec(),
 		"runtime": "Godot %s" % Engine.get_version_info().get("string", "unknown"),
 		"path": absolute_path,
 		"bytes": byte_count,
@@ -1095,7 +1216,7 @@ func _write_manifest() -> void:
 	_expect(_captures.size() == EXPECTED_FILES.size(), "expected %d captures, recorded %d" % [EXPECTED_FILES.size(), _captures.size()])
 
 	var manifest: Dictionary[String, Variant] = {
-		"schema_version": 2,
+		"schema_version": 3,
 		"capture_host": CAPTURE_NAME,
 		"status": "complete" if _failures.is_empty() else "blocked",
 		"generated_at": Time.get_datetime_string_from_system(false, true),
@@ -1115,6 +1236,7 @@ func _write_manifest() -> void:
 		"required_count": EXPECTED_FILES.size(),
 		"captured_count": _captures.size(),
 		"images_in_review_order": images_in_review_order,
+		"temporal_probes": [_temporal_probe_verdict] if not _temporal_probe_verdict.is_empty() else [],
 		"captures": _captures,
 		"failures": _failures,
 	}

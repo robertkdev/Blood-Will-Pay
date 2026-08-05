@@ -3260,6 +3260,7 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 	_set_root_control_visible("GothicItemsPlate", planning_visible)
 	_set_root_control_visible("GothicGoldPlate", planning_visible)
 	_set_root_control_visible("GothicWagerSummaryPlate", planning_visible)
+	_set_root_control_visible("GothicCommitRailPlate", planning_visible)
 	var record_mark: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	if record_mark != null:
 		record_mark.text = "FIELD RECORD // ACTIVE THREAT // NO RETREAT" if in_combat else "FIELD RECORD // DEPLOYMENT COPY // COMMIT PENDING"
@@ -3304,13 +3305,13 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 		arena_container.set_meta("use_full_combat_bounds", in_combat)
 	var arena_objective: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
 	if arena_objective != null:
-		arena_objective.text = "SURVIVE"
-		arena_objective.add_theme_font_size_override("font_size", 26)
+		arena_objective.text = "CONTACT // SURVIVE"
+		arena_objective.add_theme_font_size_override("font_size", 24)
 	var planning_directive: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
 		var tight_scale_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
 		planning_directive.text = "DEPLOY // WAGER // COMMIT" if tight_scale_layout else "DEPLOYMENT GRID // SET WAGER // COMMIT"
-		planning_directive.add_theme_font_size_override("font_size", 18)
+		planning_directive.add_theme_font_size_override("font_size", 19 if not tight_scale_layout else 17)
 	if in_combat and parent.has_method("_update_external_backplates"):
 		parent.call_deferred("_update_external_backplates")
 
@@ -3389,14 +3390,18 @@ func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_mot
 			var actor_rect: Rect2 = Rect2(actor_position, actor.size)
 			bounds = actor_rect if not found_actor else bounds.merge(actor_rect)
 			found_actor = true
-	var focus_size: Vector2 = Vector2(arena.size.x * (0.66 if pressure_phase == 0 else 0.60), arena.size.y * 0.82)
-	if focus_size.x < 720.0:
-		focus_size.x = 720.0
-	if focus_size.y < 520.0:
-		focus_size.y = 520.0
+	# Keep the live contact cluster visually dominant instead of letting a sparse
+	# first fight read as an empty tactical diagram. The focus still expands to
+	# contain every visible actor below, so this only changes the presentation
+	# frame, not the battlefield or combat simulation.
+	var focus_size: Vector2 = Vector2(arena.size.x * (0.54 if pressure_phase == 0 else 0.50), arena.size.y * 0.72)
+	if focus_size.x < 640.0:
+		focus_size.x = 640.0
+	if focus_size.y < 480.0:
+		focus_size.y = 480.0
 	var focus_center: Vector2 = arena.size * Vector2(0.5, 0.5)
 	if found_actor:
-		var padding: Vector2 = Vector2(maxf(180.0, arena.size.x * 0.16), maxf(100.0, arena.size.y * 0.12))
+		var padding: Vector2 = Vector2(maxf(110.0, arena.size.x * 0.09), maxf(70.0, arena.size.y * 0.08))
 		var padded_bounds: Rect2 = Rect2(bounds.position - padding, bounds.size + padding * 2.0)
 		focus_size.x = maxf(focus_size.x, padded_bounds.size.x)
 		focus_size.y = maxf(focus_size.y, padded_bounds.size.y)
@@ -3412,12 +3417,23 @@ func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_mot
 		focus_size.x / maxf(1.0, arena.size.x),
 		focus_size.y / maxf(1.0, arena.size.y)
 	)
+	var normalized_engagement_rect: Rect2 = Rect2()
+	if found_actor:
+		normalized_engagement_rect = Rect2(
+			clampf(bounds.position.x / maxf(1.0, arena.size.x), 0.0, 1.0),
+			clampf(bounds.position.y / maxf(1.0, arena.size.y), 0.0, 1.0),
+			clampf(bounds.size.x / maxf(1.0, arena.size.x), 0.05, 1.0),
+			clampf(bounds.size.y / maxf(1.0, arena.size.y), 0.05, 1.0)
+		)
 	if focus_painter.has_method("set_focus_rect"):
 		focus_painter.call("set_focus_rect", normalized_rect)
+	if focus_painter.has_method("set_engagement_rect"):
+		focus_painter.call("set_engagement_rect", normalized_engagement_rect if found_actor else normalized_rect)
 	if focus_painter.has_method("configure"):
 		focus_painter.call("configure", pressure_phase, reduced_motion)
 	focus_painter.visible = true
 	arena.set_meta("battlefield_focus_rect", normalized_rect)
+	arena.set_meta("battlefield_engagement_rect", normalized_engagement_rect if found_actor else normalized_rect)
 	arena.set_meta("battlefield_focus_mode", "combat_cluster_frame")
 
 func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool, casualty_pressure: float, casualty_event_index: int = 0) -> void:
@@ -3445,7 +3461,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("landmark_continuity_source", "onset_base_persistent")
 	arena.set_meta("procedural_environment_geometry_suppressed", true)
 	arena.set_meta("authored_physical_evidence_visible", true)
-	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
+	arena.set_meta("battlefield_grid_priority", "local_focus_arena_then_muted_outer_grid")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
 	var onset: Control = arena.get_node_or_null("ArenaWarAftermath/OnsetAftermathGeometry") as Control
@@ -3485,6 +3501,11 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		focus_painter.visible = true
 		if focus_painter.has_method("configure"):
 			focus_painter.call("configure", effective_phase, reduced_motion)
+	var reduced_motion_ribbon: PanelContainer = arena.get_node_or_null("ReducedMotionStateRibbon") as PanelContainer
+	if reduced_motion_ribbon != null:
+		reduced_motion_ribbon.visible = reduced_motion
+		reduced_motion_ribbon.modulate = Color.WHITE
+		reduced_motion_ribbon.set_meta("state_cue_visible", reduced_motion)
 	var arena_surface: TextureRect = arena.get_node_or_null("GothicArenaSurface") as TextureRect
 	if arena_surface != null:
 		arena_surface.texture = GothicUIAssets.battlefield_onset_texture()
@@ -3590,7 +3611,7 @@ func _protect_persistent_hud_chrome() -> void:
 		instruction_ribbon.self_modulate = Color.WHITE
 		# The result card owns the actual advance affordance. Keep the persistent
 		# combat ribbon as a quiet record stamp so the two prompts do not compete.
-		instruction_ribbon.text = "/// RECORD SEALED" if result_visible else "SURVIVE"
+		instruction_ribbon.text = "/// RECORD SEALED" if result_visible else "CONTACT // SURVIVE"
 		instruction_ribbon.add_theme_font_size_override("font_size", 20 if result_visible else 26)
 		if result_visible:
 			VisualTypeSystem.set_utility_bold(instruction_ribbon)

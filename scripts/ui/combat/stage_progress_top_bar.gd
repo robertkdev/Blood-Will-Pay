@@ -8,8 +8,8 @@ const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.
 
 const TOKEN_SIZE: Vector2 = Vector2(48.0, 38.0)
 const BAR_MIN_SIZE: Vector2 = Vector2(560.0, 56.0)
-const COMPACT_TOKEN_SIZE: Vector2 = Vector2(38.0, 30.0)
-const COMPACT_BAR_MIN_SIZE: Vector2 = Vector2(500.0, 48.0)
+const COMPACT_TOKEN_SIZE: Vector2 = Vector2(34.0, 28.0)
+const COMPACT_BAR_MIN_SIZE: Vector2 = Vector2(460.0, 42.0)
 const SELECTED_TEXTURE_PATHS: PackedStringArray = [
 	"res://assets/ui/stage_icons/stage_1_creep_selected.png",
 	"res://assets/ui/stage_icons/stage_2_challenge_selected.png",
@@ -101,22 +101,25 @@ func set_compact_layout(compact: bool) -> void:
 	custom_minimum_size = COMPACT_BAR_MIN_SIZE if compact else BAR_MIN_SIZE
 	var margin: MarginContainer = get_node_or_null("Margin") as MarginContainer
 	if margin != null:
-		margin.add_theme_constant_override("margin_left", 10 if compact else 14)
-		margin.add_theme_constant_override("margin_top", 2 if compact else 6)
-		margin.add_theme_constant_override("margin_right", 10 if compact else 14)
-		margin.add_theme_constant_override("margin_bottom", 2 if compact else 5)
+		margin.add_theme_constant_override("margin_left", 8 if compact else 14)
+		margin.add_theme_constant_override("margin_top", 1 if compact else 6)
+		margin.add_theme_constant_override("margin_right", 8 if compact else 14)
+		margin.add_theme_constant_override("margin_bottom", 1 if compact else 5)
 	if _row != null:
-		_row.add_theme_constant_override("separation", 7 if compact else 10)
+		_row.add_theme_constant_override("separation", 5 if compact else 10)
 	if _chapter_label != null:
-		_chapter_label.custom_minimum_size = Vector2(130.0 if compact else 150.0, 0.0)
-		_chapter_label.add_theme_font_size_override("font_size", 20 if compact else 24)
+		_chapter_label.custom_minimum_size = Vector2(112.0 if compact else 150.0, 0.0)
+		_chapter_label.add_theme_font_size_override("font_size", 17 if compact else 24)
 		VisualTypeSystem.set_action(_chapter_label)
 	if _phase_label != null:
-		_phase_label.custom_minimum_size = Vector2(92.0 if compact else 112.0, 0.0)
-		_phase_label.add_theme_font_size_override("font_size", 18 if compact else 21)
+		_phase_label.custom_minimum_size = Vector2(82.0 if compact else 112.0, 0.0)
+		_phase_label.add_theme_font_size_override("font_size", 15 if compact else 21)
 	var token_size: Vector2 = COMPACT_TOKEN_SIZE if compact else TOKEN_SIZE
 	for token: PanelContainer in _tokens:
 		token.custom_minimum_size = token_size
+		var token_number: Label = token.get_node_or_null("Number") as Label
+		if token_number != null:
+			token_number.add_theme_font_size_override("font_size", 16 if compact else 21)
 	queue_sort()
 
 func _ensure_built() -> void:
