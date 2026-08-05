@@ -6,12 +6,8 @@ const DAMAGE_BASE: Array[int] = [260, 390, 585]
 const AD_RATIO: float = 1.25
 const CLEAVE_RADIUS_TILES: float = 1.85
 const HOOK_TILES: float = 2.1
-const ENGAGE_TILES: float = 2.2
 const MOVE_DURATION: float = 0.18
 const STUN_DURATION: float = 0.8
-const RAMP_DURATION: float = 6.0
-const RAMP_AD_PER_STACK: float = 18.0
-const RAMP_AS_PER_STACK: float = 0.08
 
 func _level_index(unit: Unit) -> int:
 	var level: int = int(unit.level) if unit != null else 1
@@ -30,19 +26,8 @@ func cast(ctx: AbilityContext) -> bool:
 	if target_index < 0:
 		return false
 	var target_team: String = _enemy_team(ctx.caster_team)
-	var target_position: Vector2 = ctx.position_of(target_team, target_index)
-	_engage_toward(ctx, target_position)
 	_hook_target_toward_caster(ctx, target_team, target_index)
 	ctx.stun(target_team, target_index, STUN_DURATION)
-	if ctx.buff_system != null:
-		ctx.buff_system.apply_tag(ctx.state, target_team, target_index, "root", STUN_DURATION, {})
-	var stacks: int = 3 + _level_index(caster)
-	if ctx.buff_system != null:
-		ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, ctx.caster_index, "draxelle_colossus_plates", {
-			"attack_damage": RAMP_AD_PER_STACK * float(stacks),
-			"attack_speed": RAMP_AS_PER_STACK * float(stacks)
-		}, RAMP_DURATION)
-	ctx.emit_ramp_state("colossus_plates", stacks, RAMP_AD_PER_STACK * float(stacks), 6, RAMP_DURATION, "hook_cast")
 	var center: Vector2 = ctx.position_of(target_team, target_index)
 	var victims: Array[int] = ctx.enemies_in_radius_at(ctx.caster_team, center, CLEAVE_RADIUS_TILES)
 	if victims.is_empty():
@@ -50,8 +35,6 @@ func cast(ctx: AbilityContext) -> bool:
 	var damage: float = float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage)
 	for victim_index: int in victims:
 		ctx.damage_single(ctx.caster_team, ctx.caster_index, victim_index, damage, "physical")
-		if victim_index != target_index:
-			ctx.stun(target_team, victim_index, STUN_DURATION * 0.5)
 	ctx.log("Colossus Hook: pulled target %d and cleaved %d enemies" % [target_index, victims.size()])
 	return true
 
@@ -71,17 +54,6 @@ func _furthest_enemy(ctx: AbilityContext) -> int:
 			best_index = index
 	return best_index
 
-func _engage_toward(ctx: AbilityContext, target_position: Vector2) -> void:
-	var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
-	var delta: Vector2 = target_position - start
-	if delta.length() <= 0.001:
-		return
-	var destination: Vector2 = start + delta.normalized() * ENGAGE_TILES * ctx.tile_size()
-	_emit_position(ctx, ctx.caster_team, ctx.caster_index, start)
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, destination - start, MOVE_DURATION)
-	_set_unit_position(ctx, ctx.caster_team, ctx.caster_index, destination)
-
 func _hook_target_toward_caster(ctx: AbilityContext, target_team: String, target_index: int) -> void:
 	var target_position: Vector2 = ctx.position_of(target_team, target_index)
 	var caster_position: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
@@ -89,30 +61,18 @@ func _hook_target_toward_caster(ctx: AbilityContext, target_team: String, target
 	if delta.length() <= 0.001:
 		return
 	var destination: Vector2 = target_position + delta.normalized() * HOOK_TILES * ctx.tile_size()
-	_emit_position(ctx, target_team, target_index, target_position)
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
 		ctx.engine.arena_state.notify_forced_movement(target_team, target_index, destination - target_position, MOVE_DURATION)
 	_set_unit_position(ctx, target_team, target_index, destination)
 
 func _set_unit_position(ctx: AbilityContext, team: String, index: int, destination: Vector2) -> void:
-	if ctx.engine == null:
-		return
-	if ctx.engine.arena_state == null:
-		_emit_position(ctx, team, index, destination)
+	if ctx.engine.arena_state == null or ctx.engine.arena_state.data == null:
 		return
 	var movement_data: Variant = ctx.engine.arena_state.data
-	if movement_data == null:
-		_emit_position(ctx, team, index, destination)
-		return
 	var clamped: Vector2 = MovementMath.clamp_to_rect(destination, movement_data.arena_bounds)
-	if team == "player":
-		if index >= 0 and index < movement_data.player_positions.size():
-			movement_data.player_positions[index] = clamped
-	else:
-		if index >= 0 and index < movement_data.enemy_positions.size():
-			movement_data.enemy_positions[index] = clamped
-	_emit_position(ctx, team, index, clamped)
-
-func _emit_position(ctx: AbilityContext, team: String, index: int, position: Vector2) -> void:
+	if team == "player" and index >= 0 and index < movement_data.player_positions.size():
+		movement_data.player_positions[index] = clamped
+	elif team == "enemy" and index >= 0 and index < movement_data.enemy_positions.size():
+		movement_data.enemy_positions[index] = clamped
 	if ctx.engine.has_signal("position_updated"):
-		ctx.engine.emit_signal("position_updated", team, index, position.x, position.y)
+		ctx.engine.emit_signal("position_updated", team, index, clamped.x, clamped.y)

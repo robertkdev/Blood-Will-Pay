@@ -3,9 +3,9 @@ extends AbilityImplBase
 const HIT_DAMAGE: Array[int] = [74, 112, 170]
 const AD_RATIO: float = 0.58
 const HIT_COUNT: int = 3
+const HIT_INTERVAL: float = 0.22
 const DEBUFF_DURATION: float = 4.5
 const ARMOR_PER_HIT: float = 10.0
-const ATTACK_SPEED_PER_HIT: float = -0.05
 const STUN_DURATION: float = 0.35
 const FORCED_STEP_TILES: float = 0.9
 
@@ -30,27 +30,18 @@ func cast(ctx: AbilityContext) -> bool:
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var level_index: int = _level_index(caster)
 	var damage: float = float(HIT_DAMAGE[level_index]) + AD_RATIO * float(caster.attack_damage)
+	if ctx.engine.ability_system == null:
+		return false
 	for hit_index: int in range(HIT_COUNT):
-		ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, damage, "physical")
-		ctx.stun(target_team, target_index, STUN_DURATION)
-		if hit_index == 0:
-			_force_target_step(ctx, target_team, target_index)
-		if ctx.buff_system != null:
-			ctx.buff_system.push_source(ctx.caster_team, ctx.caster_index, "on_hit")
-			ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, "kett_union_breaker", {
-				"armor": -ARMOR_PER_HIT * float(hit_index + 1),
-				"attack_speed": ATTACK_SPEED_PER_HIT * float(hit_index + 1)
-			}, DEBUFF_DURATION)
-			ctx.buff_system.pop_source()
-		ctx.emit_ramp_state("kett_union_breaker", hit_index + 1, float(hit_index + 1), HIT_COUNT, DEBUFF_DURATION, "combo_hit")
+		ctx.engine.ability_system.schedule_event("kett_union_breaker_hit", ctx.caster_team, ctx.caster_index, HIT_INTERVAL * float(hit_index), {
+			"target_team": target_team,
+			"target_index": target_index,
+			"hit_number": hit_index + 1,
+			"damage": damage,
+			"armor_shred": ARMOR_PER_HIT,
+			"debuff_duration": DEBUFF_DURATION,
+			"finisher_stun": STUN_DURATION,
+			"finisher_push_tiles": FORCED_STEP_TILES
+		})
 	ctx.log("Union Breaker: three-hit debuff combo on target %d" % target_index)
 	return true
-
-func _force_target_step(ctx: AbilityContext, target_team: String, target_index: int) -> void:
-	var target_position: Vector2 = ctx.position_of(target_team, target_index)
-	var sign_x: float = 1.0 if target_team == "enemy" else -1.0
-	var destination: Vector2 = target_position + Vector2(sign_x * FORCED_STEP_TILES * ctx.tile_size(), 0.0)
-	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):
-		ctx.engine.arena_state.notify_forced_movement(target_team, target_index, destination - target_position, 0.16)
-	if ctx.engine.has_signal("position_updated"):
-		ctx.engine.emit_signal("position_updated", target_team, target_index, destination.x, destination.y)

@@ -49,7 +49,7 @@ Current formula:
   - first normal: `1.90`
   - second normal: `2.25`
   - boss: `2.65`
-  - Chapter 1 boss: `2.15`, with generated unit levels capped at `2`
+  - Chapter 1 boss raw target: `1.00` with generated unit levels capped at `2`; the player-facing preview applies the shared `1.25` escalation factor for the live boss phases
   - mirror: player-board driven, but tagged with the boss target for logging
 
 That gives the generator a smooth ramp without needing infinite authored pools. Deep scaling comes from generated levels, board size, and active trait pressure. Generated enemy items are not assigned yet; item pressure is audit-visible but should not affect generated difficulty until item-bearing enemy boards are introduced.
@@ -84,5 +84,5 @@ Validation surfaces:
 
 - `tests/rga_testing/validation/EndlessRuntimeIntegrationProbe.tscn` checks Chapter 1 generated specs, catalog stability, generated metadata, seed variation, spawner/rule compatibility, top-bar wiring, and mirror snapshot compatibility.
 - `tests/rga_testing/validation/EndlessRuntimeIntegrationProbe.tscn` also checks that a fresh run starts at board cap 3, leveling adds a board slot, and stronger unit levels improve estimated odds.
-- `tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn` runs seeded random team matchups through the real lockstep combat simulator and compares displayed odds against observed wins by bucket. Latest pass: `144` combats, predicted mean `50.0%`, observed `48.6%`, overall gap `1.4%`, no timeouts.
+- `tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn` runs seeded random team matchups through the real lockstep combat simulator and compares displayed odds against observed wins by bucket. Fresh pass: `144` combats, predicted mean `50.0%`, observed `52.08%`, Brier `0.1069`, no simulation timeouts.
 - `tests/visual/EndlessEntryMainFlowSmoke.tscn` is a Main-flow smoke that selects a starter through the real entrypoint, validates the Chapter 1 procedural preview UI/enemies, checks the `Board x/3` and `Win Odds` labels, starts the opening combat, and expects progression into Chapter 1 Round 2 with generated RGA metadata.

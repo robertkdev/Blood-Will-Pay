@@ -7,6 +7,7 @@ const RGASettings := preload("res://tests/rga_testing/settings.gd")
 const RGAUnitCatalog := preload("res://tests/rga_testing/io/unit_catalog.gd")
 const TeamOddsEstimator := preload("res://scripts/game/combat/team_odds_estimator.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
+const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
 
 const RUN_ID: String = "team_odds_calibration"
 const CALIBRATION_SEED: int = 918273
@@ -17,7 +18,7 @@ const MAX_TEAM_SIZE: int = 4
 const DELTA_S: float = 0.05
 const TIMEOUT_S: float = 60.0
 const MAX_OVERALL_GAP: float = 0.10
-const MAX_BUCKET_GAP: float = 0.22
+const MAX_BUCKET_GAP: float = 0.15
 const MIN_BUCKET_SAMPLES: int = 12
 const MAX_UNACCEPTABLE_TIMEOUTS: int = 0
 const SUMMARY_PATH: String = "user://team_odds_calibration.json"
@@ -111,6 +112,8 @@ func _record_sample(samples: Array[Dictionary], team_a_ids: Array[String], team_
 		"team_a": team_a_ids.duplicate(),
 		"team_b": team_b_ids.duplicate(),
 		"predicted": predicted_percent,
+		"player_power": TeamOddsEstimator.team_rating(player_team),
+		"enemy_power": TeamOddsEstimator.team_rating(enemy_team),
 		"actual": actual,
 		"result": result,
 		"reason": reason,
@@ -234,7 +237,9 @@ func _summarize(samples: Array[Dictionary]) -> Dictionary:
 		"engine_combat_timeout_resolutions": engine_combat_timeout_count,
 		"engine_no_progress_timeout_resolutions": engine_no_progress_timeout_count,
 		"buckets": bucket_rows,
+		"model_version": CombatPowerModel.MODEL_VERSION,
 		"sample_rows": samples,
+		"rows": samples,
 		"deterministic_fingerprint": _deterministic_fingerprint(samples),
 		"project_path": ProjectSettings.globalize_path("res://"),
 		"summary_path": SUMMARY_PATH,
@@ -256,7 +261,7 @@ func _validate_summary(summary: Dictionary, failures: Array[String]) -> void:
 		checked_buckets += 1
 		var gap: float = float(bucket.get("gap", 1.0))
 		_expect(gap <= MAX_BUCKET_GAP, "bucket %s gap %.1f%% exceeded %.1f%% with n=%d" % [String(bucket.get("bucket", "")), gap * 100.0, MAX_BUCKET_GAP * 100.0, bucket_count], failures)
-	_expect(checked_buckets >= 3, "expected at least 3 populated odds buckets, got %d" % checked_buckets, failures)
+	_expect(checked_buckets >= 5, "expected at least 5 populated odds buckets, got %d" % checked_buckets, failures)
 
 func _deterministic_fingerprint(samples: Array[Dictionary]) -> String:
 	var parts: Array[String] = []

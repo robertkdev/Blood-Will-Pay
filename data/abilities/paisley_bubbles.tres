@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "paisley_bubbles"
 name = "Bubbles"
-description = "Shields the two lowest-HP allies and throws stunning damaging bubbles at two enemies."
-targeting_summary = "Two lowest-health allies for shields; two nearest enemies for bubbles."
+description = "Shields the two weakest allies. Each bubble pops near its ally when broken or expired, damaging and briefly stunning nearby enemies."
+targeting_summary = "Two lowest-Health-ratio allies."
 base_cost = 70
-tags = ["shield", "damage", "cc"]
+tags = ["shield", "local_pop", "stun"]

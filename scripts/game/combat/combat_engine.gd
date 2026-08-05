@@ -1045,6 +1045,13 @@ func _filter_events_in_range(events: Array[AttackEvent]) -> Array[AttackEvent]:
 				shooter = state.enemy_team[idx]
 		if not shooter or not shooter.is_alive():
 			continue
+		# Re-check disarm after mana/ability processing so an attack queued earlier
+		# in this frame cannot slip through a newly applied Pocket Swap disarm.
+		if buff_system != null and buff_system.has_tag(state, team, idx, "disarm"):
+			var disarmed_cds: Array[float] = state.player_cds if team == "player" else state.enemy_cds
+			if idx >= 0 and idx < disarmed_cds.size():
+				disarmed_cds[idx] = max(0.0, float(disarmed_cds[idx]))
+			continue
 		var spos: Vector2 = arena_state.get_player_position(idx) if team == "player" else arena_state.get_enemy_position(idx)
 		var tpos: Vector2 = arena_state.get_enemy_position(tgt_idx) if team == "player" else arena_state.get_player_position(tgt_idx)
 		var prof: Variant = arena_state.get_profile(team, idx) if arena_state and arena_state.has_method("get_profile") else null

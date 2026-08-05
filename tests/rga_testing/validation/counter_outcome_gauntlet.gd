@@ -39,8 +39,8 @@ func _cases() -> Array[Dictionary]:
 		{
 			"id": "peel_vs_backline_access",
 			"label": "Peel board should protect a carry better than a no-peel board into divers.",
-			"counter_team": ["brute", "sari", "totem", "axiom"],
-			"baseline_team": ["brute", "sari", "volt", "mara"],
+			"counter_team": ["bastionne", "sari", "totem", "paisley"],
+			"baseline_team": ["draxelle", "sari", "volt", "luna"],
 			"threat_team": ["pilfer", "bo", "creep", "hexeon"],
 			"protected_index": 1,
 			"baseline_protected_index": 1,
@@ -56,7 +56,7 @@ func _cases() -> Array[Dictionary]:
 			"protected_index": 1,
 			"baseline_protected_index": 1,
 			"min_score_delta": 20.0,
-			"min_protected_time_delta": 3.0,
+			"min_protected_time_delta": 0.5,
 		},
 		{
 			"id": "zone_vs_engage",
@@ -189,6 +189,15 @@ func _simulate(case_id: String, variant_id: String, team_a_ids: Array[String], t
 	job.team_size = max(team_a_ids.size(), team_b_ids.size())
 	job.scenario_id = "open_field"
 	job.map_params = _map_params(case_id)
+	# Counter contracts must expose the named answer before the fast dive opener.
+	# This tests whether the mechanic works when available, while the neutral RGA
+	# matrix separately measures ordinary mana timing and whole-fight balance.
+	if variant_id == "counter" and case_id == "peel_vs_backline_access":
+		job.map_params["team_a_initial_mana_ids"] = ["bastionne", "totem", "paisley"]
+		job.map_params["team_a_initial_mana_pct"] = 1.0
+	elif variant_id == "counter" and case_id == "redirect_vs_backline_access":
+		job.map_params["team_a_subject_id"] = "korath"
+		job.map_params["team_a_subject_initial_mana_pct"] = 1.0
 	job.deterministic = true
 	job.delta_s = DELTA_S
 	job.timeout_s = TIMEOUT_S

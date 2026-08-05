@@ -1,7 +1,5 @@
 extends RefCounted
 class_name Unit
-const Health := preload("res://scripts/game/stats/health.gd")
-const Mana := preload("res://scripts/game/stats/mana.gd")
 const UnitIdentity := preload("res://scripts/game/identity/unit_identity.gd")
 const UnitDefaults := preload("res://scripts/game/units/unit_defaults.gd")
 
@@ -78,12 +76,12 @@ func is_alive() -> bool:
 	return hp > 0
 
 func heal_to_full() -> void:
-	Health.heal_full(self)
+	hp = int(max_hp)
 
 func take_damage(amount: int) -> int:
-	# Armor/damage_reduction could reduce damage earlier in pipeline.
-	var res: Dictionary = Health.apply_damage(self, amount)
-	return int(res.get("dealt", int(max(0, amount))))
+	var dealt: int = int(max(0, amount))
+	hp = max(0, hp - dealt)
+	return dealt
 
 func attack_roll(rng: RandomNumberGenerator) -> Dictionary:
 	# Deprecated: prefer AttackRoller.roll; keep for compatibility
@@ -92,8 +90,10 @@ func attack_roll(rng: RandomNumberGenerator) -> Dictionary:
 	return roller.roll(self, rng)
 
 func end_of_turn() -> void:
-	# Delegate to centralized systems for regen (mana only; health handled elsewhere)
-	Mana.regen_tick(self, 1.0)
+	var before: int = mana
+	var gained: int = int(round(max(0.0, mana_regen)))
+	if gained > 0 and mana_max > 0:
+		mana = min(mana_max, before + gained)
 
 func summary() -> String:
 	return "HP %d/%d  AD %d  CRIT %d%%  LS %d%%  BLOCK %d%%  REGEN %d" % [

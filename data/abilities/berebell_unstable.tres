@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "berebell_unstable"
 name = "Unstable"
-description = "Enters a blood-fueled frenzy for 5s: +AS, attacks deal bonus physical equal to % missing HP, and heals for a percent of damage dealt."
-targeting_summary = "Self-buff; empowered attacks keep using attack targeting."
+description = "For 5 seconds, attacks deal bonus physical damage based on the target's missing Health and heal Berebell through lifesteal."
+targeting_summary = "Self-buff; attacks keep their normal targets."
 base_cost = 60
-tags = ["buff", "frenzy"]
+tags = ["buff", "attrition", "self-heal"]

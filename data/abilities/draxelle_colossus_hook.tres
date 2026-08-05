@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "draxelle_colossus_hook"
 name = "Colossus Hook"
-description = "Hooks a distant enemy into the brawl, cleaves the frontline, and gains visible scaling plates."
+description = "Hooks the farthest enemy into the brawl, briefly stuns them, and cleaves enemies around the landing point."
 targeting_summary = "Farthest enemy; pulls them into the brawl and cleaves around them."
 base_cost = 30
-tags = ["damage", "engage", "disrupt", "ramp"]
+tags = ["damage", "engage", "disrupt"]

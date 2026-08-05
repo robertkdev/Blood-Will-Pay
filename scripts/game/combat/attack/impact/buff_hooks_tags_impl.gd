@@ -33,6 +33,20 @@ func korath_absorb_pct(state: BattleState, team: String, index: int) -> float:
     var meta: Dictionary = buff_system.get_tag_data(state, team, index, BuffTags.TAG_KORATH)
     return float(meta.get("pct", 0.0))
 
+func korath_redirect_index(state: BattleState, team: String, protected_index: int) -> int:
+    if buff_system == null or state == null:
+        return -1
+    var allies: Array[Unit] = state.player_team if team == "player" else state.enemy_team
+    for ally_index: int in range(allies.size()):
+        var ally: Unit = allies[ally_index]
+        if ally == null or not ally.is_alive() or not buff_system.has_tag(state, team, ally_index, BuffTags.TAG_KORATH):
+            continue
+        var meta: Dictionary = buff_system.get_tag_data(state, team, ally_index, BuffTags.TAG_KORATH)
+        var protected: Array = meta.get("protected_indices", [])
+        if protected.has(protected_index):
+            return ally_index
+    return -1
+
 func korath_accumulate_pool(state: BattleState, team: String, index: int, amount: int) -> void:
     if buff_system == null or state == null or amount <= 0:
         return

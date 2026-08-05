@@ -23,6 +23,7 @@ Roster="*res://scripts/game/roster.gd"
 Shop="*res://scripts/game/shop/shop.gd"
 Items="*res://scripts/game/items/items.gd"
 Sound="*res://scripts/game/audio/sound_manager.gd"
+CursorManager="*res://scripts/ui/cursor/cursor_manager.gd"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [debug]

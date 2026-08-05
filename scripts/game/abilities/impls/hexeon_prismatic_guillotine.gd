@@ -14,14 +14,13 @@ const KALEI_KEY := "kaleidoscope_stacks" # Legacy fallback for old saved/test st
 const EXEC_KEY := "executioner_stacks"    # Legacy fallback for old saved/test state.
 const RECAST_SCALE: float = 0.70
 const BLINK_OFFSET_TILES: float = 0.85
-const EXECUTE_ARM_THRESHOLD: float = 0.85
 const MOVE_DURATION: float = 0.16
 
 func _level_index(u: Unit) -> int:
     var lvl: int = (int(u.level) if u != null else 1)
     return clamp(lvl - 1, 0, 2)
 
-func _stack(bs, state: BattleState, team: String, index: int, key: String) -> int:
+func _stack(bs: Variant, state: BattleState, team: String, index: int, key: String) -> int:
     if bs == null:
         return 0
     var trait_key: String = key
@@ -53,36 +52,17 @@ func _strike(ctx: AbilityContext, target_idx: int, power_scale: float) -> Dictio
     if target_before != null and target_before.is_alive():
         var before_hp_pct: float = float(target_before.hp) / max(1.0, float(target_before.max_hp))
         if before_hp_pct <= threshold:
-            var execute_damage: float = float(target_before.hp)
+            var execute_damage: float = float(target_before.hp) + 1.0
             var execute_res: Dictionary = {}
             if execute_damage > 0.0:
                 ctx.emit_execute_bonus(target_team, target_idx, 0.0, execute_damage, threshold, before_hp_pct, "hexeon_prismatic_guillotine")
                 execute_res = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_idx, execute_damage, "true")
-            execute_res["executed"] = true
+            execute_res["executed"] = not ctx.is_alive(target_team, target_idx)
             return execute_res
     var dmg_f: float = float(BASE[li]) + SP_MULT * float(caster.spell_power) + 12.0 * float(max(0, kalei))
     dmg_f = max(0.0, dmg_f * max(0.0, power_scale))
     var res: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_idx, dmg_f, "magic")
-    var base_dealt: float = float(res.get("dealt", dmg_f))
-    # Execute check (post-hit HP%)
-    var tgt: Unit = ctx.unit_at(target_team, target_idx)
-    if tgt != null and tgt.is_alive():
-        var hp_pct: float = float(tgt.hp) / max(1.0, float(tgt.max_hp))
-        if power_scale >= 0.99 and hp_pct > threshold and hp_pct <= EXECUTE_ARM_THRESHOLD:
-            var threshold_hp: int = max(1, int(floor(float(tgt.max_hp) * threshold)))
-            var setup_damage: float = _damage_for_effective_amount(tgt, max(0.0, float(tgt.hp - threshold_hp - 1)))
-            if setup_damage > 0.0:
-                ctx.damage_single(ctx.caster_team, ctx.caster_index, target_idx, setup_damage, "true")
-                tgt = ctx.unit_at(target_team, target_idx)
-                if tgt != null and tgt.is_alive():
-                    hp_pct = float(tgt.hp) / max(1.0, float(tgt.max_hp))
-        if hp_pct <= threshold:
-            var to_kill: float = float(tgt.hp)
-            if to_kill > 0.0:
-                ctx.emit_execute_bonus(target_team, target_idx, base_dealt, to_kill, threshold, hp_pct, "hexeon_prismatic_guillotine")
-                ctx.damage_single(ctx.caster_team, ctx.caster_index, target_idx, to_kill, "true")
-            res["executed"] = true
-    else:
+    if not ctx.is_alive(target_team, target_idx):
         res["killed"] = true
     return res
 
@@ -92,7 +72,7 @@ func _priority_backline_enemy(ctx: AbilityContext) -> int:
     var side_sign: float = 1.0 if ctx.caster_team == "player" else -1.0
     var min_depth: float = INF
     var max_depth: float = -INF
-    for index in range(enemies.size()):
+    for index: int in range(enemies.size()):
         var enemy_for_depth: Unit = enemies[index]
         if enemy_for_depth == null or not enemy_for_depth.is_alive():
             continue
@@ -103,7 +83,7 @@ func _priority_backline_enemy(ctx: AbilityContext) -> int:
         return -1
     var backline_depth: float = min_depth + max(0.0, max_depth - min_depth) * 0.5
     var candidates: Array[Dictionary] = []
-    for i in range(enemies.size()):
+    for i: int in range(enemies.size()):
         var enemy: Unit = enemies[i]
         if enemy == null or not enemy.is_alive():
             continue
@@ -157,7 +137,7 @@ func _blink_near_target(ctx: AbilityContext, target_idx: int) -> void:
     var backline_x: float = target_pos.x
     var found_enemy: bool = false
     var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
-    for enemy_index in range(enemies.size()):
+    for enemy_index: int in range(enemies.size()):
         var enemy: Unit = enemies[enemy_index]
         if enemy == null or not enemy.is_alive():
             continue
@@ -181,14 +161,6 @@ func _blink_near_target(ctx: AbilityContext, target_idx: int) -> void:
             if ctx.caster_index >= 0 and ctx.caster_index < ctx.engine.arena_state.data.enemy_positions.size():
                 ctx.engine.arena_state.data.enemy_positions[ctx.caster_index] = dest
         ctx.engine.emit_signal("position_updated", ctx.caster_team, ctx.caster_index, dest.x, dest.y)
-
-func _damage_for_effective_amount(target: Unit, desired_effective: float) -> float:
-    if target == null:
-        return 0.0
-    var target_dr: float = clamp(float(target.damage_reduction), 0.0, 0.95)
-    var target_flat_dr: float = max(0.0, float(target.damage_reduction_flat))
-    var damage_multiplier: float = max(0.05, 1.0 - target_dr)
-    return ceil((max(0.0, desired_effective) + target_flat_dr + 1.0) / damage_multiplier)
 
 func cast(ctx: AbilityContext) -> bool:
     if ctx == null or ctx.engine == null or ctx.state == null:

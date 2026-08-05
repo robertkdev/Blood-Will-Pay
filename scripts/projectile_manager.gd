@@ -300,6 +300,25 @@ func _draw_projectile(p: Dictionary) -> void:
 			_draw_thorn(lp, dir, radius, core_color, edge_color, accent_color)
 		"stone":
 			_draw_stone(lp, dir, radius, core_color, edge_color, accent_color)
+		"brace", "gate", "sanctuary":
+			_draw_shield(lp, dir, radius, core_color, edge_color, accent_color)
+			_draw_shape_mark(lp, radius, shape, accent_color)
+		"fuse", "crater", "static":
+			_draw_volatile(lp, dir, radius, spin, shape, core_color, edge_color, accent_color)
+		"lesson", "receipt", "bid", "market", "debt", "late_fee", "last_word", "exam":
+			_draw_document(lp, dir, radius, shape, core_color, edge_color, accent_color)
+		"swap", "exit", "timeplate", "isolate":
+			_draw_portal(lp, dir, radius, spin, shape, core_color, edge_color, accent_color)
+		"knot", "constellation", "puppet", "spectrum":
+			_draw_threaded(lp, dir, radius, spin, shape, core_color, edge_color, accent_color)
+		"fist", "hook", "flesh_chain":
+			_draw_grapple(lp, dir, radius, shape, core_color, edge_color, accent_color)
+		"prism":
+			_draw_prism(lp, dir, radius, core_color, edge_color, accent_color)
+		"poultice":
+			_draw_poultice(lp, dir, radius, core_color, edge_color, accent_color)
+		"footnote":
+			_draw_footnote(lp, dir, radius, core_color, edge_color, accent_color)
 		_:
 			_draw_orb(lp, radius, core_color, edge_color, accent_color)
 
@@ -340,6 +359,8 @@ func _draw_impact(impact: Dictionary) -> void:
 		var inner: Vector2 = pos + Vector2(cos(angle), sin(angle)) * ring_radius * 0.40
 		var outer: Vector2 = pos + Vector2(cos(angle), sin(angle)) * ring_radius * 0.92
 		draw_line(inner, outer, Color(accent_color.r, accent_color.g, accent_color.b, 0.56 * inv), max(1.0, 2.8 * inv), true)
+	var impact_shape: String = String(style.get("shape", "orb"))
+	_draw_impact_signature(pos, radius * 0.52, elapsed * 5.0, impact_shape, Color(accent_color.r, accent_color.g, accent_color.b, 0.86 * inv))
 
 func _draw_orb(pos: Vector2, radius: float, core: Color, edge: Color, accent: Color) -> void:
 	draw_circle(pos, radius * 1.05, edge)
@@ -513,6 +534,113 @@ func _draw_stone(pos: Vector2, dir: Vector2, radius: float, core: Color, edge: C
 	draw_polygon(points, PackedColorArray([edge, core, core, edge, edge]))
 	draw_line(pos - perp * radius * 0.44, pos + dir * radius * 0.70, accent, max(1.0, radius * 0.16), true)
 
+func _draw_volatile(pos: Vector2, dir: Vector2, radius: float, spin: float, shape: String, core: Color, edge: Color, accent: Color) -> void:
+	if shape == "crater":
+		_draw_ring(pos, radius, spin, core, edge, accent)
+		draw_circle(pos, radius * 0.34, Color(0.10, 0.05, 0.03, 0.88))
+	else:
+		_draw_spark(pos, dir, radius, core, edge, accent)
+		if shape == "fuse":
+			draw_arc(pos - dir * radius * 0.72, radius * 0.42, 0.0, PI, 10, accent, max(1.0, radius * 0.18), true)
+		else:
+			draw_arc(pos, radius * 1.28, spin, spin + PI, 14, edge, max(1.0, radius * 0.16), true)
+
+func _draw_document(pos: Vector2, dir: Vector2, radius: float, shape: String, core: Color, edge: Color, accent: Color) -> void:
+	_draw_card(pos, dir, radius, core, edge, accent)
+	_draw_shape_mark(pos, radius, shape, accent)
+
+func _draw_portal(pos: Vector2, dir: Vector2, radius: float, spin: float, shape: String, core: Color, edge: Color, accent: Color) -> void:
+	_draw_ring(pos, radius, spin, core, edge, accent)
+	if shape == "swap":
+		draw_line(pos - dir * radius, pos + dir * radius, accent, max(1.0, radius * 0.18), true)
+		draw_circle(pos - dir * radius, radius * 0.20, accent)
+		draw_circle(pos + dir * radius, radius * 0.20, accent)
+	elif shape == "exit":
+		draw_line(pos, pos + dir * radius * 1.48, accent, max(1.0, radius * 0.24), true)
+	else:
+		_draw_shape_mark(pos, radius, shape, accent)
+
+func _draw_threaded(pos: Vector2, dir: Vector2, radius: float, spin: float, shape: String, core: Color, edge: Color, accent: Color) -> void:
+	if shape == "constellation":
+		_draw_star(pos, radius, spin, core, edge, accent)
+	elif shape == "spectrum":
+		_draw_prism(pos, dir, radius, core, edge, accent)
+	else:
+		_draw_ribbon(pos, dir, radius, spin, core, edge, accent)
+		_draw_shape_mark(pos, radius, shape, accent)
+
+func _draw_grapple(pos: Vector2, dir: Vector2, radius: float, shape: String, core: Color, edge: Color, accent: Color) -> void:
+	if shape == "fist":
+		draw_circle(pos, radius * 0.82, core)
+		for finger_index: int in range(3):
+			var finger_offset: float = (float(finger_index) - 1.0) * radius * 0.48
+			draw_circle(pos + Vector2(-dir.y, dir.x) * finger_offset + dir * radius * 0.72, radius * 0.30, edge)
+	elif shape == "hook":
+		draw_arc(pos, radius, dir.angle() - PI * 0.35, dir.angle() + PI * 1.05, 22, edge, max(1.0, radius * 0.34), true)
+		draw_line(pos - dir * radius * 1.30, pos + dir * radius * 0.40, core, max(1.0, radius * 0.22), true)
+	else:
+		_draw_chain(pos, dir, radius, core, edge, accent)
+		draw_circle(pos, radius * 0.30, Color(core.r, core.g, core.b, 0.72))
+
+func _draw_prism(pos: Vector2, dir: Vector2, radius: float, core: Color, edge: Color, accent: Color) -> void:
+	var perp: Vector2 = Vector2(-dir.y, dir.x)
+	var points: PackedVector2Array = PackedVector2Array([
+		pos + dir * radius * 1.42,
+		pos - dir * radius * 0.82 + perp * radius,
+		pos - dir * radius * 0.82 - perp * radius,
+	])
+	draw_polygon(points, PackedColorArray([accent, edge, core]))
+	draw_polyline(PackedVector2Array([points[0], points[1], points[2], points[0]]), accent, max(1.0, radius * 0.16), true)
+
+func _draw_poultice(pos: Vector2, dir: Vector2, radius: float, core: Color, edge: Color, accent: Color) -> void:
+	draw_circle(pos, radius, Color(edge.r, edge.g, edge.b, 0.78))
+	var perp: Vector2 = Vector2(-dir.y, dir.x)
+	draw_line(pos - dir * radius * 0.66, pos + dir * radius * 0.66, core, max(1.0, radius * 0.38), true)
+	draw_line(pos - perp * radius * 0.66, pos + perp * radius * 0.66, accent, max(1.0, radius * 0.38), true)
+
+func _draw_footnote(pos: Vector2, dir: Vector2, radius: float, core: Color, edge: Color, accent: Color) -> void:
+	_draw_needle(pos, dir, radius, core, edge, accent)
+	var perp: Vector2 = Vector2(-dir.y, dir.x)
+	draw_line(pos - dir * radius * 0.90 - perp * radius * 0.72, pos - dir * radius * 0.90 + perp * radius * 0.72, accent, max(1.0, radius * 0.22), true)
+
+func _draw_shape_mark(pos: Vector2, radius: float, shape: String, color: Color) -> void:
+	var shape_hash: int = abs(shape.hash())
+	var mark_count: int = 2 + (shape_hash % 4)
+	var phase_bucket: int = floori(float(shape_hash) / 7.0) % 16
+	var scale_bucket: int = floori(float(shape_hash) / 13.0) % 4
+	var phase: float = TAU * float(phase_bucket) / 16.0
+	var inner_scale: float = 0.18 + 0.04 * float(scale_bucket)
+	for mark_index: int in range(mark_count):
+		var angle: float = phase + TAU * float(mark_index) / float(mark_count)
+		var inner: Vector2 = pos + Vector2(cos(angle), sin(angle)) * radius * inner_scale
+		var outer: Vector2 = pos + Vector2(cos(angle), sin(angle)) * radius * 0.70
+		draw_line(inner, outer, color, max(1.0, radius * 0.13), true)
+
+func _draw_impact_signature(pos: Vector2, radius: float, spin: float, shape: String, color: Color) -> void:
+	match shape:
+		"brace", "gate", "sanctuary", "shield":
+			draw_arc(pos, radius, PI, TAU, 18, color, 3.0, true)
+			_draw_shape_mark(pos, radius * 0.72, shape, color)
+		"lesson", "receipt", "bid", "market", "debt", "late_fee", "last_word", "exam", "paper", "card":
+			draw_rect(Rect2(pos - Vector2(radius * 0.62, radius * 0.44), Vector2(radius * 1.24, radius * 0.88)), color, false, 2.0)
+			_draw_shape_mark(pos, radius * 0.72, shape, color)
+		"swap", "exit", "timeplate", "isolate", "ring", "rune", "glyph":
+			draw_arc(pos, radius, spin, spin + PI * 1.55, 20, color, 3.0, true)
+			_draw_shape_mark(pos, radius * 0.68, shape, color)
+		"knot", "constellation", "puppet", "spectrum", "star", "ribbon":
+			_draw_shape_mark(pos, radius, shape, color)
+		"fist", "hook", "flesh_chain", "chain":
+			draw_line(pos - Vector2(radius, 0.0), pos + Vector2(radius, 0.0), color, 3.0, true)
+			draw_circle(pos - Vector2(radius * 0.58, 0.0), radius * 0.28, color, false, 2.0)
+			draw_circle(pos + Vector2(radius * 0.58, 0.0), radius * 0.28, color, false, 2.0)
+		"prism":
+			draw_colored_polygon(PackedVector2Array([pos + Vector2(0.0, -radius), pos + Vector2(radius, radius), pos + Vector2(-radius, radius)]), color)
+		"poultice":
+			draw_line(pos - Vector2(radius, 0.0), pos + Vector2(radius, 0.0), color, 3.0, true)
+			draw_line(pos - Vector2(0.0, radius), pos + Vector2(0.0, radius), color, 3.0, true)
+		_:
+			draw_circle(pos, radius * 0.32, color)
+
 func _update_impacts(delta: float) -> void:
 	if _impacts.is_empty():
 		return
@@ -598,7 +726,7 @@ func _control_from_ref(ref_value: Variant) -> Control:
 func _intersects_rect(pos: Vector2, radius: float, rect: Rect2) -> bool:
 	if rect.size == Vector2.ZERO:
 		return false
-	var closest := Vector2(
+	var closest: Vector2 = Vector2(
 		clamp(pos.x, rect.position.x, rect.position.x + rect.size.x),
 		clamp(pos.y, rect.position.y, rect.position.y + rect.size.y)
 	)

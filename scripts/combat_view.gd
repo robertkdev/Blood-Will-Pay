@@ -118,6 +118,8 @@ func _teardown() -> void:
 	UIBars.clear_runtime()
 
 func _init_game() -> void:
+	if _teardown_done or controller == null or not is_instance_valid(controller):
+		return
 	controller._init_game()
 
 func save_active_run_now() -> Dictionary:
@@ -143,6 +145,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 func _auto_start_battle() -> void:
+	# Main schedules this call deferred after starter selection. A rapid New Run,
+	# Return to Title, or teardown can hide this view and clear its controller
+	# before the deferred callback resumes. Treat that callback as stale rather
+	# than invoking a freed controller or starting combat behind a reset screen.
+	if _teardown_done or controller == null or not is_instance_valid(controller):
+		return
+	if not is_inside_tree() or not is_visible_in_tree() or not is_processing():
+		return
 	controller._auto_start_battle()
 
 func set_auto_start_battle_enabled(enabled: bool) -> void:
@@ -227,6 +237,8 @@ func _set_sprite_texture(rect: TextureRect, path: String, fallback_color: Color)
 ## Direct sprite drag removed; UnitView handles drag-and-drop
 
 func _process(_delta: float) -> void:
+	if _teardown_done or controller == null or not is_instance_valid(controller):
+		return
 	controller.process(_delta)
 	_update_planning_timer(_delta)
 	_sync_compact_resource_strip()
@@ -264,7 +276,9 @@ func _on_phase_changed(_prev: int, next: int) -> void:
 		if planning_timer_label:
 			planning_timer_label.visible = false
 		_set_planning_timer_status(_phase_status_text(gp, next), true)
-	_apply_visual_theme_deferred()
+	# Phase changes only toggle existing controls. Reapplying the full gothic
+	# theme and responsive layout here stalls result settlement; dynamic-node and
+	# resize paths already own those refreshes.
 	if controller != null and controller.has_method("sync_tactical_phase_visuals"):
 		controller.call("sync_tactical_phase_visuals", true)
 
@@ -374,6 +388,8 @@ func _log_start_positions_and_targets() -> void:
 	controller._log_start_positions_and_targets()
 
 func set_player_team_ids(ids: Array) -> void:
+	if _teardown_done or controller == null or not is_instance_valid(controller):
+		return
 	controller.set_player_team_ids(ids)
 	_apply_visual_theme_deferred()
 

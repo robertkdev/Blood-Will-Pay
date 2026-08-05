@@ -2,15 +2,9 @@ extends AbilityImplBase
 
 const DAMAGE_BASE: Array[int] = [145, 220, 330]
 const RADIUS_TILES: float = 2.35
-const AMP_DURATION: float = 4.5
-const DAMAGE_AMP: Array[float] = [0.10, 0.15, 0.22]
-const FIELD_ATTACK_SPEED_TAX: float = -0.16
-const FIELD_ATTACK_DAMAGE_TAX: float = -20.0
-const FIELD_TAX_DURATION: float = 3.0
+const FIELD_DURATION: float = 3.0
+const FIELD_INTERVAL: float = 0.20
 const FIELD_MANA_BLOCK_TAG: String = "prisma_color_field_lock"
-const FIELD_MANA_BLOCK_DURATION: float = 2.25
-
-const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
 
 func _level_index(unit: Unit) -> int:
 	var level: int = int(unit.level) if unit != null else 1
@@ -26,33 +20,26 @@ func cast(ctx: AbilityContext) -> bool:
 	if caster == null or not caster.is_alive():
 		return false
 	var level_index: int = _level_index(caster)
-	_apply_team_amp(ctx, float(DAMAGE_AMP[level_index]))
 	var target_index: int = _zone_target(ctx)
 	if target_index < 0:
-		return true
+		return false
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var center: Vector2 = ctx.position_of(target_team, target_index)
-	var victims: Array[int] = ctx.enemies_in_radius_at(ctx.caster_team, center, RADIUS_TILES)
-	for victim_index: int in victims:
-		var result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, victim_index, float(DAMAGE_BASE[level_index]), "magic")
-		if bool(result.get("processed", false)):
-			ctx.emit_zone_exposure(target_team, victim_index, "prisma_color_field", 1.0, float(result.get("dealt", DAMAGE_BASE[level_index])), RADIUS_TILES)
-			_apply_field_tax(ctx, target_team, victim_index)
-	ctx.log("Color Theory: amplified team and burst %d enemies" % victims.size())
-	return true
-
-func _apply_field_tax(ctx: AbilityContext, target_team: String, target_index: int) -> void:
-	if ctx.buff_system == null:
-		return
-	ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, "prisma_color_field_tax", {
-		"attack_speed": FIELD_ATTACK_SPEED_TAX,
-		"attack_damage": FIELD_ATTACK_DAMAGE_TAX
-	}, FIELD_TAX_DURATION)
-	ctx.buff_system.apply_tag(ctx.state, target_team, target_index, FIELD_MANA_BLOCK_TAG, FIELD_MANA_BLOCK_DURATION, {
-		"block_mana_gain": true,
-		"is_debuff": true,
-		"cleanseable": true
+	if ctx.engine.has_signal("target_start"):
+		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, target_team, target_index)
+	if ctx.engine.ability_system == null:
+		return false
+	ctx.engine.ability_system.schedule_event("prisma_color_field_tick", ctx.caster_team, ctx.caster_index, 0.0, {
+		"center": center,
+		"radius": RADIUS_TILES,
+		"damage": DAMAGE_BASE[level_index],
+		"damage_applied": false,
+		"ticks_left": int(ceil(FIELD_DURATION / FIELD_INTERVAL)),
+		"interval": FIELD_INTERVAL,
+		"mana_block_tag": FIELD_MANA_BLOCK_TAG
 	})
+	ctx.log("Color Theory: painted one persistent denial field")
+	return true
 
 func _zone_target(ctx: AbilityContext) -> int:
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
@@ -96,22 +83,3 @@ func _zone_target_score(ctx: AbilityContext, enemy: Unit, enemy_position: Vector
 		score += 1.75
 	score += clampf(float(enemy.cost), 1.0, 5.0) * 0.20
 	return score
-
-func _apply_team_amp(ctx: AbilityContext, amp: float) -> void:
-	if ctx.buff_system == null:
-		return
-	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
-	ctx.buff_system.push_source(ctx.caster_team, ctx.caster_index, "ability")
-	for index: int in range(allies.size()):
-		var ally: Unit = allies[index]
-		if ally == null or not ally.is_alive():
-			continue
-		ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, index, BuffTags.TAG_DAMAGE_AMP, AMP_DURATION, {
-			"damage_amp_pct": amp,
-			"kind": "prisma_color_theory"
-		})
-		ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, index, BuffTags.TAG_ABILITY_AMP, AMP_DURATION, {
-			"ability_damage_amp": amp,
-			"kind": "prisma_color_theory"
-		})
-	ctx.buff_system.pop_source()
