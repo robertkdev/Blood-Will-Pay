@@ -18,19 +18,15 @@ $pullRequests = [ordered]@{
     5  = 'bbc59d55f45fd3b139ea8c05c46280d2369bdf0d'
     6  = 'b08965bd87368f2744d05488d3f27959c2de291a'
     7  = '1debe922aa4482ebdc48bddf3cb6783cfa80da4b'
-    8  = 'e7164d31da1261e0272c62b24bf0119bf84a6041'
     9  = 'c78b339a14155dc9a2288e4905055c4f7bdf8a84'
-    10 = 'a5046255d8e3c869c5d5bc63875d47d1b7f5a983'
     11 = '538638683b704cd57d6a487cc05b7d011b198b80'
     12 = '4fdd49962e887efe255d7f99b1e21e88e81c5ea8'
-    13 = 'e8382b8f0546c49d6ea97d656fdfdf6879f0f3ff'
-    14 = '060ac67b1f4f18645df86345b7483f36ddc8fdcb'
     15 = '168037a0c6d53598d8f41b4d2d703c3e7c6b5413'
     16 = '9b2d17a8b5e2136997e5653cb16495eae541c91e'
-    17 = 'e1ffe7cbab2d4cbf363bf48e00df9eae7437f560'
-    18 = '8a46ae297da2b3b46ad6ac6be3138723387cb841'
     19 = '69680363f6f445a17eaf0468bf1787f50b121912'
     20 = '2b8dca0e15511a5a519dd8f128ea4a2c12bd52ec'
+    21 = '5b81bb8784ce96f2e410faac04ad9c09d0bd1697'
+    22 = '8029e7a61f5333c4476d1b46dfb87e5709980db8'
 }
 
 $supersededPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
@@ -59,7 +55,8 @@ foreach ($path in @(
     'tests/visual/endless_entry_main_flow_smoke.gd',
     'tests/visual/item_drag_safety_smoke.gd',
     'tests/visual/mid_run_progression_smoke.gd',
-    'tests/visual/opening_fight_visual_smoke.gd'
+    'tests/visual/opening_fight_visual_smoke.gd',
+    'export_presets.cfg'
 )) {
     [void]$supersededPaths.Add($path)
 }

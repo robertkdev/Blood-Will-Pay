@@ -5,8 +5,10 @@
 - Quarantined checkout: `C:\Users\Flipm\Documents\gamble-battle`
 - Quarantined HEAD: `2963d275219b7d882c779d96e0bf50fe7d0c873c`
 - Current default base: `c23aba15138185018423b1ede51ac47e236279ae`
-- JSON SHA-256: `6005ad23b193d42ad08e7b665f3a51ac0218a8cb60781d02766af874ec8a4ebf`
-- Open pull requests inspected: #5 through #20
+- JSON SHA-256: `9e9339484b81d4ad0ba7b2fc9f1b269ba59bcba23f43af342f3638e215e23a9c`
+- Open content PRs inspected at fixed point: #5, #6, #7, #9, #11, #12,
+  #15, #16, #19, #20, #21, and #22. Audit PR #23 is self-referential and
+  path-disjoint from the quarantined source; its final head is verified after publication.
 - Expanded porcelain paths: 687
 - Byte-equal to current main despite dirty status: 138
 - Genuine byte differences: 549
@@ -20,14 +22,14 @@ of the 687 status paths.
 
 | Disposition | Paths | Meaning |
 | --- | ---: | --- |
-| Represented by exact PR content | 366 | The quarantined bytes equal an open PR head at the same path. PR #11 accounts for 364; PR #5 accounts for `cursor_manager.gd`; PRs #17/#18 account for `export_presets.cfg`. |
+| Represented by exact PR content | 365 | The quarantined bytes equal an open PR head at the same path. PR #11 accounts for 364; PR #5 accounts for `cursor_manager.gd`. |
 | Represented by canonical patch/content equivalence | 20 | Raw bytes differ only through Git filters/line endings; canonical blobs equal PR #11. This includes 19 tracked text files and untracked `unit_build_affinities.json`. |
 | Generated/vendor/noise | 138 | 124 third-party `addons/godot_ai` paths, four LFS unit-art working objects, six Godot `.import` files, and four local continuity hook files. None is replayed. |
-| Superseded | 25 | Thirteen older procedural-generator/doc/probe paths are superseded by the calibrated `CombatPowerModel` trunk line; twelve older loading, compact-layout, brightness, and visual-smoke tweaks are superseded by current trunk and PR #5. |
+| Superseded | 26 | Thirteen older procedural-generator/doc/probe paths are superseded by the calibrated `CombatPowerModel` trunk line; twelve older loading, compact-layout, brightness, and visual-smoke tweaks are superseded by current trunk and PR #5; deletion of the current Blood Will Pay Windows export preset is superseded. |
 | Current-direction unique | 0 | No unrepresented authored path remains to reconstruct. |
 
 The four disposition counts for genuine differences sum exactly to 549:
-`366 + 20 + 138 + 25 = 549`.
+`365 + 20 + 138 + 26 = 549`.
 
 ## PR #5 overlap resolution
 

@@ -1,5 +1,5 @@
 ﻿{
-    "generated_at":  "2026-08-05T07:41:07.9117195-06:00",
+    "generated_at":  "2026-08-05T07:47:22.8783741-06:00",
     "primary_path":  "C:\\Users\\Flipm\\Documents\\gamble-battle",
     "primary_head":  "2963d275219b7d882c779d96e0bf50fe7d0c873c",
     "base_commit":  "c23aba15138185018423b1ede51ac47e236279ae",
@@ -17,16 +17,8 @@
                                    "head":  "1debe922aa4482ebdc48bddf3cb6783cfa80da4b"
                                },
                                {
-                                   "number":  8,
-                                   "head":  "e7164d31da1261e0272c62b24bf0119bf84a6041"
-                               },
-                               {
                                    "number":  9,
                                    "head":  "c78b339a14155dc9a2288e4905055c4f7bdf8a84"
-                               },
-                               {
-                                   "number":  10,
-                                   "head":  "a5046255d8e3c869c5d5bc63875d47d1b7f5a983"
                                },
                                {
                                    "number":  11,
@@ -37,14 +29,6 @@
                                    "head":  "4fdd49962e887efe255d7f99b1e21e88e81c5ea8"
                                },
                                {
-                                   "number":  13,
-                                   "head":  "e8382b8f0546c49d6ea97d656fdfdf6879f0f3ff"
-                               },
-                               {
-                                   "number":  14,
-                                   "head":  "060ac67b1f4f18645df86345b7483f36ddc8fdcb"
-                               },
-                               {
                                    "number":  15,
                                    "head":  "168037a0c6d53598d8f41b4d2d703c3e7c6b5413"
                                },
@@ -53,29 +37,29 @@
                                    "head":  "9b2d17a8b5e2136997e5653cb16495eae541c91e"
                                },
                                {
-                                   "number":  17,
-                                   "head":  "e1ffe7cbab2d4cbf363bf48e00df9eae7437f560"
-                               },
-                               {
-                                   "number":  18,
-                                   "head":  "8a46ae297da2b3b46ad6ac6be3138723387cb841"
-                               },
-                               {
                                    "number":  19,
                                    "head":  "69680363f6f445a17eaf0468bf1787f50b121912"
                                },
                                {
                                    "number":  20,
                                    "head":  "2b8dca0e15511a5a519dd8f128ea4a2c12bd52ec"
+                               },
+                               {
+                                   "number":  21,
+                                   "head":  "5b81bb8784ce96f2e410faac04ad9c09d0bd1697"
+                               },
+                               {
+                                   "number":  22,
+                                   "head":  "8029e7a61f5333c4476d1b46dfb87e5709980db8"
                                }
                            ],
     "status_path_count":  687,
     "represented_main_exact_count":  138,
     "genuine_difference_count":  549,
-    "represented_pr_exact_count":  366,
+    "represented_pr_exact_count":  365,
     "represented_pr_patch_equivalent_count":  20,
     "generated_vendor_noise_count":  138,
-    "superseded_count":  25,
+    "superseded_count":  26,
     "current_direction_unique_count":  0,
     "records":  [
                     {
@@ -6694,8 +6678,7 @@
                                                  ],
                         "overlap_prs":  [
                                             7,
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -6774,10 +6757,7 @@
                         "overlap_prs":  [
                                             5,
                                             9,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "superseded"
                     },
@@ -7445,7 +7425,7 @@
                                                  ],
                         "overlap_prs":  [
                                             11,
-                                            14
+                                            22
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -7920,7 +7900,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            14
+                                            22
                                         ],
                         "category":  "superseded"
                     },
@@ -8115,7 +8095,7 @@
                                                  ],
                         "overlap_prs":  [
                                             11,
-                                            14
+                                            22
                                         ],
                         "category":  "represented_pr_patch_equivalent"
                     },
@@ -8231,10 +8211,7 @@
                         "overlap_prs":  [
                                             7,
                                             9,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "superseded"
                     },
@@ -8274,10 +8251,7 @@
                         "overlap_prs":  [
                                             7,
                                             9,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8297,8 +8271,6 @@
                                                  ],
                         "overlap_prs":  [
                                             7,
-                                            17,
-                                            18,
                                             20
                                         ],
                         "category":  "superseded"
@@ -8337,8 +8309,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8357,8 +8328,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8436,8 +8406,6 @@
                         "overlap_prs":  [
                                             7,
                                             11,
-                                            17,
-                                            18,
                                             20
                                         ],
                         "category":  "represented_pr_exact"
@@ -8457,9 +8425,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "superseded"
                     },
@@ -8478,8 +8444,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "superseded"
                     },
@@ -8557,10 +8522,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8582,8 +8544,6 @@
                                             7,
                                             11,
                                             16,
-                                            17,
-                                            18,
                                             20
                                         ],
                         "category":  "superseded"
@@ -8605,9 +8565,6 @@
                         "overlap_prs":  [
                                             7,
                                             11,
-                                            14,
-                                            17,
-                                            18,
                                             20
                                         ],
                         "category":  "represented_pr_patch_equivalent"
@@ -8651,10 +8608,7 @@
                         "overlap_prs":  [
                                             5,
                                             7,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8692,8 +8646,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            17
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8712,10 +8665,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8735,9 +8685,7 @@
                                                  ],
                         "overlap_prs":  [
                                             7,
-                                            11,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -8795,7 +8743,7 @@
                                                  ],
                         "overlap_prs":  [
                                             11,
-                                            14
+                                            22
                                         ],
                         "category":  "represented_pr_patch_equivalent"
                     },
@@ -9177,9 +9125,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            14,
-                                            17,
-                                            18
+
                                         ],
                         "category":  "superseded"
                     },
@@ -9257,7 +9203,7 @@
                                                  ],
                         "overlap_prs":  [
                                             11,
-                                            14
+                                            22
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9469,10 +9415,7 @@
                                                  ],
                         "overlap_prs":  [
                                             5,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "superseded"
                     },
@@ -9493,8 +9436,7 @@
                         "overlap_prs":  [
                                             5,
                                             9,
-                                            11,
-                                            14
+                                            11
                                         ],
                         "category":  "superseded"
                     },
@@ -9572,10 +9514,7 @@
                         "overlap_prs":  [
                                             5,
                                             7,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9613,10 +9552,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9655,10 +9591,7 @@
                                                  ],
                         "overlap_prs":  [
                                             5,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9696,10 +9629,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9720,10 +9650,7 @@
                         "overlap_prs":  [
                                             7,
                                             9,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9782,10 +9709,7 @@
                                                  ],
                         "overlap_prs":  [
                                             5,
-                                            7,
-                                            14,
-                                            17,
-                                            18
+                                            7
                                         ],
                         "category":  "superseded"
                     },
@@ -9805,10 +9729,7 @@
                                                  ],
                         "overlap_prs":  [
                                             9,
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9847,8 +9768,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9867,8 +9787,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9925,10 +9844,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            14,
-                                            17,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9948,8 +9864,7 @@
                                                  ],
                         "overlap_prs":  [
                                             7,
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9968,8 +9883,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            18
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -9988,8 +9902,7 @@
 
                                                  ],
                         "overlap_prs":  [
-                                            11,
-                                            14
+                                            11
                                         ],
                         "category":  "represented_pr_exact"
                     },
@@ -10762,18 +10675,15 @@
                         "base_blob":  "f03509bfd2f706eafa2a8b7bf130617a58c8f6b5",
                         "equal_base":  false,
                         "exact_prs":  [
-                                          17,
-                                          18
+
                                       ],
                         "patch_equivalent_prs":  [
 
                                                  ],
                         "overlap_prs":  [
-                                            14,
-                                            17,
-                                            18
+
                                         ],
-                        "category":  "represented_pr_exact"
+                        "category":  "superseded"
                     },
                     {
                         "status":  "??",
