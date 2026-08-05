@@ -1,0 +1,27 @@
+version: 1
+project: Gamble Battle
+scenarios:
+  - id: trait-visual-bible-phase1
+    title: Phase 1 trait visual reference atlas
+    adapter: generic
+    objective: Verify that all 22 traits have readable abstract non-production diagrams for palette roles, form, surface, motion, supernatural cost and visual do/don't, and that eight representative high-risk combinations preserve separate visual channels without presenting unit concepts or production assets.
+    capture_command: ["python", "../../tools/art/render_trait_visual_bible.py", "--capture-manifest", "../../outputs/visual_debug/trait_visual_bible_phase1/captures.json"]
+    capture_manifest: "../../outputs/visual_debug/trait_visual_bible_phase1/captures.json"
+    required_groups: [overview, collision]
+    runtime_provenance:
+      runtime: "Deterministic Pillow document render"
+      source: "docs/art/trait_visual_bible_phase1.json"
+      source_sha256: "5eaaFD2DC2AB2DB406491931BFE67AEC93C894221D6B9D9CD3660CF37CDBCB3B"
+      build: "codex/019f858f-005-phase1-trait-bible-repair"
+    evidence:
+      required_cameras: [document]
+      required_layers: [final]
+      required_states: [all_traits, collision_studies]
+      required_viewports: [document-2400px]
+      required_events: [trait_calibration_atlas, collision_calibration_atlas]
+      require_runtime_provenance: true
+      required_runtime_fields: [runtime, source, source_sha256, build]
+      max_source_age_seconds: 600
+    output_root: "../../outputs/visual_debug/vdh_runs"
+    max_iterations: 3
+    telegram_context: "Gamble Battle Phase 1 trait bible"
