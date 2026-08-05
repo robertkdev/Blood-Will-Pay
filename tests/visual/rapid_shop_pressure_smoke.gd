@@ -103,11 +103,14 @@ func _run_flow() -> void:
 	_expect(_deploy_prompt_visible(), "rapid purchases should leave deployment guidance visible")
 	await _after_rapid_purchase_checkpoint(expected_ids)
 
+	var available_board_slots: int = max(0, int(Roster.max_team_size) - board_before_count) if _has_autoload("Roster") else expected_ids.size()
+	var expected_deployed_count: int = min(expected_ids.size(), available_board_slots)
+	var expected_bench_count: int = expected_ids.size() - expected_deployed_count
 	var deployed_count: int = await _deploy_all_bench_units()
 	var board_after_count: int = _board_ids().size()
-	_expect(_bench_ids().is_empty(), "rapid deploy should clear bench, still has %s" % JSON.stringify(_bench_ids()))
-	_expect(deployed_count == expected_ids.size(), "rapid deploy moved %d units, expected %d" % [deployed_count, expected_ids.size()])
-	_expect(board_after_count >= board_before_count + expected_ids.size(), "rapid deploy board size should grow by %d, before=%d after=%d" % [expected_ids.size(), board_before_count, board_after_count])
+	_expect(_bench_ids().size() == expected_bench_count, "rapid deploy should leave %d capacity-blocked bench units, got %s" % [expected_bench_count, JSON.stringify(_bench_ids())])
+	_expect(deployed_count == expected_deployed_count, "rapid deploy moved %d units, expected %d under board cap=%d" % [deployed_count, expected_deployed_count, int(Roster.max_team_size)])
+	_expect(board_after_count == board_before_count + expected_deployed_count, "rapid deploy board size should grow by %d, before=%d after=%d" % [expected_deployed_count, board_before_count, board_after_count])
 	await _after_rapid_deploy_checkpoint(expected_ids)
 
 	await _press_continue(false, "post-rapid-burst fight")

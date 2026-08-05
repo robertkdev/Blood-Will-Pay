@@ -19,7 +19,7 @@ Cost 1 is for foundational units that should appear often and support early boar
 | Bo | Brawler | Disruptive skirmish dive |
 | Bonko | Brawler | Ramp window and buddy-hit tempo |
 | Brute | Tank | Simple engage, damage reduction, lockdown |
-| Cashmere | Mage | Entry burst mage with economy flavor |
+| Mara | Mage | Entry burst mage with economy flavor |
 | Grint | Tank | Initiator/debuff frontliner |
 | Korath | Tank | Absorb and release redirect tank |
 | Morrak | Brawler | Durable execute/cleave pressure |

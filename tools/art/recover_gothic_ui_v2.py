@@ -29,7 +29,7 @@ ASSETS = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Recover exact-size Gamble Battle gothic UI assets from an ImageGen sheet."
+        description="Recover exact-size Blood Will Pay gothic UI assets from an ImageGen sheet."
     )
     parser.add_argument("--input", required=True, type=Path, help="Generated 1536x1024 keyed sheet")
     parser.add_argument("--reference-dir", required=True, type=Path, help="Directory containing v1 masks")
@@ -101,7 +101,7 @@ def count_key_green(image: Image.Image) -> tuple[int, int]:
 def make_contact_sheet(images: list[tuple[str, Image.Image]], path: Path) -> None:
     canvas = Image.new("RGBA", (1400, 1080), (9, 8, 11, 255))
     draw = ImageDraw.Draw(canvas)
-    draw.text((28, 20), "Gamble Battle - restrained gothic UI v2", fill=(232, 215, 177, 255))
+    draw.text((28, 20), "Blood Will Pay - restrained gothic UI v2", fill=(232, 215, 177, 255))
     y = 58
     for name, image in images:
         draw.text((28, y), name, fill=(196, 179, 145, 255))

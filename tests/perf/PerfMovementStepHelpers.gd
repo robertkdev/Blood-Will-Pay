@@ -6,7 +6,7 @@ const UnitFactoryScript: Script = preload("res://scripts/unit_factory.gd")
 @export var samples_per_case: int = 3
 
 const UNIT_IDS: Array[String] = [
-	"bonko", "korath", "sari", "pilfer", "cashmere", "axiom",
+	"bonko", "korath", "sari", "pilfer", "mara", "axiom",
 	"brute", "repo", "hexeon", "luna", "nyxa", "morrak"
 ]
 const TAU: float = PI * 2.0

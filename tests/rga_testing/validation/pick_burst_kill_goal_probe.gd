@@ -5,7 +5,7 @@ const BattleStateScript := preload("res://scripts/game/combat/battle_state.gd")
 const CombatPatternKernel := preload("res://tests/rga_testing/aggregators/kernels/combat_pattern_kernel.gd")
 const GoalPrimaryTest := preload("res://tests/rga_testing/metrics/goal/goal_primary_test.gd")
 
-const SUBJECT_ID: String = "cashmere"
+const SUBJECT_ID: String = "mara"
 const TARGET_ID: String = "target_dummy"
 
 @export var do_quit_on_finish: bool = true
@@ -44,7 +44,7 @@ func _run() -> void:
 
 	var failed: bool = false
 	if not lethal_pass:
-		printerr("PickBurstKillGoalProbe: FAIL lethal pick-burst telemetry did not pass the real Cashmere goal")
+		printerr("PickBurstKillGoalProbe: FAIL lethal pick-burst telemetry did not pass the real Mara goal")
 		failed = true
 	if lethal_kills != 1 or not lethal_kill_span:
 		printerr("PickBurstKillGoalProbe: FAIL lethal combat telemetry did not emit a passing kill-count span")

@@ -6,6 +6,7 @@ var blocked: bool = false
 var dealt: int = 0
 var absorbed: int = 0
 var redirected: int = 0
+var redirect_index: int = -1
 var heal: int = 0
 var heal_overheal: int = 0
 var heal_before_hp: int = 0
@@ -32,6 +33,7 @@ func to_dictionary() -> Dictionary:
         "dealt": dealt,
         "absorbed": absorbed,
         "redirected": redirected,
+        "redirect_index": redirect_index,
         "heal": heal,
         "heal_overheal": heal_overheal,
         "heal_before_hp": heal_before_hp,

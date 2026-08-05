@@ -19,6 +19,9 @@ func _run() -> void:
 		window.content_scale_size = Vector2i(1920, 1080)
 	await _verify_duplicate_rows()
 	_verify_unique_rows()
+	await _verify_compact_identity_contract("player", "Berebell")
+	await _verify_compact_identity_contract("player", "Bonko")
+	await _verify_compact_identity_contract("enemy", "Berebell")
 	_finish()
 
 func _verify_duplicate_rows() -> void:
@@ -56,6 +59,36 @@ func _verify_rendered_label(row: Dictionary) -> void:
 	var expected: String = String(row.get("display_name", ""))
 	var actual: String = name_label.text if name_label != null else ""
 	_expect(actual == expected, "rendered label expected %s got %s" % [expected, actual])
+	remove_child(row_node)
+	row_node.free()
+
+func _verify_compact_identity_contract(team: String, unit_name: String) -> void:
+	var row_node: ScoreboardRow = SCOREBOARD_ROW_SCENE.instantiate() as ScoreboardRow
+	row_node.custom_minimum_size = Vector2(132.0, 40.0)
+	row_node.size = Vector2(132.0, 40.0)
+	add_child(row_node)
+	row_node.set_compact_layout(true)
+	row_node.set_exact_compact_values(true)
+	row_node.set_row_data(_make_source_row(team, 0, unit_name, 9143.0))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var name_label: Label = row_node.get_node_or_null("HBox/Content/Name") as Label
+	var value_well: Panel = row_node.get_node_or_null("HBox/Content/ValueWell") as Panel
+	var actual: String = name_label.text if name_label != null else ""
+	_expect(actual.contains(unit_name.to_upper()), "narrow compact identity lost the full %s name: %s" % [unit_name.to_upper(), actual])
+	_expect(name_label != null and bool(name_label.get_meta("compact_identity_preserves_unit_name", false)), "narrow compact identity should preserve the full authored name for %s" % unit_name)
+	_expect(name_label != null and String(name_label.get_meta("compact_team_marker", "")) == ("FOE" if team == "enemy" else "YOU"), "compact identity lost its team metadata for %s" % unit_name)
+	_expect(name_label != null and String(name_label.get_meta("compact_identity_mode", "")) == "name_only_team_in_chrome", "narrow compact identity should deliberately move team identity into row chrome")
+	_expect(name_label != null and value_well != null and name_label.get_global_rect().end.x <= value_well.get_global_rect().position.x - 4.0, "compact identity collides with its boxed numeric value for %s" % unit_name)
+	row_node.size = Vector2(240.0, 40.0)
+	await get_tree().process_frame
+	row_node.set_compact_layout(true)
+	row_node.set_exact_compact_values(true)
+	await get_tree().process_frame
+	row_node.refresh_compact_identity()
+	var full_expected: String = "%s %s" % ["FOE" if team == "enemy" else "YOU", unit_name.to_upper()]
+	_expect(name_label != null and name_label.text == full_expected, "wider compact row should restore full identity %s" % full_expected)
+	_expect(name_label != null and String(name_label.get_meta("compact_identity_mode", "")) == "full_badge", "wider compact row did not restore full badge mode")
 	remove_child(row_node)
 	row_node.free()
 

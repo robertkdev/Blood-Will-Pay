@@ -10,12 +10,12 @@ const LockstepSimulator = preload("res://tests/rga_testing/core/lockstep_simulat
 @export var timeout_s: float = 75.0
 
 const TEAM_A_POOL: Array[String] = [
-	"bonko", "korath", "sari", "pilfer", "cashmere", "axiom",
+	"bonko", "korath", "sari", "pilfer", "mara", "axiom",
 	"brute", "repo", "hexeon", "luna", "nyxa", "morrak"
 ]
 
 const TEAM_B_POOL: Array[String] = [
-	"repo", "bo", "sari", "pilfer", "cashmere", "knoll",
+	"repo", "bo", "sari", "pilfer", "mara", "knoll",
 	"korath", "brute", "hexeon", "luna", "nyxa", "morrak"
 ]
 

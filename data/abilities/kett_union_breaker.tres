@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "kett_union_breaker"
 name = "Union Breaker"
-description = "Punches three times, stacking on-hit pressure, ramp evidence, and a frontline debuff."
+description = "Punches three times with clear beats. The first two build Armor shred; the third shoves and briefly stuns. Interrupting Kett ends the sequence."
 targeting_summary = "Current attack target, or lowest-health enemy if none."
 base_cost = 50
-tags = ["damage", "on_hit_effect", "ramp", "debuff"]
+tags = ["damage", "combo", "armor_shred", "disrupt"]

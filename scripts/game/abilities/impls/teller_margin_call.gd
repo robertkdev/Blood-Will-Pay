@@ -18,8 +18,7 @@ func _level_index(u: Unit) -> int:
 func _award_gold(n: int) -> void:
 	if n <= 0:
 		return
-	# Economy is an AutoLoad singleton; call directly
-	Economy.add_gold(n)
+	Economy.add_stake_units(n, true, "teller_margin_call")
 
 func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> void:
 	var hits: Array[int] = ctx.enemies_in_line(ctx.caster_team, ctx.caster_index, target_idx, LINE_LEN_TILES, LINE_WIDTH_TILES)
@@ -30,7 +29,9 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 	var end: Vector2 = ctx.position_of(("enemy" if ctx.caster_team == "player" else "player"), target_idx)
 	var dir: Vector2 = (end - start)
 	var fwd: Vector2 = (dir.normalized() if dir.length() > 0.0 else Vector2.RIGHT)
-	var scored: Array = []
+	if ctx.engine.has_method("_resolver_emit_vfx_beam_line"):
+		ctx.engine._resolver_emit_vfx_beam_line(start, start + fwd * LINE_LEN_TILES * ctx.tile_size(), Color(0.35, 0.95, 0.72, 0.9), 3.0, 0.28)
+	var scored: Array[Dictionary] = []
 	for i in hits:
 		var p: Vector2 = ctx.position_of(("enemy" if ctx.caster_team == "player" else "player"), int(i))
 		var rel: Vector2 = p - start
@@ -48,7 +49,7 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 		var roll: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 		if roll < DROP_CHANCE:
 			_award_gold(1)
-			ctx.log("Margin Call: +1 gold")
+			ctx.log("Margin Call: +1U")
 	# Overflow to next in line: use remaining raw damage not applied to primary (post-mitigation remainder)
 	var leftover: int = max(0, raw_dmg - dealt)
 	if leftover > 0 and scored.size() > 1:
@@ -60,7 +61,7 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 			var roll2: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 			if roll2 < DROP_CHANCE:
 				_award_gold(1)
-				ctx.log("Margin Call: +1 gold")
+				ctx.log("Margin Call: +1U")
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:

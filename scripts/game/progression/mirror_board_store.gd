@@ -6,6 +6,17 @@ static var _snapshots_by_chapter: Dictionary = {}
 static func clear_runtime() -> void:
 	_snapshots_by_chapter.clear()
 
+static func snapshot_runtime() -> Dictionary:
+	return _snapshots_by_chapter.duplicate(true)
+
+static func restore_runtime(snapshot: Dictionary) -> void:
+	_snapshots_by_chapter.clear()
+	for raw_key: Variant in snapshot.keys():
+		var chapter: int = int(raw_key)
+		var value: Variant = snapshot[raw_key]
+		if chapter > 0 and value is Array:
+			_snapshots_by_chapter[chapter] = (value as Array).duplicate(true)
+
 static func capture_boss_board(ch: int, units: Array[Unit]) -> void:
 	var c: int = max(1, int(ch))
 	var captured: Array[Dictionary] = []

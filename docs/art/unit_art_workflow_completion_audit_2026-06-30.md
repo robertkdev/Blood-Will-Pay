@@ -1,5 +1,7 @@
 # Unit Art Workflow Completion Audit
 
+> Mara naming note (2026-07-28): Mara is the current unit name. Any lower-case `cashmere` ID or path in this dated audit is retained only as legacy provenance and does not approve the associated image as Mara.
+
 - Generated: 2026-07-01
 - Roster entries audited: 23
 - Playable units in matrix: 22
@@ -30,7 +32,7 @@ Completion blockers:
 | `bo` | Bo | `units` | `bo_large_brute_refit` | `current_candidate` | `narrow_proof_only` | candidate needs human approval |
 | `bonko` | Bonko | `units` | `bonko_wiry_raider_refit` | `current_candidate` | `narrow_proof_only` | candidate needs human approval |
 | `brute` | Brute | `units` | `brute_guardian_bulk_refit` | `current_candidate` | `narrow_proof_only` | candidate needs human approval |
-| `cashmere` | Cashmere | `units` | `-` | `missing` | `-` | needs visual proof |
+| `cashmere` | Mara | `units` | `-` | `missing` | `-` | needs visual proof |
 | `grint` | Grint | `units` | `grint_hard_matte_refit` | `accepted` | `narrow_proof_only` | accepted proof |
 | `hexeon` | Hexeon | `units` | `hexeon_time_blade_refit` | `current_candidate` | `narrow_proof_only` | candidate needs human approval |
 | `korath` | Korath | `units` | `korath_haloed_tank_refit` | `current_candidate` | `narrow_proof_only` | candidate needs human approval |

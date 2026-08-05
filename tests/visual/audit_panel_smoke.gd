@@ -1,6 +1,7 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 
 var _main: Control = null
 var _failures: Array[String] = []
@@ -48,9 +49,8 @@ func _run() -> void:
 	_main.call("_on_start")
 	await _settle_frames(4)
 	_main.call("_on_unit_selected", "bonko")
-	await _settle_frames(8)
+	var combat: Control = await MainTransitionWait.for_combat_view(self, _main)
 	panel.call("hold_timer_for_test")
-	var combat: Control = _main.get_node_or_null("CombatView") as Control
 	_expect(combat != null, "combat view missing after Bonko start")
 	if combat != null:
 		_expect(float(combat.get("planning_time_left")) >= 9990.0, "timer hold did not extend planning time")

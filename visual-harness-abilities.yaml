@@ -1,0 +1,27 @@
+version: 1
+project: Blood Will Pay
+scenarios:
+  - id: ability-design-roster
+    title: Full roster ability signatures
+    adapter: godot
+    objective: "Verify that all 51 live unit abilities expose a distinct caster signature, target or area setup, unmistakable impact, readable aftermath, and visible counterplay window while remaining legible in cost-tier combat groups."
+    capture_command: ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "Tools/Verify-AbilityDesignEvidence.ps1"]
+    capture_manifest: "outputs/visual_debug/ability_design_audit/captures.json"
+    required_groups: [cost1_a, cost1_b, cost1_c, cost2_a, cost2_b, cost2_c, cost3_a, cost3_b, cost4_a, cost4_b, cost5]
+    runtime_provenance:
+      entrypoint: "Godot 4.5 debug game framebuffer via MCP"
+      scene: "res://tests/visual/AbilityDesignRosterCapture.tscn"
+      build: "codex/ability-design-audit-20260804"
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [cost1_a, cost1_b, cost1_c, cost2_a, cost2_b, cost2_c, cost3_a, cost3_b, cost4_a, cost4_b, cost5]
+      required_viewports: [1600x900]
+      required_events: [setup, impact, aftermath]
+      min_temporal_frames: 3
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, scene, build]
+      max_source_age_seconds: 1800
+    output_root: "outputs/visual_debug/vdh_runs"
+    max_iterations: 3
+    telegram_context: "Blood Will Pay ability redesign"

@@ -1,7 +1,7 @@
 extends Node
 
 const COMBAT_VIEW_SCENE: PackedScene = preload("res://scenes/CombatView.tscn")
-const OUTPUT_PATH := "res://outputs/gamblebattle-gothic-ui-battle-pass6.png"
+const OUTPUT_PATH := "res://outputs/blood-will-pay-gothic-ui-battle-pass6.png"
 
 func _ready() -> void:
 	call_deferred("_run")

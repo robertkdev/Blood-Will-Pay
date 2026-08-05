@@ -8,7 +8,6 @@ const MOVE_DURATION: float = 0.20
 const DR_DURATION: float = 4.0
 const ZONE_TICKS: int = 4
 const ZONE_INTERVAL: float = 0.45
-const STUN_DURATION: float = 0.65
 
 func _level_index(unit: Unit) -> int:
 	var level: int = int(unit.level) if unit != null else 1
@@ -40,7 +39,6 @@ func cast(ctx: AbilityContext) -> bool:
 		var result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, victim_index, float(damage), "magic")
 		if bool(result.get("processed", false)):
 			ctx.emit_zone_exposure(target_team, victim_index, "caldera_molten_core", ZONE_INTERVAL, float(result.get("dealt", damage)), RADIUS_TILES)
-	ctx.stun(target_team, target_index, STUN_DURATION)
 	if ctx.engine.ability_system != null:
 		ctx.engine.ability_system.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, ZONE_INTERVAL, {
 			"center": target_position,

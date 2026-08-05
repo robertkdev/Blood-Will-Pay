@@ -39,7 +39,7 @@ static func ability_targeting_summary(unit: Unit) -> String:
 static func attack_targeting_summary(unit: Unit) -> String:
 	if unit == null:
 		return ""
-	var override_mode: String = String(unit.targeting_mode_override).strip_edges().to_lower()
+	var override_mode: String = _optional_string_property(unit, &"targeting_mode_override").strip_edges().to_lower()
 	var override_summary: String = _override_summary(override_mode)
 	if override_summary != "":
 		return override_summary
@@ -59,6 +59,14 @@ static func attack_targeting_summary(unit: Unit) -> String:
 	if _has_approach(approaches, "engage") or _has_approach(approaches, "reposition"):
 		clauses.append("Can breach close screens.")
 	return " ".join(PackedStringArray(clauses))
+
+static func _optional_string_property(value: Object, property_name: StringName) -> String:
+	if value == null:
+		return ""
+	for property: Dictionary in value.get_property_list():
+		if StringName(property.get("name", &"")) == property_name:
+			return String(value.get(property_name))
+	return ""
 
 static func _override_summary(mode_id: String) -> String:
 	match mode_id:

@@ -1,5 +1,6 @@
 extends Node
 
+const Unit := preload("res://scripts/unit.gd")
 const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
 const STARTING_TEAM_SIZE: int = ShopConfig.DEFAULT_BOARD_CAPACITY

@@ -3,20 +3,21 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Gamble Battle Unit Art Review</title>
+	<title>Blood Will Pay Unit Art Comparison Tool</title>
 	<style>
 		:root {
 			color-scheme: dark;
-			--bg: #171613;
-			--panel: #24231f;
-			--panel-2: #302f29;
-			--line: #514c41;
-			--text: #f2eee5;
-			--muted: #b8b0a1;
+			--bg: #0b0909;
+			--panel: #141110;
+			--panel-2: #1c1714;
+			--line: #40342a;
+			--text: #f1e8dc;
+			--muted: #a99b8c;
+			--gold: #c2a066;
 			--like: #68c27c;
 			--maybe: #d7aa48;
 			--cut: #d96d64;
-			--focus: #7fb7d8;
+			--focus: #d1af71;
 			--shadow: rgba(0, 0, 0, 0.35);
 		}
 
@@ -33,22 +34,25 @@
 
 		button,
 		input,
-		select {
+		select,
+		textarea {
 			font: inherit;
 		}
 
 		button {
 			border: 1px solid var(--line);
-			background: #2b2924;
+			background: #171310;
 			color: var(--text);
-			border-radius: 6px;
+			border-radius: 2px;
 			cursor: pointer;
 			min-height: 34px;
 		}
 
 		button:hover,
 		button:focus-visible,
-		input:focus-visible {
+		input:focus-visible,
+		select:focus-visible,
+		textarea:focus-visible {
 			border-color: var(--focus);
 			outline: 2px solid rgba(127, 183, 216, 0.28);
 			outline-offset: 2px;
@@ -74,10 +78,11 @@
 
 		h1 {
 			margin: 0;
-			font-size: 20px;
-			font-weight: 650;
+			font-family: Georgia, "Times New Roman", serif;
+			font-size: clamp(24px, 3vw, 42px);
+			font-weight: 600;
 			line-height: 1.2;
-			letter-spacing: 0;
+			letter-spacing: -0.02em;
 		}
 
 		.subtle {
@@ -109,7 +114,7 @@
 			grid-auto-flow: column;
 			gap: 0;
 			border: 1px solid var(--line);
-			border-radius: 8px;
+			border-radius: 999px;
 			overflow: hidden;
 		}
 
@@ -117,7 +122,7 @@
 			border: 0;
 			border-radius: 0;
 			min-width: 68px;
-			background: #25231f;
+			background: #14110f;
 		}
 
 		.segment button + button {
@@ -148,7 +153,8 @@
 		.segment button.active[data-filter="all"],
 		.segment button.active[data-filter="unmarked"],
 		.segment button.active[data-set] {
-			background: #3a382f;
+			background: var(--gold);
+			color: #17110b;
 		}
 
 		.action {
@@ -186,20 +192,42 @@
 		.grid {
 			display: grid;
 			grid-template-columns: repeat(auto-fill, minmax(var(--tile-size, 170px), 1fr));
-			gap: 14px;
-			padding: 18px;
+			gap: 18px;
+			padding: 22px;
 		}
 
 		.tile {
+			position: relative;
 			display: grid;
 			grid-template-rows: auto auto auto;
-			gap: 10px;
+			gap: 11px;
 			min-width: 0;
 			border: 1px solid var(--line);
-			border-radius: 8px;
-			padding: 10px;
+			border-radius: 0;
+			padding: 12px;
 			background: var(--panel);
-			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+			box-shadow: none;
+		}
+
+		.tile[data-pinned="true"] {
+			border-color: var(--gold);
+			box-shadow: 0 0 0 2px rgba(194, 160, 102, 0.2);
+		}
+
+		.pin-badge {
+			position: absolute;
+			z-index: 2;
+			top: 18px;
+			right: 18px;
+			border: 1px solid #d8bb83;
+			border-radius: 999px;
+			padding: 4px 7px;
+			background: rgba(20, 17, 16, 0.92);
+			color: #f5dfb6;
+			font-size: 10px;
+			font-weight: 750;
+			letter-spacing: 0.08em;
+			pointer-events: none;
 		}
 
 		.tile[data-choice="like"] {
@@ -218,8 +246,8 @@
 			display: grid;
 			place-items: center;
 			aspect-ratio: 1 / 1;
-			border: 1px solid #3c392f;
-			border-radius: 6px;
+			border: 1px solid #44372d;
+			border-radius: 0;
 			overflow: hidden;
 			background-color: #1b1a17;
 			background-image:
@@ -246,8 +274,9 @@
 		.name {
 			overflow: hidden;
 			color: var(--text);
-			font-size: 14px;
-			font-weight: 650;
+			font-family: Georgia, "Times New Roman", serif;
+			font-size: 18px;
+			font-weight: 600;
 			line-height: 1.25;
 			text-overflow: ellipsis;
 			white-space: nowrap;
@@ -286,8 +315,8 @@
 		dialog {
 			width: 100vw;
 			max-width: 100vw;
-			height: 100vh;
-			max-height: 100vh;
+			height: 100dvh;
+			max-height: 100dvh;
 			margin: 0;
 			border: 0;
 			border-radius: 0;
@@ -305,7 +334,7 @@
 			display: grid;
 			grid-template-rows: auto minmax(0, 1fr) auto;
 			width: 100vw;
-			height: 100vh;
+			height: 100dvh;
 		}
 
 		.preview-head {
@@ -313,7 +342,7 @@
 			justify-content: space-between;
 			gap: 12px;
 			align-items: center;
-			padding: 12px 14px;
+			padding: 7px 10px;
 			border-bottom: 1px solid var(--line);
 			background: rgba(18, 17, 15, 0.94);
 		}
@@ -322,7 +351,7 @@
 			display: grid;
 			place-items: center;
 			min-height: 0;
-			padding: 16px;
+			padding: 6px;
 			background:
 				linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
 				linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
@@ -336,10 +365,241 @@
 			user-select: none;
 		}
 
-		.preview-body img {
+		.preview-body > #preview-image {
+			width: 100%;
+			height: 100%;
+			min-width: 0;
+			min-height: 0;
 			max-width: 100%;
 			max-height: 100%;
+			padding: clamp(8px, 1.5vw, 24px);
 			object-fit: contain;
+		}
+
+		.comparison-grid {
+			display: none;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			grid-auto-rows: minmax(0, 1fr);
+			gap: clamp(4px, 0.5vw, 8px);
+			width: 100%;
+			height: 100%;
+			min-height: 0;
+			margin: auto;
+		}
+
+		.comparison-grid[data-count="1"] {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.comparison-grid[data-count="2"],
+		.comparison-grid[data-count="4"] {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.comparison-grid[data-count="5"] {
+			grid-template-columns: repeat(6, minmax(0, 1fr));
+		}
+
+		@media (min-width: 1580px) {
+			.comparison-grid[data-count="4"] {
+				grid-template-columns: repeat(4, minmax(0, 1fr));
+			}
+		}
+
+		@media (min-width: 1770px) {
+			.comparison-grid[data-count="5"] {
+				grid-template-columns: repeat(5, minmax(0, 1fr));
+			}
+
+			.comparison-grid[data-count="5"] .comparison-card {
+				grid-column: auto !important;
+			}
+		}
+
+		.comparison-card {
+			display: grid;
+			grid-template-rows: minmax(0, 1fr) auto;
+			min-width: 0;
+			min-height: 0;
+			overflow: hidden;
+			border: 1px solid #6c583c;
+			background: rgba(13, 12, 10, 0.82);
+		}
+
+		.comparison-card[data-active="true"] {
+			border-color: var(--accent);
+			box-shadow: inset 0 0 0 2px rgba(215, 170, 72, 0.32);
+		}
+
+		.comparison-art {
+			position: relative;
+			display: grid;
+			place-items: center;
+			min-width: 0;
+			min-height: 0;
+			overflow: hidden;
+		}
+
+		.comparison-art img {
+			position: absolute;
+			inset: 0;
+			display: block;
+			width: 100%;
+			height: 100%;
+			min-width: 0;
+			min-height: 0;
+			max-width: 100%;
+			max-height: 100%;
+			padding: clamp(3px, 0.5vw, 8px);
+			object-fit: contain;
+		}
+
+		.comparison-caption {
+			display: flex;
+			gap: 8px;
+			align-items: center;
+			justify-content: space-between;
+			min-height: 34px;
+			padding: 4px 8px 5px;
+			border-top: 1px solid rgba(108, 88, 60, 0.65);
+			background: rgba(22, 19, 16, 0.95);
+		}
+
+		.comparison-caption-head {
+			display: flex;
+			gap: 8px;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.active-review-badge {
+			border: 1px solid rgba(215, 170, 72, 0.58);
+			border-radius: 999px;
+			padding: 2px 7px;
+			background: rgba(215, 170, 72, 0.16);
+			color: #f3d997;
+			font-family: system-ui, sans-serif;
+			font-size: 9px;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
+		.comparison-caption strong {
+			font-family: Georgia, "Times New Roman", serif;
+			font-size: clamp(13px, 1vw, 17px);
+		}
+
+		.comparison-caption span {
+			overflow: hidden;
+			color: var(--muted);
+			font-size: 10px;
+			text-align: right;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		dialog[data-mode="comparison"] .preview-body {
+			overflow: auto;
+			cursor: default;
+		}
+
+		dialog[data-mode="comparison"] .comparison-grid {
+			display: grid;
+		}
+
+		dialog[data-mode="comparison"] #preview-image,
+		dialog[data-mode="comparison"] .preview-side-hint {
+			display: none;
+		}
+
+		.preview-workspace {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+			min-height: 0;
+		}
+
+		.review-sidebar {
+			min-height: 0;
+			overflow-y: auto;
+			padding: 14px;
+			border-left: 1px solid var(--line);
+			background: #201f1b;
+		}
+
+		.review-sidebar h2 {
+			margin: 0 0 8px;
+			font-size: 16px;
+		}
+
+		.sidebar-section + .sidebar-section {
+			margin-top: 22px;
+			padding-top: 18px;
+			border-top: 1px solid var(--line);
+		}
+
+		.version-nav {
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr) auto;
+			gap: 7px;
+			align-items: center;
+		}
+
+		.version-nav button {
+			padding-inline: 10px;
+		}
+
+		.version-select {
+			width: 100%;
+			min-height: 36px;
+			border: 1px solid var(--line);
+			border-radius: 6px;
+			padding: 6px 8px;
+			background: #151411;
+			color: var(--text);
+		}
+
+		.version-meta {
+			min-height: 38px;
+			margin-top: 9px;
+			color: var(--muted);
+			font-size: 12px;
+			line-height: 1.45;
+			overflow-wrap: anywhere;
+			white-space: pre-wrap;
+		}
+
+		.version-default-actions {
+			margin-top: 10px;
+		}
+
+		.comment-box {
+			display: grid;
+			gap: 8px;
+		}
+
+		.comment-box textarea {
+			width: 100%;
+			min-height: 150px;
+			resize: vertical;
+			border: 1px solid var(--line);
+			border-radius: 7px;
+			padding: 10px;
+			background: #151411;
+			color: var(--text);
+			line-height: 1.4;
+		}
+
+		.comment-actions {
+			display: flex;
+			gap: 8px;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.comment-status {
+			color: var(--muted);
+			font-size: 12px;
 		}
 
 		.preview-side-hint {
@@ -355,7 +615,8 @@
 			color: rgba(255, 255, 255, 0.72);
 			font-size: 28px;
 			transform: translateY(-50%);
-			pointer-events: none;
+			cursor: pointer;
+			z-index: 2;
 		}
 
 		.preview-side-hint.prev {
@@ -368,10 +629,10 @@
 
 		.preview-foot {
 			display: grid;
-			grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
-			gap: 12px;
+			grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
+			gap: 8px;
 			align-items: center;
-			padding: 12px 14px;
+			padding: 6px 10px;
 			border-top: 1px solid var(--line);
 			background: rgba(18, 17, 15, 0.96);
 		}
@@ -423,6 +684,16 @@
 			text-align: right;
 		}
 
+		.unit-navigation {
+			display: flex;
+			gap: 10px;
+			align-items: center;
+		}
+
+		.unit-navigation.next {
+			justify-content: flex-end;
+		}
+
 		.toast {
 			position: fixed;
 			right: 18px;
@@ -458,11 +729,15 @@
 			.search {
 				width: 100%;
 			}
+
+			.preview-workspace {
+				grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+			}
 		}
 
-		@media (max-width: 560px) {
+		@media (max-width: 680px) {
 			.grid {
-				grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+				grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 				gap: 10px;
 				padding: 12px;
 			}
@@ -475,12 +750,79 @@
 				padding-inline: 12px;
 			}
 
-			.segment button {
+			.segment {
+				display: flex;
+				flex-wrap: wrap;
+				width: 100%;
+				border: 0;
+				border-radius: 0;
+				gap: 6px;
+				overflow: visible;
+			}
+
+			.segment button,
+			.segment button + button {
+				flex: 1 1 auto;
 				min-width: 58px;
+				border: 1px solid var(--line);
+				border-radius: 999px;
 			}
 
 			.preview-foot {
 				grid-template-columns: 1fr;
+			}
+
+			.preview-workspace {
+				display: block;
+				position: relative;
+				overflow: hidden;
+			}
+
+			.preview-body {
+				height: 100%;
+				box-sizing: border-box;
+				padding-bottom: 250px;
+			}
+
+			dialog[data-mode="comparison"] .preview-body {
+				padding: 10px;
+				padding-bottom: 250px;
+			}
+
+			.comparison-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				grid-auto-rows: minmax(210px, 1fr);
+				height: auto;
+			}
+
+			.comparison-grid[data-count="1"] {
+				grid-template-columns: minmax(0, 1fr);
+			}
+
+			.comparison-grid[data-count="2"],
+			.comparison-grid[data-count="3"],
+			.comparison-grid[data-count="4"],
+			.comparison-grid[data-count="5"],
+			.comparison-grid[data-count="6"] {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.comparison-card {
+				grid-column: auto !important;
+			}
+
+			.review-sidebar {
+				position: absolute;
+				z-index: 4;
+				right: 0;
+				bottom: 0;
+				left: 0;
+				height: 240px;
+				box-sizing: border-box;
+				overflow-y: auto;
+				border-top: 1px solid var(--line);
+				border-left: 0;
+				padding: 12px;
 			}
 
 			.preview-actions {
@@ -488,9 +830,23 @@
 				grid-template-columns: repeat(2, minmax(0, 1fr));
 			}
 
+			.comment-box textarea {
+				min-height: 54px;
+			}
+
+			.sidebar-section + .sidebar-section {
+				margin-top: 10px;
+				padding-top: 10px;
+			}
+
 			.preview-help,
 			.preview-status {
 				text-align: center;
+			}
+
+			.unit-navigation,
+			.unit-navigation.next {
+				justify-content: center;
 			}
 		}
 	</style>
@@ -499,13 +855,16 @@
 	<div class="shell">
 		<header class="topbar">
 			<div>
-				<h1>Gamble Battle Unit Art Review</h1>
-				<div class="subtle" id="visible-count">Loading assets/units</div>
+				<h1>Blood Will Pay Unit Art Comparison Tool</h1>
+				<div class="subtle" id="visible-count">Loading current and historical art for every unit</div>
 			</div>
 			<div class="controls" aria-label="Review controls">
 				<input id="search" class="search" type="search" placeholder="Search units" autocomplete="off">
 				<div class="segment" aria-label="Review set">
-					<button type="button" data-set="live" class="active">Live</button>
+					<button type="button" data-set="all" class="active">All Units</button>
+					<button type="button" data-set="phase2">Phase 2</button>
+					<button type="button" data-set="history">History</button>
+					<button type="button" data-set="live">Live</button>
 					<button type="button" data-set="candidates">Candidates</button>
 					<button type="button" data-set="remembered">Remembered</button>
 				</div>
@@ -531,6 +890,7 @@
 			<div class="pill">Maybe <strong id="count-maybe">0</strong></div>
 			<div class="pill">Cut <strong id="count-cut">0</strong></div>
 			<div class="pill">Open <strong id="count-open">0</strong></div>
+			<button id="show-pins" class="pill" type="button" title="Open pinned comparison">Pinned <strong id="count-pinned">0 / 5</strong></button>
 		</section>
 
 		<main id="grid" class="grid" aria-live="polite"></main>
@@ -545,29 +905,73 @@
 				</div>
 				<button id="close-preview" class="action" type="button">Close</button>
 			</div>
-			<div class="preview-body" id="preview-body">
-				<div class="preview-side-hint prev" aria-hidden="true">&lsaquo;</div>
-				<img id="preview-image" src="" alt="">
-				<div class="preview-side-hint next" aria-hidden="true">&rsaquo;</div>
+			<div class="preview-workspace">
+				<div class="preview-body" id="preview-body">
+					<button id="previous-unit-side" class="preview-side-hint prev" type="button" aria-label="Previous unit">&lsaquo;</button>
+					<img id="preview-image" src="" alt="">
+					<div id="comparison-grid" class="comparison-grid" aria-label="Pinned art comparison"></div>
+					<button id="next-unit-side" class="preview-side-hint next" type="button" aria-label="Next unit">&rsaquo;</button>
+				</div>
+				<aside class="review-sidebar" aria-label="Version review tools">
+					<section class="sidebar-section">
+						<h2>Versions</h2>
+						<div class="version-nav">
+							<button id="previous-version" type="button" title="Previous version">&lsaquo;</button>
+							<select id="version-select" class="version-select" aria-label="Choose unit version"></select>
+							<button id="next-version" type="button" title="Next version">&rsaquo;</button>
+						</div>
+						<div id="version-meta" class="version-meta"></div>
+						<div class="comment-actions version-default-actions">
+							<span id="default-status" class="comment-status">Official default</span>
+							<button id="set-default" class="action primary" type="button">Set as Default</button>
+						</div>
+					</section>
+					<section class="sidebar-section">
+						<h2>Comment on this version</h2>
+						<div class="comment-box">
+							<textarea id="preview-comment" placeholder="What works, what needs changing, or which details to keep"></textarea>
+							<div class="comment-actions">
+								<span id="comment-status" class="comment-status">Saved locally</span>
+								<button id="save-comment" class="action primary" type="button">Save Comment</button>
+							</div>
+						</div>
+					</section>
+				</aside>
 			</div>
 			<div class="preview-foot">
-				<div class="preview-status" id="preview-status">1 / 1</div>
+				<div class="unit-navigation">
+					<button id="previous-unit" class="action" type="button">&larr; Previous Unit</button>
+					<div class="preview-status" id="preview-status">Unit 1 / 1</div>
+				</div>
 				<div class="preview-actions" aria-label="Preview voting controls">
 					<button class="preview-choice" type="button" data-preview-choice="like" data-choice="like">Like</button>
 					<button class="preview-choice" type="button" data-preview-choice="maybe" data-choice="maybe">Maybe</button>
 					<button class="preview-choice" type="button" data-preview-choice="cut" data-choice="cut">Cut</button>
 					<button class="preview-choice" type="button" data-preview-choice="" data-choice="open">Open</button>
 				</div>
-				<div class="preview-help">Left/right side or arrow keys move between visible cards</div>
+				<div class="unit-navigation next">
+					<div class="preview-help">Arrow keys change units &middot; [ and ] change versions</div>
+					<button id="next-unit" class="action" type="button">Next Unit &rarr;</button>
+				</div>
 			</div>
 		</div>
 	</dialog>
 
 	<div id="toast" class="toast" role="status"></div>
 
+	<script src="./unit-art-history-data.js?v=20260803-creep-v6-kett-v2-nyxa-v1-pilfer-v1"></script>
 	<script>
 		const ASSET_ROOT = "../../assets/units/";
-		const STORAGE_KEY = "gamble-battle-unit-art-review-v1";
+		const LOCAL_PROJECT_ASSET_ROOT = "../../";
+		const STORAGE_KEY = "blood-will-pay-unit-art-review-v1";
+		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
+		const COMMENTS_KEY = "blood-will-pay-unit-art-comments-v1";
+		const LEGACY_COMMENTS_KEY = "gamble-battle-unit-art-comments-v1";
+		const PINS_KEY = "blood-will-pay-unit-art-pins-v1";
+		const LEGACY_PINS_KEY = "gamble-battle-unit-art-pins-v1";
+		const DEFAULTS_KEY = "blood-will-pay-unit-art-defaults-v1";
+		const LEGACY_DEFAULTS_KEY = "gamble-battle-unit-art-defaults-v1";
+		const MAX_PINS = 5;
 		const LIVE_ART = [
 			"axiom.png",
 			"bastionne.png",
@@ -624,8 +1028,11 @@
 			"vykos.png"
 		].map((file) => createArtItem({
 			set: "live",
-			unit: file.replace(/\.png$/i, ""),
-			kind: "live",
+			// The retired filename is preserved for provenance only; it is not approved Mara art.
+			unit: file === "cashmere.png" ? "mara" : file.replace(/\.png$/i, ""),
+			kind: file === "cashmere.png" ? "legacy-placeholder" : "live",
+			version: file === "creep.png" ? "V5 (promoted live)" : "",
+			contentKey: file === "creep.png" ? "assets/units/creep.png" : "",
 			path: "assets/units/" + file,
 			src: ASSET_ROOT + encodeURIComponent(file)
 		}));
@@ -645,8 +1052,9 @@
 			{ unit: "brute", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/brute/brute_creep_vellum_rework_v3_board_preview_final.png" },
 			{ unit: "caldera", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/caldera/caldera_creep_vellum_rework_v1_cutout_final_cropped1024_rawfieldclean.png" },
 			{ unit: "caldera", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/caldera/caldera_creep_vellum_rework_v1_board_preview_final_matte_v1.png" },
-			{ unit: "cashmere", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_cutout_rawfieldclean.png" },
-			{ unit: "cashmere", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_board_preview_final.png" },
+			// Retired pre-Mara image provenance. Never present these as current or approved Mara art.
+			{ unit: "mara", kind: "legacy-candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_cutout_rawfieldclean.png" },
+			{ unit: "mara", kind: "legacy-board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cashmere/cashmere_creep_vellum_rework_v5_board_preview_final.png" },
 			{ unit: "cinder", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cinder/cinder_creep_vellum_rework_v3_cutout_rawfieldclean.png" },
 			{ unit: "cinder", kind: "board", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/cinder/cinder_creep_vellum_rework_v3_board_preview_final.png" },
 			{ unit: "creep", kind: "candidate", path: "outputs/art_pipeline/style_validation/goal_rework_2026_07_02/creep/creep_creep_vellum_accepted_v5_cutout_final_cropped1024_rawfieldclean.png" },
@@ -764,20 +1172,123 @@
 			path: item.path
 		}));
 
+		const PHASE2_ART = [
+			{ unit: "korath", role: "Tank", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/korath/p2-01.png" },
+			{ unit: "korath", role: "Tank", status: "Reinspection pending", version: "P2-02", title: "Board-Era Revision", current: true, path: "units/korath.png" },
+			{ unit: "veyra", role: "Tank", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/veyra/p2-01.png" },
+			{ unit: "veyra", role: "Tank", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/veyra/p2-02.png" },
+			{ unit: "veyra", role: "Tank", status: "Reapproval pending", version: "P2-03", title: "Cocoon Core / Repaired Reapproval Cut", current: true, path: "units/veyra.png" },
+			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/cashmere/p2-01.png" },
+			{ unit: "mara", role: "Mage", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/cashmere/p2-02.png" },
+			{ unit: "mara", role: "Mage", status: "Superseded identity archive", version: "P2-03", title: "Legacy Reapproval Cut", path: "units/cashmere.png" },
+			{ unit: "pilfer", role: "Assassin", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/pilfer/p2-01.png" },
+			{ unit: "pilfer", role: "Assassin", status: "Reinspection pending", version: "P2-02", title: "Board-Era Revision", current: true, path: "units/pilfer.png" },
+			{ unit: "nyxa", role: "Marksman", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/nyxa/p2-01.png" },
+			{ unit: "nyxa", role: "Marksman", status: "Reinspection pending", version: "P2-02", title: "Board-Era Revision", current: true, path: "units/nyxa.png" },
+			{ unit: "creep", role: "Assassin", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", current: true, path: "units/creep.png" },
+			{ unit: "knoll", role: "Support", status: "Direction locked", version: "P2-01", title: "Initial Calibration", path: "versions/knoll/p2-01.png" },
+			{ unit: "knoll", role: "Support", status: "Direction locked", version: "P2-02", title: "Board-Era Revision", path: "versions/knoll/p2-02.png" },
+			{ unit: "knoll", role: "Support", status: "Direction locked", version: "S3-01", title: "Foreclosure Press", current: true, path: "units/knoll.png" },
+			{ unit: "quillith", role: "Support", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/quillith/p2-01.png" },
+			{ unit: "quillith", role: "Support", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/quillith/p2-02.png" },
+			{ unit: "quillith", role: "Support", status: "Reapproval pending", version: "P2-03", title: "Repaired Reapproval Cut", current: true, path: "units/quillith.png" },
+			{ unit: "kett", role: "Brawler", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/kett/p2-01.png" },
+			{ unit: "kett", role: "Brawler", status: "Reinspection pending", version: "P2-02", title: "Board-Era Revision", current: true, path: "units/kett.png" },
+			{ unit: "luna", role: "Mage", status: "Reapproval pending", version: "P2-01", title: "Initial Calibration", path: "versions/luna/p2-01.png" },
+			{ unit: "luna", role: "Mage", status: "Reapproval pending", version: "P2-02", title: "Board-Era Revision", path: "versions/luna/p2-02.png" },
+			{ unit: "luna", role: "Mage", status: "Reapproval pending", version: "P2-03", title: "Repaired Reapproval Cut", current: true, path: "units/luna.png" },
+			{ unit: "luna", role: "Mage", status: "Candidate review", version: "P2-04", title: "Kaleidoscope Horror Concept", path: "versions/luna/p2-04.png" },
+			{ unit: "luna", role: "Mage", status: "Candidate review", version: "P2-05", title: "Kaleidoscope Horror — Mature / Tall", path: "versions/luna/p2-05.png" },
+			{ unit: "luna", role: "Mage", status: "Candidate review", version: "P2-06", title: "Kaleidoscope Horror — Ominous Smile", path: "versions/luna/p2-06.png" },
+			{ unit: "malachor", role: "Tank", status: "Direction locked", version: "P2-01", title: "Initial Calibration", path: "versions/malachor/p2-01.png" },
+			{ unit: "malachor", role: "Tank", status: "Direction locked", version: "P2-02", title: "Board-Era Revision", path: "versions/malachor/p2-02.png" },
+			{ unit: "malachor", role: "Tank", status: "Direction locked", version: "P2-03", title: "Repaired Reapproval Cut", path: "versions/malachor/p2-03.png" },
+			{ unit: "malachor", role: "Tank", status: "Direction locked", version: "S3-01", title: "Living Siege Cage", current: true, path: "units/malachor.png" },
+			{ unit: "sable", role: "Marksman", status: "Reinspection pending", version: "P2-01", title: "Initial Calibration", path: "versions/sable/p2-01.png" },
+			{ unit: "sable", role: "Marksman", status: "Reinspection pending", version: "P2-02", title: "Board-Era Revision", current: true, path: "units/sable.png" }
+		].map((item) => createArtItem({
+			set: "phase2",
+			unit: item.unit,
+			kind: item.current ? "current candidate" : "archive version",
+			note: item.title,
+			path: "phase2-concepts/" + item.path,
+			src: encodeURI("./phase2-concepts/" + item.path),
+			role: item.role,
+			status: item.status,
+			version: item.version,
+			title: item.title,
+			current: Boolean(item.current)
+		}));
+
+		const PHASE2_CURRENT = new Map();
+		PHASE2_ART.forEach((item) => {
+			const unit = normalizeUnitId(item.unit);
+			if (!PHASE2_CURRENT.has(unit) || item.current) {
+				PHASE2_CURRENT.set(unit, item);
+			}
+		});
+		const PHASE2_LATEST_ART = [...PHASE2_CURRENT.values()];
+		const HISTORICAL_MANIFEST = window.GAMBLE_BATTLE_UNIT_ART_HISTORY || { aliases: {}, items: [] };
+		const HISTORY_SEARCH_ALIASES = Object.entries(HISTORICAL_MANIFEST.aliases).reduce((byUnit, [alias, unit]) => {
+			const canonicalUnit = normalizeUnitId(unit);
+			byUnit[canonicalUnit] = [...(byUnit[canonicalUnit] || []), alias];
+			return byUnit;
+		}, {});
+		const HISTORICAL_ART = HISTORICAL_MANIFEST.items.map((item) => createArtItem({
+			set: "history",
+			unit: item.unit,
+			sourceUnit: [item.source_unit, ...(HISTORY_SEARCH_ALIASES[normalizeUnitId(item.unit)] || [])].join(" "),
+			kind: item.kind || "history",
+			note: item.label || "Historical art",
+			role: item.role || "",
+			status: item.status || "",
+			version: item.version || "",
+			title: item.label || "",
+			current: Boolean(item.current),
+			contentKey: item.content_key || "",
+			path: item.path,
+			src: item.local_path ? encodeURI("./" + item.local_path) : encodeURI(LOCAL_PROJECT_ASSET_ROOT + item.path)
+		}));
+		const CANONICAL_CURRENT = new Map(
+			HISTORICAL_ART.filter((item) => item.current).map((item) => [normalizeUnitId(item.unit), item])
+		);
+		const ALL_UNIT_ART = [];
+		const LIVE_UNIT_CURRENT = new Map();
+		LIVE_ART.forEach((item) => {
+			const unit = normalizeUnitId(item.unit);
+			const existing = LIVE_UNIT_CURRENT.get(unit);
+			if (!existing || item.unit === unit) {
+				LIVE_UNIT_CURRENT.set(unit, item);
+			}
+		});
+		LIVE_UNIT_CURRENT.forEach((item, unit) => {
+			ALL_UNIT_ART.push(CANONICAL_CURRENT.get(unit) || PHASE2_CURRENT.get(unit) || item);
+		});
+
 		const ART_SETS = {
+			all: ALL_UNIT_ART,
+			phase2: PHASE2_LATEST_ART,
+			history: [...PHASE2_ART, ...HISTORICAL_ART],
 			live: LIVE_ART,
 			candidates: CANDIDATE_ART,
 			remembered: REMEMBERED_ART
 		};
 
 		const state = {
-			set: "live",
+			set: "all",
 			filter: "all",
 			query: "",
 			tileSize: 170,
 			decisions: loadDecisions(),
-			previewItems: [],
-			previewIndex: -1
+			comments: loadComments(),
+			pins: loadPins(),
+			defaults: loadDefaults(),
+			previewMode: "single",
+			previewUnits: [],
+			previewUnitIndex: -1,
+			previewVersions: [],
+			previewVersionIndex: -1,
+			previewPreferredKeys: {}
 		};
 
 		const els = {
@@ -789,12 +1300,21 @@
 			maybe: document.getElementById("count-maybe"),
 			cut: document.getElementById("count-cut"),
 			open: document.getElementById("count-open"),
+			pinned: document.getElementById("count-pinned"),
 			preview: document.getElementById("preview"),
 			previewBody: document.getElementById("preview-body"),
 			previewName: document.getElementById("preview-name"),
 			previewPath: document.getElementById("preview-path"),
 			previewImage: document.getElementById("preview-image"),
+			comparisonGrid: document.getElementById("comparison-grid"),
 			previewStatus: document.getElementById("preview-status"),
+			versionSelect: document.getElementById("version-select"),
+			versionMeta: document.getElementById("version-meta"),
+			defaultStatus: document.getElementById("default-status"),
+			setDefault: document.getElementById("set-default"),
+			reviewSidebar: document.querySelector(".review-sidebar"),
+			comment: document.getElementById("preview-comment"),
+			commentStatus: document.getElementById("comment-status"),
 			toast: document.getElementById("toast")
 		};
 
@@ -834,11 +1354,11 @@
 		});
 
 		document.getElementById("export-json").addEventListener("click", () => {
-			download("gamble-battle-unit-art-review.json", "application/json", JSON.stringify(exportPayload(), null, "\t"));
+			download("blood-will-pay-unit-art-review.json", "application/json", JSON.stringify(exportPayload(), null, "\t"));
 		});
 
 		document.getElementById("export-csv").addEventListener("click", () => {
-			download("gamble-battle-unit-art-review.csv", "text/csv", exportCsv());
+			download("blood-will-pay-unit-art-review.csv", "text/csv", exportCsv());
 		});
 
 		document.getElementById("copy-summary").addEventListener("click", async () => {
@@ -852,25 +1372,77 @@
 		});
 
 		document.getElementById("clear-all").addEventListener("click", () => {
-			if (!confirm("Clear all current unit art decisions?")) {
+			if (!confirm("Clear all current unit art decisions and comments?")) {
 				return;
 			}
 			state.decisions = {};
+			state.comments = {};
 			saveDecisions();
+			saveComments();
 			render();
+			if (els.preview.open) {
+				updatePreview();
+			}
+		});
+
+		document.getElementById("show-pins").addEventListener("click", () => {
+			if (!pinnedItems().length) {
+				showToast("Right-click art cards to pin up to five.");
+				return;
+			}
+			openComparisonPreview();
 		});
 
 		document.getElementById("close-preview").addEventListener("click", () => {
 			els.preview.close();
 		});
 
-		els.previewBody.addEventListener("click", (event) => {
-			const rect = els.previewBody.getBoundingClientRect();
-			const midpoint = rect.left + rect.width / 2;
-			movePreview(event.clientX < midpoint ? -1 : 1);
+		document.getElementById("previous-unit").addEventListener("click", () => {
+			movePreview(-1);
+		});
+
+		document.getElementById("next-unit").addEventListener("click", () => {
+			movePreview(1);
+		});
+
+		document.getElementById("previous-unit-side").addEventListener("click", () => {
+			movePreview(-1);
+		});
+
+		document.getElementById("next-unit-side").addEventListener("click", () => {
+			movePreview(1);
+		});
+
+		document.getElementById("previous-version").addEventListener("click", () => {
+			moveVersion(-1);
+		});
+
+		document.getElementById("next-version").addEventListener("click", () => {
+			moveVersion(1);
+		});
+
+		els.versionSelect.addEventListener("change", () => {
+			state.previewVersionIndex = Number(els.versionSelect.value);
+			updatePreview();
+		});
+
+		els.setDefault.addEventListener("click", () => {
+			setCurrentAsDefault();
+		});
+
+		els.comment.addEventListener("input", () => {
+			saveCurrentComment();
+		});
+
+		document.getElementById("save-comment").addEventListener("click", () => {
+			saveCurrentComment();
+			showToast("Comment saved locally.");
 		});
 
 		els.preview.addEventListener("keydown", (event) => {
+			if (event.target.matches("input, textarea, select") || event.target.isContentEditable) {
+				return;
+			}
 			if (event.key === "ArrowLeft") {
 				event.preventDefault();
 				movePreview(-1);
@@ -878,6 +1450,22 @@
 			if (event.key === "ArrowRight") {
 				event.preventDefault();
 				movePreview(1);
+			}
+			if (event.key === "[") {
+				event.preventDefault();
+				moveVersion(-1);
+			}
+			if (event.key === "]") {
+				event.preventDefault();
+				moveVersion(1);
+			}
+			if (event.key === "ArrowUp") {
+				event.preventDefault();
+				moveVersion(-1);
+			}
+			if (event.key === "ArrowDown") {
+				event.preventDefault();
+				moveVersion(1);
 			}
 		});
 
@@ -901,19 +1489,96 @@
 				set: config.set,
 				file,
 				unit,
+				sourceUnit: config.sourceUnit || unit,
 				kind,
 				note,
+				role: config.role || "",
+				status: config.status || "",
+				version: config.version || "",
+				title: config.title || note,
+				current: Boolean(config.current),
+				contentKey: config.contentKey || "",
 				path: config.path,
 				id,
-				src: config.src || encodeURI("../../" + config.path)
+				src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)
 			};
 		}
 
 		function currentItems() {
-			return ART_SETS[state.set] || LIVE_ART;
+			const items = ART_SETS[state.set] || ALL_UNIT_ART;
+			if (state.set !== "all" && state.set !== "phase2") {
+				return items;
+			}
+			return items.map((item) => defaultItemForUnit(item.unit) || item);
+		}
+
+		function allArtItems() {
+			const seen = new Set();
+			return [PHASE2_ART, LIVE_ART, CANDIDATE_ART, REMEMBERED_ART, HISTORICAL_ART]
+				.flat()
+				.filter((item) => {
+					const identity = item.contentKey || item.path;
+					if (seen.has(identity)) {
+						return false;
+					}
+					seen.add(identity);
+					return true;
+				});
+		}
+
+		function normalizeUnitId(unit) {
+			return unit.replace(/\s+\(\d+\)$/i, "").trim().toLowerCase();
+		}
+
+		function uniqueUnits(items) {
+			return items.reduce((units, item) => {
+				const unit = normalizeUnitId(item.unit);
+				if (!units.includes(unit)) {
+					units.push(unit);
+				}
+				return units;
+			}, []);
+		}
+
+		function versionsForUnit(unit) {
+			const seen = new Set();
+			return allArtItems().filter((item) => {
+				const identity = item.contentKey || item.path;
+				if (normalizeUnitId(item.unit) !== normalizeUnitId(unit) || seen.has(identity)) {
+					return false;
+				}
+				seen.add(identity);
+				return true;
+			});
+		}
+
+		function itemIdentity(item) {
+			return item.contentKey || item.path;
+		}
+
+		function defaultItemForUnit(unit) {
+			const normalizedUnit = normalizeUnitId(unit);
+			const savedIdentity = state.defaults[normalizedUnit];
+			const savedItem = savedIdentity
+				? versionsForUnit(normalizedUnit).find((item) => itemIdentity(item) === savedIdentity)
+				: null;
+			return savedItem ||
+				CANONICAL_CURRENT.get(normalizedUnit) ||
+				PHASE2_CURRENT.get(normalizedUnit) ||
+				LIVE_UNIT_CURRENT.get(normalizedUnit) ||
+				null;
 		}
 
 		function setLabel(setName) {
+			if (setName === "all") {
+				return "all units with the newest available official art";
+			}
+			if (setName === "phase2") {
+				return "Phase 2 units, one default artwork each";
+			}
+			if (setName === "history") {
+				return "historical unit variants from the full project archive";
+			}
 			if (setName === "candidates") {
 				return "candidate variants";
 			}
@@ -928,7 +1593,11 @@
 			els.grid.replaceChildren(...visible.map((item, index) => renderTile(item, index, visible)));
 			updateCounts(visible.length);
 			if (els.preview.open) {
-				updatePreviewChoice();
+				if (state.previewMode === "comparison") {
+					updateComparisonPreview();
+				} else {
+					updatePreviewChoice();
+				}
 			}
 		}
 
@@ -936,14 +1605,21 @@
 			const choice = state.decisions[item.key] || "";
 			const tile = document.createElement("article");
 			tile.className = "tile";
+			const isPinned = state.pins.includes(item.key);
+			tile.dataset.pinned = String(isPinned);
+			tile.title = isPinned ? "Right-click to unpin" : "Right-click to pin for comparison";
 			if (choice) {
 				tile.dataset.choice = choice;
 			}
+			tile.addEventListener("contextmenu", (event) => {
+				event.preventDefault();
+				togglePin(item);
+			});
 
 			const frame = document.createElement("button");
 			frame.type = "button";
 			frame.className = "art-frame";
-			frame.title = item.path;
+			frame.title = item.path + " · right-click card to " + (isPinned ? "unpin" : "pin");
 			frame.addEventListener("click", () => openPreview(visible, index));
 
 			const image = document.createElement("img");
@@ -957,11 +1633,13 @@
 
 			const name = document.createElement("div");
 			name.className = "name";
-			name.textContent = item.id;
+			name.textContent = item.role ? displayUnitName(item.unit) : item.id;
 
 			const path = document.createElement("div");
 			path.className = "path";
-			path.textContent = item.note ? item.note + " | " + item.path : item.path;
+			path.textContent = item.role
+				? [item.role, item.version, item.status].filter(Boolean).join(" · ")
+				: (item.note ? item.note + " | " + item.path : item.path);
 			meta.append(name, path);
 
 			const decisions = document.createElement("div");
@@ -986,6 +1664,12 @@
 				setDecision(item.key, "");
 			});
 
+			if (isPinned) {
+				const pinBadge = document.createElement("span");
+				pinBadge.className = "pin-badge";
+				pinBadge.textContent = "PINNED";
+				tile.append(pinBadge);
+			}
 			tile.append(frame, meta, decisions, clear);
 			return tile;
 		}
@@ -993,7 +1677,7 @@
 		function filteredItems() {
 			return currentItems().filter((item) => {
 				const choice = state.decisions[item.key] || "";
-				const haystack = [item.id, item.unit, item.kind, item.note, item.path].join(" ").toLowerCase();
+				const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(" ").toLowerCase();
 				const matchesQuery = !state.query || haystack.includes(state.query);
 				const matchesFilter =
 					state.filter === "all" ||
@@ -1021,6 +1705,7 @@
 			els.maybe.textContent = String(counts.maybe);
 			els.cut.textContent = String(counts.cut);
 			els.open.textContent = String(counts.open);
+			els.pinned.textContent = state.pins.length + " / " + MAX_PINS;
 			els.visibleCount.textContent = visibleCount + " shown from " + setLabel(state.set);
 		}
 
@@ -1038,30 +1723,202 @@
 		}
 
 		function openPreview(items, index) {
-			state.previewItems = items.slice();
-			state.previewIndex = clampPreviewIndex(index);
+			const selectedItem = items[index];
+			configurePreviewContext(items, selectedItem);
+			state.previewMode = pinnedItems().length ? "comparison" : "single";
+			els.preview.dataset.mode = state.previewMode;
 			updatePreview();
+			els.reviewSidebar.scrollTop = 0;
+			els.preview.scrollTop = 0;
 			els.preview.showModal();
 		}
 
+		function configurePreviewContext(items, selectedItem) {
+			state.previewUnits = uniqueUnits(items);
+			state.previewPreferredKeys = items.reduce((preferred, item) => {
+				const unit = normalizeUnitId(item.unit);
+				if (!preferred[unit]) {
+					preferred[unit] = item.key;
+				}
+				return preferred;
+			}, {});
+			state.previewUnitIndex = clampPreviewIndex(state.previewUnits.indexOf(normalizeUnitId(selectedItem.unit)));
+			loadPreviewVersions(selectedItem.key);
+		}
+
+		function openComparisonPreview(selectedItem = null, items = filteredItems()) {
+			const pins = pinnedItems();
+			if (!pins.length) {
+				return;
+			}
+			const activeItem = selectedItem || pins[0];
+			const contextItems = items.some((item) => item.key === activeItem.key)
+				? items
+				: [activeItem, ...items];
+			configurePreviewContext(contextItems, activeItem);
+			state.previewMode = "comparison";
+			els.preview.dataset.mode = "comparison";
+			updatePreview();
+			els.reviewSidebar.scrollTop = 0;
+			els.preview.scrollTop = 0;
+			if (!els.preview.open) {
+				els.preview.showModal();
+			}
+		}
+
+		function pinnedItems() {
+			const byKey = new Map(allArtItems().map((item) => [item.key, item]));
+			return state.pins.map((key) => byKey.get(key)).filter(Boolean).slice(0, MAX_PINS);
+		}
+
+		function togglePin(item) {
+			const index = state.pins.indexOf(item.key);
+			if (index >= 0) {
+				state.pins.splice(index, 1);
+				showToast(displayUnitName(item.unit) + " unpinned.");
+			} else {
+				if (state.pins.length >= MAX_PINS) {
+					showToast("Five pins maximum. Unpin one before adding another.");
+					return;
+				}
+				state.pins.push(item.key);
+				showToast(displayUnitName(item.unit) + " pinned · " + state.pins.length + " / " + MAX_PINS);
+			}
+			savePins();
+			render();
+			if (state.previewMode === "comparison" && els.preview.open && !pinnedItems().length) {
+				state.previewMode = "single";
+				els.preview.dataset.mode = "single";
+				updatePreview();
+			}
+		}
+
+		function updateComparisonPreview() {
+			const activeItem = currentPreviewItem();
+			if (!activeItem) {
+				return;
+			}
+			const pins = pinnedItems();
+			const references = pins.filter((item) => item.key !== activeItem.key);
+			const items = [activeItem, ...references].slice(0, MAX_PINS + 1);
+			state.pins = pins.map((item) => item.key);
+			savePins();
+			els.previewName.textContent =
+				"Reviewing " + displayUnitName(activeItem.unit) +
+				" · " + references.length + " pinned reference" + (references.length === 1 ? "" : "s");
+			els.previewPath.textContent =
+				"Active review + pinned references · right-click any slot to pin or unpin";
+			els.comparisonGrid.dataset.count = String(items.length);
+			els.comparisonGrid.replaceChildren(...items.map((item, index) => {
+				const card = document.createElement("article");
+				card.className = "comparison-card";
+				card.style.gridColumn = comparisonColumn(items.length, index);
+				const isActive = index === 0;
+				card.dataset.active = String(isActive);
+				card.title = isActive
+					? "Active review · right-click to " + (state.pins.includes(item.key) ? "unpin" : "pin")
+					: "Pinned reference · right-click to unpin";
+				card.addEventListener("contextmenu", (event) => {
+					event.preventDefault();
+					togglePin(item);
+				});
+
+				const art = document.createElement("div");
+				art.className = "comparison-art";
+				const image = document.createElement("img");
+				image.src = item.src;
+				image.alt = item.id;
+				art.append(image);
+
+				const caption = document.createElement("div");
+				caption.className = "comparison-caption";
+				const captionHead = document.createElement("div");
+				captionHead.className = "comparison-caption-head";
+				const name = document.createElement("strong");
+				name.textContent = displayUnitName(item.unit);
+				captionHead.append(name);
+				if (isActive) {
+					const activeBadge = document.createElement("span");
+					activeBadge.className = "active-review-badge";
+					activeBadge.textContent = "Reviewing";
+					captionHead.append(activeBadge);
+				}
+				const version = document.createElement("span");
+				version.textContent = item.version || item.note || item.kind;
+				caption.append(captionHead, version);
+				card.append(art, caption);
+				return card;
+			}));
+		}
+
+		function comparisonColumn(count, index) {
+			if (count !== 5) {
+				return "";
+			}
+			if (index < 3) {
+				return (1 + index * 2) + " / span 2";
+			}
+			return (1 + (index - 3) * 3) + " / span 3";
+		}
+
 		function currentPreviewItem() {
-			return state.previewItems[state.previewIndex] || null;
+			return state.previewVersions[state.previewVersionIndex] || null;
 		}
 
 		function movePreview(delta) {
-			if (!state.previewItems.length) {
+			if (!state.previewUnits.length) {
 				return;
 			}
-			state.previewIndex = clampPreviewIndex(state.previewIndex + delta);
+			state.previewUnitIndex = clampPreviewIndex(state.previewUnitIndex + delta);
+			const unit = state.previewUnits[state.previewUnitIndex];
+			loadPreviewVersions(state.previewPreferredKeys[unit] || "");
 			updatePreview();
 		}
 
 		function clampPreviewIndex(index) {
-			const count = state.previewItems.length;
+			const count = state.previewUnits.length;
 			if (!count) {
 				return -1;
 			}
 			return ((index % count) + count) % count;
+		}
+
+		function loadPreviewVersions(selectedKey = "") {
+			const unit = normalizeUnitId(state.previewUnits[state.previewUnitIndex]);
+			state.previewVersions = versionsForUnit(unit);
+			const selectedIndex = selectedKey
+				? state.previewVersions.findIndex((item) => item.key === selectedKey)
+				: 0;
+			state.previewVersionIndex = Math.max(0, selectedIndex);
+		}
+
+		function moveVersion(delta) {
+			const count = state.previewVersions.length;
+			if (!count) {
+				return;
+			}
+			state.previewVersionIndex = ((state.previewVersionIndex + delta) % count + count) % count;
+			updatePreview();
+		}
+
+		function setCurrentAsDefault() {
+			const item = currentPreviewItem();
+			if (!item) {
+				return;
+			}
+			const unit = normalizeUnitId(item.unit);
+			const identity = itemIdentity(item);
+			if (state.defaults[unit] === identity) {
+				delete state.defaults[unit];
+				showToast(displayUnitName(unit) + " restored to the official default.");
+			} else {
+				state.defaults[unit] = identity;
+				showToast(displayUnitName(unit) + " default changed to " + versionLabel(item, state.previewVersionIndex) + ".");
+			}
+			state.previewPreferredKeys[unit] = item.key;
+			saveDefaults();
+			render();
+			updatePreview();
 		}
 
 		function voteCurrentPreview(choice) {
@@ -1081,11 +1938,95 @@
 				}
 				return;
 			}
-			els.previewName.textContent = item.id;
-			els.previewPath.textContent = item.path;
+			els.previewName.textContent = item.role
+				? item.role + " · " + displayUnitName(item.unit)
+				: item.id;
+			els.previewPath.textContent = item.version
+				? item.version + " — " + item.title
+				: item.path;
 			els.previewImage.src = item.src;
 			els.previewImage.alt = item.id;
+			renderVersionControls(item);
+			const comment = commentForItem(item);
+			els.comment.value = comment;
+			els.commentStatus.textContent = comment ? "Saved locally" : "No comment yet";
+			if (state.previewMode === "comparison") {
+				updateComparisonPreview();
+			}
 			updatePreviewChoice();
+		}
+
+		function renderVersionControls(item) {
+			const unit = normalizeUnitId(item.unit);
+			const defaultItem = defaultItemForUnit(unit);
+			const savedIdentity = state.defaults[unit] || "";
+			els.versionSelect.replaceChildren(...state.previewVersions.map((version, index) => {
+				const option = document.createElement("option");
+				option.value = String(index);
+				option.textContent = (defaultItem && itemIdentity(defaultItem) === itemIdentity(version) ? "★ " : "") + versionLabel(version, index);
+				option.selected = version.key === item.key;
+				return option;
+			}));
+			const sourceLabel = item.set === "phase2" ? "Phase 2" : item.set;
+			const details = [item.status, sourceLabel, item.kind].filter(Boolean).join(" · ");
+			const sourceDetail = item.version ? item.title : item.path;
+			els.versionMeta.textContent = details + (details ? "\n" : "") + sourceDetail;
+			if (savedIdentity === itemIdentity(item)) {
+				els.defaultStatus.textContent = "Custom default";
+				els.setDefault.textContent = "Use Official Default";
+				els.setDefault.disabled = false;
+			} else if (defaultItem && itemIdentity(defaultItem) === itemIdentity(item)) {
+				els.defaultStatus.textContent = "Official default";
+				els.setDefault.textContent = "Current Default";
+				els.setDefault.disabled = true;
+			} else {
+				els.defaultStatus.textContent = defaultItem ? "Another version is default" : "No default selected";
+				els.setDefault.textContent = "Set as Default";
+				els.setDefault.disabled = false;
+			}
+		}
+
+		function versionLabel(item, index) {
+			if (item.version) {
+				return item.version + " · " + item.title;
+			}
+			if (item.set === "live") {
+				return "Live version";
+			}
+			const description = item.note || item.kind;
+			return "Version " + (index + 1) + " · " + description;
+		}
+
+		function displayUnitName(unit) {
+			return normalizeUnitId(unit)
+				.split(/[_\s]+/)
+				.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+				.join(" ");
+		}
+
+		function saveCurrentComment() {
+			const item = currentPreviewItem();
+			if (!item) {
+				return;
+			}
+			const comment = els.comment.value.trim();
+			if (comment) {
+				state.comments[item.path] = comment;
+				els.commentStatus.textContent = "Saved locally";
+			} else {
+				delete state.comments[item.path];
+				els.commentStatus.textContent = "No comment yet";
+			}
+			saveComments();
+		}
+
+		function commentForItem(item) {
+			if (!state.comments[item.path] && item.key !== item.path && state.comments[item.key]) {
+				state.comments[item.path] = state.comments[item.key];
+				delete state.comments[item.key];
+				saveComments();
+			}
+			return state.comments[item.path] || "";
 		}
 
 		function updatePreviewChoice() {
@@ -1100,16 +2041,24 @@
 				delete els.preview.dataset.choice;
 			}
 			const label = choice ? labelFor(choice) : "Open";
-			els.previewStatus.textContent = (state.previewIndex + 1) + " / " + state.previewItems.length + " - " + label;
+			els.previewStatus.textContent =
+				"Unit " + (state.previewUnitIndex + 1) + " / " + state.previewUnits.length +
+				" · Version " + (state.previewVersionIndex + 1) + " / " + state.previewVersions.length +
+				" · " + label;
 		}
 
 		function loadDecisions() {
 			try {
-				const raw = localStorage.getItem(STORAGE_KEY);
+				const current = localStorage.getItem(STORAGE_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_STORAGE_KEY);
+				const raw = current || legacy;
 				if (!raw) {
 					return {};
 				}
 				const parsed = JSON.parse(raw);
+				if (!current && legacy) {
+					localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+				}
 				return parsed && typeof parsed === "object" ? parsed : {};
 			} catch (error) {
 				return {};
@@ -1120,6 +2069,76 @@
 			localStorage.setItem(STORAGE_KEY, JSON.stringify(state.decisions));
 		}
 
+		function loadComments() {
+			try {
+				const current = localStorage.getItem(COMMENTS_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_COMMENTS_KEY);
+				const raw = current || legacy;
+				if (!raw) {
+					return {};
+				}
+				const parsed = JSON.parse(raw);
+				if (!current && legacy) {
+					localStorage.setItem(COMMENTS_KEY, JSON.stringify(parsed));
+				}
+				return parsed && typeof parsed === "object" ? parsed : {};
+			} catch (error) {
+				return {};
+			}
+		}
+
+		function saveComments() {
+			localStorage.setItem(COMMENTS_KEY, JSON.stringify(state.comments));
+		}
+
+		function loadPins() {
+			try {
+				const current = localStorage.getItem(PINS_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_PINS_KEY);
+				const raw = current || legacy;
+				if (!raw) {
+					return [];
+				}
+				const parsed = JSON.parse(raw);
+				const pins = Array.isArray(parsed)
+					? [...new Set(parsed.filter((value) => typeof value === "string"))].slice(0, MAX_PINS)
+					: [];
+				if (!current && legacy) {
+					localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+				}
+				return pins;
+			} catch (error) {
+				return [];
+			}
+		}
+
+		function savePins() {
+			localStorage.setItem(PINS_KEY, JSON.stringify(state.pins.slice(0, MAX_PINS)));
+		}
+
+		function loadDefaults() {
+			try {
+				const current = localStorage.getItem(DEFAULTS_KEY);
+				const legacy = current ? null : localStorage.getItem(LEGACY_DEFAULTS_KEY);
+				const raw = current || legacy;
+				if (!raw) {
+					return {};
+				}
+				const parsed = JSON.parse(raw);
+				const defaults = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+				if (!current && legacy) {
+					localStorage.setItem(DEFAULTS_KEY, JSON.stringify(defaults));
+				}
+				return defaults;
+			} catch (error) {
+				return {};
+			}
+		}
+
+		function saveDefaults() {
+			localStorage.setItem(DEFAULTS_KEY, JSON.stringify(state.defaults));
+		}
+
 		function applyTileSize() {
 			els.grid.style.setProperty("--tile-size", state.tileSize + "px");
 		}
@@ -1127,25 +2146,26 @@
 		function exportPayload() {
 			const counts = getCounts();
 			return {
-				project: "gamble-battle",
+				project: "blood-will-pay",
 				review_set: state.set,
 				review_set_label: setLabel(state.set),
 				exported_at: new Date().toISOString(),
 				counts,
-				decisions: currentItems().map((item) => ({
+				decisions: exportItems().map((item) => ({
 					path: item.path,
 					unit_id: item.unit,
 					kind: item.kind,
 					label: item.id,
 					note: item.note || "",
-					decision: state.decisions[item.key] || "open"
+					decision: state.decisions[item.key] || "open",
+					comment: commentForItem(item)
 				}))
 			};
 		}
 
 		function exportCsv() {
-			const rows = [["review_set", "path", "unit_id", "kind", "label", "note", "decision"]];
-			currentItems().forEach((item) => {
+			const rows = [["review_set", "path", "unit_id", "kind", "label", "note", "decision", "comment"]];
+			exportItems().forEach((item) => {
 				rows.push([
 					state.set,
 					item.path,
@@ -1153,16 +2173,21 @@
 					item.kind,
 					item.id,
 					item.note || "",
-					state.decisions[item.key] || "open"
+					state.decisions[item.key] || "open",
+					commentForItem(item)
 				]);
 			});
 			return rows.map((row) => row.map(csvCell).join(",")).join("\r\n") + "\r\n";
 		}
 
+		function exportItems() {
+			return state.set === "all" ? allArtItems() : currentItems();
+		}
+
 		function summaryText() {
 			const payload = exportPayload();
 			const lines = [
-				"Gamble Battle unit art review - " + payload.review_set_label,
+				"Blood Will Pay unit art review - " + payload.review_set_label,
 				"Like: " + payload.counts.like,
 				"Maybe: " + payload.counts.maybe,
 				"Cut: " + payload.counts.cut,

@@ -5,6 +5,10 @@ const Trace := preload("res://scripts/util/trace.gd")
 const Debug := preload("res://scripts/util/debug.gd")
 const Strings := preload("res://scripts/util/strings.gd")
 const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.gd")
+const ACTOR_EXTRA_HORIZONTAL: float = 18.0
+const ACTOR_EXTRA_TOP: float = 32.0
+const ACTOR_EXTRA_BOTTOM: float = 18.0
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.50
 
 var arena: ArenaController = null
 var arena_container: Control
@@ -20,6 +24,10 @@ var _hidden_nodes: Array[Dictionary] = []
 var _position_signal_manager: CombatManager = null
 var _has_container_bounds: bool = false
 var _last_container_bounds: Rect2 = Rect2()
+var _initial_combatant_count: int = 0
+var _living_combatant_count: int = 0
+var _last_removed_combatant_count: int = 0
+var _casualty_event_index: int = 0
 
 func configure(_arena_container: Control, _arena_units: Control, _planning_area: Control, _arena_background: Control, _player_grid_helper: BoardGrid, _enemy_grid_helper: BoardGrid, _unit_actor_class: Script, _tile_size: int) -> void:
     arena_container = _arena_container
@@ -34,6 +42,12 @@ func configure(_arena_container: Control, _arena_units: Control, _planning_area:
         arena = ArenaControllerClass.new()
 
 func get_arena_bounds() -> Rect2:
+    if arena_container != null and is_instance_valid(arena_container) and bool(arena_container.get_meta("use_full_combat_bounds", false)):
+        var battle_area: Control = arena_container.get_parent() as Control
+        if battle_area != null:
+            var combat_rect: Rect2 = battle_area.get_global_rect()
+            if combat_rect.size.x > 1.0 and combat_rect.size.y > 1.0:
+                return Rect2(combat_rect.position, combat_rect.size)
     if planning_area != null and is_instance_valid(planning_area):
         var planning_rect: Rect2 = planning_area.get_global_rect()
         if planning_rect.size.x > 1.0 and planning_rect.size.y > 1.0:
@@ -42,6 +56,20 @@ func get_arena_bounds() -> Rect2:
         var background_rect: Rect2 = arena_background.get_global_rect()
         return Rect2(background_rect.position, background_rect.size)
     return Rect2()
+
+func get_engine_arena_bounds() -> Rect2:
+    var render_bounds: Rect2 = get_arena_bounds()
+    if render_bounds.size.x <= 1.0 or render_bounds.size.y <= 1.0:
+        return render_bounds
+    var half_actor: float = maxf(28.0, float(tile_size) * COMBAT_ACTOR_SIZE_SCALE * 0.5)
+    var left: float = half_actor + ACTOR_EXTRA_HORIZONTAL
+    var right: float = half_actor + ACTOR_EXTRA_HORIZONTAL
+    var top: float = half_actor + ACTOR_EXTRA_TOP
+    var bottom: float = half_actor + ACTOR_EXTRA_BOTTOM
+    var safe_size: Vector2 = render_bounds.size - Vector2(left + right, top + bottom)
+    if safe_size.x <= 1.0 or safe_size.y <= 1.0:
+        return render_bounds
+    return Rect2(render_bounds.position + Vector2(left, top), safe_size)
 
 func _sync_container_to_planning_rect() -> void:
     if arena_container == null or not is_instance_valid(arena_container):
@@ -89,6 +117,11 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
     _sync_container_to_planning_rect()
     arena.configure(arena_container, arena_units, player_grid_helper, enemy_grid_helper, unit_actor_class, tile_size)
     arena.enter_arena(player_views, enemy_views)
+    _initial_combatant_count = _count_living_views(player_views) + _count_living_views(enemy_views)
+    _living_combatant_count = _initial_combatant_count
+    _last_removed_combatant_count = 0
+    _casualty_event_index = 0
+    _publish_battlefield_pressure()
     if arena_container:
         arena_container.visible = true
     # Fade planning board areas (TopArea/BottomArea) but keep bench/shop visible and interactive
@@ -113,6 +146,8 @@ func sync(manager: CombatManager, player_views: Array[UnitSlotView], enemy_views
     if arena == null or arena_container == null or not arena_container.visible:
         return
     _sync_container_to_planning_rect()
+    _living_combatant_count = _count_living_views(player_views) + _count_living_views(enemy_views)
+    _publish_battlefield_pressure()
     if manager:
         _sync_engine_bounds(manager)
         var engine: Variant = manager.get_engine()
@@ -132,6 +167,10 @@ func exit_arena() -> void:
     _disconnect_position_signal()
     _has_container_bounds = false
     _last_container_bounds = Rect2()
+    _initial_combatant_count = 0
+    _living_combatant_count = 0
+    _last_removed_combatant_count = 0
+    _casualty_event_index = 0
     if arena:
         arena.exit_arena()
     if arena_container:
@@ -165,6 +204,44 @@ func teardown() -> void:
     unit_actor_class = null
     _hidden_nodes.clear()
     _position_signal_manager = null
+    _initial_combatant_count = 0
+    _living_combatant_count = 0
+    _last_removed_combatant_count = 0
+    _casualty_event_index = 0
+
+func get_battlefield_casualty_pressure() -> float:
+    if _initial_combatant_count <= 0:
+        return 0.0
+    var removed_count: int = maxi(0, _initial_combatant_count - _living_combatant_count)
+    return clampf(float(removed_count) / float(_initial_combatant_count), 0.0, 1.0)
+
+func get_battlefield_pressure_snapshot() -> Dictionary[String, Variant]:
+    return {
+        "initial_combatants": _initial_combatant_count,
+        "living_combatants": _living_combatant_count,
+        "casualty_pressure": get_battlefield_casualty_pressure(),
+        "casualty_event_index": _casualty_event_index,
+    }
+
+func _count_living_views(views: Array[UnitSlotView]) -> int:
+    var living_count: int = 0
+    for view: UnitSlotView in views:
+        if view != null and view.unit != null and view.unit.is_alive():
+            living_count += 1
+    return living_count
+
+func _publish_battlefield_pressure() -> void:
+    if arena_container == null or not is_instance_valid(arena_container):
+        return
+    var removed_count: int = maxi(0, _initial_combatant_count - _living_combatant_count)
+    if removed_count > _last_removed_combatant_count:
+        _casualty_event_index += removed_count - _last_removed_combatant_count
+    _last_removed_combatant_count = removed_count
+    arena_container.set_meta("battlefield_initial_combatants", _initial_combatant_count)
+    arena_container.set_meta("battlefield_living_combatants", _living_combatant_count)
+    arena_container.set_meta("battlefield_casualty_pressure", get_battlefield_casualty_pressure())
+    arena_container.set_meta("battlefield_removed_combatants", removed_count)
+    arena_container.set_meta("battlefield_casualty_event_index", _casualty_event_index)
 
 func get_player_actor(index: int) -> UnitActor:
     if arena:
@@ -180,6 +257,10 @@ func get_actor(team: String, index: int) -> UnitActor:
     if arena:
         return arena.get_actor(team, index)
     return null
+
+func present_combat_exchange_focus(source_team: String, source_index: int, target_team: String, target_index: int, damage: int, critical: bool) -> void:
+    if arena != null:
+        arena.present_combat_exchange_focus(source_team, source_index, target_team, target_index, damage, critical)
 
 func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlotView], _enemy_views: Array[UnitSlotView]) -> void:
     if manager == null:
@@ -210,8 +291,12 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
         if j < 8:
             var ename: String = (ev.unit.name if ev and ev.unit else "?")
             e_summary.append("%d#%d:%s(%s)" % [j, idx2, str(pos2), ename])
-    # Bounds from the planning board, not the full battle row, so actors stay out of side UI.
-    var bounds: Rect2 = get_arena_bounds()
+    # Planning preserves board-relative bounds; combat promotes the same
+    # formations into the full survival field after its side UI is removed.
+    var bounds: Rect2 = get_engine_arena_bounds()
+    if arena_container != null and bool(arena_container.get_meta("use_full_combat_bounds", false)) and bounds.size.x > 1.0 and bounds.size.y > 1.0:
+        _recenter_team_formation(ppos, bounds, Vector2(0.44, 0.66))
+        _recenter_team_formation(epos, bounds, Vector2(0.56, 0.34))
     if bounds.size.y <= 1.0 or bounds.size.x <= 1.0:
         var all_pts: Array[Vector2] = []
         for v in ppos:
@@ -270,6 +355,26 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
         print("[Arena] tile=", ts, " bounds=", bounds)
     _log_start_positions_and_targets(manager)
 
+func _recenter_team_formation(positions: Array[Vector2], bounds: Rect2, target_ratio: Vector2) -> void:
+    if positions.is_empty() or bounds.size.x <= 1.0 or bounds.size.y <= 1.0:
+        return
+    var centroid: Vector2 = Vector2.ZERO
+    for position_value: Vector2 in positions:
+        centroid += position_value
+    centroid /= float(positions.size())
+    var target: Vector2 = bounds.position + bounds.size * target_ratio
+    var shift: Vector2 = target - centroid
+    var actor_size: float = maxf(28.0, float(tile_size) * COMBAT_ACTOR_SIZE_SCALE)
+    var inset: Vector2 = Vector2(maxf(38.0, actor_size * 0.55), maxf(44.0, actor_size * 0.65))
+    var minimum: Vector2 = bounds.position + inset
+    var maximum: Vector2 = bounds.end - inset
+    for index: int in range(positions.size()):
+        var shifted: Vector2 = positions[index] + shift
+        positions[index] = Vector2(
+            clampf(shifted.x, minimum.x, maximum.x),
+            clampf(shifted.y, minimum.y, maximum.y)
+        )
+
 func _ensure_position_signal(manager: CombatManager) -> bool:
     if manager == null:
         return false
@@ -296,7 +401,7 @@ func _disconnect_position_signal() -> void:
 func _sync_engine_bounds(manager: CombatManager) -> void:
     if manager == null:
         return
-    var current_bounds: Rect2 = get_arena_bounds()
+    var current_bounds: Rect2 = get_engine_arena_bounds()
     if current_bounds.size.x <= 1.0 or current_bounds.size.y <= 1.0:
         return
     var engine_bounds: Rect2 = manager.get_arena_bounds()
@@ -313,6 +418,10 @@ func _on_manager_position_updated(team: String, index: int, x: float, y: float) 
         return
     actor.set_screen_position(Vector2(x, y))
     actor.visible = (actor.unit != null and actor.unit.is_alive())
+    if arena.has_method("refresh_combat_presentation_spacing"):
+        arena.refresh_combat_presentation_spacing()
+    elif arena.has_method("reflow_combat_readouts"):
+        arena.reflow_combat_readouts()
 
 func _sync_actor_visibility(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
     if arena == null:

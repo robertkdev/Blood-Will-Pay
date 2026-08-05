@@ -7,15 +7,10 @@ const HEALTH_COST_PCT: float = 0.07
 const HEAL_PCT: float = 0.34
 const DOT_TICKS: int = 6
 const DOT_INTERVAL: float = 0.45
-const STATIC_ZONE_RADIUS: float = 1.25
-const STATIC_MR_SHRED: float = -8.0
 
 func _level_index(unit: Unit) -> int:
 	var level: int = int(unit.level) if unit != null else 1
 	return clamp(level - 1, 0, 2)
-
-func _enemy_team(team: String) -> String:
-	return "enemy" if team == "player" else "player"
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:
@@ -33,7 +28,6 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var level_index: int = _level_index(caster)
 	var damage: float = float(DAMAGE_BASE[level_index]) + SP_RATIO * float(caster.spell_power)
-	var target_team: String = _enemy_team(ctx.caster_team)
 	for target_index: int in targets:
 		var result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, damage, "magic")
 		if bool(result.get("processed", false)):
@@ -47,14 +41,8 @@ func cast(ctx: AbilityContext) -> bool:
 					"ticks_left": DOT_TICKS,
 					"interval": DOT_INTERVAL,
 					"dot_kind": "noxley_red_static",
-					"zone_kind": "noxley_red_static_field",
-					"radius": STATIC_ZONE_RADIUS,
-					"debuff_label": "noxley_red_static",
-					"debuff_fields": {"magic_resist": STATIC_MR_SHRED},
-					"debuff_duration": float(DOT_TICKS) * DOT_INTERVAL,
 					"self_heal_pct": HEAL_PCT
 				})
-	ctx.emit_ramp_state("noxley_red_static", 2, float(targets.size()), 4, 4.0, "health_paid_cast")
 	ctx.log("Red Static: chained through %d targets" % targets.size())
 	return true
 

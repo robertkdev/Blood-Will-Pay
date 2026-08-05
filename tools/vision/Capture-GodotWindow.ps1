@@ -1,5 +1,5 @@
 param(
-	[string]$WindowTitlePattern = "Gamble Battle|Godot",
+	[string]$WindowTitlePattern = "Blood Will Pay|Gamble Battle|Godot",
 	[string]$OutputDirectory = "outputs/vision_snapshots/os_window",
 	[int]$WaitSeconds = 0
 )
