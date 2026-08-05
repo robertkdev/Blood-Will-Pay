@@ -29,5 +29,5 @@ func cast(ctx: AbilityContext) -> bool:
 		Economy.add_stake_units(1, true, "mara_arcane_ledger")
 		if ctx.buff_system != null:
 			ctx.buff_system.add_stack(ctx.state, ctx.caster_team, ctx.caster_index, STAKE_AWARDED_KEY, 1)
-		ctx.log("Arcane Ledger: deterministic +1 Stake, capped this combat")
+		ctx.log("Arcane Ledger: +1 blood Stake, capped this combat")
 	return true

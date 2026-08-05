@@ -6,7 +6,7 @@
 [ext_resource type="Shader" uid="uid://cgfcra2jd0xaq" path="res://scenes/dark_bg.gdshader" id="3_c01mt"]
 [ext_resource type="Shader" uid="uid://cnksqny6s3mip" path="res://shaders/dark_fantasy_bg.gdshader" id="4"]
 [ext_resource type="Script" uid="uid://bw62vrppbd5oq" path="res://scripts/ui/title_menu.gd" id="5"]
-[ext_resource type="Texture2D" uid="uid://bacmh3tnq3r2c" path="res://assets/ui/gold icon.png" id="6_nxtc6"]
+[ext_resource type="Texture2D" path="res://assets/ui/blood_reserve.svg" id="6_nxtc6"]
 
 [sub_resource type="ShaderMaterial" id="1"]
 shader = ExtResource("4")

@@ -863,10 +863,10 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 			_expect_control_inside(surface, "%s surface %s" % [context, path])
 	var gold_source: Label = combat.find_child("GoldLabel", true, false) as Label
 	var progress_source: Label = _find_progress_source()
-	_expect(gold_source != null, "%s lost live gold" % context)
+	_expect(gold_source != null, "%s lost live blood reserve" % context)
 	_expect(progress_source != null, "%s lost live level/XP progress" % context)
 	if gold_source != null and gold_source.is_visible_in_tree():
-		_expect_control_inside(gold_source, "%s live gold" % context)
+		_expect_control_inside(gold_source, "%s live blood reserve" % context)
 	if progress_source != null and progress_source.is_visible_in_tree():
 		_expect_control_inside(progress_source, "%s live level/XP progress" % context)
 	var shop_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
@@ -882,16 +882,16 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 func _expect_scaled_decision_data(context: String) -> void:
 	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
 	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
-	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "%s enlarged layout hid its gold/level/XP record" % context)
+	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "%s enlarged layout hid its blood/level/XP record" % context)
 	if resource_strip != null:
 		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "%s compact resource strip did not certify a complete source mirror" % context)
-		_expect(resource_strip.text.contains("GOLD"), "%s compact resource strip omitted gold" % context)
+		_expect(resource_strip.text.contains("BLOOD"), "%s compact resource strip omitted blood" % context)
 		_expect(resource_strip.text.contains("LVL"), "%s compact resource strip omitted level" % context)
 		_expect(resource_strip.text.contains("XP"), "%s compact resource strip omitted XP" % context)
 		var gold_source: Label = _main.get_node_or_null("CombatView/MarginContainer/VBoxContainer/ActionsRow/GoldLabel") as Label if _main != null else null
 		if gold_source == null and _main != null:
 			gold_source = _main.find_child("GoldLabel", true, false) as Label
-		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "%s resource strip does not mirror the live gold value" % context)
+		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "%s resource strip does not mirror the live blood value" % context)
 		var progress_source: Label = _find_progress_source()
 		_expect(progress_source != null, "%s live level/XP source is missing" % context)
 		if progress_source != null:
@@ -900,10 +900,10 @@ func _expect_scaled_decision_data(context: String) -> void:
 				if normalized_token.contains("/") or normalized_token.is_valid_int():
 					_expect(resource_strip.text.contains(normalized_token), "%s resource strip does not mirror progress token %s" % [context, normalized_token])
 		_expect(resource_strip.get_theme_font_size("font_size") >= 15, "%s compact resource strip type is too small" % context)
-		_expect_control_inside(resource_strip, "%s gold/level/XP record" % context)
+		_expect_control_inside(resource_strip, "%s blood/level/XP record" % context)
 	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s enlarged layout hid wager outcomes" % context)
 	if wager_summary != null:
-		for required_copy: String in ["Wager", "Win", "After win", "After loss"]:
+		for required_copy: String in ["DECISION", "WIN", "RESERVE", "W", "L"]:
 			_expect(wager_summary.text.contains(required_copy), "%s wager outcome record omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome record" % context)
 

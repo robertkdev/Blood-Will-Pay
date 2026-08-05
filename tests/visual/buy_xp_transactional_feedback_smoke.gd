@@ -35,17 +35,17 @@ func _run() -> void:
 	await get_tree().process_frame
 	_press_button(buy_xp)
 	await get_tree().process_frame
-	_expect(int(Economy.gold) == 4, "4g Buy XP denial should leave gold unchanged")
+	_expect(int(Economy.gold) == 4, "4-blood Buy XP denial should leave reserve unchanged")
 	_expect(int(Shop.get_level()) == 1, "4g Buy XP denial should leave level unchanged")
 	_expect(int(Shop.get_xp()) == 0, "4g Buy XP denial should leave XP unchanged")
-	_expect(_label_with_text("Need +1 gold to buy XP and keep 1 health.") != null, "4g Buy XP denial should show reserve-floor feedback")
+	_expect(_label_with_text("Need +1 blood to buy XP and keep 1 health.") != null, "4-blood Buy XP denial should show reserve-floor feedback")
 	_expect(_label_with_text("Lvl 1 (0/2)") != null, "4g Buy XP denial should leave progress label at Lvl 1 (0/2)")
 
 	_set_gold(6)
 	await get_tree().process_frame
 	_press_button(buy_xp)
 	await get_tree().process_frame
-	_expect(int(Economy.gold) == 2, "6g Buy XP should spend 4 gold and repaint Economy.gold")
+	_expect(int(Economy.gold) == 2, "6-blood Buy XP should spend 4 blood and repaint the reserve")
 	_expect(int(Shop.get_level()) == 2, "6g Buy XP should advance to level 2")
 	_expect(int(Shop.get_xp()) == 2, "6g Buy XP should preserve overflow XP after leveling")
 	_expect(int(Shop.get_xp_to_next()) == 6, "6g Buy XP should expose the next XP threshold")

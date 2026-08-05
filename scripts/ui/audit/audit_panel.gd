@@ -166,7 +166,7 @@ func _refresh_summary() -> void:
 	var roster: Dictionary = state.get("roster", {})
 	var shop: Dictionary = state.get("shop", {})
 	var combat: Dictionary = state.get("combat_view", {})
-	summary_label.text = "phase=%s stage=%s gold=%s level=%s xp=%s/%s\nboard=%s\nbench=%s\ncontinue=%s timer=%s speed=%.1f" % [
+	summary_label.text = "phase=%s stage=%s blood=%s level=%s xp=%s/%s\nboard=%s\nbench=%s\ncontinue=%s timer=%s speed=%.1f" % [
 		str(state.get("phase_name", "")),
 		str(state.get("stage_label", "")),
 		str(state.get("gold", "")),

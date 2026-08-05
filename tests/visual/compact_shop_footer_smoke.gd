@@ -196,7 +196,7 @@ func _assert_standard_1080p_planning(context: String, expected_scale: float, exp
 	var progress_label: Label = _find_progress_source()
 	_expect(continue_button != null and continue_button.is_visible_in_tree(), "%s hid the commit action" % context)
 	_expect(bet_row != null and bet_row.is_visible_in_tree(), "%s hid wager controls" % context)
-	_expect(gold_label != null, "%s lost live gold" % context)
+	_expect(gold_label != null, "%s lost live blood reserve" % context)
 	_expect(progress_label != null, "%s lost live level/XP progress" % context)
 	for decision_control: Control in [continue_button, bet_row, gold_label, progress_label]:
 		if decision_control != null and decision_control.is_visible_in_tree():
@@ -414,13 +414,13 @@ func _assert_tight_item_cache(left_panel: Control) -> void:
 func _assert_compact_decision_record(viewport_rect: Rect2) -> void:
 	var resource_strip: Label = _view.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
 	var wager_summary: Label = _view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Label
-	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "150-percent footer hid gold/level/XP")
+	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "150-percent footer hid blood/level/XP")
 	if resource_strip != null:
-		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "150-percent gold/level/XP mirror is incomplete")
-		for required_copy: String in ["GOLD", "LVL", "XP"]:
+		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "150-percent blood/level/XP mirror is incomplete")
+		for required_copy: String in ["BLOOD", "LVL", "XP"]:
 			_expect(resource_strip.text.contains(required_copy), "150-percent resource record omitted %s" % required_copy)
 		var gold_source: Label = _view.find_child("GoldLabel", true, false) as Label
-		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "150-percent resource record does not mirror live gold")
+		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "150-percent resource record does not mirror live blood")
 		var progress_source: Label = _find_progress_source()
 		_expect(progress_source != null, "150-percent footer has no live level/XP source")
 		if progress_source != null:

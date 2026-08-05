@@ -689,7 +689,7 @@ func _build_detail_lines(id: String, it: Dictionary) -> Array[String]:
 		trait_text = _format_list(_duplicate_strings(it.get("approaches", PackedStringArray())), 5)
 	if trait_text != "":
 		lines.append("Traits: %s" % trait_text)
-	lines.append("Cost: %dg" % int(it.get("cost", 0)))
+	lines.append("Cost: %d blood" % int(it.get("cost", 0)))
 	var alt_goals: String = _format_list(_duplicate_strings(it.get("alt_goals", PackedStringArray())), 3)
 	if alt_goals != "":
 		lines.append("Alt Goals: %s" % alt_goals)

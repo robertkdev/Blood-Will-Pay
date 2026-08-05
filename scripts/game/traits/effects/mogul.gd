@@ -42,11 +42,11 @@ func on_battle_end(ctx):
     if economy != null and economy.has_method("add_stake_units"):
         var awarded: int = int(economy.call("add_stake_units", amt, true, "mogul"))
         if ctx.engine != null and ctx.engine.has_method("_resolver_emit_log"):
-            ctx.engine._resolver_emit_log("Mogul payout: +%d gold (%dU)" % [awarded, amt])
+            ctx.engine._resolver_emit_log("Mogul payout: +%d blood (%d Stakes)" % [awarded, amt])
         return
     # Fallback: try to bubble to UI via log (UI can listen and award).
     if ctx.engine != null and ctx.engine.has_method("_resolver_emit_log"):
-        ctx.engine._resolver_emit_log("[Mogul] gold_awarded(%d)" % amt)
+        ctx.engine._resolver_emit_log("[Mogul] blood_awarded(%d)" % amt)
 
 func _autoload_node(path: String) -> Node:
     var loop: MainLoop = Engine.get_main_loop()

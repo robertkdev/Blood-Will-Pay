@@ -387,7 +387,7 @@ func _verify_forced_first_fight_bet_controls(view: Control, failures: Array[Stri
 		_expect(not bet_slider.visible, "Forced opener should hide the adjustable bet slider", failures)
 		_expect(not bet_slider.editable, "Forced opener bet slider should not be editable", failures)
 	var bet_value: Label = view.find_child("BetValue", true, false) as Label
-	_expect(bet_value != null and String(bet_value.text) == "Opening bet: 1", "Forced opener should show fixed opening bet copy", failures)
+	_expect(bet_value != null and String(bet_value.text) == "Opening wager: 1 blood", "Forced opener should show fixed opening blood-wager copy", failures)
 	var bet_row: Control = null
 	if bet_slider != null:
 		bet_row = bet_slider.get_parent() as Control

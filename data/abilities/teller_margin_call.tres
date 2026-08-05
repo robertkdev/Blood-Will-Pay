@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "teller_margin_call"
 name = "Margin Call"
-description = "Reveals two long shot paths, then fires at the two furthest enemies. Overflow can continue down each line and kills may earn Stake."
+description = "Reveals two long shot paths, then fires at the two furthest enemies. Overflow can continue down each line and kills may earn blood Stakes."
 targeting_summary = "Two furthest enemies."
 base_cost = 60
 tags = ["damage", "line", "economy"]
