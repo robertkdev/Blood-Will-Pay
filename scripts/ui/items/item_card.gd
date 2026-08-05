@@ -192,7 +192,6 @@ func _ensure_children() -> void:
 		combine_preview_label.visible = false
 		combine_preview_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		combine_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		combine_preview_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 		combine_preview_label.add_theme_font_size_override("font_size", 11)
 		combine_preview_label.add_theme_color_override("font_color", Color(1.0, 0.84, 0.42, 1.0))
 		combine_preview_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))

@@ -236,10 +236,10 @@ func _refresh_cards_state() -> void:
 			sc.set_affordable(affordable)
 			if not affordable:
 				var need: int = int(aff.get("need_more", 0))
-				var msg: String = "Not enough blood in reserve"
-				var reason: String = String(aff.get("reason", ""))
+				var msg := "Not enough blood in reserve"
+				var reason := String(aff.get("reason", ""))
 				if reason == ShopAffordability.REASON_RESERVE_FLOOR:
-					msg = "Must keep at least 1 health (need +%d)" % max(1, need)
+					msg = "Must keep at least 1 blood in reserve (need +%d)" % max(1, need)
 				elif reason == ShopAffordability.REASON_CREDIT_LIMIT:
 					msg = "Exceeds combat credit (need +%d)" % max(1, need)
 				if sc.has_method("set_status_tip"):
@@ -265,12 +265,12 @@ func _refresh_cards_state() -> void:
 	if _buttons:
 		var r_cost: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
 		var aff_r := ShopAffordability.can_afford(gold, bet, r_cost, in_combat, spent)
-		var msg_r: String = ""
+		var msg_r := ""
 		if not bool(aff_r.get("ok", false)):
 			var need_r: int = int(aff_r.get("need_more", 0))
 			var reason_r := String(aff_r.get("reason", ""))
 			if reason_r == ShopAffordability.REASON_RESERVE_FLOOR:
-				msg_r = "Must keep at least 1 health (need +%d)" % max(1, need_r)
+				msg_r = "Must keep at least 1 blood in reserve (need +%d)" % max(1, need_r)
 			elif reason_r == ShopAffordability.REASON_CREDIT_LIMIT:
 				msg_r = "Exceeds combat credit (need +%d)" % max(1, need_r)
 			else:
@@ -279,12 +279,12 @@ func _refresh_cards_state() -> void:
 
 		var x_cost: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
 		var aff_x := ShopAffordability.can_afford(gold, bet, x_cost, in_combat, spent)
-		var msg_x: String = ""
+		var msg_x := ""
 		if not bool(aff_x.get("ok", false)):
 			var need_x: int = int(aff_x.get("need_more", 0))
 			var reason_x := String(aff_x.get("reason", ""))
 			if reason_x == ShopAffordability.REASON_RESERVE_FLOOR:
-				msg_x = "Must keep at least 1 health (need +%d)" % max(1, need_x)
+				msg_x = "Must keep at least 1 blood in reserve (need +%d)" % max(1, need_x)
 			elif reason_x == ShopAffordability.REASON_CREDIT_LIMIT:
 				msg_x = "Exceeds combat credit (need +%d)" % max(1, need_x)
 			else:
