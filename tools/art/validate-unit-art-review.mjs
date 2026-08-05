@@ -26,7 +26,7 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 36) fail(`Expected curated history with 36 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 37) fail(`Expected curated history with 37 entries, got ${manifest.items.length}.`);
 const creepHistory = manifest.items.filter((item) => item.unit === "creep");
 if (creepHistory.length !== 4 || creepHistory.map((item) => item.version).join("|") !== "V3|V4|V5|V6") fail("Creep review history must preserve V3 through V6 in chronological order.");
 if (creepHistory.some((item) => item.version === "V6" && item.current)) fail("Creep V6 portrait crop must not replace the default.");
@@ -71,6 +71,12 @@ if (korathReviews.length !== 2 || korathReviews.map((item) => item.version).join
 if (korathReviews.some((item) => item.current)) fail("Korath review candidates must not replace the default.");
 if (!korathReviews[0].label.includes("Gold-light") || !korathReviews[1].label.includes("Violet-ivory")) fail("Korath review candidate labels are incorrect.");
 
+const quillithReviews = manifest.items.filter((item) => item.unit === "quillith");
+if (quillithReviews.length !== 1 || quillithReviews[0].version !== "Review V1") fail("Quillith cocoon review candidate is missing or out of order.");
+if (quillithReviews[0].current) fail("Quillith cocoon review candidate must not replace the default.");
+if (quillithReviews[0].label !== "Qylith floating cocoon-monstrosity" || !quillithReviews[0].status.includes("Latest review candidate")) fail("Quillith cocoon review candidate label or status is incorrect.");
+if (!/\{ unit: "quillith"[^}]*version: "P2-03"[^}]*current: true[^}]*path: "units\/quillith\.png" \}/.test(html)) fail("Quillith's existing P2-03 default is missing or was changed.");
+
 for (const item of manifest.items) {
 	if (!item.local_path) fail(`Curated history entry is not bundled locally: ${item.path}`);
 	const filePath = path.join(toolRoot, item.local_path);
@@ -108,7 +114,7 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 }
 
 [
-	"Blood Will Pay Unit Art Comparison Tool",
+	"Blood Will Pay · Unit Concepts",
 	"<button type=\"button\" data-set=\"phase2\">Phase 2</button>",
 	"unit: file === \"cashmere.png\" ? \"mara\"",
 	"{ unit: \"mara\", role: \"Mage\"",
@@ -125,17 +131,24 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"const STATE_API_URL = \"/api/unit-art-review-state\"",
 	"const STATE_FILE_LABEL = \"tools/art/unit-art-review-state.json\"",
 	"const MAX_PINS = 5",
-	"<button id=\"set-default\" class=\"action primary\" type=\"button\">Set as Default</button>",
+	"<button id=\"set-default\" class=\"action primary\" type=\"button\">Use as Working Concept</button>",
 	"function itemIdentity(item)",
 	"function defaultItemForUnit(unit)",
 	"function setCurrentAsDefault()",
 	"state.defaults[unit] = identity",
 	"function loadLegacyReviewState()",
 	"function mergeLegacyIntoDocument(document, legacy)",
+	"function ensureExplicitPhase2WorkingConcepts()",
+	"function phase2WorkingConcepts()",
+	"phase2_working_concepts: workingConcepts",
+	"Shared human-agent review state",
 	"function initializePersistence()",
 	"function queuePersistenceSave()",
 	"async function flushPersistenceSave()",
 	"function saveDefaults()",
+	"Use for now",
+	"Needs revision",
+	"Working Concept",
 	"addEventListener(\"contextmenu\"",
 	"function configurePreviewContext(items, selectedItem)",
 	"function openComparisonPreview(selectedItem = null, items = filteredItems())",
@@ -184,4 +197,4 @@ if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use th
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 if (html.includes("localStorage.setItem")) fail("The durable review file must be the only writable source of truth; browser storage is migration-only.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=36 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=37 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 quillith-reviews=1 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
