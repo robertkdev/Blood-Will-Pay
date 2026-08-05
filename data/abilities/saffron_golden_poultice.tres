@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "saffron_golden_poultice"
 name = "Golden Poultice"
-description = "Heals, shields, and reduces damage on the most threatened ally, then shares overheal as a small team shield."
-targeting_summary = "Most threatened ally; also damages current attack target if available."
+description = "Heals the most threatened ally and converts only that ally's overheal into a shield."
+targeting_summary = "Most threatened living ally."
 base_cost = 60
-tags = ["support", "peel", "sustain", "damage_reduction"]
+tags = ["support", "peel", "sustain"]

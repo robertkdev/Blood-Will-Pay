@@ -4,10 +4,12 @@ class_name StageProgressTopBar
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
 const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
-const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 
-const ICON_SIZE: Vector2 = Vector2(44.0, 44.0)
+const TOKEN_SIZE: Vector2 = Vector2(48.0, 38.0)
 const BAR_MIN_SIZE: Vector2 = Vector2(560.0, 56.0)
+const COMPACT_TOKEN_SIZE: Vector2 = Vector2(38.0, 30.0)
+const COMPACT_BAR_MIN_SIZE: Vector2 = Vector2(500.0, 48.0)
 const SELECTED_TEXTURE_PATHS: PackedStringArray = [
 	"res://assets/ui/stage_icons/stage_1_creep_selected.png",
 	"res://assets/ui/stage_icons/stage_2_challenge_selected.png",
@@ -23,17 +25,20 @@ const UNSELECTED_TEXTURE_PATHS: PackedStringArray = [
 	"res://assets/ui/stage_icons/stage_5_mirror_unselected.png",
 ]
 const STAGE_TOOLTIPS: PackedStringArray = [
-	"Stage 1: Creeps",
-	"Stage 2: Challenge",
-	"Stage 3: Challenge",
-	"Stage 4: Boss",
-	"Stage 5: Mirror",
+	"Round 1: Creeps",
+	"Round 2: Challenge",
+	"Round 3: Challenge",
+	"Round 4: Boss",
+	"Round 5: Mirror",
 ]
 
 var _row: HBoxContainer
 var _chapter_label: Label
-var _icons: Array[TextureRect] = []
+var _phase_label: Label
+var _tokens: Array[PanelContainer] = []
+var _compat_icons: Array[TextureRect] = []
 var _texture_cache: Dictionary[String, Texture2D] = {}
+var _result_state_active: bool = false
 
 func _ready() -> void:
 	_ensure_built()
@@ -41,21 +46,78 @@ func _ready() -> void:
 func update_progress(chapter: int, stage_in_chapter: int, total_stages: int) -> void:
 	_ensure_built()
 	var safe_chapter: int = max(1, int(chapter))
-	var safe_total: int = clampi(int(total_stages), 1, SELECTED_TEXTURE_PATHS.size())
+	var safe_total: int = clampi(int(total_stages), 1, STAGE_TOOLTIPS.size())
 	var safe_stage: int = clampi(int(stage_in_chapter), 1, safe_total)
 	_chapter_label.text = ChapterCatalog.display_name_for(safe_chapter)
 	_chapter_label.tooltip_text = _chapter_tooltip_for(safe_chapter, safe_total)
-	for index: int in range(_icons.size()):
-		var icon: TextureRect = _icons[index]
+	for index: int in range(_tokens.size()):
+		var token: PanelContainer = _tokens[index]
 		var stage_number: int = index + 1
-		icon.visible = stage_number <= safe_total
-		if not icon.visible:
+		token.visible = stage_number <= safe_total
+		if not token.visible:
 			continue
 		var selected: bool = stage_number == safe_stage
-		var texture_path: String = SELECTED_TEXTURE_PATHS[index] if selected else UNSELECTED_TEXTURE_PATHS[index]
-		icon.texture = _load_icon_texture(texture_path)
-		icon.tooltip_text = _stage_tooltip_for(safe_chapter, stage_number)
-		icon.modulate = Color(1.0, 1.0, 1.0, 1.0) if selected else Color(0.78, 0.78, 0.78, 1.0)
+		token.tooltip_text = _stage_tooltip_for(safe_chapter, stage_number)
+		token.add_theme_stylebox_override("panel", _make_token_style(selected))
+		if index < _compat_icons.size():
+			var compat_icon: TextureRect = _compat_icons[index]
+			var texture_path: String = SELECTED_TEXTURE_PATHS[index] if selected else UNSELECTED_TEXTURE_PATHS[index]
+			compat_icon.texture = _load_icon_texture(texture_path)
+			compat_icon.tooltip_text = token.tooltip_text
+		var number_label: Label = token.get_node_or_null("Number") as Label
+		if number_label != null:
+			number_label.text = "%02d" % stage_number
+			number_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.68, 1.0) if selected else Color(0.60, 0.57, 0.54, 0.90))
+			number_label.add_theme_constant_override("outline_size", 2 if selected else 1)
+
+func set_combat_state(in_combat: bool) -> void:
+	_ensure_built()
+	if _phase_label == null:
+		return
+	if _result_state_active:
+		return
+	_phase_label.text = "/// FIGHT" if in_combat else "/// READY"
+	_phase_label.add_theme_color_override("font_color", Color(1.0, 0.22, 0.22, 1.0) if in_combat else Color(0.82, 0.75, 0.64, 0.92))
+	_phase_label.add_theme_constant_override("outline_size", 2 if in_combat else 1)
+	_phase_label.tooltip_text = "Combat active. Hold the line." if in_combat else "Planning state. Prepare the next stage."
+
+func set_result_state(active: bool, outcome: String = "") -> void:
+	_ensure_built()
+	_result_state_active = active
+	set_meta("result_state_active", active)
+	set_meta("result_outcome", outcome.to_lower() if active else "")
+	if _phase_label == null:
+		return
+	if active:
+		_phase_label.text = "/// RECORDED"
+		_phase_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.36, 1.0))
+		_phase_label.add_theme_constant_override("outline_size", 2)
+		_phase_label.tooltip_text = "%s recorded. Review the consequence." % (outcome.capitalize() if not outcome.is_empty() else "Outcome")
+		return
+	_phase_label.tooltip_text = ""
+
+func set_compact_layout(compact: bool) -> void:
+	_ensure_built()
+	custom_minimum_size = COMPACT_BAR_MIN_SIZE if compact else BAR_MIN_SIZE
+	var margin: MarginContainer = get_node_or_null("Margin") as MarginContainer
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 10 if compact else 14)
+		margin.add_theme_constant_override("margin_top", 2 if compact else 6)
+		margin.add_theme_constant_override("margin_right", 10 if compact else 14)
+		margin.add_theme_constant_override("margin_bottom", 2 if compact else 5)
+	if _row != null:
+		_row.add_theme_constant_override("separation", 7 if compact else 10)
+	if _chapter_label != null:
+		_chapter_label.custom_minimum_size = Vector2(130.0 if compact else 150.0, 0.0)
+		_chapter_label.add_theme_font_size_override("font_size", 20 if compact else 24)
+		VisualTypeSystem.set_action(_chapter_label)
+	if _phase_label != null:
+		_phase_label.custom_minimum_size = Vector2(92.0 if compact else 112.0, 0.0)
+		_phase_label.add_theme_font_size_override("font_size", 18 if compact else 21)
+	var token_size: Vector2 = COMPACT_TOKEN_SIZE if compact else TOKEN_SIZE
+	for token: PanelContainer in _tokens:
+		token.custom_minimum_size = token_size
+	queue_sort()
 
 func _ensure_built() -> void:
 	if _row != null:
@@ -88,28 +150,63 @@ func _ensure_built() -> void:
 	_chapter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_chapter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_chapter_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	_chapter_label.add_theme_font_size_override("font_size", 22)
+	_chapter_label.add_theme_font_size_override("font_size", 24)
+	VisualTypeSystem.set_action(_chapter_label)
 	_chapter_label.add_theme_color_override("font_color", Color(0.96, 0.84, 0.60, 1.0))
 	_chapter_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
 	_chapter_label.add_theme_constant_override("shadow_offset_x", 1)
 	_chapter_label.add_theme_constant_override("shadow_offset_y", 2)
 	_row.add_child(_chapter_label)
 
-	for index: int in range(SELECTED_TEXTURE_PATHS.size()):
-		var icon: TextureRect = _make_icon(index)
-		_icons.append(icon)
-		_row.add_child(icon)
+	_phase_label = Label.new()
+	_phase_label.name = "PhaseLabel"
+	_phase_label.custom_minimum_size = Vector2(112.0, 0.0)
+	_phase_label.text = "/// READY"
+	_phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_phase_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	_phase_label.add_theme_font_size_override("font_size", 21)
+	_phase_label.add_theme_color_override("font_color", Color(0.82, 0.75, 0.64, 0.92))
+	_phase_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+	_phase_label.add_theme_constant_override("outline_size", 1)
+	VisualTypeSystem.set_action(_phase_label)
+	_row.add_child(_phase_label)
 
-func _make_icon(index: int) -> TextureRect:
-	var icon: TextureRect = TextureRect.new()
-	icon.name = "StageIcon%d" % int(index + 1)
-	icon.custom_minimum_size = ICON_SIZE
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_PASS
-	icon.texture = _load_icon_texture(UNSELECTED_TEXTURE_PATHS[index])
-	icon.tooltip_text = STAGE_TOOLTIPS[index]
-	return icon
+	for index: int in range(STAGE_TOOLTIPS.size()):
+		var token: PanelContainer = _make_token(index)
+		_tokens.append(token)
+		_row.add_child(token)
+
+func _make_token(index: int) -> PanelContainer:
+	var token: PanelContainer = PanelContainer.new()
+	token.name = "StageToken%d" % int(index + 1)
+	token.custom_minimum_size = TOKEN_SIZE
+	token.mouse_filter = Control.MOUSE_FILTER_PASS
+	token.tooltip_text = STAGE_TOOLTIPS[index]
+	token.add_theme_stylebox_override("panel", _make_token_style(index == 0))
+	var number_label: Label = Label.new()
+	number_label.name = "Number"
+	number_label.text = "%02d" % int(index + 1)
+	number_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	number_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	number_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	number_label.add_theme_font_size_override("font_size", 21)
+	number_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.68, 1.0) if index == 0 else Color(0.60, 0.57, 0.54, 0.90))
+	number_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
+	number_label.add_theme_constant_override("outline_size", 2 if index == 0 else 1)
+	VisualTypeSystem.set_action(number_label)
+	token.add_child(number_label)
+	var compat_icon: TextureRect = TextureRect.new()
+	compat_icon.name = "StageIcon%d" % int(index + 1)
+	compat_icon.custom_minimum_size = Vector2.ZERO
+	compat_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	compat_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	compat_icon.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	compat_icon.texture = _load_icon_texture(UNSELECTED_TEXTURE_PATHS[index])
+	compat_icon.tooltip_text = STAGE_TOOLTIPS[index]
+	token.add_child(compat_icon)
+	_compat_icons.append(compat_icon)
+	return token
 
 func _chapter_tooltip_for(chapter: int, total_stages: int) -> String:
 	var lines: Array[String] = [ChapterCatalog.display_name_for(chapter)]
@@ -135,7 +232,7 @@ func _stage_tooltip_for(chapter: int, stage_number: int) -> String:
 	if not challenge.is_empty():
 		var challenge_label: String = String(challenge.get("label", "")).strip_edges()
 		if challenge_label != "":
-			lines.append("RGA: %s" % challenge_label)
+			lines.append("Challenge: %s" % challenge_label)
 		var puzzle: String = String(challenge.get("puzzle", "")).strip_edges()
 		if puzzle != "":
 			lines.append("Plan: %s" % puzzle)
@@ -169,7 +266,7 @@ func _kind_label(kind: String) -> String:
 		StageTypes.KIND_CREEPS:
 			return "Creep reward"
 		StageTypes.KIND_NORMAL:
-			return "RGA challenge"
+			return "Challenge fight"
 		StageTypes.KIND_BOSS:
 			return "Boss"
 		StageTypes.KIND_MIRROR:
@@ -187,12 +284,11 @@ func _load_icon_texture(path: String) -> Texture2D:
 			_texture_cache[path] = imported_texture
 			return imported_texture
 	var image: Image = Image.new()
-	var err: Error = image.load(path)
-	if err != OK:
-		var absolute_path: String = ProjectSettings.globalize_path(path)
-		err = image.load(absolute_path)
-	if err != OK:
-		push_error("StageProgressTopBar: failed to load icon texture %s error=%d" % [path, int(err)])
+	var error: Error = image.load(path)
+	if error != OK:
+		error = image.load(ProjectSettings.globalize_path(path))
+	if error != OK:
+		push_error("StageProgressTopBar: failed to load compatibility texture %s error=%d" % [path, int(error)])
 		return null
 	var texture: ImageTexture = ImageTexture.create_from_image(image)
 	texture.take_over_path(path)
@@ -201,14 +297,24 @@ func _load_icon_texture(path: String) -> Texture2D:
 
 func _make_panel_style() -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.030, 0.024, 0.030, 0.78)
-	style.border_color = Color(0.46, 0.34, 0.20, 0.62)
-	style.border_width_left = 1
+	style.bg_color = Color(0.020, 0.017, 0.021, 0.92)
+	style.border_color = Color(0.72, 0.055, 0.085, 0.86)
+	style.border_width_left = 5
 	style.border_width_top = 1
 	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.status_strip_style(Color(0.74, 0.68, 0.58, 0.76)), style)
+	style.border_width_bottom = 2
+	return style
+
+func _make_token_style(selected: bool) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.19, 0.025, 0.038, 0.98) if selected else Color(0.035, 0.031, 0.037, 0.96)
+	style.border_color = Color(0.92, 0.075, 0.11, 1.0) if selected else Color(0.31, 0.29, 0.30, 0.88)
+	style.border_width_left = 5 if selected else 2
+	style.border_width_top = 2 if selected else 1
+	style.border_width_right = 2
+	style.border_width_bottom = 3 if selected else 2
+	style.content_margin_left = 5.0
+	style.content_margin_top = 2.0
+	style.content_margin_right = 4.0
+	style.content_margin_bottom = 2.0
+	return style

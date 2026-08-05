@@ -2,6 +2,7 @@ extends Control
 class_name MetricTabs
 
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 
 signal metric_changed(metric: String)
 
@@ -126,10 +127,7 @@ func _clear_children() -> void:
         child.queue_free()
 
 func _apply_button_style(button: Button) -> void:
-    button.add_theme_stylebox_override("normal", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(), _make_button_fallback(Color(0.043, 0.037, 0.047, 0.96), Color(0.36, 0.30, 0.26, 0.96))))
-    button.add_theme_stylebox_override("hover", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.14, 1.05, 0.92, 1.0)), _make_button_fallback(Color(0.120, 0.078, 0.090, 0.99), Color(1.0, 0.80, 0.43, 1.0))))
-    button.add_theme_stylebox_override("pressed", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.86, 0.72, 0.68, 1.0)), _make_button_fallback(Color(0.20, 0.026, 0.044, 1.0), Color(0.92, 0.68, 0.34, 1.0))))
-    button.add_theme_stylebox_override("focus", GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(1.10, 1.02, 0.88, 1.0)), _make_button_fallback(Color(0.12, 0.07, 0.08, 1.0), Color(0.92, 0.68, 0.34, 1.0))))
+    HardcoreUIAssets.apply_button_family(button, "utility")
     button.add_theme_color_override("font_color", Color(0.90, 0.82, 0.68, 1.0))
     button.add_theme_color_override("font_pressed_color", Color(1.0, 0.74, 0.48, 1.0))
     button.add_theme_font_size_override("font_size", 12)

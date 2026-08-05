@@ -17,7 +17,7 @@ user://difficulty_rating_audit.json
 On Windows MCP runs, that resolves to:
 
 ```text
-C:\Users\Flipm\AppData\Roaming\Godot\app_userdata\Gamble Battle\difficulty_rating_audit.json
+C:\Users\Flipm\AppData\Roaming\Godot\app_userdata\Blood Will Pay\difficulty_rating_audit.json
 ```
 
 The audit reports:
@@ -46,7 +46,7 @@ Chapter target:
   - first RGA: `1.90`
   - second RGA: `2.25`
   - boss: `2.65`
-  - chapter 1 boss: `2.15`
+  - chapter 1 boss raw target: `1.00` plus the shared `1.25` live escalation preview factor
   - mirror: `2.65`
 - Chapter 1 boss levels are capped at `2` so the first boss is a runway spike, not a late-run scaling check.
 
@@ -102,7 +102,7 @@ Latest audit after trait-aware scoring and the Chapter 1 runway patch:
 - Chapter 1 Round 1 sample: fixed Beegle runway opener, target `100`, difficulty `100`.
 - Chapter 1 Round 2 sample: starter-safe RGA director runway spec, with `target_rating` set to its measured `difficulty_rating`.
 - Chapter 1 Round 3 sample: starter-safe RGA director runway spec, with `target_rating` set to its measured `difficulty_rating`.
-- Chapter 1 boss sample: target `215` with authored level cap `2`; refresh `DifficultyRatingAudit.tscn` after the UI pass for exact post-cap sample rows.
+- Chapter 1 boss sample: the raw generator target is `1.00` with authored level cap `2`; the player-facing odds quote uses the shared `1.25` escalation preview factor so calibration and runtime phases stay in lockstep.
 
 The important change is that trait pressure now pulls generated levels downward instead of silently stacking on top of a near-target raw unit board. The Chapter 1 runway also keeps the first two RGA rounds authored around starter readability before the budgeted generator takes over.
 

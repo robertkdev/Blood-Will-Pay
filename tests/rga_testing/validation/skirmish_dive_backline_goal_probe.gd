@@ -6,7 +6,7 @@ const GoalPrimaryTest := preload("res://tests/rga_testing/metrics/goal/goal_prim
 
 const SUBJECT_ID: String = "bo"
 const FRONTLINE_ID: String = "brute"
-const BACKLINE_ID: String = "cashmere"
+const BACKLINE_ID: String = "mara"
 
 @export var do_quit_on_finish: bool = true
 

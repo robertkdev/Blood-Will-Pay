@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource( 1 )
 id = "repo_writ_of_severance"
-name = "Writ of Severance"
-description = "Heals, then slashes the current target for heavy physical damage, with bonus damage against Tanks. On kill, immediately recasts at reduced damage."
-targeting_summary = "Current attack target; on kill, recasts on the next current attack target."
-base_cost = 0
-tags = ["damage", "self-heal"]
+name = "Repossession"
+description = "Temporarily transfers Armor and Magic Resist from one enemy to Repo."
+targeting_summary = "Current attack target."
+base_cost = 60
+tags = ["defense_transfer", "debuff", "self_defense"]

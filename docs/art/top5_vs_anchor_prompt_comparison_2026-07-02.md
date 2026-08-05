@@ -31,7 +31,7 @@ Future prompts should not choose one family. Use the top-five single-unit struct
 - Vellum's prompts translate materials surface by surface: bodice/corset, pants, gloves, boots, sleeves, and coat become matte charcoal wool, black waxed canvas, worn velvet, scuffed dull leather, tarnished brass/iron, dry parchment, dried wax, and matte ink.
 - Vellum's prompts explicitly separate matte from low-detail: de-shining must preserve tactile dry detail, layered material storytelling, dry scratches, dust, worn edges, and hand-painted surface breakup.
 - The token prompt is the best small-asset material prompt: powder-matte parchment, dull/chalky seal, dry ink claw marks, no glossy wax, no wet ink, no readable letters or numbers.
-- Paisley's Qwen prompt is strongest as a control/identity prompt, not a global style prompt: it locks pose, adult proportions, exact two-bubble layout, hands, feet, background, and cutout constraints. Its `premium MOBA splash-art rendering` language is not safe as a general Gamble Battle style anchor.
+- Paisley's Qwen prompt is strongest as a control/identity prompt, not a global style prompt: it locks pose, adult proportions, exact two-bubble layout, hands, feet, background, and cutout constraints. Its `premium MOBA splash-art rendering` language is not safe as a general Blood Will Pay style anchor.
 
 ## Key Prompt Difference
 

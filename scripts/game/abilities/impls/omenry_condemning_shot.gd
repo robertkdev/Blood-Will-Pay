@@ -37,6 +37,11 @@ func cast(ctx: AbilityContext) -> bool:
 	if not hits.has(target_index):
 		hits.append(target_index)
 	var isolated: bool = _adjacent_count(ctx, target_index) == 0
+	if ctx.buff_system != null:
+		ctx.buff_system.record_debuff(ctx.state, target_team, target_index, "omenry_isolation_mark", {
+			"isolated": isolated
+		}, 1.0 if isolated else 0.5, 0.8)
+	ctx.emit_zone_exposure(target_team, target_index, "omenry_isolation_mark", 0.8, 0.0, 0.3)
 	var exile_bonus: float = float(ctx.exile_upgrade_level(ctx.caster_team, ctx.caster_index)) * 0.08
 	var bonus_mult: float = 1.0 + (ISOLATED_BONUS if isolated else 0.0) + exile_bonus
 	var damage: float = (float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage)) * bonus_mult

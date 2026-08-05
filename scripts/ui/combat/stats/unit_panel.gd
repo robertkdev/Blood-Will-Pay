@@ -25,6 +25,7 @@ const COLOR_ENEMY: Color = Color(0.52, 0.045, 0.070, 0.95)
 @onready var stats_grid: GridContainer = $"VBox/StatsGrid"
 @onready var dps_label: Label = $"VBox/Footer/DPSLabel"
 @onready var casts_label: Label = $"VBox/Footer/CastsLabel"
+var _extra_labels_added: bool = false
 
 var tracker: StatsTracker = null
 var team: String = "player"
@@ -104,15 +105,98 @@ func _refresh_dynamic() -> void:
     # Live DPS (3s) and casts
     var dps3: float = 0.0
     var casts: float = 0.0
+    var hps3: float = 0.0
+    var absorbed_total: float = 0.0
+    var cc_inf: float = 0.0
+    var cc_rec: float = 0.0
+    var overheal: float = 0.0
+    var kills: float = 0.0
+    var deaths: float = 0.0
+    var time_alive: float = 0.0
+    var focus_pct: float = 0.0
     if tracker != null and index >= 0:
         dps3 = tracker.get_value(team, index, "dps", "3S")
         casts = tracker.get_value(team, index, "casts", "ALL")
+        hps3 = tracker.get_value(team, index, "hps", "3S")
+        absorbed_total = tracker.get_value(team, index, "absorbed", "ALL")
+        cc_inf = tracker.get_value(team, index, "cc_inflicted", "ALL")
+        cc_rec = tracker.get_value(team, index, "cc_received", "ALL")
+        overheal = tracker.get_value(team, index, "overheal", "ALL")
+        kills = tracker.get_value(team, index, "kills", "ALL")
+        deaths = tracker.get_value(team, index, "deaths", "ALL")
+        time_alive = tracker.get_value(team, index, "time", "ALL")
+        focus_pct = tracker.get_value(team, index, "focus", "ALL")
     dps_label.text = "DPS (3s): " + _fmt(dps3)
     casts_label.text = "Casts: " + str(int(round(casts)))
+    _ensure_extra_footer()
+    var f: FlowContainer = $"VBox/Footer"
+    if f != null and f.get_child_count() >= 11:
+        var hps_lbl: Label = f.get_child(2) as Label
+        var ab_lbl: Label = f.get_child(3) as Label
+        var cci_lbl: Label = f.get_child(4) as Label
+        var ccr_lbl: Label = f.get_child(5) as Label
+        var ovh_lbl: Label = f.get_child(6) as Label
+        var kil_lbl: Label = f.get_child(7) as Label
+        var ded_lbl: Label = f.get_child(8) as Label
+        var tim_lbl: Label = f.get_child(9) as Label
+        var foc_lbl: Label = f.get_child(10) as Label
+        if hps_lbl is Label:
+            (hps_lbl as Label).text = "HPS (3s): " + _fmt(hps3)
+        if ab_lbl is Label:
+            (ab_lbl as Label).text = "Shield Abs: " + _fmt(absorbed_total)
+        if cci_lbl is Label:
+            (cci_lbl as Label).text = "CC Inf(s): " + String.num(cc_inf, 2)
+        if ccr_lbl is Label:
+            (ccr_lbl as Label).text = "CC Rec(s): " + String.num(cc_rec, 2)
+        if ovh_lbl is Label:
+            (ovh_lbl as Label).text = "Overheal: " + _fmt(overheal)
+        if kil_lbl is Label:
+            (kil_lbl as Label).text = "Kills: " + str(int(kills))
+        if ded_lbl is Label:
+            (ded_lbl as Label).text = "Deaths: " + str(int(deaths))
+        if tim_lbl is Label:
+            (tim_lbl as Label).text = "Time: " + String.num(time_alive, 1) + "s"
+        if foc_lbl is Label:
+            (foc_lbl as Label).text = "Focus: " + String.num(focus_pct, 0) + "%"
     _style_footer_labels()
     # Bars track current unit stats
     _refresh_bars()
 
+func _ensure_extra_footer() -> void:
+    if _extra_labels_added:
+        return
+    var f: FlowContainer = $"VBox/Footer"
+    if f == null:
+        return
+    var hps_lbl: Label = Label.new()
+    hps_lbl.text = "HPS (3s): 0"
+    f.add_child(hps_lbl)
+    var ab_lbl: Label = Label.new()
+    ab_lbl.text = "Shield Abs: 0"
+    f.add_child(ab_lbl)
+    var cci_lbl: Label = Label.new()
+    cci_lbl.text = "CC Inf(s): 0"
+    f.add_child(cci_lbl)
+    var ccr_lbl: Label = Label.new()
+    ccr_lbl.text = "CC Rec(s): 0"
+    f.add_child(ccr_lbl)
+    var ovh_lbl: Label = Label.new()
+    ovh_lbl.text = "Overheal: 0"
+    f.add_child(ovh_lbl)
+    var kil_lbl: Label = Label.new()
+    kil_lbl.text = "Kills: 0"
+    f.add_child(kil_lbl)
+    var ded_lbl: Label = Label.new()
+    ded_lbl.text = "Deaths: 0"
+    f.add_child(ded_lbl)
+    var tim_lbl: Label = Label.new()
+    tim_lbl.text = "Time: 0s"
+    f.add_child(tim_lbl)
+    var foc_lbl: Label = Label.new()
+    foc_lbl.text = "Focus: 0%"
+    f.add_child(foc_lbl)
+    _extra_labels_added = true
+    _style_footer_labels()
 
 func _ensure_bars() -> void:
     if hp_bar == null:

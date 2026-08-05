@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/design/cost1_cost2_ability_direction_smoke.gd" id="1"]
+
+[node name="Cost1Cost2AbilityDirectionSmoke" type="Node"]
+script = ExtResource("1")

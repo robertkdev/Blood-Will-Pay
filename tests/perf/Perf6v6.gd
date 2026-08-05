@@ -177,7 +177,7 @@ func _team_a_ids() -> Array[String]:
 	out.append("korath")
 	out.append("sari")
 	out.append("pilfer")
-	out.append("cashmere")
+	out.append("mara")
 	out.append("axiom")
 	return out
 
@@ -187,7 +187,7 @@ func _team_b_ids() -> Array[String]:
 	out.append("bo")
 	out.append("sari")
 	out.append("pilfer")
-	out.append("cashmere")
+	out.append("mara")
 	out.append("knoll")
 	return out
 

@@ -1,7 +1,7 @@
 extends "res://tests/visual/natural_representative_campaign_main_flow_smoke.gd"
 
 const ALT_CAMPAIGN_SMOKE_NAME: String = "NaturalRepresentativeCampaignAltSeedSmoke"
-const ALT_CAMPAIGN_STARTERS: Array[String] = ["axiom", "brute", "cashmere", "repo", "sari", "bonko"]
+const ALT_CAMPAIGN_STARTERS: Array[String] = ["axiom", "brute", "mara", "repo", "sari", "bonko"]
 const ALT_CAMPAIGN_SEEDS: Array[int] = [6101, 6501, 6601, 7101, 7201, 6401]
 
 func _representative_smoke_name() -> String:

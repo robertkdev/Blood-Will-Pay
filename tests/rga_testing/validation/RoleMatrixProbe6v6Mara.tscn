@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/RoleMatrixProbe.gd" id="1"]
+
+[node name="RoleMatrixProbe" type="Node"]
+script = ExtResource("1")
+quick_balance_seed_count = 1
+quick_balance_labels = PackedStringArray("neutral", "burst", "peel")
+quick_balance_mode = true
+subject_unit_id = "mara"
+subject_unit_ids = PackedStringArray()
+seeds = PackedInt32Array()
+max_sims = 3
+out_root = "user://rga_probe/mara"
+write_reports = true
+metric_ids = PackedStringArray()
+roles_to_run = PackedStringArray()
+scenario_packs_to_run = PackedStringArray()
+profile = "full_probe_6v6"
+scenario_labels_6v6 = PackedStringArray("neutral", "burst", "peel")
+max_seeds_per_label = 1

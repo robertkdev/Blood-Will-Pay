@@ -2,12 +2,12 @@ extends "res://tests/visual/actual_run_loop_smoke.gd"
 
 const UnitCatalogLib: Script = preload("res://scripts/game/shop/unit_catalog.gd")
 const SMOKE_NAME: String = "FirstShopChoiceQualitySmoke"
-const TARGET_STARTERS: Array[String] = ["axiom", "bo", "bonko", "cashmere", "korath", "morrak", "mortem", "repo", "sari"]
+const TARGET_STARTERS: Array[String] = ["axiom", "bo", "bonko", "mara", "korath", "morrak", "mortem", "repo", "sari"]
 const TARGET_HELPERS: Dictionary = {
 	"axiom": ["sari", "sari", "sari", "sari", "sari"],
-	"bo": ["berebell", "cashmere", "cashmere", "grint", "brute"],
+	"bo": ["berebell", "mara", "mara", "grint", "brute"],
 	"bonko": ["morrak", "grint", "mortem", "axiom", "korath"],
-	"cashmere": ["korath", "repo", "brute", "bonko", "brute"],
+	"mara": ["korath", "repo", "brute", "bonko", "brute"],
 	"korath": ["brute", "bonko", "sari", "morrak", "berebell"],
 	"morrak": ["repo", "berebell", "brute", "sari", "bonko"],
 	"mortem": ["morrak", "bonko", "sari", "brute", "berebell"],
@@ -45,6 +45,9 @@ func _finish_choice_if_failed() -> bool:
 	if _technical_failures().is_empty():
 		return false
 	_finish_choice_quality()
+	return true
+
+func _uses_manual_opening_continue() -> bool:
 	return true
 
 func _finish_choice_quality() -> void:
@@ -99,10 +102,10 @@ func _capture_first_shop_snapshot(starter_id: String) -> Dictionary:
 	await _settle_frames(4)
 	await _ensure_unit_select()
 	await _select_starter(starter_id)
-	await _settle_frames(4)
-	var combat_opened: bool = _node_visible("CombatView")
-	var board_repositioned: bool = await _reposition_first_board_unit("choice snapshot %s board reposition" % starter_id) if combat_opened else false
+	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
+	_expect(combat_opened, "choice snapshot %s combat view did not open" % starter_id)
 	_set_planning_timer_safe()
+	var board_repositioned: bool = await _reposition_first_board_unit("choice snapshot %s board reposition" % starter_id) if combat_opened else false
 	await _press_continue(true, "choice snapshot %s forced first fight" % starter_id)
 	var first_result: String = await _wait_for_first_result(FIRST_FIGHT_TIMEOUT)
 	var output: Dictionary = {
@@ -132,10 +135,10 @@ func _run_offer_slot_trial(starter_id: String, offers: Array[ShopOffer], gold_be
 	await _settle_frames(4)
 	await _ensure_unit_select()
 	await _select_starter(starter_id)
-	await _settle_frames(4)
-	var combat_opened: bool = _node_visible("CombatView")
-	var board_repositioned: bool = await _reposition_first_board_unit("choice trial %s slot %d board reposition" % [starter_id, slot_index]) if combat_opened else false
+	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
+	_expect(combat_opened, "choice trial %s slot %d combat view did not open" % [starter_id, slot_index])
 	_set_planning_timer_safe()
+	var board_repositioned: bool = await _reposition_first_board_unit("choice trial %s slot %d board reposition" % [starter_id, slot_index]) if combat_opened else false
 	await _press_continue(true, "choice trial %s slot %d forced first fight" % [starter_id, slot_index])
 	var first_result: String = await _wait_for_first_result(FIRST_FIGHT_TIMEOUT)
 	var result: Dictionary = {
@@ -216,15 +219,18 @@ func _start_main_scene() -> void:
 
 func _wait_for_first_result(timeout_seconds: float) -> String:
 	var deadline: int = Time.get_ticks_msec() + int(timeout_seconds * 1000.0)
+	var saw_combat: bool = false
 	while Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
 		if get_tree().root.get_node_or_null("LossOverlayLayer") != null:
 			return "loss"
+		if GameState.phase == GameState.GamePhase.COMBAT or Economy.combat_active:
+			saw_combat = true
 		if GameState.phase == GameState.GamePhase.PREVIEW and not Economy.combat_active:
 			if int(GameState.stage_in_chapter) >= 2:
 				if Shop.state != null and Shop.state.offers.size() == int(SHOP_CONFIG.SLOT_COUNT):
 					return "shop"
-			else:
+			elif saw_combat:
 				return "retry"
 	return "timeout"
 

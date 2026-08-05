@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/pacing/pacing_recorder_parse_test.gd" id="1_recorder_parse"]
+
+[node name="PacingRecorderParseTest" type="Node"]
+script = ExtResource("1_recorder_parse")

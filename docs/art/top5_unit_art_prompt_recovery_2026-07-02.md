@@ -29,7 +29,7 @@ Session evidence:
 
 ```text
 Use case: stylized-concept
-Asset type: Gamble Battle unit sprite source
+Asset type: Blood Will Pay unit sprite source
 Primary request: Omenry, a premium marksman, lone oracle-gunner with a blindfold scope and black-feather cartridges.
 Scene/backdrop: perfectly flat solid #00ff00 chroma-key background for background removal; no shadows, no floor plane, no gradient, no texture.
 Subject: one full-body dark folklore oracle-gunner, long rifle with blindfolded scope, black-feather cartridges, isolated prophet marksman, severe silhouette, ritual ammunition charms, no wings.
@@ -49,7 +49,7 @@ Session evidence:
 
 ```text
 Use case: stylized-concept
-Asset type: Gamble Battle unit sprite source
+Asset type: Blood Will Pay unit sprite source
 Primary request: Saffron, a premium support, apothecary-priest with amber bottles, floating salves, and item shards sealed in wax.
 Scene/backdrop: perfectly flat solid #00ff00 chroma-key background for background removal; no shadows, no floor plane, no gradient, no texture.
 Subject: one full-body dark folklore apothecary-priest, amber medicine bottles, floating salves, wax-sealed item shards, plague-healer silhouette, compassionate but corrupted, ritual healer in stained robes.
@@ -69,7 +69,7 @@ Session evidence:
 
 ```text
 Use case: stylized-concept
-Asset type: Gamble Battle unit sprite source
+Asset type: Blood Will Pay unit sprite source
 Primary request: Orielle, a premium mage, elegant debt-mage with floating IOU sigils orbiting her staff.
 Scene/backdrop: perfectly flat solid #00ff00 chroma-key background for background removal; no shadows, no floor plane, no gradient, no texture.
 Subject: one full-body dark folklore debt-mage, refined but cursed, floating parchment debt sigils and IOU talismans, crooked staff, austere ledger-priest silhouette, haunted eyes, corrupt magical accountant.
@@ -88,7 +88,7 @@ Original generation evidence:
 - Generated as part of a ten-unit contact sheet, not a single-unit final prompt.
 
 ```text
-Create a 5 by 2 contact sheet of ten separate transparent-background fantasy game unit sprites for a dark gothic auto-battler called Gamble Battle. Each cell should contain exactly one full-body character centered with lots of transparent padding, no text, no labels, no frame, no shadows touching cell borders, consistent board-game sprite scale, detailed dry matte gothic material, readable silhouette at small size. Order left to right, top row: Caldera basalt giant with molten item-core embedded in one hand; Ivara auctioneer sniper with long rifle shaped like a bidding gavel; Noxley blood-red street magician with sparking needles floating over one arm; Quorra clockwork duelist with mirrored armor plates and timeplate motif; Juno Vale star-map archivist with floating geometry charts and quill halo. Bottom row: Kett dockworker enforcer with coin-stamped brass knuckles and broken paygate shield; Egress pale escape artist wrapped in black ticket stubs; Marble statue-like crossbow unit with chapel-glass armor and stone halo sight; Prisma prism-faced illusionist with robe changing color like active traits; Sable ink-black rifle scholar with page talismans tied to bullets. Style: dark nihilistic occult fantasy, dry painted realism, Vellum-like bone and tarnished-metal texture, crisp alpha edges, transparent background.
+Create a 5 by 2 contact sheet of ten separate transparent-background fantasy game unit sprites for a dark gothic auto-battler called Blood Will Pay. Each cell should contain exactly one full-body character centered with lots of transparent padding, no text, no labels, no frame, no shadows touching cell borders, consistent board-game sprite scale, detailed dry matte gothic material, readable silhouette at small size. Order left to right, top row: Caldera basalt giant with molten item-core embedded in one hand; Ivara auctioneer sniper with long rifle shaped like a bidding gavel; Noxley blood-red street magician with sparking needles floating over one arm; Quorra clockwork duelist with mirrored armor plates and timeplate motif; Juno Vale star-map archivist with floating geometry charts and quill halo. Bottom row: Kett dockworker enforcer with coin-stamped brass knuckles and broken paygate shield; Egress pale escape artist wrapped in black ticket stubs; Marble statue-like crossbow unit with chapel-glass armor and stone halo sight; Prisma prism-faced illusionist with robe changing color like active traits; Sable ink-black rifle scholar with page talismans tied to bullets. Style: dark nihilistic occult fantasy, dry painted realism, Vellum-like bone and tarnished-metal texture, crisp alpha edges, transparent background.
 ```
 
 Current top-ranked Juno/Sable surfaces:
@@ -109,7 +109,7 @@ The winning single-unit prompt shape is stronger than the contact-sheet prompt:
 
 ```text
 Use case: stylized-concept
-Asset type: Gamble Battle unit sprite source
+Asset type: Blood Will Pay unit sprite source
 Primary request: [Name], a [tier/role], [specific tragic occult archetype] with [2-3 signature props].
 Scene/backdrop: perfectly flat solid #00ff00 chroma-key background for removal; no shadows, no floor, no gradient, no texture.
 Subject: one full-body dark folklore [archetype], [psychological/world condition], [role-specific props], [silhouette rule], [1-2 explicit bans].

@@ -1,11 +1,13 @@
 # Unit Art Pipeline - 2026-06-28
 
+> Mara naming note (2026-07-28): Mara is the current unit name. Any lower-case `cashmere` filename or path is preserved solely as legacy artifact provenance; its image is not approved as current Mara art.
+
 ## Current roster image findings
 
 - All 22 playable unit textures in `assets/units/` are 1024 x 1024 PNGs.
 - The game displays the full texture in unit slots, so transparent padding and baked backgrounds directly affect board readability.
 - Most units are transparent cutouts. `assets/units/morrak.png` is the main technical outlier because it has a baked square background.
-- Narrow units including Cashmere, Kythera, Korath, Totem, and Veyra read smaller in 96 px board tiles than the wider roster members.
+- Narrow units including Mara, Kythera, Korath, Totem, and Veyra read smaller in 96 px board tiles than the wider roster members.
 - Active filenames still include odd generated names: `assets/units/korath (1).png` and `assets/units/sari (3).png`.
 - Temporary analysis sheets from the first pass were written under `%LOCALAPPDATA%\Temp\gamble_battle_unit_image_analysis\`.
 

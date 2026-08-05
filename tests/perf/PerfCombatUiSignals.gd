@@ -7,7 +7,7 @@ const TraitsPresenterScript: Script = preload("res://scripts/ui/traits/traits_pr
 const UnitPanelScript: Script = preload("res://scripts/ui/combat/stats/unit_panel.gd")
 
 @export var run_seconds: float = 8.0
-@export var player_team_ids: PackedStringArray = PackedStringArray(["bonko", "korath", "sari", "pilfer", "cashmere", "axiom"])
+@export var player_team_ids: PackedStringArray = PackedStringArray(["bonko", "korath", "sari", "pilfer", "mara", "axiom"])
 
 var _view: Control = null
 var _manager: CombatManager = null

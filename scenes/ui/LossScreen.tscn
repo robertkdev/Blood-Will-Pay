@@ -1,6 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/loss_screen.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/hardcore/loss_backdrop_4k.png" id="2"]
 
 [node name="LossScreen" type="Control"]
 layout_mode = 3
@@ -20,6 +21,18 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.006, 0.005, 0.008, 1)
 
+[node name="LossBackdropArt" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2")
+expand_mode = 1
+stretch_mode = 6
+
 [node name="Panel" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -37,7 +50,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Frame" type="PanelContainer" parent="Panel/Center"]
-custom_minimum_size = Vector2(900, 0)
+custom_minimum_size = Vector2(1120, 780)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
@@ -46,7 +59,7 @@ size_flags_vertical = 4
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
-theme_override_constants/separation = 16
+theme_override_constants/separation = 10
 alignment = 1
 
 [node name="Title" type="Label" parent="Panel/Center/Frame/VBox"]
@@ -68,19 +81,20 @@ text = "High Score (Stage): 0"
 horizontal_alignment = 1
 
 [node name="Stats" type="Label" parent="Panel/Center/Frame/VBox"]
+custom_minimum_size = Vector2(0, 148)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = ""
 horizontal_alignment = 1
 
 [node name="ScoreboardHolder" type="VBoxContainer" parent="Panel/Center/Frame/VBox"]
-custom_minimum_size = Vector2(720, 220)
+custom_minimum_size = Vector2(840, 176)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 
 [node name="NewGameButton" type="Button" parent="Panel/Center/Frame/VBox"]
-custom_minimum_size = Vector2(300, 56)
+custom_minimum_size = Vector2(360, 64)
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 24

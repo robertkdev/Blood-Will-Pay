@@ -35,6 +35,7 @@ signal on_hit_proc(source_team: String, source_index: int, target_team: String, 
 signal cc_prevented(source_team: String, source_index: int, target_team: String, target_index: int, kind: String)
 signal cc_taxed(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, raw_duration: float, effective_duration: float, tenacity: float, prevented: bool)
 signal cleanse_applied(source_team: String, source_index: int, target_team: String, target_index: int, removed: int)
+signal shield_ended(target_team: String, target_index: int, reason: String, data: Dictionary)
 
 func clear() -> void:
 	_buffs.clear()
@@ -157,7 +158,7 @@ func apply_stats_labeled(state: BattleState, team: String, index: int, label: St
 	_emit_stats_presence(team, index, f, duration_s)
 	return {"processed": true, "applied": f, "duration": duration_s}
 
-func apply_shield(state: BattleState, team: String, index: int, amount: int, duration_s: float) -> Dictionary:
+func apply_shield(state: BattleState, team: String, index: int, amount: int, duration_s: float, data: Dictionary = {}) -> Dictionary:
 	var u: Unit = _unit_at(state, team, index)
 	if u == null or amount <= 0 or duration_s <= 0.0:
 		return {"processed": false}
@@ -165,12 +166,20 @@ func apply_shield(state: BattleState, team: String, index: int, amount: int, dur
 	# Apply shield strength multiplier from active healing mods tag if present
 	const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
 	if has_tag(state, team, index, BuffTags.TAG_HEALING_MODS):
-		var data: Dictionary = get_tag_data(state, team, index, BuffTags.TAG_HEALING_MODS)
-		if data != null:
-			var mult: float = 1.0 + float(data.get("shield_strength_pct", 0.0))
+		var healing_data: Dictionary = get_tag_data(state, team, index, BuffTags.TAG_HEALING_MODS)
+		if healing_data != null:
+			var mult: float = 1.0 + float(healing_data.get("shield_strength_pct", 0.0))
 			if mult != 1.0:
 				amt = int(max(0.0, round(float(amt) * max(0.0, mult))))
-	var buff: Dictionary = {"kind": "shield", "shield": int(amt), "remaining": duration_s}
+	var buff: Dictionary = {
+		"kind": "shield",
+		"shield": int(amt),
+		"remaining": duration_s,
+		"target_team": String(team),
+		"target_index": int(index),
+		"data": data.duplicate(true) if data != null else {},
+		"ended": false
+	}
 	_add_buff(u, buff)
 	_recompute_ui_shield(u)
 	_emit_buff_presence(team, index, "shield", {"shield": int(amt)}, float(amt), duration_s)
@@ -389,6 +398,8 @@ func absorb_with_shields(u: Unit, incoming_damage: int) -> Dictionary:
 		b["shield"] = s - used
 		dmg -= used
 		result["absorbed"] = int(result["absorbed"]) + used
+		if int(b["shield"]) <= 0:
+			_emit_shield_ended(b, "broken")
 	result["leftover"] = dmg
 	_recompute_ui_shield(u)
 	return result
@@ -407,6 +418,7 @@ func break_shields(u: Unit) -> int:
 		if s > 0:
 			removed += s
 			b["shield"] = 0
+			_emit_shield_ended(b, "broken")
 	_recompute_ui_shield(u)
 	return removed
 
@@ -494,8 +506,16 @@ func _expire_buff(u: Unit, buff: Dictionary) -> void:
 	# shield and stun expire passively
 	# tag kind also expires passively
 	if kind == "shield":
+		_emit_shield_ended(buff, "expired")
 		_recompute_ui_shield(u)
 	_track_removed_buff(buff)
+
+func _emit_shield_ended(buff: Dictionary, reason: String) -> void:
+	if buff == null or bool(buff.get("ended", false)):
+		return
+	buff["ended"] = true
+	var data: Dictionary = buff.get("data", {})
+	emit_signal("shield_ended", String(buff.get("target_team", "")), int(buff.get("target_index", -1)), reason, data)
 
 func _track_added_buff(buff: Dictionary) -> void:
 	if _is_movement_blocker_buff(buff):

@@ -1,6 +1,7 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter"
 
 var _main: Control = null
@@ -24,7 +25,7 @@ func _run() -> void:
 
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle(0.65)
+	await MainTransitionWait.for_combat_view(self, _main)
 	_save("after_combat_initial_pass2.png")
 
 	if Engine.has_singleton("Shop"):

@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "ravel_puppet_strings"
 name = "Puppet Strings"
-description = "Links two allies with shared tempo, then yanks an enemy formation apart and redirects focus."
-targeting_summary = "Pupil plus nearby ally links; disrupts enemies around current attack target or lowest-health enemy."
+description = "Links two allies with a visible string and yanks enemies intersecting that string away from it."
+targeting_summary = "Pupil plus one ally; only enemies crossing the line between them are moved."
 base_cost = 30
-tags = ["support", "disrupt", "redirect", "engage"]
+tags = ["support", "formation", "link", "reposition"]

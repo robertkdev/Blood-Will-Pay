@@ -11,11 +11,12 @@ const PCT_BY_LVL := [0.25, 0.30, 0.35] # absorb percent for 3s
 const RELEASE_DELAY_S := 3.0
 const RELEASE_BASE_HP_FACTOR := 0.20
 const RELEASE_STACK_BONUS := 4
+const BODYGUARD_RADIUS_TILES: float = 2.5
 
 func cast(ctx: AbilityContext) -> bool:
     if ctx == null or ctx.engine == null or ctx.state == null:
         return false
-    var bs = ctx.buff_system
+    var bs: BuffSystem = ctx.buff_system
     if bs == null:
         ctx.log("[Absorb & Release] BuffSystem not available; cast aborted")
         return false
@@ -29,13 +30,25 @@ func cast(ctx: AbilityContext) -> bool:
 
     # Read unified Titan stack key managed by trait systems; do not add here (DRY)
     var stacks_at_cast: int = int(bs.get_stack(ctx.state, ctx.caster_team, ctx.caster_index, TraitKeys.TITAN))
+    var protected_indices: Array[int] = []
+    var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
+    var caster_position: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
+    var bodyguard_radius: float = BODYGUARD_RADIUS_TILES * ctx.tile_size()
+    for ally_index: int in range(allies.size()):
+        var ally: Unit = allies[ally_index]
+        if ally_index == ctx.caster_index or ally == null or not ally.is_alive():
+            continue
+        if caster_position.distance_to(ctx.position_of(ctx.caster_team, ally_index)) <= bodyguard_radius:
+            protected_indices.append(ally_index)
 
     # Apply timed absorbing tag; also block mana gain while active
-    var meta := {
+    var meta: Dictionary[String, Variant] = {
         "pct": pct,
         "pool": 0,
         "stacks_at_cast": stacks_at_cast,
-        "block_mana_gain": true
+        "heal_only": true,
+        "block_mana_gain": true,
+        "protected_indices": protected_indices
     }
     bs.apply_tag(ctx.state, ctx.caster_team, ctx.caster_index, TAG_ACTIVE, RELEASE_DELAY_S, meta)
 

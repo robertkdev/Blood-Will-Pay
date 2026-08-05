@@ -1,5 +1,7 @@
 # Unit Art Workflow Test Log - 2026-06-29
 
+> Legacy naming note (2026-07-28): this dated log preserves the former name `Cashmere` and exact historical artifact paths. The current unit is Mara; the old formal ledger-clad image is not approved as Mara art.
+
 This log records the first visual workflow tests for `docs/art/unit_art_style_workflow.md` and `docs/art/unit_art_prompt_cases.json`.
 
 ## Summary
