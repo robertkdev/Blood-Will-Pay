@@ -6,7 +6,7 @@ const ENEMY_IDS: Array[String] = ["korath", "brute", "berebell", "mortem", "sari
 const GROUPS: Array[Dictionary] = [
 	{
 		"name": "opening_frontline",
-		"units": ["axiom", "berebell", "bo", "bonko", "brute", "cashmere"],
+		"units": ["axiom", "berebell", "bo", "bonko", "brute", "mara"],
 	},
 	{
 		"name": "engage_arcane",

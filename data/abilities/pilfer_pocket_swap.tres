@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "pilfer_pocket_swap"
 name = "Pocket Swap"
-description = "Dashes through the farthest enemy, drops targetability briefly, cuts and disrupts them, and pockets Catalyst charge."
-targeting_summary = "Farthest enemy."
+description = "Swaps positions with the furthest enemy and briefly disarms them."
+targeting_summary = "Furthest enemy."
 base_cost = 25
-tags = ["damage", "dash", "untargetable", "catalyst", "cc"]
+tags = ["swap", "disarm"]

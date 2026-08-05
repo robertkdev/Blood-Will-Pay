@@ -10,6 +10,9 @@ func nyxa_per_shot_bonus(_state: BattleState, _team: String, _index: int) -> int
 func korath_absorb_pct(_state: BattleState, _team: String, _index: int) -> float:
 	return 0.0
 
+func korath_redirect_index(_state: BattleState, _team: String, _protected_index: int) -> int:
+	return -1
+
 func korath_accumulate_pool(_state: BattleState, _team: String, _index: int, _amount: int) -> void:
 	pass
 

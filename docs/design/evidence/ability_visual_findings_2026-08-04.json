@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "evidence_status": "historical_only_fresh_capture_blocked",
+  "review_verdict": "fail",
+  "review_scope": "Ability setup, impact, aftermath, caster identity, target identity, and counterplay readability",
+  "panels": [
+    {
+      "id": "casts_and_statuses",
+      "path": "outputs/visual_iter/combat_signal_vfx_pass/combat_signals_01_casts_and_statuses.png"
+    },
+    {
+      "id": "heals_shields_stuns",
+      "path": "outputs/visual_iter/combat_signal_vfx_pass/combat_signals_02_heals_shields_stuns.png"
+    },
+    {
+      "id": "followup_effects",
+      "path": "outputs/visual_iter/combat_signal_vfx_pass/combat_signals_03_followup_effects.png"
+    }
+  ],
+  "findings": [
+    {
+      "id": "AVF-001",
+      "severity": "high",
+      "panel_id": "casts_and_statuses",
+      "region_normalized": [0.37, 0.54, 0.24, 0.22],
+      "finding": "Overlapping green and red rings, a purple aura, and ground sigils show activity but do not link one caster to one target or ability."
+    },
+    {
+      "id": "AVF-002",
+      "severity": "high",
+      "panel_id": "heals_shields_stuns",
+      "region_normalized": [0.53, 0.54, 0.08, 0.14],
+      "finding": "Near-identical purple and pink treatments do not distinguish healing, shielding, and stunning at gameplay scale."
+    },
+    {
+      "id": "AVF-003",
+      "severity": "high",
+      "panel_id": "followup_effects",
+      "region_normalized": [0.36, 0.52, 0.25, 0.29],
+      "finding": "The sequence primarily changes positions and status bars; it does not expose a legible anticipation, hit, and residue arc."
+    },
+    {
+      "id": "AVF-004",
+      "severity": "medium",
+      "panel_id": "casts_and_statuses",
+      "region_normalized": [0.34, 0.31, 0.30, 0.06],
+      "finding": "The arena-pressure banner supplies meaning through text while occluding the battlefield, substituting UI explanation for in-world causality."
+    }
+  ],
+  "limitations": [
+    "The screenshots are historical and do not establish current runtime quality.",
+    "Still images cannot assess timing, sound, motion trails, response, or anticipation frames.",
+    "Fresh capture was blocked by missing Godot imported font and audio cache artifacts.",
+    "Automated annotation was blocked because the visual_debug_harness Python module was unavailable."
+  ]
+}

@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "morrak_reaping_line"
 name = "Reaping Line"
-description = "Cleaves in a line for heavy physical damage scaling with AD and stacks; executes enemies under a threshold and briefly gains defenses."
+description = "Cleaves enemies in a line and executes only enemies already below the Executioner threshold."
 targeting_summary = "Current attack target in a line."
 base_cost = 60
-tags = ["damage", "execute", "aoe", "line", "buff"]
+tags = ["damage", "line", "execute"]

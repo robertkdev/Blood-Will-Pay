@@ -7,7 +7,6 @@ const BuffPresenceKernel := preload("res://tests/rga_testing/aggregators/kernels
 const ControlMobilityKernel := preload("res://tests/rga_testing/aggregators/kernels/control_mobility_kernel.gd")
 const CounterplayPressureKernel := preload("res://tests/rga_testing/aggregators/kernels/counterplay_pressure_kernel.gd")
 const PeelApproachTest := preload("res://tests/rga_testing/metrics/approach/peel_approach_test.gd")
-const CCImmunityApproachTest := preload("res://tests/rga_testing/metrics/approach/cc_immunity_approach_test.gd")
 const SupportRoleIdentityTest := preload("res://tests/rga_testing/metrics/support/support_role_identity_test.gd")
 const GoalPrimaryTest := preload("res://tests/rga_testing/metrics/goal/goal_primary_test.gd")
 
@@ -48,7 +47,6 @@ func _run() -> void:
 	var kernel_result: Dictionary = _merge_kernel_results([buff_kernel.call("result"), control_kernel.call("result"), counterplay_kernel.call("result")])
 	var metrics_payload: Dictionary = _metric_payload(kernel_result)
 	var peel_result: Dictionary = _run_metric(PeelApproachTest, metrics_payload)
-	var cc_immunity_result: Dictionary = _run_metric(CCImmunityApproachTest, metrics_payload)
 	var support_result: Dictionary = _run_metric(SupportRoleIdentityTest, metrics_payload)
 	var goal_result: Dictionary = _run_metric(GoalPrimaryTest, metrics_payload)
 
@@ -60,10 +58,9 @@ func _run() -> void:
 	var carry_target_rec: Dictionary = _target_rec(buff_presence, "a", "nyxa")
 	var enemy_counter_rec: Dictionary = _per_unit_rec(counterplay, "b", "repo")
 	var cleanse_applied: int = int(totem_buff_rec.get("cleanse_applied", 0))
-	var cc_immunity_applied: int = int(totem_buff_rec.get("cc_immunity", 0))
 	var cc_events: int = int(totem_control_rec.get("cc_events", 0))
 	var carry_cleanse_received: int = int(carry_target_rec.get("cleanse_received", 0))
-	var carry_immunity_received: int = int(carry_target_rec.get("cc_immunity_received", 0))
+	var carry_shield: int = int(carry.ui_shield)
 	var cleanse_pressure_events: int = int(enemy_counter_rec.get("cleanse_pressure_events", 0))
 	var cleanse_pressure_removed: int = int(enemy_counter_rec.get("cleanse_pressure_removed", 0))
 	var goal_save_failed: bool = _has_span(goal_result, "goal_peel_carry_peel_saves", false)
@@ -76,13 +73,11 @@ func _run() -> void:
 		" armor_restored=", armor_restored,
 		" cleanse_applied=", cleanse_applied,
 		" carry_cleanse_received=", carry_cleanse_received,
-		" cc_immunity_applied=", cc_immunity_applied,
-		" carry_immunity_received=", carry_immunity_received,
+		" carry_shield=", carry_shield,
 		" cc_events=", cc_events,
 		" cleanse_pressure_events=", cleanse_pressure_events,
 		" cleanse_pressure_removed=", cleanse_pressure_removed,
 		" peel_pass=", bool(peel_result.get("pass", false)),
-		" cc_immunity_pass=", bool(cc_immunity_result.get("pass", false)),
 		" support_pass=", bool(support_result.get("pass", false)),
 		" goal_pass=", bool(goal_result.get("pass", false)),
 		" goal_save_failed=", goal_save_failed,
@@ -101,17 +96,14 @@ func _run() -> void:
 	if cleanse_applied < 1 or carry_cleanse_received < 1:
 		printerr("TotemCleanseLiveProbe: FAIL source-owned cleanse telemetry was not captured")
 		failed = true
-	if cc_immunity_applied < 1 or carry_immunity_received < 1:
-		printerr("TotemCleanseLiveProbe: FAIL source-owned CC-immunity telemetry was not captured")
+	if carry_shield <= 0:
+		printerr("TotemCleanseLiveProbe: FAIL carry shield was not applied")
 		failed = true
 	if cleanse_pressure_events < 1 or cleanse_pressure_removed < 1:
 		printerr("TotemCleanseLiveProbe: FAIL cleanse pressure was not attributed to the enemy debuff source")
 		failed = true
 	if not bool(peel_result.get("pass", false)) or not _has_span_label(peel_result, "subject_peel_cleanse_applied"):
 		printerr("TotemCleanseLiveProbe: FAIL approach_peel did not expose direct cleanse evidence")
-		failed = true
-	if not bool(cc_immunity_result.get("pass", false)) or not _has_span_label(cc_immunity_result, "subject_cc_immunity_applied_or_received"):
-		printerr("TotemCleanseLiveProbe: FAIL approach_cc_immunity did not pass on direct CC-immunity evidence")
 		failed = true
 	if not bool(support_result.get("pass", false)) or not _has_span_label(support_result, "subject_support_cleanse_applied"):
 		printerr("TotemCleanseLiveProbe: FAIL support identity did not expose direct cleanse evidence")
@@ -201,7 +193,10 @@ func _cast_totem_cleanse(engine: CombatEngine, state: BattleState) -> bool:
 	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, "player", 0)
 	ctx.buff_system = engine.buff_system
 	var ability: Variant = TotemCleanse.new()
-	return bool(ability.call("cast", ctx))
+	engine.buff_system.push_source("player", 0, "ability")
+	var cast_result: bool = bool(ability.call("cast", ctx))
+	engine.buff_system.pop_source()
+	return cast_result
 
 func _merge_kernel_results(kernel_results: Array[Dictionary]) -> Dictionary:
 	var merged: Dictionary = {}

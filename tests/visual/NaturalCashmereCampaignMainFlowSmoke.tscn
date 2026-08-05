@@ -1,9 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://tests/visual/natural_single_campaign_main_flow_smoke.gd" id="1"]
-
-[node name="NaturalCashmereCampaignMainFlowSmoke" type="Node"]
-script = ExtResource("1")
-campaign_smoke_name = "NaturalCashmereCampaignMainFlowSmoke"
-campaign_starter_id = "cashmere"
-campaign_shop_seed = 4601

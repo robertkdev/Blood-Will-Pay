@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ShopTransactions
 
+const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.gd")
+
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
 const ShopErrors := preload("res://scripts/game/shop/shop_errors.gd")
 const ShopAffordability := preload("res://scripts/game/shop/affordability.gd")
@@ -46,7 +48,7 @@ func toggle_lock(state: ShopState) -> ShopState:
 	var locked: bool = not bool(state.locked)
 	return ShopState.new(state.offers, locked, state.free_rerolls)
 
-func reroll(state: ShopState, level: int, available_gold: int, opening_starter_id: String = "") -> Dictionary:
+func reroll(state: ShopState, level: int, available_gold: int, opening_starter_id: String = "", quoted_cost: int = ShopConfig.REROLL_COST) -> Dictionary:
 	# Fail fast; no side-effects outside the returned payload.
 	# Returns { ok: bool, error?: String, state?: ShopState, gold_spent?: int }
 	if _roller == null:
@@ -58,7 +60,7 @@ func reroll(state: ShopState, level: int, available_gold: int, opening_starter_i
 		return { "ok": false, "error": ShopErrors.SHOP_LOCKED }
 
 	# Cost computation (free reroll consumes a charge)
-	var cost: int = int(ShopConfig.REROLL_COST)
+	var cost: int = max(0, int(quoted_cost))
 	var new_free: int = int(state.free_rerolls)
 	if new_free > 0:
 		cost = 0
@@ -88,9 +90,9 @@ func reroll(state: ShopState, level: int, available_gold: int, opening_starter_i
 	var new_state: ShopState = ShopState.new(offers, next_locked, new_free)
 	return { "ok": true, "state": new_state, "gold_spent": cost }
 
-func buy_xp(progress: PlayerProgress, available_gold: int) -> Dictionary:
+func buy_xp(progress: PlayerProgress, available_gold: int, quoted_cost: int = ShopConfig.BUY_XP_COST) -> Dictionary:
 	# Returns { ok: bool, error?: String, gold_spent?: int, level?: int, xp?: int, xp_to_next?: int }
-	var cost: int = int(ShopConfig.BUY_XP_COST)
+	var cost: int = max(0, int(quoted_cost))
 	var in_combat: bool = false
 	if Engine.has_singleton("GameState"):
 		in_combat = (GameState.phase == GameState.GamePhase.COMBAT)
@@ -101,14 +103,23 @@ func buy_xp(progress: PlayerProgress, available_gold: int) -> Dictionary:
 		return { "ok": false, "error": ShopErrors.WOULD_KILL_YOU, "need_more": int(aff.get("need_more", 0)) }
 	if progress == null:
 		return { "ok": false, "error": ShopErrors.UNKNOWN }
-	progress.buy_xp()
-	return {
+	var progress_result: Dictionary = progress.purchase_progression()
+	if not bool(progress_result.get("ok", true)):
+		return {
+			"ok": false,
+			"error": String(progress_result.get("error", ShopErrors.ACTION_FAILED)),
+			"command_points": int(progress_result.get("command_points", 0)),
+			"command_rank": int(progress_result.get("command_rank", 0)),
+		}
+	var result: Dictionary = {
 		"ok": true,
 		"gold_spent": cost,
 		"level": int(progress.level),
 		"xp": int(progress.xp),
 		"xp_to_next": int(progress.xp_to_next()),
 	}
+	result.merge(progress_result, true)
+	return result
 
 func buy_unit(state: ShopState, slot_index: int, available_gold: int, _level: int) -> Dictionary:
 	# Returns { ok, state?, gold_spent?, bench_slot?, unit_id?, error? }
@@ -122,7 +133,7 @@ func buy_unit(state: ShopState, slot_index: int, available_gold: int, _level: in
 	var offer: ShopOffer = state.offers[idx]
 	if offer == null:
 		return { "ok": false, "error": ShopErrors.INVALID_SLOT }
-	var cost: int = int(offer.cost)
+	var cost: int = int(offer.price) if int(offer.price) > 0 else int(offer.cost)
 	# Affordability (phase-aware)
 	var in_combat: bool = false
 	if Engine.has_singleton("GameState"):
@@ -141,9 +152,13 @@ func buy_unit(state: ShopState, slot_index: int, available_gold: int, _level: in
 	if bench_slot == -1:
 		return { "ok": false, "error": ShopErrors.BENCH_FULL }
 	# Spawn unit
-	var u: Unit = UnitFactory.spawn(String(offer.id))
+	var u: Unit = UnitFactory.spawn_at_level(String(offer.id), max(1, int(offer.package_level)))
 	if u == null:
 		return { "ok": false, "error": ShopErrors.UNKNOWN }
+	u.purchase_value = cost
+	u.market_package_kind = String(offer.package_kind)
+	if u.market_package_kind == "current_grade":
+		UnitUpgradePaths.apply_capital_charter(u)
 	# Place in bench
 	var placed: bool = false
 	if _roster != null and _roster.has_method("set_slot"):
@@ -233,6 +248,8 @@ func _remove_from_board(u: Unit) -> bool:
 func _calculate_sell_value(u: Unit) -> int:
 	if u == null:
 		return 0
+	if int(u.purchase_value) > 0:
+		return int(u.purchase_value)
 	var base_cost: int = max(0, int(u.cost))
 	var lvl: int = max(1, int(u.level))
 	var mult: int = 1

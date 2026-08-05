@@ -1,13 +1,10 @@
 extends AbilityImplBase
 
 const MovementMath := preload("res://scripts/game/combat/movement/math.gd")
+const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
 
-const SHIELD_BASE: Array[int] = [115, 175, 265]
 const MANA_GRANT: Array[int] = [10, 16, 24]
-const DISRUPT_DAMAGE: Array[int] = [80, 120, 180]
-const RADIUS_TILES: float = 2.4
-const SHIELD_DURATION: float = 4.5
-const STUN_DURATION: float = 0.85
+const LINE_HALF_WIDTH_TILES: float = 0.55
 const FORMATION_PUSH_TILES: float = 1.15
 const MOVE_DURATION: float = 0.18
 
@@ -25,45 +22,41 @@ func cast(ctx: AbilityContext) -> bool:
 	if caster == null or not caster.is_alive():
 		return false
 	var level_index: int = _level_index(caster)
-	var linked_allies: Array[int] = _linked_allies(ctx, caster)
+	var linked_allies: Array[int] = _linked_allies(ctx)
+	if linked_allies.size() < 2:
+		return false
 	for ally_index: int in linked_allies:
 		_grant_mana(ctx, ally_index, MANA_GRANT[level_index])
-		if ctx.buff_system != null:
-			ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, ally_index, SHIELD_BASE[level_index], SHIELD_DURATION)
-	var target_index: int = ctx.current_target(ctx.caster_team, ctx.caster_index)
-	if target_index < 0:
-		target_index = ctx.lowest_hp_enemy(ctx.caster_team)
-	if target_index < 0:
-		return not linked_allies.is_empty()
 	var target_team: String = _enemy_team(ctx.caster_team)
-	var center: Vector2 = ctx.position_of(target_team, target_index)
-	var victims: Array[int] = ctx.enemies_in_radius_at(ctx.caster_team, center, RADIUS_TILES)
+	var line_start: Vector2 = ctx.position_of(ctx.caster_team, linked_allies[0])
+	var line_end: Vector2 = ctx.position_of(ctx.caster_team, linked_allies[1])
+	var victims: Array[int] = _enemies_crossing_link(ctx, target_team, line_start, line_end)
 	for order: int in range(victims.size()):
 		var victim_index: int = victims[order]
-		ctx.damage_single(ctx.caster_team, ctx.caster_index, victim_index, float(DISRUPT_DAMAGE[level_index]), "magic")
-		ctx.stun(target_team, victim_index, STUN_DURATION)
-		_scatter_enemy(ctx, target_team, victim_index, center, order)
-		ctx.emit_zone_exposure(target_team, victim_index, "juno_constellation_field", STUN_DURATION, float(DISRUPT_DAMAGE[level_index]), RADIUS_TILES)
-		ctx.emit_redirect_semantic(target_team, victim_index, "constellation_misdirection", STUN_DURATION, 1.0, 0.6)
+		_push_off_line(ctx, target_team, victim_index, line_start, line_end, order)
+		ctx.emit_redirect_semantic(target_team, victim_index, "juno_constellation_line", MOVE_DURATION, FORMATION_PUSH_TILES, 0.0)
 	ctx.log("Constellation Math: linked %d allies and disrupted %d enemies" % [linked_allies.size(), victims.size()])
 	return true
 
-func _linked_allies(ctx: AbilityContext, caster: Unit) -> Array[int]:
+func _linked_allies(ctx: AbilityContext) -> Array[int]:
 	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
-	var output: Array[int] = []
+	var candidates: Array[int] = []
 	for index: int in range(allies.size()):
 		var ally: Unit = allies[index]
-		if ally == null or not ally.is_alive() or index == ctx.caster_index:
-			continue
-		if not _shares_trait(caster, ally):
-			output.append(index)
-		if output.size() >= 2:
-			break
-	if output.is_empty():
-		var fallback: int = ctx.lowest_hp_ally(ctx.caster_team)
-		if fallback >= 0:
-			output.append(fallback)
-	return output
+		if ally != null and ally.is_alive() and index != ctx.caster_index:
+			candidates.append(index)
+	for first_offset: int in range(candidates.size()):
+		for second_offset: int in range(first_offset + 1, candidates.size()):
+			var first_index: int = candidates[first_offset]
+			var second_index: int = candidates[second_offset]
+			if not _shares_trait(allies[first_index], allies[second_index]):
+				var preferred_pair: Array[int] = [first_index, second_index]
+				return preferred_pair
+	if candidates.size() >= 2:
+		var fallback_pair: Array[int] = [candidates[0], candidates[1]]
+		return fallback_pair
+	var no_pair: Array[int] = []
+	return no_pair
 
 func _shares_trait(first: Unit, second: Unit) -> bool:
 	for first_trait: String in first.traits:
@@ -85,11 +78,38 @@ func _grant_mana(ctx: AbilityContext, target_index: int, amount: int) -> void:
 	if ctx.buff_system != null:
 		ctx.buff_system.record_buff(ctx.state, ctx.caster_team, target_index, "juno_mana_link", {"mana": gained}, float(gained), 0.0)
 
-func _scatter_enemy(ctx: AbilityContext, target_team: String, target_index: int, center: Vector2, order: int) -> void:
+func _enemies_crossing_link(ctx: AbilityContext, target_team: String, line_start: Vector2, line_end: Vector2) -> Array[int]:
+	var victims: Array[int] = []
+	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	var width: float = LINE_HALF_WIDTH_TILES * ctx.tile_size()
+	for enemy_index: int in range(enemies.size()):
+		var enemy: Unit = enemies[enemy_index]
+		if enemy == null or not enemy.is_alive():
+			continue
+		var enemy_position: Vector2 = ctx.position_of(target_team, enemy_index)
+		if _distance_to_segment(enemy_position, line_start, line_end) <= width:
+			victims.append(enemy_index)
+	return victims
+
+func _distance_to_segment(point: Vector2, start: Vector2, finish: Vector2) -> float:
+	var segment: Vector2 = finish - start
+	var length_squared: float = segment.length_squared()
+	if length_squared <= 0.001:
+		return point.distance_to(start)
+	var projection: float = clamp((point - start).dot(segment) / length_squared, 0.0, 1.0)
+	return point.distance_to(start + segment * projection)
+
+func _push_off_line(ctx: AbilityContext, target_team: String, target_index: int, line_start: Vector2, line_end: Vector2, order: int) -> void:
+	if ctx.buff_system != null and ctx.buff_system.has_tag(ctx.state, target_team, target_index, BuffTags.TAG_CC_IMMUNE):
+		return
 	var current: Vector2 = ctx.position_of(target_team, target_index)
-	var direction: Vector2 = current - center
+	var segment: Vector2 = line_end - line_start
+	var direction: Vector2 = Vector2(-segment.y, segment.x).normalized()
+	var midpoint: Vector2 = (line_start + line_end) * 0.5
+	if (current - midpoint).dot(direction) < 0.0:
+		direction = -direction
 	if direction.length_squared() <= 0.001:
-		var angle: float = float(order) * TAU / 6.0
+		var angle: float = float(order) * PI
 		direction = Vector2(cos(angle), sin(angle))
 	var destination: Vector2 = current + direction.normalized() * FORMATION_PUSH_TILES * ctx.tile_size()
 	if ctx.engine.arena_state != null and ctx.engine.arena_state.has_method("notify_forced_movement"):

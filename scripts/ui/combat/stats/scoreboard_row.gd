@@ -2,8 +2,6 @@ extends Control
 class_name ScoreboardRow
 
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
-const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
-
 var team: String = "player"
 var index: int = -1
 var unit_ref: Unit = null
@@ -23,6 +21,29 @@ var display_name: String = ""
 var _frame: Panel = null
 var _value_well: Panel = null
 var _hovered: bool = false
+var _record_emphasis: bool = false
+var _compact_layout: bool = false
+var _compact_identity_font_size: int = 14
+var _exact_compact_values: bool = false
+var _compact_identity_mode: String = "full_badge"
+
+func set_compact_layout(enabled: bool) -> void:
+	_compact_layout = enabled
+	set_meta("compact_layout", enabled)
+	_refresh()
+
+func set_exact_compact_values(enabled: bool) -> void:
+	_exact_compact_values = enabled
+	set_meta("exact_compact_values", enabled)
+	_refresh()
+
+func set_record_emphasis(enabled: bool) -> void:
+	_record_emphasis = enabled
+	_refresh()
+
+func refresh_compact_identity() -> void:
+	if _compact_layout:
+		_update_identity()
 
 func set_row_data(row: Dictionary) -> void:
 	team = String(row.get("team", team))
@@ -55,6 +76,8 @@ func _update_bar() -> void:
 	var fill_w: float = w * share
 	bar_fill.anchor_left = 0.0
 	bar_fill.anchor_right = 0.0
+	bar_fill.anchor_top = 0.72 if _record_emphasis else 0.78
+	bar_fill.anchor_bottom = 0.92 if _record_emphasis else 0.90
 	bar_fill.offset_left = 0.0
 	bar_fill.offset_right = fill_w
 	bar_fill.offset_top = 0.0
@@ -70,13 +93,29 @@ func _update_identity() -> void:
 		unit_name = display_name.strip_edges()
 	elif unit_ref != null and String(unit_ref.name).strip_edges() != "":
 		unit_name = String(unit_ref.name)
-	name_label.text = unit_name
+	var team_prefix: String = "FOE" if team == "enemy" else "YOU"
+	if _compact_layout:
+		var compact_identity: String = _compact_identity_for_width(unit_name, team_prefix, _compact_identity_available_width())
+		name_label.text = compact_identity
+		name_label.set_meta("compact_identity_source", unit_name.to_upper())
+		name_label.set_meta("compact_identity_lossless", compact_identity == "%s %s" % [team_prefix, unit_name.to_upper()])
+		name_label.set_meta("compact_team_marker", team_prefix)
+		name_label.set_meta("compact_identity_font_size", _compact_identity_font_size)
+		name_label.set_meta("compact_identity_mode", _compact_identity_mode)
+		name_label.set_meta("compact_identity_preserves_unit_name", compact_identity.contains(unit_name.to_upper()))
+	else:
+		name_label.text = unit_name
+	name_label.set_meta("compact_identity_complete", _compact_layout)
+	name_label.tooltip_text = "%s team — %s" % ["Enemy" if team == "enemy" else "Your", unit_name]
 
 func _apply_visual_style() -> void:
-	custom_minimum_size.y = max(custom_minimum_size.y, 54.0)
+	# A compact metric is a record, not decorative microcopy. Keep the row and
+	# its identity at an accessibility-safe baseline when the parent rail is
+	# widened for maximum-scale planning.
+	custom_minimum_size.y = 42.0 if _compact_layout else 94.0 if _record_emphasis else 54.0
 	var player_side: bool = team != "enemy"
-	var fill_color: Color = Color(0.20, 0.38, 0.40, 0.96) if player_side else Color(0.62, 0.07, 0.10, 0.96)
-	var bg_color: Color = Color(0.020, 0.018, 0.024, 0.96)
+	var fill_color: Color = Color(0.66, 0.055, 0.070, 0.92) if player_side else Color(0.42, 0.030, 0.045, 0.90)
+	var bg_color: Color = Color(0.016, 0.014, 0.018, 0.42)
 	if _frame != null:
 		_frame.add_theme_stylebox_override("panel", _make_row_style(player_side, _hovered))
 	if bar_bg != null:
@@ -84,20 +123,83 @@ func _apply_visual_style() -> void:
 	if bar_fill != null:
 		bar_fill.color = Color(fill_color.r + 0.06, fill_color.g + 0.05, fill_color.b + 0.04, 1.0) if _hovered else fill_color
 	if name_label != null:
-		name_label.add_theme_font_size_override("font_size", 14)
+		name_label.add_theme_font_size_override("font_size", _compact_identity_font_size if _compact_layout else 22 if _record_emphasis else 17)
 		name_label.add_theme_color_override("font_color", Color(0.96, 0.90, 0.78, 1.0) if _hovered else Color(0.88, 0.84, 0.76, 1.0))
 		name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.78))
 		name_label.add_theme_constant_override("outline_size", 1)
 	if value_label != null:
-		value_label.add_theme_font_size_override("font_size", 15)
-		value_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.50, 1.0) if _hovered else Color(0.95, 0.75, 0.42, 1.0))
+		value_label.add_theme_font_size_override("font_size", 15 if _compact_layout else 26 if _record_emphasis else 18)
+		value_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.60, 1.0) if _hovered else Color(0.95, 0.56, 0.50, 1.0))
 		value_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		value_label.add_theme_constant_override("outline_size", 1)
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		value_label.clip_text = true
-	if portrait != null:
-		portrait.custom_minimum_size = Vector2(42.0, 42.0)
-		portrait.modulate = Color(1.0, 0.94, 0.80, 1.0) if _hovered else Color(0.95, 0.90, 0.82, 1.0)
+		value_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+
+func _compact_identity_for_width(unit_name: String, team_prefix: String, available_width: float) -> String:
+	var clean_name: String = unit_name.strip_edges().to_upper()
+	if clean_name == "":
+		clean_name = "UNIT"
+	var font: Font = name_label.get_theme_font("font") if name_label != null else null
+	if available_width < 112.0:
+		_compact_identity_font_size = 14
+		var tight_badge: String = "%s %s" % [team_prefix.left(1), clean_name]
+		if _compact_text_width(tight_badge, font, _compact_identity_font_size) <= available_width:
+			_compact_identity_mode = "tight_team_marker"
+			return tight_badge
+		_compact_identity_mode = "coded_name_tight_team_marker"
+		return "%s %s" % [team_prefix.left(1), _compact_identity_name(clean_name)]
+	var full_badge: String = "%s %s" % [team_prefix, clean_name]
+	_compact_identity_font_size = 14
+	while _compact_identity_font_size > 14 and _compact_text_width(full_badge, font, _compact_identity_font_size) > available_width:
+		_compact_identity_font_size -= 1
+	if _compact_text_width(full_badge, font, _compact_identity_font_size) <= available_width:
+		_compact_identity_mode = "full_badge"
+		return full_badge
+	_compact_identity_font_size = 14
+	while _compact_identity_font_size > 14 and _compact_text_width(clean_name, font, _compact_identity_font_size) > available_width:
+		_compact_identity_font_size -= 1
+	if _compact_text_width(clean_name, font, _compact_identity_font_size) <= available_width:
+		_compact_identity_mode = "name_only_team_in_chrome"
+		return clean_name
+	_compact_identity_font_size = 14
+	_compact_identity_mode = "coded_name_team_in_chrome"
+	return _compact_identity_name(clean_name)
+
+func _compact_identity_available_width() -> float:
+	if name_label == null:
+		return 72.0
+	if name_label.size.x > 1.0:
+		# Compact rails can settle a few pixels narrower after the row text is
+		# first measured. Reserve that final-layout inset so a full badge never
+		# wins against a provisional width and then clips at 125/150% scaling.
+		return maxf(32.0, name_label.size.x - 8.0)
+	if content_box != null and content_box.size.x > 1.0:
+		return maxf(32.0, content_box.size.x - 60.0)
+	return maxf(32.0, size.x - 70.0)
+
+func _compact_text_width(text: String, font: Font, font_size: int) -> float:
+	if font != null:
+		return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+	return float(text.length() * 8)
+
+func _compact_identity_name(unit_name: String) -> String:
+	var clean_name: String = unit_name.strip_edges()
+	if clean_name == "":
+		return "UNIT"
+	if clean_name.length() <= 6:
+		return clean_name.to_upper()
+	var duplicate_marker: int = clean_name.rfind("#")
+	if duplicate_marker > 0:
+		var suffix: String = clean_name.substr(duplicate_marker).strip_edges()
+		var base_budget: int = maxi(2, 6 - suffix.length())
+		return "%s%s" % [clean_name.left(base_budget).to_upper(), suffix]
+	var words: PackedStringArray = clean_name.split(" ", false)
+	if words.size() > 1:
+		var first_code: String = words[0].left(3).to_upper()
+		var final_code: String = words[words.size() - 1].left(2).to_upper()
+		return "%s%s" % [first_code, final_code]
+	return "%s%s" % [clean_name.left(4).to_upper(), clean_name.right(2).to_upper()]
 
 func _ensure_layout() -> void:
 	if _frame == null:
@@ -114,46 +216,49 @@ func _ensure_layout() -> void:
 		_frame.offset_bottom = 0.0
 	if hbox != null:
 		hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-		hbox.offset_left = 8.0
-		hbox.offset_top = 6.0
-		hbox.offset_right = -8.0
-		hbox.offset_bottom = -6.0
-		hbox.add_theme_constant_override("separation", 8)
+		hbox.offset_left = 5.0 if _compact_layout else 12.0 if _record_emphasis else 8.0
+		hbox.offset_top = 3.0 if _compact_layout else 8.0 if _record_emphasis else 6.0
+		hbox.offset_right = -5.0 if _compact_layout else -12.0 if _record_emphasis else -8.0
+		hbox.offset_bottom = -3.0 if _compact_layout else -8.0 if _record_emphasis else -6.0
+		hbox.add_theme_constant_override("separation", 0 if _compact_layout else 12 if _record_emphasis else 8)
+	if portrait != null:
+		portrait.visible = not _compact_layout
+		portrait.custom_minimum_size = Vector2.ZERO if _compact_layout else Vector2(78.0, 78.0) if _record_emphasis else Vector2(40.0, 40.0)
 	if content_box != null:
-		content_box.custom_minimum_size = Vector2(0.0, 42.0)
+		content_box.custom_minimum_size = Vector2(0.0, 34.0) if _compact_layout else Vector2(0.0, 78.0) if _record_emphasis else Vector2(0.0, 42.0)
 		_ensure_value_well()
 	if name_label != null:
+		var compact_value_width: float = _compact_numeric_well_width()
 		name_label.anchor_left = 0.0
 		name_label.anchor_right = 1.0
 		name_label.anchor_top = 0.0
 		name_label.anchor_bottom = 1.0
-		name_label.offset_left = 10.0
-		name_label.offset_right = -84.0
+		name_label.offset_left = 4.0 if _compact_layout else 16.0 if _record_emphasis else 10.0
+		name_label.offset_right = -(compact_value_width + 6.0) if _compact_layout else -126.0 if _record_emphasis else -84.0
 		name_label.clip_text = true
+		name_label.set_meta("compact_numeric_safety_gap", 6.0 if _compact_layout else 0.0)
 	if value_label != null:
+		var compact_content_width: float = _compact_numeric_content_width()
+		var compact_right_inset: float = _compact_numeric_right_inset()
 		value_label.anchor_left = 1.0
 		value_label.anchor_right = 1.0
 		value_label.anchor_top = 0.0
 		value_label.anchor_bottom = 1.0
-		value_label.offset_left = -76.0
-		value_label.offset_right = -10.0
+		value_label.offset_left = -compact_content_width - compact_right_inset if _compact_layout else -116.0 if _record_emphasis else -76.0
+		value_label.offset_right = -compact_right_inset if _compact_layout else -14.0 if _record_emphasis else -10.0
+		value_label.set_meta("compact_numeric_content_width", compact_content_width if _compact_layout else 0.0)
 
 func _make_row_style(player_side: bool, hovered: bool = false) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.050, 0.038, 0.044, 0.94) if hovered else Color(0.032, 0.028, 0.036, 0.88)
-	style.border_color = Color(0.96, 0.70, 0.34, 0.96) if hovered else Color(0.24, 0.34, 0.34, 0.74) if player_side else Color(0.48, 0.045, 0.070, 0.80)
-	style.border_width_left = 1
+	style.bg_color = Color(0.050, 0.030, 0.034, 0.98) if hovered else Color(0.027, 0.023, 0.028, 0.96)
+	style.border_color = Color(0.96, 0.55, 0.23, 0.98) if hovered else Color(0.46, 0.34, 0.22, 0.88) if player_side else Color(0.58, 0.035, 0.060, 0.92)
+	style.border_width_left = 5
 	style.border_width_top = 1
 	style.border_width_right = 1
 	style.border_width_bottom = 1
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.shadow_size = 8 if hovered else 4
-	style.shadow_color = Color(0.60, 0.16, 0.040, 0.26) if hovered else Color(0.0, 0.0, 0.0, 0.38)
-	var modulate: Color = Color(1.14, 1.05, 0.92, 1.0) if hovered else Color(0.86, 0.82, 0.78, 0.94)
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(modulate), style)
+	style.shadow_size = 4 if hovered else 2
+	style.shadow_color = Color(0.60, 0.025, 0.035, 0.24) if hovered else Color(0.0, 0.0, 0.0, 0.42)
+	return style
 
 func _ensure_value_well() -> void:
 	if content_box == null:
@@ -167,11 +272,13 @@ func _ensure_value_well() -> void:
 	_value_well.anchor_right = 1.0
 	_value_well.anchor_top = 0.0
 	_value_well.anchor_bottom = 1.0
-	_value_well.offset_left = -82.0
+	var compact_well_width: float = _compact_numeric_well_width()
+	_value_well.offset_left = -compact_well_width if _compact_layout else -122.0 if _record_emphasis else -82.0
 	_value_well.offset_right = 0.0
 	_value_well.offset_top = 3.0
 	_value_well.offset_bottom = -3.0
 	_value_well.add_theme_stylebox_override("panel", _make_value_well_style())
+	_value_well.set_meta("compact_numeric_well_width", compact_well_width if _compact_layout else 0.0)
 	if name_label != null:
 		content_box.move_child(name_label, content_box.get_child_count() - 1)
 	if value_label != null:
@@ -179,16 +286,28 @@ func _ensure_value_well() -> void:
 
 func _make_value_well_style() -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.018, 0.015, 0.020, 0.82)
-	style.border_color = Color(0.30, 0.22, 0.18, 0.54)
-	style.border_width_left = 1
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_right = 4
-	style.corner_radius_bottom_left = 4
+	style.bg_color = Color(0.010, 0.009, 0.012, 0.94)
+	style.border_color = Color(0.48, 0.30, 0.18, 0.82)
+	style.border_width_left = 3
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
 	style.content_margin_left = 6
 	style.content_margin_right = 8
-	return GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.68, 0.64, 0.60, 0.70)), style)
+	return style
+
+func _compact_numeric_well_width() -> float:
+	if not _exact_compact_values:
+		return 22.0
+	return 62.0 if size.x < 180.0 else 78.0
+
+func _compact_numeric_content_width() -> float:
+	if not _exact_compact_values:
+		return 16.0
+	return 50.0 if size.x < 180.0 else 64.0
+
+func _compact_numeric_right_inset() -> float:
+	return 8.0 if _exact_compact_values else 4.0
 
 func _format_value(v: float) -> String:
 	if metric_key == "dps":
@@ -196,6 +315,8 @@ func _format_value(v: float) -> String:
 			return String.num(v/1000.0, 1) + "k"
 		return String.num(v, 1)
 	if metric_key == "casts":
+		return str(int(round(v)))
+	if _compact_layout and _exact_compact_values and absi(int(round(v))) < 10000:
 		return str(int(round(v)))
 	if v >= 1000000.0:
 		return String.num(v/1000000.0, 1) + "m"
@@ -223,6 +344,9 @@ func _center_value_label() -> void:
 	value_label.offset_bottom = top + text_h
 
 func _ready() -> void:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	_compact_layout = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0
+	set_meta("compact_layout", _compact_layout)
 	_ensure_layout()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -239,6 +363,10 @@ func _ready() -> void:
 		resized.connect(_update_bar)
 	if content_box and not content_box.is_connected("resized", Callable(self, "_update_bar")):
 		content_box.resized.connect(_update_bar)
+	if not is_connected("resized", Callable(self, "_update_identity")):
+		resized.connect(_update_identity)
+	if content_box and not content_box.is_connected("resized", Callable(self, "_update_identity")):
+		content_box.resized.connect(_update_identity)
 	if value_label:
 		value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_center_value_label()

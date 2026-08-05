@@ -1,7 +1,7 @@
 extends "res://tests/visual/random_later_shop_progression_smoke.gd"
 
 const REWARD_RUNTIME_SMOKE_NAME: String = "RandomLaterRewardRuntimeResetSmoke"
-const REWARD_RUNTIME_STARTERS: Array[String] = ["axiom", "berebell", "bo", "bonko", "brute", "cashmere"]
+const REWARD_RUNTIME_STARTERS: Array[String] = ["axiom", "berebell", "bo", "bonko", "brute", "mara"]
 const REWARD_RUNTIME_SEEDS: Array[int] = [4101, 4201, 4301, 4401, 4501, 4601]
 
 func _random_sample_starters() -> Array[String]:

@@ -1,6 +1,8 @@
 extends Control
 class_name TeamTabs
 
+const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+
 signal category_changed(category)
 
 var categories: Array = [
@@ -58,6 +60,7 @@ func _build() -> void:
         b.toggle_mode = true
         b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
         b.focus_mode = Control.FOCUS_ALL
+        HardcoreUIAssets.apply_button_family(b, "utility")
         b.pressed.connect(func(): set_selected_category(key))
         row.add_child(b)
         _buttons[key] = b

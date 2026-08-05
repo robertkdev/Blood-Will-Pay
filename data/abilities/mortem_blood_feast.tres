@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "mortem_blood_feast"
 name = "Blood Feast"
-description = "Cycles across casts: Backstep Rend (dash through target and deal magic), Bonebreaker (magic + brief knockup), Crimson Cleave (2‑tile cone magic)."
-targeting_summary = "Current attack target, or lowest-health enemy if none; cone casts face that target."
+description = "The first two casts slash one enemy. Every third cast cleaves nearby enemies and heals Mortem from damage dealt."
+targeting_summary = "Current attack target; every third cast cleaves around it."
 base_cost = 60
-tags = ["damage", "dash", "knockup", "cone"]
+tags = ["damage", "combo", "self-heal"]

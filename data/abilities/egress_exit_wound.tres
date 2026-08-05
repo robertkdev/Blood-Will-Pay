@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "egress_exit_wound"
 name = "Exit Wound"
-description = "Strikes the lowest-health enemy, executes near threshold, vanishes, and resets on a kill."
-targeting_summary = "Lowest-health enemy from the enemy backline half; falls back to lowest-health enemy."
+description = "Marks a wounded backliner, strikes once, and executes only if they were already below 30% Health. Egress retreats only after a kill."
+targeting_summary = "Lowest-health enemy from the enemy backline half; shields and healing during the tell can deny the execute."
 base_cost = 30
-tags = ["damage", "execute", "reset_mechanic", "untargetable"]
+tags = ["damage", "execute", "retreat"]

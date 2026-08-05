@@ -100,7 +100,7 @@ def main() -> int:
         written.append(path)
 
     index_lines = [
-        "# Gamble Battle Unit Art Prompt Packets",
+        "# Blood Will Pay Unit Art Prompt Packets",
         "",
         f"- Source cases: `{CASES_PATH.relative_to(ROOT)}`",
         f"- Count: {len(written)}",

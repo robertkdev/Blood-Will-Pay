@@ -7,7 +7,7 @@ const INSTALLER_NAME: String = "CombatVfxInstaller"
 const BRIDGE_NAME: String = "CombatVfxBridge"
 const PLAYER_IDS: Array[String] = ["saffron"]
 const ENEMY_IDS: Array[String] = ["brute"]
-const EXPECTED_READABILITY_MODULATE: Color = Color(0.74, 0.62, 0.54, 0.42)
+const EXPECTED_READABILITY_MODULATE: Color = Color(0.92, 0.86, 0.82, 0.82)
 const MAX_EXPECTED_ACTIVE_LINES: int = 10
 const MAX_EXPECTED_ACTIVE_BURSTS: int = 16
 
@@ -80,7 +80,7 @@ func _run() -> void:
 	_expect(bridge.z_as_relative, "CombatVfxBridge should use relative z ordering")
 	_expect(bridge.z_index == 5, "CombatVfxBridge relative z_index should be 5, got %d" % bridge.z_index)
 	_expect(bridge.self_modulate.is_equal_approx(EXPECTED_READABILITY_MODULATE), "CombatVfxBridge readability modulate mismatch expected=%s actual=%s" % [str(EXPECTED_READABILITY_MODULATE), str(bridge.self_modulate)])
-	_expect(String(bridge.get_meta("gothic_readability_profile", "")) == "v2", "CombatVfxBridge readability metadata should be v2")
+	_expect(String(bridge.get_meta("gothic_readability_profile", "")) == "v3_ability_signatures", "CombatVfxBridge readability metadata should identify the ability-signature profile")
 
 	var engine: Object = _manager.get_engine() as Object
 	_expect(engine != null, "Combat engine should exist while combat is active")
@@ -92,6 +92,8 @@ func _run() -> void:
 	_expect(bridge.get("_bound_manager") == _manager, "CombatVfxBridge signal manager should be bound")
 	_expect(bridge.get("_bound_engine") == engine, "CombatVfxBridge signal engine should be bound")
 
+	_exercise_ready_telegraph(bridge)
+	_exercise_ability_signatures(bridge)
 	_exercise_line_cap(bridge, arena_container)
 	_exercise_burst_cap(bridge)
 	arena_container.visible = false
@@ -103,6 +105,45 @@ func _run() -> void:
 	var cleared_bursts: Array[Dictionary] = bridge.get("_bursts") as Array[Dictionary]
 	_expect(cleared_lines.is_empty() and cleared_bursts.is_empty(), "CombatVfxBridge should clear queued effects when the arena hides")
 	await _finish()
+
+func _exercise_ready_telegraph(bridge: CombatVfxBridge) -> void:
+	var unit: Unit = _manager.player_team[0] if _manager != null and not _manager.player_team.is_empty() else null
+	_expect(unit != null, "ready-telegraph exercise requires the player unit")
+	if unit == null:
+		return
+	unit.mana = int(ceil(float(unit.mana_max) * 0.80))
+	var candidates_value: Variant = bridge.call("_ready_telegraph_candidates")
+	var candidates: Array[Dictionary] = []
+	if candidates_value is Array:
+		for candidate_value: Variant in candidates_value as Array:
+			if candidate_value is Dictionary:
+				candidates.append(candidate_value as Dictionary)
+	_expect(candidates.size() == 1, "80% mana should expose one pre-cast telegraph candidate")
+	if candidates.size() != 1:
+		return
+	var candidate: Dictionary[String, Variant] = {}
+	candidate.assign(candidates[0])
+	var style: Dictionary[String, Variant] = {}
+	var style_value: Variant = candidate.get("style", {})
+	if style_value is Dictionary:
+		style.assign(style_value)
+	_expect(String(style.get("shape", "")) == "poultice", "near-ready telegraph should preserve Saffron's poultice signature")
+	_expect(bool(candidate.get("target_found", false)), "near-ready telegraph should preview Saffron's current target")
+
+func _exercise_ability_signatures(bridge: CombatVfxBridge) -> void:
+	bridge.clear()
+	bridge.call("_on_ability_cast", "player", 0, "saffron_golden_poultice", "enemy", 0, Vector2.ZERO)
+	var ability_bursts: Array[Dictionary] = bridge.get("_bursts") as Array[Dictionary]
+	var ability_lines: Array[Dictionary] = bridge.get("_lines") as Array[Dictionary]
+	_expect(ability_bursts.size() == 2, "ability signature should create one source glyph and one target reticle")
+	if ability_bursts.size() == 2:
+		_expect(String(ability_bursts[0].get("phase", "")) == "source", "first ability glyph should identify the caster")
+		_expect(String(ability_bursts[1].get("phase", "")) == "target", "second ability glyph should identify the target")
+		_expect(String(ability_bursts[0].get("shape", "")) == "poultice", "Saffron should use her unique poultice signature")
+	_expect(ability_lines.size() == 1, "ability signature should create one causal caster-to-target path")
+	if ability_lines.size() == 1:
+		_expect(String(ability_lines[0].get("ability_id", "")) == "saffron_golden_poultice", "ability path should preserve ability identity")
+		_expect(String(ability_lines[0].get("shape", "")) == "poultice", "ability path should carry the same signature as source and target")
 
 func _exercise_line_cap(bridge: CombatVfxBridge, arena_container: Control) -> void:
 	var arena_rect: Rect2 = arena_container.get_global_rect()

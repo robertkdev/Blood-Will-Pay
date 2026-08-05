@@ -1,0 +1,119 @@
+{
+  "observed_at": "2026-07-16T00:00:00-06:00",
+  "source_checkout": "C:/Users/Flipm/Documents/gamble-battle",
+  "source_head": "8fdc966e1bfdf0396ffe746f5c901d4f68e498fd",
+  "source_checkout_had_uncommitted_changes": true,
+  "source_note": "Values were read from the live working checkout because it contains newer user and concurrent work than the isolated task worktree. This file records derived configuration facts only; it does not copy or modify those changes.",
+  "economy": {
+    "starting_gold": 3,
+    "current_gross_win_multiplier": 2.0,
+    "current_loss_multiplier": 0.0,
+    "wager_is_escrowed": true,
+    "reroll_cost": 2,
+    "buy_xp_cost": 4,
+    "xp_per_buy": 4
+  },
+  "shop": {
+    "slot_count": 5,
+    "unit_costs": [1, 2, 3, 4, 5],
+    "unit_count_by_cost": {
+      "1": 14,
+      "2": 13,
+      "3": 12,
+      "4": 8,
+      "5": 4
+    },
+    "total_playable_units": 51,
+    "starting_player_level": 1,
+    "maximum_player_level": 14,
+    "starting_board_capacity": 3,
+    "maximum_board_capacity": 16,
+    "xp_thresholds": {
+      "2": 2,
+      "3": 6,
+      "4": 10,
+      "5": 16,
+      "6": 24,
+      "7": 40,
+      "8": 64,
+      "9": 100,
+      "10": 154,
+      "11": 232,
+      "12": 344,
+      "13": 504,
+      "14": 728
+    },
+    "total_xp_to_max": 2224,
+    "gold_to_max_level_at_current_rate": 2224
+  },
+  "units": {
+    "copies_per_promotion": 3,
+    "maximum_unit_level": 4,
+    "copies_for_level_4": 27,
+    "sell_value_recovers_base_copy_cost": true,
+    "scaled_stat_step_per_cost_or_level": 1.5,
+    "cost_tier_stat_multipliers": [1.0, 1.5, 2.25, 3.375, 5.0625],
+    "level_4_stat_multiplier_over_level_1": 3.375,
+    "full_level_4_cost_by_base_cost": {
+      "1": 27,
+      "2": 54,
+      "3": 81,
+      "4": 108,
+      "5": 135
+    },
+    "sixteen_level_4_five_cost_units_base_spend": 2160
+  },
+  "items": {
+    "maximum_slots_per_unit": 3,
+    "component_types": 8,
+    "completed_items_in_audit": 36
+  },
+  "progression": {
+    "stages_per_chapter": 5,
+    "stage_sequence": ["creep", "normal", "normal", "boss", "mirror"],
+    "easiest_reference_rating": 100,
+    "chapter_rating_step": 18,
+    "chapter_band_size": 5,
+    "chapter_band_rating_step": 35,
+    "stage_multipliers": [0.35, 0.70, 0.80, 0.85, 1.05],
+    "average_stage_multiplier": 0.75,
+    "procedural_from_chapter": 1
+  },
+  "odds_estimator": {
+    "odds_exponent": 1.12,
+    "minimum_percent": 1,
+    "maximum_percent": 99,
+    "calibration_samples": 144,
+    "calibration_matchups": 24,
+    "predicted_mean": 0.5,
+    "observed_win_rate": 0.479166666666667,
+    "overall_gap": 0.0208333333333333,
+    "brier_score": 0.115341666666667,
+    "calibration_caveat": "The aggregate calibration is close, but the outer buckets were underconfident in the saved 144-sample run. Payout odds should not ship from this model without a larger calibration set."
+  },
+  "design_defaults": {
+    "target_pre_fight_win_probability": 0.68,
+    "acceptable_probability_band": [0.60, 0.75],
+    "target_net_bankroll_growth_per_chapter": 1.22,
+    "major_decisions_per_chapter": 1,
+    "major_contract_reference_share": 0.20,
+    "run_horizon_chapters": 80,
+    "persistence": "identity_only",
+    "late_shop_role": "donor_and_contract_market",
+    "spectacle_priority": "readable_escalation",
+    "pricing_rule": "fixed_from_reference_curve_not_current_bankroll"
+  },
+  "source_paths": [
+    "scripts/game/economy/economy.gd",
+    "scripts/game/shop/shop_config.gd",
+    "scripts/game/shop/player_progress.gd",
+    "scripts/game/shop/combine_service.gd",
+    "scripts/game/shop/shop_transactions.gd",
+    "scripts/game/units/unit_scaler.gd",
+    "scripts/game/items/items.gd",
+    "scripts/game/progression/endless_chapter_generator.gd",
+    "scripts/game/combat/team_odds_estimator.gd",
+    "C:/Users/Flipm/AppData/Roaming/Godot/app_userdata/Gamble Battle/team_odds_calibration.json",
+    "C:/Users/Flipm/AppData/Roaming/Godot/app_userdata/Gamble Battle/difficulty_rating_audit.json"
+  ]
+}

@@ -5,7 +5,7 @@ class_name AttackRoller
 
 var deterministic: bool = true
 
-func roll(u: Unit, rng: RandomNumberGenerator) -> Dictionary:
+func roll(u: Variant, rng: RandomNumberGenerator) -> Dictionary:
     if u == null:
         return {"damage": 0, "crit": false}
     if deterministic:

@@ -2,7 +2,7 @@ extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const REPRO_NAME: String = "BoC5R4MainHangRepro"
 const PLAYER_IDS: Array[String] = ["bo", "veyra", "luna", "vykos", "nyxa", "paisley", "teller", "volt", "totem"]
-const BENCH_IDS: Array[String] = ["berebell", "repo", "mortem", "bonko", "cashmere", "sari", "grint"]
+const BENCH_IDS: Array[String] = ["berebell", "repo", "mortem", "bonko", "mara", "sari", "grint"]
 const CHAPTER: int = 5
 const ROUND_IN_CHAPTER: int = 4
 const GOLD: int = 7

@@ -7,6 +7,7 @@ const RGASettings := preload("res://tests/rga_testing/settings.gd")
 const RGAUnitCatalog := preload("res://tests/rga_testing/io/unit_catalog.gd")
 const TeamOddsEstimator := preload("res://scripts/game/combat/team_odds_estimator.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
+const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
 
 const RUN_ID: String = "team_odds_calibration"
 const CALIBRATION_SEED: int = 918273
@@ -17,9 +18,9 @@ const MAX_TEAM_SIZE: int = 4
 const DELTA_S: float = 0.05
 const TIMEOUT_S: float = 60.0
 const MAX_OVERALL_GAP: float = 0.10
-const MAX_BUCKET_GAP: float = 0.22
+const MAX_BUCKET_GAP: float = 0.15
 const MIN_BUCKET_SAMPLES: int = 12
-const MAX_TIMEOUT_RATE: float = 0.05
+const MAX_UNACCEPTABLE_TIMEOUTS: int = 0
 const SUMMARY_PATH: String = "user://team_odds_calibration.json"
 
 func _ready() -> void:
@@ -47,7 +48,7 @@ func _run() -> void:
 			if samples.size() % 12 == 0:
 				print("TeamOddsCalibrationProbe: progress samples=%d/%d" % [samples.size(), MATCHUP_COUNT * SEEDS_PER_MATCHUP * 2])
 	var summary: Dictionary = _summarize(samples)
-	_write_summary(summary)
+	_expect(_write_summary(summary), "could not write " + SUMMARY_PATH, failures)
 	_validate_summary(summary, failures)
 	if failures.is_empty():
 		print("TeamOddsCalibrationProbe: PASS %s" % _summary_line(summary))
@@ -88,8 +89,18 @@ func _record_sample(samples: Array[Dictionary], team_a_ids: Array[String], team_
 	var out: Dictionary = simulator.run(job, false, null)
 	var outcome: Variant = out.get("engine_outcome", null)
 	var result: String = "missing"
+	var reason: String = "missing_outcome"
+	var time_s: float = 0.0
+	var frames: int = 0
+	var team_a_alive: int = 0
+	var team_b_alive: int = 0
 	if outcome != null:
 		result = String(outcome.result)
+		reason = String(outcome.reason)
+		time_s = float(outcome.time_s)
+		frames = int(outcome.frames)
+		team_a_alive = int(outcome.team_a_alive)
+		team_b_alive = int(outcome.team_b_alive)
 	var actual: float = 0.5
 	if result == "team_a":
 		actual = 1.0
@@ -101,8 +112,16 @@ func _record_sample(samples: Array[Dictionary], team_a_ids: Array[String], team_
 		"team_a": team_a_ids.duplicate(),
 		"team_b": team_b_ids.duplicate(),
 		"predicted": predicted_percent,
+		"player_power": TeamOddsEstimator.team_rating(player_team),
+		"enemy_power": TeamOddsEstimator.team_rating(enemy_team),
 		"actual": actual,
 		"result": result,
+		"reason": reason,
+		"time_s": time_s,
+		"frames": frames,
+		"team_a_alive": team_a_alive,
+		"team_b_alive": team_b_alive,
+		"reliability": out.get("reliability", {}),
 	})
 
 func _spawn_team(ids: Array[String]) -> Array[Unit]:
@@ -137,7 +156,10 @@ func _make_job(team_a_ids: Array[String], team_b_ids: Array[String], sim_seed: i
 	job.alternate_order = false
 	job.bridge_projectile_to_hit = true
 	job.capabilities = PackedStringArray(["base"])
-	job.metadata = {"scenario_label": "odds_calibration"}
+	job.metadata = {
+		"scenario_label": "odds_calibration",
+		"collect_reliability_diagnostics": true,
+	}
 	return job
 
 func _summarize(samples: Array[Dictionary]) -> Dictionary:
@@ -146,13 +168,26 @@ func _summarize(samples: Array[Dictionary]) -> Dictionary:
 	var actual_sum: float = 0.0
 	var brier_sum: float = 0.0
 	var timeout_count: int = 0
+	var tie_count: int = 0
+	var simulation_timeout_count: int = 0
+	var engine_combat_timeout_count: int = 0
+	var engine_no_progress_timeout_count: int = 0
 	for sample: Dictionary in samples:
 		var predicted_percent: int = int(sample.get("predicted", 50))
 		var predicted: float = float(predicted_percent) / 100.0
 		var actual: float = float(sample.get("actual", 0.5))
 		var result: String = String(sample.get("result", ""))
-		if result == "timeout" or result == "missing":
+		var reason: String = String(sample.get("reason", ""))
+		if _is_unacceptable_outcome(result, reason):
 			timeout_count += 1
+		if result == "timeout" or result == "missing" or result == "wall_timeout":
+			simulation_timeout_count += 1
+		if reason == "engine_combat_timeout":
+			engine_combat_timeout_count += 1
+		elif reason == "engine_no_progress_timeout":
+			engine_no_progress_timeout_count += 1
+		if result == "draw":
+			tie_count += 1
 		predicted_sum += predicted
 		actual_sum += actual
 		brier_sum += pow(predicted - actual, 2.0)
@@ -197,15 +232,24 @@ func _summarize(samples: Array[Dictionary]) -> Dictionary:
 		"brier": brier_sum / float(count),
 		"timeouts": timeout_count,
 		"timeout_rate": float(timeout_count) / float(count),
+		"ties": tie_count,
+		"simulation_timeouts": simulation_timeout_count,
+		"engine_combat_timeout_resolutions": engine_combat_timeout_count,
+		"engine_no_progress_timeout_resolutions": engine_no_progress_timeout_count,
 		"buckets": bucket_rows,
+		"model_version": CombatPowerModel.MODEL_VERSION,
+		"sample_rows": samples,
+		"rows": samples,
+		"deterministic_fingerprint": _deterministic_fingerprint(samples),
+		"project_path": ProjectSettings.globalize_path("res://"),
 		"summary_path": SUMMARY_PATH,
 	}
 
 func _validate_summary(summary: Dictionary, failures: Array[String]) -> void:
 	var expected_samples: int = MATCHUP_COUNT * SEEDS_PER_MATCHUP * 2
 	_expect(int(summary.get("samples", 0)) == expected_samples, "expected %d samples, got %d" % [expected_samples, int(summary.get("samples", 0))], failures)
-	var timeout_rate: float = float(summary.get("timeout_rate", 1.0))
-	_expect(timeout_rate <= MAX_TIMEOUT_RATE, "timeout rate %.1f%% exceeded %.1f%%" % [timeout_rate * 100.0, MAX_TIMEOUT_RATE * 100.0], failures)
+	var timeout_count: int = int(summary.get("timeouts", -1))
+	_expect(timeout_count <= MAX_UNACCEPTABLE_TIMEOUTS, "unacceptable timeouts %d exceeded %d" % [timeout_count, MAX_UNACCEPTABLE_TIMEOUTS], failures)
 	var overall_gap: float = float(summary.get("overall_gap", 1.0))
 	_expect(overall_gap <= MAX_OVERALL_GAP, "overall predicted-vs-observed gap %.1f%% exceeded %.1f%%" % [overall_gap * 100.0, MAX_OVERALL_GAP * 100.0], failures)
 	var bucket_rows: Array = summary.get("buckets", [])
@@ -217,7 +261,44 @@ func _validate_summary(summary: Dictionary, failures: Array[String]) -> void:
 		checked_buckets += 1
 		var gap: float = float(bucket.get("gap", 1.0))
 		_expect(gap <= MAX_BUCKET_GAP, "bucket %s gap %.1f%% exceeded %.1f%% with n=%d" % [String(bucket.get("bucket", "")), gap * 100.0, MAX_BUCKET_GAP * 100.0, bucket_count], failures)
-	_expect(checked_buckets >= 3, "expected at least 3 populated odds buckets, got %d" % checked_buckets, failures)
+	_expect(checked_buckets >= 5, "expected at least 5 populated odds buckets, got %d" % checked_buckets, failures)
+
+func _deterministic_fingerprint(samples: Array[Dictionary]) -> String:
+	var parts: Array[String] = []
+	for sample: Dictionary in samples:
+		var reliability: Dictionary = sample.get("reliability", {})
+		parts.append("%d|%d|%s|%s|%s|%s|%d|%.3f|%d|%d|%s" % [
+			int(sample.get("sim_index", -1)),
+			int(sample.get("seed", 0)),
+			",".join(_string_array(sample.get("team_a", []))),
+			",".join(_string_array(sample.get("team_b", []))),
+			String(sample.get("result", "")),
+			String(sample.get("reason", "")),
+			int(sample.get("predicted", 0)),
+			float(sample.get("time_s", 0.0)),
+			int(sample.get("team_a_alive", 0)),
+			int(sample.get("team_b_alive", 0)),
+			JSON.stringify(reliability).sha256_text(),
+		])
+	return "\n".join(parts).sha256_text()
+
+func _is_unacceptable_outcome(result: String, reason: String) -> bool:
+	return (
+		result == "timeout"
+		or result == "missing"
+		or result == "wall_timeout"
+		or reason == "engine_no_progress_timeout"
+	)
+
+func _string_array(value: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if value is Array:
+		for entry: Variant in value:
+			out.append(String(entry))
+	elif value is PackedStringArray:
+		for entry: String in value:
+			out.append(entry)
+	return out
 
 func _bucket_key(predicted_percent: int) -> String:
 	if predicted_percent < 25:
@@ -234,13 +315,14 @@ func _bucket_key(predicted_percent: int) -> String:
 		return "61-75"
 	return "76-99"
 
-func _write_summary(summary: Dictionary) -> void:
+func _write_summary(summary: Dictionary) -> bool:
 	var file: FileAccess = FileAccess.open(SUMMARY_PATH, FileAccess.WRITE)
 	if file == null:
-		push_warning("TeamOddsCalibrationProbe: could not write " + SUMMARY_PATH)
-		return
+		push_error("TeamOddsCalibrationProbe: could not write " + SUMMARY_PATH)
+		return false
 	file.store_string(JSON.stringify(summary, "\t"))
 	file.close()
+	return true
 
 func _summary_line(summary: Dictionary) -> String:
 	var parts: Array[String] = []
@@ -250,6 +332,10 @@ func _summary_line(summary: Dictionary) -> String:
 	parts.append("gap=%.1f%%" % (float(summary.get("overall_gap", 0.0)) * 100.0))
 	parts.append("brier=%.3f" % float(summary.get("brier", 0.0)))
 	parts.append("timeouts=%d" % int(summary.get("timeouts", 0)))
+	parts.append("engine_combat_timeouts=%d" % int(summary.get("engine_combat_timeout_resolutions", 0)))
+	parts.append("engine_no_progress_timeouts=%d" % int(summary.get("engine_no_progress_timeout_resolutions", 0)))
+	parts.append("ties=%d" % int(summary.get("ties", 0)))
+	parts.append("fingerprint=%s" % String(summary.get("deterministic_fingerprint", "")))
 	var bucket_rows: Array = summary.get("buckets", [])
 	var bucket_parts: Array[String] = []
 	for bucket: Dictionary in bucket_rows:

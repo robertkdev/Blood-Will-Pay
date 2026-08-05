@@ -156,6 +156,7 @@ func apply_hit(source_team: String, source_index: int, src: Unit, tgt_team: Stri
 		var div: int = int(r.get("diverted", 0))
 		if div > 0:
 			result.redirected += div
+			result.redirect_index = int(r.get("redirect_index", -1))
 			dealt_left = int(r.get("leftover", dealt_left))
 
 	# Apply damage
@@ -270,6 +271,7 @@ func apply_ability_hit(source_team: String, source_index: int, src: Unit, tgt_te
 		var div: int = int(r.get("diverted", 0))
 		if div > 0:
 			result.redirected += div
+			result.redirect_index = int(r.get("redirect_index", -1))
 			dealt_left = int(r.get("leftover", dealt_left))
 
 	# Apply damage

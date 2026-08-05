@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://tests/rga_testing/validation/project_name_migration_probe.gd" type="Script" id="1"]
+
+[node name="ProjectNameMigrationProbe" type="Node"]
+script = ExtResource("1")

@@ -29,22 +29,23 @@ func _run() -> void:
 		return
 
 	controller.call("_begin_combat_resolving_feedback")
-	_expect(String(button.text) == "Combat Resolving...", "initial resolving text should stay immediate")
+	controller.set("_battle_start_pending", true)
+	_expect(String(button.text) == "Preparing battle...", "initial startup text should be immediate")
 
 	controller.call("_update_combat_resolving_feedback", 2.0)
-	_expect(String(button.text) == "Combat Resolving...", "resolving text should not count before delay")
+	_expect(String(button.text) == "Preparing battle...", "startup text should not count before delay")
 
 	controller.call("_update_combat_resolving_feedback", 1.2)
-	_expect(String(button.text) == "Resolving 3s...", "resolving text should show elapsed seconds after delay")
+	_expect(String(button.text) == "Preparing battle 3s...", "startup text should show elapsed seconds after delay")
 
 	controller.call("_update_combat_resolving_feedback", 7.0)
-	_expect(String(button.text) == "Still resolving 10s...", "long resolving text should warn after 10 seconds")
+	_expect(String(button.text) == "Startup delayed 10s...", "long startup text should warn after 10 seconds")
 
 	controller.call("_on_log_line", "Combat no-progress timeout: forcing result from current board state.")
-	_expect(String(button.text) == "Resolving fallback...", "watchdog log should switch button to fallback text")
+	_expect(String(button.text) == "Battle resolved by failsafe", "watchdog log should switch button to fallback text")
 
 	controller.call("_update_combat_resolving_feedback", 3.0)
-	_expect(String(button.text) == "Resolving fallback...", "fallback text should not be overwritten by timer updates")
+	_expect(String(button.text) == "Battle resolved by failsafe", "fallback text should not be overwritten by timer updates")
 
 	_finish()
 

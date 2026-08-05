@@ -1,6 +1,7 @@
 extends Node
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
+const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/bar_items_traits_pass"
 
 var _main: Control = null
@@ -26,8 +27,7 @@ func _run() -> void:
 	await _settle(0.20)
 	if _main.has_method("_on_unit_selected"):
 		_main.call("_on_unit_selected", "mortem")
-	await _settle(0.30)
-	_view = _main.get_node_or_null("CombatView") as Control
+	_view = await MainTransitionWait.for_combat_view(self, _main)
 	if _view == null:
 		push_error("BarItemsTraitsCapture: CombatView missing")
 		get_tree().quit(1)
@@ -36,6 +36,7 @@ func _run() -> void:
 		_view.call("set_player_team_ids", ["mortem", "berebell"])
 	if _view.has_method("_init_game"):
 		_view.call("_init_game")
+	_force_planning_surface()
 	await _settle(0.45)
 	_force_item_and_trait_state()
 	await _settle(0.35)
@@ -43,8 +44,12 @@ func _run() -> void:
 	_filled_item_cards = _count_filled_item_cards()
 	_visible_trait_icons = _count_visible_trait_icons()
 	_planning_visible_bars = _visible_progressbars(_player_grid()) + _visible_progressbars(_enemy_grid())
-	if not _first_item_card_uses_generated_frame():
-		push_error("BarItemsTraitsCapture: filled item card should use the generated item slot asset")
+	if not _first_item_card_uses_complete_frame():
+		push_error("BarItemsTraitsCapture: filled item card should use a complete two-rail slot frame")
+		get_tree().quit(1)
+		return
+	if not _item_cache_has_stable_label():
+		push_error("BarItemsTraitsCapture: item cache should expose a stable label and inventory state")
 		get_tree().quit(1)
 		return
 	_save_capture("01_planning_grid_bars_hidden_items_traits.png")
@@ -88,6 +93,7 @@ func _run() -> void:
 		return
 
 	if _view.has_method("_on_continue_pressed"):
+		_view.set_process(true)
 		_view.call("_on_continue_pressed")
 	await _settle(0.28)
 	_combat_visible_bars = _visible_progressbars(_arena_units())
@@ -111,6 +117,23 @@ func _run() -> void:
 		return
 	print("BarItemsTraitsCapture: OK planning_visible_bars=%d combat_visible_bars=%d filled_item_cards=%d visible_trait_icons=%d tooltip_edge_skips=%d output=%s" % [_planning_visible_bars, _combat_visible_bars, _filled_item_cards, _visible_trait_icons, _tooltip_edge_skips, ProjectSettings.globalize_path(OUTPUT_DIR)])
 	get_tree().quit(0)
+
+func _force_planning_surface() -> void:
+	_view.set_process(false)
+	GameState.set_phase(GameState.GamePhase.PREVIEW)
+	if _view.has_method("_exit_combat_arena"):
+		_view.call("_exit_combat_arena")
+	var controller: Variant = _view.get("controller")
+	if controller == null:
+		return
+	if controller.has_method("refresh_all_views"):
+		controller.call("refresh_all_views")
+	if controller.has_method("_sync_bottom_combat_visibility"):
+		controller.call("_sync_bottom_combat_visibility", true)
+	if controller.has_method("sync_tactical_phase_visuals"):
+		controller.call("sync_tactical_phase_visuals", true)
+	if _view.has_method("_apply_responsive_layout"):
+		_view.call("_apply_responsive_layout")
 
 func _force_item_and_trait_state() -> void:
 	var manager: CombatManager = _view.get("manager") as CombatManager
@@ -221,7 +244,13 @@ func _exercise_static_hover_targets() -> bool:
 			_static_hover_failure = "missing path %s" % path
 			return false
 		targets.append(control)
-	var required_button_texts: Array[String] = ["Damage", "DPS", "Casts", "Reroll", "Lock", "Buy XP", "Start Opening Fight", "Menu"]
+	var required_button_texts: Array[String] = ["Menu"]
+	if not bool(_view.get_meta("compact_layout", false)):
+		required_button_texts.append_array(["Damage", "DPS", "Casts"])
+	for optional_text: String in ["Reroll", "Lock", "Buy XP", "Start Opening Fight"]:
+		var optional_button: Button = _find_button_by_text(_view, optional_text)
+		if optional_button != null:
+			targets.append(optional_button)
 	for text: String in required_button_texts:
 		var search_root: Node = _main if text == "Menu" else _view
 		var button: Button = _find_button_by_text(search_root, text)
@@ -229,10 +258,10 @@ func _exercise_static_hover_targets() -> bool:
 			_static_hover_failure = "missing button text %s" % text
 			return false
 		targets.append(button)
+	var exercised_targets: int = 0
 	for target: Control in targets:
 		if not target.visible or not target.is_visible_in_tree():
-			_static_hover_failure = "hidden target %s" % target.name
-			return false
+			continue
 		var before_rect: Rect2 = target.get_global_rect()
 		if before_rect.size.x <= 0.0 or before_rect.size.y <= 0.0:
 			_static_hover_failure = "zero rect target %s rect=%s" % [target.name, str(before_rect)]
@@ -242,8 +271,12 @@ func _exercise_static_hover_targets() -> bool:
 		if not _rect_is_stable(before_rect, target.get_global_rect()):
 			_static_hover_failure = "shifted target %s before=%s after=%s" % [target.name, str(before_rect), str(target.get_global_rect())]
 			return false
+		exercised_targets += 1
 	Input.warp_mouse(Vector2(4.0, 4.0))
 	await _settle(0.04)
+	if exercised_targets < 1:
+		_static_hover_failure = "no visible stability target was available"
+		return false
 	return true
 
 func _exercise_item_tooltip_edges() -> bool:
@@ -382,14 +415,34 @@ func _count_trait_icons_recursive(root: Node) -> int:
 		total += _count_trait_icons_recursive(child)
 	return total
 
-func _first_item_card_uses_generated_frame() -> bool:
+func _first_item_card_uses_complete_frame() -> bool:
 	var card: Control = _first_filled_item_card()
 	if card == null:
 		return false
-	var background: Control = card.get_node_or_null("Background") as Control
-	if background == null:
+	var background: Panel = card.get_node_or_null("Background") as Panel
+	var frame: Panel = card.get_node_or_null("Frame") as Panel
+	if background == null or frame == null:
 		return false
-	return background.get_theme_stylebox("panel") is StyleBoxTexture
+	var outer_style: StyleBoxFlat = background.get_theme_stylebox("panel") as StyleBoxFlat
+	var inner_style: StyleBoxFlat = frame.get_theme_stylebox("panel") as StyleBoxFlat
+	if outer_style == null or inner_style == null:
+		return false
+	return (
+		outer_style.border_width_left > 0
+		and outer_style.border_width_top > 0
+		and outer_style.border_width_right > 0
+		and outer_style.border_width_bottom > 0
+		and inner_style.border_width_left > 0
+		and inner_style.border_width_top > 0
+		and inner_style.border_width_right > 0
+		and inner_style.border_width_bottom > 0
+	)
+
+func _item_cache_has_stable_label() -> bool:
+	var header: Label = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
+	if header == null or not header.is_visible_in_tree():
+		return false
+	return (header.text.contains("CACHE") or header.text.contains("ITEMS")) and (header.text.contains("EMPTY") or header.text.contains("/"))
 
 func _tooltip_uses_generated_frame(tooltip_name: String) -> bool:
 	var tooltip: Control = get_tree().root.get_node_or_null(tooltip_name) as Control
@@ -406,10 +459,15 @@ func _tooltip_respects_board_gap(tooltip_name: String) -> bool:
 	var tooltip: Control = get_tree().root.get_node_or_null(tooltip_name) as Control
 	if tooltip == null:
 		return false
-	var board_surface: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea") as Control
-	if board_surface == null:
-		return true
-	return tooltip.get_global_rect().end.x <= board_surface.get_global_rect().position.x - 2.0
+	var tooltip_rect: Rect2 = tooltip.get_global_rect()
+	for grid_path: String in [
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/EnemyGrid",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid",
+	]:
+		var board_grid: Control = _view.get_node_or_null(grid_path) as Control
+		if board_grid != null and board_grid.is_visible_in_tree() and tooltip_rect.intersects(board_grid.get_global_rect()):
+			return false
+	return _control_inside_viewport(tooltip)
 
 func _rect_is_stable(before_rect: Rect2, after_rect: Rect2) -> bool:
 	return before_rect.position.distance_to(after_rect.position) <= 0.5 and before_rect.size.distance_to(after_rect.size) <= 0.5

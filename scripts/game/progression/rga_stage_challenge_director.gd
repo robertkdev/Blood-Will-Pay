@@ -9,7 +9,7 @@ static var _choices: Dictionary = {}
 
 static var _pools: Dictionary = {
 	1: [
-		{"id": "frontline_lesson", "label": "Frontline Lesson", "ids": ["brute", "cashmere"], "puzzle": "Break a simple front line before its support stabilizes."},
+		{"id": "frontline_lesson", "label": "Frontline Lesson", "ids": ["brute", "mara"], "puzzle": "Break a simple front line before its support stabilizes."},
 		{"id": "range_pressure", "label": "Range Pressure", "ids": ["luna", "grint"], "puzzle": "Reach or outlast protected ranged pressure."},
 		{"id": "pick_access", "label": "Pick Access", "ids": ["bo", "bonko"], "puzzle": "Protect fragile units from early backline access."},
 		{"id": "attrition_intro", "label": "Attrition Intro", "ids": ["berebell", "morrak"], "puzzle": "Close the fight before attrition healing wins."},

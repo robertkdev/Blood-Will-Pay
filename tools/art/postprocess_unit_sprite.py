@@ -299,7 +299,7 @@ def make_preview(sprite: Image.Image, output_path: Path) -> None:
 
 
 def main() -> None:
-	parser = argparse.ArgumentParser(description="Post-process a generated Gamble Battle unit sprite.")
+	parser = argparse.ArgumentParser(description="Post-process a generated Blood Will Pay unit sprite.")
 	parser.add_argument("input", type=Path)
 	parser.add_argument("output", type=Path)
 	parser.add_argument("--canvas-size", type=int, default=1024)

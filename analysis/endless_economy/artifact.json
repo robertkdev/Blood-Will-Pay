@@ -1,0 +1,2800 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Gamble Battle Endless Economy \u2014 Decision Blueprint",
+    "description": "A research-backed, simulation-checked economy and escalation blueprint.",
+    "generatedAt": "2026-07-16T14:28:54+00:00",
+    "sources": [
+      {
+        "id": "curve-source",
+        "label": "Recommended 80-chapter economy curve",
+        "path": "analysis/endless_economy/recommended_curve.csv",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "sql": "WITH curve_source (chapter, reference_bankroll, standard_contract_price, bold_contract_price, reroll_price, xp_or_command_price, donor_contract_fee) AS (\n  VALUES\n    (1, 3, 1, 2, 2, 4, 5),\n    (2, 3.66, 1, 2, 2, 4, 5),\n    (3, 4.47, 1, 2, 2, 4, 5),\n    (4, 5.45, 1, 2, 2, 4, 5),\n    (5, 6.65, 1, 2, 2, 4, 5),\n    (6, 8.11, 2, 5, 2, 4, 5),\n    (7, 9.89, 2, 5, 2, 4, 5),\n    (8, 12.07, 2, 5, 2, 4, 5),\n    (9, 14.72, 3, 5, 2, 4, 5),\n    (10, 17.96, 4, 6, 2, 4, 5),\n    (11, 21.91, 4, 7, 2, 4, 5),\n    (12, 26.73, 5, 10, 2, 4, 5),\n    (13, 32.62, 7, 10, 2, 4, 5),\n    (14, 39.79, 8, 10, 2, 4, 5),\n    (15, 48.55, 10, 20, 2, 4, 5),\n    (16, 59.23, 10, 20, 2, 4, 5),\n    (17, 72.26, 10, 20, 2, 4, 5),\n    (18, 88.15, 20, 50, 2, 4, 5),\n    (19, 107.55, 20, 50, 2, 4, 5),\n    (20, 131.21, 20, 50, 2, 4, 5),\n    (21, 160.07, 20, 50, 2, 4, 6),\n    (22, 195.29, 50, 100, 2, 4, 8),\n    (23, 238.25, 50, 100, 2, 5, 10),\n    (24, 290.67, 50, 100, 3, 6, 10),\n    (25, 354.62, 50, 100, 4, 7, 10),\n    (26, 432.63, 100, 200, 4, 9, 20),\n    (27, 527.81, 100, 200, 5, 10, 20),\n    (28, 643.93, 100, 200, 6, 10, 20),\n    (29, 785.59, 200, 500, 8, 20, 20),\n    (30, 958.42, 200, 500, 10, 20, 50),\n    (31, 1169.27, 200, 500, 10, 20, 50),\n    (32, 1426.51, 200, 500, 10, 20, 50),\n    (33, 1740.35, 200, 500, 20, 20, 50),\n    (34, 2123.22, 500, 1000, 20, 50, 100),\n    (35, 2590.33, 500, 1000, 20, 50, 100),\n    (36, 3160.21, 500, 1000, 20, 50, 100),\n    (37, 3855.45, 1000, 2000, 50, 100, 200),\n    (38, 4703.65, 1000, 2000, 50, 100, 200),\n    (39, 5738.45, 1000, 2000, 50, 100, 200),\n    (40, 7000.91, 1000, 2000, 50, 100, 200),\n    (41, 8541.11, 2000, 5000, 100, 200, 200),\n    (42, 10420.16, 2000, 5000, 100, 200, 500),\n    (43, 12712.59, 2000, 5000, 100, 200, 500),\n    (44, 15509.36, 2000, 5000, 200, 200, 500),\n    (45, 18921.42, 5000, 10000, 200, 500, 1000),\n    (46, 23084.14, 5000, 10000, 200, 500, 1000),\n    (47, 28162.65, 5000, 10000, 200, 500, 1000),\n    (48, 34358.43, 5000, 10000, 200, 500, 1000),\n    (49, 41917.28, 10000, 20000, 500, 1000, 2000),\n    (50, 51139.09, 10000, 20000, 500, 1000, 2000),\n    (51, 62389.68, 10000, 20000, 500, 1000, 2000),\n    (52, 76115.41, 20000, 50000, 1000, 2000, 2000),\n    (53, 92860.81, 20000, 50000, 1000, 2000, 5000),\n    (54, 113290.18, 20000, 50000, 1000, 2000, 5000),\n    (55, 138214.02, 20000, 50000, 1000, 2000, 5000),\n    (56, 168621.11, 20000, 50000, 2000, 2000, 5000),\n    (57, 205717.75, 50000, 100000, 2000, 5000, 10000),\n    (58, 250975.66, 50000, 100000, 2000, 5000, 10000),\n    (59, 306190.3, 50000, 100000, 2000, 5000, 10000),\n    (60, 373552.17, 50000, 100000, 5000, 5000, 10000),\n    (61, 455733.65, 100000, 200000, 5000, 10000, 20000),\n    (62, 555995.05, 100000, 200000, 5000, 10000, 20000),\n    (63, 678313.96, 100000, 200000, 5000, 10000, 20000),\n    (64, 827543.03, 200000, 500000, 10000, 20000, 20000),\n    (65, 1009602.5, 200000, 500000, 10000, 20000, 50000),\n    (66, 1231715.05, 200000, 500000, 10000, 20000, 50000),\n    (67, 1502692.36, 200000, 500000, 20000, 20000, 50000),\n    (68, 1833284.68, 500000, 1000000, 20000, 50000, 50000),\n    (69, 2236607.31, 500000, 1000000, 20000, 50000, 100000),\n    (70, 2728660.92, 500000, 1000000, 20000, 50000, 100000),\n    (71, 3328966.32, 500000, 1000000, 20000, 50000, 100000),\n    (72, 4061338.92, 1000000, 2000000, 50000, 100000, 200000),\n    (73, 4954833.48, 1000000, 2000000, 50000, 100000, 200000),\n    (74, 6044896.84, 1000000, 2000000, 50000, 100000, 200000),\n    (75, 7374774.15, 1000000, 2000000, 50000, 100000, 200000),\n    (76, 8997224.46, 2000000, 5000000, 100000, 200000, 500000),\n    (77, 10976613.84, 2000000, 5000000, 100000, 200000, 500000),\n    (78, 13391468.89, 2000000, 5000000, 100000, 200000, 500000),\n    (79, 16337592.04, 2000000, 5000000, 200000, 200000, 500000),\n    (80, 19931862.29, 5000000, 10000000, 200000, 500000, 1000000)\n)\nSELECT * FROM curve_source;",
+          "description": "Fixed reference bankroll and player-facing prices by chapter.",
+          "tables_used": [
+            "analysis/endless_economy/recommended_curve.csv"
+          ],
+          "filters": [
+            "Deterministic model output generated from the checked-in baseline and fixed seed."
+          ],
+          "metric_definitions": [
+            "Reference bankroll = 3 * 1.22^(chapter - 1).",
+            "Standard contract price = 1-2-5 rounded band near 20% of reference bankroll.",
+            "Bold contract price = next visible 1-2-5 band above the standard option.",
+            "Prices never use the player's current bankroll."
+          ]
+        }
+      },
+      {
+        "id": "policy-source",
+        "label": "Monte Carlo betting-policy validation",
+        "path": "analysis/endless_economy/policy_summary.csv",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "sql": "WITH policy_source (policy, simulations, survival_rate, median_bankroll, median_total_earned, median_contracts_bought, mean_win_probability, mean_bet_fraction) AS (\n  VALUES\n    ('odds_aware', 5000, 0.7018, 3523.62, 31809.88, 28, 0.6701, 0.2917),\n    ('fixed_25', 5000, 0.7024, 1396.54, 15162.99, 21, 0.6635, 0.2691),\n    ('conservative', 5000, 0.8166, 1081.82, 8502.5, 13, 0.6086, 0.1843),\n    ('ten_x_floor', 5000, 0.6134, 14.14, 540.66, 2, 0.4676, 0.1608),\n    ('all_in', 5000, 0, 0.46, 15.63, 0, 0.746, 0.9787)\n)\nSELECT * FROM policy_source;",
+          "description": "Five deterministic policy cohorts, each simulated 5,000 times across 40 chapters.",
+          "tables_used": [
+            "analysis/endless_economy/policy_summary.csv"
+          ],
+          "filters": [
+            "Deterministic model output generated from the checked-in baseline and fixed seed."
+          ],
+          "metric_definitions": [
+            "Survival rate = share of simulations completing all 40 modeled chapters.",
+            "Median total earned = median cumulative gross winnings, not ending bankroll.",
+            "Odds-aware policy uses a fractional Kelly rule clamped to a minority wager."
+          ]
+        }
+      },
+      {
+        "id": "unit-source",
+        "label": "Base unit price candidate comparison",
+        "path": "analysis/endless_economy/live_baseline.json",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "sql": "WITH unit_source (candidate, prices, price_power_cv, top_tier_doublings, decision) AS (\n  VALUES\n    ('Current', '1 / 2 / 3 / 4 / 5', 0.1303, 0.0, 'Keep ratio, scale denomination'),\n    ('Moderate widening', '1 / 2 / 4 / 7 / 11', 0.2662, 1.1375, 'Reject as main sink'),\n    ('Broad exponential', '1 / 3 / 10 / 30 / 100', 0.9469, 4.3219, 'Reject as main sink')\n)\nSELECT * FROM unit_source;",
+          "description": "Candidate tier schedules compared against the current 1.5x per-level stat multiplier.",
+          "tables_used": [
+            "analysis/endless_economy/live_baseline.json"
+          ],
+          "filters": [
+            "Deterministic model output generated from the checked-in baseline and fixed seed."
+          ],
+          "metric_definitions": [
+            "Price-power CV = coefficient of variation of price divided by modeled power.",
+            "Lower CV means more consistent value per gold across unit tiers."
+          ]
+        }
+      },
+      {
+        "id": "market-source",
+        "label": "Sticky high-water unit-market model",
+        "path": "analysis/endless_economy/unit_market_results.json",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "sql": "WITH market_source (peak_bankroll, market_unit, one_cost_price, five_cost_price, reroll_price, xp_or_command_price, expected_level_14_shop_price, five_cost_share_of_peak, expected_shop_share_of_peak) AS (\n  VALUES\n    (50, 1, 1, 5, 2, 4, 19.8, 0.1, 0.396),\n    (100, 2, 2, 10, 4, 8, 39.6, 0.1, 0.396),\n    (250, 5, 5, 25, 10, 20, 99.0, 0.1, 0.396),\n    (500, 10, 10, 50, 20, 40, 198.0, 0.1, 0.396),\n    (1000, 20, 20, 100, 40, 80, 396.0, 0.1, 0.396),\n    (10000, 200, 200, 1000, 400, 800, 3960.0, 0.1, 0.396),\n    (100000, 2000, 2000, 10000, 4000, 8000, 39600.0, 0.1, 0.396),\n    (1000000, 20000, 20000, 100000, 40000, 80000, 396000.0, 0.1, 0.396),\n    (2000000, 20000, 20000, 100000, 40000, 80000, 396000.0, 0.05, 0.198),\n    (2500000, 50000, 50000, 250000, 100000, 200000, 990000.0, 0.1, 0.396),\n    (5000000, 100000, 100000, 500000, 200000, 400000, 1980000.0, 0.1, 0.396),\n    (10000000, 200000, 200000, 1000000, 400000, 800000, 3960000.0, 0.1, 0.396)\n)\nSELECT * FROM market_source;",
+          "description": "Deterministic 1-2-5 Stakes denomination scenarios using the current five-slot shop odds and 51-unit cost distribution.",
+          "tables_used": [
+            "analysis/endless_economy/unit_market_results.json"
+          ],
+          "filters": [
+            "Deterministic model output generated from the checked-in baseline and fixed seed."
+          ],
+          "metric_definitions": [
+            "U = largest 1-2-5 denomination no greater than peak bankroll / 50.",
+            "Unit price = rarity tier * U; reroll = 2U; XP or command = 4U.",
+            "Promotions use a sticky high-water mark and occur only at chapter boundaries.",
+            "Expected shop price uses current level-specific tier odds across five slots."
+          ]
+        }
+      },
+      {
+        "id": "shop-pressure-source",
+        "label": "Expected five-slot shop pressure by player level",
+        "path": "analysis/endless_economy/unit_market_results.json",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "sql": "WITH shop_pressure_source (level, expected_shop_units, share_of_50_unit_reserve, reroll_plus_shop_share) AS (\n  VALUES\n    (1, 5.0, 0.1, 0.14),\n    (3, 7.0, 0.14, 0.18),\n    (6, 11.85, 0.237, 0.277),\n    (10, 16.25, 0.325, 0.365),\n    (14, 19.8, 0.396, 0.436)\n)\nSELECT * FROM shop_pressure_source;",
+          "description": "Expected shop sticker cost under the current level-specific tier odds.",
+          "tables_used": [
+            "analysis/endless_economy/unit_market_results.json"
+          ],
+          "filters": [
+            "Deterministic model output generated from the checked-in baseline and fixed seed."
+          ],
+          "metric_definitions": [
+            "Expected shop units = five times the probability-weighted average unit tier.",
+            "Reserve share uses a 50U healthy liquid reserve."
+          ]
+        }
+      },
+      {
+        "id": "search-source",
+        "label": "Specific-unit search cost at level 14",
+        "path": "analysis/endless_economy/unit_market_results.json",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "sql": "WITH search_source (tier, identities_in_tier, specific_unit_slot_probability, specific_unit_shop_probability, expected_rerolls, expected_search_and_purchase_units, share_of_50_unit_reserve) AS (\n  VALUES\n    (1, 14, 0.002142857142857143, 0.010668465638060454, 92.73419139416208, 186.46838278832416, 3.729367655766483),\n    (2, 13, 0.004615384615384615, 0.022864886217562774, 42.73518374352936, 87.47036748705872, 1.7494073497411744),\n    (3, 12, 0.015, 0.07278349763437508, 12.739378190142208, 28.478756380284416, 0.5695751276056883),\n    (4, 8, 0.0475, 0.21598400723623046, 3.629972435441757, 11.259944870883514, 0.22519889741767027),\n    (5, 4, 0.0875, 0.367348757019043, 1.7222087482064379, 8.444417496412875, 0.1688883499282575)\n)\nSELECT * FROM search_source;",
+          "description": "Expected paid rerolls plus sticker price for one named unit at level 14.",
+          "tables_used": [
+            "analysis/endless_economy/unit_market_results.json"
+          ],
+          "filters": [
+            "Deterministic model output generated from the checked-in baseline and fixed seed."
+          ],
+          "metric_definitions": [
+            "Specific shop probability assumes five independent slots using current tier odds and identities per tier.",
+            "Expected rerolls = 1 / shop probability - 1."
+          ]
+        }
+      },
+      {
+        "id": "completion-source",
+        "label": "Specific five-cost completion pressure",
+        "path": "analysis/endless_economy/unit_market_results.json",
+        "query": {
+          "engine": "SQLite",
+          "language": "sql",
+          "sql": "WITH completion_source (copies, expected_cost_units, share_of_50_unit_reserve, expected_chapters_from_natural_shops) AS (\n  VALUES\n    (1, 8.44, 0.168888, 0.46),\n    (3, 25.33, 0.506665, 1.37),\n    (9, 76.0, 1.519995, 4.11),\n    (27, 228.0, 4.559985, 12.34)\n)\nSELECT * FROM completion_source;",
+          "description": "Expected cost and natural-shop time for completing a named five-cost.",
+          "tables_used": [
+            "analysis/endless_economy/unit_market_results.json"
+          ],
+          "filters": [
+            "Deterministic model output generated from the checked-in baseline and fixed seed."
+          ],
+          "metric_definitions": [
+            "Costs multiply the one-copy expected search and purchase cost.",
+            "Natural-shop chapters assume five natural shops per five-fight chapter."
+          ]
+        }
+      },
+      {
+        "id": "notebook-source",
+        "label": "Executable economy model notebook",
+        "path": "analysis/endless_economy/endless_economy_model.ipynb"
+      },
+      {
+        "id": "blueprint-source",
+        "label": "Implementation blueprint",
+        "path": "docs/research/endless_economy_blueprint_2026-07-16.md"
+      },
+      {
+        "id": "tockers-source",
+        "label": "Riot Games \u2014 Tocker's Trials mode overview",
+        "href": "https://teamfighttactics.leagueoflegends.com/en-gb/news/game-updates/new-tft-workshop-mode-tockers-trials/"
+      },
+      {
+        "id": "riot-inflation-source",
+        "label": "Riot Games \u2014 Rise of the Elements economy learnings",
+        "href": "https://teamfighttactics.leagueoflegends.com/en-gb/news/dev/dev-tft-rise-of-the-elements-learnings/"
+      },
+      {
+        "id": "riot-shop-source",
+        "label": "Riot Games \u2014 TFT shop odds and shared-pool strategy",
+        "href": "https://teamfighttactics.leagueoflegends.com/en-gb/news/game-updates/teamfight-tactics-patch-13-23-notes/"
+      },
+      {
+        "id": "riot-dragons-source",
+        "label": "Riot Games \u2014 Dragonlands expensive-unit tradeoffs",
+        "href": "https://teamfighttactics.leagueoflegends.com/en-us/news/game-updates/dragonlands-set-mechanics-overview/"
+      },
+      {
+        "id": "incremental-math-source",
+        "label": "Kongregate \u2014 The Math of Idle Games",
+        "href": "https://blog.kongregate.com/the-math-of-idle-games-part-i/"
+      },
+      {
+        "id": "last-flame-source",
+        "label": "The Last Flame \u2014 official announcements",
+        "href": "https://steamcommunity.com/app/1830970/announcements/?l=english"
+      },
+      {
+        "id": "hadean-source",
+        "label": "Hadean Tactics \u2014 Eternal Rift overview and updates",
+        "href": "https://emberfishgames.com/hadean-tactics"
+      }
+    ],
+    "cards": [
+      {
+        "id": "target-odds",
+        "description": "Normal fights should feel favorable but not safe.",
+        "dataset": "headline",
+        "sourceId": "curve-source",
+        "metrics": [
+          {
+            "label": "Target projected win odds",
+            "field": "target_odds",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "curve-growth",
+        "description": "The independent curve used for prices and content budgets.",
+        "dataset": "headline",
+        "sourceId": "curve-source",
+        "metrics": [
+          {
+            "label": "Reference bankroll growth / chapter",
+            "field": "curve_growth",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "normal-survival",
+        "description": "Odds-aware policy completion rate across 40 modeled chapters.",
+        "dataset": "headline",
+        "sourceId": "policy-source",
+        "metrics": [
+          {
+            "label": "Odds-aware survival",
+            "field": "normal_survival",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "hoard-penalty",
+        "description": "Ten-times-price hoarding fails to become the dominant strategy.",
+        "dataset": "headline",
+        "sourceId": "policy-source",
+        "metrics": [
+          {
+            "label": "10x hoarder earnings vs odds-aware",
+            "field": "hoard_ratio",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "five-cost-pressure",
+        "description": "A standard five-cost immediately after a Stakes promotion.",
+        "dataset": "market_headline",
+        "sourceId": "market-source",
+        "metrics": [
+          {
+            "label": "Five-cost / promoted bankroll",
+            "field": "five_cost_share",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "mature-shop-pressure",
+        "description": "Expected five-slot shop cost at current level-14 odds.",
+        "dataset": "market_headline",
+        "sourceId": "market-source",
+        "metrics": [
+          {
+            "label": "Mature shop / promoted bankroll",
+            "field": "mature_shop_share",
+            "format": "percent"
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "price-curve",
+        "title": "Player-facing price curve by chapter",
+        "subtitle": "Fixed 1-2-5 price bands derived from the independent reference curve; logarithmic growth is shown as exact values in the milestone table.",
+        "type": "line",
+        "dataset": "curve",
+        "sourceId": "curve-source",
+        "encodings": {
+          "x": {
+            "field": "chapter",
+            "type": "ordinal",
+            "label": "Chapter"
+          },
+          "y": {
+            "field": "standard_contract_price",
+            "type": "quantitative",
+            "label": "Gold"
+          },
+          "tooltip": [
+            {
+              "field": "reference_bankroll",
+              "type": "quantitative",
+              "label": "Reference bankroll"
+            },
+            {
+              "field": "bold_contract_price",
+              "type": "quantitative",
+              "label": "Bold contract"
+            },
+            {
+              "field": "donor_contract_fee",
+              "type": "quantitative",
+              "label": "Donor fee"
+            }
+          ]
+        },
+        "xAxisTitle": "Chapter",
+        "yAxisTitle": "Standard contract price (gold)",
+        "valueFormat": "compact",
+        "layout": "full"
+      },
+      {
+        "id": "policy-earnings",
+        "title": "Median money earned by betting policy",
+        "subtitle": "5,000 simulations per policy over 40 chapters; exact survival and behavior fields remain available in the supporting table.",
+        "type": "bar",
+        "dataset": "policies",
+        "sourceId": "policy-source",
+        "encodings": {
+          "x": {
+            "field": "policy",
+            "type": "nominal",
+            "label": "Policy"
+          },
+          "y": {
+            "field": "median_total_earned",
+            "type": "quantitative",
+            "label": "Median total earned"
+          },
+          "tooltip": [
+            {
+              "field": "survival_rate",
+              "type": "quantitative",
+              "format": "percent",
+              "label": "Survival"
+            },
+            {
+              "field": "median_contracts_bought",
+              "type": "quantitative",
+              "label": "Contracts bought"
+            },
+            {
+              "field": "mean_bet_fraction",
+              "type": "quantitative",
+              "format": "percent",
+              "label": "Mean bet fraction"
+            }
+          ]
+        },
+        "xAxisTitle": "Betting policy",
+        "yAxisTitle": "Median cumulative winnings",
+        "valueFormat": "compact",
+        "layout": "full"
+      },
+      {
+        "id": "shop-pressure",
+        "title": "Expected shop cost by player level",
+        "subtitle": "Five-slot expected sticker cost as a share of a 50U healthy reserve; rerolls and targeted search add further pressure.",
+        "type": "bar",
+        "dataset": "level_shop_pressure",
+        "sourceId": "shop-pressure-source",
+        "encodings": {
+          "x": {
+            "field": "level",
+            "type": "ordinal",
+            "label": "Player level"
+          },
+          "y": {
+            "field": "share_of_50_unit_reserve",
+            "type": "quantitative",
+            "format": "percent",
+            "label": "Reserve share"
+          },
+          "tooltip": [
+            {
+              "field": "expected_shop_units",
+              "type": "quantitative",
+              "label": "Expected shop cost in U"
+            },
+            {
+              "field": "reroll_plus_shop_share",
+              "type": "quantitative",
+              "format": "percent",
+              "label": "Reroll plus shop"
+            }
+          ]
+        },
+        "xAxisTitle": "Player level",
+        "yAxisTitle": "Expected shop / 50U reserve",
+        "valueFormat": "percent",
+        "layout": "full"
+      }
+    ],
+    "tables": [
+      {
+        "id": "milestone-table",
+        "title": "Milestone price schedule",
+        "subtitle": "Exact player-facing prices at selected chapters.",
+        "dataset": "milestones",
+        "sourceId": "curve-source",
+        "defaultSort": {
+          "field": "chapter",
+          "direction": "asc"
+        },
+        "layout": "full",
+        "columns": [
+          {
+            "field": "chapter",
+            "label": "Chapter",
+            "format": "number"
+          },
+          {
+            "field": "reference_bankroll",
+            "label": "Reference bank",
+            "format": "compact"
+          },
+          {
+            "field": "standard_contract_price",
+            "label": "Standard",
+            "format": "compact"
+          },
+          {
+            "field": "bold_contract_price",
+            "label": "Bold",
+            "format": "compact"
+          },
+          {
+            "field": "reroll_price",
+            "label": "Scout/reroll",
+            "format": "compact"
+          },
+          {
+            "field": "xp_or_command_price",
+            "label": "XP/command",
+            "format": "compact"
+          },
+          {
+            "field": "donor_contract_fee",
+            "label": "Donor fee",
+            "format": "compact"
+          }
+        ]
+      },
+      {
+        "id": "unit-price-table",
+        "title": "Why widening one fixed ladder is insufficient",
+        "subtitle": "The 1\u20135 relationship remains useful, but literal prices must inherit the current Stakes denomination.",
+        "dataset": "unit_candidates",
+        "sourceId": "unit-source",
+        "defaultSort": {
+          "field": "price_power_cv",
+          "direction": "asc"
+        },
+        "layout": "full",
+        "columns": [
+          {
+            "field": "candidate",
+            "label": "Candidate",
+            "type": "text"
+          },
+          {
+            "field": "prices",
+            "label": "Tier prices",
+            "type": "text"
+          },
+          {
+            "field": "price_power_cv",
+            "label": "Price/power CV",
+            "format": "number"
+          },
+          {
+            "field": "top_tier_doublings",
+            "label": "Extra doublings",
+            "format": "number"
+          },
+          {
+            "field": "decision",
+            "label": "Decision",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "stakes-scenario-table",
+        "title": "Sticky Stakes-market examples",
+        "subtitle": "All gold remains liquid; the market denomination promotes irreversibly at chapter boundaries using a 1-2-5 high-water ladder.",
+        "dataset": "market_scenarios",
+        "sourceId": "market-source",
+        "defaultSort": {
+          "field": "peak_bankroll",
+          "direction": "asc"
+        },
+        "layout": "full",
+        "columns": [
+          {
+            "field": "peak_bankroll",
+            "label": "Peak bank",
+            "format": "compact"
+          },
+          {
+            "field": "market_unit",
+            "label": "U",
+            "format": "compact"
+          },
+          {
+            "field": "one_cost_price",
+            "label": "1-cost",
+            "format": "compact"
+          },
+          {
+            "field": "five_cost_price",
+            "label": "5-cost",
+            "format": "compact"
+          },
+          {
+            "field": "reroll_price",
+            "label": "Reroll",
+            "format": "compact"
+          },
+          {
+            "field": "expected_level_14_shop_price",
+            "label": "Expected L14 shop",
+            "format": "compact"
+          },
+          {
+            "field": "five_cost_share_of_peak",
+            "label": "5-cost share",
+            "format": "percent"
+          },
+          {
+            "field": "expected_shop_share_of_peak",
+            "label": "Shop share",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "specific-search-table",
+        "title": "Expected targeted-unit search cost at level 14",
+        "subtitle": "Current 51-unit roster and five-slot shop; figures include expected paid rerolls before purchase.",
+        "dataset": "specific_search",
+        "sourceId": "search-source",
+        "defaultSort": {
+          "field": "tier",
+          "direction": "asc"
+        },
+        "layout": "full",
+        "columns": [
+          {
+            "field": "tier",
+            "label": "Cost tier",
+            "format": "number"
+          },
+          {
+            "field": "identities_in_tier",
+            "label": "Identities",
+            "format": "number"
+          },
+          {
+            "field": "specific_unit_shop_probability",
+            "label": "Chance / shop",
+            "format": "percent"
+          },
+          {
+            "field": "expected_rerolls",
+            "label": "Expected rerolls",
+            "format": "number"
+          },
+          {
+            "field": "expected_search_and_purchase_units",
+            "label": "Search + buy (U)",
+            "format": "number"
+          },
+          {
+            "field": "share_of_50_unit_reserve",
+            "label": "Reserve share",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "five-cost-completion-table",
+        "title": "Specific five-cost completion pressure",
+        "subtitle": "Flat tier\u00d7U prices already become expensive through copies and search; geometric copy taxes are unnecessary initially.",
+        "dataset": "five_cost_completion",
+        "sourceId": "completion-source",
+        "defaultSort": {
+          "field": "copies",
+          "direction": "asc"
+        },
+        "layout": "full",
+        "columns": [
+          {
+            "field": "copies",
+            "label": "Copies",
+            "format": "number"
+          },
+          {
+            "field": "expected_cost_units",
+            "label": "Expected cost (U)",
+            "format": "number"
+          },
+          {
+            "field": "share_of_50_unit_reserve",
+            "label": "Reserve share",
+            "format": "percent"
+          },
+          {
+            "field": "expected_chapters_from_natural_shops",
+            "label": "Natural-shop chapters",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "policy-table",
+        "title": "Policy validation details",
+        "subtitle": "Normal strategies retain comparable survival while pathological hoarding and all-in behavior are unattractive.",
+        "dataset": "policies",
+        "sourceId": "policy-source",
+        "defaultSort": {
+          "field": "median_total_earned",
+          "direction": "desc"
+        },
+        "layout": "full",
+        "columns": [
+          {
+            "field": "policy",
+            "label": "Policy",
+            "type": "text"
+          },
+          {
+            "field": "survival_rate",
+            "label": "Survival",
+            "format": "percent"
+          },
+          {
+            "field": "median_bankroll",
+            "label": "Median bank",
+            "format": "compact"
+          },
+          {
+            "field": "median_total_earned",
+            "label": "Median earned",
+            "format": "compact"
+          },
+          {
+            "field": "median_contracts_bought",
+            "label": "Contracts",
+            "format": "number"
+          },
+          {
+            "field": "mean_win_probability",
+            "label": "Mean win odds",
+            "format": "percent"
+          },
+          {
+            "field": "mean_bet_fraction",
+            "label": "Mean wager",
+            "format": "percent"
+          }
+        ]
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# Gamble Battle Endless Economy \u2014 Decision Blueprint"
+      },
+      {
+        "id": "exec-heading",
+        "type": "markdown",
+        "body": "## Executive Summary"
+      },
+      {
+        "id": "exec-body",
+        "type": "markdown",
+        "body": "The earlier recommendation to keep units at literal **1\u20135 gold forever is rejected**. Riot has described the same failure in TFT: when players can buy every shop, the economic decision disappears. Gamble Battle should preserve TFT's **ratios**, not its nominal numbers.\n\nUse a visible, irreversible **Stakes denomination U**. Units cost `1U\u20135U`, rerolls `2U`, and XP/command purchases `4U`. U advances through a sticky 1-2-5 high-water ladder only at chapter boundaries, while the entire bankroll remains liquid. At one million gold, the proposed market is 20k/40k/60k/80k/100k\u2014not 1/2/3/4/5."
+      },
+      {
+        "id": "headline",
+        "type": "metric-strip",
+        "cardIds": [
+          "five-cost-pressure",
+          "mature-shop-pressure",
+          "normal-survival",
+          "hoard-penalty"
+        ]
+      },
+      {
+        "id": "research-heading",
+        "type": "markdown",
+        "body": "## What the Reference Modes Contribute"
+      },
+      {
+        "id": "research-body",
+        "type": "markdown",
+        "body": "Riot's Tocker's Trials was not literally endless: it used 30 rounds, six bosses, three lives, solo planning without timers, a high score, and a separate Chaos layer. The useful lesson is its clear boss cadence and permission to show boards outside normal TFT constraints. The Last Flame's endless act and Hadean Tactics' Eternal Rift reinforce the value of run-specific build mutation, save/resume support, and new upgrade vocabularies after the ordinary roster loop is mature.\n\nGamble Battle should combine those structures with incremental-game arithmetic: a visible exponential reference curve, periodic qualitative breakpoints, and reset boundaries that preserve identity without adding permanent exponential combat power."
+      },
+      {
+        "id": "decision-heading",
+        "type": "markdown",
+        "body": "## Decisions to Lock"
+      },
+      {
+        "id": "decision-body",
+        "type": "markdown",
+        "body": "1. **Unit shop:** preserve the 1\u20135 rarity relationship, but multiply it by a visible Stakes unit `U`.\n2. **Stakes progression:** use `U = 1, 2, 5, 10, 20, 50\u2026`; promote irreversibly between chapters using the greater of depth schedule or high-water eligibility.\n3. **Shared economy:** scale units, rerolls, XP/command and premium offers together; wagers use post-shopping liquid gold.\n4. **Recruit quality:** higher-Stakes shops sell current-depth, promoted, mutation-bearing or premium recruits\u2014not the same obsolete copy with extra zeroes.\n5. **Premium units:** direct two-stars, dragons, bosses and capital units may cost `8U\u201325U` when their qualitative power and slot cost justify it.\n6. **No conventional interest initially:** wagering already supplies compounding opportunity cost; test interest only if purchasing remains too easy.\n7. **Contracts and spectacle:** retain chapter contracts as additional sinks, but do not use them to replace the core unit-buying decision."
+      },
+      {
+        "id": "curve-heading",
+        "type": "markdown",
+        "body": "## Reference Curve and Stakes Ladder"
+      },
+      {
+        "id": "curve-body",
+        "type": "markdown",
+        "body": "The reference curve is a content budget, not a rubber band. It defines what a healthy run should be able to earn and spend by chapter. It sets the normal depth schedule for Stakes promotion and contract prices. A sticky high-water rule may promote unusually rich runs early so shops cannot remain trivial forever. Prices never fall after spending, and never change during a chapter."
+      },
+      {
+        "id": "curve-chart-block",
+        "type": "chart",
+        "chartId": "price-curve"
+      },
+      {
+        "id": "milestone-block",
+        "type": "table",
+        "tableId": "milestone-table"
+      },
+      {
+        "id": "unit-heading",
+        "type": "markdown",
+        "body": "## Preserve TFT Ratios, Not Literal Prices"
+      },
+      {
+        "id": "unit-body",
+        "type": "markdown",
+        "body": "A fixed chapter-only price cannot survive unbounded liquid wealth: as bankroll grows, price divided by wealth approaches zero. The proposed sawtooth market lets the player become genuinely richer within a Stakes tier, then visibly promotes the run to a higher-grade market before buying everything becomes permanent. Riot's own TFT retrospective identifies buy-all gold inflation as destructive to shop decision-making."
+      },
+      {
+        "id": "shop-pressure-chart-block",
+        "type": "chart",
+        "chartId": "shop-pressure"
+      },
+      {
+        "id": "stakes-scenario-block",
+        "type": "table",
+        "tableId": "stakes-scenario-table"
+      },
+      {
+        "id": "search-body",
+        "type": "markdown",
+        "sourceId": "search-source",
+        "body": "### Search cost is part of unit price\n\nAt current level-14 odds, a specific five-cost appears in about 36.7% of shops. Expected rerolls plus purchase cost about `8.44U`, or 16.9% of a healthy `50U` reserve. Three targeted copies cost roughly half a reserve before considering tactical pivots or other purchases."
+      },
+      {
+        "id": "specific-search-block",
+        "type": "table",
+        "tableId": "specific-search-table"
+      },
+      {
+        "id": "five-cost-completion-block",
+        "type": "table",
+        "tableId": "five-cost-completion-table"
+      },
+      {
+        "id": "unit-table-block",
+        "type": "table",
+        "tableId": "unit-price-table"
+      },
+      {
+        "id": "policy-heading",
+        "type": "markdown",
+        "body": "## Betting Behavior Check"
+      },
+      {
+        "id": "policy-body",
+        "type": "markdown",
+        "body": "With the selected provisional parameters, odds-aware and fixed-25% strategies both complete 40 chapters in about 70% of runs, while conservative play trades earnings for survival. A player who waits for ten times the contract price earns only about 1.7% as much as the odds-aware policy, and repeated all-in play collapses immediately."
+      },
+      {
+        "id": "policy-chart-block",
+        "type": "chart",
+        "chartId": "policy-earnings"
+      },
+      {
+        "id": "policy-table-block",
+        "type": "table",
+        "tableId": "policy-table"
+      },
+      {
+        "id": "roadmap-heading",
+        "type": "markdown",
+        "body": "## Content Roadmap"
+      },
+      {
+        "id": "roadmap-body",
+        "type": "markdown",
+        "body": "**Chapters 1\u20135:** ordinary roster building, current reroll/XP prices, first low-cost contract tutorial.\n\n**Chapters 6\u201315:** contracts add first qualitative mutations; duplicate units begin serving as named donors.\n\n**After level 14 / level-4 cap:** XP becomes Command Research and duplicate combining stops. Spending shifts to team rules, formation capacity, targeted scouting, trait rewrites, item awakenings, enemy modifiers, and spectacle systems.\n\n**Deep endless:** escalation comes from readable event chains\u2014splits, summons, transformations, chain reactions, boss phases, hazards, and battlefield-wide payoffs\u2014while board cap and UI readability remain bounded."
+      },
+      {
+        "id": "risks-heading",
+        "type": "markdown",
+        "body": "## Caveats and Required Tests"
+      },
+      {
+        "id": "risks-body",
+        "type": "markdown",
+        "body": "This is a blueprint, not production balance. The saved odds calibration has only 144 samples and is weakest in the outer probability buckets. The combat-rating model is a budgeting proxy, not a full unit-power estimator. The betting model has an extreme rich tail: its chapter-40 odds-aware P90 bankroll is more than 350,000 times the reference curve. Stakes promotion is required precisely because a depth-only price cannot cover such outcomes.\n\nBefore implementation, test `50U`, `75U` and `100U` healthy reserves; shop buy-out rate; economic pass rate; composition-dependent five-cost acceptance; higher-grade recruit clarity; post-shopping wager flexibility; sell-value arbitrage; and whether Stakes promotion feels like advancement rather than a merchant reading the wallet."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-16T14:28:54+00:00",
+    "status": "ready",
+    "datasets": {
+      "headline": [
+        {
+          "target_odds": 0.68,
+          "curve_growth": 0.22,
+          "normal_survival": 0.7018,
+          "hoard_ratio": 0.016997
+        }
+      ],
+      "market_headline": [
+        {
+          "five_cost_share": 0.1,
+          "mature_shop_share": 0.396,
+          "greedy_offer_buy_rate": 0.6909595000000001,
+          "greedy_remaining_share": 0.0
+        }
+      ],
+      "curve": [
+        {
+          "chapter": 1,
+          "reference_bankroll": 3,
+          "enemy_base_rating": 100,
+          "average_enemy_rating": 75,
+          "required_player_rating_for_68pct": 147.01,
+          "incremental_power_required": 147.01,
+          "standard_contract_price": 1,
+          "bold_contract_price": 2,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 2,
+          "reference_bankroll": 3.66,
+          "enemy_base_rating": 118,
+          "average_enemy_rating": 88.5,
+          "required_player_rating_for_68pct": 173.47,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1,
+          "bold_contract_price": 2,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 3,
+          "reference_bankroll": 4.47,
+          "enemy_base_rating": 136,
+          "average_enemy_rating": 102,
+          "required_player_rating_for_68pct": 199.93,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1,
+          "bold_contract_price": 2,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 4,
+          "reference_bankroll": 5.45,
+          "enemy_base_rating": 154,
+          "average_enemy_rating": 115.5,
+          "required_player_rating_for_68pct": 226.39,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1,
+          "bold_contract_price": 2,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 5,
+          "reference_bankroll": 6.65,
+          "enemy_base_rating": 172,
+          "average_enemy_rating": 129,
+          "required_player_rating_for_68pct": 252.86,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1,
+          "bold_contract_price": 2,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 6,
+          "reference_bankroll": 8.11,
+          "enemy_base_rating": 225,
+          "average_enemy_rating": 168.75,
+          "required_player_rating_for_68pct": 330.77,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 2,
+          "bold_contract_price": 5,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 7,
+          "reference_bankroll": 9.89,
+          "enemy_base_rating": 243,
+          "average_enemy_rating": 182.25,
+          "required_player_rating_for_68pct": 357.23,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2,
+          "bold_contract_price": 5,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 8,
+          "reference_bankroll": 12.07,
+          "enemy_base_rating": 261,
+          "average_enemy_rating": 195.75,
+          "required_player_rating_for_68pct": 383.7,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2,
+          "bold_contract_price": 5,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 9,
+          "reference_bankroll": 14.72,
+          "enemy_base_rating": 279,
+          "average_enemy_rating": 209.25,
+          "required_player_rating_for_68pct": 410.16,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 3,
+          "bold_contract_price": 5,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 10,
+          "reference_bankroll": 17.96,
+          "enemy_base_rating": 297,
+          "average_enemy_rating": 222.75,
+          "required_player_rating_for_68pct": 436.62,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 4,
+          "bold_contract_price": 6,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 11,
+          "reference_bankroll": 21.91,
+          "enemy_base_rating": 350,
+          "average_enemy_rating": 262.5,
+          "required_player_rating_for_68pct": 514.53,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 4,
+          "bold_contract_price": 7,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 12,
+          "reference_bankroll": 26.73,
+          "enemy_base_rating": 368,
+          "average_enemy_rating": 276,
+          "required_player_rating_for_68pct": 541,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 5,
+          "bold_contract_price": 10,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 13,
+          "reference_bankroll": 32.62,
+          "enemy_base_rating": 386,
+          "average_enemy_rating": 289.5,
+          "required_player_rating_for_68pct": 567.46,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 7,
+          "bold_contract_price": 10,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 14,
+          "reference_bankroll": 39.79,
+          "enemy_base_rating": 404,
+          "average_enemy_rating": 303,
+          "required_player_rating_for_68pct": 593.92,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 8,
+          "bold_contract_price": 10,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 15,
+          "reference_bankroll": 48.55,
+          "enemy_base_rating": 422,
+          "average_enemy_rating": 316.5,
+          "required_player_rating_for_68pct": 620.38,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 10,
+          "bold_contract_price": 20,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 16,
+          "reference_bankroll": 59.23,
+          "enemy_base_rating": 475,
+          "average_enemy_rating": 356.25,
+          "required_player_rating_for_68pct": 698.3,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 10,
+          "bold_contract_price": 20,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 17,
+          "reference_bankroll": 72.26,
+          "enemy_base_rating": 493,
+          "average_enemy_rating": 369.75,
+          "required_player_rating_for_68pct": 724.76,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 10,
+          "bold_contract_price": 20,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 18,
+          "reference_bankroll": 88.15,
+          "enemy_base_rating": 511,
+          "average_enemy_rating": 383.25,
+          "required_player_rating_for_68pct": 751.22,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20,
+          "bold_contract_price": 50,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 19,
+          "reference_bankroll": 107.55,
+          "enemy_base_rating": 529,
+          "average_enemy_rating": 396.75,
+          "required_player_rating_for_68pct": 777.68,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20,
+          "bold_contract_price": 50,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 20,
+          "reference_bankroll": 131.21,
+          "enemy_base_rating": 547,
+          "average_enemy_rating": 410.25,
+          "required_player_rating_for_68pct": 804.14,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20,
+          "bold_contract_price": 50,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 21,
+          "reference_bankroll": 160.07,
+          "enemy_base_rating": 600,
+          "average_enemy_rating": 450,
+          "required_player_rating_for_68pct": 882.06,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 20,
+          "bold_contract_price": 50,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 6,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 22,
+          "reference_bankroll": 195.29,
+          "enemy_base_rating": 618,
+          "average_enemy_rating": 463.5,
+          "required_player_rating_for_68pct": 908.52,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50,
+          "bold_contract_price": 100,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 8,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 23,
+          "reference_bankroll": 238.25,
+          "enemy_base_rating": 636,
+          "average_enemy_rating": 477,
+          "required_player_rating_for_68pct": 934.98,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50,
+          "bold_contract_price": 100,
+          "reroll_price": 2,
+          "xp_or_command_price": 5,
+          "donor_contract_fee": 10,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 24,
+          "reference_bankroll": 290.67,
+          "enemy_base_rating": 654,
+          "average_enemy_rating": 490.5,
+          "required_player_rating_for_68pct": 961.44,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50,
+          "bold_contract_price": 100,
+          "reroll_price": 3,
+          "xp_or_command_price": 6,
+          "donor_contract_fee": 10,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 25,
+          "reference_bankroll": 354.62,
+          "enemy_base_rating": 672,
+          "average_enemy_rating": 504,
+          "required_player_rating_for_68pct": 987.91,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50,
+          "bold_contract_price": 100,
+          "reroll_price": 4,
+          "xp_or_command_price": 7,
+          "donor_contract_fee": 10,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 26,
+          "reference_bankroll": 432.63,
+          "enemy_base_rating": 725,
+          "average_enemy_rating": 543.75,
+          "required_player_rating_for_68pct": 1065.82,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 100,
+          "bold_contract_price": 200,
+          "reroll_price": 4,
+          "xp_or_command_price": 9,
+          "donor_contract_fee": 20,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 27,
+          "reference_bankroll": 527.81,
+          "enemy_base_rating": 743,
+          "average_enemy_rating": 557.25,
+          "required_player_rating_for_68pct": 1092.28,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 100,
+          "bold_contract_price": 200,
+          "reroll_price": 5,
+          "xp_or_command_price": 10,
+          "donor_contract_fee": 20,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 28,
+          "reference_bankroll": 643.93,
+          "enemy_base_rating": 761,
+          "average_enemy_rating": 570.75,
+          "required_player_rating_for_68pct": 1118.74,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 100,
+          "bold_contract_price": 200,
+          "reroll_price": 6,
+          "xp_or_command_price": 10,
+          "donor_contract_fee": 20,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 29,
+          "reference_bankroll": 785.59,
+          "enemy_base_rating": 779,
+          "average_enemy_rating": 584.25,
+          "required_player_rating_for_68pct": 1145.21,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 200,
+          "bold_contract_price": 500,
+          "reroll_price": 8,
+          "xp_or_command_price": 20,
+          "donor_contract_fee": 20,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 30,
+          "reference_bankroll": 958.42,
+          "enemy_base_rating": 797,
+          "average_enemy_rating": 597.75,
+          "required_player_rating_for_68pct": 1171.67,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 200,
+          "bold_contract_price": 500,
+          "reroll_price": 10,
+          "xp_or_command_price": 20,
+          "donor_contract_fee": 50,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 31,
+          "reference_bankroll": 1169.27,
+          "enemy_base_rating": 850,
+          "average_enemy_rating": 637.5,
+          "required_player_rating_for_68pct": 1249.58,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 200,
+          "bold_contract_price": 500,
+          "reroll_price": 10,
+          "xp_or_command_price": 20,
+          "donor_contract_fee": 50,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 32,
+          "reference_bankroll": 1426.51,
+          "enemy_base_rating": 868,
+          "average_enemy_rating": 651,
+          "required_player_rating_for_68pct": 1276.04,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 200,
+          "bold_contract_price": 500,
+          "reroll_price": 10,
+          "xp_or_command_price": 20,
+          "donor_contract_fee": 50,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 33,
+          "reference_bankroll": 1740.35,
+          "enemy_base_rating": 886,
+          "average_enemy_rating": 664.5,
+          "required_player_rating_for_68pct": 1302.51,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 200,
+          "bold_contract_price": 500,
+          "reroll_price": 20,
+          "xp_or_command_price": 20,
+          "donor_contract_fee": 50,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 34,
+          "reference_bankroll": 2123.22,
+          "enemy_base_rating": 904,
+          "average_enemy_rating": 678,
+          "required_player_rating_for_68pct": 1328.97,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 500,
+          "bold_contract_price": 1000,
+          "reroll_price": 20,
+          "xp_or_command_price": 50,
+          "donor_contract_fee": 100,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 35,
+          "reference_bankroll": 2590.33,
+          "enemy_base_rating": 922,
+          "average_enemy_rating": 691.5,
+          "required_player_rating_for_68pct": 1355.43,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 500,
+          "bold_contract_price": 1000,
+          "reroll_price": 20,
+          "xp_or_command_price": 50,
+          "donor_contract_fee": 100,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 36,
+          "reference_bankroll": 3160.21,
+          "enemy_base_rating": 975,
+          "average_enemy_rating": 731.25,
+          "required_player_rating_for_68pct": 1433.34,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 500,
+          "bold_contract_price": 1000,
+          "reroll_price": 20,
+          "xp_or_command_price": 50,
+          "donor_contract_fee": 100,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 37,
+          "reference_bankroll": 3855.45,
+          "enemy_base_rating": 993,
+          "average_enemy_rating": 744.75,
+          "required_player_rating_for_68pct": 1459.81,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000,
+          "bold_contract_price": 2000,
+          "reroll_price": 50,
+          "xp_or_command_price": 100,
+          "donor_contract_fee": 200,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 38,
+          "reference_bankroll": 4703.65,
+          "enemy_base_rating": 1011,
+          "average_enemy_rating": 758.25,
+          "required_player_rating_for_68pct": 1486.27,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000,
+          "bold_contract_price": 2000,
+          "reroll_price": 50,
+          "xp_or_command_price": 100,
+          "donor_contract_fee": 200,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 39,
+          "reference_bankroll": 5738.45,
+          "enemy_base_rating": 1029,
+          "average_enemy_rating": 771.75,
+          "required_player_rating_for_68pct": 1512.73,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000,
+          "bold_contract_price": 2000,
+          "reroll_price": 50,
+          "xp_or_command_price": 100,
+          "donor_contract_fee": 200,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 40,
+          "reference_bankroll": 7000.91,
+          "enemy_base_rating": 1047,
+          "average_enemy_rating": 785.25,
+          "required_player_rating_for_68pct": 1539.19,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000,
+          "bold_contract_price": 2000,
+          "reroll_price": 50,
+          "xp_or_command_price": 100,
+          "donor_contract_fee": 200,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 41,
+          "reference_bankroll": 8541.11,
+          "enemy_base_rating": 1100,
+          "average_enemy_rating": 825,
+          "required_player_rating_for_68pct": 1617.11,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 2000,
+          "bold_contract_price": 5000,
+          "reroll_price": 100,
+          "xp_or_command_price": 200,
+          "donor_contract_fee": 200,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 42,
+          "reference_bankroll": 10420.16,
+          "enemy_base_rating": 1118,
+          "average_enemy_rating": 838.5,
+          "required_player_rating_for_68pct": 1643.57,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2000,
+          "bold_contract_price": 5000,
+          "reroll_price": 100,
+          "xp_or_command_price": 200,
+          "donor_contract_fee": 500,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 43,
+          "reference_bankroll": 12712.59,
+          "enemy_base_rating": 1136,
+          "average_enemy_rating": 852,
+          "required_player_rating_for_68pct": 1670.03,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2000,
+          "bold_contract_price": 5000,
+          "reroll_price": 100,
+          "xp_or_command_price": 200,
+          "donor_contract_fee": 500,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 44,
+          "reference_bankroll": 15509.36,
+          "enemy_base_rating": 1154,
+          "average_enemy_rating": 865.5,
+          "required_player_rating_for_68pct": 1696.49,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2000,
+          "bold_contract_price": 5000,
+          "reroll_price": 200,
+          "xp_or_command_price": 200,
+          "donor_contract_fee": 500,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 45,
+          "reference_bankroll": 18921.42,
+          "enemy_base_rating": 1172,
+          "average_enemy_rating": 879,
+          "required_player_rating_for_68pct": 1722.95,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 5000,
+          "bold_contract_price": 10000,
+          "reroll_price": 200,
+          "xp_or_command_price": 500,
+          "donor_contract_fee": 1000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 46,
+          "reference_bankroll": 23084.14,
+          "enemy_base_rating": 1225,
+          "average_enemy_rating": 918.75,
+          "required_player_rating_for_68pct": 1800.87,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 5000,
+          "bold_contract_price": 10000,
+          "reroll_price": 200,
+          "xp_or_command_price": 500,
+          "donor_contract_fee": 1000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 47,
+          "reference_bankroll": 28162.65,
+          "enemy_base_rating": 1243,
+          "average_enemy_rating": 932.25,
+          "required_player_rating_for_68pct": 1827.33,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 5000,
+          "bold_contract_price": 10000,
+          "reroll_price": 200,
+          "xp_or_command_price": 500,
+          "donor_contract_fee": 1000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 48,
+          "reference_bankroll": 34358.43,
+          "enemy_base_rating": 1261,
+          "average_enemy_rating": 945.75,
+          "required_player_rating_for_68pct": 1853.79,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 5000,
+          "bold_contract_price": 10000,
+          "reroll_price": 200,
+          "xp_or_command_price": 500,
+          "donor_contract_fee": 1000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 49,
+          "reference_bankroll": 41917.28,
+          "enemy_base_rating": 1279,
+          "average_enemy_rating": 959.25,
+          "required_player_rating_for_68pct": 1880.25,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 10000,
+          "bold_contract_price": 20000,
+          "reroll_price": 500,
+          "xp_or_command_price": 1000,
+          "donor_contract_fee": 2000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 50,
+          "reference_bankroll": 51139.09,
+          "enemy_base_rating": 1297,
+          "average_enemy_rating": 972.75,
+          "required_player_rating_for_68pct": 1906.72,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 10000,
+          "bold_contract_price": 20000,
+          "reroll_price": 500,
+          "xp_or_command_price": 1000,
+          "donor_contract_fee": 2000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 51,
+          "reference_bankroll": 62389.68,
+          "enemy_base_rating": 1350,
+          "average_enemy_rating": 1012.5,
+          "required_player_rating_for_68pct": 1984.63,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 10000,
+          "bold_contract_price": 20000,
+          "reroll_price": 500,
+          "xp_or_command_price": 1000,
+          "donor_contract_fee": 2000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 52,
+          "reference_bankroll": 76115.41,
+          "enemy_base_rating": 1368,
+          "average_enemy_rating": 1026,
+          "required_player_rating_for_68pct": 2011.09,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20000,
+          "bold_contract_price": 50000,
+          "reroll_price": 1000,
+          "xp_or_command_price": 2000,
+          "donor_contract_fee": 2000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 53,
+          "reference_bankroll": 92860.81,
+          "enemy_base_rating": 1386,
+          "average_enemy_rating": 1039.5,
+          "required_player_rating_for_68pct": 2037.55,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20000,
+          "bold_contract_price": 50000,
+          "reroll_price": 1000,
+          "xp_or_command_price": 2000,
+          "donor_contract_fee": 5000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 54,
+          "reference_bankroll": 113290.18,
+          "enemy_base_rating": 1404,
+          "average_enemy_rating": 1053,
+          "required_player_rating_for_68pct": 2064.02,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20000,
+          "bold_contract_price": 50000,
+          "reroll_price": 1000,
+          "xp_or_command_price": 2000,
+          "donor_contract_fee": 5000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 55,
+          "reference_bankroll": 138214.02,
+          "enemy_base_rating": 1422,
+          "average_enemy_rating": 1066.5,
+          "required_player_rating_for_68pct": 2090.48,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20000,
+          "bold_contract_price": 50000,
+          "reroll_price": 1000,
+          "xp_or_command_price": 2000,
+          "donor_contract_fee": 5000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 56,
+          "reference_bankroll": 168621.11,
+          "enemy_base_rating": 1475,
+          "average_enemy_rating": 1106.25,
+          "required_player_rating_for_68pct": 2168.39,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 20000,
+          "bold_contract_price": 50000,
+          "reroll_price": 2000,
+          "xp_or_command_price": 2000,
+          "donor_contract_fee": 5000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 57,
+          "reference_bankroll": 205717.75,
+          "enemy_base_rating": 1493,
+          "average_enemy_rating": 1119.75,
+          "required_player_rating_for_68pct": 2194.85,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50000,
+          "bold_contract_price": 100000,
+          "reroll_price": 2000,
+          "xp_or_command_price": 5000,
+          "donor_contract_fee": 10000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 58,
+          "reference_bankroll": 250975.66,
+          "enemy_base_rating": 1511,
+          "average_enemy_rating": 1133.25,
+          "required_player_rating_for_68pct": 2221.32,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50000,
+          "bold_contract_price": 100000,
+          "reroll_price": 2000,
+          "xp_or_command_price": 5000,
+          "donor_contract_fee": 10000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 59,
+          "reference_bankroll": 306190.3,
+          "enemy_base_rating": 1529,
+          "average_enemy_rating": 1146.75,
+          "required_player_rating_for_68pct": 2247.78,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50000,
+          "bold_contract_price": 100000,
+          "reroll_price": 2000,
+          "xp_or_command_price": 5000,
+          "donor_contract_fee": 10000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 60,
+          "reference_bankroll": 373552.17,
+          "enemy_base_rating": 1547,
+          "average_enemy_rating": 1160.25,
+          "required_player_rating_for_68pct": 2274.24,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50000,
+          "bold_contract_price": 100000,
+          "reroll_price": 5000,
+          "xp_or_command_price": 5000,
+          "donor_contract_fee": 10000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 61,
+          "reference_bankroll": 455733.65,
+          "enemy_base_rating": 1600,
+          "average_enemy_rating": 1200,
+          "required_player_rating_for_68pct": 2352.16,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 100000,
+          "bold_contract_price": 200000,
+          "reroll_price": 5000,
+          "xp_or_command_price": 10000,
+          "donor_contract_fee": 20000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 62,
+          "reference_bankroll": 555995.05,
+          "enemy_base_rating": 1618,
+          "average_enemy_rating": 1213.5,
+          "required_player_rating_for_68pct": 2378.62,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 100000,
+          "bold_contract_price": 200000,
+          "reroll_price": 5000,
+          "xp_or_command_price": 10000,
+          "donor_contract_fee": 20000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 63,
+          "reference_bankroll": 678313.96,
+          "enemy_base_rating": 1636,
+          "average_enemy_rating": 1227,
+          "required_player_rating_for_68pct": 2405.08,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 100000,
+          "bold_contract_price": 200000,
+          "reroll_price": 5000,
+          "xp_or_command_price": 10000,
+          "donor_contract_fee": 20000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 64,
+          "reference_bankroll": 827543.03,
+          "enemy_base_rating": 1654,
+          "average_enemy_rating": 1240.5,
+          "required_player_rating_for_68pct": 2431.54,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 200000,
+          "bold_contract_price": 500000,
+          "reroll_price": 10000,
+          "xp_or_command_price": 20000,
+          "donor_contract_fee": 20000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 65,
+          "reference_bankroll": 1009602.5,
+          "enemy_base_rating": 1672,
+          "average_enemy_rating": 1254,
+          "required_player_rating_for_68pct": 2458,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 200000,
+          "bold_contract_price": 500000,
+          "reroll_price": 10000,
+          "xp_or_command_price": 20000,
+          "donor_contract_fee": 50000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 66,
+          "reference_bankroll": 1231715.05,
+          "enemy_base_rating": 1725,
+          "average_enemy_rating": 1293.75,
+          "required_player_rating_for_68pct": 2535.92,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 200000,
+          "bold_contract_price": 500000,
+          "reroll_price": 10000,
+          "xp_or_command_price": 20000,
+          "donor_contract_fee": 50000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 67,
+          "reference_bankroll": 1502692.36,
+          "enemy_base_rating": 1743,
+          "average_enemy_rating": 1307.25,
+          "required_player_rating_for_68pct": 2562.38,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 200000,
+          "bold_contract_price": 500000,
+          "reroll_price": 20000,
+          "xp_or_command_price": 20000,
+          "donor_contract_fee": 50000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 68,
+          "reference_bankroll": 1833284.68,
+          "enemy_base_rating": 1761,
+          "average_enemy_rating": 1320.75,
+          "required_player_rating_for_68pct": 2588.84,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 500000,
+          "bold_contract_price": 1000000,
+          "reroll_price": 20000,
+          "xp_or_command_price": 50000,
+          "donor_contract_fee": 50000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 69,
+          "reference_bankroll": 2236607.31,
+          "enemy_base_rating": 1779,
+          "average_enemy_rating": 1334.25,
+          "required_player_rating_for_68pct": 2615.3,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 500000,
+          "bold_contract_price": 1000000,
+          "reroll_price": 20000,
+          "xp_or_command_price": 50000,
+          "donor_contract_fee": 100000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 70,
+          "reference_bankroll": 2728660.92,
+          "enemy_base_rating": 1797,
+          "average_enemy_rating": 1347.75,
+          "required_player_rating_for_68pct": 2641.76,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 500000,
+          "bold_contract_price": 1000000,
+          "reroll_price": 20000,
+          "xp_or_command_price": 50000,
+          "donor_contract_fee": 100000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 71,
+          "reference_bankroll": 3328966.32,
+          "enemy_base_rating": 1850,
+          "average_enemy_rating": 1387.5,
+          "required_player_rating_for_68pct": 2719.68,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 500000,
+          "bold_contract_price": 1000000,
+          "reroll_price": 20000,
+          "xp_or_command_price": 50000,
+          "donor_contract_fee": 100000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 72,
+          "reference_bankroll": 4061338.92,
+          "enemy_base_rating": 1868,
+          "average_enemy_rating": 1401,
+          "required_player_rating_for_68pct": 2746.14,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000000,
+          "bold_contract_price": 2000000,
+          "reroll_price": 50000,
+          "xp_or_command_price": 100000,
+          "donor_contract_fee": 200000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 73,
+          "reference_bankroll": 4954833.48,
+          "enemy_base_rating": 1886,
+          "average_enemy_rating": 1414.5,
+          "required_player_rating_for_68pct": 2772.6,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000000,
+          "bold_contract_price": 2000000,
+          "reroll_price": 50000,
+          "xp_or_command_price": 100000,
+          "donor_contract_fee": 200000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 74,
+          "reference_bankroll": 6044896.84,
+          "enemy_base_rating": 1904,
+          "average_enemy_rating": 1428,
+          "required_player_rating_for_68pct": 2799.06,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000000,
+          "bold_contract_price": 2000000,
+          "reroll_price": 50000,
+          "xp_or_command_price": 100000,
+          "donor_contract_fee": 200000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 75,
+          "reference_bankroll": 7374774.15,
+          "enemy_base_rating": 1922,
+          "average_enemy_rating": 1441.5,
+          "required_player_rating_for_68pct": 2825.53,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000000,
+          "bold_contract_price": 2000000,
+          "reroll_price": 50000,
+          "xp_or_command_price": 100000,
+          "donor_contract_fee": 200000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 76,
+          "reference_bankroll": 8997224.46,
+          "enemy_base_rating": 1975,
+          "average_enemy_rating": 1481.25,
+          "required_player_rating_for_68pct": 2903.44,
+          "incremental_power_required": 77.92,
+          "standard_contract_price": 2000000,
+          "bold_contract_price": 5000000,
+          "reroll_price": 100000,
+          "xp_or_command_price": 200000,
+          "donor_contract_fee": 500000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 77,
+          "reference_bankroll": 10976613.84,
+          "enemy_base_rating": 1993,
+          "average_enemy_rating": 1494.75,
+          "required_player_rating_for_68pct": 2929.9,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2000000,
+          "bold_contract_price": 5000000,
+          "reroll_price": 100000,
+          "xp_or_command_price": 200000,
+          "donor_contract_fee": 500000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 78,
+          "reference_bankroll": 13391468.89,
+          "enemy_base_rating": 2011,
+          "average_enemy_rating": 1508.25,
+          "required_player_rating_for_68pct": 2956.37,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2000000,
+          "bold_contract_price": 5000000,
+          "reroll_price": 100000,
+          "xp_or_command_price": 200000,
+          "donor_contract_fee": 500000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 79,
+          "reference_bankroll": 16337592.04,
+          "enemy_base_rating": 2029,
+          "average_enemy_rating": 1521.75,
+          "required_player_rating_for_68pct": 2982.83,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 2000000,
+          "bold_contract_price": 5000000,
+          "reroll_price": 200000,
+          "xp_or_command_price": 200000,
+          "donor_contract_fee": 500000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 80,
+          "reference_bankroll": 19931862.29,
+          "enemy_base_rating": 2047,
+          "average_enemy_rating": 1535.25,
+          "required_player_rating_for_68pct": 3009.29,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 5000000,
+          "bold_contract_price": 10000000,
+          "reroll_price": 200000,
+          "xp_or_command_price": 500000,
+          "donor_contract_fee": 1000000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        }
+      ],
+      "milestones": [
+        {
+          "chapter": 1,
+          "reference_bankroll": 3,
+          "enemy_base_rating": 100,
+          "average_enemy_rating": 75,
+          "required_player_rating_for_68pct": 147.01,
+          "incremental_power_required": 147.01,
+          "standard_contract_price": 1,
+          "bold_contract_price": 2,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 5,
+          "reference_bankroll": 6.65,
+          "enemy_base_rating": 172,
+          "average_enemy_rating": 129,
+          "required_player_rating_for_68pct": 252.86,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1,
+          "bold_contract_price": 2,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 10,
+          "reference_bankroll": 17.96,
+          "enemy_base_rating": 297,
+          "average_enemy_rating": 222.75,
+          "required_player_rating_for_68pct": 436.62,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 4,
+          "bold_contract_price": 6,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 20,
+          "reference_bankroll": 131.21,
+          "enemy_base_rating": 547,
+          "average_enemy_rating": 410.25,
+          "required_player_rating_for_68pct": 804.14,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 20,
+          "bold_contract_price": 50,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "donor_contract_fee": 5,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 40,
+          "reference_bankroll": 7000.91,
+          "enemy_base_rating": 1047,
+          "average_enemy_rating": 785.25,
+          "required_player_rating_for_68pct": 1539.19,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 1000,
+          "bold_contract_price": 2000,
+          "reroll_price": 50,
+          "xp_or_command_price": 100,
+          "donor_contract_fee": 200,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 60,
+          "reference_bankroll": 373552.17,
+          "enemy_base_rating": 1547,
+          "average_enemy_rating": 1160.25,
+          "required_player_rating_for_68pct": 2274.24,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 50000,
+          "bold_contract_price": 100000,
+          "reroll_price": 5000,
+          "xp_or_command_price": 5000,
+          "donor_contract_fee": 10000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        },
+        {
+          "chapter": 80,
+          "reference_bankroll": 19931862.29,
+          "enemy_base_rating": 2047,
+          "average_enemy_rating": 1535.25,
+          "required_player_rating_for_68pct": 3009.29,
+          "incremental_power_required": 26.46,
+          "standard_contract_price": 5000000,
+          "bold_contract_price": 10000000,
+          "reroll_price": 200000,
+          "xp_or_command_price": 500000,
+          "donor_contract_fee": 1000000,
+          "target_probability": 0.68,
+          "gross_payout_at_target_odds": 2.1324,
+          "payout_bonus": 0.45
+        }
+      ],
+      "policies": [
+        {
+          "policy": "odds_aware",
+          "simulations": 5000,
+          "survival_rate": 0.7018,
+          "median_chapters_completed": 40,
+          "p10_bankroll": 0.41,
+          "median_bankroll": 3523.62,
+          "p90_bankroll": 2472855348.96,
+          "median_total_earned": 31809.88,
+          "median_contracts_bought": 28,
+          "mean_win_probability": 0.6701,
+          "mean_bet_fraction": 0.2917,
+          "mean_all_in_rate": 0.0083,
+          "target_chapters": 40,
+          "selected_payout_bonus": null,
+          "selected_contract_share": null,
+          "selection_score": null,
+          "sweep_simulations_per_policy": null,
+          "sweep_chapters": null
+        },
+        {
+          "policy": "fixed_25",
+          "simulations": 5000,
+          "survival_rate": 0.7024,
+          "median_chapters_completed": 40,
+          "p10_bankroll": 0.35,
+          "median_bankroll": 1396.54,
+          "p90_bankroll": 170401732.03,
+          "median_total_earned": 15162.99,
+          "median_contracts_bought": 21,
+          "mean_win_probability": 0.6635,
+          "mean_bet_fraction": 0.2691,
+          "mean_all_in_rate": 0.0085,
+          "target_chapters": 40,
+          "selected_payout_bonus": null,
+          "selected_contract_share": null,
+          "selection_score": null,
+          "sweep_simulations_per_policy": null,
+          "sweep_chapters": null
+        },
+        {
+          "policy": "conservative",
+          "simulations": 5000,
+          "survival_rate": 0.8166,
+          "median_chapters_completed": 40,
+          "p10_bankroll": 0.72,
+          "median_bankroll": 1081.82,
+          "p90_bankroll": 29739.63,
+          "median_total_earned": 8502.5,
+          "median_contracts_bought": 13,
+          "mean_win_probability": 0.6086,
+          "mean_bet_fraction": 0.1843,
+          "mean_all_in_rate": 0.0065,
+          "target_chapters": 40,
+          "selected_payout_bonus": null,
+          "selected_contract_share": null,
+          "selection_score": null,
+          "sweep_simulations_per_policy": null,
+          "sweep_chapters": null
+        },
+        {
+          "policy": "ten_x_floor",
+          "simulations": 5000,
+          "survival_rate": 0.6134,
+          "median_chapters_completed": 40,
+          "p10_bankroll": 0.27,
+          "median_bankroll": 14.14,
+          "p90_bankroll": 832696.43,
+          "median_total_earned": 540.66,
+          "median_contracts_bought": 2,
+          "mean_win_probability": 0.4676,
+          "mean_bet_fraction": 0.1608,
+          "mean_all_in_rate": 0.007,
+          "target_chapters": 40,
+          "selected_payout_bonus": null,
+          "selected_contract_share": null,
+          "selection_score": null,
+          "sweep_simulations_per_policy": null,
+          "sweep_chapters": null
+        },
+        {
+          "policy": "all_in",
+          "simulations": 5000,
+          "survival_rate": 0,
+          "median_chapters_completed": 0,
+          "p10_bankroll": 0,
+          "median_bankroll": 0.46,
+          "p90_bankroll": 0.64,
+          "median_total_earned": 15.63,
+          "median_contracts_bought": 0,
+          "mean_win_probability": 0.746,
+          "mean_bet_fraction": 0.9787,
+          "mean_all_in_rate": 0.4496,
+          "target_chapters": 40,
+          "selected_payout_bonus": null,
+          "selected_contract_share": null,
+          "selection_score": null,
+          "sweep_simulations_per_policy": null,
+          "sweep_chapters": null
+        }
+      ],
+      "unit_candidates": [
+        {
+          "candidate": "Current",
+          "prices": "1 / 2 / 3 / 4 / 5",
+          "price_power_cv": 0.1303,
+          "top_tier_doublings": 0.0,
+          "decision": "Keep ratio, scale denomination"
+        },
+        {
+          "candidate": "Moderate widening",
+          "prices": "1 / 2 / 4 / 7 / 11",
+          "price_power_cv": 0.2662,
+          "top_tier_doublings": 1.1375,
+          "decision": "Reject as main sink"
+        },
+        {
+          "candidate": "Broad exponential",
+          "prices": "1 / 3 / 10 / 30 / 100",
+          "price_power_cv": 0.9469,
+          "top_tier_doublings": 4.3219,
+          "decision": "Reject as main sink"
+        }
+      ],
+      "market_scenarios": [
+        {
+          "peak_bankroll": 50,
+          "market_unit": 1,
+          "effective_market_reserve_units": 50.0,
+          "one_cost_price": 1,
+          "two_cost_price": 2,
+          "three_cost_price": 3,
+          "four_cost_price": 4,
+          "five_cost_price": 5,
+          "reroll_price": 2,
+          "xp_or_command_price": 4,
+          "expected_level_14_shop_price": 19.8,
+          "five_cost_share_of_peak": 0.1,
+          "reroll_share_of_peak": 0.04,
+          "expected_shop_share_of_peak": 0.396
+        },
+        {
+          "peak_bankroll": 1000,
+          "market_unit": 20,
+          "effective_market_reserve_units": 50.0,
+          "one_cost_price": 20,
+          "two_cost_price": 40,
+          "three_cost_price": 60,
+          "four_cost_price": 80,
+          "five_cost_price": 100,
+          "reroll_price": 40,
+          "xp_or_command_price": 80,
+          "expected_level_14_shop_price": 396.0,
+          "five_cost_share_of_peak": 0.1,
+          "reroll_share_of_peak": 0.04,
+          "expected_shop_share_of_peak": 0.396
+        },
+        {
+          "peak_bankroll": 1000000,
+          "market_unit": 20000,
+          "effective_market_reserve_units": 50.0,
+          "one_cost_price": 20000,
+          "two_cost_price": 40000,
+          "three_cost_price": 60000,
+          "four_cost_price": 80000,
+          "five_cost_price": 100000,
+          "reroll_price": 40000,
+          "xp_or_command_price": 80000,
+          "expected_level_14_shop_price": 396000.0,
+          "five_cost_share_of_peak": 0.1,
+          "reroll_share_of_peak": 0.04,
+          "expected_shop_share_of_peak": 0.396
+        },
+        {
+          "peak_bankroll": 2000000,
+          "market_unit": 20000,
+          "effective_market_reserve_units": 100.0,
+          "one_cost_price": 20000,
+          "two_cost_price": 40000,
+          "three_cost_price": 60000,
+          "four_cost_price": 80000,
+          "five_cost_price": 100000,
+          "reroll_price": 40000,
+          "xp_or_command_price": 80000,
+          "expected_level_14_shop_price": 396000.0,
+          "five_cost_share_of_peak": 0.05,
+          "reroll_share_of_peak": 0.02,
+          "expected_shop_share_of_peak": 0.198
+        },
+        {
+          "peak_bankroll": 2500000,
+          "market_unit": 50000,
+          "effective_market_reserve_units": 50.0,
+          "one_cost_price": 50000,
+          "two_cost_price": 100000,
+          "three_cost_price": 150000,
+          "four_cost_price": 200000,
+          "five_cost_price": 250000,
+          "reroll_price": 100000,
+          "xp_or_command_price": 200000,
+          "expected_level_14_shop_price": 990000.0,
+          "five_cost_share_of_peak": 0.1,
+          "reroll_share_of_peak": 0.04,
+          "expected_shop_share_of_peak": 0.396
+        },
+        {
+          "peak_bankroll": 5000000,
+          "market_unit": 100000,
+          "effective_market_reserve_units": 50.0,
+          "one_cost_price": 100000,
+          "two_cost_price": 200000,
+          "three_cost_price": 300000,
+          "four_cost_price": 400000,
+          "five_cost_price": 500000,
+          "reroll_price": 200000,
+          "xp_or_command_price": 400000,
+          "expected_level_14_shop_price": 1980000.0,
+          "five_cost_share_of_peak": 0.1,
+          "reroll_share_of_peak": 0.04,
+          "expected_shop_share_of_peak": 0.396
+        },
+        {
+          "peak_bankroll": 10000000,
+          "market_unit": 200000,
+          "effective_market_reserve_units": 50.0,
+          "one_cost_price": 200000,
+          "two_cost_price": 400000,
+          "three_cost_price": 600000,
+          "four_cost_price": 800000,
+          "five_cost_price": 1000000,
+          "reroll_price": 400000,
+          "xp_or_command_price": 800000,
+          "expected_level_14_shop_price": 3960000.0,
+          "five_cost_share_of_peak": 0.1,
+          "reroll_share_of_peak": 0.04,
+          "expected_shop_share_of_peak": 0.396
+        }
+      ],
+      "level_shop_pressure": [
+        {
+          "level": 1,
+          "expected_shop_units": 5.0,
+          "share_of_50_unit_reserve": 0.1,
+          "reroll_plus_shop_share": 0.14
+        },
+        {
+          "level": 3,
+          "expected_shop_units": 7.0,
+          "share_of_50_unit_reserve": 0.14,
+          "reroll_plus_shop_share": 0.18
+        },
+        {
+          "level": 6,
+          "expected_shop_units": 11.85,
+          "share_of_50_unit_reserve": 0.237,
+          "reroll_plus_shop_share": 0.277
+        },
+        {
+          "level": 10,
+          "expected_shop_units": 16.25,
+          "share_of_50_unit_reserve": 0.325,
+          "reroll_plus_shop_share": 0.365
+        },
+        {
+          "level": 14,
+          "expected_shop_units": 19.8,
+          "share_of_50_unit_reserve": 0.396,
+          "reroll_plus_shop_share": 0.436
+        }
+      ],
+      "specific_search": [
+        {
+          "level": 14,
+          "tier": 1,
+          "identities_in_tier": 14,
+          "specific_unit_slot_probability": 0.002142857142857143,
+          "specific_unit_shop_probability": 0.010668465638060454,
+          "expected_rerolls": 92.73419139416208,
+          "expected_search_and_purchase_units": 186.46838278832416,
+          "share_of_50_unit_reserve": 3.729367655766483
+        },
+        {
+          "level": 14,
+          "tier": 2,
+          "identities_in_tier": 13,
+          "specific_unit_slot_probability": 0.004615384615384615,
+          "specific_unit_shop_probability": 0.022864886217562774,
+          "expected_rerolls": 42.73518374352936,
+          "expected_search_and_purchase_units": 87.47036748705872,
+          "share_of_50_unit_reserve": 1.7494073497411744
+        },
+        {
+          "level": 14,
+          "tier": 3,
+          "identities_in_tier": 12,
+          "specific_unit_slot_probability": 0.015,
+          "specific_unit_shop_probability": 0.07278349763437508,
+          "expected_rerolls": 12.739378190142208,
+          "expected_search_and_purchase_units": 28.478756380284416,
+          "share_of_50_unit_reserve": 0.5695751276056883
+        },
+        {
+          "level": 14,
+          "tier": 4,
+          "identities_in_tier": 8,
+          "specific_unit_slot_probability": 0.0475,
+          "specific_unit_shop_probability": 0.21598400723623046,
+          "expected_rerolls": 3.629972435441757,
+          "expected_search_and_purchase_units": 11.259944870883514,
+          "share_of_50_unit_reserve": 0.22519889741767027
+        },
+        {
+          "level": 14,
+          "tier": 5,
+          "identities_in_tier": 4,
+          "specific_unit_slot_probability": 0.0875,
+          "specific_unit_shop_probability": 0.367348757019043,
+          "expected_rerolls": 1.7222087482064379,
+          "expected_search_and_purchase_units": 8.444417496412875,
+          "share_of_50_unit_reserve": 0.1688883499282575
+        }
+      ],
+      "five_cost_completion": [
+        {
+          "copies": 1,
+          "expected_cost_units": 8.44,
+          "share_of_50_unit_reserve": 0.168888,
+          "expected_chapters_from_natural_shops": 0.46
+        },
+        {
+          "copies": 3,
+          "expected_cost_units": 25.33,
+          "share_of_50_unit_reserve": 0.506665,
+          "expected_chapters_from_natural_shops": 1.37
+        },
+        {
+          "copies": 9,
+          "expected_cost_units": 76.0,
+          "share_of_50_unit_reserve": 1.519995,
+          "expected_chapters_from_natural_shops": 4.11
+        },
+        {
+          "copies": 27,
+          "expected_cost_units": 228.0,
+          "share_of_50_unit_reserve": 4.559985,
+          "expected_chapters_from_natural_shops": 12.34
+        }
+      ]
+    },
+    "accessIssues": []
+  },
+  "sources": [
+    {
+      "id": "curve-source",
+      "label": "Recommended 80-chapter economy curve",
+      "path": "analysis/endless_economy/recommended_curve.csv",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "sql": "WITH curve_source (chapter, reference_bankroll, standard_contract_price, bold_contract_price, reroll_price, xp_or_command_price, donor_contract_fee) AS (\n  VALUES\n    (1, 3, 1, 2, 2, 4, 5),\n    (2, 3.66, 1, 2, 2, 4, 5),\n    (3, 4.47, 1, 2, 2, 4, 5),\n    (4, 5.45, 1, 2, 2, 4, 5),\n    (5, 6.65, 1, 2, 2, 4, 5),\n    (6, 8.11, 2, 5, 2, 4, 5),\n    (7, 9.89, 2, 5, 2, 4, 5),\n    (8, 12.07, 2, 5, 2, 4, 5),\n    (9, 14.72, 3, 5, 2, 4, 5),\n    (10, 17.96, 4, 6, 2, 4, 5),\n    (11, 21.91, 4, 7, 2, 4, 5),\n    (12, 26.73, 5, 10, 2, 4, 5),\n    (13, 32.62, 7, 10, 2, 4, 5),\n    (14, 39.79, 8, 10, 2, 4, 5),\n    (15, 48.55, 10, 20, 2, 4, 5),\n    (16, 59.23, 10, 20, 2, 4, 5),\n    (17, 72.26, 10, 20, 2, 4, 5),\n    (18, 88.15, 20, 50, 2, 4, 5),\n    (19, 107.55, 20, 50, 2, 4, 5),\n    (20, 131.21, 20, 50, 2, 4, 5),\n    (21, 160.07, 20, 50, 2, 4, 6),\n    (22, 195.29, 50, 100, 2, 4, 8),\n    (23, 238.25, 50, 100, 2, 5, 10),\n    (24, 290.67, 50, 100, 3, 6, 10),\n    (25, 354.62, 50, 100, 4, 7, 10),\n    (26, 432.63, 100, 200, 4, 9, 20),\n    (27, 527.81, 100, 200, 5, 10, 20),\n    (28, 643.93, 100, 200, 6, 10, 20),\n    (29, 785.59, 200, 500, 8, 20, 20),\n    (30, 958.42, 200, 500, 10, 20, 50),\n    (31, 1169.27, 200, 500, 10, 20, 50),\n    (32, 1426.51, 200, 500, 10, 20, 50),\n    (33, 1740.35, 200, 500, 20, 20, 50),\n    (34, 2123.22, 500, 1000, 20, 50, 100),\n    (35, 2590.33, 500, 1000, 20, 50, 100),\n    (36, 3160.21, 500, 1000, 20, 50, 100),\n    (37, 3855.45, 1000, 2000, 50, 100, 200),\n    (38, 4703.65, 1000, 2000, 50, 100, 200),\n    (39, 5738.45, 1000, 2000, 50, 100, 200),\n    (40, 7000.91, 1000, 2000, 50, 100, 200),\n    (41, 8541.11, 2000, 5000, 100, 200, 200),\n    (42, 10420.16, 2000, 5000, 100, 200, 500),\n    (43, 12712.59, 2000, 5000, 100, 200, 500),\n    (44, 15509.36, 2000, 5000, 200, 200, 500),\n    (45, 18921.42, 5000, 10000, 200, 500, 1000),\n    (46, 23084.14, 5000, 10000, 200, 500, 1000),\n    (47, 28162.65, 5000, 10000, 200, 500, 1000),\n    (48, 34358.43, 5000, 10000, 200, 500, 1000),\n    (49, 41917.28, 10000, 20000, 500, 1000, 2000),\n    (50, 51139.09, 10000, 20000, 500, 1000, 2000),\n    (51, 62389.68, 10000, 20000, 500, 1000, 2000),\n    (52, 76115.41, 20000, 50000, 1000, 2000, 2000),\n    (53, 92860.81, 20000, 50000, 1000, 2000, 5000),\n    (54, 113290.18, 20000, 50000, 1000, 2000, 5000),\n    (55, 138214.02, 20000, 50000, 1000, 2000, 5000),\n    (56, 168621.11, 20000, 50000, 2000, 2000, 5000),\n    (57, 205717.75, 50000, 100000, 2000, 5000, 10000),\n    (58, 250975.66, 50000, 100000, 2000, 5000, 10000),\n    (59, 306190.3, 50000, 100000, 2000, 5000, 10000),\n    (60, 373552.17, 50000, 100000, 5000, 5000, 10000),\n    (61, 455733.65, 100000, 200000, 5000, 10000, 20000),\n    (62, 555995.05, 100000, 200000, 5000, 10000, 20000),\n    (63, 678313.96, 100000, 200000, 5000, 10000, 20000),\n    (64, 827543.03, 200000, 500000, 10000, 20000, 20000),\n    (65, 1009602.5, 200000, 500000, 10000, 20000, 50000),\n    (66, 1231715.05, 200000, 500000, 10000, 20000, 50000),\n    (67, 1502692.36, 200000, 500000, 20000, 20000, 50000),\n    (68, 1833284.68, 500000, 1000000, 20000, 50000, 50000),\n    (69, 2236607.31, 500000, 1000000, 20000, 50000, 100000),\n    (70, 2728660.92, 500000, 1000000, 20000, 50000, 100000),\n    (71, 3328966.32, 500000, 1000000, 20000, 50000, 100000),\n    (72, 4061338.92, 1000000, 2000000, 50000, 100000, 200000),\n    (73, 4954833.48, 1000000, 2000000, 50000, 100000, 200000),\n    (74, 6044896.84, 1000000, 2000000, 50000, 100000, 200000),\n    (75, 7374774.15, 1000000, 2000000, 50000, 100000, 200000),\n    (76, 8997224.46, 2000000, 5000000, 100000, 200000, 500000),\n    (77, 10976613.84, 2000000, 5000000, 100000, 200000, 500000),\n    (78, 13391468.89, 2000000, 5000000, 100000, 200000, 500000),\n    (79, 16337592.04, 2000000, 5000000, 200000, 200000, 500000),\n    (80, 19931862.29, 5000000, 10000000, 200000, 500000, 1000000)\n)\nSELECT * FROM curve_source;",
+        "description": "Fixed reference bankroll and player-facing prices by chapter.",
+        "tables_used": [
+          "analysis/endless_economy/recommended_curve.csv"
+        ],
+        "filters": [
+          "Deterministic model output generated from the checked-in baseline and fixed seed."
+        ],
+        "metric_definitions": [
+          "Reference bankroll = 3 * 1.22^(chapter - 1).",
+          "Standard contract price = 1-2-5 rounded band near 20% of reference bankroll.",
+          "Bold contract price = next visible 1-2-5 band above the standard option.",
+          "Prices never use the player's current bankroll."
+        ]
+      }
+    },
+    {
+      "id": "policy-source",
+      "label": "Monte Carlo betting-policy validation",
+      "path": "analysis/endless_economy/policy_summary.csv",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "sql": "WITH policy_source (policy, simulations, survival_rate, median_bankroll, median_total_earned, median_contracts_bought, mean_win_probability, mean_bet_fraction) AS (\n  VALUES\n    ('odds_aware', 5000, 0.7018, 3523.62, 31809.88, 28, 0.6701, 0.2917),\n    ('fixed_25', 5000, 0.7024, 1396.54, 15162.99, 21, 0.6635, 0.2691),\n    ('conservative', 5000, 0.8166, 1081.82, 8502.5, 13, 0.6086, 0.1843),\n    ('ten_x_floor', 5000, 0.6134, 14.14, 540.66, 2, 0.4676, 0.1608),\n    ('all_in', 5000, 0, 0.46, 15.63, 0, 0.746, 0.9787)\n)\nSELECT * FROM policy_source;",
+        "description": "Five deterministic policy cohorts, each simulated 5,000 times across 40 chapters.",
+        "tables_used": [
+          "analysis/endless_economy/policy_summary.csv"
+        ],
+        "filters": [
+          "Deterministic model output generated from the checked-in baseline and fixed seed."
+        ],
+        "metric_definitions": [
+          "Survival rate = share of simulations completing all 40 modeled chapters.",
+          "Median total earned = median cumulative gross winnings, not ending bankroll.",
+          "Odds-aware policy uses a fractional Kelly rule clamped to a minority wager."
+        ]
+      }
+    },
+    {
+      "id": "unit-source",
+      "label": "Base unit price candidate comparison",
+      "path": "analysis/endless_economy/live_baseline.json",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "sql": "WITH unit_source (candidate, prices, price_power_cv, top_tier_doublings, decision) AS (\n  VALUES\n    ('Current', '1 / 2 / 3 / 4 / 5', 0.1303, 0.0, 'Keep ratio, scale denomination'),\n    ('Moderate widening', '1 / 2 / 4 / 7 / 11', 0.2662, 1.1375, 'Reject as main sink'),\n    ('Broad exponential', '1 / 3 / 10 / 30 / 100', 0.9469, 4.3219, 'Reject as main sink')\n)\nSELECT * FROM unit_source;",
+        "description": "Candidate tier schedules compared against the current 1.5x per-level stat multiplier.",
+        "tables_used": [
+          "analysis/endless_economy/live_baseline.json"
+        ],
+        "filters": [
+          "Deterministic model output generated from the checked-in baseline and fixed seed."
+        ],
+        "metric_definitions": [
+          "Price-power CV = coefficient of variation of price divided by modeled power.",
+          "Lower CV means more consistent value per gold across unit tiers."
+        ]
+      }
+    },
+    {
+      "id": "market-source",
+      "label": "Sticky high-water unit-market model",
+      "path": "analysis/endless_economy/unit_market_results.json",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "sql": "WITH market_source (peak_bankroll, market_unit, one_cost_price, five_cost_price, reroll_price, xp_or_command_price, expected_level_14_shop_price, five_cost_share_of_peak, expected_shop_share_of_peak) AS (\n  VALUES\n    (50, 1, 1, 5, 2, 4, 19.8, 0.1, 0.396),\n    (100, 2, 2, 10, 4, 8, 39.6, 0.1, 0.396),\n    (250, 5, 5, 25, 10, 20, 99.0, 0.1, 0.396),\n    (500, 10, 10, 50, 20, 40, 198.0, 0.1, 0.396),\n    (1000, 20, 20, 100, 40, 80, 396.0, 0.1, 0.396),\n    (10000, 200, 200, 1000, 400, 800, 3960.0, 0.1, 0.396),\n    (100000, 2000, 2000, 10000, 4000, 8000, 39600.0, 0.1, 0.396),\n    (1000000, 20000, 20000, 100000, 40000, 80000, 396000.0, 0.1, 0.396),\n    (2000000, 20000, 20000, 100000, 40000, 80000, 396000.0, 0.05, 0.198),\n    (2500000, 50000, 50000, 250000, 100000, 200000, 990000.0, 0.1, 0.396),\n    (5000000, 100000, 100000, 500000, 200000, 400000, 1980000.0, 0.1, 0.396),\n    (10000000, 200000, 200000, 1000000, 400000, 800000, 3960000.0, 0.1, 0.396)\n)\nSELECT * FROM market_source;",
+        "description": "Deterministic 1-2-5 Stakes denomination scenarios using the current five-slot shop odds and 51-unit cost distribution.",
+        "tables_used": [
+          "analysis/endless_economy/unit_market_results.json"
+        ],
+        "filters": [
+          "Deterministic model output generated from the checked-in baseline and fixed seed."
+        ],
+        "metric_definitions": [
+          "U = largest 1-2-5 denomination no greater than peak bankroll / 50.",
+          "Unit price = rarity tier * U; reroll = 2U; XP or command = 4U.",
+          "Promotions use a sticky high-water mark and occur only at chapter boundaries.",
+          "Expected shop price uses current level-specific tier odds across five slots."
+        ]
+      }
+    },
+    {
+      "id": "shop-pressure-source",
+      "label": "Expected five-slot shop pressure by player level",
+      "path": "analysis/endless_economy/unit_market_results.json",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "sql": "WITH shop_pressure_source (level, expected_shop_units, share_of_50_unit_reserve, reroll_plus_shop_share) AS (\n  VALUES\n    (1, 5.0, 0.1, 0.14),\n    (3, 7.0, 0.14, 0.18),\n    (6, 11.85, 0.237, 0.277),\n    (10, 16.25, 0.325, 0.365),\n    (14, 19.8, 0.396, 0.436)\n)\nSELECT * FROM shop_pressure_source;",
+        "description": "Expected shop sticker cost under the current level-specific tier odds.",
+        "tables_used": [
+          "analysis/endless_economy/unit_market_results.json"
+        ],
+        "filters": [
+          "Deterministic model output generated from the checked-in baseline and fixed seed."
+        ],
+        "metric_definitions": [
+          "Expected shop units = five times the probability-weighted average unit tier.",
+          "Reserve share uses a 50U healthy liquid reserve."
+        ]
+      }
+    },
+    {
+      "id": "search-source",
+      "label": "Specific-unit search cost at level 14",
+      "path": "analysis/endless_economy/unit_market_results.json",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "sql": "WITH search_source (tier, identities_in_tier, specific_unit_slot_probability, specific_unit_shop_probability, expected_rerolls, expected_search_and_purchase_units, share_of_50_unit_reserve) AS (\n  VALUES\n    (1, 14, 0.002142857142857143, 0.010668465638060454, 92.73419139416208, 186.46838278832416, 3.729367655766483),\n    (2, 13, 0.004615384615384615, 0.022864886217562774, 42.73518374352936, 87.47036748705872, 1.7494073497411744),\n    (3, 12, 0.015, 0.07278349763437508, 12.739378190142208, 28.478756380284416, 0.5695751276056883),\n    (4, 8, 0.0475, 0.21598400723623046, 3.629972435441757, 11.259944870883514, 0.22519889741767027),\n    (5, 4, 0.0875, 0.367348757019043, 1.7222087482064379, 8.444417496412875, 0.1688883499282575)\n)\nSELECT * FROM search_source;",
+        "description": "Expected paid rerolls plus sticker price for one named unit at level 14.",
+        "tables_used": [
+          "analysis/endless_economy/unit_market_results.json"
+        ],
+        "filters": [
+          "Deterministic model output generated from the checked-in baseline and fixed seed."
+        ],
+        "metric_definitions": [
+          "Specific shop probability assumes five independent slots using current tier odds and identities per tier.",
+          "Expected rerolls = 1 / shop probability - 1."
+        ]
+      }
+    },
+    {
+      "id": "completion-source",
+      "label": "Specific five-cost completion pressure",
+      "path": "analysis/endless_economy/unit_market_results.json",
+      "query": {
+        "engine": "SQLite",
+        "language": "sql",
+        "sql": "WITH completion_source (copies, expected_cost_units, share_of_50_unit_reserve, expected_chapters_from_natural_shops) AS (\n  VALUES\n    (1, 8.44, 0.168888, 0.46),\n    (3, 25.33, 0.506665, 1.37),\n    (9, 76.0, 1.519995, 4.11),\n    (27, 228.0, 4.559985, 12.34)\n)\nSELECT * FROM completion_source;",
+        "description": "Expected cost and natural-shop time for completing a named five-cost.",
+        "tables_used": [
+          "analysis/endless_economy/unit_market_results.json"
+        ],
+        "filters": [
+          "Deterministic model output generated from the checked-in baseline and fixed seed."
+        ],
+        "metric_definitions": [
+          "Costs multiply the one-copy expected search and purchase cost.",
+          "Natural-shop chapters assume five natural shops per five-fight chapter."
+        ]
+      }
+    },
+    {
+      "id": "notebook-source",
+      "label": "Executable economy model notebook",
+      "path": "analysis/endless_economy/endless_economy_model.ipynb"
+    },
+    {
+      "id": "blueprint-source",
+      "label": "Implementation blueprint",
+      "path": "docs/research/endless_economy_blueprint_2026-07-16.md"
+    },
+    {
+      "id": "tockers-source",
+      "label": "Riot Games \u2014 Tocker's Trials mode overview",
+      "href": "https://teamfighttactics.leagueoflegends.com/en-gb/news/game-updates/new-tft-workshop-mode-tockers-trials/"
+    },
+    {
+      "id": "riot-inflation-source",
+      "label": "Riot Games \u2014 Rise of the Elements economy learnings",
+      "href": "https://teamfighttactics.leagueoflegends.com/en-gb/news/dev/dev-tft-rise-of-the-elements-learnings/"
+    },
+    {
+      "id": "riot-shop-source",
+      "label": "Riot Games \u2014 TFT shop odds and shared-pool strategy",
+      "href": "https://teamfighttactics.leagueoflegends.com/en-gb/news/game-updates/teamfight-tactics-patch-13-23-notes/"
+    },
+    {
+      "id": "riot-dragons-source",
+      "label": "Riot Games \u2014 Dragonlands expensive-unit tradeoffs",
+      "href": "https://teamfighttactics.leagueoflegends.com/en-us/news/game-updates/dragonlands-set-mechanics-overview/"
+    },
+    {
+      "id": "incremental-math-source",
+      "label": "Kongregate \u2014 The Math of Idle Games",
+      "href": "https://blog.kongregate.com/the-math-of-idle-games-part-i/"
+    },
+    {
+      "id": "last-flame-source",
+      "label": "The Last Flame \u2014 official announcements",
+      "href": "https://steamcommunity.com/app/1830970/announcements/?l=english"
+    },
+    {
+      "id": "hadean-source",
+      "label": "Hadean Tactics \u2014 Eternal Rift overview and updates",
+      "href": "https://emberfishgames.com/hadean-tactics"
+    }
+  ]
+}

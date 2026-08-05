@@ -7,12 +7,12 @@ const UnitFactoryScript: Script = preload("res://scripts/unit_factory.gd")
 @export var samples_per_case: int = 3
 
 const TEAM_A_IDS: Array[String] = [
-	"bonko", "korath", "sari", "pilfer", "cashmere", "axiom",
+	"bonko", "korath", "sari", "pilfer", "mara", "axiom",
 	"brute", "repo", "hexeon", "luna", "nyxa", "morrak"
 ]
 
 const TEAM_B_IDS: Array[String] = [
-	"repo", "bo", "sari", "pilfer", "cashmere", "knoll",
+	"repo", "bo", "sari", "pilfer", "mara", "knoll",
 	"korath", "brute", "hexeon", "luna", "nyxa", "morrak"
 ]
 

@@ -182,8 +182,10 @@ func _play_loss_cycle(unit_id: String, cycle_index: int) -> void:
 	print("ActualRunLoopSmoke: opening cycle %d selected starter" % cycle_index)
 	if not _failures.is_empty():
 		return
-	await _settle_frames(4)
-	_expect(_node_visible("CombatView"), "cycle %d combat view did not open" % cycle_index)
+	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
+	_expect(combat_opened, "cycle %d combat view did not open" % cycle_index)
+	if not combat_opened:
+		return
 	var combat_seen: bool = await _wait_for_combat_active(6.0)
 	_expect(combat_seen, "cycle %d opener did not enter combat automatically" % cycle_index)
 	if not combat_seen:
@@ -282,7 +284,27 @@ func _select_starter(unit_id: String) -> void:
 		_expect(false, "unit select start button missing")
 		return
 	_expect(not start.disabled, "unit select start button did not enable for %s" % unit_id)
+	if _uses_manual_opening_continue():
+		var combat: Control = await _wait_for_combat_view_ready(20.0)
+		_expect(combat != null, "combat view did not prewarm before manual opening for %s" % unit_id)
+		if combat == null:
+			return
+		_set_opening_auto_start_enabled(false)
 	await _click_button(start, "unit select start button")
+
+func _uses_manual_opening_continue() -> bool:
+	return false
+
+func _set_opening_auto_start_enabled(enabled: bool) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	if combat == null:
+		return
+	if combat.has_method("set_auto_start_battle_enabled"):
+		combat.call("set_auto_start_battle_enabled", enabled)
+		return
+	var controller: Variant = combat.get("controller")
+	if controller != null and controller.has_method("set_auto_start_battle_enabled"):
+		controller.call("set_auto_start_battle_enabled", enabled)
 
 func _press_continue(expect_forced: bool, label: String) -> void:
 	var button: Button = _main.find_child("ContinueButton", true, false) as Button
@@ -459,10 +481,12 @@ func _reposition_first_board_unit(label: String) -> bool:
 	var target_tile: int = _first_empty_board_tile_except(controller, current_tile)
 	if target_tile < 0:
 		return false
+	var moved_unit: Unit = unit_view.unit as Unit
 	var target_center: Vector2 = controller.player_grid_helper.get_center(target_tile)
 	var dragged: bool = await _drag_control_to(unit_view, target_center, label)
 	await _settle_frames(4)
-	var new_tile: int = controller.player_grid_helper.index_of(unit_view)
+	var live_view: UnitView = _find_unit_view_for_unit(player_grid, moved_unit)
+	var new_tile: int = controller.player_grid_helper.index_of(live_view if live_view != null else unit_view)
 	return dragged and new_tile == target_tile
 
 func _drag_first_bench_unit_to_board() -> bool:
@@ -493,6 +517,18 @@ func _find_first_unit_view(root: Node) -> UnitView:
 		if child is UnitView:
 			return child as UnitView
 		var nested: UnitView = _find_first_unit_view(child)
+		if nested != null:
+			return nested
+	return null
+
+func _find_unit_view_for_unit(root: Node, target_unit: Unit) -> UnitView:
+	if root == null or target_unit == null:
+		return null
+	for child: Node in root.get_children():
+		var unit_view: UnitView = child as UnitView
+		if unit_view != null and unit_view.unit == target_unit:
+			return unit_view
+		var nested: UnitView = _find_unit_view_for_unit(child, target_unit)
 		if nested != null:
 			return nested
 	return null
@@ -782,6 +818,23 @@ func _unit_select_reset() -> bool:
 func _node_visible(path: String) -> bool:
 	var node: CanvasItem = _main.get_node_or_null(path) as CanvasItem
 	return node != null and node.visible
+
+func _wait_for_combat_view_visible(timeout_seconds: float) -> bool:
+	var deadline_ms: int = Time.get_ticks_msec() + int(max(0.0, timeout_seconds) * 1000.0)
+	while Time.get_ticks_msec() < deadline_ms:
+		if _node_visible("CombatView"):
+			return true
+		await get_tree().process_frame
+	return false
+
+func _wait_for_combat_view_ready(timeout_seconds: float) -> Control:
+	var deadline_ms: int = Time.get_ticks_msec() + int(max(0.0, timeout_seconds) * 1000.0)
+	while Time.get_ticks_msec() < deadline_ms:
+		var combat: Control = _main.get_node_or_null("CombatView") as Control
+		if combat != null and combat.get("controller") != null:
+			return combat
+		await get_tree().process_frame
+	return null
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

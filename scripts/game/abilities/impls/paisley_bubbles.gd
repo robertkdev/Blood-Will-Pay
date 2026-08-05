@@ -1,113 +1,53 @@
 extends AbilityImplBase
 
-# Paisley — Bubbles
-# Shields the two allies closest to death (lowest HP/MaxHP ratio), once per unique ally, for 1.5s.
-# Then throws bubbles that deal split magic damage to the two nearest enemies (full damage if only one enemy).
-# Trait-ready: scales with Kaleidoscope and Arcanist stacks (fallback 0 until traits are wired).
+const SHIELD_BASE: Array[int] = [100, 150, 225]
+const SHIELD_SP_RATIO: float = 0.6
+const SHIELD_DURATION: float = 2.5
+const POP_DAMAGE: Array[int] = [110, 165, 260]
+const POP_SP_RATIO: float = 0.7
+const POP_RADIUS_TILES: float = 1.0
+const POP_STUN_DURATION: float = 0.4
 
-const SHIELD_BASE := [80, 100, 135]
-const SHIELD_SP_MULT := 0.60
-const SHIELD_KALEI_PER_STACK := 10.0
-const SHIELD_ARCA_PER_STACK := 8.0
-const SHIELD_DURATION := 1.5
-
-const DMG_BASE := [110, 165, 260]
-const DMG_SP_MULT := 0.70
-const DMG_KALEI_PER_STACK := 12.0
-const DMG_ARCA_PER_STACK := 8.0
-const BUBBLE_STUN_DURATION := 0.4
-
-const TraitKeys := preload("res://scripts/game/traits/runtime/trait_keys.gd")
-const KEY_KALEIDOSCOPE := "kaleidoscope_stacks" # Legacy fallback for old saved/test state.
-const KEY_ARCANIST := "arcanist_stacks"         # Legacy fallback for old saved/test state.
-
-func _level_index(u: Unit) -> int:
-	var lvl: int = (int(u.level) if u != null else 1)
-	return clamp(lvl - 1, 0, 2)
-
-func _get_stack(bs, state: BattleState, team: String, index: int, key: String) -> int:
-	if bs == null:
-		return 0
-	var trait_key: String = key
-	if key == KEY_ARCANIST:
-		trait_key = TraitKeys.ARCANIST
-	elif key == KEY_KALEIDOSCOPE:
-		trait_key = TraitKeys.KALEIDOSCOPE
-	var v: int = int(bs.get_stack(state, team, index, trait_key))
-	if v > 0:
-		return v
-	return int(bs.get_stack(state, team, index, key))
-
-func _ally_indices_by_lowest_ratio(ctx: AbilityContext, team: String) -> Array[int]:
-	var arr: Array[Unit] = ctx.ally_team_array(team)
-	var pairs: Array = []
-	for i in range(arr.size()):
-		var u: Unit = arr[i]
-		if u == null or not u.is_alive():
-			continue
-		var ratio: float = float(u.hp) / max(1.0, float(u.max_hp))
-		pairs.append({"i": i, "r": ratio})
-	pairs.sort_custom(func(a, b): return float(a.r) < float(b.r))
-	var out: Array[int] = []
-	for p in pairs:
-		if out.size() >= 2:
-			break
-		out.append(int(p.i))
-	return out
+func _level_index(unit: Unit) -> int:
+	var level: int = int(unit.level) if unit != null else 1
+	return clamp(level - 1, 0, 2)
 
 func cast(ctx: AbilityContext) -> bool:
-	if ctx == null or ctx.engine == null or ctx.state == null:
+	if ctx == null or ctx.engine == null or ctx.state == null or ctx.buff_system == null:
 		return false
-	var bs: BuffSystem = ctx.buff_system
-	if bs == null:
-		ctx.log("[Bubbles] BuffSystem not available; cast aborted")
-		return false
-
 	var caster: Unit = ctx.unit_at(ctx.caster_team, ctx.caster_index)
 	if caster == null or not caster.is_alive():
 		return false
+	var level_index: int = _level_index(caster)
+	var shield_amount: int = int(round(float(SHIELD_BASE[level_index]) + SHIELD_SP_RATIO * float(caster.spell_power)))
+	var pop_damage: int = int(round(float(POP_DAMAGE[level_index]) + POP_SP_RATIO * float(caster.spell_power)))
+	var targets: Array[int] = _two_weakest_allies(ctx)
+	for ally_index: int in targets:
+		var pop_data: Dictionary = {
+			"kind": "paisley_bubble_pop",
+			"source_team": ctx.caster_team,
+			"source_index": ctx.caster_index,
+			"damage": pop_damage,
+			"radius_tiles": POP_RADIUS_TILES,
+			"stun_duration": POP_STUN_DURATION,
+			"pop_on_break_or_expiry": true
+		}
+		ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, ally_index, shield_amount, SHIELD_DURATION, pop_data)
+	ctx.log("Bubbles: shielded %d weak allies; each bubble pops locally" % targets.size())
+	return not targets.is_empty()
 
-	var li: int = _level_index(caster)
-	var kalei: int = _get_stack(bs, ctx.state, ctx.caster_team, ctx.caster_index, KEY_KALEIDOSCOPE)
-	var arca: int = _get_stack(bs, ctx.state, ctx.caster_team, ctx.caster_index, KEY_ARCANIST)
-
-	# Compute shield value (per ally)
-	var shield_f: float = float(SHIELD_BASE[li])
-	shield_f += SHIELD_SP_MULT * float(caster.spell_power)
-	shield_f += SHIELD_KALEI_PER_STACK * float(max(0, kalei))
-	shield_f += SHIELD_ARCA_PER_STACK * float(max(0, arca))
-	var shield_val: int = int(max(0.0, round(shield_f)))
-
-	# Pick two unique allies closest to death (include self as candidate via ally array)
-	var targets: Array[int] = _ally_indices_by_lowest_ratio(ctx, ctx.caster_team)
-	var applied: int = 0
-	for i in targets:
-		var res: Dictionary = bs.apply_shield(ctx.state, ctx.caster_team, i, shield_val, SHIELD_DURATION)
-		if bool(res.get("processed", false)):
-			applied += 1
-
-	# Damage bubbles: split between two nearest enemies (full to one if only one target)
-	var total_dmg_f: float = float(DMG_BASE[li])
-	total_dmg_f += DMG_SP_MULT * float(caster.spell_power)
-	total_dmg_f += DMG_KALEI_PER_STACK * float(max(0, kalei))
-	total_dmg_f += DMG_ARCA_PER_STACK * float(max(0, arca))
-	var total_dmg: int = int(max(0.0, round(total_dmg_f)))
-
-	var enemy_idxs: Array[int] = ctx.two_nearest_enemies(ctx.caster_team)
-	if enemy_idxs.size() == 0:
-		ctx.log("Bubbles: shielded %d allies for %d; no enemies in range" % [applied, shield_val])
-		return true
-	elif enemy_idxs.size() == 1:
-		ctx.damage_single(ctx.caster_team, ctx.caster_index, enemy_idxs[0], float(total_dmg), "magic")
-		ctx.stun(ctx._other_team(ctx.caster_team), enemy_idxs[0], BUBBLE_STUN_DURATION)
-		ctx.log("Bubbles: shield %d for %d; dealt %d and stunned one enemy" % [applied, shield_val, total_dmg])
-		return true
-	else:
-		var a: int = int(floor(float(total_dmg) * 0.5))
-		var b: int = total_dmg - a
-		ctx.damage_single(ctx.caster_team, ctx.caster_index, enemy_idxs[0], float(a), "magic")
-		ctx.stun(ctx._other_team(ctx.caster_team), enemy_idxs[0], BUBBLE_STUN_DURATION)
-		ctx.damage_single(ctx.caster_team, ctx.caster_index, enemy_idxs[1], float(b), "magic")
-		ctx.stun(ctx._other_team(ctx.caster_team), enemy_idxs[1], BUBBLE_STUN_DURATION)
-		ctx.log("Bubbles: shield %d for %d; split %d/%d dmg and stunned targets" % [applied, shield_val, a, b])
-		return true
+func _two_weakest_allies(ctx: AbilityContext) -> Array[int]:
+	var ranked: Array[Dictionary] = []
+	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
+	for index: int in range(allies.size()):
+		var ally: Unit = allies[index]
+		if ally == null or not ally.is_alive():
+			continue
+		ranked.append({"index": index, "ratio": float(ally.hp) / max(1.0, float(ally.max_hp))})
+	ranked.sort_custom(func(first: Dictionary, second: Dictionary) -> bool:
+		return float(first.get("ratio", 1.0)) < float(second.get("ratio", 1.0))
+	)
+	var output: Array[int] = []
+	for ranked_index: int in range(min(2, ranked.size())):
+		output.append(int(ranked[ranked_index].get("index", -1)))
+	return output
