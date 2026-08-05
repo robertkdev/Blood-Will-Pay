@@ -1,6 +1,8 @@
 extends Object
 class_name AudioCatalog
 
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
+
 # Catalog of AudioStream resources under a root directory (default: res://assets/audio).
 # Scans recursively and maps ids to streams. Ids are the relative path without extension,
 # lowercased, using forward slashes. Example: res://assets/audio/ui/click.ogg -> ui/click
@@ -52,8 +54,10 @@ func _scan_dir(path: String) -> void:
 		if dir.current_is_dir():
 			_scan_dir(full)
 			continue
-		if not (name.ends_with(".ogg") or name.ends_with(".wav") or name.ends_with(".mp3")):
+		var resource_name: String = ResourcePathNormalizer.source_name(name)
+		if not (resource_name.ends_with(".ogg") or resource_name.ends_with(".wav") or resource_name.ends_with(".mp3")):
 			continue
+		full = path + "/" + resource_name
 		if not ResourceLoader.exists(full):
 			continue
 		var stream = load(full)

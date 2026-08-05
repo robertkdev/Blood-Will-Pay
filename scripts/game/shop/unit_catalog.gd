@@ -3,6 +3,7 @@ class_name UnitCatalog
 
 const Debug := preload("res://scripts/util/debug.gd")
 const ShopOdds := preload("res://scripts/game/shop/shop_odds.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 
 # Read-only catalog of unit definitions indexed by cost.
 # Scans `res://data/units` for UnitProfile resources and caches ID->meta.
@@ -31,9 +32,10 @@ func refresh() -> void:
 			continue
 		if dir.current_is_dir():
 			continue
-		if not f.ends_with(".tres"):
+		var resource_name: String = ResourcePathNormalizer.source_name(f)
+		if not resource_name.ends_with(".tres"):
 			continue
-		var path := "res://data/units/%s" % f
+		var path: String = "res://data/units/%s" % resource_name
 		if not ResourceLoader.exists(path):
 			continue
 		var res = load(path)
