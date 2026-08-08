@@ -1,6 +1,8 @@
 extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const ALL_SMOKE_NAME: String = "AllStarterMainFlowSmoke"
+const AccountProfileStoreScript: GDScript = preload("res://scripts/game/account/account_profile_store.gd")
+const TEST_ACCOUNT_PROFILE_PATH: String = "user://playtest_all_starters_account_profile.json"
 
 var _starter_results: Array[Dictionary] = []
 
@@ -20,6 +22,7 @@ func _run() -> void:
 	var catalog: UnitCatalog = UnitCatalogLib.new()
 	catalog.refresh()
 	var starter_ids: Array[String] = _starter_ids_for_run(catalog)
+	_prepare_test_account(starter_ids)
 	print("%s: starters=%s" % [_smoke_name(), ",".join(starter_ids)])
 	_expect(not starter_ids.is_empty(), "starter catalog should not be empty")
 	for starter_id: String in starter_ids:
@@ -64,8 +67,53 @@ func _finish_all_starters() -> void:
 		for failure: String in _technical_failures():
 			push_error("%s: %s" % [_smoke_name(), failure])
 		exit_code = 1
+	_write_terminal_evidence(exit_code)
 	_cleanup_runtime()
-	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+	AccountProfileStoreScript.clear(TEST_ACCOUNT_PROFILE_PATH)
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	get_tree().quit(exit_code)
+
+func _prepare_test_account(starter_ids: Array[String]) -> void:
+	AccountProfileStoreScript.clear(TEST_ACCOUNT_PROFILE_PATH)
+	var profile: Dictionary = AccountProfileStoreScript.default_profile()
+	profile["unlocked_starter_ids"] = starter_ids.duplicate()
+	var result: Dictionary = AccountProfileStoreScript.save_profile(profile, TEST_ACCOUNT_PROFILE_PATH)
+	_expect(bool(result.get("ok", false)), "could not create isolated all-starter account profile")
+
+func _start_main_scene() -> void:
+	_main = MAIN_SCENE.instantiate() as Control
+	var unit_select: UnitSelect = _main.get_node_or_null("UnitSelect") as UnitSelect
+	if unit_select != null:
+		unit_select.account_profile_path = TEST_ACCOUNT_PROFILE_PATH
+	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_main.offset_left = 0.0
+	_main.offset_top = 0.0
+	_main.offset_right = 0.0
+	_main.offset_bottom = 0.0
+	get_tree().root.add_child(_main)
+
+func _write_terminal_evidence(exit_code: int) -> void:
+	var output_dir: String = ProjectSettings.globalize_path("user://playtest_results")
+	var mkdir_error: Error = DirAccess.make_dir_recursive_absolute(output_dir)
+	if mkdir_error != OK:
+		push_warning("%s: could not create terminal evidence directory error=%d" % [_smoke_name(), int(mkdir_error)])
+		return
+	var output_path: String = output_dir.path_join("%s.json" % _smoke_name())
+	var output_file: FileAccess = FileAccess.open(output_path, FileAccess.WRITE)
+	if output_file == null:
+		push_warning("%s: could not write terminal evidence path=%s" % [_smoke_name(), output_path])
+		return
+	var payload: Dictionary = {
+		"smoke": _smoke_name(),
+		"exit_code": exit_code,
+		"passed": exit_code == 0,
+		"failures": _technical_failures(),
+		"summary": _all_starter_summary(),
+		"starter_results": _starter_results,
+	}
+	output_file.store_string(JSON.stringify(payload, "\t"))
+	output_file.close()
+	print("%s: terminal_evidence=%s" % [_smoke_name(), output_path])
 
 func _smoke_name() -> String:
 	return ALL_SMOKE_NAME
