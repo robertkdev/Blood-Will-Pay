@@ -98,7 +98,7 @@ func set_data(props: Dictionary) -> void:
 	if _name_label:
 		_name_label.text = "%s • Lv%d" % [title, _package_level] if _package_kind != "standard" else title
 	if _price_label:
-		_price_label.text = str(price_i) + "g"
+		_price_label.text = "%d blood" % price_i
 	if _name_label and _package_kind == "current_grade":
 		_name_label.text = "CAPITAL %s • Lv%d" % [title, _package_level]
 	if _icon:
@@ -144,11 +144,11 @@ func set_data(props: Dictionary) -> void:
 	else:
 		tooltip_text = title
 	_tooltip_title = title
-	_tooltip_subtitle = "%dg • %s Lv%d" % [price_i, "Current Grade" if _package_kind == "current_grade" else "Depth Grade", _package_level] if _package_kind != "standard" else "%dg" % price_i
+	_tooltip_subtitle = "%d blood • %s Lv%d" % [price_i, "Current Grade" if _package_kind == "current_grade" else "Depth Grade", _package_level] if _package_kind != "standard" else "%d blood" % price_i
 	_tooltip_lines = _build_tooltip_lines(display_role, display_goal, approaches, alt_goals, traits)
 	if _package_kind == "current_grade":
 		var capital_charter: Dictionary = UnitUpgradePaths.charter_definition(UnitUpgradePaths.charter_for_role(primary_role))
-		_tooltip_subtitle = "%dg • CAPITAL Lv%d" % [price_i, _package_level]
+		_tooltip_subtitle = "%d blood • CAPITAL Lv%d" % [price_i, _package_level]
 		_tooltip_lines.push_front("DRAWBACK — %s" % String(capital_charter.get("drawback", "")))
 		_tooltip_lines.push_front("BENEFIT — %s" % String(capital_charter.get("benefit", "")))
 		_tooltip_lines.push_front("CAPITAL CHARTER — %s" % String(capital_charter.get("name", "")))
@@ -237,7 +237,7 @@ func set_affordable(affordable: bool) -> void:
 		disabled = not ok
 	if _price_label:
 		_price_label.modulate = Color(1, 1, 0.8, 0.95) if ok else Color(1, 0.5, 0.5, 0.85)
-	set_status_tip("" if ok else "Not enough gold")
+	set_status_tip("" if ok else "Not enough blood in reserve")
 	_refresh_cursor()
 
 func set_shop_disabled(reason) -> void:
