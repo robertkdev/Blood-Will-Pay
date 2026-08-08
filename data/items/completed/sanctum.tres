@@ -9,7 +9,8 @@ name = "Sanctum"
 type = "completed"
 icon_path = "res://assets/items/sanctum_icon.png"
 stat_mods = {"flat_mr": 70}
-effects = []
+effects = ["sanctum"]
 components = ["veil", "veil"]
 tags = PackedStringArray("tank", "support")
+build_axes = PackedStringArray("magic_resist", "anti_control")
 

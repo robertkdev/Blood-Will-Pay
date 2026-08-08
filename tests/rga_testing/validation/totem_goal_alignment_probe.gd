@@ -82,8 +82,8 @@ func _evaluate_goal_alignment() -> Array[String]:
 
 	var current_goal: Dictionary = _run_goal(ctx)
 	var current_pass: bool = bool(current_goal.get("pass", false))
-	var current_save_fail: bool = _has_span_status(current_goal, "goal_peel_carry_peel_saves", false)
-	var current_interrupt_fail: bool = _has_span_status(current_goal, "goal_peel_carry_interrupt_events", false)
+	var current_save_pass: bool = _has_span_status(current_goal, "goal_peel_carry_peel_saves", true)
+	var current_interrupt_pass: bool = _has_span_status(current_goal, "goal_peel_carry_interrupt_events", true)
 	var current_protection_pass: bool = _has_span_status(current_goal, "goal_peel_carry_ally_protection_events", true)
 	var current_cc_immunity_pass: bool = _has_span_status(current_goal, "goal_peel_carry_cc_immunity_applied", true)
 
@@ -98,8 +98,8 @@ func _evaluate_goal_alignment() -> Array[String]:
 	var alternate_has_peel_rows: bool = _has_span_prefix(alternate_goal, "goal_peel_carry_")
 
 	print("TotemGoalAlignmentProbe: current_pass=", current_pass,
-		" current_save_fail=", current_save_fail,
-		" current_interrupt_fail=", current_interrupt_fail,
+		" current_save_pass=", current_save_pass,
+		" current_interrupt_pass=", current_interrupt_pass,
 		" current_protection_pass=", current_protection_pass,
 		" current_cc_immunity_pass=", current_cc_immunity_pass,
 		" alternate_pass=", alternate_pass,
@@ -108,8 +108,8 @@ func _evaluate_goal_alignment() -> Array[String]:
 		" alternate_output_pass=", alternate_output_pass,
 		" alternate_has_peel_rows=", alternate_has_peel_rows)
 
-	if not current_pass or not current_save_fail or not current_interrupt_fail or not current_protection_pass or not current_cc_immunity_pass:
-		failures.append("TotemGoalAlignmentProbe: current peel-carry residual shape did not match the expected live debt")
+	if not current_pass or not current_save_pass or not current_interrupt_pass or not current_protection_pass or not current_cc_immunity_pass:
+		failures.append("TotemGoalAlignmentProbe: current peel-carry contract did not match expected live save-plus-interrupt proof shape")
 	if not alternate_pass or not alternate_buff_pass or not alternate_magnitude_pass or not alternate_output_pass:
 		failures.append("TotemGoalAlignmentProbe: alternate team-amplification contract did not pass on the same live Totem rows")
 	if alternate_has_peel_rows:

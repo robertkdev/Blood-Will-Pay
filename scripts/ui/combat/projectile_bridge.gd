@@ -65,7 +65,8 @@ func teardown() -> void:
             projectile_manager.projectile_visual_arrived.disconnect(visual_cb)
         projectile_manager.clear()
         if projectile_manager.get_parent() != null:
-            projectile_manager.queue_free()
+            projectile_manager.get_parent().remove_child(projectile_manager)
+            projectile_manager.free()
         else:
             projectile_manager.free()
     projectile_manager = null

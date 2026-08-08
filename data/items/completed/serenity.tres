@@ -9,7 +9,8 @@ name = "Serenity"
 type = "completed"
 icon_path = "res://assets/items/serenity_icon.png"
 stat_mods = {"flat_mr": 40, "pct_mana_regen": 0.15}
-effects = []
+effects = ["serenity"]
 components = ["veil", "orb"]
 tags = PackedStringArray("support", "mage")
+build_axes = PackedStringArray("magic_resist", "anti_control", "mana", "tempo")
 

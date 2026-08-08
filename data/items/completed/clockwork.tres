@@ -9,7 +9,8 @@ name = "Clockwork"
 type = "completed"
 icon_path = "res://assets/items/clockwork_icon.png"
 stat_mods = {"pct_as": 0.25, "flat_start_mana": 15}
-effects = []
+effects = ["clockwork"]
 components = ["crystal", "orb"]
 tags = PackedStringArray("marksman", "mage")
+build_axes = PackedStringArray("attack_speed", "mana", "tempo")
 

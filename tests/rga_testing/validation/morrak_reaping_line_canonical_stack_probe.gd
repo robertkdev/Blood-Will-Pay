@@ -55,6 +55,7 @@ func _run() -> void:
 	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, "player", 0)
 	ctx.buff_system = engine.buff_system
 	var ability: Variant = MorrakReapingLine.new()
+	var preferred_target: int = int(ability.call("_preferred_target", ctx, 0.33))
 	var cast_ok: bool = bool(ability.call("cast", ctx))
 
 	var canonical_striker: int = int(engine.buff_system.get_stack(state, "player", 0, TraitKeys.STRIKER))
@@ -66,6 +67,7 @@ func _run() -> void:
 	var morrak_heal: int = int(morrak.hp) - before_morrak_hp
 
 	print("MorrakReapingLineCanonicalStackProbe: cast_ok=", cast_ok,
+		" preferred_target=", preferred_target,
 		" canonical_striker=", canonical_striker,
 		" canonical_executioner=", canonical_executioner,
 		" legacy_striker=", legacy_striker,
@@ -78,6 +80,9 @@ func _run() -> void:
 
 	if not cast_ok:
 		printerr("MorrakReapingLineCanonicalStackProbe: FAIL Reaping Line did not cast")
+		failed = true
+	if preferred_target != 1:
+		printerr("MorrakReapingLineCanonicalStackProbe: FAIL Reaping Line did not prefer the executable enemy")
 		failed = true
 	if canonical_striker != expected_striker or canonical_executioner != expected_executioner:
 		printerr("MorrakReapingLineCanonicalStackProbe: FAIL canonical stack count changed")
@@ -107,9 +112,13 @@ func _make_state() -> BattleState:
 	morrak.hp = 700
 	morrak.level = 1
 	morrak.attack_damage = 0.0
-	var high_target: Unit = _make_unit("enemy_high", 1000)
-	var execute_target: Unit = _make_unit("enemy_execute", 1000)
-	execute_target.hp = 190
+	# Keep this enemy lower in absolute HP than the executable target while its
+	# HP percentage remains above the threshold. This guards against selecting
+	# only the lowest absolute-HP enemy and missing a valid execute elsewhere.
+	var high_target: Unit = _make_unit("enemy_high", 600)
+	high_target.hp = 450
+	var execute_target: Unit = _make_unit("enemy_execute", 2000)
+	execute_target.hp = 500
 	state.player_team = [morrak]
 	state.enemy_team = [high_target, execute_target]
 	state.player_cds = [0.0]

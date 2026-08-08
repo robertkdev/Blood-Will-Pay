@@ -12,4 +12,5 @@ stat_mods = {"flat_hp": 300}
 effects = []
 components = []
 tags = PackedStringArray("tank", "support")
+build_axes = PackedStringArray("health", "frontline")
 

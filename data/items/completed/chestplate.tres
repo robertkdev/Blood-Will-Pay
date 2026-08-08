@@ -9,7 +9,8 @@ name = "Chestplate"
 type = "completed"
 icon_path = "res://assets/items/chestplate_icon.png"
 stat_mods = {"flat_armor": 70}
-effects = []
+effects = ["chestplate"]
 components = ["plate", "plate"]
 tags = PackedStringArray("tank")
+build_axes = PackedStringArray("armor", "frontline")
 

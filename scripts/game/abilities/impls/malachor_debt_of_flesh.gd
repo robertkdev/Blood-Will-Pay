@@ -42,11 +42,12 @@ func cast(ctx: AbilityContext) -> bool:
 
 func _priority_lockdown_target(ctx: AbilityContext) -> int:
 	var enemies: Array[Unit] = ctx.enemy_team_array(ctx.caster_team)
+	var target_team: String = _enemy_team(ctx.caster_team)
 	var best_index: int = -1
 	var best_score: float = -INF
 	for index: int in range(enemies.size()):
 		var enemy: Unit = enemies[index]
-		if enemy == null or not enemy.is_alive():
+		if enemy == null or not ctx.is_targetable(target_team, index):
 			continue
 		var score: float = float(enemy.attack_damage) + 0.65 * float(enemy.spell_power) + float(enemy.cost * 80)
 		if score > best_score:

@@ -3,6 +3,8 @@ extends Node
 const MarksmanRoleTest := preload("res://tests/rga_testing/metrics/marksman/marksman_role_identity_test.gd")
 
 const SUBJECT_ID: String = "sari"
+const UTILITY_SUBJECT_ID: String = "marble"
+const DIRECT_WINDOW_SUBJECT_ID: String = "teller"
 const ALLY_ID: String = "frontline_dummy"
 const TARGET_ID: String = "target_dummy"
 
@@ -15,10 +17,16 @@ func _run() -> void:
 	var positive_metric: Dictionary = _run_metric_result(_make_positive_payload())
 	var auxiliary_metric: Dictionary = _run_metric_result(_make_auxiliary_share_payload())
 	var alternate_metric: Dictionary = _run_metric_result(_make_alternate_ranged_payload())
+	var utility_metric: Dictionary = _run_metric_result(_make_utility_payload())
+	var utility_negative_metric: Dictionary = _run_metric_result(_make_utility_negative_payload())
+	var direct_window_metric: Dictionary = _run_metric_result(_make_direct_window_payload())
 	var negative_metric: Dictionary = _run_metric_result(_make_negative_payload())
 	var positive_pass: bool = bool(positive_metric.get("pass", false))
 	var auxiliary_pass: bool = bool(auxiliary_metric.get("pass", false))
 	var alternate_pass: bool = bool(alternate_metric.get("pass", false))
+	var utility_pass: bool = bool(utility_metric.get("pass", false))
+	var utility_negative_pass: bool = bool(utility_negative_metric.get("pass", false))
+	var direct_window_pass: bool = bool(direct_window_metric.get("pass", false))
 	var negative_pass: bool = bool(negative_metric.get("pass", false))
 	var backline_share: float = _span_value(positive_metric, "backline_share_med_a")
 	var candidate_share: float = _span_value(positive_metric, "team_share_med_a")
@@ -35,6 +43,11 @@ func _run() -> void:
 	var auxiliary_candidate_diag: bool = _has_diagnostic_span(auxiliary_metric, "team_share_med_a", "auxiliary_marksman_damage_share_not_required")
 	var auxiliary_subject_diag: bool = _has_diagnostic_span(auxiliary_metric, "subject_team_damage_share_med", "auxiliary_marksman_damage_share_not_required")
 	var alternate_backline_diag: bool = _has_diagnostic_span(alternate_metric, "backline_share_med_a", "alternate_marksman_ranged_evidence_satisfied")
+	var utility_sustained_diag: bool = _has_diagnostic_span(utility_metric, "subject_sustained_mult", "utility_marksman_goal_variant")
+	var utility_floor_span: bool = _has_passing_span(utility_metric, "subject_utility_damage_share_floor")
+	var direct_window_sustained_diag: bool = _has_diagnostic_span(direct_window_metric, "subject_sustained_mult", "alternate_sustained_window_evidence_satisfied")
+	var direct_window_share_span: bool = _has_passing_span(direct_window_metric, "subject_sustained_3_10s_team_share")
+	var direct_window_rate_span: bool = _has_passing_span(direct_window_metric, "subject_sustained_3_10s_rate")
 	var ranged_span: bool = _has_passing_span(positive_metric, "subject_ranged_proxy_med")
 	var tot_span: bool = _has_passing_span(positive_metric, "subject_time_on_target_med")
 	var candidate_id: String = _span_extra_string(positive_metric, "team_share_med_a", "candidate_id")
@@ -51,6 +64,9 @@ func _run() -> void:
 		" alternate_pass=", alternate_pass,
 		" alternate_backline_share=", alternate_backline_share,
 		" alternate_backline_diag=", alternate_backline_diag,
+		" utility_pass=", utility_pass,
+		" utility_negative_pass=", utility_negative_pass,
+		" direct_window_pass=", direct_window_pass,
 		" ranged_proxy=", ranged_proxy,
 		" time_on_target=", time_on_target,
 		" candidate_id=", candidate_id,
@@ -78,6 +94,15 @@ func _run() -> void:
 	if not alternate_pass or not alternate_backline_diag:
 		printerr("MarksmanPositioningRoleProbe: FAIL low side backline row did not stay diagnostic when subject ranged evidence proved marksman")
 		failed = true
+	if not utility_pass or not utility_sustained_diag or not utility_floor_span:
+		printerr("MarksmanPositioningRoleProbe: FAIL utility marksman goal did not pass through its ranged damage-floor contract")
+		failed = true
+	if utility_negative_pass:
+		printerr("MarksmanPositioningRoleProbe: FAIL utility marksman passed without the minimum damage contribution")
+		failed = true
+	if not direct_window_pass or not direct_window_sustained_diag or not direct_window_share_span or not direct_window_rate_span:
+		printerr("MarksmanPositioningRoleProbe: FAIL direct sustained-window evidence did not satisfy marksman throughput identity")
+		failed = true
 	if negative_pass:
 		printerr("MarksmanPositioningRoleProbe: FAIL weak negative marksman payload passed role_marksman_identity")
 		failed = true
@@ -104,7 +129,34 @@ func _make_alternate_ranged_payload() -> Dictionary:
 func _make_negative_payload() -> Dictionary:
 	return _make_payload(12.0, 24.0, 300.0, 0.18, 0.20, 0.18, 1.4)
 
-func _make_payload(subject_rate: float, subject_damage: float, team_damage: float, backline_share: float, ranged_proxy: float, time_on_target: float, attack_distance: float) -> Dictionary:
+func _make_utility_payload() -> Dictionary:
+	return _make_payload(12.0, 24.0, 300.0, 0.12, 0.86, 0.72, 4.2, UTILITY_SUBJECT_ID)
+
+func _make_utility_negative_payload() -> Dictionary:
+	return _make_payload(12.0, 6.0, 300.0, 0.12, 0.86, 0.72, 4.2, UTILITY_SUBJECT_ID)
+
+func _make_direct_window_payload() -> Dictionary:
+	var payload: Dictionary = _make_payload(12.0, 60.0, 300.0, 0.12, 0.86, 0.72, 4.2, DIRECT_WINDOW_SUBJECT_ID)
+	var sims: Dictionary = (payload.get("context", {}) as Dictionary).get("sims", {})
+	var probe: Dictionary = sims.get("probe", {})
+	var kernels: Dictionary = probe.get("kernels", {})
+	kernels["combat_patterns"] = {
+		"per_unit": {
+			"a": {
+				DIRECT_WINDOW_SUBJECT_ID: {
+					"sustained_3_10s_team_share": 0.27,
+					"sustained_3_10s_rate": 30.0
+				}
+			},
+			"b": {}
+		}
+	}
+	probe["kernels"] = kernels
+	sims["probe"] = probe
+	(payload.get("context", {}) as Dictionary)["sims"] = sims
+	return payload
+
+func _make_payload(subject_rate: float, subject_damage: float, team_damage: float, backline_share: float, ranged_proxy: float, time_on_target: float, attack_distance: float, subject_id: String = SUBJECT_ID) -> Dictionary:
 	var ally_damage: float = max(0.0, team_damage - subject_damage)
 	return {
 		"context": {
@@ -112,13 +164,13 @@ func _make_payload(subject_rate: float, subject_damage: float, team_damage: floa
 			"sims": {
 				"probe": {
 					"context": {
-						"team_a_ids": [SUBJECT_ID, ALLY_ID],
+						"team_a_ids": [subject_id, ALLY_ID],
 						"team_b_ids": [TARGET_ID]
 					},
 					"units": {
 						"a": [
 							{
-								"unit_id": SUBJECT_ID,
+								"unit_id": subject_id,
 								"damage": subject_damage
 							},
 							{
@@ -171,7 +223,7 @@ func _make_payload(subject_rate: float, subject_damage: float, team_damage: floa
 						},
 						"per_unit_kpis": {
 							"a": {
-								SUBJECT_ID: {
+								subject_id: {
 									"attacks_over_2_tiles_pct": ranged_proxy,
 									"time_on_target_pct": time_on_target,
 									"attack_distance_median_tiles": attack_distance
@@ -194,7 +246,7 @@ func _make_payload(subject_rate: float, subject_damage: float, team_damage: floa
 				}
 			}
 		},
-		"subject_unit_ids": [SUBJECT_ID]
+		"subject_unit_ids": [subject_id]
 	}
 
 func _has_passing_span(metric_result: Dictionary, label_prefix: String) -> bool:

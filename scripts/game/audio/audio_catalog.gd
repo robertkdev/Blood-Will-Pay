@@ -56,9 +56,10 @@ func _scan_dir(path: String) -> void:
 			continue
 		if not ResourceLoader.exists(full):
 			continue
-		var stream = load(full)
+		var resource: Resource = ResourceLoader.load(full, "AudioStream", ResourceLoader.CACHE_MODE_IGNORE)
+		var stream: AudioStream = resource as AudioStream
 		if stream is AudioStream:
-			var sid := _id_from_path(full)
+			var sid: String = _id_from_path(full)
 			_by_id[sid] = stream
 	dir.list_dir_end()
 

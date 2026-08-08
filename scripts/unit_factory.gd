@@ -9,6 +9,7 @@ static func clear_cache() -> void:
 	_index_built = false
 
 const UnitIdentity := preload("res://scripts/game/identity/unit_identity.gd")
+const BuildAffinityCatalog := preload("res://scripts/game/identity/build_affinity_catalog.gd")
 const UnitDefaults := preload("res://scripts/game/units/unit_defaults.gd")
 
 const IdentityValidator := preload("res://scripts/game/identity/identity_validator.gd")
@@ -242,7 +243,8 @@ static func _from_profile(profile: UnitProfile) -> Unit:
 	var primary_goal_id := _resolve_primary_goal(identity_resource, profile, primary_role_id)
 	var approaches := _resolve_approaches(identity_resource, profile, primary_role_id)
 	var alt_goals := _resolve_alt_goals(identity_resource, profile, primary_role_id, primary_goal_id)
-	u.set_identity_data(primary_role_id, primary_goal_id, approaches, alt_goals, identity_resource)
+	var build_affinities: Dictionary = _resolve_build_affinities(identity_resource, profile)
+	u.set_identity_data(primary_role_id, primary_goal_id, approaches, alt_goals, identity_resource, build_affinities)
 
 	# Seed baseline then override either with creep-specific stats (if available)
 	# or with the role profile stats for playables/others.
@@ -426,6 +428,17 @@ static func _resolve_alt_goals(identity: UnitIdentity, profile: UnitProfile, _pr
 	merged.append_array(_copy_string_array(profile.alt_goals))
 	return _unique_strings(merged)
 
+static func _resolve_build_affinities(identity: UnitIdentity, profile: UnitProfile) -> Dictionary:
+	var merged: Dictionary = {}
+	if identity != null and not identity.build_affinities.is_empty():
+		merged = identity.build_affinities.duplicate(true)
+	if profile != null and not profile.build_affinities.is_empty():
+		_merge_dictionary_defaults(merged, profile.build_affinities)
+	if profile != null:
+		var catalog_affinities: Dictionary = BuildAffinityCatalog.for_unit(String(profile.id))
+		_merge_dictionary_defaults(merged, catalog_affinities)
+	return merged
+
 static func _primary_role_from_unit(u: Unit) -> String:
 	if u == null:
 		return ""
@@ -463,3 +476,9 @@ static func _unique_strings(values: Array[String]) -> Array[String]:
 		seen[key] = true
 		out.append(key)
 	return out
+
+static func _merge_dictionary_defaults(target: Dictionary, defaults: Dictionary) -> void:
+	for key in defaults.keys():
+		if target.has(key):
+			continue
+		target[key] = defaults[key]
