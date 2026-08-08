@@ -24,6 +24,11 @@ func _ready() -> void:
 			_textures[key] = _scaled_texture(texture)
 	_apply_state(CursorState.DEFAULT)
 
+func _exit_tree() -> void:
+	set_process(false)
+	_clear_custom_cursors()
+	_textures.clear()
+
 func _scaled_texture(texture: Texture2D) -> Texture2D:
 	var image: Image = texture.get_image()
 	if image == null or image.is_empty():

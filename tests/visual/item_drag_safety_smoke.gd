@@ -63,7 +63,7 @@ func _run() -> void:
 		_finish()
 		return
 	var unit: Unit = _manager.player_team[0] as Unit
-	var target_position: Vector2 = _first_combat_actor_center()
+	var target_position: Vector2 = await _wait_for_combat_actor_center(false, 5.0)
 	if target_position.x < 0.0:
 		_fail("combat hammer check needs a live player arena actor")
 		_finish()
@@ -91,7 +91,7 @@ func _run() -> void:
 		_finish()
 		return
 	var combat_crystal_card: ItemCard = _find_item_card("crystal")
-	var combat_actor_center: Vector2 = _first_combat_actor_center()
+	var combat_actor_center: Vector2 = await _wait_for_combat_actor_center(false, 5.0)
 	if combat_crystal_card == null or combat_actor_center.x < 0.0:
 		_fail("combat item check needs a crystal card and live player arena actor")
 		_finish()
@@ -106,7 +106,7 @@ func _run() -> void:
 	Items.add_to_inventory("spike", 1)
 	await _settle_frames(2)
 	var spike_card: ItemCard = _find_item_card("spike")
-	var enemy_actor_center: Vector2 = _first_enemy_actor_center()
+	var enemy_actor_center: Vector2 = await _wait_for_combat_actor_center(true, 5.0)
 	if spike_card == null or enemy_actor_center.x < 0.0:
 		_fail("enemy rejection check needs a spike card and live enemy arena actor")
 		_finish()
@@ -206,6 +206,15 @@ func _first_enemy_actor_center() -> Vector2:
 		return Vector2(-1.0, -1.0)
 	return actor.get_global_rect().get_center()
 
+func _wait_for_combat_actor_center(enemy: bool, timeout_seconds: float) -> Vector2:
+	var deadline_ms: int = Time.get_ticks_msec() + int(max(0.0, timeout_seconds) * 1000.0)
+	while Time.get_ticks_msec() < deadline_ms:
+		var center: Vector2 = _first_enemy_actor_center() if enemy else _first_combat_actor_center()
+		if center.x > 0.0 and center.y > 0.0:
+			return center
+		await get_tree().process_frame
+	return Vector2(-1.0, -1.0)
+
 func _combat_is_active() -> bool:
 	return int(GameState.phase) == int(GameState.GamePhase.COMBAT) and bool(Economy.combat_active)
 
@@ -274,8 +283,10 @@ func _finish() -> void:
 		_main = null
 	if _failures.is_empty():
 		print(SMOKE_NAME + ": OK")
+		await get_tree().create_timer(2.0, true, false, true).timeout
 		get_tree().quit(0)
 		return
 	for failure: String in _failures:
 		push_error(SMOKE_NAME + ": " + failure)
+	await get_tree().create_timer(2.0, true, false, true).timeout
 	get_tree().quit(1)

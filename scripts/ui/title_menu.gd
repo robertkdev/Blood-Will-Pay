@@ -1442,6 +1442,10 @@ func _add_accessibility_priority_banner() -> void:
 		copy.add_child(_make_label("Scale and motion controls stay first so the command record can be made usable before anything else.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
 
 func _add_settings_docket() -> void:
+	# At enlarged UI scale the dossier plate consumes the first screenful while
+	# adding no control. Keep scale and Reduced Motion immediately reachable.
+	if _is_short_compact_layout():
+		return
 	var docket: PanelContainer = _make_field_order_container("SettingsDocket")
 	docket.custom_minimum_size.y = 64.0 if _is_compact_layout() else 72.0
 	docket.set_meta("settings_shell_persistence", "full_dossier_record_remains_visible_across_input_states")
@@ -2079,7 +2083,9 @@ func _update_nav_state() -> void:
 		nav_button.button_pressed = is_active
 		nav_button.text = "ACTIVE // " + base_label if is_active else base_label
 		if _is_short_compact_layout():
-			nav_button.add_theme_font_size_override("font_size", 14 if compact_settings_active else 16)
+			# Keep the selected settings action at the same functional minimum as
+			# every other compact navigation control, even at 1024x576.
+			nav_button.add_theme_font_size_override("font_size", 16)
 		nav_button.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62, 1.0) if is_active else COLOR_RAIL_TEXT)
 		nav_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.91, 0.68, 1.0) if is_active else Color(1.0, 0.76, 0.55, 1.0))
 		_apply_field_navigation_style(nav_button, is_active)
