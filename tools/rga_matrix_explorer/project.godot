@@ -1,0 +1,14 @@
+; Minimal Godot runner for the shared RGA planning model.
+; It deliberately has no game autoloads or rendering dependencies.
+
+config_version=5
+
+[application]
+
+config/name="Gamble Battle RGA Matrix Plan Smoke"
+run/main_scene="res://godot_validation/RgaTraitMatrixPlanSmoke.tscn"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
