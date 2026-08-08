@@ -5,12 +5,6 @@
 [ext_resource type="Resource" uid="uid://cyar1x4pufubx" path="res://data/creeps/reward_pools/gold_pool.tres" id="3"]
 [ext_resource type="Resource" uid="uid://c0flu8u4yx7bp" path="res://data/creeps/reward_pools/reroll_pool.tres" id="4"]
 
-[sub_resource type="Resource" id="5"]
-script = ExtResource("2")
-id = "nothing"
-kind = "nothing"
-weight = 20.0
-
 [sub_resource type="Resource" id="6"]
 script = ExtResource("2")
 id = "gold_pool_pick"
@@ -37,4 +31,4 @@ sub_pool = ExtResource("4")
 [resource]
 script = ExtResource("1")
 id = "default"
-entries = Array[ExtResource("2")]([SubResource("5"), SubResource("6"), SubResource("7"), SubResource("8")])
+entries = Array[ExtResource("2")]([SubResource("7")])
