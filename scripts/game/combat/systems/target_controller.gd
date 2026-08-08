@@ -8,6 +8,7 @@ const Targeting := preload("res://scripts/game/combat/targeting.gd")
 
 var state: BattleState
 var selector: Callable = Callable()
+var buff_system: BuffSystem = null
 var _arena_resolver: Callable
 var _resolving_player: Array[bool] = []
 var _resolving_enemy: Array[bool] = []
@@ -44,10 +45,9 @@ func _current_target_impl(team: String, shooter_index: int, targets: Array[int])
 
 func _safe_target(team: String, shooter_index: int, targets: Array[int]) -> int:
 	var idx: int = (int(targets[shooter_index]) if shooter_index < targets.size() else -1)
-	var enemy_team: Array[Unit] = _enemy_team_for(team)
-	if BattleState.is_target_alive(enemy_team, idx):
+	if _is_target_alive(team, idx):
 		return idx
-	return Targeting.pick_first_alive(enemy_team)
+	return _pick_first_available(team)
 
 func refresh_target(team: String, shooter_index: int) -> int:
 	_sync_arrays()
@@ -90,7 +90,7 @@ func copy_arena_targets(player_out: Array[int], enemy_out: Array[int]) -> void:
 			player_out[i] = -1
 			continue
 		var player_target: int = int(state.player_targets[i])
-		if BattleState.is_target_alive(state.enemy_team, player_target):
+		if _is_target_alive("player", player_target):
 			player_out[i] = player_target
 		else:
 			player_out[i] = current_target("player", i)
@@ -100,7 +100,7 @@ func copy_arena_targets(player_out: Array[int], enemy_out: Array[int]) -> void:
 			enemy_out[j] = -1
 			continue
 		var enemy_target: int = int(state.enemy_targets[j])
-		if BattleState.is_target_alive(state.player_team, enemy_target):
+		if _is_target_alive("enemy", enemy_target):
 			enemy_out[j] = enemy_target
 		else:
 			enemy_out[j] = current_target("enemy", j)
@@ -124,6 +124,21 @@ func refresh_live_targets() -> void:
 		var enemy_unit: Unit = state.enemy_team[j]
 		if enemy_unit != null and enemy_unit.is_alive():
 			refresh_target("enemy", j)
+
+func invalidate_target(target_team: String, target_index: int) -> void:
+	if not state or target_index < 0:
+		return
+	_sync_arrays()
+	var shooter_team: String = "enemy" if target_team == "player" else "player"
+	var targets: Array[int] = _targets_for(shooter_team)
+	var shooters: Array[Unit] = state.enemy_team if shooter_team == "enemy" else state.player_team
+	for shooter_index: int in range(targets.size()):
+		if int(targets[shooter_index]) == target_index:
+			var shooter: Unit = shooters[shooter_index] if shooter_index < shooters.size() else null
+			if shooter == null or not shooter.is_alive():
+				targets[shooter_index] = -1
+				continue
+			refresh_target(shooter_team, shooter_index)
 
 func _resolve_for_arena(team: String, shooter_index: int) -> int:
 	if not state or shooter_index < 0:
@@ -170,18 +185,28 @@ func _emit_target_end(team: String, shooter_index: int, target_index: int) -> vo
 
 func _is_target_alive(team: String, idx: int) -> bool:
 	var enemy_team: Array[Unit] = _enemy_team_for(team)
-	return BattleState.is_target_alive(enemy_team, idx)
+	if not BattleState.is_target_alive(enemy_team, idx):
+		return false
+	if buff_system == null:
+		return true
+	return bool(buff_system.is_targetable(state, _enemy_team_name(team), idx))
 
 func _select_target(team: String, shooter_index: int) -> int:
-	var enemy_team: Array[Unit] = _enemy_team_for(team)
 	var enemy_team_name: String = _enemy_team_name(team)
 	if selector.is_valid():
 		var result: Variant = selector.call(team, shooter_index, enemy_team_name)
 		if typeof(result) == TYPE_INT:
 			var idx: int = int(result)
-			if BattleState.is_target_alive(enemy_team, idx):
+			if _is_target_alive(team, idx):
 				return idx
-	return Targeting.pick_first_alive(enemy_team)
+	return _pick_first_available(team)
+
+func _pick_first_available(team: String) -> int:
+	var enemy_team: Array[Unit] = _enemy_team_for(team)
+	for index: int in range(enemy_team.size()):
+		if _is_target_alive(team, index):
+			return index
+	return -1
 
 func _prime_targets() -> void:
 	if not state:

@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/combat_analytics_gauntlet.gd" id="1"]
+
+[node name="CombatAnalyticsGauntletSmoke" type="Node"]
+script = ExtResource("1")
+output_label = "live_scale_smoke"
+tile_size_px = 80.0
+unit_seeds_per_matchup = 2
+trait_seeds_per_matchup = 2
+max_unit_pairs_per_scenario = 12
+max_trait_pairs = 6

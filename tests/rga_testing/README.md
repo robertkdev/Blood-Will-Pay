@@ -45,6 +45,15 @@ Notes
 - Config files may be JSON or TRES; both are loaded into a Dictionary then merged.
 - The pipeline logs the final merged settings before running.
 
+## Build Lane Matchup Gauntlet
+
+`tests/rga_testing/validation/LaneMatchupGauntlet.tscn` is the live combat gate for generated build lanes from `data/identity/unit_build_affinities.json`.
+
+- It covers every generated lane and searches ranked real enemy types until it finds at least one target the lane can beat and one counter board that beats it.
+- Beat cases use one bridge-compatible ally so support, tank, and assassin lanes are evaluated as small lane shells instead of isolated duelists.
+- Counter cases use small counter boards and item loadouts. Lockstep applies equip stat overlays plus registered item runtime effects when jobs pass `team_a_items` or `team_b_items`.
+- Output summary: `user://lane_matchup_gauntlet.json`.
+
 ## Identity Probe (per-unit)
 
 Analyze a single subject unit across multiple intents/seeds, then run all subject-aware role metrics and emit a JSON report.

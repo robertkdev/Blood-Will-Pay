@@ -7,7 +7,8 @@ const UI := preload("res://scripts/constants/ui_constants.gd")
 const ShopConfig := preload("res://scripts/game/shop/shop_config.gd")
 const SHOP_CARD_SCENE_PATH: String = "res://scenes/ui/shop/ShopCard.tscn"
 const ShopOffer := preload("res://scripts/game/shop/shop_offer.gd")
-const EmptySigilTexture: Texture2D = preload("res://assets/ui/gold icon.png")
+const TextureUtils: GDScript = preload("res://scripts/util/texture_utils.gd")
+const EMPTY_SIGIL_TEXTURE_PATH: String = "res://assets/ui/gold icon.png"
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const OPENING_FIGHT_MESSAGE: String = "Opening fight is fixed. Win it to unlock the shop."
@@ -256,7 +257,7 @@ func _make_placeholder(sold: bool) -> Control:
     wrap.add_child(stack)
 
     var icon: TextureRect = TextureRect.new()
-    icon.texture = EmptySigilTexture
+    icon.texture = TextureUtils.try_load_texture(EMPTY_SIGIL_TEXTURE_PATH)
     icon.custom_minimum_size = Vector2(38.0, 38.0) if first_fight_placeholder or compact else Vector2(44.0, 44.0)
     icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

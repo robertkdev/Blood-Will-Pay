@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "marksman"
 primary_goal = "marksman.tank_shredding"
 approaches = ["long_range", "debuff", "on_hit_effect"]
-alt_goals = []
+alt_goals = ["marksman.sustained_dps", "support.enemy_lockdown"]

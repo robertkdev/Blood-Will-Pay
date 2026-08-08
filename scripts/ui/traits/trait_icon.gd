@@ -18,6 +18,7 @@ const COLOR_ICON_ACTIVE: Color = Color(1.0, 0.86, 0.58, 1.0)
 const COLOR_ICON_INACTIVE: Color = Color(0.62, 0.56, 0.50, 0.82)
 const COLOR_ICON_HOVER: Color = Color(1.0, 0.91, 0.70, 1.0)
 const HOVER_DELAY: float = 0.08
+const HIDE_DELAY: float = 0.14
 const TOOLTIP_GROUP: String = "gothic_hover_tooltip"
 
 @onready var _icon: TextureRect = $Texture
@@ -28,6 +29,7 @@ var _active: bool = false
 var _count: int = 0
 var _tier: int = -1
 var _hovered: bool = false
+var _tooltip_hovered: bool = false
 var _hover_token: int = 0
 var _hover_tween: Tween = null
 
@@ -50,6 +52,12 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	_clear_tooltip()
+	if _hover_tween != null and is_instance_valid(_hover_tween):
+		_hover_tween.kill()
+	_hover_tween = null
+	if _icon != null:
+		_icon.texture = null
+	TraitTooltip.clear_runtime()
 
 func set_trait(id: String) -> void:
 	trait_id = String(id)
@@ -64,7 +72,7 @@ func _update_visuals() -> void:
 	var path: String = _resolve_icon_path(trait_id)
 	var tex: Texture2D = null
 	if path != "" and ResourceLoader.exists(path):
-		tex = load(path)
+		tex = TextureUtils.try_load_texture(path)
 	if tex == null:
 		tex = TextureUtils.make_circle_texture(Color(0.44, 0.34, 0.24, 0.62), 32)
 	if _icon:
@@ -119,6 +127,10 @@ func _show_tooltip() -> void:
 	var root: Window = get_tree().root
 	if root:
 		root.add_child(tooltip)
+	if not tooltip.is_connected("mouse_entered", Callable(self, "_on_tooltip_mouse_entered")):
+		tooltip.mouse_entered.connect(_on_tooltip_mouse_entered)
+	if not tooltip.is_connected("mouse_exited", Callable(self, "_on_tooltip_mouse_exited")):
+		tooltip.mouse_exited.connect(_on_tooltip_mouse_exited)
 	if tooltip.has_method("set_trait"):
 		tooltip.call("set_trait", trait_id)
 	if tooltip.has_method("set_context"):
@@ -137,7 +149,7 @@ func _on_mouse_exited() -> void:
 	if _icon:
 		_icon.modulate = COLOR_ICON_ACTIVE if _active else COLOR_ICON_INACTIVE
 	_apply_active_bg()
-	_clear_tooltip()
+	_schedule_clear_tooltip()
 
 func _on_focus_entered() -> void:
 	if trait_id.strip_edges() == "":
@@ -161,19 +173,34 @@ func _on_focus_exited() -> void:
 	if _icon:
 		_icon.modulate = COLOR_ICON_ACTIVE if _active else COLOR_ICON_INACTIVE
 	_apply_active_bg()
-	_clear_tooltip()
+	_schedule_clear_tooltip()
 
 func _on_hover_gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion and _tooltip != null and is_instance_valid(_tooltip):
-		if _tooltip.has_method("move_to_raw"):
-			_tooltip.call("move_to_raw", _tooltip_anchor_position())
-		elif _tooltip.has_method("move_to"):
-			_tooltip.call("move_to", _tooltip_anchor_position())
+	if event is InputEventMouseMotion:
+		return
+
+func _schedule_clear_tooltip() -> void:
+	var token: int = _hover_token
+	await get_tree().create_timer(HIDE_DELAY).timeout
+	if token != _hover_token:
+		return
+	if _hovered or _tooltip_hovered:
+		return
+	_clear_tooltip()
+
+func _on_tooltip_mouse_entered() -> void:
+	_tooltip_hovered = true
+
+func _on_tooltip_mouse_exited() -> void:
+	_tooltip_hovered = false
+	_hover_token += 1
+	_schedule_clear_tooltip()
 
 func _clear_tooltip() -> void:
 	if _tooltip and is_instance_valid(_tooltip):
 		_tooltip.queue_free()
 	_tooltip = null
+	_tooltip_hovered = false
 
 func _clear_global_tooltips() -> void:
 	if get_tree() == null:

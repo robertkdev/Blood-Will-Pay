@@ -9,12 +9,16 @@ extends AbilityImplBase
 const BASE: Array[int] = [300, 450, 900]
 const SP_MULT: float = 0.90
 const TraitKeys := preload("res://scripts/game/traits/runtime/trait_keys.gd")
+const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
 const MovementMath := preload("res://scripts/game/combat/movement/math.gd")
 const KALEI_KEY := "kaleidoscope_stacks" # Legacy fallback for old saved/test state.
 const EXEC_KEY := "executioner_stacks"    # Legacy fallback for old saved/test state.
 const RECAST_SCALE: float = 0.70
 const BLINK_OFFSET_TILES: float = 0.85
 const MOVE_DURATION: float = 0.16
+const HEALING_REDUCTION_PCT: float = -0.50
+const SHIELD_REDUCTION_PCT: float = -0.50
+const SUSTAIN_FRACTURE_DURATION_S: float = 5.0
 
 func _level_index(u: Unit) -> int:
     var lvl: int = (int(u.level) if u != null else 1)
@@ -64,6 +68,16 @@ func _strike(ctx: AbilityContext, target_idx: int, power_scale: float) -> Dictio
     var res: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_idx, dmg_f, "magic")
     if not ctx.is_alive(target_team, target_idx):
         res["killed"] = true
+    if not bool(res.get("executed", false)) and tgt != null and tgt.is_alive() and bs != null:
+        bs.apply_tag(ctx.state, target_team, target_idx, BuffTags.TAG_HEALING_REDUCTION_HEXEON, SUSTAIN_FRACTURE_DURATION_S, {
+            "healing_received_pct": HEALING_REDUCTION_PCT,
+            "shield_strength_pct": SHIELD_REDUCTION_PCT,
+            "kind": "hexeon_sustain_fracture",
+        })
+        bs.record_debuff(ctx.state, target_team, target_idx, "hexeon_sustain_fracture", {
+            "healing_received_pct": HEALING_REDUCTION_PCT,
+            "shield_strength_pct": SHIELD_REDUCTION_PCT,
+        }, abs(HEALING_REDUCTION_PCT) + abs(SHIELD_REDUCTION_PCT), SUSTAIN_FRACTURE_DURATION_S)
     return res
 
 func _priority_backline_enemy(ctx: AbilityContext) -> int:
@@ -74,7 +88,7 @@ func _priority_backline_enemy(ctx: AbilityContext) -> int:
     var max_depth: float = -INF
     for index: int in range(enemies.size()):
         var enemy_for_depth: Unit = enemies[index]
-        if enemy_for_depth == null or not enemy_for_depth.is_alive():
+        if enemy_for_depth == null or not ctx.is_targetable(target_team, index):
             continue
         var depth_value: float = ctx.position_of(target_team, index).x * side_sign
         min_depth = min(min_depth, depth_value)
@@ -85,7 +99,7 @@ func _priority_backline_enemy(ctx: AbilityContext) -> int:
     var candidates: Array[Dictionary] = []
     for i: int in range(enemies.size()):
         var enemy: Unit = enemies[i]
-        if enemy == null or not enemy.is_alive():
+        if enemy == null or not ctx.is_targetable(target_team, i):
             continue
         var pos: Vector2 = ctx.position_of(target_team, i)
         var depth: float = pos.x * side_sign
@@ -150,8 +164,6 @@ func _blink_near_target(ctx: AbilityContext, target_idx: int) -> void:
         else:
             backline_x = min(backline_x, enemy_pos.x)
     var dest: Vector2 = Vector2(backline_x + sign_x * BLINK_OFFSET_TILES * ctx.tile_size(), target_pos.y)
-    if ctx.engine.arena_state.has_method("notify_forced_movement"):
-        ctx.engine.arena_state.notify_forced_movement(ctx.caster_team, ctx.caster_index, dest - start, MOVE_DURATION)
     if ctx.engine.arena_state.data != null:
         dest = MovementMath.clamp_to_rect(dest, ctx.engine.arena_state.data.arena_bounds)
         if ctx.caster_team == "player":

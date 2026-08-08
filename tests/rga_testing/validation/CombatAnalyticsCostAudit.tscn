@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/combat_analytics_gauntlet.gd" id="1"]
+
+[node name="CombatAnalyticsCostAudit" type="Node"]
+script = ExtResource("1")
+output_label = "rga_cost_ability_audit_20260709"
+unit_seeds_per_matchup = 1
+trait_seeds_per_matchup = 1
+run_no_items = true
+run_primary_items = false
+run_trait_stack = false
+progress_every_rows = 100

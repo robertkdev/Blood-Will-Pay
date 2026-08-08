@@ -2,6 +2,23 @@
 
 Run these scenes via MCP for headless validation and reports.
 
+- Lane matchup counter/prey gates
+  - Fast strict gate: `tests/rga_testing/validation/LaneMatchupGauntlet.tscn`.
+  - Enforced ranked audit: `tests/rga_testing/validation/LaneMatchupCandidateAudit.tscn`.
+  - Exhaustive report-only survey: `tests/rga_testing/validation/LaneMatchupExhaustiveCandidateSurvey.tscn`.
+  - The strict gate fails on first-choice counter/prey pair issues. The ranked audit samples the top four candidates per lane and fails on directional contradictions. The exhaustive survey samples all currently generated ranked candidates, writes `user://lane_matchup_exhaustive_candidate_audit.json`, and is intentionally report-only because it is heavy diagnostic coverage. The latest generated candidate pool is clean at the tested lane/loadout scope; broader item, trait, and full-board balance still needs separate analytics coverage.
+
+- Combat analytics gauntlets
+  - Full run: `tests/rga_testing/validation/CombatAnalyticsGauntlet.tscn`.
+  - Fast smoke: `tests/rga_testing/validation/CombatAnalyticsGauntletFastSmoke.tscn`.
+  - Live-scale smoke: `tests/rga_testing/validation/CombatAnalyticsGauntletSmoke.tscn`.
+  - Tank item focus: `tests/rga_testing/validation/CombatAnalyticsTankItemFocus.tscn`.
+  - Tank problem focus: `tests/rga_testing/validation/CombatAnalyticsTankProblemFocus.tscn`.
+  - Worst non-tank item candidate focus: `tests/rga_testing/validation/CombatAnalyticsWorstItemCandidateFocus.tscn`.
+  - Worst non-tank item candidate focus round 2: `tests/rga_testing/validation/CombatAnalyticsWorstItemCandidateFocusRound2.tscn`.
+  - Worst non-tank primary focus: `tests/rga_testing/validation/CombatAnalyticsWorstItemPrimaryFocus.tscn`.
+  - The focus scenes use `focus_unit_ids` to run changed primaries against the full unit list without rerunning trait stacks. The broad tank focus writes `user://combat_analytics/tank_item_focus`; the Brute/Korath problem focus writes `user://combat_analytics/tank_problem_focus`; the worst-item scenes write `user://combat_analytics/worst_item_candidate_focus`, `user://combat_analytics/worst_item_candidate_focus_round2`, and `user://combat_analytics/worst_item_primary_focus_after_overrides`.
+
 - Role Matrix Probe (per-unit orchestrator)
   - Scene: `tests/rga_testing/validation/RoleMatrixProbe.tscn`
   - Args (examples):
@@ -111,6 +128,9 @@ Run these scenes via MCP for headless validation and reports.
 - Bonko empower contract probe
   - Scene: `tests/rga_testing/validation/BonkoEmpowerContractProbe.tscn`
   - Proves the current Bonk cast applies the Bonko empower tag with the expected hit count, damage/heal/mana metadata, and direct ramp-state telemetry. Bonko no longer reads legacy Striker stack helpers in the cast path.
+- Bonko on-hit proc probe
+  - Scene: `tests/rga_testing/validation/BonkoOnHitProcProbe.tscn`
+  - Proves Bonko's empowered basic attacks emit explicit on-hit proc telemetry, so the `on_hit_effect` identity approach is backed by runtime evidence.
 
 - Mage sustained-DPS goal positive/negative control
   - Scene: `tests/rga_testing/validation/MageSustainedDpsGoalProbe.tscn`

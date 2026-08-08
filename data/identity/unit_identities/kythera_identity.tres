@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "tank"
 primary_goal = "tank.team_fortification"
 approaches = ["damage_reduction", "debuff"]
-alt_goals = []
+alt_goals = ["tank.frontline_absorb", "marksman.tank_shredding"]

@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "tank"
 primary_goal = "tank.initiate_fight"
 approaches = ["engage", "zone", "aoe"]
-alt_goals = []
+alt_goals = ["tank.team_fortification", "mage.wombo_combo_burst"]

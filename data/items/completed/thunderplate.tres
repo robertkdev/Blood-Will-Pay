@@ -9,7 +9,8 @@ name = "Thunderplate"
 type = "completed"
 icon_path = "res://assets/items/thunderplate_icon.png"
 stat_mods = {"pct_as": 0.25, "flat_armor": 30}
-effects = []
+effects = ["thunderplate"]
 components = ["crystal", "plate"]
 tags = PackedStringArray("brawler", "tank")
+build_axes = PackedStringArray("attack_speed", "armor", "frontline", "tempo")
 
