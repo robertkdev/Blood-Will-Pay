@@ -32,3 +32,8 @@ class_name ItemDef
 # Allowed role tags: "tank", "brawler", "marksman", "assassin", "mage", "support".
 # Items should have at least one applicable role tag.
 @export var tags: PackedStringArray = PackedStringArray()
+
+# Build-axis tags describe what stat/effect lane this item enables.
+# Examples: "attack_damage", "spell_power", "mana", "health", "armor",
+# "magic_resist", "crit", "attack_speed", "tenacity", "sustain", "tempo".
+@export var build_axes: PackedStringArray = PackedStringArray()

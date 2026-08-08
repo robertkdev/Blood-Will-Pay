@@ -2,6 +2,7 @@ extends Panel
 class_name TraitTooltip
 
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const UnitCatalogLib: GDScript = preload("res://scripts/game/shop/unit_catalog.gd")
 
 @onready var _name_label: Label = $VBox/Name
 @onready var _state_label: Label = $VBox/State
@@ -10,6 +11,7 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 @onready var _footer_label: Label = $VBox/Footer
 @onready var _vbox: VBoxContainer = $VBox
 var _threshold_row: HBoxContainer = null
+var _members_label: Label = null
 
 const TOOLTIP_WIDTH: float = 320.0
 const PADDING: float = 18.0
@@ -33,14 +35,25 @@ var trait_count: int = 0
 var trait_tier: int = -1
 var is_active: bool = false
 
+static var _unit_catalog: UnitCatalog = null
+
+static func clear_runtime() -> void:
+	_unit_catalog = null
+
+static func _get_unit_catalog() -> UnitCatalog:
+	if _unit_catalog == null:
+		_unit_catalog = UnitCatalogLib.new() as UnitCatalog
+	return _unit_catalog
+
 func _ready() -> void:
 	top_level = true
 	focus_mode = Control.FOCUS_NONE
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 900
 	add_to_group(TOOLTIP_GROUP)
 	custom_minimum_size.x = TOOLTIP_WIDTH
 	_ensure_threshold_row()
+	_ensure_members_label()
 	_apply_style()
 	_update_labels()
 
@@ -80,6 +93,10 @@ func _apply_style() -> void:
 		_description_label.add_theme_font_size_override("font_size", 15)
 		_description_label.add_theme_color_override("font_color", COLOR_TEXT)
 		_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if _members_label != null:
+		_members_label.add_theme_font_size_override("font_size", 13)
+		_members_label.add_theme_color_override("font_color", Color(0.77, 0.69, 0.56, 1.0))
+		_members_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if _footer_label != null:
 		_footer_label.add_theme_font_size_override("font_size", 14)
 		_footer_label.add_theme_color_override("font_color", COLOR_MUTED)
@@ -128,6 +145,9 @@ func move_to_raw(raw_position: Vector2) -> void:
 	_sync_size()
 	global_position = _clamped_position(raw_position)
 
+func contains_global_point(point: Vector2) -> bool:
+	return get_global_rect().has_point(point)
+
 func _update_labels() -> void:
 	var def: TraitDef = _load_trait_def(trait_id)
 	var title: String = trait_id
@@ -150,6 +170,7 @@ func _update_labels() -> void:
 	if _description_label:
 		_description_label.text = description
 		_description_label.visible = description.strip_edges() != ""
+	_update_members_label()
 	if _footer_label:
 		_footer_label.text = _format_footer(def)
 		_footer_label.visible = _footer_label.text.strip_edges() != ""
@@ -197,6 +218,21 @@ func _ensure_threshold_row() -> void:
 	_vbox.add_child(_threshold_row)
 	_vbox.move_child(_threshold_row, min(insert_index, _vbox.get_child_count() - 1))
 
+func _ensure_members_label() -> void:
+	if _vbox == null:
+		return
+	_members_label = _vbox.get_node_or_null("Members") as Label
+	if _members_label != null:
+		return
+	_members_label = Label.new()
+	_members_label.name = "Members"
+	_members_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var insert_index: int = _vbox.get_child_count()
+	if _description_label != null:
+		insert_index = _description_label.get_index() + 1
+	_vbox.add_child(_members_label)
+	_vbox.move_child(_members_label, min(insert_index, _vbox.get_child_count() - 1))
+
 func _update_threshold_row(def: TraitDef) -> void:
 	_ensure_threshold_row()
 	if _threshold_row == null:
@@ -221,6 +257,46 @@ func _update_threshold_row(def: TraitDef) -> void:
 		chip.add_theme_color_override("font_color", Color(1.0, 0.98, 0.82, 1.0) if active_chip else (COLOR_TEXT if reached else COLOR_MUTED))
 		chip.add_theme_stylebox_override("normal", _make_threshold_chip_style(active_chip, reached))
 		_threshold_row.add_child(chip)
+
+func _update_members_label() -> void:
+	_ensure_members_label()
+	if _members_label == null:
+		return
+	var names: Array[String] = _unit_names_for_trait(trait_id)
+	if names.is_empty():
+		_members_label.visible = false
+		_members_label.text = ""
+		return
+	_members_label.visible = true
+	_members_label.text = "Units: %s" % ", ".join(names)
+
+func _unit_names_for_trait(id: String) -> Array[String]:
+	var clean_id: String = String(id).strip_edges()
+	var names: Array[String] = []
+	if clean_id == "":
+		return names
+	var unit_catalog: UnitCatalog = _get_unit_catalog()
+	if unit_catalog == null:
+		return names
+	unit_catalog.ensure_ready()
+	for cost: int in unit_catalog.get_all_costs():
+		for unit_id: String in unit_catalog.get_ids_by_cost(cost):
+			var meta: Dictionary = unit_catalog.get_unit_meta(unit_id)
+			var flags: Dictionary = {}
+			var raw_flags: Variant = meta.get("flags", {})
+			if typeof(raw_flags) == TYPE_DICTIONARY:
+				flags = raw_flags
+			if bool(flags.get("hidden", false)) or bool(flags.get("enemy_only", false)):
+				continue
+			var traits: Array = []
+			var raw_traits: Variant = meta.get("traits", [])
+			if raw_traits is Array:
+				traits = raw_traits
+			if not traits.has(clean_id):
+				continue
+			names.append(String(meta.get("name", unit_id)))
+	names.sort()
+	return names
 
 func _threshold_values(def: TraitDef) -> Array[int]:
 	var values: Array[int] = []

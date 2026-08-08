@@ -12,4 +12,5 @@ stat_mods = {"flat_armor": 30}
 effects = []
 components = []
 tags = PackedStringArray("tank", "brawler")
+build_axes = PackedStringArray("armor", "frontline")
 

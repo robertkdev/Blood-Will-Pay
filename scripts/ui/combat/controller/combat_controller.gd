@@ -422,6 +422,7 @@ var _combat_resolving_watchdog_seen: bool = false
 var _battle_start_pending: bool = false
 var _battle_start_elapsed: float = 0.0
 var _battle_start_generation: int = 0
+var _pending_combat_quote_multiplier: float = -1.0
 var _hud_snapshot_signature: String = ""
 var _result_banner: PanelContainer = null
 var _result_hold_elapsed: float = 0.0
@@ -1492,6 +1493,7 @@ func _on_continue_pressed() -> void:
 func _queue_battle_start() -> void:
 	if _battle_start_pending:
 		return
+	_pending_combat_quote_multiplier = float(Economy.quoted_gross_multiplier) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else -1.0
 	_battle_start_pending = true
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
@@ -1524,11 +1526,13 @@ func _complete_pending_battle_start() -> void:
 	_battle_start_pending = false
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_pending_combat_quote_multiplier = -1.0
 
 func _cancel_pending_battle_start() -> void:
 	_battle_start_pending = false
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_pending_combat_quote_multiplier = -1.0
 
 func _recover_pending_battle_start(reason: String) -> void:
 	if not _battle_start_pending:
@@ -2199,6 +2203,7 @@ func _on_bet_changed(val: float) -> void:
 
 func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	Trace.step("CombatView._on_battle_started: begin")
+	var locked_quote_multiplier: float = _pending_combat_quote_multiplier
 	_complete_pending_battle_start()
 	if continue_button != null:
 		continue_button.text = BATTLE_LOCKED_TEXT
@@ -2216,7 +2221,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	_update_stage_label()
 	_sync_bottom_combat_visibility()
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
-		Economy.start_combat()
+		Economy.start_combat(locked_quote_multiplier)
 	var battle_snapshot: Dictionary = _build_account_victory_snapshot()
 	AccountProgressionScript.record_battle_start(battle_snapshot)
 	if grid_placement and manager:
@@ -3379,6 +3384,7 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 	_set_root_control_visible("GothicItemsPlate", planning_visible)
 	_set_root_control_visible("GothicGoldPlate", planning_visible)
 	_set_root_control_visible("GothicWagerSummaryPlate", planning_visible)
+	_set_root_control_visible("GothicCommitRailPlate", planning_visible)
 	var record_mark: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	if record_mark != null:
 		record_mark.text = "FIELD RECORD // ACTIVE THREAT // NO RETREAT" if in_combat else "FIELD RECORD // DEPLOYMENT COPY // COMMIT PENDING"

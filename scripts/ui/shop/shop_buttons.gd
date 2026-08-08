@@ -14,6 +14,7 @@ var _lock: Button = null
 var _buy_xp: Button = null
 var _progress_label: Label = null
 var _progression_available: bool = true
+var _enabled: bool = true
 
 func configure(host_container: Container) -> HBoxContainer:
 	_host = host_container
@@ -69,13 +70,15 @@ func teardown() -> void:
 	_lock = null
 	_buy_xp = null
 	_progress_label = null
+	_enabled = true
 
 func set_locked(locked: bool) -> void:
 	if _lock:
 		_lock.button_pressed = bool(locked)
 
 func set_enabled(enabled: bool) -> void:
-	var en := bool(enabled)
+	var en: bool = bool(enabled)
+	_enabled = en
 	if _reroll:
 		_reroll.disabled = not en
 		_reroll.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if en else Control.CURSOR_ARROW
@@ -112,8 +115,9 @@ func set_progression_available(available: bool, progression_mode: String) -> voi
 	if _buy_xp == null:
 		return
 	_progression_available = available
-	_buy_xp.disabled = not _progression_available
-	_buy_xp.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available else Control.CURSOR_ARROW
+	var progression_enabled: bool = _enabled and _progression_available
+	_buy_xp.disabled = not progression_enabled
+	_buy_xp.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if progression_enabled else Control.CURSOR_ARROW
 	if not available and String(progression_mode) == "command":
 		_buy_xp.text = "Research Complete"
 

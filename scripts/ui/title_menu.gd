@@ -1442,6 +1442,10 @@ func _add_accessibility_priority_banner() -> void:
 		copy.add_child(_make_label("Scale and motion controls stay first so the command record can be made usable before anything else.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
 
 func _add_settings_docket() -> void:
+	# At enlarged UI scale the dossier plate consumes the first screenful while
+	# adding no control. Keep scale and Reduced Motion immediately reachable.
+	if _is_short_compact_layout():
+		return
 	var docket: PanelContainer = _make_field_order_container("SettingsDocket")
 	docket.custom_minimum_size.y = 64.0 if _is_compact_layout() else 72.0
 	docket.set_meta("settings_shell_persistence", "full_dossier_record_remains_visible_across_input_states")
@@ -2079,7 +2083,9 @@ func _update_nav_state() -> void:
 		nav_button.button_pressed = is_active
 		nav_button.text = "ACTIVE // " + base_label if is_active else base_label
 		if _is_short_compact_layout():
-			nav_button.add_theme_font_size_override("font_size", 14 if compact_settings_active else 16)
+			# Keep the selected settings action at the same functional minimum as
+			# every other compact navigation control, even at 1024x576.
+			nav_button.add_theme_font_size_override("font_size", 16)
 		nav_button.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62, 1.0) if is_active else COLOR_RAIL_TEXT)
 		nav_button.add_theme_color_override("font_pressed_color", Color(1.0, 0.91, 0.68, 1.0) if is_active else Color(1.0, 0.76, 0.55, 1.0))
 		_apply_field_navigation_style(nav_button, is_active)
@@ -2212,7 +2218,9 @@ func _style_selector(option: OptionButton) -> void:
 	VisualTypeSystem.set_action(option)
 	option.add_theme_stylebox_override("normal", _selector_box(Color(0.035, 0.029, 0.034, 0.98), Color(0.69, 0.61, 0.49, 0.92), 2))
 	option.add_theme_stylebox_override("hover", _selector_box(Color(0.075, 0.050, 0.050, 1.0), Color(0.94, 0.72, 0.39, 1.0), 3))
-	option.add_theme_stylebox_override("pressed", _selector_box(Color(0.20, 0.045, 0.055, 1.0), Color(1.0, 0.14, 0.16, 1.0), 6))
+	# Pressed remains a local control state; its brighter fill must never be
+	# mistaken for a menu fade or selector-only composite.
+	option.add_theme_stylebox_override("pressed", _selector_box(Color(0.27, 0.055, 0.065, 1.0), Color(1.0, 0.22, 0.20, 1.0), 8))
 	option.add_theme_stylebox_override("focus", _selector_box(Color(0.026, 0.072, 0.098, 1.0), COLOR_SIGNAL_BLUE, 10))
 	var disabled_style: StyleBoxFlat = _selector_box(Color(0.025, 0.023, 0.026, 0.96), Color(0.36, 0.34, 0.31, 0.94), 11)
 	disabled_style.border_width_right = 4
@@ -2220,7 +2228,17 @@ func _style_selector(option: OptionButton) -> void:
 	option.add_theme_stylebox_override("disabled", disabled_style)
 	option.set_meta("authored_interaction_states", PackedStringArray(["normal", "hover", "pressed", "focus", "disabled"]))
 	option.set_meta("focus_visual_cue", "signal_blue_full_frame")
+	option.set_meta("pressed_visual_cue", "blood_red_fill_and_full_settings_shell")
 	option.set_meta("disabled_non_color_cue", "blocked_left_bar_and_bottom_cut")
+	option.set_meta("pressed_state_preserves_settings_shell", true)
+	if not option.is_connected("button_down", Callable(self, "_on_settings_selector_pressed")):
+		option.button_down.connect(_on_settings_selector_pressed)
+
+func _on_settings_selector_pressed() -> void:
+	# OptionButton's local pressed treatment must never become a selector-only
+	# composite. Reassert the surrounding command record before the framebuffer
+	# can settle, while keeping the red pressed style local to the selector.
+	ensure_settings_surface_visible()
 
 func _selector_box(background_color: Color, border_color: Color, left_width: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -2422,6 +2440,7 @@ func _refresh_scaled_layout() -> void:
 	_sync_action_hierarchy()
 	if _runtime_settings_mode:
 		_apply_runtime_settings_chrome()
+		ensure_settings_surface_visible()
 	_queue_title_panel_fit()
 	if _scaled_focus_target_name != "":
 		call_deferred("_restore_scaled_settings_focus")

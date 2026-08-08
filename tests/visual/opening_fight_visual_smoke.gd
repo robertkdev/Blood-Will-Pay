@@ -12,6 +12,9 @@ const OPENING_FIGHT_MESSAGE: String = "Opening fight is fixed. Win it to unlock 
 var _saved_captures: int = 0
 var _finished_opening_smoke: bool = false
 
+func _uses_manual_opening_continue() -> bool:
+	return true
+
 func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	var window: Window = get_window()
@@ -156,8 +159,36 @@ func _finish_opening_smoke() -> void:
 		for failure: String in _failures:
 			push_error(SMOKE_NAME + ": " + failure)
 		exit_code = 1
+	_write_terminal_evidence(exit_code)
 	_cleanup_runtime()
-	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	get_tree().quit(exit_code)
 
 func _finish() -> void:
 	_finish_opening_smoke()
+
+func _write_terminal_evidence(exit_code: int) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
+	var path: String = "%s/result.json" % OUTPUT_DIR
+	var output_file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	if output_file == null:
+		push_warning("%s: could not write terminal evidence" % SMOKE_NAME)
+		return
+	output_file.store_string(JSON.stringify({
+		"smoke": SMOKE_NAME,
+		"passed": exit_code == 0,
+		"failures": _failures,
+		"captures": _saved_captures,
+		"shop_buttons": _shop_button_evidence(),
+	}, "\t"))
+	output_file.close()
+
+func _shop_button_evidence() -> Array[Dictionary]:
+	var evidence: Array[Dictionary] = []
+	if _main == null:
+		return evidence
+	for node: Node in _main.find_children("*", "Button", true, false):
+		var button: Button = node as Button
+		if button != null and (button.text.begins_with("Reroll") or button.text.begins_with("Lock") or button.text.begins_with("Buy XP")):
+			evidence.append({"text": button.text, "disabled": button.disabled, "visible": button.is_visible_in_tree()})
+	return evidence

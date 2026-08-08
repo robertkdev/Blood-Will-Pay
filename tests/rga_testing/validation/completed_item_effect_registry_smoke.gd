@@ -42,6 +42,8 @@ func _run() -> void:
 			effect_id_count += 1
 			if not registry.has_handler(effect_id):
 				failures.append("CompletedItemEffectRegistrySmoke: %s declares unregistered runtime effect '%s'" % [item_id, effect_id])
+		if not has_runtime_effect:
+			failures.append("CompletedItemEffectRegistrySmoke: %s is stat-only; every completed item should declare a runtime effect" % item_id)
 		if has_runtime_effect:
 			items_with_effects += 1
 

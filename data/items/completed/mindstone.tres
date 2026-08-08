@@ -12,4 +12,5 @@ stat_mods = {"pct_as": 0.30, "flat_sp": 50.0}
 effects = ["mindstone"]
 components = ["crystal", "wand"]
 tags = PackedStringArray("mage", "marksman")
+build_axes = PackedStringArray("attack_speed", "spell_power", "hybrid")
 
