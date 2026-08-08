@@ -7,8 +7,10 @@ const toolRoot = path.resolve(process.argv[2] || ".");
 const projectRoot = path.resolve(process.argv[3] || process.cwd());
 const htmlPath = path.join(toolRoot, "unit-art-review.html");
 const dataPath = path.join(toolRoot, "unit-art-history-data.js");
+const serverPath = path.join(toolRoot, "serve_unit_art_review.py");
 const html = fs.readFileSync(htmlPath, "utf8");
 const dataSource = fs.readFileSync(dataPath, "utf8");
+const serverSource = fs.readFileSync(serverPath, "utf8");
 const context = { window: {} };
 vm.runInNewContext(dataSource, context, { filename: dataPath });
 
@@ -17,11 +19,14 @@ const fail = (message) => { throw new Error(message); };
 const requireText = (value) => {
 	if (!html.includes(value)) fail(`Missing tool behavior: ${value}`);
 };
+const requireServerText = (value) => {
+	if (!serverSource.includes(value)) fail(`Missing persistence server behavior: ${value}`);
+};
 const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 34) fail(`Expected curated history with 34 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 37) fail(`Expected curated history with 37 entries, got ${manifest.items.length}.`);
 const creepHistory = manifest.items.filter((item) => item.unit === "creep");
 if (creepHistory.length !== 4 || creepHistory.map((item) => item.version).join("|") !== "V3|V4|V5|V6") fail("Creep review history must preserve V3 through V6 in chronological order.");
 if (creepHistory.some((item) => item.version === "V6" && item.current)) fail("Creep V6 portrait crop must not replace the default.");
@@ -61,11 +66,33 @@ if (pilferReviews.some((item) => item.current)) fail("Pilfer review history must
 if (!pilferReviews[0].status.includes("Latest review candidate") || pilferReviews[0].label !== "Feral transfusion assassin") fail("Pilfer's feral transfusion concept must remain the newest review candidate.");
 if (!/\{ unit: "pilfer"[^}]*version: "P2-02"[^}]*current: true[^}]*path: "units\/pilfer\.png" \}/.test(html)) fail("Pilfer's existing P2-02 default is missing or was changed.");
 
+const korathReviews = manifest.items.filter((item) => item.unit === "korath");
+if (korathReviews.length !== 2 || korathReviews.map((item) => item.version).join("|") !== "Review V1|Review V2") fail("Korath review candidates are missing or out of order.");
+if (korathReviews.some((item) => item.current)) fail("Korath review candidates must not replace the default.");
+if (!korathReviews[0].label.includes("Gold-light") || !korathReviews[1].label.includes("Violet-ivory")) fail("Korath review candidate labels are incorrect.");
+
+const quillithReviews = manifest.items.filter((item) => item.unit === "quillith");
+if (quillithReviews.length !== 1 || quillithReviews[0].version !== "Review V1") fail("Quillith cocoon review candidate is missing or out of order.");
+if (quillithReviews[0].current) fail("Quillith cocoon review candidate must not replace the default.");
+if (quillithReviews[0].label !== "Qylith floating cocoon-monstrosity" || !quillithReviews[0].status.includes("Latest review candidate")) fail("Quillith cocoon review candidate label or status is incorrect.");
+if (!/\{ unit: "quillith"[^}]*version: "P2-03"[^}]*current: true[^}]*path: "units\/quillith\.png" \}/.test(html)) fail("Quillith's existing P2-03 default is missing or was changed.");
+
 for (const item of manifest.items) {
 	if (!item.local_path) fail(`Curated history entry is not bundled locally: ${item.path}`);
 	const filePath = path.join(toolRoot, item.local_path);
 	if (!fs.existsSync(filePath)) fail(`Missing history image: ${item.path}`);
 	if (fs.statSync(filePath).size < 1024) fail(`History image is not hydrated: ${item.path}`);
+}
+
+const archivePrefix = "outputs/art_pipeline/style_validation/";
+const htmlArchivePaths = [...html.matchAll(/path: "([^"]+)"/g)]
+	.map((match) => match[1])
+	.filter((itemPath) => itemPath.startsWith(archivePrefix));
+const uniqueArchivePaths = [...new Set(htmlArchivePaths)];
+if (uniqueArchivePaths.length !== 111) fail(`Expected 111 hydrated reviewer archive references, got ${uniqueArchivePaths.length}.`);
+for (const itemPath of uniqueArchivePaths) {
+	const bundledPath = path.join(toolRoot, "history", itemPath.slice(archivePrefix.length));
+	if (!fs.existsSync(bundledPath) || fs.statSync(bundledPath).size < 1024) fail(`Missing hydrated reviewer archive: ${itemPath}`);
 }
 
 const liveCreep = path.join(projectRoot, "assets/units/creep.png");
@@ -87,7 +114,7 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 }
 
 [
-	"Blood Will Pay Unit Art Comparison Tool",
+	"Blood Will Pay · Unit Concepts",
 	"<button type=\"button\" data-set=\"phase2\">Phase 2</button>",
 	"unit: file === \"cashmere.png\" ? \"mara\"",
 	"{ unit: \"mara\", role: \"Mage\"",
@@ -101,14 +128,27 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"const LEGACY_COMMENTS_KEY",
 	"const LEGACY_PINS_KEY",
 	"const LEGACY_DEFAULTS_KEY",
+	"const STATE_API_URL = \"/api/unit-art-review-state\"",
+	"const STATE_FILE_LABEL = \"tools/art/unit-art-review-state.json\"",
 	"const MAX_PINS = 5",
-	"<button id=\"set-default\" class=\"action primary\" type=\"button\">Set as Default</button>",
+	"<button id=\"set-default\" class=\"action primary\" type=\"button\">Use as Working Concept</button>",
 	"function itemIdentity(item)",
 	"function defaultItemForUnit(unit)",
 	"function setCurrentAsDefault()",
 	"state.defaults[unit] = identity",
-	"function loadDefaults()",
+	"function loadLegacyReviewState()",
+	"function mergeLegacyIntoDocument(document, legacy)",
+	"function ensureExplicitPhase2WorkingConcepts()",
+	"function phase2WorkingConcepts()",
+	"phase2_working_concepts: workingConcepts",
+	"Shared human-agent review state",
+	"function initializePersistence()",
+	"function queuePersistenceSave()",
+	"async function flushPersistenceSave()",
 	"function saveDefaults()",
+	"Use for now",
+	"Needs revision",
+	"Working Concept",
 	"addEventListener(\"contextmenu\"",
 	"function configurePreviewContext(items, selectedItem)",
 	"function openComparisonPreview(selectedItem = null, items = filteredItems())",
@@ -129,17 +169,32 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"return (1 + (index - 3) * 3) + \" / span 3\"",
 	"comparison-grid",
 	"Active review + pinned references",
-	"src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)",
+	"const REVIEWER_ARCHIVE_PREFIX = \"outputs/art_pipeline/style_validation/\"",
+	"function bundledArchiveSrc(path)",
+	"src: config.src || bundledArchiveSrc(config.path)",
 	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
 	"history: [...PHASE2_ART, ...HISTORICAL_ART]",
 	"function versionsForUnit(unit)",
 	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()"
 ].forEach(requireText);
 
+[
+	"STATE_API_PATHS",
+	"REVIEW_PAGE_PATHS",
+	"unit-art-review-state.json",
+	"class ReviewStateStore",
+	"os.replace(temporary_path, self.state_path)",
+	"STATE_FILE_MALFORMED",
+	"STATE_CONFLICT",
+	"expected_revision",
+	"def do_POST(self)"
+].forEach(requireServerText);
+
 if (html.includes("Six pins maximum") || html.includes("0 / 6")) fail("The comparison tool still exposes the old six-pin limit.");
 if (html.includes("src: config.src || encodeURI(\"../../\" + config.path)")) fail("Candidate and remembered art must load from the main project asset server.");
 if (html.includes("padding: clamp(10px, 2vw, 30px)")) fail("Comparison artwork still wastes card area on the old oversized padding.");
 if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use the full available review workspace.");
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
+if (html.includes("localStorage.setItem")) fail("The durable review file must be the only writable source of truth; browser storage is migration-only.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=34 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 archive=33 phase2-units=12 canonical=mara pins=5 active-review=1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=37 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 quillith-reviews=1 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");

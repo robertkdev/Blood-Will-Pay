@@ -4,6 +4,23 @@
 
 Use this when a new Codex agent has no conversation history and needs to continue the Blood Will Pay unit-art workflow without drifting away from the approved direction.
 
+## Start With The User's Selected Working Concepts
+
+Before opening the proof ledger, generated-output folders, or remembered candidates, read:
+
+`C:\Users\Flipm\Documents\Blood-Will-Pay-shared\tools\art\unit-art-review-state.json`
+
+The `communication.phase2_working_concepts` array is the current human-agent
+contract. For each Phase 2 unit it records the exact selected image path,
+decision, and note. The user's **working concept** is the version they are going
+with for now for model, sprite-sheet, and downstream asset work. Always inspect
+that exact image before critiquing a named unit. Historical candidates and the
+proof ledger remain useful workflow evidence, but they do not override a newer
+selection in the shared review state.
+
+Use `tools/art/UNIT_CONCEPT_REVIEW.md` for the operational read, interaction,
+sync, and downstream-verification procedure.
+
 ## Current State
 
 - The larger art-workflow goal is active, not complete.
@@ -25,22 +42,24 @@ Use this when a new Codex agent has no conversation history and needs to continu
 
 Read these in order:
 
-1. `docs/art/unit_art_style_workflow.md`
-2. `docs/art/unit_art_workflow_completion_audit_2026-06-30.md`
-3. `docs/art/unit_art_review_queue_2026-06-30.md`
-4. `docs/art/unit_art_proof_matrix.json`
-5. `docs/art/unit_art_roster_prompt_matrix.json`
-6. `docs/art/unit_art_style_drift_audit_2026-06-30.md`
-7. `docs/art/unit_art_candidate_style_triage_2026-07-01.md`
-8. `docs/art/unit_art_cutout_orange_fringe_audit_2026-07-01.md`
-9. `docs/art/creep_review_decision_packet_2026-07-01.md`
-10. `docs/art/creep_review_decision_packet_2026-07-01_scorecard_template.json`
-11. `docs/art/creep_revision_prompt_packet_2026_07_01/creep.md`
-12. `docs/art/creep_builtin_revision_candidate_v5_2026-07-01.md`
-13. `docs/art/creep_builtin_revision_candidate_v4_2026-07-01.md`
-14. `docs/art/creep_builtin_revision_candidate_v3_2026-07-01.md`
-15. `docs/art/vellum_alignment_continuation_2026-07-01.md`
-16. `docs/art/unit_art_lore_style_gate_2026-07-01.md`
+1. `C:\Users\Flipm\Documents\Blood-Will-Pay-shared\tools\art\unit-art-review-state.json`
+2. `tools/art/UNIT_CONCEPT_REVIEW.md`
+3. `docs/art/unit_art_style_workflow.md`
+4. `docs/art/unit_art_workflow_completion_audit_2026-06-30.md`
+5. `docs/art/unit_art_review_queue_2026-06-30.md`
+6. `docs/art/unit_art_proof_matrix.json`
+7. `docs/art/unit_art_roster_prompt_matrix.json`
+8. `docs/art/unit_art_style_drift_audit_2026-06-30.md`
+9. `docs/art/unit_art_candidate_style_triage_2026-07-01.md`
+10. `docs/art/unit_art_cutout_orange_fringe_audit_2026-07-01.md`
+11. `docs/art/creep_review_decision_packet_2026-07-01.md`
+12. `docs/art/creep_review_decision_packet_2026-07-01_scorecard_template.json`
+13. `docs/art/creep_revision_prompt_packet_2026_07_01/creep.md`
+14. `docs/art/creep_builtin_revision_candidate_v5_2026-07-01.md`
+15. `docs/art/creep_builtin_revision_candidate_v4_2026-07-01.md`
+16. `docs/art/creep_builtin_revision_candidate_v3_2026-07-01.md`
+17. `docs/art/vellum_alignment_continuation_2026-07-01.md`
+18. `docs/art/unit_art_lore_style_gate_2026-07-01.md`
 
 The completion audit is the current truth for remaining blockers. At the latest audit, 23 roster entries were checked: 3 accepted unit proofs, 14 current-candidate unit proofs needing human approval, and 6 roster entries with no visual proof (`berebell`, `cashmere`, `mortem`, `nyxa`, `repo`, `veyra`).
 
