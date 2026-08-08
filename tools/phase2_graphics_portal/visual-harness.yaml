@@ -1,0 +1,31 @@
+version: 1
+project: Gamble Battle
+scenarios:
+  - id: phase2-version-review
+    title: Phase II named version review
+    adapter: generic
+    objective: Verify that the real browser opens a centered full-screen unit viewer, clearly distinguishes current and historical art, exposes stable reference names, keeps version navigation readable, and binds the review rail to the selected version.
+    capture_command: ["node", "scripts/prepare-vdh-captures.mjs"]
+    capture_manifest: "visual-evidence/captures.json"
+    required_groups: [version-review]
+    runtime_provenance:
+      runtime: "Vinext local web runtime in Codex in-app browser"
+      source: "http://localhost:3000/"
+      source_sha256: "6bd90847f345beea49337beeb7be79f52cf105a4"
+      build: "npm test / vinext build"
+    evidence:
+      required_cameras: [browser]
+      required_layers: [final]
+      required_states: [version_review]
+      required_viewports: [desktop-1904x708]
+      required_events: [inspect_veyra_current, inspect_veyra_closed_egg]
+      required_combinations:
+        - {state: version_review, viewport: desktop-1904x708}
+      required_pairs:
+        version_switch: [reference, actual]
+      require_runtime_provenance: true
+      required_runtime_fields: [runtime, source, source_sha256, build]
+      max_source_age_seconds: 600
+    output_root: "visual-evidence/vdh-runs"
+    max_iterations: 2
+    telegram_context: "Gamble Battle Phase II graphics portal"
