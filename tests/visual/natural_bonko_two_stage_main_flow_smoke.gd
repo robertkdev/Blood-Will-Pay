@@ -37,6 +37,26 @@ func _run() -> void:
 	await _run_two_stage_flow()
 	_finish_two_stage_flow()
 
+func _press_continue(expect_forced: bool, label: String) -> void:
+	# Chapter contracts are a real planning gate after a chapter transition.
+	# Resolve the optional contract before delegating to the shared Start Battle
+	# click helper; otherwise the controller intentionally opens the contract
+	# market and never queues combat.
+	for frame_index: int in range(30):
+		if Shop != null and Shop.has_method("has_pending_contract_choice") and bool(Shop.call("has_pending_contract_choice")):
+			break
+		await _settle_frames(1)
+	if Shop != null and Shop.has_method("has_pending_contract_choice") and bool(Shop.call("has_pending_contract_choice")):
+		var combat_view: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+		var controller: Variant = combat_view.get("controller") if combat_view != null else null
+		if controller != null and controller.has_method("_on_contract_pass_pressed"):
+			controller.call("_on_contract_pass_pressed")
+		elif Shop.has_method("pass_contract"):
+			var pass_result: Dictionary = Shop.call("pass_contract") as Dictionary
+			_expect(bool(pass_result.get("ok", false)), "%s pending contract pass failed: %s" % [label, JSON.stringify(pass_result)])
+		await _settle_frames(4)
+	await super._press_continue(expect_forced, label)
+
 func _run_two_stage_flow() -> void:
 	await _ensure_unit_select()
 	await _select_starter(_flow_starter_id())
