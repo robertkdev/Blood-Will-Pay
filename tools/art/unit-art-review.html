@@ -67,34 +67,72 @@
 			top: 0;
 			z-index: 10;
 			display: grid;
-			grid-template-columns: minmax(180px, 1fr) auto;
-			gap: 16px;
+			grid-template-columns: auto minmax(0, 1fr);
+			gap: 10px 16px;
 			align-items: center;
-			padding: 14px 18px;
+			padding: 8px 14px;
 			border-bottom: 1px solid var(--line);
 			background: rgba(23, 22, 19, 0.96);
-			box-shadow: 0 12px 32px var(--shadow);
+			box-shadow: 0 8px 24px var(--shadow);
+		}
+
+		.brand {
+			display: grid;
+			gap: 2px;
+			min-width: 245px;
 		}
 
 		h1 {
 			margin: 0;
 			font-family: Georgia, "Times New Roman", serif;
-			font-size: clamp(24px, 3vw, 42px);
+			font-size: clamp(18px, 1.4vw, 24px);
 			font-weight: 600;
-			line-height: 1.2;
+			line-height: 1.05;
 			letter-spacing: -0.02em;
+			white-space: nowrap;
 		}
 
 		.subtle {
 			color: var(--muted);
-			font-size: 13px;
-			margin-top: 4px;
+			font-size: 11px;
+			margin-top: 0;
+		}
+
+		.persistence-line {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-top: 2px;
+			font-size: 11px;
+		}
+
+		.persistence-status {
+			color: var(--muted);
+		}
+
+		.persistence-status[data-state="saved"] {
+			color: var(--like);
+		}
+
+		.persistence-status[data-state="saving"],
+		.persistence-status[data-state="warning"] {
+			color: var(--maybe);
+		}
+
+		.persistence-status[data-state="error"] {
+			color: var(--cut);
+		}
+
+		.persistence-retry {
+			min-height: 24px;
+			padding: 1px 8px;
+			font-size: 11px;
 		}
 
 		.controls {
 			display: flex;
 			flex-wrap: wrap;
-			gap: 8px;
+			gap: 6px;
 			justify-content: flex-end;
 			align-items: center;
 		}
@@ -722,6 +760,10 @@
 				grid-template-columns: 1fr;
 			}
 
+			.brand {
+				min-width: 0;
+			}
+
 			.controls {
 				justify-content: flex-start;
 			}
@@ -854,9 +896,13 @@
 <body>
 	<div class="shell">
 		<header class="topbar">
-			<div>
-				<h1>Blood Will Pay Unit Art Comparison Tool</h1>
+			<div class="brand">
+				<h1>Blood Will Pay · Unit Concepts</h1>
 				<div class="subtle" id="visible-count">Loading current and historical art for every unit</div>
+				<div class="persistence-line">
+					<span id="persistence-status" class="persistence-status" data-state="loading" role="status">Loading durable review state...</span>
+					<button id="retry-persistence" class="persistence-retry" type="button" hidden>Retry</button>
+				</div>
 			</div>
 			<div class="controls" aria-label="Review controls">
 				<input id="search" class="search" type="search" placeholder="Search units" autocomplete="off">
@@ -870,26 +916,26 @@
 				</div>
 				<div class="segment" aria-label="Filter">
 					<button type="button" data-filter="all" class="active">All</button>
-					<button type="button" data-filter="like">Like</button>
-					<button type="button" data-filter="maybe">Maybe</button>
-					<button type="button" data-filter="cut">Cut</button>
-					<button type="button" data-filter="unmarked">Open</button>
+					<button type="button" data-filter="like">Use for now</button>
+					<button type="button" data-filter="maybe">Needs revision</button>
+					<button type="button" data-filter="cut">Reject</button>
+					<button type="button" data-filter="unmarked">Undecided</button>
 				</div>
 				<button id="smaller" class="action" type="button" title="Smaller cards">-</button>
 				<button id="larger" class="action" type="button" title="Larger cards">+</button>
 				<button id="export-json" class="action primary" type="button">Export JSON</button>
 				<button id="export-csv" class="action" type="button">Export CSV</button>
 				<button id="copy-summary" class="action" type="button">Copy Summary</button>
-				<button id="clear-all" class="action" type="button">Clear</button>
+				<button id="clear-all" class="action" type="button">Reset review</button>
 			</div>
 		</header>
 
 		<section class="summary" aria-label="Decision summary">
 			<div class="pill">Total <strong id="count-total">0</strong></div>
-			<div class="pill">Like <strong id="count-like">0</strong></div>
-			<div class="pill">Maybe <strong id="count-maybe">0</strong></div>
-			<div class="pill">Cut <strong id="count-cut">0</strong></div>
-			<div class="pill">Open <strong id="count-open">0</strong></div>
+			<div class="pill">Use for now <strong id="count-like">0</strong></div>
+			<div class="pill">Needs revision <strong id="count-maybe">0</strong></div>
+			<div class="pill">Reject <strong id="count-cut">0</strong></div>
+			<div class="pill">Undecided <strong id="count-open">0</strong></div>
 			<button id="show-pins" class="pill" type="button" title="Open pinned comparison">Pinned <strong id="count-pinned">0 / 5</strong></button>
 		</section>
 
@@ -923,15 +969,15 @@
 						<div id="version-meta" class="version-meta"></div>
 						<div class="comment-actions version-default-actions">
 							<span id="default-status" class="comment-status">Official default</span>
-							<button id="set-default" class="action primary" type="button">Set as Default</button>
+							<button id="set-default" class="action primary" type="button">Use as Working Concept</button>
 						</div>
 					</section>
 					<section class="sidebar-section">
-						<h2>Comment on this version</h2>
+						<h2>Notes on this concept</h2>
 						<div class="comment-box">
 							<textarea id="preview-comment" placeholder="What works, what needs changing, or which details to keep"></textarea>
 							<div class="comment-actions">
-								<span id="comment-status" class="comment-status">Saved locally</span>
+								<span id="comment-status" class="comment-status">No note yet</span>
 								<button id="save-comment" class="action primary" type="button">Save Comment</button>
 							</div>
 						</div>
@@ -944,10 +990,10 @@
 					<div class="preview-status" id="preview-status">Unit 1 / 1</div>
 				</div>
 				<div class="preview-actions" aria-label="Preview voting controls">
-					<button class="preview-choice" type="button" data-preview-choice="like" data-choice="like">Like</button>
-					<button class="preview-choice" type="button" data-preview-choice="maybe" data-choice="maybe">Maybe</button>
-					<button class="preview-choice" type="button" data-preview-choice="cut" data-choice="cut">Cut</button>
-					<button class="preview-choice" type="button" data-preview-choice="" data-choice="open">Open</button>
+					<button class="preview-choice" type="button" data-preview-choice="like" data-choice="like">Use for now</button>
+					<button class="preview-choice" type="button" data-preview-choice="maybe" data-choice="maybe">Needs revision</button>
+					<button class="preview-choice" type="button" data-preview-choice="cut" data-choice="cut">Reject</button>
+					<button class="preview-choice" type="button" data-preview-choice="" data-choice="open">Undecided</button>
 				</div>
 				<div class="unit-navigation next">
 					<div class="preview-help">Arrow keys change units &middot; [ and ] change versions</div>
@@ -959,10 +1005,18 @@
 
 	<div id="toast" class="toast" role="status"></div>
 
-	<script src="./unit-art-history-data.js?v=20260803-creep-v6-kett-v2-nyxa-v1-pilfer-v1"></script>
+	<script src="./unit-art-history-data.js?v=20260805-persistence-archive-quillith-v1"></script>
 	<script>
 		const ASSET_ROOT = "../../assets/units/";
 		const LOCAL_PROJECT_ASSET_ROOT = "../../";
+		const REVIEWER_ARCHIVE_PREFIX = "outputs/art_pipeline/style_validation/";
+		const REVIEWER_ARCHIVE_ROOT = "history/";
+		function bundledArchiveSrc(path) {
+			if (!path.startsWith(REVIEWER_ARCHIVE_PREFIX)) {
+				return encodeURI(LOCAL_PROJECT_ASSET_ROOT + path);
+			}
+			return encodeURI("./" + REVIEWER_ARCHIVE_ROOT + path.slice(REVIEWER_ARCHIVE_PREFIX.length));
+		}
 		const STORAGE_KEY = "blood-will-pay-unit-art-review-v1";
 		const LEGACY_STORAGE_KEY = "gamble-battle-unit-art-review-v1";
 		const COMMENTS_KEY = "blood-will-pay-unit-art-comments-v1";
@@ -971,6 +1025,10 @@
 		const LEGACY_PINS_KEY = "gamble-battle-unit-art-pins-v1";
 		const DEFAULTS_KEY = "blood-will-pay-unit-art-defaults-v1";
 		const LEGACY_DEFAULTS_KEY = "gamble-battle-unit-art-defaults-v1";
+		const STATE_API_URL = "/api/unit-art-review-state";
+		const STATE_FILE_LABEL = "tools/art/unit-art-review-state.json";
+		const STATE_SCHEMA_VERSION = 1;
+		const VALID_DECISIONS = new Set(["like", "maybe", "cut"]);
 		const MAX_PINS = 5;
 		const LIVE_ART = [
 			"axiom.png",
@@ -1279,16 +1337,23 @@
 			filter: "all",
 			query: "",
 			tileSize: 170,
-			decisions: loadDecisions(),
-			comments: loadComments(),
-			pins: loadPins(),
-			defaults: loadDefaults(),
+			decisions: {},
+			comments: {},
+			pins: [],
+			defaults: {},
 			previewMode: "single",
 			previewUnits: [],
 			previewUnitIndex: -1,
 			previewVersions: [],
 			previewVersionIndex: -1,
-			previewPreferredKeys: {}
+			previewPreferredKeys: {},
+			persistenceDocument: {},
+			persistenceRevision: null,
+			persistenceReady: false,
+			persistenceDirty: false,
+			persistenceSaving: false,
+			persistenceSaveQueued: false,
+			persistenceRetryMode: "load"
 		};
 
 		const els = {
@@ -1315,42 +1380,64 @@
 			reviewSidebar: document.querySelector(".review-sidebar"),
 			comment: document.getElementById("preview-comment"),
 			commentStatus: document.getElementById("comment-status"),
+			persistenceStatus: document.getElementById("persistence-status"),
+			persistenceRetry: document.getElementById("retry-persistence"),
 			toast: document.getElementById("toast")
 		};
 
 		document.querySelectorAll("[data-set]").forEach((button) => {
 			button.addEventListener("click", () => {
+				if (!guardPersistenceReady()) {
+					return;
+				}
 				state.set = button.dataset.set;
 				document.querySelectorAll("[data-set]").forEach((candidate) => {
 					candidate.classList.toggle("active", candidate === button);
 				});
 				render();
+				queuePersistenceSave();
 			});
 		});
 
 		document.querySelectorAll("[data-filter]").forEach((button) => {
 			button.addEventListener("click", () => {
+				if (!guardPersistenceReady()) {
+					return;
+				}
 				state.filter = button.dataset.filter;
 				document.querySelectorAll("[data-filter]").forEach((candidate) => {
 					candidate.classList.toggle("active", candidate === button);
 				});
 				render();
+				queuePersistenceSave();
 			});
 		});
 
 		els.search.addEventListener("input", () => {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			state.query = els.search.value.trim().toLowerCase();
 			render();
+			queuePersistenceSave();
 		});
 
 		document.getElementById("smaller").addEventListener("click", () => {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			state.tileSize = Math.max(128, state.tileSize - 20);
 			applyTileSize();
+			queuePersistenceSave();
 		});
 
 		document.getElementById("larger").addEventListener("click", () => {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			state.tileSize = Math.min(260, state.tileSize + 20);
 			applyTileSize();
+			queuePersistenceSave();
 		});
 
 		document.getElementById("export-json").addEventListener("click", () => {
@@ -1372,7 +1459,10 @@
 		});
 
 		document.getElementById("clear-all").addEventListener("click", () => {
-			if (!confirm("Clear all current unit art decisions and comments?")) {
+			if (!guardPersistenceReady()) {
+				return;
+			}
+			if (!confirm("Reset all concept statuses and notes? Working concept selections will be preserved.")) {
 				return;
 			}
 			state.decisions = {};
@@ -1422,8 +1512,12 @@
 		});
 
 		els.versionSelect.addEventListener("change", () => {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			state.previewVersionIndex = Number(els.versionSelect.value);
 			updatePreview();
+			queuePersistenceSave();
 		});
 
 		els.setDefault.addEventListener("click", () => {
@@ -1434,9 +1528,17 @@
 			saveCurrentComment();
 		});
 
-		document.getElementById("save-comment").addEventListener("click", () => {
-			saveCurrentComment();
-			showToast("Comment saved locally.");
+			document.getElementById("save-comment").addEventListener("click", () => {
+				saveCurrentComment();
+				showToast("Concept note queued for shared save.");
+			});
+
+		els.persistenceRetry.addEventListener("click", () => {
+			if (state.persistenceRetryMode === "load") {
+				void initializePersistence();
+				return;
+			}
+			void flushPersistenceSave();
 		});
 
 		els.preview.addEventListener("keydown", (event) => {
@@ -1500,7 +1602,7 @@
 				contentKey: config.contentKey || "",
 				path: config.path,
 				id,
-				src: config.src || encodeURI(LOCAL_PROJECT_ASSET_ROOT + config.path)
+				src: config.src || bundledArchiveSrc(config.path)
 			};
 		}
 
@@ -1649,7 +1751,8 @@
 				button.type = "button";
 				button.className = "choice";
 				button.dataset.choice = value;
-				button.textContent = labelFor(value);
+				button.textContent = cardLabelFor(value);
+				button.title = labelFor(value);
 				button.addEventListener("click", () => {
 					setDecision(item.key, value);
 				});
@@ -1659,7 +1762,7 @@
 			const clear = document.createElement("button");
 			clear.type = "button";
 			clear.className = "clear";
-			clear.textContent = "Clear";
+			clear.textContent = "Clear status";
 			clear.addEventListener("click", () => {
 				setDecision(item.key, "");
 			});
@@ -1688,6 +1791,9 @@
 		}
 
 		function setDecision(file, choice) {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			if (choice) {
 				state.decisions[file] = choice;
 			} else {
@@ -1744,6 +1850,7 @@
 			}, {});
 			state.previewUnitIndex = clampPreviewIndex(state.previewUnits.indexOf(normalizeUnitId(selectedItem.unit)));
 			loadPreviewVersions(selectedItem.key);
+			queuePersistenceSave();
 		}
 
 		function openComparisonPreview(selectedItem = null, items = filteredItems()) {
@@ -1772,6 +1879,9 @@
 		}
 
 		function togglePin(item) {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			const index = state.pins.indexOf(item.key);
 			if (index >= 0) {
 				state.pins.splice(index, 1);
@@ -1873,6 +1983,7 @@
 			const unit = state.previewUnits[state.previewUnitIndex];
 			loadPreviewVersions(state.previewPreferredKeys[unit] || "");
 			updatePreview();
+			queuePersistenceSave();
 		}
 
 		function clampPreviewIndex(index) {
@@ -1899,22 +2010,21 @@
 			}
 			state.previewVersionIndex = ((state.previewVersionIndex + delta) % count + count) % count;
 			updatePreview();
+			queuePersistenceSave();
 		}
 
 		function setCurrentAsDefault() {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			const item = currentPreviewItem();
 			if (!item) {
 				return;
 			}
 			const unit = normalizeUnitId(item.unit);
 			const identity = itemIdentity(item);
-			if (state.defaults[unit] === identity) {
-				delete state.defaults[unit];
-				showToast(displayUnitName(unit) + " restored to the official default.");
-			} else {
-				state.defaults[unit] = identity;
-				showToast(displayUnitName(unit) + " default changed to " + versionLabel(item, state.previewVersionIndex) + ".");
-			}
+			state.defaults[unit] = identity;
+			showToast(displayUnitName(unit) + " working concept changed to " + versionLabel(item, state.previewVersionIndex) + ".");
 			state.previewPreferredKeys[unit] = item.key;
 			saveDefaults();
 			render();
@@ -1922,6 +2032,9 @@
 		}
 
 		function voteCurrentPreview(choice) {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			const item = currentPreviewItem();
 			if (!item) {
 				return;
@@ -1949,7 +2062,7 @@
 			renderVersionControls(item);
 			const comment = commentForItem(item);
 			els.comment.value = comment;
-			els.commentStatus.textContent = comment ? "Saved locally" : "No comment yet";
+			els.commentStatus.textContent = comment ? "Saved in shared review file" : "No note yet";
 			if (state.previewMode === "comparison") {
 				updateComparisonPreview();
 			}
@@ -1959,7 +2072,6 @@
 		function renderVersionControls(item) {
 			const unit = normalizeUnitId(item.unit);
 			const defaultItem = defaultItemForUnit(unit);
-			const savedIdentity = state.defaults[unit] || "";
 			els.versionSelect.replaceChildren(...state.previewVersions.map((version, index) => {
 				const option = document.createElement("option");
 				option.value = String(index);
@@ -1971,17 +2083,13 @@
 			const details = [item.status, sourceLabel, item.kind].filter(Boolean).join(" · ");
 			const sourceDetail = item.version ? item.title : item.path;
 			els.versionMeta.textContent = details + (details ? "\n" : "") + sourceDetail;
-			if (savedIdentity === itemIdentity(item)) {
-				els.defaultStatus.textContent = "Custom default";
-				els.setDefault.textContent = "Use Official Default";
-				els.setDefault.disabled = false;
-			} else if (defaultItem && itemIdentity(defaultItem) === itemIdentity(item)) {
-				els.defaultStatus.textContent = "Official default";
-				els.setDefault.textContent = "Current Default";
+			if (defaultItem && itemIdentity(defaultItem) === itemIdentity(item)) {
+				els.defaultStatus.textContent = "Working concept";
+				els.setDefault.textContent = "Working Concept";
 				els.setDefault.disabled = true;
 			} else {
-				els.defaultStatus.textContent = defaultItem ? "Another version is default" : "No default selected";
-				els.setDefault.textContent = "Set as Default";
+				els.defaultStatus.textContent = defaultItem ? "Another version is the working concept" : "No working concept selected";
+				els.setDefault.textContent = "Use as Working Concept";
 				els.setDefault.disabled = false;
 			}
 		}
@@ -2005,6 +2113,9 @@
 		}
 
 		function saveCurrentComment() {
+			if (!guardPersistenceReady()) {
+				return;
+			}
 			const item = currentPreviewItem();
 			if (!item) {
 				return;
@@ -2012,10 +2123,10 @@
 			const comment = els.comment.value.trim();
 			if (comment) {
 				state.comments[item.path] = comment;
-				els.commentStatus.textContent = "Saved locally";
+				els.commentStatus.textContent = "Queued for shared save";
 			} else {
 				delete state.comments[item.path];
-				els.commentStatus.textContent = "No comment yet";
+				els.commentStatus.textContent = "No note yet";
 			}
 			saveComments();
 		}
@@ -2040,103 +2151,548 @@
 			} else {
 				delete els.preview.dataset.choice;
 			}
-			const label = choice ? labelFor(choice) : "Open";
+			const label = choice ? labelFor(choice) : "Undecided";
 			els.previewStatus.textContent =
 				"Unit " + (state.previewUnitIndex + 1) + " / " + state.previewUnits.length +
 				" · Version " + (state.previewVersionIndex + 1) + " / " + state.previewVersions.length +
 				" · " + label;
 		}
 
-		function loadDecisions() {
+		function emptyReviewDocument() {
+			return {
+				schema_version: STATE_SCHEMA_VERSION,
+				project: "blood-will-pay",
+				revision: 0,
+				decisions: {},
+				comments: {},
+				pins: [],
+				defaults: {},
+				ui: {
+					review_set: "all",
+					filter: "all",
+					query: "",
+					tile_size: 170
+				},
+				selection: {
+					active_item_key: "",
+					preview_preferred_keys: {}
+				},
+				migration: {},
+				communication: {}
+			};
+		}
+
+		function readLegacyJson(storageKey, expectedKind, errors) {
+			let raw = null;
 			try {
-				const current = localStorage.getItem(STORAGE_KEY);
-				const legacy = current ? null : localStorage.getItem(LEGACY_STORAGE_KEY);
-				const raw = current || legacy;
-				if (!raw) {
-					return {};
-				}
-				const parsed = JSON.parse(raw);
-				if (!current && legacy) {
-					localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-				}
-				return parsed && typeof parsed === "object" ? parsed : {};
+				raw = localStorage.getItem(storageKey);
 			} catch (error) {
-				return {};
+				errors.push(storageKey + " could not be read: " + error.message);
+				return null;
 			}
+			if (raw === null) {
+				return null;
+			}
+			try {
+				const parsed = JSON.parse(raw);
+				const valid = expectedKind === "array"
+					? Array.isArray(parsed)
+					: parsed && typeof parsed === "object" && !Array.isArray(parsed);
+				if (!valid) {
+					errors.push(storageKey + " has the wrong JSON shape and was left untouched.");
+					return null;
+				}
+				return parsed;
+			} catch (error) {
+				errors.push(storageKey + " contains malformed JSON and was left untouched.");
+				return null;
+			}
+		}
+
+		function mergeLegacyMaps(storageKeys, section, errors, conflicts, valueValidator) {
+			const merged = {};
+			storageKeys.forEach((storageKey) => {
+				const parsed = readLegacyJson(storageKey, "object", errors);
+				if (!parsed) {
+					return;
+				}
+				Object.entries(parsed).forEach(([key, value]) => {
+					if (typeof key !== "string" || !valueValidator(value)) {
+						errors.push(storageKey + " has an invalid " + section + " entry for " + key + ".");
+						return;
+					}
+					if (Object.prototype.hasOwnProperty.call(merged, key) && merged[key] !== value) {
+						conflicts.push({
+							section,
+							key,
+							kept_value: merged[key],
+							alternate_value: value,
+							source: storageKey
+						});
+						return;
+					}
+					merged[key] = value;
+				});
+			});
+			return merged;
+		}
+
+		function mergeLegacyPins(storageKeys, errors) {
+			const pins = [];
+			storageKeys.forEach((storageKey) => {
+				const parsed = readLegacyJson(storageKey, "array", errors);
+				if (!parsed) {
+					return;
+				}
+				parsed.forEach((value) => {
+					if (typeof value !== "string") {
+						errors.push(storageKey + " contains a non-string pin and was left untouched.");
+						return;
+					}
+					if (!pins.includes(value)) {
+						pins.push(value);
+					}
+				});
+			});
+			return pins.slice(0, MAX_PINS);
+		}
+
+		function loadLegacyReviewState() {
+			const errors = [];
+			const conflicts = [];
+			const document = emptyReviewDocument();
+			document.decisions = mergeLegacyMaps(
+				[STORAGE_KEY, LEGACY_STORAGE_KEY],
+				"decisions",
+				errors,
+				conflicts,
+				(value) => typeof value === "string" && VALID_DECISIONS.has(value)
+			);
+			document.comments = mergeLegacyMaps(
+				[COMMENTS_KEY, LEGACY_COMMENTS_KEY],
+				"comments",
+				errors,
+				conflicts,
+				(value) => typeof value === "string"
+			);
+			document.defaults = mergeLegacyMaps(
+				[DEFAULTS_KEY, LEGACY_DEFAULTS_KEY],
+				"defaults",
+				errors,
+				conflicts,
+				(value) => typeof value === "string"
+			);
+			document.pins = mergeLegacyPins([PINS_KEY, LEGACY_PINS_KEY], errors);
+			const hasData = Object.keys(document.decisions).length > 0 ||
+				Object.keys(document.comments).length > 0 ||
+				Object.keys(document.defaults).length > 0 ||
+				document.pins.length > 0;
+			return { document, errors, conflicts, hasData };
+		}
+
+		function addUniqueMigrationRecord(records, record) {
+			const fingerprint = JSON.stringify(record);
+			if (!records.some((existing) => JSON.stringify(existing) === fingerprint)) {
+				records.push(record);
+				return true;
+			}
+			return false;
+		}
+
+		function mergeLegacyIntoDocument(document, legacy) {
+			const merged = normalizeReviewDocument(document);
+			let changed = false;
+			const migration = { ...merged.migration };
+			const migrationConflicts = Array.isArray(migration.legacy_conflicts)
+				? migration.legacy_conflicts.slice()
+				: [];
+
+			["decisions", "comments", "defaults"].forEach((section) => {
+				Object.entries(legacy.document[section]).forEach(([key, value]) => {
+					if (!Object.prototype.hasOwnProperty.call(merged[section], key)) {
+						merged[section][key] = value;
+						changed = true;
+						return;
+					}
+					if (merged[section][key] !== value) {
+						changed = addUniqueMigrationRecord(migrationConflicts, {
+							section,
+							key,
+							durable_value: merged[section][key],
+							browser_value: value
+						}) || changed;
+					}
+				});
+			});
+
+			legacy.document.pins.forEach((pin) => {
+				if (!merged.pins.includes(pin) && merged.pins.length < MAX_PINS) {
+					merged.pins.push(pin);
+					changed = true;
+				}
+			});
+
+			legacy.conflicts.forEach((conflict) => {
+				changed = addUniqueMigrationRecord(migrationConflicts, conflict) || changed;
+			});
+			if (migrationConflicts.length > 0) {
+				migration.legacy_conflicts = migrationConflicts;
+			}
+
+			if (legacy.errors.length > 0) {
+				const previousErrors = Array.isArray(migration.legacy_errors) ? migration.legacy_errors : [];
+				const nextErrors = [...new Set([...previousErrors, ...legacy.errors])];
+				if (JSON.stringify(previousErrors) !== JSON.stringify(nextErrors)) {
+					migration.legacy_errors = nextErrors;
+					changed = true;
+				}
+			}
+			if (legacy.hasData && !migration.legacy_imported_at) {
+				migration.legacy_imported_at = new Date().toISOString();
+				changed = true;
+			}
+			merged.migration = migration;
+			return { document: merged, changed };
+		}
+
+		function validateStringMap(value, field, valueValidator = (item) => typeof item === "string") {
+			if (!value || typeof value !== "object" || Array.isArray(value)) {
+				throw new Error(field + " must be a JSON object.");
+			}
+			Object.entries(value).forEach(([key, item]) => {
+				if (typeof key !== "string" || !valueValidator(item)) {
+					throw new Error(field + " contains an invalid entry for " + key + ".");
+				}
+			});
+			return { ...value };
+		}
+
+		function normalizeReviewDocument(value) {
+			if (!value || typeof value !== "object" || Array.isArray(value)) {
+				throw new Error("Review state must be a JSON object.");
+			}
+			if ((value.schema_version ?? STATE_SCHEMA_VERSION) !== STATE_SCHEMA_VERSION) {
+				throw new Error("Unsupported review state schema: " + value.schema_version);
+			}
+			if ((value.project ?? "blood-will-pay") !== "blood-will-pay") {
+				throw new Error("Review state belongs to another project.");
+			}
+			const revision = value.revision ?? 0;
+			if (!Number.isInteger(revision) || revision < 0) {
+				throw new Error("Review state revision must be a non-negative integer.");
+			}
+			const pins = value.pins ?? [];
+			if (!Array.isArray(pins) || pins.some((pin) => typeof pin !== "string")) {
+				throw new Error("Review state pins must be an array of strings.");
+			}
+			for (const field of ["ui", "selection", "migration", "communication"]) {
+				const fieldValue = value[field] ?? {};
+				if (!fieldValue || typeof fieldValue !== "object" || Array.isArray(fieldValue)) {
+					throw new Error("Review state " + field + " must be a JSON object.");
+				}
+			}
+			return {
+				...value,
+				schema_version: STATE_SCHEMA_VERSION,
+				project: "blood-will-pay",
+				revision,
+				decisions: validateStringMap(
+					value.decisions ?? {},
+					"decisions",
+					(item) => typeof item === "string" && VALID_DECISIONS.has(item)
+				),
+				comments: validateStringMap(value.comments ?? {}, "comments"),
+				defaults: validateStringMap(value.defaults ?? {}, "defaults"),
+				pins: [...new Set(pins)].slice(0, MAX_PINS),
+				ui: { ...(value.ui ?? {}) },
+				selection: { ...(value.selection ?? {}) },
+				migration: { ...(value.migration ?? {}) },
+				communication: { ...(value.communication ?? {}) }
+			};
+		}
+
+		function applyReviewDocument(reviewDocument) {
+			const normalized = normalizeReviewDocument(reviewDocument);
+			state.persistenceDocument = normalized;
+			state.persistenceRevision = normalized.revision;
+			state.decisions = { ...normalized.decisions };
+			state.comments = { ...normalized.comments };
+			state.pins = normalized.pins.slice(0, MAX_PINS);
+			state.defaults = { ...normalized.defaults };
+			ensureExplicitPhase2WorkingConcepts();
+
+			const ui = normalized.ui;
+			state.set = ART_SETS[ui.review_set] ? ui.review_set : "all";
+			state.filter = ["all", "like", "maybe", "cut", "unmarked"].includes(ui.filter)
+				? ui.filter
+				: "all";
+			state.query = typeof ui.query === "string" ? ui.query : "";
+			state.tileSize = Number.isInteger(ui.tile_size)
+				? Math.max(128, Math.min(260, ui.tile_size))
+				: 170;
+
+			const preferred = normalized.selection.preview_preferred_keys ?? {};
+			state.previewPreferredKeys = {
+				...validateStringMap(preferred, "selection.preview_preferred_keys"),
+				...phase2WorkingVersionKeys()
+			};
+			els.search.value = state.query;
+			document.querySelectorAll("[data-set]").forEach((button) => {
+				button.classList.toggle("active", button.dataset.set === state.set);
+			});
+			document.querySelectorAll("[data-filter]").forEach((button) => {
+				button.classList.toggle("active", button.dataset.filter === state.filter);
+			});
+			applyTileSize();
+			render();
+		}
+
+		function ensureExplicitPhase2WorkingConcepts() {
+			uniqueUnits(PHASE2_ART).forEach((unit) => {
+				if (!state.defaults[unit]) {
+					const current = CANONICAL_CURRENT.get(unit) || PHASE2_CURRENT.get(unit);
+					if (current) {
+						state.defaults[unit] = itemIdentity(current);
+					}
+				}
+			});
+		}
+
+		function phase2WorkingVersionKeys() {
+			return uniqueUnits(PHASE2_ART).reduce((result, unit) => {
+				const item = defaultItemForUnit(unit);
+				if (item) {
+					result[unit] = item.key;
+				}
+				return result;
+			}, {});
+		}
+
+		function phase2WorkingConcepts() {
+			return uniqueUnits(PHASE2_ART).map((unit) => {
+				const item = defaultItemForUnit(unit);
+				return {
+					unit,
+					selected_key: item?.key || "",
+					image_path: item?.path || "",
+					label: item?.title || item?.note || "",
+					decision: item ? (state.decisions[item.key] || "undecided") : "missing",
+					note: item ? (state.comments[item.path] || state.comments[item.key] || "") : ""
+				};
+			});
+		}
+
+		function buildReviewDocument() {
+			ensureExplicitPhase2WorkingConcepts();
+			const previous = state.persistenceDocument && typeof state.persistenceDocument === "object"
+				? state.persistenceDocument
+				: {};
+			const currentItem = currentPreviewItem();
+			const previousSelection = previous.selection && typeof previous.selection === "object"
+				? previous.selection
+				: {};
+			const workingConcepts = phase2WorkingConcepts();
+			return {
+				...previous,
+				schema_version: STATE_SCHEMA_VERSION,
+				project: "blood-will-pay",
+				decisions: { ...state.decisions },
+				comments: { ...state.comments },
+				pins: state.pins.slice(0, MAX_PINS),
+				defaults: { ...state.defaults },
+				ui: {
+					...(previous.ui ?? {}),
+					review_set: state.set,
+					filter: state.filter,
+					query: state.query,
+					tile_size: state.tileSize
+				},
+				selection: {
+					...previousSelection,
+					active_item_key: currentItem ? currentItem.key : (previousSelection.active_item_key ?? ""),
+					preview_preferred_keys: {
+						...state.previewPreferredKeys,
+						...phase2WorkingVersionKeys()
+					}
+				},
+				communication: {
+					...(previous.communication ?? {}),
+					purpose: "Shared human-agent review state. Working concepts are the versions to use for current downstream asset work.",
+					working_concept_count: workingConcepts.length,
+					approved_working_concept_count: workingConcepts.filter((item) => item.decision === "like").length,
+					phase2_working_concepts: workingConcepts
+				}
+			};
+		}
+
+		async function responsePayload(response) {
+			try {
+				return await response.json();
+			} catch (error) {
+				return null;
+			}
+		}
+
+		function responseError(response, payload) {
+			return payload?.error?.message || "Review-state request failed with HTTP " + response.status + ".";
+		}
+
+		function setPersistenceStatus(kind, message, retryMode = "") {
+			els.persistenceStatus.dataset.state = kind;
+			els.persistenceStatus.textContent = message;
+			state.persistenceRetryMode = retryMode || state.persistenceRetryMode;
+			els.persistenceRetry.hidden = !retryMode;
+		}
+
+		function guardPersistenceReady() {
+			if (state.persistenceReady) {
+				return true;
+			}
+			showToast("Review data is not writable yet. Use Retry if loading failed.");
+			return false;
+		}
+
+		async function initializePersistence() {
+			if (state.persistenceSaving) {
+				return;
+			}
+			state.persistenceReady = false;
+			setPersistenceStatus("loading", "Loading durable review state...", "");
+			const legacy = loadLegacyReviewState();
+			try {
+				const response = await fetch(STATE_API_URL, {
+					headers: { "Accept": "application/json" },
+					cache: "no-store"
+				});
+				let document = null;
+				let stateWasMissing = false;
+				if (response.status === 404) {
+					stateWasMissing = true;
+					if (legacy.errors.length > 0) {
+						throw new Error(
+							"The durable file is missing, but browser review data is malformed. " +
+							"Nothing was overwritten: " + legacy.errors.join(" ")
+						);
+					}
+					document = emptyReviewDocument();
+				} else {
+					const payload = await responsePayload(response);
+					if (!response.ok || !payload?.ok || !payload.state) {
+						throw new Error(responseError(response, payload));
+					}
+					document = payload.state;
+				}
+
+				const merged = mergeLegacyIntoDocument(document, legacy);
+				applyReviewDocument(merged.document);
+				state.persistenceReady = true;
+				state.persistenceDirty = stateWasMissing || merged.changed;
+				if (state.persistenceDirty) {
+					const saved = await flushPersistenceSave();
+					if (!saved) {
+						return;
+					}
+				}
+
+				if (legacy.errors.length > 0 || legacy.conflicts.length > 0) {
+					setPersistenceStatus(
+						"warning",
+						"Durable file loaded; legacy browser conflicts/errors were preserved for review."
+					);
+				} else if (legacy.hasData && (stateWasMissing || merged.changed)) {
+					setPersistenceStatus("saved", "Existing browser reviews migrated to " + STATE_FILE_LABEL + ".");
+				} else {
+					setPersistenceStatus("saved", "Saved in " + STATE_FILE_LABEL + " · revision " + state.persistenceRevision);
+				}
+			} catch (error) {
+				state.persistenceReady = false;
+				setPersistenceStatus("error", error.message, "load");
+				showToast("Durable review state was not changed. " + error.message);
+				console.error("Unit art review persistence load failed", error);
+			}
+		}
+
+		let persistenceSaveTimer = 0;
+		function queuePersistenceSave() {
+			if (!state.persistenceReady) {
+				return;
+			}
+			state.persistenceDirty = true;
+			setPersistenceStatus("saving", "Saving review state...", "");
+			window.clearTimeout(persistenceSaveTimer);
+			persistenceSaveTimer = window.setTimeout(() => {
+				void flushPersistenceSave();
+			}, 0);
+		}
+
+		async function flushPersistenceSave() {
+			window.clearTimeout(persistenceSaveTimer);
+			if (!state.persistenceReady || !state.persistenceDirty) {
+				return state.persistenceReady;
+			}
+			if (state.persistenceSaving) {
+				state.persistenceSaveQueued = true;
+				return false;
+			}
+
+			state.persistenceSaving = true;
+			state.persistenceSaveQueued = false;
+			state.persistenceDirty = false;
+			setPersistenceStatus("saving", "Saving review state...", "");
+			let saved = false;
+			try {
+				const response = await fetch(STATE_API_URL, {
+					method: "POST",
+					headers: {
+						"Accept": "application/json",
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						expected_revision: state.persistenceRevision,
+						state: buildReviewDocument()
+					})
+				});
+				const payload = await responsePayload(response);
+				if (!response.ok || !payload?.ok || !payload.state) {
+					throw new Error(responseError(response, payload));
+				}
+				state.persistenceDocument = normalizeReviewDocument(payload.state);
+				state.persistenceRevision = state.persistenceDocument.revision;
+				const currentItem = currentPreviewItem();
+				if (currentItem) {
+					els.commentStatus.textContent = commentForItem(currentItem) ? "Saved in review file" : "No comment yet";
+				}
+				setPersistenceStatus("saved", "Saved in " + STATE_FILE_LABEL + " · revision " + state.persistenceRevision);
+				saved = true;
+			} catch (error) {
+				state.persistenceDirty = true;
+				setPersistenceStatus("error", "Save failed; review changes remain open: " + error.message, "save");
+				console.error("Unit art review persistence save failed", error);
+			} finally {
+				state.persistenceSaving = false;
+				if (saved && (state.persistenceSaveQueued || state.persistenceDirty)) {
+					window.setTimeout(() => {
+						void flushPersistenceSave();
+					}, 0);
+				}
+			}
+			return saved;
 		}
 
 		function saveDecisions() {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(state.decisions));
-		}
-
-		function loadComments() {
-			try {
-				const current = localStorage.getItem(COMMENTS_KEY);
-				const legacy = current ? null : localStorage.getItem(LEGACY_COMMENTS_KEY);
-				const raw = current || legacy;
-				if (!raw) {
-					return {};
-				}
-				const parsed = JSON.parse(raw);
-				if (!current && legacy) {
-					localStorage.setItem(COMMENTS_KEY, JSON.stringify(parsed));
-				}
-				return parsed && typeof parsed === "object" ? parsed : {};
-			} catch (error) {
-				return {};
-			}
+			queuePersistenceSave();
 		}
 
 		function saveComments() {
-			localStorage.setItem(COMMENTS_KEY, JSON.stringify(state.comments));
-		}
-
-		function loadPins() {
-			try {
-				const current = localStorage.getItem(PINS_KEY);
-				const legacy = current ? null : localStorage.getItem(LEGACY_PINS_KEY);
-				const raw = current || legacy;
-				if (!raw) {
-					return [];
-				}
-				const parsed = JSON.parse(raw);
-				const pins = Array.isArray(parsed)
-					? [...new Set(parsed.filter((value) => typeof value === "string"))].slice(0, MAX_PINS)
-					: [];
-				if (!current && legacy) {
-					localStorage.setItem(PINS_KEY, JSON.stringify(pins));
-				}
-				return pins;
-			} catch (error) {
-				return [];
-			}
+			queuePersistenceSave();
 		}
 
 		function savePins() {
-			localStorage.setItem(PINS_KEY, JSON.stringify(state.pins.slice(0, MAX_PINS)));
-		}
-
-		function loadDefaults() {
-			try {
-				const current = localStorage.getItem(DEFAULTS_KEY);
-				const legacy = current ? null : localStorage.getItem(LEGACY_DEFAULTS_KEY);
-				const raw = current || legacy;
-				if (!raw) {
-					return {};
-				}
-				const parsed = JSON.parse(raw);
-				const defaults = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-				if (!current && legacy) {
-					localStorage.setItem(DEFAULTS_KEY, JSON.stringify(defaults));
-				}
-				return defaults;
-			} catch (error) {
-				return {};
-			}
+			queuePersistenceSave();
 		}
 
 		function saveDefaults() {
-			localStorage.setItem(DEFAULTS_KEY, JSON.stringify(state.defaults));
+			queuePersistenceSave();
 		}
 
 		function applyTileSize() {
@@ -2188,10 +2744,10 @@
 			const payload = exportPayload();
 			const lines = [
 				"Blood Will Pay unit art review - " + payload.review_set_label,
-				"Like: " + payload.counts.like,
-				"Maybe: " + payload.counts.maybe,
-				"Cut: " + payload.counts.cut,
-				"Open: " + payload.counts.open
+				"Use for now: " + payload.counts.like,
+				"Needs revision: " + payload.counts.maybe,
+				"Reject: " + payload.counts.cut,
+				"Undecided: " + payload.counts.open
 			];
 			["like", "maybe", "cut"].forEach((decision) => {
 				const files = payload.decisions
@@ -2222,15 +2778,28 @@
 
 		function labelFor(value) {
 			if (value === "like") {
-				return "Like";
+				return "Use for now";
 			}
 			if (value === "maybe") {
-				return "Maybe";
+				return "Needs revision";
 			}
 			if (value === "cut") {
-				return "Cut";
+				return "Reject";
 			}
-			return "Open";
+			return "Undecided";
+		}
+
+		function cardLabelFor(value) {
+			if (value === "like") {
+				return "Use";
+			}
+			if (value === "maybe") {
+				return "Revise";
+			}
+			if (value === "cut") {
+				return "Reject";
+			}
+			return "Clear";
 		}
 
 		let toastTimer = 0;
@@ -2245,6 +2814,7 @@
 
 		applyTileSize();
 		render();
+		void initializePersistence();
 	</script>
 </body>
 </html>
