@@ -56,16 +56,29 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          & "${{ steps.godot.outputs.godot }}" --headless --editor --path "$env:GITHUB_WORKSPACE" --quit
-          if ($LASTEXITCODE -ne 0) { throw "Godot resource import failed with exit code $LASTEXITCODE" }
+          $gui = "${{ steps.godot.outputs.godot }}"
+          $console = $gui -replace "_win64\.exe$", "_win64_console.exe"
+          $runner = if (Test-Path $console) { $console } else { $gui }
+          $stdout = Join-Path $env:RUNNER_TEMP "godot-import.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "godot-import.stderr.log"
+          $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--editor", "--path", $env:GITHUB_WORKSPACE, "--quit") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+          Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+          if ($process.ExitCode -ne 0) { throw "Godot resource import failed with exit code $($process.ExitCode)" }
 
       - name: Export checked-in Windows preset
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\build\windows" | Out-Null
-          & "${{ steps.godot.outputs.godot }}" --headless --path "$env:GITHUB_WORKSPACE" --export-release "Windows Desktop" "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe"
-          if ($LASTEXITCODE -ne 0) { throw "Godot Windows export failed with exit code $LASTEXITCODE" }
+          $gui = "${{ steps.godot.outputs.godot }}"
+          $console = $gui -replace "_win64\.exe$", "_win64_console.exe"
+          $runner = if (Test-Path $console) { $console } else { $gui }
+          $stdout = Join-Path $env:RUNNER_TEMP "godot-export.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "godot-export.stderr.log"
+          $arguments = @("--headless", "--path", $env:GITHUB_WORKSPACE, "--export-release", "Windows Desktop", "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")
+          $process = Start-Process -FilePath $runner -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+          Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+          if ($process.ExitCode -ne 0) { throw "Godot Windows export failed with exit code $($process.ExitCode)" }
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")) { throw "Windows executable was not produced" }
 
       - name: Run packaged resource smoke
