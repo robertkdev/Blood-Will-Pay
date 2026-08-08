@@ -10,6 +10,9 @@ on:
       - "tests/rga_testing/validation/packaged_resource_discovery_probe.gd"
       - "export_presets.cfg"
       - ".github/workflows/windows-package-smoke.yml"
+  push:
+    branches:
+      - "codex/019f7639-package-resource-replay"
   workflow_dispatch:
 
 permissions:
