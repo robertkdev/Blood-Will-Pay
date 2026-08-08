@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1158" viewBox="0 0 1400 1158">
+<rect width="100%" height="100%" fill="#18171A"/>
+<style>text{font-family:Arial,sans-serif}.title{font-size:34px;font-weight:700;fill:#F2E9DA}.sub{font-size:17px;fill:#BFAE9D}.name{font-size:19px;font-weight:700;fill:#F3E8D8}.body{font-size:14px;fill:#CFC4BC}.pass{font-size:13px;fill:#98C5A5}.fail{font-size:13px;fill:#D596A5}</style>
+<text x="42" y="54" class="title">Gamble Battle - Phase 1 Trait Collision Calibration</text>
+<text x="42" y="88" class="sub">Abstract channel-arbitration index; authoritative review raster is trait_visual_bible_phase1_collision_atlas.png</text>
+<rect x="42" y="120" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="148" class="name">DEF-01 - Defensive family: enclosure / compression / settlement</text>
+<text x="58" y="173" class="body">Aegis owns enclosing form; Bulwark owns pressure seams and rebound cadence; Fortified owns low-value settled surface and compacted cost.</text>
+<text x="58" y="198" class="pass">PASS: Three defensive signals remain separable without adding shields, armor sets, or blue bubbles.</text>
+<text x="58" y="221" class="fail">FAIL: One generic plated tank silhouette carrying three defensive ornaments.</text>
+<rect x="42" y="246" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="274" class="name">KNW-01 - Knowledge family: transgression / storage / transfer</text>
+<text x="58" y="299" class="body">Arcanist owns tapered edited form; Scholar owns layered archive surface; Mentor owns unequal transfer rhythm and drained cost.</text>
+<text x="58" y="324" class="pass">PASS: Illegal notation, accumulated memory and dependency read as different operations.</text>
+<text x="58" y="347" class="fail">FAIL: Three robed academics differentiated only by glyph color.</text>
+<rect x="42" y="372" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="400" class="name">ECO-01 - Economy family: ownership / accumulation / exchange</text>
+<text x="58" y="425" class="body">Cartel owns ranked hierarchy; Mogul owns top-heavy survivor accumulation; Trader owns reciprocal wear and depletion rhythm.</text>
+<text x="58" y="450" class="pass">PASS: Power structure, hoarded survival and transaction remain visually distinct without coin clutter.</text>
+<text x="58" y="473" class="fail">FAIL: Three merchants in the same luxury clothing aisle.</text>
+<rect x="42" y="498" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="526" class="name">LTH-01 - Lethality family: threshold / commitment / condemnation</text>
+<text x="58" y="551" class="body">Executioner owns the severing threshold; Striker owns forward thrust; Vindicator owns converging erosion and self-loss.</text>
+<text x="58" y="576" class="pass">PASS: Kill logic is distinguished by timing and direction rather than weapon class.</text>
+<text x="58" y="599" class="fail">FAIL: Three angry black-clad assassins with blades and red accents.</text>
+<rect x="42" y="624" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="652" class="name">BLS-01 - Blessed under mass: disgrace / scale / endurance</text>
+<text x="58" y="677" class="body">Blessed stays art-primary and owns bowed burden; Titan expands internal scale; Fortified settles and compacts the surface without correcting the shame posture.</text>
+<text x="58" y="702" class="pass">PASS: A failed miracle made larger and harder to escape.</text>
+<text x="58" y="725" class="fail">FAIL: Radiant armored paladin or decorative black-wing colossus.</text>
+<rect x="42" y="750" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="778" class="name">CHR-01 - Chromatic relation: perception / connection / fusion</text>
+<text x="58" y="803" class="body">Kaleidoscope owns fractured dark-rest form; Liaison owns stressed links; Catalyst owns one irreversible seam rather than extra orbiting color.</text>
+<text x="58" y="828" class="pass">PASS: Damaged perception, relationship and fusion occupy separate channels.</text>
+<text x="58" y="851" class="fail">FAIL: Glossy rainbow crystal surrounded by floating nodes.</text>
+<rect x="42" y="876" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="904" class="name">HEAL-01 - Healing collision: circulation / compulsory mercy</text>
+<text x="58" y="929" class="body">Sanguine owns returning circulation and appetite; Blessed owns shame posture and transferred wounds. Red is not sufficient evidence for either trait.</text>
+<text x="58" y="954" class="pass">PASS: One system feeds and repairs; the other is forced to receive suffering.</text>
+<text x="58" y="977" class="fail">FAIL: Pretty sad vampire angel with a blood halo.</text>
+<rect x="42" y="1002" width="1316" height="112" rx="12" fill="#242126" stroke="#5A5057"/>
+<text x="58" y="1030" class="name">TIME-01 - Timing collision: enclosure / desynchronization</text>
+<text x="58" y="1055" class="body">Aegis owns the closing protected void; Chronomancer owns staggered intervals, age marks and asynchronous closure timing.</text>
+<text x="58" y="1080" class="pass">PASS: The prison closes out of sequence while remaining recognizably enclosing.</text>
+<text x="58" y="1103" class="fail">FAIL: A shield with a clock face or floating hourglasses.</text>
+</svg>
