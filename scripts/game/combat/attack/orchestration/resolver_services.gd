@@ -60,7 +60,7 @@ func configure(state: BattleState, target_controller: TargetController, rng: Ran
     projectile_emitter.configure(events)
 
     multishot = _maybe_override(overrides, KEYS.multishot, MultishotSelectorLib.new())
-    multishot.configure(rng, hooks, buff_system)
+    multishot.configure(rng, hooks)
 
     mana_service = _maybe_override(overrides, KEYS.mana_service, ManaOnAttackLib.new())
     mana_service.configure(state, ability_system, buff_system)
