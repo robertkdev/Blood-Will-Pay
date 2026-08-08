@@ -153,7 +153,7 @@ func refresh() -> void:
 	if not _has_economy():
 		return
 	if gold_label:
-		gold_label.text = "Gold: " + str(Economy.gold)
+		gold_label.text = "Blood Reserve: " + str(Economy.gold)
 
 	var in_combat: bool = false
 	var forced_first_fight: bool = _is_forced_first_fight()
@@ -186,7 +186,7 @@ func refresh() -> void:
 
 	# Hide static "Bet:" labels whenever the slider is hidden; bet_value carries the state copy.
 	if _bet_row:
-		_bet_row.tooltip_text = "Opening fight uses the default wager. Betting opens after the first shop." if forced_first_fight else ""
+		_bet_row.tooltip_text = "Opening fight uses the default blood wager. Wager controls open after the first shop." if forced_first_fight else ""
 		for ch: Node in _bet_row.get_children():
 			if ch is Label and ch != bet_value:
 				(ch as Label).visible = not in_combat and not forced_first_fight
@@ -194,16 +194,16 @@ func refresh() -> void:
 	if bet_value:
 		if in_combat:
 			var locked_bet: int = int(Economy.current_bet)
-			bet_value.text = "Bet: %d (locked)" % max(0, locked_bet)
+			bet_value.text = "Wager: %d blood (locked)" % max(0, locked_bet)
 			bet_value.visible = true
 		elif forced_first_fight:
-			bet_value.text = "Opening bet: %d" % max(1, int(Economy.current_bet))
+			bet_value.text = "Opening wager: %d blood" % max(1, int(Economy.current_bet))
 			bet_value.visible = true
 		else:
 			if bet_slider:
-				bet_value.text = str(int(bet_slider.value))
+				bet_value.text = "%d blood" % int(bet_slider.value)
 			else:
-				bet_value.text = str(max(1, int(Economy.current_bet)))
+				bet_value.text = "%d blood" % max(1, int(Economy.current_bet))
 			bet_value.visible = true
 	_refresh_wager_summary(in_combat, forced_first_fight)
 
@@ -215,7 +215,7 @@ func on_bet_changed(val: float) -> void:
 		return
 	Economy.set_bet(int(val))
 	if bet_value:
-		bet_value.text = str(int(val))
+		bet_value.text = "%d blood" % int(val)
 	_refresh_all_in_visual(false, false)
 	_refresh_wager_summary(false, false)
 
@@ -259,7 +259,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		return
 	var tight_compact: bool = _is_tight_compact_layout()
 	if forced_first_fight:
-		wager_summary.text = "OPENING RISK // 1g // SHOP NEXT" if tight_compact else "OPENING RISK // 1g // SHOP UNLOCKS NEXT"
+		wager_summary.text = "OPENING RISK // 1B // SHOP NEXT" if tight_compact else "OPENING RISK // 1 BLOOD // SHOP UNLOCKS NEXT"
 		wager_summary.tooltip_text = "Win the forced opener to unlock wager choice and outcome quotes."
 		wager_summary.set_meta("compact_summary_format", "opening_risk")
 		return
@@ -277,7 +277,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		risk_prefix = "ALL IN // " if tight_compact else "ALL IN ARMED | "
 	if tight_compact:
 		var locked_suffix: String = " LOCKED" if in_combat else ""
-		wager_summary.text = "DECISION // %sRISK %dg%s // WIN %d%% // BANK W%dg / L%dg" % [
+		wager_summary.text = "DECISION // %sRISK B%d%s // WIN %d%% // RESERVE W%d / L%d" % [
 			risk_prefix,
 			wager,
 			locked_suffix,
@@ -287,7 +287,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
 	else:
-		wager_summary.text = "DECISION // %sRISK %dg%s // WIN %d%% // BANK W%dg / L%dg" % [
+		wager_summary.text = "DECISION // %sRISK %d BLOOD%s // WIN %d%% // RESERVE W%d / L%d" % [
 			risk_prefix,
 			wager,
 			" LOCKED" if in_combat else "",
@@ -296,7 +296,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 			after_loss,
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
-	wager_summary.tooltip_text = "Gross return includes the wager. Win odds are an estimate, not a guarantee."
+	wager_summary.tooltip_text = "B means Blood Reserve. Gross return includes the wager. Win odds are an estimate, not a guarantee."
 
 func set_bet_editable(editable: bool) -> void:
 	if bet_slider:
