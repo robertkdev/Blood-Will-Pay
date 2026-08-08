@@ -20,6 +20,7 @@ const IdentityRegistry := preload("res://scripts/game/identity/identity_registry
 const TraitCompiler := preload("res://scripts/game/traits/trait_compiler.gd")
 
 signal battle_started(stage: int, enemy)
+signal battle_prepared(stage: int, enemy)
 signal log_line(text: String)
 signal stats_updated(player, enemy)
 signal team_stats_updated(player_team, enemy_team)
@@ -61,6 +62,11 @@ var _pending_enemy_pos: Array = []
 var _pending_bounds: Rect2 = Rect2()
 var _pending_movement_debug_frames: int = 0
 var _trait_runtime: TraitRuntime = null
+var _stage_prepared: bool = false
+var _engine_running: bool = false
+var _prepared_spec: Dictionary = {}
+var _prepared_chapter: int = 1
+var _prepared_stage_in_chapter: int = 1
 
 func _mirror_stage_from_gamestate() -> void:
 	# Mirror manager.stage from GameState (authoritative source)
@@ -194,6 +200,11 @@ func teardown() -> void:
 
 func clear_active_battle_runtime() -> void:
 	StageRuleRunner.clear_runtime()
+	_stage_prepared = false
+	_engine_running = false
+	_prepared_spec.clear()
+	_prepared_chapter = 1
+	_prepared_stage_in_chapter = 1
 	if _trait_runtime != null:
 		_trait_runtime.unwire_signals()
 		_trait_runtime = null
@@ -209,10 +220,10 @@ func is_turn_in_progress() -> bool:
 	return false
 
 func _process(delta: float) -> void:
-	if _engine:
+	if _engine and _engine_running:
 		_engine.process(delta)
 	# Single hook to drive trait runtime ticks
-	if _trait_runtime != null:
+	if _trait_runtime != null and _engine_running:
 		_trait_runtime.process(delta)
 
 func _wire_engine_signals() -> void:
@@ -393,11 +404,15 @@ func _ensure_default_player_team_into(arr: Array) -> void:
 		arr.append(u2)
 
 func start_stage() -> void:
+	if prepare_stage():
+		begin_prepared_stage()
+
+func prepare_stage() -> bool:
 	_mirror_stage_from_gamestate()
-	Trace.step("CM.start_stage: begin stage=" + str(stage))
+	Trace.step("CM.prepare_stage: begin stage=" + str(stage))
 	_ensure_state()
 	clear_active_battle_runtime()
-	Trace.step("CM.start_stage: state ensured")
+	Trace.step("CM.prepare_stage: state ensured")
 	# Log canonical stage banner using chapter/stage mapping
 	var mapping := ProgressionService.from_global_stage(int(stage))
 	var ch: int = int(mapping.get("chapter", 1))
@@ -413,11 +428,11 @@ func start_stage() -> void:
 		if u:
 			saved_team.append(u)
 	_state.reset()
-	Trace.step("CM.start_stage: state reset")
+	Trace.step("CM.prepare_stage: state reset")
 	_state.stage = stage
 	# Rebuild state player team from snapshot (or defaults)
 	if saved_team.is_empty():
-		Trace.step("CM.start_stage: no saved team -> defaults")
+		Trace.step("CM.prepare_stage: no saved team -> defaults")
 		_ensure_default_player_team_into(saved_team)
 	_state.player_team.clear()
 	for i in range(saved_team.size()):
@@ -425,20 +440,20 @@ func start_stage() -> void:
 		_state.player_team.append(u2)
 		if i < 8:
 			Trace.step("CM.copy idx=" + str(i))
-	Trace.step("CM.start_stage: copy done; state size=" + str(_state.player_team.size()))
-	Trace.step("CM.start_stage: create spawner")
+	Trace.step("CM.prepare_stage: copy done; state size=" + str(_state.player_team.size()))
+	Trace.step("CM.prepare_stage: create spawner")
 	var spawner: EnemySpawner = load("res://scripts/game/combat/enemy_spawner.gd").new()
 	# Build spec via catalog and run rule hooks around spawn
 	var spec: Dictionary = RosterCatalog.get_spec(ch, sic)
 	if String(spec.get(StageTypes.KEY_KIND, StageTypes.KIND_NORMAL)) == StageTypes.KIND_BOSS:
 		MirrorBoardStore.capture_boss_board(ch, _state.player_team)
 	StageRuleRunner.pre_spawn(spec, ch, sic)
-	Trace.step("CM.start_stage: build enemy team from spec")
+	Trace.step("CM.prepare_stage: build enemy team from spec")
 	_state.enemy_team = spawner.build_for_spec(spec, ch, sic)
 	StageRuleRunner.post_spawn(_state.enemy_team, spec, ch, sic)
 	# Apply centralized stage-based scaling (no-op unless enabled)
 	EnemyScaling.apply_for_stage(_state.enemy_team, stage)
-	Trace.step("CM.start_stage: teams built p=" + str(_state.player_team.size()) + " e=" + str(_state.enemy_team.size()))
+	Trace.step("CM.prepare_stage: teams built p=" + str(_state.player_team.size()) + " e=" + str(_state.enemy_team.size()))
 
 
 	# Expose battle arrays to the view (alias to state for live updates)
@@ -451,14 +466,14 @@ func start_stage() -> void:
 	var pref: Unit = BattleState.first_alive(_state.player_team)
 	if pref == null and _state.player_team.size() > 0:
 		pref = _state.player_team[0]
-	Trace.step("CM.start_stage: emit stats_updated")
+	Trace.step("CM.prepare_stage: emit stats_updated")
 	emit_signal("stats_updated", pref, enemy)
 
-	Trace.step("CM.start_stage: create engine")
+	Trace.step("CM.prepare_stage: create engine")
 	_engine = load("res://scripts/game/combat/combat_engine.gd").new()
 	# Rules: allow provider to tweak state/engine prior to configure
 	StageRuleRunner.pre_engine_config(_state, _engine, spec, ch, sic)
-	Trace.step("CM.start_stage: configure engine")
+	Trace.step("CM.prepare_stage: configure engine")
 	_engine.configure(_state, pref, stage, select_closest_target)
 	# Apply any pre-provided arena configuration from UI before starting engine
 	if _pending_tile_size > 0.0:
@@ -469,7 +484,7 @@ func start_stage() -> void:
 		_pending_enemy_pos = []
 	else:
 		_compute_mentor_pairs(_engine.get_player_positions_copy(), _engine.get_enemy_positions_copy())
-	Trace.step("CM.start_stage: wire engine signals")
+	Trace.step("CM.prepare_stage: wire engine signals")
 	_wire_engine_signals()
 	# Create trait runtime after engine is configured (ability/buff systems ready)
 	if _trait_runtime != null:
@@ -478,14 +493,31 @@ func start_stage() -> void:
 	_trait_runtime = TraitRuntimeLib.new()
 	_trait_runtime.configure(_engine, _state, _engine.buff_system, _engine.ability_system)
 	_trait_runtime.wire_signals()
-	Trace.step("CM.start_stage: start engine")
+	_prepared_spec = spec.duplicate(true)
+	_prepared_chapter = ch
+	_prepared_stage_in_chapter = sic
+	_stage_prepared = true
+	_engine_running = false
+	Trace.step("CM.prepare_stage: emit battle_prepared")
+	emit_signal("battle_prepared", stage, enemy)
+	Trace.step("CM.prepare_stage: end")
+	return true
+
+func begin_prepared_stage() -> bool:
+	if not _stage_prepared or _engine == null or _state == null:
+		return false
+	var spec: Dictionary = _prepared_spec.duplicate(true)
+	var ch: int = _prepared_chapter
+	var sic: int = _prepared_stage_in_chapter
+	Trace.step("CM.begin_prepared_stage: start engine")
 	_engine.start()
 	# Rules: notify provider after engine start, before first process tick
 	StageRuleRunner.on_battle_start(_state, _engine, spec, ch, sic)
 	# Notify traits battle start after engine start but before first process tick
 	if _trait_runtime != null:
 		_trait_runtime.on_battle_start()
-	Trace.step("CM.start_stage: engine started")
+	_engine_running = true
+	Trace.step("CM.begin_prepared_stage: engine started")
 	# Apply any pending movement debug logging without peeking internal fields
 	if _pending_movement_debug_frames > 0 and _engine and _engine.has_method("set_movement_debug_frames"):
 		_engine.set_movement_debug_frames(_pending_movement_debug_frames)
@@ -497,9 +529,18 @@ func start_stage() -> void:
 	var e_traits: Dictionary = tc.compile(_state.enemy_team)
 	_log_trait_summary("Your team", p_traits)
 	_log_trait_summary("Enemy team", e_traits)
-	Trace.step("CM.start_stage: emit battle_started")
+	_stage_prepared = false
+	_prepared_spec.clear()
+	Trace.step("CM.begin_prepared_stage: emit battle_started")
 	emit_signal("battle_started", stage, enemy)
-	Trace.step("CM.start_stage: end")
+	Trace.step("CM.begin_prepared_stage: end")
+	return true
+
+func is_stage_prepared() -> bool:
+	return _stage_prepared and _engine != null and not _engine_running
+
+func is_engine_running() -> bool:
+	return _engine_running
 
 func start_custom_battle(player_ids: Array[String], enemy_ids: Array[String], options: Dictionary[String, Variant] = {}) -> Dictionary[String, Variant]:
 	var result: Dictionary[String, Variant] = {"ok": false, "reason": ""}
@@ -555,6 +596,7 @@ func start_custom_battle(player_ids: Array[String], enemy_ids: Array[String], op
 	_trait_runtime.configure(_engine, _state, _engine.buff_system, _engine.ability_system)
 	_trait_runtime.wire_signals()
 	_engine.start()
+	_engine_running = true
 	if _trait_runtime != null:
 		_trait_runtime.on_battle_start()
 	if _pending_movement_debug_frames > 0 and _engine and _engine.has_method("set_movement_debug_frames"):

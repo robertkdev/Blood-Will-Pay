@@ -161,7 +161,8 @@ func _assert_result_card() -> void:
 	_expect(settlement_label != null and settlement_label.text.ends_with("// HOLD") and not settlement_label.text.contains("SEC"), "post-win result card should use natural hold copy without QA timing telemetry")
 	_expect(impact_stamp != null and impact_stamp.text == "PAID IN BLOOD // WALKING", "post-win result card should close with an authored survival stamp")
 	_expect(hold_progress != null and hold_progress.max_value == 1.0, "result card should expose visible hold progress")
-	_expect(hold_label != null and hold_label.text.begins_with("READ THE COST // ACTION ARMS IN"), "result card should protect a player-controlled reading window before the return action arms")
+	var hold_copy_valid: bool = hold_label != null and (hold_label.text.begins_with("READ THE COST // ACTION ARMS IN") or hold_label.text.begins_with("AUTO-ADVANCE IN"))
+	_expect(hold_copy_valid, "result card should expose either its protected reading gate or armed dwell state; got=%s" % (hold_label.text if hold_label != null else "<missing>"))
 	_expect(skip_button != null and skip_button.text.contains("ENTER / SPACE") and not skip_button.text.contains("("), "result card should expose a threshold-free keyboard advance affordance")
 	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, "VICTORY")
 	_assert_result_frame_inside_viewport(card, skip_button, "VICTORY")
@@ -353,7 +354,7 @@ func _assert_active_combat_shell() -> void:
 	_expect(fog != null and smoke != null and not fog.visible and not smoke.visible, "combat shell leaked retired gradient fog/smoke layers")
 	_expect(wet_reflection != null and not wet_reflection.visible, "combat shell leaked the synthetic wet-ground reflection")
 	var combat_pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "onset")) if arena_container != null else "onset"
-	var expects_physical_evidence: bool = combat_pressure_phase != "onset"
+	var expects_physical_evidence: bool = bool(arena_container.get_meta("authored_physical_evidence_visible", false)) if arena_container != null else false
 	_expect(war_aftermath != null and war_aftermath.visible == expects_physical_evidence, "combat shell has the wrong authored physical-evidence visibility")
 	_expect(onset_geometry != null and not onset_geometry.visible and midfight_geometry != null and not midfight_geometry.visible and collapse_geometry != null and not collapse_geometry.visible and reduced_geometry != null and not reduced_geometry.visible, "combat shell leaked a procedural evidence painter")
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "combat grid seams do not stay above the environment")

@@ -77,6 +77,15 @@ func _run_result_dismissal_probe() -> void:
 	_filmstrip_anchor_usec = input_accepted_usec
 	await get_tree().process_frame
 	var first_visible_response_usec: int = Time.get_ticks_usec()
+	var hold_label: Label = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label
+	var skip_button: Button = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
+	var first_frame_acknowledged: bool = (
+		hold_label != null
+		and hold_label.text == "FIELD RESET // REDEPLOYING"
+		and skip_button != null
+		and skip_button.disabled
+		and skip_button.text == "GRID RETURN IN PROGRESS"
+	)
 	_record_timeline("dismiss_input_accepted", post_parse_usec)
 	_record_timeline("dismiss_frame_00", first_visible_response_usec)
 	for rapid_index: int in range(RAPID_RESULT_INPUT_COUNT):
@@ -97,9 +106,10 @@ func _run_result_dismissal_probe() -> void:
 	var repeated_count: int = int(latency.get("repeated_input_count", 0))
 	var cleanup_count: int = int(latency.get("cleanup_count", 0))
 	var first_frame_ms: float = float(first_visible_response_usec - input_accepted_usec) / 1000.0
-	_expect(immediate_hidden or visible_ms >= 0.0, "accepted result input did not produce a measurable visible response")
+	_expect(not immediate_hidden, "result card should stay fixed while the battlefield returns behind it")
+	_expect(first_frame_acknowledged and visible_ms >= 0.0, "accepted result input did not acknowledge the grid return by the first frame")
 	_expect(visible_ms >= 0.0 and visible_ms <= InteractionLatencyBudget.RESULT_DISMISS_VISIBLE_RESPONSE_MS, "result visible response exceeded %.1f ms: %.3f" % [InteractionLatencyBudget.RESULT_DISMISS_VISIBLE_RESPONSE_MS, visible_ms])
-	_expect(first_frame_ms <= InteractionLatencyBudget.RESULT_DISMISS_FIRST_FRAME_RESPONSE_MS, "result banner did not hide by the first observed frame: %.3f ms" % first_frame_ms)
+	_expect(first_frame_ms <= InteractionLatencyBudget.RESULT_DISMISS_FIRST_FRAME_RESPONSE_MS, "result return acknowledgement missed the first observed frame: %.3f ms" % first_frame_ms)
 	_expect(repeated_count >= 1, "rapid result inputs were not consumed by the duplicate-input guard")
 	_expect(cleanup_count == 1, "rapid result inputs ran post-combat cleanup %d times" % cleanup_count)
 	_expect(cleanup_ms >= 0.0, "post-combat cleanup duration was not recorded")
@@ -115,6 +125,7 @@ func _run_result_dismissal_probe() -> void:
 		"input_accepted_usec": input_accepted_usec,
 		"post_parse_usec": post_parse_usec,
 		"immediate_hidden": immediate_hidden,
+		"first_frame_acknowledged": first_frame_acknowledged,
 		"visible_response_ms": visible_ms,
 		"first_frame_ms": first_frame_ms,
 		"cleanup_ms": cleanup_ms,
