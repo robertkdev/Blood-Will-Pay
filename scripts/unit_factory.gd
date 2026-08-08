@@ -9,11 +9,13 @@ static func clear_cache() -> void:
 	_index_built = false
 
 const UnitIdentity := preload("res://scripts/game/identity/unit_identity.gd")
+const Unit := preload("res://scripts/unit.gd")
+const UnitProfile := preload("res://scripts/game/units/unit_profile.gd")
 const BuildAffinityCatalog := preload("res://scripts/game/identity/build_affinity_catalog.gd")
 const UnitDefaults := preload("res://scripts/game/units/unit_defaults.gd")
 
 const IdentityValidator := preload("res://scripts/game/identity/identity_validator.gd")
-const RoleLibrary = preload("res://scripts/game/units/role_library.gd")
+const RoleLibrary := preload("res://scripts/game/units/role_library.gd")
 const IdentityUtils := preload("res://scripts/game/identity/identity_utils.gd")
 const UnitScaler := preload("res://scripts/game/units/unit_scaler.gd")
 const Trace := preload("res://scripts/util/trace.gd")
@@ -228,7 +230,7 @@ static func spawn_at_level(id: String, target_level: int) -> Unit:
 	return _from_profile(package_profile)
 
 static func _from_profile(profile: UnitProfile) -> Unit:
-	var u := Unit.new()
+	var u: Unit = Unit.new()
 	u.id = profile.id
 	u.name = profile.name
 	u.sprite_path = profile.sprite_path

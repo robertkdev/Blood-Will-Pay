@@ -1,6 +1,8 @@
 extends Object
 class_name UnitScaler
 
+const Unit := preload("res://scripts/unit.gd")
+
 # Centralized multiplicative scaling by cost and level for select Unit fields.
 # Does not mutate unrelated fields; callers should handle final clamps and HP reset.
 
