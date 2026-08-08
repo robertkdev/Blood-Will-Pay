@@ -40,7 +40,10 @@ jobs:
           Invoke-WebRequest -Uri $godotUrl -OutFile $godotZip
           Expand-Archive -LiteralPath $godotZip -DestinationPath $godotRoot -Force
           $godotExe = (Get-ChildItem -LiteralPath $godotRoot -Filter "Godot_v${version}_win64.exe" -Recurse | Select-Object -First 1).FullName
+          $godotConsoleExe = (Get-ChildItem -LiteralPath $godotRoot -Filter "Godot_v${version}_win64_console.exe" -Recurse | Select-Object -First 1).FullName
           if (-not $godotExe) { throw "Pinned Godot executable was not found" }
+          Get-ChildItem -LiteralPath $godotRoot -File -Recurse | ForEach-Object { "Godot archive file: $($_.FullName)" }
+          if (-not $godotConsoleExe) { "Godot archive console executable: ABSENT" }
 
           $templateDir = Join-Path $env:APPDATA "Godot\export_templates\4.5.stable"
           New-Item -ItemType Directory -Force -Path $templateDir | Out-Null
@@ -52,13 +55,15 @@ jobs:
           Copy-Item -Path (Join-Path $templateStage "templates\*") -Destination $templateDir -Recurse -Force
 
           "godot=$godotExe" >> $env:GITHUB_OUTPUT
+          "godot_console=$godotConsoleExe" >> $env:GITHUB_OUTPUT
           & $godotExe --version
 
       - name: Import project resources
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $runner = "${{ steps.godot.outputs.godot }}"
+          $runner = "${{ steps.godot.outputs.godot_console }}"
+          if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
           $stdout = Join-Path $env:RUNNER_TEMP "godot-import.stdout.log"
           $stderr = Join-Path $env:RUNNER_TEMP "godot-import.stderr.log"
           $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--editor", "--path", $env:GITHUB_WORKSPACE, "--quit") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
@@ -70,7 +75,8 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\build\windows" | Out-Null
-          $runner = "${{ steps.godot.outputs.godot }}"
+          $runner = "${{ steps.godot.outputs.godot_console }}"
+          if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
           $stdout = Join-Path $env:RUNNER_TEMP "godot-export.stdout.log"
           $stderr = Join-Path $env:RUNNER_TEMP "godot-export.stderr.log"
           $arguments = @("--headless", "--path", $env:GITHUB_WORKSPACE, "--export-release=Windows Desktop", "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")
