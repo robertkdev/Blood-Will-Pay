@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RGA Matrix Explorer Runtime Review - Visual Lab</title>
+<style>
+:root{--bg:#0f1218;--panel:#191e28;--text:#ecf0f7;--muted:#9ba6b8;--accent:#43d9ad}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px Segoe UI,Arial,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#0f1218f2;padding:18px 28px;border-bottom:1px solid #2b3342}
+h1{margin:0 0 8px;font-size:24px}p{margin:0;color:var(--muted)}a{color:var(--accent)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}input,select,button{padding:10px 14px;border-radius:9px;border:1px solid #394457;background:#151a23;color:white}#filter{width:min(480px,100%)}
+#compare-shell{padding:24px 24px 0}#compare-card{background:var(--panel);border:1px solid #2d3748;border-radius:14px;padding:16px}
+#compare-controls{display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;margin-bottom:14px;align-items:center}#compare-controls label{display:grid;gap:5px;color:var(--muted)}
+#viewport{position:relative;height:min(62vw,760px);min-height:360px;overflow:hidden;background:repeating-conic-gradient(#777 0 25%,#aaa 0 50%) 0/28px 28px;border-radius:10px}
+#viewport img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}#imageB{opacity:.5}#agent-order{margin-top:12px;color:var(--muted)}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:24px;padding:24px}
+figure{margin:0;background:var(--panel);border:1px solid #2d3748;border-radius:14px;overflow:hidden}figure button{display:block;width:100%;padding:0;border:0;border-radius:0;cursor:zoom-in}figure img{display:block;width:100%;height:auto}figcaption{padding:12px 16px;color:var(--muted)}
+@media(max-width:800px){main{grid-template-columns:1fr;padding:10px}#compare-shell{padding:10px 10px 0}#compare-controls{grid-template-columns:1fr}}
+</style></head><body><header><h1>RGA Matrix Explorer Runtime Review</h1><p>Verify that the counter matrix, trait plan, numbered bridge roster, and double-vertical proofs are legible, coherent, and responsive in the real browser runtime.</p><div class="tools"><input id="filter" placeholder="Filter packet images"><button id="swap">Swap A/B</button><button id="export">Export comparison PNG</button></div></header>
+<section id="compare-shell"><div id="compare-card"><div id="compare-controls"><label>A<select id="selectA"><option value="captures/P001.jpg">P001 - Desktop overview</option>
+<option value="captures/P002.jpg">P002 - Desktop counter matrix</option>
+<option value="captures/P003.jpg">P003 - Desktop trait atlas</option>
+<option value="captures/P004.jpg">P004 - Desktop numbered bridge roster</option>
+<option value="captures/P005.jpg">P005 - Desktop double-vertical proof lab</option>
+<option value="captures/P006.jpg">P006 - Mobile overview at 390 by 844</option>
+<option value="captures/P007.jpg">P007 - Mobile matrix viewport</option>
+<option value="captures/P008.jpg">P008 - Mobile trait atlas filtered to Arcanist</option>
+<option value="captures/P009.jpg">P009 - Mobile double-vertical proof lab</option>
+<option value="packet/00-agent-review-instructions.png">00-agent-review-instructions.png</option>
+<option value="packet/01-overview-board-01.png">01-overview-board-01.png</option>
+<option value="packet/05-detail-crops-P007.png">05-detail-crops-P007.png</option>
+<option value="packet/06-annotated-findings-P007.png">06-annotated-findings-P007.png</option>
+<option value="packet/99-final-verdict-board.png">99-final-verdict-board.png</option></select></label><label>B<select id="selectB"><option value="captures/P001.jpg">P001 - Desktop overview</option>
+<option value="captures/P002.jpg">P002 - Desktop counter matrix</option>
+<option value="captures/P003.jpg">P003 - Desktop trait atlas</option>
+<option value="captures/P004.jpg">P004 - Desktop numbered bridge roster</option>
+<option value="captures/P005.jpg">P005 - Desktop double-vertical proof lab</option>
+<option value="captures/P006.jpg">P006 - Mobile overview at 390 by 844</option>
+<option value="captures/P007.jpg">P007 - Mobile matrix viewport</option>
+<option value="captures/P008.jpg">P008 - Mobile trait atlas filtered to Arcanist</option>
+<option value="captures/P009.jpg">P009 - Mobile double-vertical proof lab</option>
+<option value="packet/00-agent-review-instructions.png">00-agent-review-instructions.png</option>
+<option value="packet/01-overview-board-01.png">01-overview-board-01.png</option>
+<option value="packet/05-detail-crops-P007.png">05-detail-crops-P007.png</option>
+<option value="packet/06-annotated-findings-P007.png">06-annotated-findings-P007.png</option>
+<option value="packet/99-final-verdict-board.png">99-final-verdict-board.png</option></select></label><label>B opacity<input id="opacity" type="range" min="0" max="100" value="50"></label><output id="opacityValue">50%</output></div><div id="viewport"><img id="imageA"><img id="imageB"></div><p id="agent-order">Agent order: overview -&gt; reference/overlay -&gt; diagnostics -&gt; matrices -&gt; temporal sheets -&gt; crops/annotations -&gt; verdict. Inspect the full-resolution PNGs below.</p></div></section>
+<main id="gallery"><figure data-name="00-agent-review-instructions.png"><button class="inspect" data-src="packet/00-agent-review-instructions.png" title="Load into comparator"><img src="packet/00-agent-review-instructions.png" loading="lazy"></button><figcaption><a href="packet/00-agent-review-instructions.png">00-agent-review-instructions.png</a></figcaption></figure>
+<figure data-name="01-overview-board-01.png"><button class="inspect" data-src="packet/01-overview-board-01.png" title="Load into comparator"><img src="packet/01-overview-board-01.png" loading="lazy"></button><figcaption><a href="packet/01-overview-board-01.png">01-overview-board-01.png</a></figcaption></figure>
+<figure data-name="05-detail-crops-p007.png"><button class="inspect" data-src="packet/05-detail-crops-P007.png" title="Load into comparator"><img src="packet/05-detail-crops-P007.png" loading="lazy"></button><figcaption><a href="packet/05-detail-crops-P007.png">05-detail-crops-P007.png</a></figcaption></figure>
+<figure data-name="06-annotated-findings-p007.png"><button class="inspect" data-src="packet/06-annotated-findings-P007.png" title="Load into comparator"><img src="packet/06-annotated-findings-P007.png" loading="lazy"></button><figcaption><a href="packet/06-annotated-findings-P007.png">06-annotated-findings-P007.png</a></figcaption></figure>
+<figure data-name="99-final-verdict-board.png"><button class="inspect" data-src="packet/99-final-verdict-board.png" title="Load into comparator"><img src="packet/99-final-verdict-board.png" loading="lazy"></button><figcaption><a href="packet/99-final-verdict-board.png">99-final-verdict-board.png</a></figcaption></figure></main>
+<script>
+const selectA=document.querySelector('#selectA'),selectB=document.querySelector('#selectB'),imageA=document.querySelector('#imageA'),imageB=document.querySelector('#imageB'),opacity=document.querySelector('#opacity'),opacityValue=document.querySelector('#opacityValue');
+selectA.value="captures/P001.jpg";selectB.value="captures/P002.jpg";
+function sync(){imageA.src=selectA.value;imageB.src=selectB.value;imageB.style.opacity=Number(opacity.value)/100;opacityValue.value=opacity.value+'%'}sync();
+selectA.addEventListener('change',sync);selectB.addEventListener('change',sync);opacity.addEventListener('input',sync);
+document.querySelector('#swap').addEventListener('click',()=>{const a=selectA.value;selectA.value=selectB.value;selectB.value=a;sync()});
+document.querySelectorAll('.inspect').forEach((button,index)=>button.addEventListener('click',()=>{if(index%2===0)selectA.value=button.dataset.src;else selectB.value=button.dataset.src;sync();scrollTo({top:0,behavior:'smooth'})}));
+const f=document.querySelector('#filter');f.addEventListener('input',()=>{for(const e of document.querySelectorAll('figure'))e.hidden=!e.dataset.name.includes(f.value.toLowerCase())});
+document.querySelector('#export').addEventListener('click',async()=>{const [a,b]=await Promise.all([load(selectA.value),load(selectB.value)]),w=Math.max(a.naturalWidth,b.naturalWidth),h=Math.max(a.naturalHeight,b.naturalHeight),c=document.createElement('canvas');c.width=w;c.height=h+80;const x=c.getContext('2d');x.fillStyle='#191e28';x.fillRect(0,0,w,h+80);x.fillStyle='#ecf0f7';x.font='bold 24px Segoe UI,Arial';x.fillText('A: '+selectA.options[selectA.selectedIndex].text,20,32);x.fillText('B: '+selectB.options[selectB.selectedIndex].text+' | opacity '+opacity.value+'%',20,64);drawContain(x,a,w,h,1,80);drawContain(x,b,w,h,Number(opacity.value)/100,80);const link=document.createElement('a');link.download='visual-lab-comparison.png';link.href=c.toDataURL('image/png');link.click()});
+function load(src){return new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=src})}function drawContain(ctx,img,w,h,alpha,top){const s=Math.min(w/img.naturalWidth,h/img.naturalHeight),dw=img.naturalWidth*s,dh=img.naturalHeight*s;ctx.globalAlpha=alpha;ctx.drawImage(img,(w-dw)/2,top+(h-dh)/2,dw,dh);ctx.globalAlpha=1}
+</script>
+</body></html>

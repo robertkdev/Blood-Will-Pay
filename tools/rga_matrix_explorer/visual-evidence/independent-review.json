@@ -1,0 +1,28 @@
+{
+  "reviewer": "/root/visual_acceptance",
+  "independent": true,
+  "run_id": "rga-explorer-fd9465e788",
+  "verdict": "pass",
+  "reviewed_images": [
+    "00-agent-review-instructions.png",
+    "01-overview-board-01.png",
+    "99-final-verdict-board.png"
+  ],
+  "packet_hashes": {
+    "00-agent-review-instructions.png": "211afa760dc3bec5432b4fd359612ab92749611fedc5a218dd08cebfa2500c44",
+    "01-overview-board-01.png": "3766b476fe609188481e3f60e695bf54d7ea0c80ae104cf834b8e26110911113",
+    "99-final-verdict-board.png": "3cb67fc2793a6a3887363c01ca0b8b075caa65d0b3d6aa2bfb405456db44a04e"
+  },
+  "reviewed_panel_ids": [
+    "P001",
+    "P002",
+    "P003",
+    "P004",
+    "P005",
+    "P006",
+    "P007",
+    "P008",
+    "P009"
+  ],
+  "notes": "PASS after the mobile matrix gained an explicit horizontal-scroll affordance. No remaining visible defects, stale images, or unreadable captures."
+}
