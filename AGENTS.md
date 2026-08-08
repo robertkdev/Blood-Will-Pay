@@ -70,6 +70,7 @@ Output locations
 - Preferred Codex/Godot loop
   - Use `godot-ai` first when the editor is open and live inspection matters: `session_manage`, `editor_state`, `logs_read`, `project_run`, `editor_screenshot`, scene/script tools, and game eval.
   - Use the legacy `godot` MCP as the fallback runner and project utility layer, especially from a fresh Codex session before `godot-ai` has loaded.
+  - On every fresh, replaced, or newly selected checkout, launch the editor through MCP before the first project run, then require `Tools\Test-GodotEditorHydration.ps1 -ProjectPath "<selected-project-path>" -AsJson` to return `ready: true`. Never start `Main.tscn` while this gate reports missing script classes or imported resources; doing so can produce false SVG-loader and external-class parser failures.
   - For visual verification, run the scene with `godot-ai project_run`, wait for `editor_state.game_capture_ready == true`, then capture `editor_screenshot(source="game")`.
   - Codex config has both MCP servers: `godot` for local process control and `godot-ai` at `http://127.0.0.1:8000/mcp` for live-editor control.
 
