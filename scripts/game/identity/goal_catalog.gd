@@ -3,6 +3,7 @@ class_name GoalCatalog
 
 const GoalDef := preload("res://scripts/game/identity/goal_def.gd")
 const IdentityKeys := preload("res://scripts/game/identity/identity_keys.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 
 const GOALS_DIR := "res://data/identity/goals"
 
@@ -23,9 +24,12 @@ static func reload() -> void:
         var entry := dir.get_next()
         if entry == "":
             break
-        if dir.current_is_dir() or not entry.ends_with(".tres"):
+        if dir.current_is_dir():
             continue
-        var path := "%s/%s" % [GOALS_DIR, entry]
+        var resource_entry: String = ResourcePathNormalizer.source_name(entry)
+        if not resource_entry.ends_with(".tres"):
+            continue
+        var path: String = "%s/%s" % [GOALS_DIR, resource_entry]
         if not ResourceLoader.exists(path):
             continue
         var res := ResourceLoader.load(path)

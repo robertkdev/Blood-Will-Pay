@@ -1,0 +1,124 @@
+name: Windows package smoke
+
+on:
+  pull_request:
+    paths:
+      - "assets/audio/**"
+      - "scripts/game/audio/**"
+      - "scripts/util/resource_path_normalizer.gd"
+      - "tests/rga_testing/validation/PackagedResourceDiscoveryProbe.tscn"
+      - "tests/rga_testing/validation/packaged_resource_discovery_probe.gd"
+      - "export_presets.cfg"
+      - ".github/workflows/windows-package-smoke.yml"
+  push:
+    branches:
+      - "codex/019f7639-package-resource-replay"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-package-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install pinned Godot 4.5 and export templates
+        id: godot
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "4.5-stable"
+          $godotRoot = Join-Path $env:RUNNER_TEMP "godot"
+          $godotZip = Join-Path $env:RUNNER_TEMP "godot.zip"
+          $godotUrl = "https://github.com/godotengine/godot/releases/download/$version/Godot_v${version}_win64.exe.zip"
+          Invoke-WebRequest -Uri $godotUrl -OutFile $godotZip
+          Expand-Archive -LiteralPath $godotZip -DestinationPath $godotRoot -Force
+          $godotExe = (Get-ChildItem -LiteralPath $godotRoot -Filter "Godot_v${version}_win64.exe" -Recurse | Select-Object -First 1).FullName
+          $godotConsoleExe = (Get-ChildItem -LiteralPath $godotRoot -Filter "Godot_v${version}_win64_console.exe" -Recurse | Select-Object -First 1).FullName
+          if (-not $godotExe) { throw "Pinned Godot executable was not found" }
+          Get-ChildItem -LiteralPath $godotRoot -File -Recurse | ForEach-Object { "Godot archive file: $($_.FullName)" }
+          if (-not $godotConsoleExe) { "Godot archive console executable: ABSENT" }
+
+          $templateDir = Join-Path $env:APPDATA "Godot\export_templates\4.5.stable"
+          New-Item -ItemType Directory -Force -Path $templateDir | Out-Null
+          $templateZip = Join-Path $env:RUNNER_TEMP "templates.zip"
+          $templateUrl = "https://github.com/godotengine/godot/releases/download/$version/Godot_v${version}_export_templates.tpz"
+          Invoke-WebRequest -Uri $templateUrl -OutFile $templateZip
+          $templateStage = Join-Path $env:RUNNER_TEMP "templates"
+          Expand-Archive -LiteralPath $templateZip -DestinationPath $templateStage -Force
+          Copy-Item -Path (Join-Path $templateStage "templates\*") -Destination $templateDir -Recurse -Force
+
+          "godot=$godotExe" >> $env:GITHUB_OUTPUT
+          "godot_console=$godotConsoleExe" >> $env:GITHUB_OUTPUT
+          & $godotExe --version
+
+      - name: Import project resources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $runner = "${{ steps.godot.outputs.godot_console }}"
+          if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
+          $stdout = Join-Path $env:RUNNER_TEMP "godot-import.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "godot-import.stderr.log"
+          $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--editor", "--path", $env:GITHUB_WORKSPACE, "--quit") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+          Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+          if ($process.ExitCode -ne 0) { throw "Godot resource import failed with exit code $($process.ExitCode)" }
+
+      - name: Export checked-in Windows preset
+        id: export
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\build\windows" | Out-Null
+          $runner = "${{ steps.godot.outputs.godot_console }}"
+          if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
+          $stdout = Join-Path $env:RUNNER_TEMP "godot-export.stdout.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "godot-export.stderr.log"
+          $arguments = @("--headless", "--path", $env:GITHUB_WORKSPACE, '--export-release="Windows Desktop"', "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")
+          $process = Start-Process -FilePath $runner -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          $completed = Wait-Process -Id $process.Id -Timeout 300 -ErrorAction SilentlyContinue
+          if (-not $completed) {
+            Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+            Copy-Item $stdout "$env:GITHUB_WORKSPACE\godot-export.stdout.log" -Force -ErrorAction SilentlyContinue
+            Copy-Item $stderr "$env:GITHUB_WORKSPACE\godot-export.stderr.log" -Force -ErrorAction SilentlyContinue
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw "Godot Windows export timed out after 300 seconds"
+          }
+          $process.Refresh()
+          Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+          Copy-Item $stdout "$env:GITHUB_WORKSPACE\godot-export.stdout.log" -Force -ErrorAction SilentlyContinue
+          Copy-Item $stderr "$env:GITHUB_WORKSPACE\godot-export.stderr.log" -Force -ErrorAction SilentlyContinue
+          if ($process.ExitCode -ne 0) { throw "Godot Windows export failed with exit code $($process.ExitCode)" }
+          if (-not (Test-Path "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")) { throw "Windows executable was not produced" }
+
+      - name: Run packaged resource smoke
+        if: ${{ steps.export.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe"
+          $stdout = "$env:RUNNER_TEMP\blood-will-pay.stdout.log"
+          $stderr = "$env:RUNNER_TEMP\blood-will-pay.stderr.log"
+          $process = Start-Process -FilePath $exe -ArgumentList "--headless", "--quit-after", "10" -WorkingDirectory "$env:GITHUB_WORKSPACE\build\windows" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+          Get-Content $stdout, $stderr -ErrorAction SilentlyContinue | Set-Content "$env:GITHUB_WORKSPACE\packaged-resource-smoke.log"
+          if ($process.ExitCode -ne 0) { throw "Packaged Windows executable exited with code $($process.ExitCode)" }
+          $log = Get-Content "$env:GITHUB_WORKSPACE\packaged-resource-smoke.log" -Raw
+          if ($log -match "Cannot open file|Failed loading resource|Error loading resource|SCRIPT ERROR") { throw "Packaged runtime reported resource or script errors" }
+
+      - name: Upload package smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package-smoke-${{ github.sha }}
+          path: |
+            packaged-resource-smoke.log
+            godot-export.stdout.log
+            godot-export.stderr.log
+          if-no-files-found: warn

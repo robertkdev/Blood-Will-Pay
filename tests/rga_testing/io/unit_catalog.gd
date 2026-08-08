@@ -4,6 +4,7 @@ class_name RGAUnitCatalog
 const UnitFactory = preload("res://scripts/unit_factory.gd")
 const UnitProfile = preload("res://scripts/game/units/unit_profile.gd")
 const RGASettings = preload("res://tests/rga_testing/settings.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 
 # Lists units with minimal identity fields.
 # Applies only provided filters from RGASettings.
@@ -23,9 +24,12 @@ func list(settings: RGASettings) -> Array[Dictionary]:
         var f := dir.get_next()
         if f == "":
             break
-        if dir.current_is_dir() or f.begins_with(".") or not f.ends_with(".tres"):
+        if dir.current_is_dir() or f.begins_with("."):
             continue
-        var path := "res://data/units/%s" % f
+        var resource_name: String = ResourcePathNormalizer.source_name(f)
+        if not resource_name.ends_with(".tres"):
+            continue
+        var path: String = "res://data/units/%s" % resource_name
         var res = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
         if res == null:
             continue
@@ -113,4 +117,3 @@ func _to_lower_array(arr: PackedStringArray) -> PackedStringArray:
         if s != "":
             out.append(s)
     return out
-

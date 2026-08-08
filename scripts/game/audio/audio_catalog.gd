@@ -1,6 +1,8 @@
 extends Object
 class_name AudioCatalog
 
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
+
 # Catalog of AudioStream resources under a root directory (default: res://assets/audio).
 # Scans recursively and maps ids to streams. Ids are the relative path without extension,
 # lowercased, using forward slashes. Example: res://assets/audio/ui/click.ogg -> ui/click
@@ -52,16 +54,34 @@ func _scan_dir(path: String) -> void:
 		if dir.current_is_dir():
 			_scan_dir(full)
 			continue
-		if not (name.ends_with(".ogg") or name.ends_with(".wav") or name.ends_with(".mp3")):
+		var resource_name: String = ResourcePathNormalizer.source_name(name)
+		if not (resource_name.ends_with(".ogg") or resource_name.ends_with(".wav") or resource_name.ends_with(".mp3")):
 			continue
+		full = path + "/" + resource_name
 		if not ResourceLoader.exists(full):
 			continue
-		var resource: Resource = ResourceLoader.load(full, "AudioStream", ResourceLoader.CACHE_MODE_IGNORE)
+		var resource: Resource = null
+		if _imported_resource_available(full):
+			resource = ResourceLoader.load(full, "AudioStream", ResourceLoader.CACHE_MODE_IGNORE)
 		var stream: AudioStream = resource as AudioStream
+		if stream == null and resource_name.ends_with(".wav"):
+			stream = AudioStreamWAV.load_from_file(full)
 		if stream is AudioStream:
 			var sid: String = _id_from_path(full)
 			_by_id[sid] = stream
 	dir.list_dir_end()
+
+func _imported_resource_available(source_path: String) -> bool:
+	var import_path: String = source_path + ".import"
+	if not FileAccess.file_exists(import_path):
+		return true
+	var config: ConfigFile = ConfigFile.new()
+	if config.load(import_path) != OK:
+		return true
+	var imported_path: String = String(config.get_value("remap", "path", ""))
+	if imported_path == "":
+		return true
+	return FileAccess.file_exists(imported_path)
 
 func _id_from_path(full: String) -> String:
 	var base_root := String(_root)

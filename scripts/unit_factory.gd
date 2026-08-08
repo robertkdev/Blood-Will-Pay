@@ -15,6 +15,7 @@ const UnitDefaults := preload("res://scripts/game/units/unit_defaults.gd")
 const IdentityValidator := preload("res://scripts/game/identity/identity_validator.gd")
 const RoleLibrary = preload("res://scripts/game/units/role_library.gd")
 const IdentityUtils := preload("res://scripts/game/identity/identity_utils.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 const UnitScaler := preload("res://scripts/game/units/unit_scaler.gd")
 const Trace := preload("res://scripts/util/trace.gd")
 
@@ -171,9 +172,10 @@ static func _scan_root_into_index(root: String, recursive: bool) -> void:
 			if recursive and not entry.begins_with("."):
 				_scan_root_into_index(base + "/" + entry, recursive)
 			continue
-		if not entry.ends_with(".tres"):
+		var resource_entry: String = ResourcePathNormalizer.source_name(entry)
+		if not resource_entry.ends_with(".tres"):
 			continue
-		var path: String = base + "/" + entry
+		var path: String = base + "/" + resource_entry
 		if not ResourceLoader.exists(path):
 			continue
 		var res = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
