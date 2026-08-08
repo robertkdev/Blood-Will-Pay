@@ -12,6 +12,7 @@ Data Model
   - `stat_mods: Dictionary` normalized keys (see Mod Schema).
   - `effects: PackedStringArray` list of runtime effect ids consumed by the Effect Registry.
   - `components: PackedStringArray` (completed items only) the two component ids that craft this item.
+  - `build_axes: PackedStringArray` stat/effect lane tags such as `attack_damage`, `spell_power`, `mana`, `health`, `crit`, `tenacity`, `sustain`, or `tempo`.
 
 Mod Schema (flat vs pct)
 
@@ -70,7 +71,9 @@ Runtime Effects
 - `scripts/game/items/effects/effect_registry.gd` maps `effect_id` -> handler instance.
 - Handlers live in `scripts/game/items/effects/*.gd` and only consume signals + BuffSystem:
   - Examples: `doubleblade.gd` (stacking AD), `hyperstone.gd` (AS ramp + bleed proxy), `spellblade.gd`, `shiv.gd`, `blood_engine.gd`, `mind_siphon.gd`, `mindstone.gd`, `bandana.gd`, `turbine.gd`.
-- Completed items should only list an `effects` id when a matching handler is registered. `tests/rga_testing/validation/CompletedItemEffectRegistrySmoke.tscn` guards this and also catches unsupported completed-item `stat_mods` keys.
+- The remaining completed items route through `completed_runtime_effect.gd`, which provides concise combat hooks for shields, burst pulses, stat windows, on-hit damage, mana support, and low-health saves.
+- Completed items should list at least one `effects` id and each id must have a registered handler. `tests/rga_testing/validation/CompletedItemEffectRegistrySmoke.tscn` guards registry coverage and unsupported completed-item `stat_mods` keys. `tests/rga_testing/validation/CompletedItemRuntimeEffectsProbe.tscn` dispatches combat events across all completed items and fails if an item effect does not change runtime combat state.
+- `tests/rga_testing/core/lockstep_simulator.gd` applies item loadouts only when a simulation job passes `team_a_items` or `team_b_items` metadata. In that mode it applies equip stat overlays and dispatches registered item runtime effects through `EffectRegistry`, with a reentrancy guard so item-triggered events do not recursively fire more item effects in the same stack.
 - Item tag namespace lives in `scripts/game/abilities/buff_tags_items.gd` to avoid collisions with core `BuffTags`.
 
 UI Integration
@@ -83,7 +86,7 @@ How to Add a New Item
 
 1) Data: create `data/items/components/<id>.tres` or `data/items/completed/<id>.tres` with `ItemDef` and stat/effect fields.
 2) Combine: update `scripts/game/items/combine_rules.gd` if it’s a combo result.
-3) Effect (optional): add `scripts/game/items/effects/<id>.gd` and register it in `effect_registry.gd` with the same id in the item’s `effects` array.
+3) Effect: add `scripts/game/items/effects/<id>.gd` or route the item through `completed_runtime_effect.gd`, then register the same id in `effect_registry.gd` and the item's `effects` array.
 4) Icon: set `icon_path` in the resource for UI.
 
 SRP Boundaries

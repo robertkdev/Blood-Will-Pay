@@ -12,6 +12,7 @@ var rng: RandomNumberGenerator
 var caster_team: String = ""
 var caster_index: int = -1
 var buff_system: BuffSystem = null
+var _post_cast_mana_refund: int = 0
 
 func _init(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGenerator, _caster_team: String, _caster_index: int) -> void:
 	engine = _engine
@@ -40,6 +41,34 @@ func is_alive(team: String, idx: int) -> bool:
 	var arr: Array[Unit] = state.player_team if team == "player" else state.enemy_team
 	return BattleState.is_target_alive(arr, idx)
 
+func is_targetable(team: String, idx: int) -> bool:
+	if not is_alive(team, idx):
+		return false
+	if buff_system == null or not buff_system.has_method("is_targetable"):
+		return true
+	return bool(buff_system.is_targetable(state, team, idx))
+
+func apply_untargetable(duration_s: float, reason: String) -> Dictionary:
+	if state == null or engine == null or buff_system == null:
+		return {"processed": false}
+	var duration: float = max(0.0, duration_s)
+	if duration <= 0.0:
+		return {"processed": false}
+	var result: Dictionary = buff_system.apply_tag(
+		state,
+		caster_team,
+		caster_index,
+		BuffTags.TAG_UNTARGETABLE,
+		duration,
+		{"reason": String(reason)})
+	if not bool(result.get("processed", false)):
+		return result
+	if engine.target_controller != null and engine.target_controller.has_method("invalidate_target"):
+		engine.target_controller.invalidate_target(caster_team, caster_index)
+	if engine.has_method("_resolver_emit_targetability_window"):
+		engine._resolver_emit_targetability_window(caster_team, caster_index, false, duration, String(reason))
+	return result
+
 # --- Selectors ---
 func current_target(team: String, idx: int) -> int:
 	if engine == null:
@@ -64,7 +93,7 @@ func lowest_hp_enemy(team: String) -> int:
 	var best_hp: int = 1 << 30
 	for i in range(arr.size()):
 		var u: Unit = arr[i]
-		if u and u.is_alive():
+		if u and is_targetable(_other_team(team), i):
 			if u.hp < best_hp:
 				best_hp = int(u.hp)
 				best_idx = i
@@ -90,6 +119,15 @@ func _enemy_indices_alive(team: String) -> Array[int]:
 			arr.append(i)
 	return arr
 
+func _enemy_indices_targetable(team: String) -> Array[int]:
+	var arr: Array[int] = []
+	var enemy_team_name: String = _other_team(team)
+	var enemies: Array[Unit] = enemy_team_array(team)
+	for index: int in range(enemies.size()):
+		if is_targetable(enemy_team_name, index):
+			arr.append(index)
+	return arr
+
 # Geometric selectors (tile-aware; use MovementMath and MovementService tuning
 # epsilon so range checks behave consistently with movement/attacks.)
 func enemies_in_radius(team: String, center_index: int, radius_tiles: float) -> Array[int]:
@@ -98,7 +136,7 @@ func enemies_in_radius(team: String, center_index: int, radius_tiles: float) -> 
 	var ts: float = tile_size()
 	var epsilon: float = _range_epsilon()
 	var band_mult: float = _band_max_for(team, center_index)
-	for i in _enemy_indices_alive(team):
+	for i: int in _enemy_indices_alive(team):
 		var p: Vector2 = position_of(_other_team(team), i)
 		if MovementMath.within_radius_tiles(center, p, radius_tiles * band_mult, ts, epsilon):
 			out.append(i)
@@ -108,7 +146,7 @@ func enemies_in_radius_at(team: String, center_world: Vector2, radius_tiles: flo
 	var out: Array[int] = []
 	var ts: float = tile_size()
 	var epsilon: float = _range_epsilon()
-	for i in _enemy_indices_alive(team):
+	for i: int in _enemy_indices_alive(team):
 		var p: Vector2 = position_of(_other_team(team), i)
 		if MovementMath.within_radius_tiles(center_world, p, radius_tiles, ts, epsilon):
 			out.append(i)
@@ -125,7 +163,7 @@ func enemies_in_line(team: String, shooter_index: int, target_index: int, length
 	# Expand half-width by epsilon to keep edge behavior consistent
 	var half_w: float = max(0.0, width_tiles) * tile_size() * 0.5 + _range_epsilon()
 	var fwd: Vector2 = dir.normalized()
-	for i in _enemy_indices_alive(team):
+	for i: int in _enemy_indices_alive(team):
 		var p: Vector2 = position_of(_other_team(team), i)
 		var rel: Vector2 = p - start
 		var proj: float = rel.dot(fwd)
@@ -140,7 +178,7 @@ func two_nearest_enemies(team: String) -> Array[int]:
 	var out: Array[int] = []
 	var src: Vector2 = position_of(team, caster_index)
 	var pairs: Array = []
-	for i in _enemy_indices_alive(team):
+	for i: int in _enemy_indices_targetable(team):
 		var p: Vector2 = position_of(_other_team(team), i)
 		pairs.append({"i": i, "d": src.distance_to(p)})
 	pairs.sort_custom(func(a, b): return float(a.d) < float(b.d))
@@ -152,7 +190,7 @@ func two_furthest_enemies(team: String) -> Array[int]:
 	var out: Array[int] = []
 	var src: Vector2 = position_of(team, caster_index)
 	var pairs: Array = []
-	for i in _enemy_indices_alive(team):
+	for i: int in _enemy_indices_targetable(team):
 		var p: Vector2 = position_of(_other_team(team), i)
 		pairs.append({"i": i, "d": src.distance_to(p)})
 	pairs.sort_custom(func(a, b): return float(a.d) > float(b.d))
@@ -195,6 +233,16 @@ func exile_upgrade_level(team: String, index: int) -> int:
 
 func _other_team(team: String) -> String:
 	return TeamUtils.other_team(team)
+
+# Applied by AbilitySystem after its successful-cast mana reset so an
+# implementation-side refund cannot be overwritten by the shared commit path.
+func request_post_cast_mana_refund(amount: int) -> void:
+	_post_cast_mana_refund += max(0, amount)
+
+func consume_post_cast_mana_refund() -> int:
+	var amount: int = max(0, _post_cast_mana_refund)
+	_post_cast_mana_refund = 0
+	return amount
 
 # --- Mentor–Pupil pairing ---
 func pupil_for(team: String, mentor_index: int) -> int:

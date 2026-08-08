@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "mage"
 primary_goal = "mage.sustained_dps"
 approaches = ["dot", "sustain", "ramp"]
-alt_goals = []
+alt_goals = ["mage.area_denial_zone", "brawler.attrition_dps"]

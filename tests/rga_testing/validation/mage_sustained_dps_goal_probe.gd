@@ -13,17 +13,24 @@ func _ready() -> void:
 func _run() -> void:
 	_install_probe_identity()
 	var positive_result: Dictionary = _run_goal(_positive_payload())
+	var window_result: Dictionary = _run_goal(_sustained_window_payload(0.25, 12.0))
+	var weak_window_result: Dictionary = _run_goal(_sustained_window_payload(0.10, 4.0))
 	var negative_result: Dictionary = _run_goal(_negative_aoe_only_payload())
 	RoleCommon.clear_identity_cache()
 
 	var positive_pass: bool = bool(positive_result.get("pass", false))
+	var window_pass: bool = bool(window_result.get("pass", false))
+	var weak_window_pass: bool = bool(weak_window_result.get("pass", false))
 	var negative_pass: bool = bool(negative_result.get("pass", false))
 	var dot_span: bool = _has_span_prefix(positive_result, "goal_mage_sustained_dps_dot_tick_events")
 	var zone_span: bool = _has_span_prefix(positive_result, "goal_mage_sustained_dps_zone_exposure_events")
 	var ramp_span: bool = _has_span_prefix(positive_result, "goal_mage_sustained_dps_ramp_state_events")
 	var diagnostic_span: bool = _has_span_prefix(negative_result, "goal_mage_sustained_dps_aoe_dps_diagnostic")
+	var window_damage_diagnostic: bool = _has_diagnostic_span(window_result, "goal_mage_sustained_dps_team_damage_share", "alternate_sustained_window_evidence_satisfied")
 
 	print("MageSustainedDpsGoalProbe: positive_pass=", positive_pass,
+		" window_pass=", window_pass,
+		" weak_window_pass=", weak_window_pass,
 		" negative_pass=", negative_pass,
 		" dot_span=", dot_span,
 		" zone_span=", zone_span,
@@ -33,6 +40,12 @@ func _run() -> void:
 	var failed: bool = false
 	if not positive_pass:
 		printerr("MageSustainedDpsGoalProbe: FAIL direct sustained magic evidence did not pass")
+		failed = true
+	if not window_pass or not window_damage_diagnostic:
+		printerr("MageSustainedDpsGoalProbe: FAIL direct sustained-window evidence did not provide the low-total-share alternate")
+		failed = true
+	if weak_window_pass:
+		printerr("MageSustainedDpsGoalProbe: FAIL weak sustained-window evidence bypassed the damage contribution gate")
 		failed = true
 	if negative_pass:
 		printerr("MageSustainedDpsGoalProbe: FAIL AoE-only damage case passed without direct sustained mechanism")
@@ -140,6 +153,36 @@ func _negative_aoe_only_payload() -> Dictionary:
 		}
 	}, 120.0, 180.0)
 
+func _sustained_window_payload(team_share: float, rate: float) -> Dictionary:
+	return _base_payload({
+		"combat_patterns": {
+			"per_unit": {
+				"a": {
+					SUBJECT_ID: {
+						"sustained_3_10s_team_share": team_share,
+						"sustained_3_10s_rate": rate
+					}
+				}
+			}
+		},
+		"buff_presence": {
+			"supported": true,
+			"dot_tick_supported": true,
+			"per_unit": {
+				"a": {
+					SUBJECT_ID: {
+						"dot_tick_events": 3,
+						"dot_tick_damage": 45.0,
+						"dot_tick_targets": 1,
+						"dot_duration_applied_s": 3.0,
+						"dot_uptime_s": 2.0
+					}
+				},
+				"b": {}
+			}
+		}
+	}, 15.0, 180.0)
+
 func _base_payload(kernels: Dictionary, subject_damage: float, team_damage: float) -> Dictionary:
 	return {
 		"context": {
@@ -191,6 +234,18 @@ func _has_span_prefix(metric_result: Dictionary, prefix: String) -> bool:
 			continue
 		var label: String = String((span_value as Dictionary).get("label", ""))
 		if label.begins_with(prefix):
+			return true
+	return false
+
+func _has_diagnostic_span(metric_result: Dictionary, label_prefix: String, expected_reason: String) -> bool:
+	var spans: Array = metric_result.get("spans", []) if (metric_result is Dictionary) else []
+	for span_value in spans:
+		if not (span_value is Dictionary):
+			continue
+		var span: Dictionary = span_value
+		var label: String = String(span.get("label", ""))
+		var reason: String = String(span.get("reason", ""))
+		if label.begins_with(label_prefix) and not span.has("ok") and reason == expected_reason:
 			return true
 	return false
 

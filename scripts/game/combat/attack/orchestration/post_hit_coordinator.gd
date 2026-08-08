@@ -53,9 +53,11 @@ func apply(source_team: String, source_index: int, target_team: String, target_i
 			if source_index >= 0 and source_index < state.enemy_damage_this_round.size():
 				state.enemy_damage_this_round[source_index] = int(state.enemy_damage_this_round[source_index]) + int(dealt)
 
-	# Mana gain on attack (handles tag-based blocking and optional autocast)
 	var src: Unit = TeamUtils.unit_at(state, source_team, source_index)
-	mana_service.gain(source_team, source_index, src)
+	# Mana gain is basic-attack-only. Ability and scheduled damage can emit
+	# hit telemetry, but should not recursively refuel the caster.
+	if bool(is_basic_attack):
+		mana_service.gain(source_team, source_index, src)
 
 	# Bonko empower: consume a charge after this hit and apply heal on empowered basic attacks
 	var bs: BuffSystem = (mana_service.buff_system if mana_service != null else null)
@@ -65,6 +67,7 @@ func apply(source_team: String, source_index: int, target_team: String, target_i
 		var heal_pct: float = float(meta.get("heal_missing_pct", 0.0))
 		var empowered_this_hit: bool = (hits_left > 0 and bool(is_basic_attack))
 		if empowered_this_hit:
+			var heal_applied: int = 0
 			# Heal the attacker for a percentage of missing HP
 			if src != null and heal_pct > 0.0:
 				var missing: int = max(0, int(src.max_hp) - int(src.hp))
@@ -72,10 +75,20 @@ func apply(source_team: String, source_index: int, target_team: String, target_i
 				if heal_amt > 0:
 					var hres: Dictionary = HealingService.apply_heal(state, bs, source_team, source_index, float(heal_amt))
 					if bool(hres.get("processed", false)):
+						heal_applied = int(hres.get("healed", 0))
 						events.heal_applied(source_team, source_index, source_team, source_index, int(hres.get("healed", 0)), int(hres.get("overheal", 0)), int(hres.get("before_hp", 0)), int(hres.get("after_hp", 0)))
 					events.unit_stat_changed(source_team, source_index, {"hp": src.hp})
 			# Decrement hits and update mana-block tag state after mana gain
 			var new_hits: int = max(0, hits_left - 1)
+			var on_hit_fields: Dictionary = {
+				"hits_left_before": hits_left,
+				"hits_left_after": new_hits,
+				"extra_ad_ratio": float(meta.get("extra_ad_ratio", 1.0)),
+				"heal_missing_pct": heal_pct,
+				"heal_applied": heal_applied,
+				"damage_dealt": dealt
+			}
+			bs.record_on_hit_proc(state, source_team, source_index, target_team, target_index, "bonko_empowered_hit", on_hit_fields, float(dealt))
 			var new_meta: Dictionary = meta.duplicate()
 			new_meta["hits_left"] = new_hits
 			# Keep mana block active only while there are charges remaining

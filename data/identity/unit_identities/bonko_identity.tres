@@ -6,4 +6,5 @@
 script = ExtResource("1")
 primary_role = "brawler"
 primary_goal = "brawler.attrition_dps"
-approaches = Array[String](["sustain", "ramp"])
+approaches = Array[String](["sustain", "ramp", "on_hit_effect"])
+alt_goals = ["brawler.skirmish_dive", "marksman.sustained_dps"]

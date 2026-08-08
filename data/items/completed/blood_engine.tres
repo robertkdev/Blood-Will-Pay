@@ -12,4 +12,5 @@ stat_mods = {"pct_ad": 0.20, "flat_hp": 200}
 effects = ["blood_engine"]
 components = ["hammer", "core"]
 tags = PackedStringArray("brawler")
+build_axes = PackedStringArray("attack_damage", "health", "frontline", "sustain")
 

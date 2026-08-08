@@ -12,4 +12,5 @@ stat_mods = {"pct_as": 0.25, "flat_hp": 200}
 effects = ["turbine"]
 components = ["crystal", "core"]
 tags = PackedStringArray("brawler", "marksman")
+build_axes = PackedStringArray("attack_speed", "health", "frontline", "tempo", "ramp")
 

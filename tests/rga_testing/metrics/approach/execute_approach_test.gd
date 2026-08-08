@@ -74,11 +74,15 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 		overkill_samples.append(float(rec.get("overkill_rate", 0.0)))
 		if rec.has("execute_bonus_events") or rec.has("execute_bonus_damage_share"):
 			direct_supported = true
-			total_bonus_events += int(rec.get("execute_bonus_events", 0))
+			var rec_bonus_events: int = int(rec.get("execute_bonus_events", 0))
+			total_bonus_events += rec_bonus_events
 			total_bonus_damage += float(rec.get("execute_bonus_damage", 0.0))
 			total_bonus_targets += int(rec.get("execute_bonus_targets", 0))
 			total_outside_threshold += int(rec.get("execute_bonus_outside_threshold_events", 0))
-			bonus_share_samples.append(float(rec.get("execute_bonus_damage_share", 0.0)))
+			# Execute share is conditional on an execute window existing. Including
+			# zero-event fights in the median erases valid sparse finishers.
+			if rec_bonus_events > 0:
+				bonus_share_samples.append(float(rec.get("execute_bonus_damage_share", 0.0)))
 
 	var low_hp_share: float = float(total_low_hp_kills) / max(1.0, float(total_kills))
 	var overkill_value: float = RoleCommon.median(overkill_samples)
@@ -92,6 +96,9 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 	var kcfg: Dictionary = cfg.get("k_of_n", {"k": 3, "n": 5})
 	var eval_result: Dictionary = RoleCommon.k_of_n([bonus_events_pass, bonus_share_pass, share_pass, kills_pass, overkill_ok], int(kcfg.get("k", 3)), int(kcfg.get("n", 5)))
 	var pass_flag: bool = bonus_events_pass and bool(eval_result.get("pass", false)) and outside_threshold_ok
+	var direct_conversion_pass: bool = bonus_events_pass and total_bonus_damage > 0.0 and total_kills > 0 and overkill_ok and outside_threshold_ok
+	if direct_supported and total_bonus_damage > 0.0:
+		pass_flag = direct_conversion_pass
 	if not direct_supported:
 		pass_flag = share_pass and kills_pass and overkill_ok
 	var bonus_share_span_ok: Variant = bonus_share_pass
@@ -115,8 +122,15 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 	RoleCommon.append_span(spans, "subject_execute_bonus_damage_share", bonus_share_value, bonus_share_req, bonus_share_span_ok if direct_supported else null, _extras_for_span(extras, bonus_share_span_ok, "alternate_execute_evidence_satisfied"))
 	RoleCommon.append_span(spans, "subject_execute_bonus_damage", total_bonus_damage, null, direct_supported and total_bonus_damage > 0.0, extras)
 	RoleCommon.append_span(spans, "subject_execute_bonus_outside_threshold_events", total_outside_threshold, 0, outside_threshold_ok if direct_supported else null, extras)
-	RoleCommon.append_span(spans, "subject_low_hp_kill_share", low_hp_share, share_req, share_pass, extras)
-	RoleCommon.append_span(spans, "subject_low_hp_kills", total_low_hp_kills, kills_req, kills_pass, extras)
+	var low_hp_share_span_ok: Variant = share_pass
+	var low_hp_kills_span_ok: Variant = kills_pass
+	if direct_conversion_pass:
+		if not share_pass:
+			low_hp_share_span_ok = null
+		if not kills_pass:
+			low_hp_kills_span_ok = null
+	RoleCommon.append_span(spans, "subject_low_hp_kill_share", low_hp_share, share_req, low_hp_share_span_ok, _extras_for_span(extras, low_hp_share_span_ok, "direct_execute_conversion_satisfied"))
+	RoleCommon.append_span(spans, "subject_low_hp_kills", total_low_hp_kills, kills_req, low_hp_kills_span_ok, _extras_for_span(extras, low_hp_kills_span_ok, "direct_execute_conversion_satisfied"))
 	RoleCommon.append_span(spans, "subject_execute_overkill_rate_med", overkill_value, overkill_max, overkill_ok, extras)
 
 	return {

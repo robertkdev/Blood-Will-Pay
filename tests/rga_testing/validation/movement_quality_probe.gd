@@ -144,8 +144,16 @@ func _check_team_movement_report(report: Dictionary, failures: Array[String]) ->
 	var totem_report: Dictionary = _unit_report(unit_reports, "totem")
 	var final_positions: Array = report.get("final_player_positions", [])
 	var sari_final: Dictionary = final_positions[0] if final_positions.size() > 0 and final_positions[0] is Dictionary else {}
+	var final_targets: Array = report.get("final_player_targets", [])
+	var sari_final_target: int = int(final_targets[0]) if final_targets.size() > 0 else -1
+	var sari_target_switches: int = int(sari_report.get("target_switches", 0))
+	var sari_self_defense: bool = sari_final_target == 0 and sari_target_switches >= 1
 	_expect(float(sari_report.get("path_length", 0.0)) >= 35.0, "Sari should visibly reposition/strafe; path=%.2f" % float(sari_report.get("path_length", 0.0)), failures)
-	_expect(float(sari_report.get("band_share", 0.0)) >= 0.45, "Sari should spend meaningful time in attack band; band_share=%.2f" % float(sari_report.get("band_share", 0.0)), failures)
+	if sari_self_defense:
+		_expect(float(sari_report.get("band_share", 0.0)) >= 0.15, "Sari should preserve some attack-band time while self-defending against Hexeon; band_share=%.2f" % float(sari_report.get("band_share", 0.0)), failures)
+		_expect(int(sari_report.get("target_diversity", 0)) >= 2, "Sari self-defense should be visible as a real target switch; diversity=%d" % int(sari_report.get("target_diversity", 0)), failures)
+	else:
+		_expect(float(sari_report.get("band_share", 0.0)) >= 0.45, "Sari should spend meaningful time in attack band when no self-defense interrupt fires; band_share=%.2f" % float(sari_report.get("band_share", 0.0)), failures)
 	_expect(float(sari_final.get("x", 0.0)) >= 8.0, "Sari should slide along bounds instead of pinning to the left wall; final_x=%.2f" % float(sari_final.get("x", 0.0)), failures)
 	_expect(float(bonko_report.get("path_length", 0.0)) >= 35.0, "Bonko should close as a melee/brawler; path=%.2f" % float(bonko_report.get("path_length", 0.0)), failures)
 	_expect(int(report.get("player_target_diversity", 0)) >= 2, "team should split target priorities across at least two enemies; diversity=%d" % int(report.get("player_target_diversity", 0)), failures)

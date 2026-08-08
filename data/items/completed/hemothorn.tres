@@ -9,7 +9,8 @@ name = "Hemothorn"
 type = "completed"
 icon_path = "res://assets/items/hemothorn_icon.png"
 stat_mods = {"pct_crit_chance": 0.20, "pct_lifesteal": 0.10}
-effects = []
+effects = ["hemothorn"]
 components = ["spike", "core"]
 tags = PackedStringArray("assassin", "brawler")
+build_axes = PackedStringArray("crit", "lifesteal", "sustain", "execute")
 

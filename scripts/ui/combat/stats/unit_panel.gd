@@ -38,6 +38,7 @@ var attack_info_label: Label = null
 var attack_targeting_label: Label = null
 var ability_info_label: Label = null
 var ability_targeting_label: Label = null
+var _compact_layout: bool = false
 
 static var diagnostics_enabled: bool = false
 static var diagnostic_dynamic_refresh_calls: int = 0
@@ -62,6 +63,16 @@ func _ready() -> void:
     _ensure_identity_styles()
     _apply_static_styles()
     set_process(false)
+
+func set_compact_layout(enabled: bool) -> void:
+    var next_compact: bool = bool(enabled)
+    if _compact_layout == next_compact:
+        return
+    _compact_layout = next_compact
+    _apply_static_styles()
+    if unit_ref != null:
+        _build_stats_grid()
+        _refresh_combat_info()
 
 func _exit_tree() -> void:
     teardown()
@@ -107,57 +118,34 @@ func _refresh_dynamic() -> void:
     var casts: float = 0.0
     var hps3: float = 0.0
     var absorbed_total: float = 0.0
-    var cc_inf: float = 0.0
-    var cc_rec: float = 0.0
-    var overheal: float = 0.0
     var kills: float = 0.0
     var deaths: float = 0.0
     var time_alive: float = 0.0
-    var focus_pct: float = 0.0
     if tracker != null and index >= 0:
         dps3 = tracker.get_value(team, index, "dps", "3S")
         casts = tracker.get_value(team, index, "casts", "ALL")
         hps3 = tracker.get_value(team, index, "hps", "3S")
         absorbed_total = tracker.get_value(team, index, "absorbed", "ALL")
-        cc_inf = tracker.get_value(team, index, "cc_inflicted", "ALL")
-        cc_rec = tracker.get_value(team, index, "cc_received", "ALL")
-        overheal = tracker.get_value(team, index, "overheal", "ALL")
         kills = tracker.get_value(team, index, "kills", "ALL")
         deaths = tracker.get_value(team, index, "deaths", "ALL")
         time_alive = tracker.get_value(team, index, "time", "ALL")
-        focus_pct = tracker.get_value(team, index, "focus", "ALL")
     dps_label.text = "DPS (3s): " + _fmt(dps3)
     casts_label.text = "Casts: " + str(int(round(casts)))
     _ensure_extra_footer()
     var f: FlowContainer = $"VBox/Footer"
-    if f != null and f.get_child_count() >= 11:
+    if f != null and f.get_child_count() >= 6:
         var hps_lbl: Label = f.get_child(2) as Label
         var ab_lbl: Label = f.get_child(3) as Label
-        var cci_lbl: Label = f.get_child(4) as Label
-        var ccr_lbl: Label = f.get_child(5) as Label
-        var ovh_lbl: Label = f.get_child(6) as Label
-        var kil_lbl: Label = f.get_child(7) as Label
-        var ded_lbl: Label = f.get_child(8) as Label
-        var tim_lbl: Label = f.get_child(9) as Label
-        var foc_lbl: Label = f.get_child(10) as Label
+        var ko_lbl: Label = f.get_child(4) as Label
+        var tim_lbl: Label = f.get_child(5) as Label
         if hps_lbl is Label:
             (hps_lbl as Label).text = "HPS (3s): " + _fmt(hps3)
         if ab_lbl is Label:
-            (ab_lbl as Label).text = "Shield Abs: " + _fmt(absorbed_total)
-        if cci_lbl is Label:
-            (cci_lbl as Label).text = "CC Inf(s): " + String.num(cc_inf, 2)
-        if ccr_lbl is Label:
-            (ccr_lbl as Label).text = "CC Rec(s): " + String.num(cc_rec, 2)
-        if ovh_lbl is Label:
-            (ovh_lbl as Label).text = "Overheal: " + _fmt(overheal)
-        if kil_lbl is Label:
-            (kil_lbl as Label).text = "Kills: " + str(int(kills))
-        if ded_lbl is Label:
-            (ded_lbl as Label).text = "Deaths: " + str(int(deaths))
+            (ab_lbl as Label).text = "Shield: " + _fmt(absorbed_total)
+        if ko_lbl is Label:
+            (ko_lbl as Label).text = "K/D: %d/%d" % [int(kills), int(deaths)]
         if tim_lbl is Label:
             (tim_lbl as Label).text = "Time: " + String.num(time_alive, 1) + "s"
-        if foc_lbl is Label:
-            (foc_lbl as Label).text = "Focus: " + String.num(focus_pct, 0) + "%"
     _style_footer_labels()
     # Bars track current unit stats
     _refresh_bars()
@@ -172,29 +160,14 @@ func _ensure_extra_footer() -> void:
     hps_lbl.text = "HPS (3s): 0"
     f.add_child(hps_lbl)
     var ab_lbl: Label = Label.new()
-    ab_lbl.text = "Shield Abs: 0"
+    ab_lbl.text = "Shield: 0"
     f.add_child(ab_lbl)
-    var cci_lbl: Label = Label.new()
-    cci_lbl.text = "CC Inf(s): 0"
-    f.add_child(cci_lbl)
-    var ccr_lbl: Label = Label.new()
-    ccr_lbl.text = "CC Rec(s): 0"
-    f.add_child(ccr_lbl)
-    var ovh_lbl: Label = Label.new()
-    ovh_lbl.text = "Overheal: 0"
-    f.add_child(ovh_lbl)
-    var kil_lbl: Label = Label.new()
-    kil_lbl.text = "Kills: 0"
-    f.add_child(kil_lbl)
-    var ded_lbl: Label = Label.new()
-    ded_lbl.text = "Deaths: 0"
-    f.add_child(ded_lbl)
+    var ko_lbl: Label = Label.new()
+    ko_lbl.text = "K/D: 0/0"
+    f.add_child(ko_lbl)
     var tim_lbl: Label = Label.new()
     tim_lbl.text = "Time: 0s"
     f.add_child(tim_lbl)
-    var foc_lbl: Label = Label.new()
-    foc_lbl.text = "Focus: 0%"
-    f.add_child(foc_lbl)
     _extra_labels_added = true
     _style_footer_labels()
 
@@ -238,7 +211,7 @@ func _make_info_label(label_name: String) -> Label:
     label.name = label_name
     label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    label.add_theme_font_size_override("font_size", 12)
+    label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
     label.add_theme_color_override("font_color", COLOR_TEXT)
     label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.70))
     label.add_theme_constant_override("outline_size", 1)
@@ -249,37 +222,57 @@ func _ensure_identity_styles() -> void:
         role_badge.add_theme_stylebox_override("normal", _make_badge_style())
 
 func _apply_static_styles() -> void:
-    custom_minimum_size = Vector2(max(custom_minimum_size.x, 294.0), max(custom_minimum_size.y, 360.0))
+    var panel_min_width: float = 252.0 if _compact_layout else 294.0
+    custom_minimum_size = Vector2(panel_min_width, max(custom_minimum_size.y, 360.0))
     var root_box: VBoxContainer = $"VBox"
     if root_box != null:
-        root_box.add_theme_constant_override("separation", 10)
+        root_box.add_theme_constant_override("separation", 7 if _compact_layout else 10)
     var header: HBoxContainer = $"VBox/Header"
     if header != null:
-        header.add_theme_constant_override("separation", 12)
-        header.custom_minimum_size = Vector2(0.0, 78.0)
+        header.add_theme_constant_override("separation", 8 if _compact_layout else 12)
+        header.custom_minimum_size = Vector2(0.0, 64.0 if _compact_layout else 78.0)
     if portrait != null:
-        portrait.custom_minimum_size = Vector2(72.0, 72.0)
+        var portrait_size: float = 56.0 if _compact_layout else 72.0
+        portrait.custom_minimum_size = Vector2(portrait_size, portrait_size)
         portrait.modulate = Color(0.96, 0.91, 0.84, 1.0)
     if name_label != null:
-        name_label.add_theme_font_size_override("font_size", 18)
+        name_label.add_theme_font_size_override("font_size", 16 if _compact_layout else 18)
         name_label.add_theme_color_override("font_color", COLOR_TEXT)
         name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.74))
         name_label.add_theme_constant_override("outline_size", 1)
     if goal_label != null:
-        goal_label.add_theme_font_size_override("font_size", 12)
+        goal_label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
         goal_label.add_theme_color_override("font_color", COLOR_MUTED)
     if traits_label != null:
-        traits_label.add_theme_font_size_override("font_size", 13)
+        traits_label.add_theme_font_size_override("font_size", 12 if _compact_layout else 13)
         traits_label.add_theme_color_override("font_color", Color(0.84, 0.78, 0.68, 1.0))
         traits_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _style_info_labels()
+    _style_approach_tags()
     if stats_grid != null:
-        stats_grid.add_theme_constant_override("h_separation", 7)
-        stats_grid.add_theme_constant_override("v_separation", 7)
+        stats_grid.columns = 3 if _compact_layout else 4
+        stats_grid.add_theme_constant_override("h_separation", 5 if _compact_layout else 7)
+        stats_grid.add_theme_constant_override("v_separation", 5 if _compact_layout else 7)
     var footer: FlowContainer = $"VBox/Footer"
     if footer != null:
-        footer.add_theme_constant_override("h_separation", 6)
-        footer.add_theme_constant_override("v_separation", 6)
+        footer.add_theme_constant_override("h_separation", 4 if _compact_layout else 6)
+        footer.add_theme_constant_override("v_separation", 4 if _compact_layout else 6)
     _style_footer_labels()
+
+func _style_info_labels() -> void:
+    var labels: Array[Label] = [attack_info_label, attack_targeting_label, ability_info_label, ability_targeting_label]
+    for label: Label in labels:
+        if label == null or not is_instance_valid(label):
+            continue
+        label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
+
+func _style_approach_tags() -> void:
+    if approach_tags == null or not is_instance_valid(approach_tags):
+        return
+    for child: Node in approach_tags.get_children():
+        var label: Label = child as Label
+        if label != null:
+            label.add_theme_font_size_override("font_size", 11 if _compact_layout else 13)
 
 func _refresh_header() -> void:
     var tex: Texture2D = null
@@ -362,7 +355,7 @@ func _set_approach_tags(approaches: Array) -> void:
         lbl.text = label_text
         lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        lbl.add_theme_font_size_override("font_size", 13)
+        lbl.add_theme_font_size_override("font_size", 11 if _compact_layout else 13)
         lbl.add_theme_color_override("font_color", COLOR_TEXT)
         lbl.add_theme_stylebox_override("normal", _make_tag_style())
         approach_tags.add_child(lbl)
@@ -402,7 +395,7 @@ func _refresh_combat_info() -> void:
     var attack_period: float = 1.0 / max(0.01, float(unit_ref.attack_speed))
     var crit_chance: int = int(round(float(unit_ref.crit_chance) * 100.0))
     var crit_damage: String = String.num(float(unit_ref.crit_damage), 2)
-    attack_info_label.text = "Attack: basic hit deals %s physical damage every %ss at %d tiles. Crit %d%% for %sx damage." % [
+    attack_info_label.text = "Attack: %s dmg | %ss | range %d | crit %d%% x%s" % [
         _fmt(unit_ref.attack_damage),
         String.num(attack_period, 2),
         int(unit_ref.attack_range),
@@ -430,9 +423,9 @@ func _refresh_combat_info() -> void:
         description = String(ability_def.description).strip_edges()
         if int(ability_def.base_cost) > 0:
             cost = int(ability_def.base_cost)
-    var cost_text: String = " Cost: %d mana." % cost if cost > 0 else ""
-    ability_info_label.text = "Ability: %s.%s %s" % [ability_name, cost_text, description]
-    ability_info_label.tooltip_text = ability_info_label.text
+    var cost_text: String = " | %d mana" % cost if cost > 0 else ""
+    ability_info_label.text = "Ability: %s%s" % [ability_name, cost_text]
+    ability_info_label.tooltip_text = "%s\n%s" % [ability_info_label.text, description] if description != "" else ability_info_label.text
     ability_targeting_label.text = UnitTargetingText.ability_targeting_line(unit_ref)
     ability_targeting_label.tooltip_text = ability_targeting_label.text
     ability_targeting_label.visible = ability_targeting_label.text.strip_edges() != ""
@@ -464,7 +457,7 @@ func _build_stats_grid() -> void:
     ]
     for e: Array in entries:
         var card: PanelContainer = PanelContainer.new()
-        card.custom_minimum_size = Vector2(64.0, 50.0)
+        card.custom_minimum_size = Vector2(56.0 if _compact_layout else 64.0, 46.0 if _compact_layout else 50.0)
         card.add_theme_stylebox_override("panel", _make_stat_card_style())
         var box: VBoxContainer = VBoxContainer.new()
         box.add_theme_constant_override("separation", 2)
@@ -472,12 +465,12 @@ func _build_stats_grid() -> void:
         var icon: Label = Label.new()
         icon.text = String(e[0])
         icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        icon.add_theme_font_size_override("font_size", 11)
+        icon.add_theme_font_size_override("font_size", 10 if _compact_layout else 11)
         icon.add_theme_color_override("font_color", COLOR_MUTED)
         var val: Label = Label.new()
         val.text = String(e[1])
         val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        val.add_theme_font_size_override("font_size", 16)
+        val.add_theme_font_size_override("font_size", 14 if _compact_layout else 16)
         val.add_theme_color_override("font_color", COLOR_TEXT)
         val.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
         val.add_theme_constant_override("outline_size", 1)
@@ -552,8 +545,8 @@ func _make_badge_style() -> StyleBoxFlat:
     sb.corner_radius_top_right = 7
     sb.corner_radius_bottom_right = 7
     sb.corner_radius_bottom_left = 7
-    sb.content_margin_left = 10
-    sb.content_margin_right = 10
+    sb.content_margin_left = 7 if _compact_layout else 10
+    sb.content_margin_right = 7 if _compact_layout else 10
     sb.content_margin_top = 4
     sb.content_margin_bottom = 4
     return sb
@@ -570,8 +563,8 @@ func _make_tag_style() -> StyleBoxFlat:
     sb.corner_radius_top_right = 6
     sb.corner_radius_bottom_right = 6
     sb.corner_radius_bottom_left = 6
-    sb.content_margin_left = 6
-    sb.content_margin_right = 6
+    sb.content_margin_left = 4 if _compact_layout else 6
+    sb.content_margin_right = 4 if _compact_layout else 6
     sb.content_margin_top = 2
     sb.content_margin_bottom = 2
     return sb
@@ -620,6 +613,6 @@ func _style_footer_labels() -> void:
         var label: Label = child as Label
         if label == null:
             continue
-        label.add_theme_font_size_override("font_size", 12)
+        label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
         label.add_theme_color_override("font_color", COLOR_TEXT)
         label.add_theme_stylebox_override("normal", _make_footer_chip_style())

@@ -30,13 +30,19 @@ func _run() -> void:
 		_force_items(second, ["plate"])
 		_apply_source_stats(second, 2, 555, 31.0, 7.0, 70, 10)
 
-	MirrorBoardStore.capture_boss_board(1, boss_board)
+	var boss_positions: Array[Vector2] = [Vector2(80.0, 120.0), Vector2(144.0, 184.0)]
+	MirrorBoardStore.capture_boss_board(1, boss_board, boss_positions)
 	_expect(MirrorBoardStore.has_snapshot(1), "mirror store did not capture boss-entry board", failures)
 	_expect(_same_strings(MirrorBoardStore.snapshot_ids(1), ["sari", "paisley"]), "mirror snapshot ids should preserve source board order", failures)
+	_expect(_same_vectors(MirrorBoardStore.snapshot_positions(1), boss_positions), "mirror snapshot positions should preserve source board order", failures)
 
 	var spec: Dictionary = StageTypes.make_spec([], StageTypes.KIND_MIRROR, {})
 	StageRuleRunner.pre_spawn(spec, 1, 5)
 	_expect(_same_strings(_spec_ids(spec), ["sari", "paisley"]), "mirror pre-spawn did not replace spec ids with snapshot ids", failures)
+	var manager: CombatManager = CombatManager.new()
+	var translated_positions: Array = manager.call("_mirror_enemy_positions_for", spec, 1, [Vector2(400.0, 200.0), Vector2(464.0, 200.0)])
+	manager.free()
+	_expect(_same_vectors(_vectors_from_array(translated_positions), [Vector2(464.0, 168.0), Vector2(400.0, 232.0)]), "mirror arena positions should mirror copied formation on enemy side", failures)
 
 	var spawner: EnemySpawner = EnemySpawner.new()
 	var enemies: Array[Unit] = spawner.build_for_spec(spec, 1, 5)
@@ -117,6 +123,22 @@ func _same_strings(left: Array[String], right: Array[String]) -> bool:
 		if String(left[i]) != String(right[i]):
 			return false
 	return true
+
+func _same_vectors(left: Array[Vector2], right: Array[Vector2]) -> bool:
+	if left.size() != right.size():
+		return false
+	for i: int in range(left.size()):
+		if not left[i].is_equal_approx(right[i]):
+			return false
+	return true
+
+func _vectors_from_array(values: Array) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for value: Variant in values:
+		if typeof(value) == TYPE_VECTOR2:
+			var position: Vector2 = value
+			out.append(position)
+	return out
 
 func _expect(condition: bool, message: String, failures: Array[String]) -> void:
 	if not condition:

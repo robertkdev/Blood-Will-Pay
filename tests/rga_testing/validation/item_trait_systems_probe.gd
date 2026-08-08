@@ -9,6 +9,7 @@ const TraitCompiler := preload("res://scripts/game/traits/trait_compiler.gd")
 const TraitRegistry := preload("res://scripts/game/traits/runtime/trait_registry.gd")
 const TraitRuntimeLib := preload("res://scripts/game/traits/runtime/trait_runtime.gd")
 const MentorLink := preload("res://scripts/game/traits/runtime/mentor_link.gd")
+const ShopTransactions := preload("res://scripts/game/shop/shop_transactions.gd")
 const CombatEngineScript := preload("res://scripts/game/combat/combat_engine.gd")
 const BattleStateScript := preload("res://scripts/game/combat/battle_state.gd")
 const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
@@ -31,6 +32,7 @@ func _run() -> void:
 	var trait_counts: Dictionary[String, int] = _validate_trait_catalog_contract()
 	_validate_item_catalog_contract()
 	_validate_item_equip_combine_remove_flow()
+	_validate_sell_returns_completed_items()
 	_validate_trait_compiler_contract()
 	_validate_catalyst_trait_item_evolution()
 	_validate_trait_runtime_contract(trait_counts)
@@ -113,6 +115,7 @@ func _validate_item_catalog_contract() -> void:
 		var completed_id: String = String(completed_item.id)
 		_expect(completed_item.components.size() == 2, "%s should declare exactly two components" % completed_id)
 		_expect(recipe_results.has(completed_id), "%s should be reachable from CombineRules" % completed_id)
+		_expect(completed_item.effects.size() > 0, "%s should declare at least one runtime effect" % completed_id)
 		for effect_value: String in completed_item.effects:
 			var effect_id: String = String(effect_value).strip_edges()
 			_expect(effect_id != "", "%s declares an empty runtime effect id" % completed_id)
@@ -173,6 +176,41 @@ func _validate_item_equip_combine_remove_flow() -> void:
 	_expect(_approx(float(unit.attack_speed), base_as), "remover should restore base AS")
 	GameState.set_phase(int(GameState.GamePhase.MENU))
 
+func _validate_sell_returns_completed_items() -> void:
+	if _items_node() == null:
+		_fail("sell item return test needs Items autoload")
+		return
+	if _game_state_node() == null:
+		_fail("sell item return test needs GameState autoload")
+		return
+	Items.reset_run()
+	GameState.set_phase(int(GameState.GamePhase.PREVIEW))
+	var unit: Unit = UnitFactory.spawn("mortem")
+	_expect(unit != null, "could not spawn sellback test unit 'mortem'")
+	if unit == null:
+		return
+	var forced: Variant = Items.force_set_equipped(unit, ["dagger"])
+	_expect(_result_ok(forced), "sellback setup should force-equip completed dagger")
+	_expect(_equipped_ids(unit) == ["dagger"], "sellback setup should equip dagger")
+	var board_team: Array[Unit] = [unit]
+	var tx: ShopTransactions = ShopTransactions.new()
+	tx.configure(null, null)
+	tx.set_board_team_provider(func(): return board_team)
+	tx.set_remove_from_board(func(target):
+		for i: int in range(board_team.size()):
+			if board_team[i] == target:
+				board_team.remove_at(i)
+				return true
+		return false
+	)
+	var sold: Dictionary = tx.sell_unit(unit)
+	_expect(bool(sold.get("ok", false)), "selling a unit with items should succeed")
+	_expect(board_team.is_empty(), "sold board unit should be removed from board team")
+	_expect(_equipped_ids(unit).is_empty(), "selling should unequip all items from the unit")
+	_expect(_inventory_has("dagger"), "selling should return completed dagger intact")
+	_expect(not _inventory_has("hammer") and not _inventory_has("crystal"), "selling should not break completed dagger into components")
+	GameState.set_phase(int(GameState.GamePhase.MENU))
+
 func _validate_trait_catalog_contract() -> Dictionary[String, int]:
 	var units: Array[Unit] = _load_playable_units()
 	var trait_counts: Dictionary[String, int] = {}
@@ -224,6 +262,15 @@ func _validate_trait_compiler_contract() -> void:
 	_expect(int(tiers.get("Trader", -99)) == -1, "one Trader unit should not activate Trader")
 	_expect(int(counts.get("Exile", 0)) == 1, "sample team should count one Exile unit")
 	_expect(int(tiers.get("Exile", -99)) == 0, "one Exile unit should activate Exile tier index 0")
+
+	var duplicate_a: Unit = UnitFactory.spawn("axiom")
+	var duplicate_b: Unit = UnitFactory.spawn("axiom")
+	_expect(duplicate_a != null and duplicate_b != null, "duplicate trait test should spawn two axiom copies")
+	if duplicate_a != null and duplicate_b != null:
+		var duplicate_compiled: Dictionary = TraitCompiler.compile([duplicate_a, duplicate_b])
+		var duplicate_counts: Dictionary = duplicate_compiled.get("counts", {})
+		for trait_id: String in duplicate_a.traits:
+			_expect(int(duplicate_counts.get(trait_id, 0)) == 1, "duplicate copies of axiom should count %s once, got %d" % [trait_id, int(duplicate_counts.get(trait_id, 0))])
 
 func _validate_catalyst_trait_item_evolution() -> void:
 	if _items_node() == null:
