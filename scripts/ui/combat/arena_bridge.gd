@@ -6,9 +6,9 @@ const Debug := preload("res://scripts/util/debug.gd")
 const Strings := preload("res://scripts/util/strings.gd")
 const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.gd")
 const ACTOR_EXTRA_HORIZONTAL: float = 18.0
-const ACTOR_EXTRA_TOP: float = 32.0
+const ACTOR_EXTRA_TOP: float = 72.0
 const ACTOR_EXTRA_BOTTOM: float = 18.0
-const COMBAT_ACTOR_SIZE_SCALE: float = 2.50
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.64
 
 var arena: ArenaController = null
 var arena_container: Control
@@ -110,7 +110,7 @@ func _sync_container_to_planning_rect() -> void:
 func _rect_close(a: Rect2, b: Rect2, tolerance: float) -> bool:
     return a.position.distance_to(b.position) <= tolerance and a.size.distance_to(b.size) <= tolerance
 
-func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
+func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView], hide_planning_immediately: bool = true) -> void:
     if arena == null:
         return
     Trace.step("ArenaBridge.enter_arena: begin")
@@ -124,7 +124,8 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
     _publish_battlefield_pressure()
     if arena_container:
         arena_container.visible = true
-    # Fade planning board areas (TopArea/BottomArea) but keep bench/shop visible and interactive
+    # Lock planning board areas immediately, but let the phase transition own
+    # their alpha when it needs a visible grid-to-arena crossfade.
     if planning_area:
         _hidden_nodes.clear()
         var names: PackedStringArray = PackedStringArray(["TopArea", "BottomArea"])
@@ -134,12 +135,14 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
                 var c: Control = n
                 _hidden_nodes.append({
                     "node_ref": weakref(c),
-                    "mouse_filter": int(c.mouse_filter)
+                    "mouse_filter": int(c.mouse_filter),
+                    "alpha": c.modulate.a,
                 })
                 c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-                var m: Color = c.modulate
-                m.a = 0.0
-                c.modulate = m
+                if hide_planning_immediately:
+                    var m: Color = c.modulate
+                    m.a = 0.0
+                    c.modulate = m
     Trace.step("ArenaBridge.enter_arena: done")
 
 func sync(manager: CombatManager, player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
@@ -185,7 +188,7 @@ func exit_arena() -> void:
             if c == null:
                 continue
             var m: Color = c.modulate
-            m.a = 1.0
+            m.a = float(record.get("alpha", 1.0))
             c.modulate = m
             c.mouse_filter = int(record.get("mouse_filter", Control.MOUSE_FILTER_PASS)) as Control.MouseFilter
         _hidden_nodes.clear()
@@ -407,8 +410,31 @@ func _sync_engine_bounds(manager: CombatManager) -> void:
     var engine_bounds: Rect2 = manager.get_arena_bounds()
     if _rect_close(engine_bounds, current_bounds, 1.0):
         return
-    if manager.has_method("set_arena_bounds"):
+    # Container promotion and viewport resizing can change the live field after
+    # the engine has positions. Preserve each fighter's relative field position
+    # while moving it into the new safe bounds so bodies and readouts cannot be
+    # stranded outside the player-visible arena.
+    if engine_bounds.size.x > 1.0 and engine_bounds.size.y > 1.0 and manager.has_method("set_arena"):
+        var player_positions: Array = manager.get_player_positions()
+        var enemy_positions: Array = manager.get_enemy_positions()
+        _remap_positions_between_bounds(player_positions, engine_bounds, current_bounds)
+        _remap_positions_between_bounds(enemy_positions, engine_bounds, current_bounds)
+        manager.set_arena(float(tile_size), player_positions, enemy_positions, current_bounds)
+    elif manager.has_method("set_arena_bounds"):
         manager.set_arena_bounds(current_bounds)
+
+func _remap_positions_between_bounds(positions: Array, source: Rect2, target: Rect2) -> void:
+    if source.size.x <= 1.0 or source.size.y <= 1.0 or target.size.x <= 1.0 or target.size.y <= 1.0:
+        return
+    for index: int in range(positions.size()):
+        if typeof(positions[index]) != TYPE_VECTOR2:
+            continue
+        var position_value: Vector2 = positions[index] as Vector2
+        var ratio: Vector2 = Vector2(
+            clampf((position_value.x - source.position.x) / source.size.x, 0.0, 1.0),
+            clampf((position_value.y - source.position.y) / source.size.y, 0.0, 1.0)
+        )
+        positions[index] = target.position + target.size * ratio
 
 func _on_manager_position_updated(team: String, index: int, x: float, y: float) -> void:
     if arena == null:

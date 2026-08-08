@@ -20,6 +20,7 @@ const MoveRouter := preload("res://scripts/ui/combat/move_router.gd")
 const ProjectileBridge := preload("res://scripts/ui/combat/projectile_bridge.gd")
 const EconomyUI := preload("res://scripts/ui/combat/economy_ui.gd")
 const IntermissionController := preload("res://scripts/ui/combat/intermission_controller.gd")
+const PhaseTransitionControllerClass := preload("res://scripts/ui/combat/phase_transition_controller.gd")
 const ShopPresenter := preload("res://scripts/ui/shop/shop_presenter.gd")
 const SellZone := preload("res://scripts/ui/shop/sell_zone.gd") # legacy; no longer used visually
 const SelectionService := preload("res://scripts/ui/combat/stats/selection_service.gd")
@@ -70,8 +71,8 @@ const COMBAT_PRESSURE_MIDFIGHT_SECONDS: float = 0.14
 const COMBAT_PRESSURE_COLLAPSE_SECONDS: float = 2.75
 const COMBAT_PRESSURE_MIDFIGHT_CASUALTIES: float = 0.12
 const COMBAT_PRESSURE_COLLAPSE_CASUALTIES: float = 0.35
-const PHASE_TRANSITION_HOLD_SECONDS: float = 0.62
-const PHASE_TRANSITION_FADE_SECONDS: float = 0.16
+const LEGACY_PHASE_BRIDGE_HOLD_SECONDS: float = 0.62
+const LEGACY_PHASE_BRIDGE_FADE_SECONDS: float = 0.16
 const BOSS_PREP_MIN_GOLD: int = 4
 const EARLY_RETRY_RECOVERY_MAX_CHAPTER: int = 2
 # Preserve a meaningful next decision after an early non-broke loss. Six gold
@@ -428,6 +429,7 @@ var _pending_combat_quote_multiplier: float = -1.0
 var _hud_snapshot_signature: String = ""
 var _result_banner: PanelContainer = null
 var _result_hold_elapsed: float = 0.0
+var _result_hold_started_usec: int = 0
 var _result_hold_active: bool = false
 var _result_hold_finishing: bool = false
 var _intermission_finish_scheduled: bool = false
@@ -452,6 +454,13 @@ var _combat_impact_event_index: int = 0
 var _combat_exchange_copy: String = "CLOSE CONTACT // HOLD THE LINE"
 var _phase_transition_bridge: Control = null
 var _phase_transition_hide_tween: Tween = null
+var phase_transition: PhaseTransitionController = null
+var _arena_prepared_for_transition: bool = false
+var _post_combat_return_started: bool = false
+var _post_combat_return_complete: bool = false
+var _post_combat_planning_prepared: bool = false
+var _result_dismiss_requested: bool = false
+var _post_combat_cleanup_steps_ms: Dictionary[String, float] = {}
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -515,6 +524,9 @@ func teardown() -> void:
 	_intermission_finish_count = 0
 	_result_repeated_input_count = 0
 	_cancel_pending_battle_start()
+	if phase_transition != null:
+		phase_transition.teardown()
+		phase_transition = null
 	_end_combat_resolving_feedback()
 	_disconnect_controller_signals()
 	var shop_node: Node = _shop_singleton()
@@ -616,6 +628,7 @@ func teardown() -> void:
 
 func _disconnect_controller_signals() -> void:
 	if manager != null and is_instance_valid(manager):
+		_disconnect_signal(manager, "battle_prepared", "_on_battle_prepared")
 		_disconnect_signal(manager, "battle_started", "_on_battle_started")
 		_disconnect_signal(manager, "log_line", "_on_log_line")
 		_disconnect_signal(manager, "stats_updated", "_on_stats_updated")
@@ -683,6 +696,8 @@ func initialize() -> void:
 			parent.add_child(manager)
 		if not manager.is_connected("battle_started", Callable(self, "_on_battle_started")):
 			manager.battle_started.connect(_on_battle_started)
+		if manager.has_signal("battle_prepared") and not manager.is_connected("battle_prepared", Callable(self, "_on_battle_prepared")):
+			manager.battle_prepared.connect(_on_battle_prepared)
 		if not manager.is_connected("log_line", Callable(self, "_on_log_line")):
 			manager.log_line.connect(_on_log_line)
 		if not manager.is_connected("stats_updated", Callable(self, "_on_stats_updated")):
@@ -838,6 +853,11 @@ func initialize() -> void:
 	# Arena + projectiles
 	arena_bridge = ArenaBridge.new()
 	arena_bridge.configure(arena_container, arena_units, planning_area, arena_background, player_grid_helper, enemy_grid_helper, preload("res://scripts/ui/combat/unit_actor.gd"), _layout_tile_size)
+	phase_transition = PhaseTransitionControllerClass.new()
+	phase_transition.configure(parent, planning_area, arena_container)
+	phase_transition.countdown_finished.connect(_on_combat_countdown_finished)
+	phase_transition.entry_visual_finished.connect(_on_combat_entry_visual_finished)
+	phase_transition.return_visual_finished.connect(_on_combat_return_visual_finished)
 
 	projectile_bridge = ProjectileBridge.new()
 	projectile_bridge.configure(parent, arena_bridge, player_grid_helper, enemy_grid_helper, manager, view_rng)
@@ -1151,7 +1171,7 @@ func _apply_grid_dimensions(tile: int) -> void:
 		bottom_area.custom_minimum_size.y = player_top_pad + float(grid_h) + player_bottom_pad
 
 func process(_delta: float) -> void:
-	if arena_container and arena_container.visible:
+	if arena_container and arena_container.visible and not _post_combat_return_started:
 		_sync_arena_units()
 	_sync_bottom_combat_visibility()
 	sync_tactical_phase_visuals()
@@ -1163,6 +1183,14 @@ func process(_delta: float) -> void:
 
 func _init_game() -> void:
 	clear_log()
+	_arena_prepared_for_transition = false
+	_post_combat_return_started = false
+	_post_combat_return_complete = false
+	_post_combat_planning_prepared = false
+	_result_dismiss_requested = false
+	_post_combat_cleanup_steps_ms.clear()
+	if phase_transition != null:
+		phase_transition.reset()
 	_intermission_finish_scheduled = false
 	_intermission_finish_in_progress = false
 	_intermission_finish_count = 0
@@ -1499,9 +1527,16 @@ func _queue_battle_start() -> void:
 	_battle_start_pending = true
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
-	var generation: int = _battle_start_generation
-	Trace.step("Battle start queued generation=" + str(generation))
-	call_deferred("_execute_pending_battle_start", generation)
+	Trace.step("Battle start queued generation=" + str(_battle_start_generation))
+	if phase_transition == null:
+		call_deferred("_execute_pending_battle_start", _battle_start_generation)
+		return
+	phase_transition.start_countdown(_reduced_motion_enabled())
+
+func _on_combat_countdown_finished() -> void:
+	if not _battle_start_pending:
+		return
+	call_deferred("_execute_pending_battle_start", _battle_start_generation)
 
 func _execute_pending_battle_start(generation: int) -> void:
 	if not _battle_start_pending or generation != _battle_start_generation:
@@ -1509,11 +1544,48 @@ func _execute_pending_battle_start(generation: int) -> void:
 	if manager == null or not is_instance_valid(manager):
 		_recover_pending_battle_start("combat manager became unavailable")
 		return
-	Trace.step("Calling manager.start_stage() generation=" + str(generation))
-	manager.start_stage()
-	Trace.step("Returned from manager.start_stage() generation=" + str(generation))
-	if _battle_start_pending and generation == _battle_start_generation:
-		_recover_pending_battle_start("setup returned before engine readiness")
+	Trace.step("Calling manager.prepare_stage() generation=" + str(generation))
+	var prepared: bool = bool(manager.prepare_stage()) if manager.has_method("prepare_stage") else false
+	Trace.step("Returned from manager.prepare_stage() generation=" + str(generation))
+	if not prepared or not manager.has_method("is_stage_prepared") or not bool(manager.is_stage_prepared()):
+		_recover_pending_battle_start("setup returned before battle preparation")
+
+func _on_battle_prepared(_stage: int, _enemy: Unit) -> void:
+	if not _battle_start_pending or manager == null:
+		return
+	if grid_placement != null:
+		grid_placement.rebuild_enemy_views(manager.enemy_team)
+		enemy_views = grid_placement.get_enemy_views()
+		grid_placement.rebuild_player_views(manager.player_team, false)
+		player_views = grid_placement.get_player_views()
+	# Promote the planning shell to the authored full combat field before the
+	# arena is laid out. The next-frame barrier lets Godot settle containers, so
+	# actor bounds and readouts are born in the same geometry the player sees.
+	_sync_bottom_combat_visibility(true)
+	_update_tactical_shell_layout(true)
+	var tree: SceneTree = parent.get_tree() if parent != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_begin_prepared_arena_crossfade"), CONNECT_ONE_SHOT)
+	else:
+		_begin_prepared_arena_crossfade()
+
+func _begin_prepared_arena_crossfade() -> void:
+	if not _battle_start_pending or manager == null:
+		return
+	_arena_prepared_for_transition = true
+	if arena_bridge != null:
+		arena_bridge.enter_arena(player_views, enemy_views, false)
+		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
+	if phase_transition != null:
+		phase_transition.start_entry_crossfade()
+	else:
+		_on_combat_entry_visual_finished()
+
+func _on_combat_entry_visual_finished() -> void:
+	if not _battle_start_pending or manager == null:
+		return
+	if not manager.has_method("begin_prepared_stage") or not bool(manager.begin_prepared_stage()):
+		_recover_pending_battle_start("prepared battle could not begin")
 
 func _update_pending_battle_start(delta: float) -> void:
 	if not _battle_start_pending:
@@ -1535,11 +1607,14 @@ func _cancel_pending_battle_start() -> void:
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
 	_pending_combat_quote_multiplier = -1.0
+	_arena_prepared_for_transition = false
 
 func _recover_pending_battle_start(reason: String) -> void:
 	if not _battle_start_pending:
 		return
 	_cancel_pending_battle_start()
+	if phase_transition != null:
+		phase_transition.reset()
 	if manager != null and is_instance_valid(manager):
 		manager.clear_active_battle_runtime()
 		manager.setup_stage_preview()
@@ -1547,6 +1622,8 @@ func _recover_pending_battle_start(reason: String) -> void:
 		_exit_combat_arena()
 	if Engine.has_singleton("GameState") or (parent != null and parent.has_node("/root/GameState")):
 		GameState.set_phase(GameState.GamePhase.PREVIEW)
+	_sync_bottom_combat_visibility(true)
+	sync_tactical_phase_visuals(true)
 	if grid_placement != null and manager != null and is_instance_valid(manager):
 		grid_placement.rebuild_enemy_views(manager.enemy_team)
 		enemy_views = grid_placement.get_enemy_views()
@@ -2222,18 +2299,24 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 		GameState.set_phase(GameState.GamePhase.COMBAT)
 	_update_stage_label()
 	_sync_bottom_combat_visibility()
+	sync_tactical_phase_visuals(true)
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 		Economy.start_combat(locked_quote_multiplier)
 	var battle_snapshot: Dictionary = _build_account_victory_snapshot()
 	AccountProgressionScript.record_battle_start(battle_snapshot, account_journal_path)
-	if grid_placement and manager:
+	if grid_placement and manager and not _arena_prepared_for_transition:
 		grid_placement.rebuild_enemy_views(manager.enemy_team)
 		enemy_views = grid_placement.get_enemy_views()
 		grid_placement.rebuild_player_views(manager.player_team, false)
 		player_views = grid_placement.get_player_views()
 	Trace.step("CombatView._on_battle_started: enter arena")
-	_enter_combat_arena()
-	_show_phase_transition_bridge("planning_to_combat")
+	if _arena_prepared_for_transition:
+		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
+	else:
+		_enter_combat_arena()
+	_arena_prepared_for_transition = false
+	if phase_transition != null:
+		phase_transition.mark_combat()
 	# Optional: add layout prints here when debugging sizes
 	# Ensure economy UI reflects combat lock state immediately
 	if economy_ui:
@@ -2501,6 +2584,7 @@ func _on_victory(_stage: int) -> void:
 		_on_log_line("Black Ledger: %s" % victory_detail.replace("\n", " | "))
 	_show_result_banner("VICTORY", victory_detail, Color(0.76, 0.075, 0.11, 1.0), Color(0.98, 0.88, 0.70, 1.0))
 	_auto_loop_running = false
+	_begin_post_combat_return()
 	_start_intermission(RESULT_MINIMUM_DWELL_SECONDS)
 
 func _on_defeat(_stage: int) -> void:
@@ -2509,6 +2593,7 @@ func _on_defeat(_stage: int) -> void:
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "defeat"
 	_show_result_banner("DEFEAT", _build_result_economy_detail("defeat"), Color(0.74, 0.20, 0.16, 1.0), Color(1.0, 0.69, 0.60, 1.0))
+	_begin_post_combat_return()
 	_start_intermission(RESULT_MINIMUM_DWELL_SECONDS)
 	_auto_loop_running = false
 
@@ -2518,8 +2603,25 @@ func _on_tie(_stage: int) -> void:
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "tie"
 	_show_result_banner("STALEMATE", _build_result_economy_detail("tie"), Color(0.50, 0.12, 0.10, 1.0), Color(0.92, 0.86, 0.74, 1.0))
+	_begin_post_combat_return()
 	_start_intermission(RESULT_MINIMUM_DWELL_SECONDS)
 	_auto_loop_running = false
+
+func _begin_post_combat_return() -> void:
+	if _post_combat_return_started:
+		return
+	_post_combat_return_started = true
+	_post_combat_return_complete = false
+	_post_combat_planning_prepared = false
+	_result_dismiss_requested = false
+	_post_combat_cleanup_steps_ms.clear()
+	if phase_transition != null:
+		phase_transition.capture_combat_rect()
+	var tree: SceneTree = parent.get_tree() if parent != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_prepare_post_combat_planning_return"), CONNECT_ONE_SHOT)
+	else:
+		_prepare_post_combat_planning_return()
 
 func _build_result_economy_detail(outcome: String, bounty_result: Dictionary = {}) -> String:
 	var economy: Node = _autoload_node("Economy")
@@ -2623,55 +2725,48 @@ func _on_deferred_intermission_finished() -> void:
 	if not _last_result_latency.is_empty():
 		_last_result_latency["cleanup_deferred"] = true
 		_last_result_latency["cleanup_started_usec"] = cleanup_started_usec
-		_last_result_latency["cleanup_finished_usec"] = cleanup_finished_usec
-		_last_result_latency["cleanup_ms"] = float(cleanup_finished_usec - cleanup_started_usec) / 1000.0
-		var accepted_usec: int = int(_last_result_latency.get("input_accepted_usec", cleanup_started_usec))
-		_last_result_latency["settled_ms"] = float(cleanup_finished_usec - accepted_usec) / 1000.0
-		_last_result_latency["repeated_input_count"] = _result_repeated_input_count
-		_last_result_latency["cleanup_count"] = _intermission_finish_count
-		_last_result_latency["settled_budget_ms"] = InteractionLatencyBudget.RESULT_DISMISS_SETTLED_RESPONSE_MS
+		_last_result_latency["dismiss_request_processed_usec"] = cleanup_finished_usec
+		_last_result_latency["waiting_for_grid_return"] = not _post_combat_return_complete
 
 func _on_intermission_finished() -> void:
-	if _intermission_finish_in_progress:
-		return
-	var cleanup_steps_ms: Dictionary[String, float] = {}
-	var cleanup_step_usec: int = Time.get_ticks_usec()
-	_intermission_finish_in_progress = true
+	_result_dismiss_requested = true
 	_intermission_finish_scheduled = false
-	_intermission_finish_count += 1
-	var planning_redeployed: bool = false
-	_hide_result_banner()
-	if arena_container:
-		_exit_combat_arena()
+	if not _post_combat_return_started:
+		_begin_post_combat_return()
+	if not _post_combat_planning_prepared:
+		_prepare_post_combat_planning_return()
+	if _post_combat_return_complete:
+		_finalize_post_combat_return()
+
+func _prepare_post_combat_planning_return() -> void:
+	if _post_combat_planning_prepared or not _post_combat_return_started:
+		return
+	_post_combat_planning_prepared = true
+	var cleanup_step_usec: int = Time.get_ticks_usec()
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.POST_COMBAT)
 	if projectile_bridge:
 		projectile_bridge.clear()
-	cleanup_steps_ms["arena_and_projectiles"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	_post_combat_cleanup_steps_ms["arena_and_projectiles"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
 	cleanup_step_usec = Time.get_ticks_usec()
 	if manager and manager.has_method("finalize_post_combat"):
 		manager.finalize_post_combat()
-		cleanup_steps_ms["manager_finalize"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+		_post_combat_cleanup_steps_ms["manager_finalize"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
 		cleanup_step_usec = Time.get_ticks_usec()
-		# Advance progression on victory so planning shows the upcoming enemy
-		var win2: bool = (_post_combat_outcome == "victory")
-		if win2 and (Engine.has_singleton("GameState") or parent.has_node("/root/GameState")):
+		var won: bool = _post_combat_outcome == "victory"
+		if won and (Engine.has_singleton("GameState") or parent.has_node("/root/GameState")):
 			GameState.advance_after_victory()
-		# Build a fresh preview for the next attempt (next stage on win, same stage on defeat)
 		if manager.has_method("setup_stage_preview"):
 			manager.setup_stage_preview()
-			# refresh_all_views below rebuilds the upcoming enemy once. Rebuilding it
-			# here as well doubled the most expensive result-dismissal work.
 			_refresh_stats()
-		cleanup_steps_ms["next_stage_preview"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+		_post_combat_cleanup_steps_ms["next_stage_preview"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
 		cleanup_step_usec = Time.get_ticks_usec()
-		# Rebuild UI after state changes
 		refresh_all_views()
-		cleanup_steps_ms["planning_view_rebuild"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+		_post_combat_cleanup_steps_ms["planning_view_rebuild"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
 		cleanup_step_usec = Time.get_ticks_usec()
 		if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 			if _post_combat_outcome != "":
-				var win: bool = (_post_combat_outcome == "victory")
+				var win: bool = _post_combat_outcome == "victory"
 				if _post_combat_outcome == "tie" and Economy.has_method("resolve_tie"):
 					Economy.resolve_tie()
 				else:
@@ -2684,30 +2779,55 @@ func _on_intermission_finished() -> void:
 					_apply_early_run_retry_recovery(win)
 			if economy_ui:
 				economy_ui.refresh()
-				economy_ui.set_bet_editable(true)
-		cleanup_steps_ms["economy_settlement"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+				economy_ui.set_bet_editable(false)
+		_post_combat_cleanup_steps_ms["economy_settlement"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
 		cleanup_step_usec = Time.get_ticks_usec()
-		# Auto-refresh the shop after combat ends (respect lock; free refresh)
 		if _post_combat_outcome != "tie" and (Engine.has_singleton("Shop") or parent.has_node("/root/Shop")):
-			var locked: bool = (bool(Shop.state.locked) if Shop and Shop.state else false)
+			var locked: bool = bool(Shop.state.locked) if Shop and Shop.state else false
 			if not locked:
 				Shop.add_free_rerolls(1)
 				Shop.reroll()
-	cleanup_steps_ms["shop_refresh"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
-	cleanup_step_usec = Time.get_ticks_usec()
-	# Refresh label to reflect the stage/round the player will fight next
+	_post_combat_cleanup_steps_ms["shop_refresh"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
 	_update_stage_label()
-	# Return to planning phase after post-combat housekeeping
+	_sync_bottom_combat_visibility(true)
+	sync_tactical_phase_visuals(true)
+	if phase_transition != null:
+		phase_transition.start_return(_reduced_motion_enabled())
+	else:
+		_on_combat_return_visual_finished()
+
+func _on_combat_return_visual_finished() -> void:
+	_post_combat_return_complete = true
+	# Planning layout changes underneath the fixed result card can invalidate its
+	# container geometry for the completion frame. Re-assert the authored card
+	# layout now and once more after Godot's deferred container sort.
+	refresh_result_banner_layout()
+	call_deferred("refresh_result_banner_layout")
+	if _result_dismiss_requested:
+		_finalize_post_combat_return()
+
+func _finalize_post_combat_return() -> void:
+	if _intermission_finish_in_progress or not _post_combat_planning_prepared or not _post_combat_return_complete:
+		return
+	_intermission_finish_in_progress = true
+	_intermission_finish_count += 1
+	_hide_result_banner()
+	if arena_container:
+		_exit_combat_arena()
+		var arena_modulate: Color = arena_container.modulate
+		arena_modulate.a = 1.0
+		arena_container.modulate = arena_modulate
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.PREVIEW)
-	cleanup_steps_ms["planning_phase"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
-	cleanup_step_usec = Time.get_ticks_usec()
 	_queue_active_run_save()
-	_sync_bottom_combat_visibility()
+	_sync_bottom_combat_visibility(true)
+	sync_tactical_phase_visuals(true)
 	if parent and parent.has_method("reset_planning_timer"):
 		parent.call("reset_planning_timer")
-	cleanup_steps_ms["planning_controls"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
-	cleanup_step_usec = Time.get_ticks_usec()
+	if economy_ui != null:
+		economy_ui.set_bet_editable(true)
+		economy_ui.refresh()
+	var planning_redeployed: bool = false
 	if _post_combat_outcome == "defeat" and (Engine.has_singleton("Economy") or parent.has_node("/root/Economy")) and Economy.is_broke():
 		# Show loss screen instead of flipping the continue button to Restart
 		var loss_scene: PackedScene = load("res://scenes/ui/LossScreen.tscn") as PackedScene
@@ -2753,19 +2873,27 @@ func _on_intermission_finished() -> void:
 			continue_button.disabled = false
 			continue_button.visible = true
 		planning_redeployed = true
-	cleanup_steps_ms["loss_or_continue"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
-	cleanup_step_usec = Time.get_ticks_usec()
 	_pending_continue = false
 	if planning_redeployed:
-		# The return bridge is deliberately shown after planning has been restored.
-		# It therefore reads as a redeploy handoff over the real shop and board,
-		# never as a decorative overlay stranded over a defeat result.
-		_show_phase_transition_bridge("combat_to_planning")
+		_on_log_line("FIELD ORDER // REDEPLOYMENT WINDOW")
 	_post_combat_outcome = ""
 	_intermission_finish_in_progress = false
-	cleanup_steps_ms["transition_bridge"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	_post_combat_return_started = false
+	_post_combat_return_complete = false
+	_post_combat_planning_prepared = false
+	_result_dismiss_requested = false
 	if not _last_result_latency.is_empty():
-		_last_result_latency["cleanup_steps_ms"] = cleanup_steps_ms
+		var cleanup_finished_usec: int = Time.get_ticks_usec()
+		var cleanup_started_usec: int = int(_last_result_latency.get("cleanup_started_usec", cleanup_finished_usec))
+		var accepted_usec: int = int(_last_result_latency.get("input_accepted_usec", cleanup_started_usec))
+		_last_result_latency["cleanup_finished_usec"] = cleanup_finished_usec
+		_last_result_latency["cleanup_ms"] = float(cleanup_finished_usec - cleanup_started_usec) / 1000.0
+		_last_result_latency["settled_ms"] = float(cleanup_finished_usec - accepted_usec) / 1000.0
+		_last_result_latency["repeated_input_count"] = _result_repeated_input_count
+		_last_result_latency["cleanup_count"] = _intermission_finish_count
+		_last_result_latency["settled_budget_ms"] = InteractionLatencyBudget.RESULT_DISMISS_SETTLED_RESPONSE_MS
+		_last_result_latency["waiting_for_grid_return"] = false
+		_last_result_latency["cleanup_steps_ms"] = _post_combat_cleanup_steps_ms.duplicate(true)
 
 func _apply_first_boss_prep_gold_floor(win: bool) -> void:
 	if not win:
@@ -3953,16 +4081,16 @@ func _show_phase_transition_bridge(kind: String) -> void:
 	bridge.set_meta("transition_kind", kind)
 	bridge.set_meta("transition_copy_complete", true)
 	bridge.set_meta("transition_visual_only", true)
-	bridge.set_meta("transition_hold_seconds", PHASE_TRANSITION_HOLD_SECONDS)
+	bridge.set_meta("transition_hold_seconds", LEGACY_PHASE_BRIDGE_HOLD_SECONDS)
 	bridge.set_meta("transition_respects_reduced_motion", _reduced_motion_enabled())
 	bridge.set_meta("transition_surface", "brief_material_field_order_strip")
 	bridge.set_meta("transition_board_visibility", "live_board_retained_around_strip")
 	_phase_transition_hide_tween = bridge.create_tween()
-	_phase_transition_hide_tween.tween_interval(PHASE_TRANSITION_HOLD_SECONDS)
+	_phase_transition_hide_tween.tween_interval(LEGACY_PHASE_BRIDGE_HOLD_SECONDS)
 	if _reduced_motion_enabled():
 		_phase_transition_hide_tween.tween_callback(Callable(self, "_hide_phase_transition_bridge"))
 	else:
-		_phase_transition_hide_tween.tween_property(bridge, "modulate:a", 0.0, PHASE_TRANSITION_FADE_SECONDS)
+		_phase_transition_hide_tween.tween_property(bridge, "modulate:a", 0.0, LEGACY_PHASE_BRIDGE_FADE_SECONDS)
 		_phase_transition_hide_tween.tween_callback(Callable(self, "_hide_phase_transition_bridge"))
 
 func _hide_phase_transition_bridge() -> void:
@@ -4032,7 +4160,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	if hold_progress != null:
 		hold_progress.value = 0.0
 	if hold_label != null:
-		hold_label.text = "AUTO-ADVANCE IN 6"
+		hold_label.text = "READ THE COST // ACTION ARMS IN 1"
 	if skip_button != null:
 		skip_button.text = "HOLD // ENTER / SPACE"
 		skip_button.disabled = true
@@ -4043,6 +4171,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	banner.modulate = Color.WHITE
 	_protect_persistent_hud_chrome()
 	_result_hold_elapsed = 0.0
+	_result_hold_started_usec = Time.get_ticks_usec()
 	_result_hold_active = true
 	_result_hold_finishing = false
 	if card != null:
@@ -4360,6 +4489,7 @@ func _hide_result_banner() -> void:
 	_result_hold_active = false
 	_result_hold_finishing = false
 	_result_hold_elapsed = 0.0
+	_result_hold_started_usec = 0
 
 func _set_result_underlay_visibility(restore_phase_visibility: bool) -> void:
 	if parent == null:
@@ -4411,7 +4541,8 @@ func _is_result_skip_event(event: InputEvent) -> bool:
 func _update_result_hold(delta: float) -> void:
 	if not _result_hold_active or _result_banner == null or not is_instance_valid(_result_banner) or not _result_banner.visible:
 		return
-	_result_hold_elapsed = minf(RESULT_MINIMUM_DWELL_SECONDS, _result_hold_elapsed + maxf(0.0, delta))
+	var real_elapsed: float = float(maxi(0, Time.get_ticks_usec() - _result_hold_started_usec)) / 1000000.0 if _result_hold_started_usec > 0 else maxf(0.0, delta)
+	_result_hold_elapsed = minf(RESULT_MINIMUM_DWELL_SECONDS, real_elapsed)
 	var progress: ProgressBar = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldProgress") as ProgressBar
 	var hold_label: Label = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label
 	var skip_button: Button = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
@@ -4419,7 +4550,7 @@ func _update_result_hold(delta: float) -> void:
 		progress.value = clampf(_result_hold_elapsed / RESULT_MINIMUM_DWELL_SECONDS, 0.0, 1.0)
 	var remaining: float = maxf(0.0, RESULT_MINIMUM_DWELL_SECONDS - _result_hold_elapsed)
 	if hold_label != null:
-		hold_label.text = "AUTO-ADVANCE IN %d" % ceili(remaining)
+		hold_label.text = "READ THE COST // ACTION ARMS IN %d" % ceili(RESULT_SKIP_GUARD_SECONDS - _result_hold_elapsed) if _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS else "AUTO-ADVANCE IN %d" % ceili(remaining)
 	if skip_button != null:
 		skip_button.disabled = _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS
 		skip_button.text = "HOLD // ENTER / SPACE" if skip_button.disabled else "ENTER / SPACE // ADVANCE"
@@ -4434,14 +4565,16 @@ func _skip_result_hold() -> void:
 	_result_hold_active = false
 	if intermission != null:
 		intermission.stop()
-	# Hide the result immediately. The post-combat rebuild is intentionally
-	# deferred so refresh_all_views and settlement cannot stall this response.
-	_hide_result_banner()
-	# Stop per-frame actor synchronization immediately while leaving teardown to
-	# the deferred cleanup pass. A finished arena can otherwise consume the first
-	# response frame even though the result card is already hidden.
-	if arena_container != null:
-		arena_container.visible = false
+	# Keep the result card fixed while the battlefield finishes returning to the
+	# planning grid behind it. A label/button state change acknowledges the skip
+	# immediately without exposing interactive planning controls mid-transition.
+	var hold_label: Label = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label if _result_banner != null else null
+	var skip_button: Button = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if _result_banner != null else null
+	if hold_label != null:
+		hold_label.text = "FIELD RESET // REDEPLOYING"
+	if skip_button != null:
+		skip_button.disabled = true
+		skip_button.text = "GRID RETURN IN PROGRESS"
 	var visible_response_usec: int = Time.get_ticks_usec()
 	_last_result_latency = {
 		"input_path": "result_skip",
@@ -4853,6 +4986,7 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
 	if aftermath != null:
 		aftermath.visible = true
+		aftermath.modulate = Color.WHITE
 		aftermath.set_meta("outcome_variant", title.to_lower())
 		aftermath.set_meta("physical_geometry_signature", "persistent_field_open_escape" if title == "VICTORY" else "persistent_field_suspended_deadlock" if title == "STALEMATE" else "persistent_field_grave_descent")
 		aftermath.set_meta("physical_geometry_child_count", 1)
