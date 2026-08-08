@@ -257,7 +257,7 @@ static func _draw_header(image: Image, snapshot: Dictionary[String, Variant]) ->
 	_fill_rect(image, Rect2i(0, 0, SOFTWARE_WIDTH, 172), Color(0.035, 0.028, 0.032, 1.0))
 	_draw_text(image, "VISION SNAPSHOT: " + str(snapshot.get("label", "")).to_upper(), 22, 22, Color(0.96, 0.82, 0.46, 1.0), 3)
 	var state: Dictionary = snapshot.get("state", {}) as Dictionary
-	var line_a: String = "PHASE %s   C%s R%s   GOLD %s   BET %s   SHOP L%s XP %s" % [
+	var line_a: String = "PHASE %s   C%s R%s   BLOOD %s   WAGER %s   SHOP L%s XP %s" % [
 		str(state.get("phase_name", "")),
 		str(state.get("chapter", "")),
 		str(state.get("stage_in_chapter", "")),

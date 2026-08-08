@@ -883,10 +883,10 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 func _expect_scaled_decision_data(context: String) -> void:
 	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
 	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
-	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "%s enlarged layout hid its gold/level/XP record" % context)
+	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "%s enlarged layout hid its blood/level/XP record" % context)
 	if resource_strip != null:
 		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "%s compact resource strip did not certify a complete source mirror" % context)
-		_expect(resource_strip.text.contains("GOLD"), "%s compact resource strip omitted gold" % context)
+		_expect(resource_strip.text.contains("BLOOD"), "%s compact resource strip omitted blood" % context)
 		_expect(resource_strip.text.contains("LVL"), "%s compact resource strip omitted level" % context)
 		_expect(resource_strip.text.contains("XP"), "%s compact resource strip omitted XP" % context)
 		var gold_source: Label = _main.get_node_or_null("CombatView/MarginContainer/VBoxContainer/ActionsRow/GoldLabel") as Label if _main != null else null
@@ -901,10 +901,10 @@ func _expect_scaled_decision_data(context: String) -> void:
 				if normalized_token.contains("/") or normalized_token.is_valid_int():
 					_expect(resource_strip.text.contains(normalized_token), "%s resource strip does not mirror progress token %s" % [context, normalized_token])
 		_expect(resource_strip.get_theme_font_size("font_size") >= 15, "%s compact resource strip type is too small" % context)
-		_expect_control_inside(resource_strip, "%s gold/level/XP record" % context)
+		_expect_control_inside(resource_strip, "%s blood/level/XP record" % context)
 	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s enlarged layout hid wager outcomes" % context)
 	if wager_summary != null:
-		for required_copy: String in ["DECISION", "RISK", "WIN", "BANK W", "/ L"]:
+		for required_copy: String in ["DECISION", "WIN", "RESERVE", "W", "L"]:
 			_expect(wager_summary.text.contains(required_copy), "%s wager outcome record omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome record" % context)
 
@@ -1041,7 +1041,7 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
 	if wager_summary != null:
 		_expect(wager_summary.get_theme_font_size("font_size") >= (14 if tight else 18), "%s wager outcome metadata is too small" % context)
-		for required_copy: String in ["DECISION", "RISK", "WIN", "BANK W", "/ L"]:
+		for required_copy: String in ["Wager", "Win", "After win", "After loss"]:
 			_expect(wager_summary.text.contains(required_copy), "%s wager outcome metadata omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
