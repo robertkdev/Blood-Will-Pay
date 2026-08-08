@@ -26,7 +26,6 @@ var identity: UnitIdentity = null
 var targeting_approach_mask_cache: int = -1
 var targeting_role_cache: String = ""
 var targeting_goal_cache: String = ""
-var targeting_mode_override: String = ""
 
 # Health
 var max_hp: int = int(UnitDefaults.BASELINE_STATS["max_hp"])
