@@ -34,7 +34,7 @@ jobs:
           $godotUrl = "https://github.com/godotengine/godot/releases/download/$version/Godot_v${version}_win64.exe.zip"
           Invoke-WebRequest -Uri $godotUrl -OutFile $godotZip
           Expand-Archive -LiteralPath $godotZip -DestinationPath $godotRoot -Force
-          $godotExe = (Get-ChildItem -LiteralPath $godotRoot -Filter "Godot_v$version_win64.exe" -Recurse | Select-Object -First 1).FullName
+          $godotExe = (Get-ChildItem -LiteralPath $godotRoot -Filter "Godot_v${version}_win64.exe" -Recurse | Select-Object -First 1).FullName
           if (-not $godotExe) { throw "Pinned Godot executable was not found" }
 
           $templateDir = Join-Path $env:APPDATA "Godot\export_templates\4.5.stable"
