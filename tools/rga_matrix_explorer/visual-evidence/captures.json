@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "product": "Gamble Battle RGA Matrix Explorer",
+  "runtime": {
+    "entrypoint": "http://localhost:3000/",
+    "adapter": "Codex in-app browser",
+    "capturedAt": "2026-07-24",
+    "notes": "Viewport captures are authoritative. The browser full-page stitcher duplicated a scroll segment, so no stitched image is used for acceptance."
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "interactionProof": {
+    "traitSearchQuery": "Arcanist",
+    "visibleTraitCards": [
+      "Arcanist"
+    ],
+    "doubleVerticalCardCount": 4,
+    "mobileInnerWidth": 390,
+    "mobileDocumentScrollWidth": 375
+  },
+  "captures": [
+    "desktop-overview.jpg",
+    "desktop-matrix.jpg",
+    "desktop-traits.jpg",
+    "desktop-bridges.jpg",
+    "desktop-team-lab.jpg",
+    "mobile-overview.jpg",
+    "mobile-matrix-clip.jpg",
+    "mobile-traits-filtered.jpg",
+    "mobile-team-lab.jpg"
+  ]
+}

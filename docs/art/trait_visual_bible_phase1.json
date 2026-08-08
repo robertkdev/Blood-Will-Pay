@@ -1,0 +1,979 @@
+{
+  "schema_version": 1,
+  "phase": "Phase 1 — World and trait bible",
+  "deliverable_kind": "written_trait_cards_with_nonproduction_visual_references",
+  "source_authority": {
+    "google_doc_id": "1OCS4jfjMIiw-2-VQbLPaeDxsmzZMKEAFKb6BHvkMa7I",
+    "google_doc_revision": "ALtnJHwVO7G76JsUnkVIkVyHLKuse48SHx1Pk0B9i1FHjMLgxeswS59muBXlBSbeQVko1B2fa1PG06v52UK-fHA",
+    "trait_resource_path": "data/traits/*.tres",
+    "catalog_count": 22
+  },
+  "world_system": {
+    "thesis": "Every inhabitant is a villain shaped by survival in a dry, tactile, occult world. Shared finish creates one world; trait grammar creates family resemblance; combat role creates board-readable function; individual body, face, species and psychology prevent uniformity.",
+    "shared_finish": [
+      "Favor matte, dry, worn and porous surfaces; reserve gloss for a specific wet, vitreous or precious material with narrative cause.",
+      "Show accumulated survival through repair, depletion, contamination, asymmetry, scar, posture or altered anatomy rather than decorative grime alone.",
+      "Preserve controlled color. Desaturation is a finish, not a ban; each chromatic choice must carry trait or psychological meaning.",
+      "Read hostile intent in mass, negative space and posture before lore, facial anger or floating effects explain it.",
+      "Use one dominant visual thesis per unit. Repetition of small accessories never substitutes for a distinct body plan.",
+      "Keep all conscious characters villain-first, while varying evil through manipulation, ferality, dissociation, numb obedience, theatricality, obsession, hunger, shame and predatory calm."
+    ],
+    "prior_pass_lessons": [
+      "Vellum is the material-richness and anti-gloss veto, never a shared costume template.",
+      "Creep proves that narrow, alien, dissociated horror can outperform ornate gothic decoration; do not give every monster the same demon anatomy.",
+      "Paisley proves that strange color, pattern and fabric movement belong in the world when weathered and psychologically specific.",
+      "Morwen defines the attractive-adult lane: dangerous, wounded, controlled, villainous and non-explicit; appeal must not collapse into one face or clothing aisle.",
+      "The horror pass overused rib masks, hooks, halos, black cloth and generic demon anatomy; symbolic meaning must live in anatomy, posture or behavior before ornament.",
+      "The women pass overused black leather, long coats, corsets, heels, leg slits, rear poses and orbiting clutter; every person needs an individual face, body, garment family and form of villainy."
+    ],
+    "trait_channel_hierarchy": [
+      "Art-primary trait owns the dominant mass, negative space and garment/anatomy family.",
+      "Secondary trait owns a separate surface channel: palette, material, pattern or magical movement.",
+      "A third trait, when present, owns one restrained cost mark, anatomical corruption or secondary rhythm.",
+      "Combat role owns stance, reach, weight distribution and the speed implied by the silhouette.",
+      "Individual identity owns face, age, gender expression, body type, species, history and survival psychology.",
+      "A finished unit should show two strong trait signals and at most one subtle signal; more usually becomes visual soup."
+    ],
+    "roster_wide_prohibitions": [
+      "No shared black-cloak, black-leather or tarnished-trinket uniform across unrelated traits.",
+      "No same-face, same-body, same-corset, same-heel, same-leg-slit or same-rear-pose convergence.",
+      "No trait may depend entirely on a halo, horn, hook, rib mask, floating object or orbiting effect.",
+      "No clean heroic fantasy, porcelain skin, latex shine, glossy gacha finish, mascot anatomy or generic Bloodborne imitation.",
+      "No automatic full-black palette. Neutrals must leave room for trait-specific color, material and pattern.",
+      "No supernatural power without a visible price borne by body, memory, identity, relationship or environment."
+    ]
+  },
+  "exit_tests": [
+    "All 22 live traits have one complete card with every required Phase 1 field.",
+    "Every trait has a prop-free definition that remains recognizable without a named costume, object or production effect.",
+    "Every palette, pattern, material and motion family is distinct enough to avoid one shared gothic costume lane.",
+    "Blessed reads as disgrace, shame, ruined miracle and compulsory penance before it reads as angelic.",
+    "Sanguine supports courtly, medical, feral, monastic and nonhuman vampyr lanes rather than one vampire stereotype.",
+    "Kaleidoscope reads as weathered psychedelic perception fracture rather than glossy rainbow crystal.",
+    "Combination rules preserve separate visual channels and cap visible trait signals at two strong plus one subtle.",
+    "The compact atlas contains only abstract reference information; it is not new unit artwork or production asset creation."
+  ],
+  "traits": [
+    {
+      "trait": "Aegis",
+      "mechanics_anchor": "Defensive bonuses with cast-based defensive stacking for members and allies.",
+      "core_fantasy": "Protection as incarceration: safety granted by something that encloses, claims and gradually turns the protected body into part of the ward.",
+      "emotional_tone": "Possessive vigilance, punitive care and the claustrophobic relief of surviving inside a prison.",
+      "silhouette_verbs": ["encircle", "interlock", "brace"],
+      "silhouette_language": "Nested masses and sheltering overhangs create guarded negative space. The figure should appear to close around a threat or protected volume rather than pose as a noble defender.",
+      "garment_anatomy_families": [
+        "Nested architectural planes that overlap without becoming conventional plate",
+        "Ringed or chambered anatomy that creates protected interior voids",
+        "Dense wrapped and quilted construction with deliberate closure lines",
+        "Scar lattices and calcified growth that record every absorbed impact",
+        "Membranous or shell-like nonhuman enclosures"
+      ],
+      "palette": [
+        {"name": "salt gray", "hex": "#AAA59B"},
+        {"name": "oxidized teal", "hex": "#476C68"},
+        {"name": "smoke violet", "hex": "#61546B"},
+        {"name": "bruised blue", "hex": "#3F5267"},
+        {"name": "tarnished silver", "hex": "#787B78"}
+      ],
+      "patterns": ["concentric closures", "threshold bands", "stress-line lattices"],
+      "materials": ["salted limestone", "weathered stained glass", "hammered dull metal", "scar tissue", "dense felted fiber"],
+      "magic_behavior": "Defense moves inward. Thin planes, scars or membranes close in sequence; impacts redirect through visible paths and leave new fractures rather than blooming as a clean blue bubble.",
+      "supernatural_cost": "Each act of protection reduces sensation, flexibility or personal boundary. The defender calcifies, hollows or becomes a permanent enclosure for damage that never fully leaves.",
+      "allowed_variations": ["ward-jailer", "possessive martyr", "mobile refuge", "parasite protector", "alien chamber-organism", "architectural beast"],
+      "forbidden_cliches": ["royal paladin", "clean blue force bubble", "ordinary full plate", "one round defensive emblem", "benevolent guardian posture"],
+      "combination_rules": [
+        "As primary, Aegis owns enclosing mass and protected negative space.",
+        "As secondary, Aegis appears in closure seams, stress paths or a bodily sacrifice—not extra defensive equipment.",
+        "With Bulwark, Aegis supplies enclosing protection while Bulwark supplies compression and release.",
+        "With Blessed, protection must deepen humiliation or bodily cost rather than sanctify the figure."
+      ],
+      "compact_visual_references": {
+        "form": "nested alcoves and closing shells",
+        "surface": "salt efflorescence crossed by stained-glass stress lines",
+        "motion": "successive planes folding toward an impact",
+        "cost_mark": "calcified joints and sensation-dead skin"
+      },
+      "prop_free_definition": "A possessive defense that survives by enclosing bodies and slowly turning them into the prison itself."
+    },
+    {
+      "trait": "Arcanist",
+      "mechanics_anchor": "Spell power, kill stacks and high-tier amplification or double-cast behavior.",
+      "core_fantasy": "Forbidden spellcraft as invasive language: knowledge that rewrites the caster while rewarding mastery with increasingly illegal power.",
+      "emotional_tone": "Controlled obsession, intellectual trespass and the cold pride of understanding something that should not be legible.",
+      "silhouette_verbs": ["taper", "inscribe", "suspend"],
+      "silhouette_language": "Long, precise tensions terminate in sharp interruptions. The body feels edited, annotated or held in an unnatural grammatical pause instead of reading as a generic robed caster.",
+      "garment_anatomy_families": [
+        "Inscribed skin and tendon lines that behave like living syntax",
+        "Severe clerical, laboratory, itinerant and courtly knowledge-worker constructions",
+        "Asymmetrical folded planes resembling edited or erased passages",
+        "Black-glass or scarred anatomical inserts",
+        "Alien mathematical bodies organized around impossible ratios"
+      ],
+      "palette": [
+        {"name": "black glass", "hex": "#17171D"},
+        {"name": "ink blue", "hex": "#25354D"},
+        {"name": "smoke violet", "hex": "#594762"},
+        {"name": "acid chalk", "hex": "#C9C6A1"},
+        {"name": "old vellum", "hex": "#A88F6A"}
+      ],
+      "patterns": ["palimpsest erasure", "branching syntax", "interrupted marginal grids"],
+      "materials": ["obsidian", "soot", "absorbed ink", "scorched skin", "faded woven fiber"],
+      "magic_behavior": "Marks appear in a single disciplined locus, crawl under a surface, then burn away or repeat out of sequence. Double casts should feel like a forbidden sentence correcting reality twice.",
+      "supernatural_cost": "Language consumes language: speech, memory, names or parts of the body are overwritten. Mastery leaves burns, missing recollections and anatomy reorganized into notation.",
+      "allowed_variations": ["contract occultist", "hedge mathematician", "court heretic", "tattooed medium", "alien logician", "illiterate vessel of living syntax"],
+      "forbidden_cliches": ["generic purple wizard", "floating page cloud", "star-covered academic robes", "glowing marks across every surface", "clean fantasy spell circle"],
+      "combination_rules": [
+        "As primary, Arcanist owns precision, taper and the inscribed or edited body.",
+        "As secondary, it owns one controlled notation system or cast echo while the primary trait keeps the silhouette.",
+        "With Scholar, Arcanist is transgressive application while Scholar is accumulated knowledge and bodily storage.",
+        "With Overload, syntax should break cadence and misfire rather than simply glow brighter."
+      ],
+      "compact_visual_references": {
+        "form": "tensioned verticals interrupted like edited sentences",
+        "surface": "palimpsest ink over smoke-dark glass",
+        "motion": "marks writing inward, burning away, then repeating",
+        "cost_mark": "lost speech and anatomy reorganized as notation"
+      },
+      "prop_free_definition": "Illegal knowledge becomes living syntax that sharpens power while rewriting memory, language and flesh."
+    },
+    {
+      "trait": "Blessed",
+      "mechanics_anchor": "Increased healing and protection, with excess restoration becoming further protection at higher tiers.",
+      "core_fantasy": "Divine favor experienced as disgrace: fallen angels, failed saints, shame, ruined miracles and compulsory penance.",
+      "emotional_tone": "Public humiliation, exhausted beauty, self-loathing, bitter obedience and cruelty born from being forced to perform mercy.",
+      "silhouette_verbs": ["bow", "molt", "burden"],
+      "silhouette_language": "The body folds inward, drags or bears an unwanted sacred weight. Even a large or beautiful form must read as disgraced, watched and compelled before it reads as celestial.",
+      "garment_anatomy_families": [
+        "Penitential wrapping, scorched ceremonial cloth and old medical fiber",
+        "Molting, vestigial or inward-folded avian anatomy",
+        "Ex-voto growths, stigmatic tissue and cracked gilded skin",
+        "Failed-saint bodies marked by repeated restoration",
+        "Nonhuman organisms forced to exude protective secretions"
+      ],
+      "palette": [
+        {"name": "corpse ivory", "hex": "#C8BFAE"},
+        {"name": "dirty wax", "hex": "#B8A274"},
+        {"name": "tarnished gold", "hex": "#8B7043"},
+        {"name": "bruised lavender", "hex": "#776476"},
+        {"name": "soot blood", "hex": "#4A2C2C"}
+      ],
+      "patterns": ["broken radiance", "penance tally scars", "molt and burn gradients"],
+      "materials": ["dirty candle wax", "cracked gilding", "old medical cloth", "ash", "scarred skin"],
+      "magic_behavior": "A miracle should arrive reluctantly and transfer consequence. Healing exposes old wounds, draws injury into the source or builds tense scar-like protection instead of clean radiant spectacle.",
+      "supernatural_cost": "Every miracle deepens visible shame: wounds migrate, tissue calcifies, sacred growths fail, beauty decays or the body is forced to display the suffering it removed from others.",
+      "allowed_variations": ["disgraced celestial", "failed saint", "involuntary healer", "hypocritical holy tyrant", "living evidence of a ruined miracle", "nonhuman penance organism", "bitter martyr"],
+      "forbidden_cliches": ["clean holy hero", "radiant paladin", "decorative black-wing demon", "generic pretty sad angel", "lingerie or fake sacred protection", "perfect floating halo", "gold used without psychological consequence"],
+      "combination_rules": [
+        "Blessed always owns shame, posture, facial condition or visible miracle cost even when secondary.",
+        "Celestial anatomy is optional; disgrace and compulsory mercy are mandatory.",
+        "With Titan or Fortified, scale and endurance must intensify the burden rather than create a heroic colossus.",
+        "With Kaleidoscope, color behaves like damaged revelation and sensory punishment, never celebratory radiance."
+      ],
+      "compact_visual_references": {
+        "form": "inward-folded weight and failed upward growth",
+        "surface": "dirty wax, cracked gilding and bruised scar tissue",
+        "motion": "reluctant light transferring wounds toward its source",
+        "cost_mark": "shame posture and fresh evidence of borrowed pain"
+      },
+      "prop_free_definition": "Unwanted grace preserves others by humiliating, exposing and physically degrading the being forced to channel it."
+    },
+    {
+      "trait": "Bulwark",
+      "mechanics_anchor": "Tenacity with a high-tier first-control cleanse and protective response.",
+      "core_fantasy": "Restraint survived and weaponized: a body that learned to resist control by internalizing the pressure once used to contain it.",
+      "emotional_tone": "Controlled panic, stubborn refusal and the frightening stillness of someone waiting for restraint to snap.",
+      "silhouette_verbs": ["compress", "lock", "square"],
+      "silhouette_language": "Shortened gaps, dense joints and lateral compression make the figure look difficult to move. Release should feel sudden because the resting state stores pressure.",
+      "garment_anatomy_families": [
+        "Dense wrapped, quilted and braced construction",
+        "Compression-scar bands and flattened tissue",
+        "Block-jointed or low-slung nonhuman bodies",
+        "Repair webbing that records repeated containment",
+        "Bodies shaped by cages, institutional restraint or crushing environments without depicting the object itself"
+      ],
+      "palette": [
+        {"name": "iron gray", "hex": "#55595A"},
+        {"name": "prison green", "hex": "#596754"},
+        {"name": "old linen", "hex": "#A39A83"},
+        {"name": "rust", "hex": "#7C4A36"},
+        {"name": "bruise plum", "hex": "#5D4658"}
+      ],
+      "patterns": ["compression bands", "snapped rhythm", "dense cross-bracing"],
+      "materials": ["felted fiber", "scar tissue", "dull iron", "cracked resin", "packed hide"],
+      "magic_behavior": "Control pressure accumulates visibly, then breaks in one sharp release. The response is bodily and mechanical—tension discharges, a locked rhythm skips—rather than a generic immunity glow.",
+      "supernatural_cost": "Resistance leaves joints locked, breath shallow and sensation numbed. Each release reopens old restraint injuries or makes the body less capable of softness.",
+      "allowed_variations": ["institutional survivor", "brutal jailer", "compressed beast", "siege laborer", "panic-frozen aristocrat", "carapaced alien"],
+      "forbidden_cliches": ["ordinary knight tank", "sports blocker", "generic chains everywhere", "clean heavy plate", "calm benevolent protector"],
+      "combination_rules": [
+        "As primary, Bulwark owns compression, density and stored release.",
+        "As secondary, use banding, joint behavior or a single snapped rhythm instead of adding bulk everywhere.",
+        "With Aegis, Bulwark is internal resistance while Aegis is external enclosure.",
+        "With Striker, released pressure becomes forward momentum but must retain visible restraint damage."
+      ],
+      "compact_visual_references": {
+        "form": "compressed blocks with almost no loose negative space",
+        "surface": "quilted density crossed by old pressure scars",
+        "motion": "long stillness followed by one snapped release",
+        "cost_mark": "locked joints, flattened breath and reopened bands"
+      },
+      "prop_free_definition": "A compressed survivor stores the memory of restraint until attempted control triggers a violent bodily release."
+    },
+    {
+      "trait": "Cartel",
+      "mechanics_anchor": "Team-wide bonuses derived from the costs represented on the field.",
+      "core_fantasy": "Criminal loyalty enforced through valuation: belonging is purchased, status is visible and every relationship carries a price.",
+      "emotional_tone": "Predatory intimacy, conspiratorial calm, class resentment and the security of being owned by dangerous people.",
+      "silhouette_verbs": ["cluster", "angle", "close"],
+      "silhouette_language": "Figures imply closed ranks through inward angles, paired asymmetries and guarded social distance. Luxury appears repaired, inherited or stolen rather than pristine.",
+      "garment_anatomy_families": [
+        "Predatory formal, labor-gang, prison-economy and decayed aristocratic construction",
+        "Repaired luxury with visible ownership changes",
+        "Paired markings or anatomical repetitions that imply a network",
+        "Segmented nonhuman colonies governed by rank",
+        "Bodies branded, altered or weighted according to value"
+      ],
+      "palette": [
+        {"name": "oxblood", "hex": "#6E2F32"},
+        {"name": "patinated jade", "hex": "#466B5A"},
+        {"name": "jaundiced ivory", "hex": "#B5A67D"},
+        {"name": "cigarette gray", "hex": "#6B6861"},
+        {"name": "tarnished brass", "hex": "#80633D"}
+      ],
+      "patterns": ["account grids", "shared cut marks", "ranked serial repetition"],
+      "materials": ["worn silk", "felt", "cracked lacquer", "scarred hide", "tarnished brass"],
+      "magic_behavior": "Power moves across proximity and status. Advantage transfers like pressure through a closed network; value makes bodies visually heavier or more protected without summoning literal currency.",
+      "supernatural_cost": "Identity becomes collateral. Members carry brands, shared pain, purchased repairs or bodily evidence that their survival belongs to the group.",
+      "allowed_variations": ["street syndicate", "decayed noble cabal", "prison economy", "family enterprise", "alien contract colony", "labor conspiracy", "ritual protection racket"],
+      "forbidden_cliches": ["clean modern suit", "mafia costume", "coin rain", "gold bling as personality", "identical gang uniform", "cheerful criminal charm"],
+      "combination_rules": [
+        "As primary, Cartel owns social geometry, rank and repaired luxury.",
+        "As secondary, it appears through shared marks, material quality or ownership scars—not matching outfits.",
+        "With Mogul, Cartel is networked value while Mogul is personal accumulation and spatial dominance.",
+        "With Trader, Cartel is enforced belonging while Trader remains mobile, opportunistic and culturally mixed."
+      ],
+      "compact_visual_references": {
+        "form": "inward angles and ranked proximity",
+        "surface": "repaired luxury carrying multiple ownership scars",
+        "motion": "pressure and advantage passing through a closed network",
+        "cost_mark": "identity branded as group collateral"
+      },
+      "prop_free_definition": "A closed criminal network converts rank, price and belonging into shared power while mortgaging every member's identity."
+    },
+    {
+      "trait": "Catalyst",
+      "mechanics_anchor": "Post-battle item transformation through combining or evolution.",
+      "core_fantasy": "Irreversible transformation: contact between unlike substances produces a new state that cannot return to what it was.",
+      "emotional_tone": "Hungry curiosity, bodily trespass and exhilaration at becoming useful through permanent change.",
+      "silhouette_verbs": ["fuse", "bloom", "split"],
+      "silhouette_language": "Asymmetry must show before and after states in one body. One side fuses, ruptures, flowers or vitrifies while the other retains the prior condition.",
+      "garment_anatomy_families": [
+        "Fused seams joining incompatible materials",
+        "Kiln-cracked ceramic or heat-warped bodies",
+        "Botanical, fungal and biochemical chimera growth",
+        "Industrial bodies shaped by reaction chambers without gadget clutter",
+        "Textiles and skin permanently changed along a visible reaction front"
+      ],
+      "palette": [
+        {"name": "heat copper", "hex": "#9B603E"},
+        {"name": "furnace black", "hex": "#242122"},
+        {"name": "bone ceramic", "hex": "#C1B79E"},
+        {"name": "opal oil", "hex": "#6D746B"},
+        {"name": "chemical green", "hex": "#6D7C48"}
+      ],
+      "patterns": ["reaction fronts", "crystallization gradients", "fused asymmetry"],
+      "materials": ["heat-stained copper", "cracked ceramic", "slag", "char", "mutated tissue"],
+      "magic_behavior": "Change begins at one contact point and travels across a material boundary. The result is a visible state change—fusing, vitrifying, charring, sprouting—not a cloud of alchemical accessories.",
+      "supernatural_cost": "Every successful reaction leaves an irreversible mutation, fused joint, contaminated memory or incompatible material growing through the body.",
+      "allowed_variations": ["occult metallurgy", "biochemical mutation", "botanical grafting", "fungal conversion", "alien cocoon", "industrial reaction body", "ceramic transmuter"],
+      "forbidden_cliches": ["generic steampunk inventor", "potion belt", "gear clutter", "rainbow alchemy", "clean laboratory coat", "floating ingredient cloud"],
+      "combination_rules": [
+        "As primary, Catalyst owns visible state transition and fused asymmetry.",
+        "As secondary, it changes one material or anatomical site chosen by the primary trait.",
+        "A third trait may alter the result of the reaction but cannot add another transformation center.",
+        "With Titan, transformation affects strata or communal mass; with Kaleidoscope, it affects perception before color saturation."
+      ],
+      "compact_visual_references": {
+        "form": "one body split between prior and transformed states",
+        "surface": "heat bloom crossing ceramic, slag and tissue",
+        "motion": "a reaction front traveling from one contact point",
+        "cost_mark": "permanent fusion and incompatible growth"
+      },
+      "prop_free_definition": "Contact triggers irreversible material and bodily change, making usefulness inseparable from contamination and lost original form."
+    },
+    {
+      "trait": "Chronomancer",
+      "mechanics_anchor": "Allied acceleration and enemy slowing based on the number of Chronomancers.",
+      "core_fantasy": "Stolen years and temporal decay: time is redistributed rather than controlled, leaving age, injury and memory out of order.",
+      "emotional_tone": "Impatient exhaustion, nostalgia for events not yet lived and terror of arriving after one's own death.",
+      "silhouette_verbs": ["lag", "repeat", "taper"],
+      "silhouette_language": "Contours echo at slightly wrong intervals; one region appears older, younger or delayed. The shape suggests a body failing to occupy one moment cleanly.",
+      "garment_anatomy_families": [
+        "Mismatched-age anatomy across one body",
+        "Layered eras of wear and repair",
+        "Interrupted growth, regression or fossilization",
+        "Faded duelist, laborer, court and nomadic constructions from incompatible periods",
+        "Larval, fossil and senescent nonhuman stages coexisting"
+      ],
+      "palette": [
+        {"name": "smoke blue", "hex": "#566A78"},
+        {"name": "faded lavender", "hex": "#817487"},
+        {"name": "nicotine ivory", "hex": "#B5A77D"},
+        {"name": "oxidized pewter", "hex": "#6A706F"},
+        {"name": "dead rose", "hex": "#7C555E"}
+      ],
+      "patterns": ["ghost repetition", "interrupted stripes", "uneven sun fading"],
+      "materials": ["moth-eaten fiber", "aged bone", "corroded metal", "faded dye", "dry translucent skin"],
+      "magic_behavior": "Motion arrives early or late. Afterimages misregister, dust briefly reverses and wounds wait before appearing; the behavior should never depend on visible clockwork.",
+      "supernatural_cost": "Age distributes unevenly, memories lose sequence, injuries are deferred into worse moments and fatigue duplicates instead of resolving.",
+      "allowed_variations": ["young-old hybrid", "veteran trapped in one instant", "time parasite", "fossil larva", "decayed aristocrat", "accelerated beast", "future-haunted laborer"],
+      "forbidden_cliches": ["floating clocks", "gear collage", "hourglass motif", "clean white-gold time knight", "blue portal rings", "perfect symmetrical afterimages"],
+      "combination_rules": [
+        "As primary, Chronomancer owns repeated contour, age mismatch and delayed posture.",
+        "As secondary, it changes the age or timing of one primary-trait channel.",
+        "With Overload, time skips and drops rather than becoming continuous speed energy.",
+        "With Exile, temporal displacement reinforces absence without defaulting to a traveler archetype."
+      ],
+      "compact_visual_references": {
+        "form": "one contour repeated at unequal intervals",
+        "surface": "faded layers aging at different rates",
+        "motion": "early afterimage, delayed impact, brief reverse dust",
+        "cost_mark": "unequal age and memories out of sequence"
+      },
+      "prop_free_definition": "Time is redistributed across one life, accelerating allies while leaving age, injury and memory permanently out of order."
+    },
+    {
+      "trait": "Executioner",
+      "mechanics_anchor": "Critical lethality, kill stacking and high-tier bleed or protection-bypass behavior.",
+      "core_fantasy": "Procedural death and official cruelty: killing treated as a final administrative action rather than a burst of rage.",
+      "emotional_tone": "Cold certainty, practiced contempt and the calm of someone who believes an ending has already been authorized.",
+      "silhouette_verbs": ["descend", "sever", "finalize"],
+      "silhouette_language": "Weight gathers above a decisive downward line. Neck, joint and termination zones are emphasized; the pose appears mid-verdict rather than stealthy or acrobatic.",
+      "garment_anatomy_families": [
+        "Top-heavy or shearing anatomy built around downward force",
+        "State, slaughterhouse, surgical and ritual-functionary constructions",
+        "Dense collar and termination-line anatomy",
+        "Insect, avian or machine-like predation organized around one final stroke",
+        "Bodies scarred by repetitive authorized killing"
+      ],
+      "palette": [
+        {"name": "iron black", "hex": "#222225"},
+        {"name": "bone", "hex": "#B9AE97"},
+        {"name": "dried red", "hex": "#6F3031"},
+        {"name": "execution green", "hex": "#4E5B4C"},
+        {"name": "ash", "hex": "#77716C"}
+      ],
+      "patterns": ["termination bars", "tally gaps", "single descending diagonals"],
+      "materials": ["broad dull iron", "worn wood grain", "cured hide", "bone", "dried residue"],
+      "magic_behavior": "Force compresses into one downward or severing event. Effects fall, split or stop abruptly; they do not orbit, flourish or advertise stealth.",
+      "supernatural_cost": "The body stiffens into procedure, sensation dulls and victims leave persistent marks. Repetition makes reversal, mercy and lateral movement physically difficult.",
+      "allowed_variations": ["state functionary", "slaughter-beast", "surgical finalizer", "insect predator", "ritual judge", "industrial termination body", "silent civic killer"],
+      "forbidden_cliches": ["hooded axe stereotype", "generic assassin", "skull-covered protection", "blood splash as sole identity", "nimble rogue silhouette", "theatrical rage"],
+      "combination_rules": [
+        "As primary, Executioner owns downward mass and the single terminating line.",
+        "As secondary, it contributes a finish rhythm or one anatomical shear point—not an occupational costume.",
+        "With Vindicator, Vindicator strips resistance while Executioner ends the target.",
+        "With Exile, lethal function survives after social identity and belonging have been removed."
+      ],
+      "compact_visual_references": {
+        "form": "top weight collapsing into one downward line",
+        "surface": "broad iron, bone and dried termination marks",
+        "motion": "compression followed by an abrupt final stop",
+        "cost_mark": "stiffened procedure and victim traces that remain"
+      },
+      "prop_free_definition": "Death becomes a calm authorized procedure expressed through descending force, severed continuity and a body losing mercy."
+    },
+    {
+      "trait": "Exile",
+      "mechanics_anchor": "Exact-count ability upgrades at one, three or five fielded Exiles.",
+      "core_fantasy": "No-home survival and erased identity: power comes from living outside belonging, with exact gatherings briefly creating a substitute condition.",
+      "emotional_tone": "Watchful isolation, severed pride, cultural grief and the dangerous self-sufficiency of someone no group can reclaim.",
+      "silhouette_verbs": ["drift", "detach", "misalign"],
+      "silhouette_language": "One region appears separated from the rest by negative space, missing continuity or mismatched construction. The body never settles into a complete symmetrical belonging.",
+      "garment_anatomy_families": [
+        "Mismatched repairs from incompatible places and eras",
+        "Missing, blank or deliberately erased identity regions",
+        "Weathered nomadic, court-banished, scavenged and institutional-survivor construction",
+        "Separated or socially absent anatomy",
+        "Nonhuman castoffs with incomplete colony, pack or hive morphology"
+      ],
+      "palette": [
+        {"name": "road dust", "hex": "#8B7D6A"},
+        {"name": "storm blue", "hex": "#4D6170"},
+        {"name": "faded heraldry", "hex": "#76545C"},
+        {"name": "rust", "hex": "#7D4C36"},
+        {"name": "bone gray", "hex": "#AAA79D"}
+      ],
+      "patterns": ["interrupted borders", "blank identity patches", "stitched route fragments"],
+      "materials": ["patched textile", "weathered hide", "sanded metal", "scar tissue", "dust-caked fiber"],
+      "magic_behavior": "Position, attachment and continuity briefly detach. At exact counts, isolated rhythms align for one sharp upgrade, then remain visibly separate rather than becoming a matching faction.",
+      "supernatural_cost": "Names, features, cultural memory or physical connections erode. The body cannot fully settle, heal into symmetry or be recognized by its former belonging.",
+      "allowed_variations": ["banished noble", "refugee predator", "alien castoff", "desert scavenger", "ghost without homeland", "packless beast", "institutional escapee"],
+      "forbidden_cliches": ["generic hooded rogue", "lone samurai", "one tattered travel look", "map clutter", "romantic wandering hero", "uniformly dusty human nomad"],
+      "combination_rules": [
+        "As primary, Exile owns absence, detachment and mismatched construction.",
+        "As secondary, it removes or interrupts one channel belonging to the primary trait.",
+        "Exact-count strength should intensify relational spacing, not produce identical clothing or anatomy.",
+        "With Sanguine, exile changes the culture and psychology of hunger rather than merely weathering a vampire costume."
+      ],
+      "compact_visual_references": {
+        "form": "a continuous body interrupted by deliberate absence",
+        "surface": "incompatible repairs with erased identity patches",
+        "motion": "drifting parts that align only at exact moments",
+        "cost_mark": "names, features and belonging worn away"
+      },
+      "prop_free_definition": "Power comes from permanent unbelonging, with identity and bodily continuity eroded each time isolation becomes useful."
+    },
+    {
+      "trait": "Fortified",
+      "mechanics_anchor": "Incoming damage reduction for members and, at higher tiers, allies.",
+      "core_fantasy": "Siege architecture made flesh: survival through load-bearing structure, layered repair and the refusal to collapse under accumulated impact.",
+      "emotional_tone": "Grounded fatalism, patient endurance and the grim dignity of becoming infrastructure for other people's survival.",
+      "silhouette_verbs": ["anchor", "terrace", "interlock"],
+      "silhouette_language": "Mass settles downward through buttressed, layered forms. The body reads as load-bearing and repaired, not simply large or covered in conventional protection.",
+      "garment_anatomy_families": [
+        "Buttressed torsos and load-bearing limbs",
+        "Layered masonry, earth or densely woven tissue",
+        "Embedded repair systems and visible structural patches",
+        "Squat, columnar, quadruped and low-spread body plans",
+        "Soft bodies made stable through tension, packing or interlock"
+      ],
+      "palette": [
+        {"name": "terracotta", "hex": "#8C5944"},
+        {"name": "slate", "hex": "#555E62"},
+        {"name": "lichen", "hex": "#68705A"},
+        {"name": "mortar", "hex": "#A49A87"},
+        {"name": "oxidized iron", "hex": "#604B43"}
+      ],
+      "patterns": ["masonry bonds", "compression cracks", "stratified repair layers"],
+      "materials": ["clay", "slate", "compacted fiber", "corroded reinforcement", "packed organic tissue"],
+      "magic_behavior": "Impacts redistribute through visible structural paths, settle into lower layers and leave dust, flex or small compression fractures. Nothing flashes cleanly away.",
+      "supernatural_cost": "The body becomes slower, less sensate and more environmental. Repairs trap debris, memories and other people's damage until the individual is buried inside the structure.",
+      "allowed_variations": ["walking ruin", "woven barricade body", "human structural growth", "quadruped fortress", "living earthwork", "soft-tissue tension organism", "civic survivor"],
+      "forbidden_cliches": ["clean knight protection", "generic rock golem", "castle pieces on shoulders", "one enormous defensive object", "pristine geometric plating", "heroic fortress guardian"],
+      "combination_rules": [
+        "As primary, Fortified owns load path, repair strata and grounded mass.",
+        "As secondary, it appears through interlock, compression cracks or redistribution behavior rather than more bulk.",
+        "With Titan, Fortified is structural logic while Titan is scale, accumulation and communal burden.",
+        "With Catalyst, one structural material may transform while the overall load path remains legible."
+      ],
+      "compact_visual_references": {
+        "form": "terraced load paths settling into a broad base",
+        "surface": "masonry bonds and layered field repairs",
+        "motion": "impact traveling downward and dispersing through strata",
+        "cost_mark": "the individual buried beneath accumulated structure"
+      },
+      "prop_free_definition": "A living load-bearing structure survives by redistributing impact until repair layers bury mobility, sensation and selfhood."
+    },
+    {
+      "trait": "Harmony",
+      "mechanics_anchor": "A team bonus determined by keeping the largest trait family at a precise small size.",
+      "core_fantasy": "Coerced concord and forced chorus: strength emerges when unlike beings are made to occupy an exact shared rhythm without becoming one identity.",
+      "emotional_tone": "Beautiful unease, social control, suppressed dissent and the intimacy of being synchronized against one's will.",
+      "silhouette_verbs": ["mirror", "pair", "phase"],
+      "silhouette_language": "Paired masses and near-symmetry establish rhythm, but one deliberate mismatch keeps the harmony coercive. The form should feel tuned rather than cheerful.",
+      "garment_anatomy_families": [
+        "Paired organs, limbs or bodily rhythms with one controlled disagreement",
+        "Two-part garment construction from unrelated cultural families",
+        "Resonant membrane, pleat and repeated-edge anatomy",
+        "Symbiotic or conjoined nonhuman bodies",
+        "Group forms organized by spacing and cadence rather than matching appearance"
+      ],
+      "palette": [
+        {"name": "ivory", "hex": "#C3B9A4"},
+        {"name": "oxidized teal", "hex": "#4E746E"},
+        {"name": "dead rose", "hex": "#805D68"},
+        {"name": "charcoal", "hex": "#36383B"},
+        {"name": "bruised mauve", "hex": "#675365"}
+      ],
+      "patterns": ["dyads", "interference waves", "synchronized imperfection"],
+      "materials": ["woven fiber", "resonant membrane", "hammered bronze", "bone china", "skin"],
+      "magic_behavior": "Breath, shadow, pulse or movement synchronizes across precise small groupings. Resonance strengthens through controlled repetition and breaks violently when the count becomes too large.",
+      "supernatural_cost": "Individual timing and emotion erode. Dissonance ruptures tissue, multiplies voices or forces private feeling into public rhythm.",
+      "allowed_variations": ["duet tyrant", "symbiotic pair", "forced family", "hive conductor", "mirrored beast", "ritual chorus", "two-culture survivor"],
+      "forbidden_cliches": ["cheerful bard", "musical-note clutter", "rainbow friendship", "identical twins", "floating sound rings", "perfect decorative symmetry"],
+      "combination_rules": [
+        "As primary, Harmony owns pairing, rhythm and one controlled mismatch.",
+        "As secondary, it synchronizes one motion or surface channel without duplicating the whole design.",
+        "With Kaleidoscope, use at most two controlled pattern systems so perception fracture does not erase cadence.",
+        "With Liaison, Harmony is shared rhythm while Liaison is directional transfer and boundary loss."
+      ],
+      "compact_visual_references": {
+        "form": "near-symmetry with one deliberate disagreement",
+        "surface": "paired rhythms producing interference instead of decoration",
+        "motion": "breath and shadow locking to an exact count",
+        "cost_mark": "private emotion forced into public synchronization"
+      },
+      "prop_free_definition": "Exact shared rhythm creates power by suppressing individual timing, making concord beautiful, coercive and physically dangerous."
+    },
+    {
+      "trait": "Kaleidoscope",
+      "mechanics_anchor": "Team attack, spell and health gains per distinct active trait, with acceleration at very wide diversity.",
+      "core_fantasy": "Psychedelic perception fracture: diversity bends the way reality is seen, producing power through unstable multiplicity rather than clean elemental color.",
+      "emotional_tone": "Mesmerized dread, manic curiosity, sensory trespass and the alien confidence of seeing several incompatible truths at once.",
+      "silhouette_verbs": ["flare", "refract", "oscillate"],
+      "silhouette_language": "Contours flare or repeat at misregistered angles. Pattern must alter perceived mass and negative space, not sit on a conventional mage body as decoration.",
+      "garment_anatomy_families": [
+        "Optical-pattern textiles with weathered, uneven registration",
+        "Chromatophore, compound-eye and segmented sensory anatomy",
+        "Flared, folded and mirrored planes integrated into the body",
+        "Fungal, carnival-decay, court and monastic sensory-survivor families",
+        "Nonhuman bodies whose outline changes with viewing angle"
+      ],
+      "palette": [
+        {"name": "smoked magenta", "hex": "#873F69"},
+        {"name": "acid teal", "hex": "#3F8B83"},
+        {"name": "bruised amber", "hex": "#A06E32"},
+        {"name": "ultramarine", "hex": "#394D82"},
+        {"name": "soot", "hex": "#27262B"}
+      ],
+      "patterns": ["moiré interference", "false contours", "chromatic misregistration", "warped checker fields"],
+      "materials": ["faded patterned textile", "smoky glass", "oil film", "patinated foil", "iridescent shell"],
+      "magic_behavior": "Edges split into restrained chromatic offsets, silhouettes repeat at false positions and local space breathes or folds. Use three chromatic notes plus neutrals by default, not a full-spectrum explosion.",
+      "supernatural_cost": "Vision, identity and body registration fragment. The user cannot fully trust location, color, memory or the boundary between multiple selves.",
+      "allowed_variations": ["weathered carnival horror", "fungal trip", "alien chromatophore", "optical court", "sensory-deprived mystic", "diseased stained-glass organism", "psychedelic predator"],
+      "forbidden_cliches": ["glossy rainbow crystal", "prism mage", "clean neon", "gacha fireworks", "floating shard cloud", "every color at equal saturation", "cheerful psychedelic mascot"],
+      "combination_rules": [
+        "As primary, Kaleidoscope owns contour distortion, optical pattern and perceptual negative space.",
+        "As secondary, it owns controlled misregistration or one pattern family while the primary trait restricts color and material.",
+        "Default to three chromatic notes plus neutrals; expand only when the individual concept proves necessity.",
+        "With Blessed, color is damaged revelation; with Sanguine, color behaves like bruising, blood memory or sensory hunger."
+      ],
+      "compact_visual_references": {
+        "form": "flared contours occupying several false positions",
+        "surface": "weathered moiré and smoky chromatic misregistration",
+        "motion": "local afterimages breathing out of phase",
+        "cost_mark": "fractured vision and unstable bodily registration"
+      },
+      "prop_free_definition": "Perception fractures into weathered chromatic multiplicity, granting power while location, identity and sensory truth become unreliable."
+    },
+    {
+      "trait": "Liaison",
+      "mechanics_anchor": "Formation links between adjacent allies without shared traits, including mutual exchange and higher-tier triangular mana behavior.",
+      "core_fantasy": "Shared wounds and dangerous connection: power created by crossing boundaries between unlike beings until harm, feeling and intent can no longer stay private.",
+      "emotional_tone": "Predatory empathy, tense intimacy, manipulative diplomacy and fear of needing someone whose pain can enter your body.",
+      "silhouette_verbs": ["bridge", "cross", "reach"],
+      "silhouette_language": "Directional lines cross the torso or extend toward absent partners. The body should look organized around transfer and interrupted personal boundaries, not romance.",
+      "garment_anatomy_families": [
+        "Joined seams and crossed construction from unlike material families",
+        "Connective-tissue, graft and shared-circulation anatomy",
+        "Asymmetrical bodies shaped by reaching toward an absent counterpart",
+        "Diplomatic, parasitic, ritual and communal-survivor garment families",
+        "Networked nonhuman organisms with visibly unequal nodes"
+      ],
+      "palette": [
+        {"name": "rust", "hex": "#8B503C"},
+        {"name": "bond teal", "hex": "#4B7472"},
+        {"name": "ivory", "hex": "#BFB4A0"},
+        {"name": "oxblood", "hex": "#682F37"},
+        {"name": "slate", "hex": "#525A63"}
+      ],
+      "patterns": ["crossing paths", "unequal knots", "triangular transfer rhythms"],
+      "materials": ["braided fiber", "suture tissue", "riveted joints", "contrasting textiles", "vascular membrane"],
+      "magic_behavior": "Energy, injury or mana travels along the shortest visible relationship and changes both ends. Higher-tier triangles should feel like tense circulation, not orbiting connection nodes.",
+      "supernatural_cost": "Wounds, emotion and identity leak across relationships. Movement is constrained by absent partners, and boundaries remain damaged after the link ends.",
+      "allowed_variations": ["predatory diplomat", "parasite", "conjoined beast", "cult matchmaker", "network intelligence", "hostage negotiator", "symbiotic survivor"],
+      "forbidden_cliches": ["romance symbols", "friendship beam", "floating connection nodes", "decorative chains", "matching couple design", "benevolent teamwork aura"],
+      "combination_rules": [
+        "As primary, Liaison owns directional reach, crossing geometry and boundary loss.",
+        "As secondary, it changes what transfers through one existing seam, organ or motion channel.",
+        "With Harmony, Liaison carries consequence while Harmony sets the shared cadence.",
+        "Connection must alter both participants; a detached floating line is never sufficient trait proof."
+      ],
+      "compact_visual_references": {
+        "form": "cross-body lines reaching toward an absent counterpart",
+        "surface": "unlike materials joined by unequal living seams",
+        "motion": "consequence traveling the shortest relational path",
+        "cost_mark": "boundaries left porous after connection ends"
+      },
+      "prop_free_definition": "Unlike beings gain power by sharing consequence until wounds, emotion and personal boundaries can no longer remain separate."
+    },
+    {
+      "trait": "Mentor",
+      "mechanics_anchor": "The nearest unlike ally becomes a Pupil and inherits part of the Mentor's stats and later mana behavior.",
+      "core_fantasy": "Cruel instruction and inherited discipline: power transferred through correction, repetition and the reshaping of another being into useful form.",
+      "emotional_tone": "Authoritarian patience, disappointed contempt, possessive pride and fear disguised as pedagogy.",
+      "silhouette_verbs": ["correct", "loom", "direct"],
+      "silhouette_language": "An asymmetrical authority posture directs attention toward a lower or adjacent space. Repeated forms appear with one disciplined deviation, suggesting correction rather than companionship.",
+      "garment_anatomy_families": [
+        "Severe academic, military, craft, monastic and brood-trainer construction",
+        "Bodies marked by repeated correction and overtrained posture",
+        "Authority asymmetry concentrated in gaze, spine or directing limbs",
+        "Pupil-like secondary anatomy that is similar but deliberately incomplete",
+        "Alien imprint organisms and coercive brood bodies"
+      ],
+      "palette": [
+        {"name": "chalk", "hex": "#C1B8A4"},
+        {"name": "ink", "hex": "#2B3440"},
+        {"name": "iron", "hex": "#55595C"},
+        {"name": "old plum", "hex": "#654A5F"},
+        {"name": "tobacco", "hex": "#76543C"}
+      ],
+      "patterns": ["correction marks", "graded stripes", "repetition with one deviation"],
+      "materials": ["chalk dust", "blackened wood", "worn wool", "vellum", "lesson scars"],
+      "magic_behavior": "Transfer travels through posture, gaze and positional correction. The recipient visibly tightens, repeats or inherits a flaw; the effect is instructional pressure, not a friendly buff glow.",
+      "supernatural_cost": "The source hollows or ages while the recipient inherits compulsions, injuries and an inability to distinguish learned strength from imposed identity.",
+      "allowed_variations": ["abusive master", "cult elder", "drill tyrant", "animal brood trainer", "alien imprint organism", "craft disciplinarian", "failed prodigy reproducing harm"],
+      "forbidden_cliches": ["kind elderly wizard", "school uniform shorthand", "floating lesson text", "benevolent teacher posture", "wise hero mentor", "matching pupil costume"],
+      "combination_rules": [
+        "As primary, Mentor owns hierarchy, direction and repeated form with correction.",
+        "As secondary, it creates one visible inheritance or overcorrection in the primary trait's channel.",
+        "The Pupil must not become a smaller copy; shared damage and imposed discipline are more important than matching appearance.",
+        "With Scholar, Mentor imposes and transmits while Scholar stores and consumes knowledge."
+      ],
+      "compact_visual_references": {
+        "form": "one looming posture directing an incomplete echo",
+        "surface": "graded marks and scars of repeated correction",
+        "motion": "strength transferring as posture tightens",
+        "cost_mark": "source hollowing as imposed identity spreads"
+      },
+      "prop_free_definition": "Authority transfers strength by correcting another body until discipline, injury and identity become inherited together."
+    },
+    {
+      "trait": "Mogul",
+      "mechanics_anchor": "Post-combat wealth generated by Moguls who survive.",
+      "core_fantasy": "Predatory wealth and vault aristocracy: survival converts the world into owned value, making accumulated resources feel physically heavy and socially violent.",
+      "emotional_tone": "Entitled calm, famine-era opulence, contemptuous patience and terror of losing what has replaced human feeling.",
+      "silhouette_verbs": ["weigh", "widen", "occupy"],
+      "silhouette_language": "The figure takes more spatial authority than its body requires. Weight gathers centrally and spreads outward through dense, formal or storage-like masses.",
+      "garment_anatomy_families": [
+        "Industrial finery and decayed formal construction",
+        "Storage-like or collateralized anatomy",
+        "Broad, weighted and compressed body plans",
+        "Hoarding beasts and alien resource organs",
+        "Famine aristocrats physically invaded by precious materials"
+      ],
+      "palette": [
+        {"name": "emerald black", "hex": "#233C34"},
+        {"name": "tobacco", "hex": "#745139"},
+        {"name": "cream", "hex": "#C1B28F"},
+        {"name": "bronze", "hex": "#7B5B36"},
+        {"name": "dried burgundy", "hex": "#623840"}
+      ],
+      "patterns": ["account grids", "heavy borders", "layered valuation marks"],
+      "materials": ["worn velvet", "tarnished bronze", "cracked enamel", "dense stone", "oily hide"],
+      "magic_behavior": "Survival makes nearby surfaces visually heavier, darker or more compressed. Accumulation reads as pressure and occupancy rather than literal currency appearing in the air.",
+      "supernatural_cost": "The body becomes collateral and storage. Mobility, empathy and empty space disappear as valued matter invades flesh and replaces private identity.",
+      "allowed_variations": ["industrial baron", "corpse banker", "hoarding beast", "alien resource tyrant", "famine aristocrat", "vault organism", "survivor who monetizes everyone"],
+      "forbidden_cliches": ["coin rain", "jovial top-hat capitalist", "clean business suit", "gold bling", "cheerful merchant", "treasure pile as the whole design"],
+      "combination_rules": [
+        "As primary, Mogul owns spatial occupancy, central weight and precious-material invasion.",
+        "As secondary, it densifies one material or turns one survival mark into collateral.",
+        "With Cartel, Mogul is the accumulating center while Cartel is the network distributing status and benefit.",
+        "With Titan, avoid simply making a larger rich humanoid; express wealth as landscape, storage or communal burden."
+      ],
+      "compact_visual_references": {
+        "form": "central weight expanding beyond personal space",
+        "surface": "worn luxury compressed into dense storage strata",
+        "motion": "survival making nearby matter heavier and darker",
+        "cost_mark": "flesh replaced by collateral and owned value"
+      },
+      "prop_free_definition": "Survival accumulates as physical and social weight until wealth occupies the body and displaces empathy, mobility and self."
+    },
+    {
+      "trait": "Overload",
+      "mechanics_anchor": "Reduced ability cost with unstable high-tier full casts.",
+      "core_fantasy": "A nervous-system storm: power exceeds containment, skipping normal buildup and forcing the body into sudden complete discharge.",
+      "emotional_tone": "Manic anticipation, sensory terror, compulsive risk and exhausted relief after a catastrophic release.",
+      "silhouette_verbs": ["arc", "spasm", "split"],
+      "silhouette_language": "Joints and contours fail to agree on one rhythm. Tension gathers along branching paths, then breaks the silhouette at one or two containment failures.",
+      "garment_anatomy_families": [
+        "Exposed conductor, nerve and pressure-channel anatomy",
+        "Burst-open seams and interrupted joint construction",
+        "Storm debtor, psychic rupture, reactor and spore-burst families",
+        "Ceramic insulation and carbonized tissue bodies",
+        "Nonhuman organisms built around irregular discharge cycles"
+      ],
+      "palette": [
+        {"name": "storm blue", "hex": "#405F76"},
+        {"name": "hazard orange", "hex": "#A45B2F"},
+        {"name": "copper green", "hex": "#52756A"},
+        {"name": "burned black", "hex": "#252426"},
+        {"name": "nerve white", "hex": "#C7C0AE"}
+      ],
+      "patterns": ["broken cadence", "branching burns", "alternating dead gaps"],
+      "materials": ["oxidized copper", "carbonized fiber", "cracked ceramic", "scorched skin", "dry insulating membrane"],
+      "magic_behavior": "Charge arrives in irregular surges, snaps to a full state and drops suddenly dead. Discharge must reveal a failed containment path rather than wrapping the whole figure in continuous neon.",
+      "supernatural_cost": "Tremor, sensory loss, burn, memory reset and muscles firing against their own joints accumulate after every forced complete release.",
+      "allowed_variations": ["storm debtor", "psychic rupture", "pressure reactor", "fungal burst body", "magical mania", "alien conductor", "executed power vessel"],
+      "forbidden_cliches": ["neon superhero", "lightning crown", "clean technology protection", "coil backpack", "energy sphere", "continuous full-body aura"],
+      "combination_rules": [
+        "As primary, Overload owns broken cadence, tension paths and containment failure.",
+        "As secondary, it changes the timing of one primary-trait behavior and leaves one burn or dead zone.",
+        "With Chronomancer, release skips time and arrives out of order rather than merely accelerating.",
+        "With Sanguine, discharge is fueled by hunger or circulation but must not become a generic electric vampire."
+      ],
+      "compact_visual_references": {
+        "form": "branching tension interrupted by failed joints",
+        "surface": "burned insulation and copper-green discharge paths",
+        "motion": "irregular surge, complete snap, sudden dead drop",
+        "cost_mark": "tremor, sensory loss and muscles fighting joints"
+      },
+      "prop_free_definition": "Power skips normal buildup and discharges completely through a body that accumulates burn, tremor and sensory collapse."
+    },
+    {
+      "trait": "Sanguine",
+      "mechanics_anchor": "Omnivamp, excess healing interactions and high-tier funnel behavior.",
+      "core_fantasy": "Vampyr hunger and memory through blood: survival stolen from others carries appetite, history and contamination back into the body.",
+      "emotional_tone": "Starved elegance, predatory exhaustion, intimate revulsion and the shame or pride of needing another being to remain whole.",
+      "silhouette_verbs": ["stalk", "hollow", "draw"],
+      "silhouette_language": "Mass pulls inward toward hunger. Whether courtly, medical, feral or nonhuman, the body should imply depletion and predation rather than one caped aristocratic shape.",
+      "garment_anatomy_families": [
+        "Courtly, medical, feral, monastic and laboring vampyr cultures",
+        "Starved, overfilled, vascular and leech-like anatomy",
+        "Insect, botanical, fungal and alien fluid predators",
+        "Predatory elegance built from posture and depletion rather than exposure",
+        "Bodies marked by borrowed circulation and remembered wounds"
+      ],
+      "palette": [
+        {"name": "dried oxblood", "hex": "#672E34"},
+        {"name": "plum", "hex": "#59354F"},
+        {"name": "liver black", "hex": "#241C21"},
+        {"name": "pallor", "hex": "#B9AAA0"},
+        {"name": "bruised mauve", "hex": "#765762"}
+      ],
+      "patterns": ["capillary maps", "clot marbling", "tide marks of depletion"],
+      "materials": ["dried blood lacquer", "worn velvet", "old gauze", "bone", "smoky blood glass"],
+      "magic_behavior": "Blood, heat or vitality pulls inward. Excess restoration packs beneath the surface as tense swelling, darkened veins or hardened clot-like protection; high-tier funneling should feel hungry, not generous.",
+      "supernatural_cost": "Hunger never resolves. Borrowed memories invade, veins blacken and the body oscillates between dangerous emptiness and painful overfilling.",
+      "allowed_variations": ["courtly vampyr", "medical predator", "feral hunter", "monastic hunger cult", "leech or insect organism", "botanical sap predator", "blood-memory aristocrat", "grotesque overfilled beast"],
+      "forbidden_cliches": ["one Dracula stereotype", "red opera uniform", "clean cape and fangs", "sexy vampire sameness", "red mist everywhere", "glossy blood protection", "all Sanguine units as pale humans"],
+      "combination_rules": [
+        "As primary, Sanguine owns hunger, inward-pulled mass and borrowed circulation.",
+        "As secondary, it alters appetite, healing behavior or one vascular surface without forcing red clothing or pallor.",
+        "Another trait determines culture and body plan; Sanguine determines what is consumed and what the body remembers.",
+        "With Exile, hunger becomes displaced and culturally rootless; with Titan, consumed lives accumulate as communal mass."
+      ],
+      "compact_visual_references": {
+        "form": "starved mass pulling inward around a predatory center",
+        "surface": "dried oxblood, clot marbling and borrowed veins",
+        "motion": "vitality drawn inward and packed beneath the skin",
+        "cost_mark": "borrowed memories and cycles of emptiness and overfill"
+      },
+      "prop_free_definition": "Predatory hunger steals vitality and memory, sustaining the body while making emptiness, contamination and borrowed identity permanent."
+    },
+    {
+      "trait": "Scholar",
+      "mechanics_anchor": "Mana regeneration for members and allies.",
+      "core_fantasy": "Knowledge consumed as fuel: learning becomes a metabolic act that stores, burns and releases understanding through a damaged living archive.",
+      "emotional_tone": "Compulsive curiosity, sleepless resentment and the hollow superiority of someone who remembers facts better than a self.",
+      "silhouette_verbs": ["hunch", "index", "accumulate"],
+      "silhouette_language": "The body organizes around storage and retrieval. Weight or attention gathers on one working side, producing asymmetry from use rather than a generic academic outline.",
+      "garment_anatomy_families": [
+        "Field, archive, laboratory, oral-history and scavenger knowledge-worker construction",
+        "Storage scars, memory tissue and indexed anatomy",
+        "Work-worn posture with one overused side",
+        "Alien recorder bodies and collective-memory organisms",
+        "Bodies partially overwritten by the material they study"
+      ],
+      "palette": [
+        {"name": "parchment", "hex": "#B6A47E"},
+        {"name": "navy", "hex": "#303F54"},
+        {"name": "ash", "hex": "#77716C"},
+        {"name": "ink black", "hex": "#25262A"},
+        {"name": "faded ochre", "hex": "#92713E"}
+      ],
+      "patterns": ["marginal cross-reference", "burnt indexing", "compressed knowledge grids"],
+      "materials": ["paper fiber", "absorbed ink", "charred cloth", "wax", "bone tabs"],
+      "magic_behavior": "Information is absorbed, compressed and released as a deliberate pulse. Notation stays concentrated in one bodily or material locus; loose-page storms are prohibited.",
+      "supernatural_cost": "Memory is overwritten by reference, senses become catalog entries and sleep disappears. The body becomes an archive that can retrieve everything except its original owner.",
+      "allowed_variations": ["field anatomist", "forbidden archivist", "oral-history monster", "scavenger intelligence", "alien recorder", "battle researcher", "memory cannibal"],
+      "forbidden_cliches": ["floating book", "loose page storm", "university robe", "spectacles as identity", "generic wise wizard", "clean library aesthetic"],
+      "combination_rules": [
+        "As primary, Scholar owns storage posture, indexing and bodily accumulation.",
+        "As secondary, it records or metabolizes one channel belonging to the primary trait.",
+        "With Mentor, Scholar is the learner or archive while Mentor is coercive transfer and correction.",
+        "With Overload, stored knowledge releases too early or all at once and leaves erased sections."
+      ],
+      "compact_visual_references": {
+        "form": "one overworked side shaped around storage and retrieval",
+        "surface": "burned indexing, absorbed ink and memory scars",
+        "motion": "information compressing before one deliberate pulse",
+        "cost_mark": "the archive preserving facts while erasing its owner"
+      },
+      "prop_free_definition": "Knowledge becomes metabolic fuel, increasing capacity while memory, sleep and personal identity are overwritten by the living archive."
+    },
+    {
+      "trait": "Striker",
+      "mechanics_anchor": "Attack damage with kill-based stacking for members and partial allied benefit at low tiers.",
+      "core_fantasy": "Violence as momentum: every successful impact teaches the body to commit harder, making motion, damage and confidence accumulate together.",
+      "emotional_tone": "Compulsive forward drive, pain dependence, competitive contempt and fear of what happens if movement stops.",
+      "silhouette_verbs": ["drive", "recoil", "accumulate"],
+      "silhouette_language": "Mass leans into a clear forward vector. Impact-adapted joints and an asymmetric recovery line show repeated collisions without forcing every member into a fist-fighter body.",
+      "garment_anatomy_families": [
+        "Impact-adapted joints and forward-loaded anatomy",
+        "Battered labor, pit, military, hunting and surgical combat construction",
+        "Long-limbed, compact, quadruped and many-limbed striking bodies",
+        "Scar systems aligned with repeated motion",
+        "Bodies whose old injuries have become mechanical advantages"
+      ],
+      "palette": [
+        {"name": "faded mustard", "hex": "#9A7837"},
+        {"name": "red brown", "hex": "#78453B"},
+        {"name": "oxidized teal", "hex": "#4E716C"},
+        {"name": "concrete", "hex": "#777570"},
+        {"name": "bone", "hex": "#B5AA91"}
+      ],
+      "patterns": ["impact rings", "forward chevrons", "accumulated strike marks"],
+      "materials": ["battered fiber", "bruised skin", "dented metal", "resin", "splintered dense tissue"],
+      "magic_behavior": "Each successful strike adds visible stance, cadence or damage memory. Shock travels linearly through the body and target; momentum never becomes a generic flame aura.",
+      "supernatural_cost": "Joints deform, pain becomes necessary and old impacts replay through the body. Stopping produces collapse, tremor or a sudden return of accumulated injury.",
+      "allowed_variations": ["pit striker", "ramming beast", "surgical duelist", "projectile specialist", "many-limbed alien", "labor bruiser", "predatory dancer"],
+      "forbidden_cliches": ["superhero brawler", "glowing oversized fists", "sports fighter", "generic barbarian", "full-body flame aura", "one muscular male body type"],
+      "combination_rules": [
+        "As primary, Striker owns forward vector, recoil and accumulated impact damage.",
+        "As secondary, it changes cadence or one joint system while the primary trait keeps mass and culture.",
+        "Combat role still determines reach and weight; Striker does not force melee or humanoid anatomy.",
+        "With Bulwark, stored compression releases forward; with Sanguine, momentum is fed by stolen vitality."
+      ],
+      "compact_visual_references": {
+        "form": "forward-loaded mass with an asymmetric recoil line",
+        "surface": "old impacts aligned into functional scar patterns",
+        "motion": "each hit tightening the next committed vector",
+        "cost_mark": "deformed joints and collapse when momentum stops"
+      },
+      "prop_free_definition": "Successful impact compounds into forward power while joints, pain and old injuries make stopping increasingly catastrophic."
+    },
+    {
+      "trait": "Titan",
+      "mechanics_anchor": "Maximum health, cast stacking, allied regeneration and high-tier excess-healing protection.",
+      "core_fantasy": "Cairn giant and communal endurance: many lives, burdens or environments accumulated into one immense body that survives by carrying more than a self.",
+      "emotional_tone": "Ancient exhaustion, possessive caretaking, monumental loneliness and the slow terror of becoming a place instead of a person.",
+      "silhouette_verbs": ["loom", "root", "carry"],
+      "silhouette_language": "Scale comes from relation, overhang and accumulated strata—not one bodybuilder anatomy. Tall skeletal, broad, quadruped, columnar and landscape-like plans are all valid.",
+      "garment_anatomy_families": [
+        "Tall skeletal, broad maternal, quadruped, columnar and terrain-like giant forms",
+        "Cairn, strata, growth-ring and communal-flesh anatomy",
+        "Bodies embedded with traces of former lives or environments",
+        "Shipwreck, burial, root and compacted-community construction",
+        "Human-scale carriers enlarged by accumulated burden rather than muscle"
+      ],
+      "palette": [
+        {"name": "clay", "hex": "#8B6047"},
+        {"name": "lichen", "hex": "#69705A"},
+        {"name": "burial gray", "hex": "#77746E"},
+        {"name": "peat", "hex": "#3D352E"},
+        {"name": "oxidized copper", "hex": "#55746A"}
+      ],
+      "patterns": ["strata", "cairn stacking", "growth rings", "embedded life traces"],
+      "materials": ["earth", "bone", "compacted cloth", "bark", "old metal"],
+      "magic_behavior": "Casting visibly adds mass, strata or remembered lives. Restoration moves low and outward through the ground or shared body; excess packs into crust rather than shining as clean protection.",
+      "supernatural_cost": "The individual is buried beneath accumulated lives. Movement cracks body and environment, memory becomes communal and selfhood gradually turns into monument or habitat.",
+      "allowed_variations": ["cairn giant", "swarm colossus", "living hill", "shipwreck body", "communal flesh monument", "skeletal carrier", "quadruped burden beast"],
+      "forbidden_cliches": ["generic stone golem", "clean giant protection", "bodybuilder demon", "castle shoulders", "gentle tree guardian", "one broad male giant template"],
+      "combination_rules": [
+        "As primary, Titan owns scale, carrying and accumulated-life strata.",
+        "As secondary, it enlarges the consequence or communal burden of one primary-trait channel rather than the whole silhouette.",
+        "With Fortified, Titan provides magnitude and memory while Fortified provides load-bearing structure.",
+        "With Blessed, shame and compulsory penance must remain legible at monumental scale."
+      ],
+      "compact_visual_references": {
+        "form": "immense overhangs carrying visible accumulated strata",
+        "surface": "clay, burial layers and traces of former lives",
+        "motion": "new mass settling after each exertion",
+        "cost_mark": "selfhood buried until the body becomes a place"
+      },
+      "prop_free_definition": "An immense communal body endures by accumulating lives and burdens until the original self becomes landscape, monument and memory."
+    },
+    {
+      "trait": "Trader",
+      "mechanics_anchor": "Free shop rerolls each round.",
+      "core_fantasy": "Road-market chance broker: survival through exchange, adaptation and the ability to replace a bad possibility before it hardens into fate.",
+      "emotional_tone": "Restless charm, opportunistic suspicion, cultural flexibility and private terror that everything—including identity—can be traded away.",
+      "silhouette_verbs": ["pivot", "fan", "bargain"],
+      "silhouette_language": "The form looks able to redirect, reveal alternatives or reorganize quickly. Asymmetry suggests many routes and histories without becoming a cheerful overloaded merchant caricature.",
+      "garment_anatomy_families": [
+        "Mobile layered construction assembled from several routes and cultures",
+        "Pack-animal, scavenger, caravan and exchange-organism anatomy",
+        "Adaptive folds, pockets, skin flaps and replaceable body sections",
+        "Hands, eyes or sensory arrays specialized for comparison",
+        "Bodies visibly patched with parts or histories acquired through trade"
+      ],
+      "palette": [
+        {"name": "faded turquoise", "hex": "#4F827B"},
+        {"name": "sand", "hex": "#B09668"},
+        {"name": "rust", "hex": "#8B5036"},
+        {"name": "tobacco", "hex": "#6E503C"},
+        {"name": "bruised coral", "hex": "#8F5E5D"}
+      ],
+      "patterns": ["route stripes", "worn probability marks", "replaceable patch grids"],
+      "materials": ["woven reed", "patched textile", "bone counter material", "tarnished metal", "inked skin"],
+      "magic_behavior": "Possibilities briefly swap, fan or reorder, then one becomes real. Chance reads through repositioning and replacement, never a cloud of currency, dice or tickets.",
+      "supernatural_cost": "Every exchange removes a piece of origin. The body becomes patched from traded histories, luck scars accumulate and the broker can no longer prove which memories were originally theirs.",
+      "allowed_variations": ["caravan broker", "grave-market scavenger", "smuggler", "fate parasite", "alien exchange organ", "desert route tyrant", "body-part negotiator"],
+      "forbidden_cliches": ["cheerful merchant", "shop mascot", "coin or dice aura", "giant backpack", "tourist bazaar stereotype", "clean charming rogue"],
+      "combination_rules": [
+        "As primary, Trader owns adaptability, branching routes and visibly acquired history.",
+        "As secondary, it permits one channel to swap, patch or present alternatives.",
+        "With Cartel, Trader remains mobile and opportunistic while Cartel imposes closed membership and rank.",
+        "With Exile, traded histories should worsen the loss of origin without defaulting to a generic traveler."
+      ],
+      "compact_visual_references": {
+        "form": "asymmetric layers able to pivot into several routes",
+        "surface": "patched histories from incompatible places",
+        "motion": "possibilities fanning, swapping and hardening into one",
+        "cost_mark": "origin erased by too many successful exchanges"
+      },
+      "prop_free_definition": "Adaptation replaces bad possibilities through exchange, but every favorable bargain trades away another piece of origin and identity."
+    },
+    {
+      "trait": "Vindicator",
+      "mechanics_anchor": "Attacks progressively strip physical and magical resistance.",
+      "core_fantasy": "Ruined judgment and obsessive revenge: an accusation made bodily, peeling away every defense until only the condemned target remains.",
+      "emotional_tone": "Cold grievance, tunnel vision, violated dignity and the terrible relief of reducing a complex world to one guilty thing.",
+      "silhouette_verbs": ["aim", "accuse", "pierce"],
+      "silhouette_language": "A narrowed body commits to one diagonal line and one target. The posture should look accusatory and self-eroding, not righteous or heroically avenging.",
+      "garment_anatomy_families": [
+        "Scarred court, military, civic, peasant and execution-survivor construction",
+        "Diagonal anatomy and narrowed asymmetry",
+        "Bodies etched by confession, testimony or repeated pursuit",
+        "Immune-hunter and prey-specialist nonhuman forms",
+        "Surfaces progressively stripped of protective layers"
+      ],
+      "palette": [
+        {"name": "ash gray", "hex": "#77716D"},
+        {"name": "slate", "hex": "#4E5963"},
+        {"name": "dried burgundy", "hex": "#6B3D43"},
+        {"name": "old parchment", "hex": "#AB9972"},
+        {"name": "cold iron", "hex": "#4B5052"}
+      ],
+      "patterns": ["strike-throughs", "verdict diagonals", "erased seals"],
+      "materials": ["scratched cloth", "cold iron", "cracked wax", "scar tissue", "soot"],
+      "magic_behavior": "Every hit scrapes, scores or erases a visible layer of resistance. The effect carves and narrows toward the target instead of producing a righteous glow.",
+      "supernatural_cost": "Obsession removes nuance, twists the body toward one quarry and corrodes the accuser with every judgment. Confession scars remain even when the target is gone.",
+      "allowed_variations": ["betrayed judge", "mob avenger", "alien immune hunter", "victim turned tyrant", "execution survivor", "obsessive investigator", "prey-specialist beast"],
+      "forbidden_cliches": ["righteous paladin", "holy avenger", "generic dark knight", "glowing justice imagery", "red-eyed rage", "noble revenge hero"],
+      "combination_rules": [
+        "As primary, Vindicator owns the accusatory diagonal, narrowing and progressive stripping.",
+        "As secondary, it erodes one defense or surface channel chosen by the primary trait.",
+        "With Executioner, Vindicator exposes and strips while Executioner delivers final procedure.",
+        "With Exile, revenge may grow from erased identity, but absence must remain distinct from accusation."
+      ],
+      "compact_visual_references": {
+        "form": "one narrowed diagonal committing the whole body",
+        "surface": "layers scored, struck through and progressively erased",
+        "motion": "each contact carving closer to an exposed core",
+        "cost_mark": "the accuser corroded into one permanent grievance"
+      },
+      "prop_free_definition": "Obsessive judgment strips away every defense while reducing the accuser's body, nuance and identity to one grievance."
+    }
+  ],
+  "combination_quick_rules": [
+    "First select an art-primary trait from gameplay identity and the strongest surviving concept idea.",
+    "Assign secondary traits to material, pattern, palette, motion or cost channels that do not compete with the primary silhouette.",
+    "A third trait receives one subtle corruption or rhythm only; never give all three traits equal visual volume.",
+    "Combat role remains independently readable through stance, reach, speed and mass even when trait grammar is removed.",
+    "Individual identity must still determine face, age, body type, species, culture and form of villainy.",
+    "Test the design with color removed, effects removed and props hidden; at least one trait and the role must survive.",
+    "If two traits both claim the same channel, the primary keeps it and the secondary moves to magic behavior or supernatural cost.",
+    "No combination may erase the visible price of surviving this world."
+  ],
+  "source_evidence": [
+    "docs/art/unit_art_lore_style_gate_2026-07-01.md — world, villain and anti-generic style gate.",
+    "docs/art/unit_art_current_best_alignment_rank_2026-07-02.md — prior roster-level alignment evidence.",
+    "docs/art/top5_creep_vellum_prompt_retest_2026-07-02.md — Creep/Vellum limits and material-finish lessons.",
+    "outputs/unit_concepts/creep_horror_2026_07_05_v5_alien_divergent/concept_pack_v5.md — local-only narrow alien-horror anchor.",
+    "outputs/unit_concepts/single_test_morwen_ashvein_2026_07_05/concept_brief.md — local-only attractive-adult villain anchor.",
+    "outputs/unit_concepts/trait_outfit_correction_2026_07_05/concept_pack.md — local-only anti-uniform and controlled-color evidence.",
+    "Google design document section 11 and data/traits/*.tres — live mechanical anchors and exact 22-trait catalog."
+  ]
+}
