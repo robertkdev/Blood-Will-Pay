@@ -1,8 +1,8 @@
 extends "res://tests/visual/first_shop_choice_quality_smoke.gd"
 
 const ALL_SMOKE_NAME: String = "AllStarterMainFlowSmoke"
-const AccountProfileStoreScript: GDScript = preload("res://scripts/game/account/account_profile_store.gd")
-const TEST_ACCOUNT_PROFILE_PATH: String = "user://playtest_all_starters_account_profile.json"
+const ALL_STARTER_PROFILE_PATH: String = "user://all_starter_main_flow_account_profile.json"
+const ALL_STARTER_JOURNAL_PATH: String = "user://all_starter_main_flow_omen_journal.json"
 
 var _starter_results: Array[Dictionary] = []
 
@@ -22,10 +22,10 @@ func _run() -> void:
 	var catalog: UnitCatalog = UnitCatalogLib.new()
 	catalog.refresh()
 	var starter_ids: Array[String] = _starter_ids_for_run(catalog)
-	_prepare_test_account(starter_ids)
 	print("%s: starters=%s" % [_smoke_name(), ",".join(starter_ids)])
 	_expect(not starter_ids.is_empty(), "starter catalog should not be empty")
 	for starter_id: String in starter_ids:
+		_expect(_seed_isolated_account_profile(ALL_STARTER_PROFILE_PATH, starter_ids), "all-starter smoke profile should save")
 		var result: Dictionary = await _run_starter_main_flow(starter_id, catalog)
 		_starter_results.append(result)
 		_assert_starter_main_flow(result)
@@ -69,28 +69,8 @@ func _finish_all_starters() -> void:
 		exit_code = 1
 	_write_terminal_evidence(exit_code)
 	_cleanup_runtime()
-	AccountProfileStoreScript.clear(TEST_ACCOUNT_PROFILE_PATH)
-	await get_tree().create_timer(2.0, true, false, true).timeout
-	get_tree().quit(exit_code)
-
-func _prepare_test_account(starter_ids: Array[String]) -> void:
-	AccountProfileStoreScript.clear(TEST_ACCOUNT_PROFILE_PATH)
-	var profile: Dictionary = AccountProfileStoreScript.default_profile()
-	profile["unlocked_starter_ids"] = starter_ids.duplicate()
-	var result: Dictionary = AccountProfileStoreScript.save_profile(profile, TEST_ACCOUNT_PROFILE_PATH)
-	_expect(bool(result.get("ok", false)), "could not create isolated all-starter account profile")
-
-func _start_main_scene() -> void:
-	_main = MAIN_SCENE.instantiate() as Control
-	var unit_select: UnitSelect = _main.get_node_or_null("UnitSelect") as UnitSelect
-	if unit_select != null:
-		unit_select.account_profile_path = TEST_ACCOUNT_PROFILE_PATH
-	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_main.offset_left = 0.0
-	_main.offset_top = 0.0
-	_main.offset_right = 0.0
-	_main.offset_bottom = 0.0
-	get_tree().root.add_child(_main)
+	_clear_isolated_account_profile(ALL_STARTER_PROFILE_PATH, ALL_STARTER_JOURNAL_PATH)
+	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
 
 func _write_terminal_evidence(exit_code: int) -> void:
 	var output_dir: String = ProjectSettings.globalize_path("user://playtest_results")
@@ -146,10 +126,12 @@ func _run_starter_main_flow(starter_id: String, catalog: UnitCatalog) -> Diction
 	await _settle_frames(4)
 	var unit_select_started_reset: bool = _unit_select_reset()
 	await _ensure_unit_select()
+	await _apply_isolated_account_profile(ALL_STARTER_PROFILE_PATH)
 	await _select_starter(starter_id)
 	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	var board_repositioned: bool = false
 	if combat_opened:
+		_apply_isolated_combat_account_paths(ALL_STARTER_PROFILE_PATH, ALL_STARTER_JOURNAL_PATH)
 		_prepare_opener_planning(starter_id)
 		await _press_continue(true, "starter %s opening fight" % starter_id)
 	var first_result: String = await _wait_for_first_result(_first_fight_timeout_seconds())

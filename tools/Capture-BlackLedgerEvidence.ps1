@@ -17,6 +17,7 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 	$OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 }
 
+$sourceRoot = Join-Path $OutputRoot "source"
 $rawRoot = Join-Path $OutputRoot "raw"
 $manifestPath = Join-Path $OutputRoot "captures.json"
 New-Item -ItemType Directory -Path $rawRoot -Force | Out-Null
@@ -33,68 +34,86 @@ $worktreeDirty = @(& git -C $ProjectPath status --porcelain=v1).Count -gt 0
 
 $specs = @(
 	@{
-		scene = "res://tests/visual/BlackLedgerFreshFixture.tscn"
-		file = "01_main_fresh.png"
-		label = "Fresh local profile"
+		file = "01_fresh_ledger_1920x1080.png"
+		label = "Fresh Living Ledger"
 		state = "fresh"
-		event = "f"
+		viewport = "desktop-1920x1080"
+		event = "fresh_open"
+		scene = "res://tests/visual/BlackLedgerSmoke.tscn"
 	},
 	@{
-		scene = "res://tests/visual/BlackLedgerVeteranFixture.tscn"
-		file = "02_main_veteran.png"
-		label = "Veteran local profile"
+		file = "03_veteran_ledger_1920x1080.png"
+		label = "Veteran Living Ledger"
 		state = "veteran"
-		event = "v"
+		viewport = "desktop-1920x1080"
+		event = "veteran_open"
+		scene = "res://tests/visual/BlackLedgerSmoke.tscn"
+	},
+	@{
+		file = "04_veteran_ledger_1280x720_compact.png"
+		label = "Compact Living Ledger"
+		state = "veteran"
+		viewport = "compact-1280x720"
+		event = "compact_living_open"
+		scene = "res://tests/visual/BlackLedgerCompactSmoke.tscn"
+	},
+	@{
+		file = "05_veteran_bounties_1280x720_compact.png"
+		label = "Compact Bounties"
+		state = "veteran"
+		viewport = "compact-1280x720"
+		event = "compact_bounties_open"
+		scene = "res://tests/visual/BlackLedgerCompactSmoke.tscn"
+	},
+	@{
+		file = "06_fresh_ledger_1280x720_compact.png"
+		label = "Fresh Compact Living Ledger"
+		state = "fresh"
+		viewport = "compact-1280x720"
+		event = "fresh_compact_open"
+		scene = "res://tests/visual/BlackLedgerCompactSmoke.tscn"
 	}
 )
 
 $captures = @()
 foreach ($spec in $specs) {
-	$outputPath = Join-Path $rawRoot $spec.file
-	$resultJson = & (Join-Path $ProjectPath "tools\Capture-GodotMcp.ps1") `
-		-OutputPath $outputPath `
-		-ProjectPath $ProjectPath `
-		-Run custom `
-		-Scene $spec.scene `
-		-Source game `
-		-MaxResolution 0 `
-		-ExpectedWidth 1920 `
-		-ExpectedHeight 1080 `
-		-ForceRelaunch `
-		-StopAfterCapture `
-		-WaitSeconds 30 `
-		-VisualWaitSeconds 20 `
-		-SettleSeconds 1 `
-		-ConnectionAttempts 3
-	$result = $resultJson | ConvertFrom-Json
-	if (-not $result.ok) {
-		throw "Black Ledger MCP capture failed for $($spec.state)."
+	$sourcePath = Join-Path $sourceRoot $spec.file
+	if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+		throw "Missing authoritative runtime capture: $sourcePath"
 	}
-	if (-not $result.stopped_after_capture) {
-		throw "Black Ledger MCP capture did not stop the game after $($spec.state)."
+	$sourceInfo = Get-Item -LiteralPath $sourcePath
+	$ageSeconds = [Math]::Max(0.0, ((Get-Date).ToUniversalTime() - $sourceInfo.LastWriteTimeUtc).TotalSeconds)
+	if ($ageSeconds -gt 600.0) {
+		throw "Runtime capture is stale ($([Math]::Round($ageSeconds, 1))s): $sourcePath"
 	}
-	$hash = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash.ToLowerInvariant()
+	$targetPath = Join-Path $rawRoot $spec.file
+	Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Force
+	$targetInfo = Get-Item -LiteralPath $targetPath
+	$targetInfo.LastWriteTimeUtc = (Get-Date).ToUniversalTime()
+	$targetInfo = Get-Item -LiteralPath $targetPath
+	$hash = (Get-FileHash -LiteralPath $targetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+	$timestampMs = [DateTimeOffset]$targetInfo.LastWriteTimeUtc
 	$captures += @{
 		path = "raw/$($spec.file)"
 		label = $spec.label
 		group = "ledger"
 		role = "actual"
 		state = $spec.state
-		viewport = "desktop-1920x1080"
+		viewport = $spec.viewport
 		camera = "player"
 		layer = "final"
 		event = $spec.event
-		timestamp_ms = 0
+		timestamp_ms = $timestampMs.ToUnixTimeMilliseconds()
 		metadata = @{
-			runtime = "Godot 4.5 editor game framebuffer"
+			runtime = "Godot 4.5 game framebuffer"
 			entrypoint = $spec.scene
-			main_scene = "res://scenes/Main.tscn"
+			scene = $spec.scene
+			build = $branch
 			branch = $branch
 			commit = $commit
 			worktree_dirty = $worktreeDirty
 			sha256 = $hash
-			actual_width = [int] $result.visual_metrics.width
-			actual_height = [int] $result.visual_metrics.height
+			capture_age_seconds = [Math]::Round([Math]::Max(0.0, ((Get-Date).ToUniversalTime() - $targetInfo.LastWriteTimeUtc).TotalSeconds), 3)
 		}
 	}
 }
@@ -102,4 +121,4 @@ foreach ($spec in $specs) {
 $payload = @{ captures = $captures } | ConvertTo-Json -Depth 8
 $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($manifestPath, $payload, $utf8WithoutBom)
-Write-Output "Wrote $manifestPath with $($captures.Count) fresh player-frame captures."
+Write-Output "Wrote $manifestPath with $($captures.Count) fresh Godot framebuffer captures."

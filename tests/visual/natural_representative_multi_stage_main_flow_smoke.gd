@@ -9,6 +9,8 @@ const REPRESENTATIVE_TARGET_CHAPTER: int = 1
 const REPRESENTATIVE_TARGET_ROUND: int = 4
 const REPRESENTATIVE_MAX_BATTLES: int = 6
 const REPRESENTATIVE_ROUND_TIMEOUT: float = 190.0
+const REPRESENTATIVE_PROFILE_PATH: String = "user://representative_main_flow_account_profile.json"
+const REPRESENTATIVE_JOURNAL_PATH: String = "user://representative_main_flow_omen_journal.json"
 
 var _representative_results: Array[Dictionary] = []
 var _current_representative_starter: String = ""
@@ -37,12 +39,15 @@ func _run() -> void:
 	for sample_index: int in range(representative_starters.size()):
 		_current_representative_starter = representative_starters[sample_index]
 		_current_representative_seed = representative_seeds[sample_index]
+		_expect(_seed_isolated_account_profile(REPRESENTATIVE_PROFILE_PATH, representative_starters), "representative smoke profile should save")
 		_reset_representative_sample_state()
 		var failure_start: int = _failures.size()
 		var shop_error_start: int = _shop_errors.size()
 		_set_shop_seed(_flow_shop_seed())
 		_start_main_scene()
 		await _settle_frames(4)
+		await _ensure_unit_select()
+		await _apply_isolated_account_profile(REPRESENTATIVE_PROFILE_PATH)
 		await _run_two_stage_flow()
 		_representative_results.append(_representative_sample_output(failure_start, shop_error_start))
 		await _cleanup_between_starters()
@@ -101,7 +106,14 @@ func _finish_representative_flow() -> void:
 		print("%s: summary=%s" % [_representative_smoke_name(), JSON.stringify(_representative_result_summary())])
 		exit_code = 1
 	_cleanup_runtime()
+	_clear_isolated_account_profile(REPRESENTATIVE_PROFILE_PATH, REPRESENTATIVE_JOURNAL_PATH)
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+
+func _flow_account_profile_path() -> String:
+	return REPRESENTATIVE_PROFILE_PATH
+
+func _flow_account_journal_path() -> String:
+	return REPRESENTATIVE_JOURNAL_PATH
 
 func _reached_representative_count() -> int:
 	var count: int = 0

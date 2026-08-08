@@ -97,7 +97,8 @@ func _combat_phase_error(op: String, extra: Dictionary = {}) -> Dictionary:
 
 func reset_run() -> void:
 	# Clear state for a new run.
-	state = ShopState.new([], false if ShopConfig.CLEAR_LOCK_ON_NEW_RUN else state.locked, 0)
+	var edict_free_rerolls: int = 1 if _has_autoload("Economy") and Economy.has_method("has_ledger_edict") and bool(Economy.call("has_ledger_edict", "house_courtesy")) else 0
+	state = ShopState.new([], false if ShopConfig.CLEAR_LOCK_ON_NEW_RUN else state.locked, edict_free_rerolls)
 	_opening_starter_id = ""
 	_opening_helper_shops_consumed = 0
 	_opening_retry_team_bonus_active = false
