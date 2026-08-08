@@ -12,7 +12,7 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	var low_case: Dictionary = _run_execute_case("low_hp_threshold", 370, 1000)
+	var low_case: Dictionary = _run_execute_case("low_hp_threshold", 110, 1000)
 	var high_case: Dictionary = _run_execute_case("above_threshold", 500, 1000)
 	var metric_result: Dictionary = _run_metric_result(low_case, high_case)
 

@@ -146,7 +146,7 @@ func _check_backline_siege_on_hit_does_not_become_tank_shred(failures: Array[Str
 func _check_targeting_mode_overrides(failures: Array[String]) -> void:
 	var assassin_default: Unit = _unit("assassin_default", "assassin", "assassin.backline_elimination", ["access_backline", "execute"], 1)
 	var assassin_front: Unit = _unit("assassin_front", "assassin", "assassin.backline_elimination", ["access_backline", "execute"], 1)
-	assassin_front.set_targeting_mode_override(Targeting.TARGETING_MODE_FRONT_TO_BACK)
+	assassin_front.set_targeting_mode_override("front_to_back")
 	var tank: Unit = _unit("tank", "tank", "tank.frontline_absorb", ["damage_reduction"], 1)
 	var carry: Unit = _unit("carry", "marksman", "marksman.sustained_dps", ["long_range"], 4)
 	var default_pick: int = _pick(
@@ -167,7 +167,7 @@ func _check_targeting_mode_overrides(failures: Array[String]) -> void:
 	_expect(front_pick == 0, "front_to_back targeting mode should make even an access unit prioritize closest accessible frontline; picked=%d" % front_pick, failures)
 
 	var marksman: Unit = _unit("marksman", "marksman", "marksman.sustained_dps", ["long_range"], 4)
-	marksman.set_targeting_mode_override(Targeting.TARGETING_MODE_LOWEST_HP)
+	marksman.set_targeting_mode_override("lowest_hp")
 	var full_front: Unit = _unit("full_front", "tank", "tank.frontline_absorb", ["redirect"], 1)
 	var wounded_back: Unit = _unit("wounded_back", "mage", "mage.pick_burst", ["burst"], 4)
 	wounded_back.hp = int(float(wounded_back.max_hp) * 0.15)

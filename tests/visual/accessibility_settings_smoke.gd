@@ -176,7 +176,9 @@ func _run() -> void:
 		window.content_scale_size = viewport_size
 	if title_menu != null:
 		title_menu.call_deferred("_refresh_scaled_layout")
-	await _settle_frames(5)
+	# UI-scale changes rebuild the command-menu content on deferred frames.
+	# Wait through that rebuild so focus screenshots never capture the transient blank shell.
+	await _settle_frames(12)
 	motion_check = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	reset_button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
 	if motion_check != null:

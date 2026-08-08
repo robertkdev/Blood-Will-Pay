@@ -177,7 +177,6 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 		hits_avg_by_side[ssum] = (float(acc.get("sum", 0.0)) / max(1.0, float(nacc))) if nacc > 0 else 0.0
 	var spans: Array = []
 	var subj_pass: bool = false
-	var subj_side: String = ""
 	for side4 in ["a","b"]:
 		var passed_units: int = 0
 		var rates_map: Dictionary = rates_by_unit.get(side4, {})
@@ -222,7 +221,10 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 				ex["sustained_z"] = z
 				ex["incoming_avg"] = inc_avg
 				ex["req_incoming_avg"] = dmg_req
-				ex["focus_survival_avg_s"] = focus_avg if focus_n > 0 else null
+				if focus_n > 0:
+					ex["focus_survival_avg_s"] = focus_avg
+				else:
+					ex["focus_survival_avg_s"] = null
 				ex["hits_survived_avg"] = hits_avg
 				ex["time_alive_avg_s"] = tl_avg
 				# Include requirements for clearer reporting
@@ -259,7 +261,6 @@ func run_metric(payload: Dictionary = {}) -> Dictionary:
 					RoleCommon.append_span(spans, "unit_pass", 1, 1, true, ex)
 					if has_subject and String(uid) == subj_id:
 						subj_pass = true
-						subj_side = side4
 				else:
 					# Emit a failing per-unit span with details so callers can see why
 					RoleCommon.append_span(spans, "unit_pass", 0, 1, false, ex)

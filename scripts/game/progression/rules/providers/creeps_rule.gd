@@ -16,7 +16,7 @@ func on_pre_spawn(spec: Dictionary, _ch: int, _sic: int) -> void:
 	if not spec.has(StageTypes.KEY_RULES) or typeof(spec[StageTypes.KEY_RULES]) != TYPE_DICTIONARY:
 		spec[StageTypes.KEY_RULES] = {}
 
-func on_battle_start(state, engine, spec: Dictionary, _ch: int = 0, _sic: int = 0) -> void:
+func on_battle_start(_state, engine, spec: Dictionary, _ch: int = 0, _sic: int = 0) -> void:
 	# Build and attach a CreepRewardsRuntime if pool is configured or default should apply.
 	if engine == null:
 		return

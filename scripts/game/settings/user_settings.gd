@@ -135,12 +135,12 @@ static func _ensure_joypad_button(action: StringName, button_index: JoyButton) -
 	if not InputMap.has_action(action):
 		InputMap.add_action(action)
 	for event: InputEvent in InputMap.action_get_events(action):
-		var joypad_event: InputEventJoypadButton = event as InputEventJoypadButton
-		if joypad_event != null and joypad_event.button_index == button_index:
+		var existing_joypad_event: InputEventJoypadButton = event as InputEventJoypadButton
+		if existing_joypad_event != null and existing_joypad_event.button_index == button_index:
 			return
-	var joypad_event: InputEventJoypadButton = InputEventJoypadButton.new()
-	joypad_event.button_index = button_index
-	InputMap.action_add_event(action, joypad_event)
+	var default_joypad_event: InputEventJoypadButton = InputEventJoypadButton.new()
+	default_joypad_event.button_index = button_index
+	InputMap.action_add_event(action, default_joypad_event)
 
 static func _replace_keyboard_events(action: StringName, keyboard_events: Array[InputEventKey]) -> void:
 	if not InputMap.has_action(action):
@@ -185,8 +185,8 @@ static func _event_to_dictionary(key_event: InputEventKey) -> Dictionary[String,
 
 static func _event_from_dictionary(value: Dictionary) -> InputEventKey:
 	var key_event: InputEventKey = InputEventKey.new()
-	key_event.keycode = int(value.get("keycode", 0))
-	key_event.physical_keycode = int(value.get("physical_keycode", 0))
+	key_event.keycode = int(value.get("keycode", 0)) as Key
+	key_event.physical_keycode = int(value.get("physical_keycode", 0)) as Key
 	key_event.shift_pressed = bool(value.get("shift", false))
 	key_event.ctrl_pressed = bool(value.get("ctrl", false))
 	key_event.alt_pressed = bool(value.get("alt", false))

@@ -53,15 +53,15 @@
     },
     {
       "unit_id": "bonko", "ability_id": "bonko_bonk", "cost": 1,
-      "traits": ["Cartel", "Chronomancer"], "primary_role": "brawler", "primary_goal": "brawler.attrition_dps", "approaches": ["sustain", "ramp"],
+      "traits": ["Cartel", "Chronomancer"], "primary_role": "brawler", "primary_goal": "brawler.frontline_disruption", "approaches": ["disrupt", "lockdown", "burst"],
       "core_promise": "Bonk one enemy very hard.",
-      "player_explanation": "Bonko empowers three attacks with extra damage, wounded-target healing, and mana lock instead of performing the documented bonk.",
-      "effect_families": ["damage", "sustain", "resource"], "complexity_breach": "The live three-hit package exceeds the simple cost-1 contract and contradicts the resource description.",
+      "player_explanation": "Bonko damages and stuns one target, dealing bonus damage if that target was already stunned.",
+      "effect_families": ["damage", "hard_cc"], "complexity_breach": "",
       "team_utility": "Should provide simple single-target interruption and follow-up on allied control.", "signature_moment": "One oversized Tom-and-Jerry mallet impact with a stun starburst.",
       "counterplay": {"levers": ["CC immunity or cleanse", "bait the cast onto a tank", "control Bonko before impact"], "failure_state": "No target means no cast; CC immunity should deny stun but not damage."},
-      "verdict": "simplify", "scores": {"cohesion": 1, "uniqueness": 2, "team_utility": 1, "player_clarity": 0, "visual_satisfaction": 0, "counterplay": 1, "cost_fit": 2},
-      "problem": "The excellent one-bonk description and the empowered-attack implementation are different abilities.",
-      "direction": "Restore one direct damage-and-stun impact; remove the three-hit empowerment and healing, with bonus damage only against already-stunned targets.",
+      "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 1, "team_utility": 2, "player_clarity": 2, "visual_satisfaction": 2, "counterplay": 2, "cost_fit": 2},
+      "problem": "The runtime and identity record must remain aligned with the one-bonk interruption contract.",
+      "direction": "Keep one direct damage-and-stun impact with bonus damage only against already-stunned targets.",
       "test_cases": [
         {"id": "bonko_bonk_contract", "type": "counterplay", "assertions": ["exactly one target takes damage and stun", "already-stunned targets take the conditional bonus", "Bonko gains no healing or persistent buff"]},
         {"id": "bonko_bonk_temporal", "type": "visual", "assertions": ["one wind-up is readable", "one oversized impact hits one enemy", "no persistent empowerment aura remains"]}
@@ -394,7 +394,7 @@
     },
     {
       "unit_id": "egress", "ability_id": "egress_exit_wound", "cost": 3,
-      "traits": ["Exile", "Executioner"], "primary_role": "assassin", "primary_goal": "assassin.cleanup_execution", "approaches": ["execute", "reset_mechanic", "untargetable"],
+      "traits": ["Exile", "Executioner"], "primary_role": "assassin", "primary_goal": "assassin.cleanup_execution", "approaches": ["access_backline", "execute", "reset_mechanic", "untargetable"],
       "core_promise": "Execute an already-wounded backliner and retreat.", "player_explanation": "Egress blinks, forces most survivors down to an execute threshold, kills them, breaks shields, and retreats under vanish telemetry.",
       "effect_families": ["movement", "damage", "execute_reset", "self_defense"],
       "team_utility": "Should finish a genuinely wounded backliner and leave without chaining.", "signature_moment": "A readable mark precedes one strike and a retreat trail.",

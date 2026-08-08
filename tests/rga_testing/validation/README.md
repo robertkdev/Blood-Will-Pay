@@ -125,12 +125,9 @@ Run these scenes via MCP for headless validation and reports.
   - Scene: `tests/rga_testing/validation/HexeonGuillotineCanonicalStackProbe.tscn`
   - Proves the real Prismatic Guillotine cast consumes canonical `TraitKeys.KALEIDOSCOPE` stacks for damage scaling and canonical `TraitKeys.EXECUTIONER` stacks for the low-HP execute threshold without relying on old stack-key fallbacks.
 
-- Bonko empower contract probe
-  - Scene: `tests/rga_testing/validation/BonkoEmpowerContractProbe.tscn`
-  - Proves the current Bonk cast applies the Bonko empower tag with the expected hit count, damage/heal/mana metadata, and direct ramp-state telemetry. Bonko no longer reads legacy Striker stack helpers in the cast path.
-- Bonko on-hit proc probe
-  - Scene: `tests/rga_testing/validation/BonkoOnHitProcProbe.tscn`
-  - Proves Bonko's empowered basic attacks emit explicit on-hit proc telemetry, so the `on_hit_effect` identity approach is backed by runtime evidence.
+- Bonko Bonk contract probe
+  - Scene: `tests/rga_testing/validation/BonkoBonkContractProbe.tscn`
+  - Proves the current Bonk cast damages and stuns one target, deals conditional bonus damage to an already-stunned target, and does not apply the retired persistent empower or ramp telemetry.
 
 - Mage sustained-DPS goal positive/negative control
   - Scene: `tests/rga_testing/validation/MageSustainedDpsGoalProbe.tscn`

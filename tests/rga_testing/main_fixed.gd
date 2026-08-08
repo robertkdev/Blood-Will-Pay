@@ -166,8 +166,8 @@ func _scenario_hint_from_path(p: String) -> String:
 		return "counter"
 	return ""
 
-func _resolve_profile_path(name: String) -> String:
-	var n: String = String(name).strip_edges().to_lower()
+func _resolve_profile_path(profile_name: String) -> String:
+	var n: String = String(profile_name).strip_edges().to_lower()
 	if n == "" or n == "none":
 		return ""
 	if n.ends_with(".json") or n.ends_with(".tres") or n.find("//") >= 0 or n.find("/") >= 0 or n.find("\\") >= 0:

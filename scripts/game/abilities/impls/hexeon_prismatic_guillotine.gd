@@ -68,7 +68,7 @@ func _strike(ctx: AbilityContext, target_idx: int, power_scale: float) -> Dictio
     var res: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_idx, dmg_f, "magic")
     if not ctx.is_alive(target_team, target_idx):
         res["killed"] = true
-    if not bool(res.get("executed", false)) and tgt != null and tgt.is_alive() and bs != null:
+    if not bool(res.get("executed", false)) and target_before != null and target_before.is_alive() and bs != null:
         bs.apply_tag(ctx.state, target_team, target_idx, BuffTags.TAG_HEALING_REDUCTION_HEXEON, SUSTAIN_FRACTURE_DURATION_S, {
             "healing_received_pct": HEALING_REDUCTION_PCT,
             "shield_strength_pct": SHIELD_REDUCTION_PCT,

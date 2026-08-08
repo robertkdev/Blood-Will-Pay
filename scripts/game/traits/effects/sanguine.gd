@@ -64,7 +64,6 @@ func on_hit_applied(ctx, event: Dictionary):
 	if raw_heal <= 0:
 		return
 	var hres: Dictionary = HealingService.apply_heal(ctx.state, ctx.buff_system, team, src_idx, float(raw_heal))
-	var healed: int = int(hres.get("healed", 0))
 	var overheal: int = int(hres.get("overheal", 0))
 	_emit_heal(ctx, team, src_idx, team, src_idx, hres)
 

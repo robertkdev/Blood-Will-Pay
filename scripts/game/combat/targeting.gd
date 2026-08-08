@@ -90,6 +90,11 @@ static func pick_by_priority(attacker: Unit, source_position: Vector2, ally_team
 				current_target,
 				safe_tile_size,
 				inv_tile_size)
+		score += _screening_score(attacker_role, attacker_mask, source_position, enemy, i, enemy_team, enemy_positions, enemy_position, safe_tile_size)
+		var enemy_role_for_interrupt: String = _role(enemy)
+		var distance_tiles_for_interrupt: float = source_position.distance_to(enemy_position) * inv_tile_size
+		if attacker_role == "marksman" and (enemy_role_for_interrupt == "assassin" or enemy_role_for_interrupt == "brawler") and distance_tiles_for_interrupt <= 1.25:
+			score += 6.0
 		score += _doctrine_score(
 			String(attacker.targeting_mode_override),
 			source_position,
@@ -124,7 +129,7 @@ static func _doctrine_score(doctrine_id: String, source_position: Vector2, ally_
 	var enemy_role: String = _role(enemy)
 	match doctrine:
 		"front_to_back":
-			return max(0.0, 10.0 - distance_tiles) * 1.5
+			return max(0.0, 10.0 - distance_tiles) * 4.0
 		"backline":
 			var carry_bonus: float = 7.0 if enemy_role == "marksman" or enemy_role == "mage" or enemy_role == "support" else 0.0
 			return carry_bonus + distance_tiles * 0.8 + float(enemy.attack_range) * 0.6
@@ -137,6 +142,30 @@ static func _doctrine_score(doctrine_id: String, source_position: Vector2, ally_
 		"peel":
 			var role_bonus: float = 7.0 if enemy_role == "assassin" or enemy_role == "brawler" else 0.0
 			return role_bonus + _ally_peel_pressure_simple(ally_team, ally_positions, enemy_position, inv_tile_size)
+	return 0.0
+
+static func _screening_score(attacker_role: String, attacker_mask: int, source_position: Vector2, enemy: Unit, enemy_index: int, enemy_team: Array[Unit], enemy_positions: Array[Vector2], enemy_position: Vector2, tile_size: float) -> float:
+	if enemy == null:
+		return 0.0
+	if attacker_role == "support" and ((attacker_mask & APPROACH_PEEL) != 0 or (attacker_mask & APPROACH_LOCKDOWN) != 0):
+		return 0.0
+	var candidate_distance: float = source_position.distance_to(enemy_position)
+	for index: int in range(enemy_team.size()):
+		if index == enemy_index:
+			continue
+		var screen: Unit = enemy_team[index]
+		if screen == null or not screen.is_alive():
+			continue
+		var screen_position: Vector2 = _position_at(enemy_positions, index, enemy_position)
+		if absf(screen_position.y - enemy_position.y) > tile_size * 1.25:
+			continue
+		if source_position.distance_to(screen_position) >= candidate_distance:
+			continue
+		var screen_mask: int = _approach_mask(screen)
+		if (screen_mask & APPROACH_REDIRECT) != 0:
+			return -8.0
+		if (attacker_mask & APPROACH_ACCESS_BACKLINE) == 0:
+			return -5.0
 	return 0.0
 
 static func _ally_peel_pressure_simple(ally_team: Array[Unit], ally_positions: Array[Vector2], enemy_position: Vector2, inv_tile_size: float) -> float:
@@ -247,7 +276,12 @@ static func _score_assassin(attacker_mask: int, enemy: Unit, enemy_role: String,
 
 static func _score_marksman(attacker_mask: int, attacker_goal: String, enemy: Unit, enemy_role: String, enemy_is_carry: bool, dist_tiles: float) -> float:
 	var score: float = max(0.0, 7.0 - dist_tiles) * 0.35
-	var tank_shredder: bool = attacker_goal == "marksman.tank_shredding" or (attacker_mask & APPROACH_DEBUFF) != 0 or (attacker_mask & APPROACH_ON_HIT_EFFECT) != 0
+	if attacker_goal == "marksman.backline_siege":
+		if enemy_is_carry or enemy_role == "support":
+			score += 3.0
+		elif enemy_role == "tank" or enemy_role == "brawler":
+			score -= 1.5
+	var tank_shredder: bool = attacker_goal == "marksman.tank_shredding" or (attacker_mask & APPROACH_DEBUFF) != 0
 	if tank_shredder:
 		if enemy_role == "tank" or enemy_role == "brawler":
 			score += 2.20

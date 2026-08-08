@@ -690,7 +690,6 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_area.size_flags_horizontal = Control.SIZE_SHRINK_END
 		stats_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_area.modulate.a = 0.80 if maximum_scale_layout else 1.0
-	var stats_panel: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel") as Control
 	if stats_panel != null:
 		stats_panel.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
 		stats_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
