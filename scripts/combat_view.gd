@@ -431,7 +431,7 @@ func _apply_responsive_layout() -> void:
 		# Keep a physical 8px escape gutter below the shop chrome at enlarged UI
 		# scale. Without it, a valid internal ShopBottomGutter can still be hidden
 		# by the framebuffer edge after container rounding.
-		margin.add_theme_constant_override("margin_bottom", 8 if tight_compact else 8 if compact else 18)
+		margin.add_theme_constant_override("margin_bottom", 4 if maximum_scale_layout else 8 if tight_compact else 8 if compact else 18)
 	stage_label.visible = not compact
 	stage_label.custom_minimum_size = Vector2.ZERO if compact else Vector2(0.0, 64.0)
 	if planning_timer_label != null:
@@ -460,7 +460,7 @@ func _apply_responsive_layout() -> void:
 		board_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if planning_area != null:
 		planning_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(160.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
@@ -504,13 +504,13 @@ func _apply_responsive_layout() -> void:
 	wager_summary.autowrap_mode = TextServer.AUTOWRAP_OFF
 	wager_summary.clip_text = false
 	_set_box_separation("MarginContainer/VBoxContainer", 2 if tight_compact else 3 if compact else 3)
-	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 10 if tight_compact else 14 if compact else 20)
+	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 6 if maximum_scale_layout else 10 if tight_compact else 14 if compact else 20)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", 2 if tight_compact else 8 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn", 6 if compact else 8)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea", 2 if tight_compact else 6 if compact else 8)
 	_set_grid_separation(enemy_grid, 4 if tight_compact else 6 if compact else 8)
 	_set_grid_separation(player_grid, 4 if tight_compact else 6 if compact else 8)
-	_set_box_separation("MarginContainer/VBoxContainer/BottomStorageArea", 6 if compact else 10)
+	_set_box_separation("MarginContainer/VBoxContainer/BottomStorageArea", 2 if maximum_scale_layout else 6 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/ActionsRow", 6 if tight_compact else 10 if compact else 18)
 	_apply_shop_compact_layout(compact, tight_compact)
 	_apply_shop_action_bar_layout(compact, tight_compact)
@@ -665,7 +665,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			136.0 if tight_compact else 172.0 if compact else 286.0,
 			34.0 if tight_compact else 44.0 if compact else 48.0,
 			26.0 if tight_compact else 34.0 if compact else 40.0,
-			tight_compact
+			compact
 		)
 	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	if stats_area != null:
@@ -821,7 +821,9 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	label_plate.bg_color = Color(0.012, 0.010, 0.013, 0.91)
 	label_plate.border_color = Color(0.82, 0.07, 0.09, 0.92) if enemy_side else Color(0.76, 0.62, 0.38, 0.90)
 	label_plate.border_width_left = 4 if enemy_side else 1
-	label_plate.border_width_right = 1 if enemy_side else 4
+	# A terminal right rule reads like a clipped text delimiter beside the
+	# intentionally shortened maximum-scale "HOLD LINE" label.
+	label_plate.border_width_right = 0 if maximum_scale_layout and not enemy_side else 1 if enemy_side else 4
 	label_plate.content_margin_left = 8.0
 	label_plate.content_margin_right = 8.0
 	label.add_theme_stylebox_override("normal", label_plate)
@@ -1111,11 +1113,11 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		planning_directive.offset_right = 246.0 if tight_compact else 286.0
 		planning_directive.offset_top = 0.0 if tight_compact else 12.0
 		planning_directive.offset_bottom = 34.0 if tight_compact else 54.0
-		planning_directive.visible = true
+		planning_directive.visible = not maximum_scale_layout
 		planning_directive.z_index = 110
 		planning_directive.z_as_relative = false
 		planning_directive.set_meta("planning_action_order", "deploy>wager>commit")
-		planning_directive.set_meta("maximum_scale_disclosure", "persistent_ordered_command")
+		planning_directive.set_meta("maximum_scale_disclosure", "hidden_redundant_instruction" if maximum_scale_layout else "persistent_ordered_command")
 	if continue_button != null:
 		continue_button.set_meta("visual_role", "primary_commit")
 		continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL

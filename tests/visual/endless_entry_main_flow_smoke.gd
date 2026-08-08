@@ -151,4 +151,5 @@ func _finish_procedural_entry() -> void:
 			push_error("%s: %s" % [SMOKE_TITLE, failure])
 		exit_code = 1
 	_cleanup_runtime()
-	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	get_tree().quit(exit_code)
