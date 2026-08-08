@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Check out candidate
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Install pinned Godot 4.5 and export templates
         id: godot
