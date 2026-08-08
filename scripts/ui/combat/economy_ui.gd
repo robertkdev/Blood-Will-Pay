@@ -184,7 +184,7 @@ func refresh() -> void:
 		all_in_button.visible = not in_combat and not forced_first_fight
 		_refresh_all_in_visual(in_combat, forced_first_fight)
 
-	# Hide static "Bet:" labels whenever the slider is hidden; bet_value carries the state copy.
+	# Hide static "Wager:" labels whenever the slider is hidden; bet_value carries the state copy.
 	if _bet_row:
 		_bet_row.tooltip_text = "Opening fight uses the default blood wager. Wager controls open after the first shop." if forced_first_fight else ""
 		for ch: Node in _bet_row.get_children():

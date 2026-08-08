@@ -1275,12 +1275,12 @@ func _sync_compact_resource_strip() -> void:
 	strip.visible = tight_compact
 	if not tight_compact:
 		return
-	var gold_text: String = gold_label.text.strip_edges().to_upper() if gold_label != null else "GOLD --"
+	var gold_text: String = gold_label.text.strip_edges().to_upper() if gold_label != null else "BLOOD --"
 	gold_text = gold_text.replace(":", "")
 	var progress_text: String = _compact_progress_text()
 	strip.text = "%s  //  %s" % [gold_text, progress_text]
 	strip.tooltip_text = "Current spendable gold, command level, and XP progress remain visible at enlarged UI scales."
-	strip.set_meta("decision_data_complete", gold_text.contains("GOLD") and progress_text.contains("LVL") and progress_text.contains("XP"))
+	strip.set_meta("decision_data_complete", (gold_text.contains("BLOOD") or gold_text.contains("GOLD")) and progress_text.contains("LVL") and progress_text.contains("XP"))
 
 func _ensure_compact_resource_strip() -> Label:
 	if _compact_resource_strip != null and is_instance_valid(_compact_resource_strip):

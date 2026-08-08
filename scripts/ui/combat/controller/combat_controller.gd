@@ -1853,7 +1853,7 @@ func _show_contract_market() -> void:
 		_contract_choices.add_child(button)
 	var pass_button: Button = Button.new()
 	pass_button.name = "ContractPass"
-	pass_button.text = "PASS — keep your gold and accept no new obligation"
+	pass_button.text = "PASS — keep your blood reserve and accept no new obligation"
 	pass_button.custom_minimum_size = Vector2(880.0, 48.0)
 	pass_button.add_theme_font_size_override("font_size", 18)
 	VisualTypeSystem.set_action(pass_button)
@@ -2782,7 +2782,7 @@ func _apply_first_boss_prep_gold_floor(win: bool) -> void:
 	if missing_gold <= 0:
 		return
 	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("First boss prep stipend: +%d gold." % missing_gold)
+	_on_log_line("First boss prep allocation: +%d blood." % missing_gold)
 
 func _apply_chapter_two_stability_gold_floor(win: bool) -> void:
 	if not win:
@@ -2800,7 +2800,7 @@ func _apply_chapter_two_stability_gold_floor(win: bool) -> void:
 	if missing_gold <= 0:
 		return
 	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Chapter 2 stability stipend: +%d gold." % missing_gold)
+	_on_log_line("Chapter 2 stability allocation: +%d blood." % missing_gold)
 
 func _apply_chapter_three_stability_gold_floor(win: bool) -> void:
 	if not win:
@@ -2818,7 +2818,7 @@ func _apply_chapter_three_stability_gold_floor(win: bool) -> void:
 	if missing_gold <= 0:
 		return
 	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Chapter 3 stability stipend: +%d gold." % missing_gold)
+	_on_log_line("Chapter 3 stability allocation: +%d blood." % missing_gold)
 
 func _apply_boss_prep_gold_floor(win: bool) -> void:
 	if not win:
@@ -2835,7 +2835,7 @@ func _apply_boss_prep_gold_floor(win: bool) -> void:
 	if missing_gold <= 0:
 		return
 	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Boss prep stipend: +%d gold." % missing_gold)
+	_on_log_line("Boss prep allocation: +%d blood." % missing_gold)
 
 func _apply_opening_retry_recovery(win: bool) -> void:
 	if win:
@@ -2855,7 +2855,7 @@ func _apply_opening_retry_recovery(win: bool) -> void:
 	if missing_gold <= 0:
 		return
 	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Opening retry recovery: +%d gold." % missing_gold)
+	_on_log_line("Opening retry transfusion: +%d blood." % missing_gold)
 
 func _apply_early_run_retry_recovery(win: bool) -> void:
 	if win:
@@ -2874,7 +2874,7 @@ func _apply_early_run_retry_recovery(win: bool) -> void:
 	if missing_gold <= 0:
 		return
 	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Early retry recovery: +%d gold." % missing_gold)
+	_on_log_line("Early retry transfusion: +%d blood." % missing_gold)
 
 func _start_auto_loop() -> void:
 	if not auto_combat:
