@@ -209,10 +209,9 @@ func _verify_post_shop_bet_controls() -> void:
 		_expect(armed_style != null and armed_style.texture != null and String(armed_style.texture.resource_path).ends_with("button_wager_selected.png"), "armed all-in control should use the authored selected wager state")
 	if wager_summary != null:
 		var summary_copy: String = String(wager_summary.text)
-		_expect(summary_copy.begins_with("ALL IN ARMED"), "all-in summary should expose the armed risk state: %s" % summary_copy)
-		_expect(summary_copy.contains("Wager %dg" % max_bet), "wager summary should show selected wager: %s" % summary_copy)
-		_expect(summary_copy.contains("Win ") and summary_copy.contains("Gross "), "wager summary should show odds and gross return: %s" % summary_copy)
-		_expect(summary_copy.contains("After win ") and summary_copy.contains("After loss "), "wager summary should show both bankroll outcomes: %s" % summary_copy)
+		_expect(summary_copy.begins_with("DECISION //"), "wager summary should identify the planning decision: %s" % summary_copy)
+		_expect(summary_copy.contains("ALL IN") and summary_copy.contains("RISK %dg" % max_bet), "all-in summary should expose its armed wager: %s" % summary_copy)
+		_expect(summary_copy.contains("WIN ") and summary_copy.contains("BANK W") and summary_copy.contains(" / L"), "wager summary should show odds and both bankroll outcomes: %s" % summary_copy)
 	var bottom_storage: Control = _main.find_child("BottomStorageArea", true, false) as Control if _main != null else null
 	var shop_grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer if _main != null else null
 	_expect_control_inside_viewport(bottom_storage, "post-shop footer")
@@ -254,12 +253,12 @@ func _start_and_verify_locked_max_bet() -> void:
 	_expect(int(Economy.gold) == max(0, starting_gold - selected_bet), "combat should escrow selected bet")
 	_expect(int(Economy.last_gold_start) == starting_gold, "combat should capture pre-escrow gold")
 	_expect(int(Economy.last_bet_start) == selected_bet, "combat should capture selected bet")
-	_expect(int(Economy.combat_credit_base) == expected_credit, "combat credit base should derive from the locked odds quote")
+	_expect(int(Economy.combat_credit_base) == expected_credit, "combat credit base should derive from the locked odds quote expected=%d actual=%d locked=%.4f current=%.4f" % [expected_credit, int(Economy.combat_credit_base), float(Economy.get("_locked_gross_multiplier")), float(Economy.quoted_gross_multiplier)])
 	_expect(not slider.visible, "bet slider should hide while combat is active")
 	_expect(not slider.editable, "bet slider should lock while combat is active")
 	_expect(String(value_label.text) == "Bet: %d (locked)" % selected_bet, "combat should show locked bet copy, got %s" % String(value_label.text))
 	var wager_summary: Label = _main.find_child("WagerSummary", true, false) as Label if _main != null else null
-	_expect(wager_summary != null and String(wager_summary.text).contains("locked"), "combat should show visibly locked wager summary")
+	_expect(wager_summary != null and String(wager_summary.text).to_upper().contains("LOCKED"), "combat should show visibly locked wager summary")
 	var ignored_ok: bool = Economy.set_bet(1)
 	_expect(ignored_ok, "set_bet during Main-scene combat should report existing positive wager")
 	_expect(int(Economy.current_bet) == selected_bet, "set_bet during Main-scene combat should not change wager")
@@ -315,4 +314,5 @@ func _finish() -> void:
 			push_error(SMOKE_NAME + ": " + failure)
 		exit_code = 1
 	_cleanup_runtime()
-	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	get_tree().quit(exit_code)
