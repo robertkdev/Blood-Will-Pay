@@ -348,6 +348,36 @@ window.GAMBLE_BATTLE_UNIT_ART_HISTORY = {
 			status: "Latest review candidate; no default change",
 			local_path: "history/pilfer/pilfer-review-v1.png",
 			path: "tools/art/history/pilfer/pilfer-review-v1.png"
+		},
+		{
+			unit: "korath",
+			source_unit: "korath",
+			kind: "candidate",
+			version: "Review V1",
+			label: "Gold-light tablet action concept",
+			status: "Historical review candidate; no default change",
+			local_path: "history/korath/korath-review-v1.png",
+			path: "tools/art/history/korath/korath-review-v1.png"
+		},
+		{
+			unit: "korath",
+			source_unit: "korath",
+			kind: "candidate",
+			version: "Review V2",
+			label: "Violet-ivory contained-energy tablet concept",
+			status: "Latest review candidate; no default change",
+			local_path: "history/korath/korath-review-v2.png",
+			path: "tools/art/history/korath/korath-review-v2.png"
+		},
+		{
+			unit: "quillith",
+			source_unit: "quillith",
+			kind: "candidate",
+			version: "Review V1",
+			label: "Qylith floating cocoon-monstrosity",
+			status: "Latest review candidate; no default change",
+			local_path: "history/quillith/quillith-review-v1-qylith-cocoon.png",
+			path: "tools/art/history/quillith/quillith-review-v1-qylith-cocoon.png"
 		}
 	],
 	excluded_source_categories: [
