@@ -1,5 +1,6 @@
 [gd_scene load_steps=18 format=3 uid="uid://cs1wvmj4qc8xt"]
 
+[ext_resource type="PackedScene" uid="uid://bq7rbbhqrjhrt" path="res://scenes/CombatView.tscn" id="1"]
 [ext_resource type="Script" uid="uid://dgmadxqjln56b" path="res://scripts/main.gd" id="2"]
 [ext_resource type="PackedScene" uid="uid://dmyvfgesh7dsg" path="res://scenes/UnitSelect.tscn" id="3"]
 [ext_resource type="Shader" uid="uid://cgfcra2jd0xaq" path="res://scenes/dark_bg.gdshader" id="3_c01mt"]
@@ -151,6 +152,10 @@ theme_override_styles/pressed = SubResource("StyleBoxTexture_btn_press")
 theme_override_styles/hover = SubResource("StyleBoxTexture_btn_hover")
 theme_override_styles/focus = SubResource("StyleBoxTexture_btn_hover")
 text = "Quit"
+
+[node name="CombatView" parent="." instance=ExtResource("1")]
+visible = false
+layout_mode = 1
 
 [node name="UnitSelect" parent="." instance=ExtResource("3")]
 visible = false

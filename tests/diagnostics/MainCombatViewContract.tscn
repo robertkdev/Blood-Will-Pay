@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/diagnostics/main_combat_view_contract.gd" id="1"]
+
+[node name="MainCombatViewContract" type="Node"]
+script = ExtResource("1")
