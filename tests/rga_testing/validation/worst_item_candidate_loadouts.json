@@ -1,0 +1,124 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "candidate_creep_dagger_shiv_lifetaker",
+      "focus_unit_ids": ["creep"],
+      "items_by_unit": {"creep": ["dagger", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "candidate_creep_dagger_shiv_gamblers_eye",
+      "focus_unit_ids": ["creep"],
+      "items_by_unit": {"creep": ["dagger", "shiv", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "candidate_creep_mind_siphon_shiv_lifetaker",
+      "focus_unit_ids": ["creep"],
+      "items_by_unit": {"creep": ["mind_siphon", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "candidate_creep_lifetaker_shiv_hemothorn",
+      "focus_unit_ids": ["creep"],
+      "items_by_unit": {"creep": ["lifetaker", "shiv", "hemothorn"]}
+    },
+    {
+      "scenario_id": "candidate_noxley_arc_dice_orb_clockwork",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["arc_dice", "orb_on_a_stick", "clockwork"]}
+    },
+    {
+      "scenario_id": "candidate_noxley_largewand_orb_clockwork",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["largewand", "orb_on_a_stick", "clockwork"]}
+    },
+    {
+      "scenario_id": "candidate_noxley_mageheart_orb_clockwork",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "orb_on_a_stick", "clockwork"]}
+    },
+    {
+      "scenario_id": "candidate_noxley_arc_dice_orb_spellblade",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["arc_dice", "orb_on_a_stick", "spellblade"]}
+    },
+    {
+      "scenario_id": "candidate_saffron_conductor_orb_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["conductor", "orb_on_a_stick", "vital_battery"]}
+    },
+    {
+      "scenario_id": "candidate_saffron_anchor_orb_conductor",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["anchor", "orb_on_a_stick", "conductor"]}
+    },
+    {
+      "scenario_id": "candidate_saffron_codex_orb_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["codex", "orb_on_a_stick", "vital_battery"]}
+    },
+    {
+      "scenario_id": "candidate_saffron_windwall_orb_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["windwall", "orb_on_a_stick", "vital_battery"]}
+    },
+    {
+      "scenario_id": "candidate_quorra_mind_siphon_relay_vengeance",
+      "focus_unit_ids": ["quorra"],
+      "items_by_unit": {"quorra": ["mind_siphon", "relay", "vengeance"]}
+    },
+    {
+      "scenario_id": "candidate_quorra_dagger_shiv_lifetaker",
+      "focus_unit_ids": ["quorra"],
+      "items_by_unit": {"quorra": ["dagger", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "candidate_quorra_lifetaker_shiv_vengeance",
+      "focus_unit_ids": ["quorra"],
+      "items_by_unit": {"quorra": ["lifetaker", "shiv", "vengeance"]}
+    },
+    {
+      "scenario_id": "candidate_quorra_mind_siphon_shiv_lifetaker",
+      "focus_unit_ids": ["quorra"],
+      "items_by_unit": {"quorra": ["mind_siphon", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "candidate_teller_bandana_clockwork_dagger",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["bandana", "clockwork", "dagger"]}
+    },
+    {
+      "scenario_id": "candidate_teller_clockwork_hyperstone_shiv",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["clockwork", "hyperstone", "shiv"]}
+    },
+    {
+      "scenario_id": "candidate_teller_shiv_spellblade_hyperstone",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["shiv", "spellblade", "hyperstone"]}
+    },
+    {
+      "scenario_id": "candidate_teller_shiv_bandana_clockwork",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["shiv", "bandana", "clockwork"]}
+    },
+    {
+      "scenario_id": "candidate_hexeon_relay_shiv_lifetaker",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["relay", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "candidate_hexeon_relay_shiv_gamblers_eye",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["relay", "shiv", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "candidate_hexeon_dagger_shiv_gamblers_eye",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["dagger", "shiv", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "candidate_hexeon_mind_siphon_shiv_lifetaker",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["mind_siphon", "shiv", "lifetaker"]}
+    }
+  ]
+}

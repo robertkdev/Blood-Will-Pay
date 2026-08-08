@@ -10,7 +10,7 @@ Terminology: capital-C `Creep` (`data/units/creep.tres`) is a playable roster un
 | Bastionne | bastionne | tank | tank.single_target_lockdown | lockdown, redirect, cc_immunity | res://data/identity/unit_identities/bastionne_identity.tres |
 | Berebell | berebell | brawler | brawler.attrition_dps | sustain, reposition, burst | res://data/identity/unit_identities/berebell_identity.tres |
 | Bo | bo | brawler | brawler.skirmish_dive | disrupt, reposition | res://data/identity/unit_identities/bo_identity.tres |
-| Bonko | bonko | brawler | brawler.attrition_dps | sustain, ramp | res://data/identity/unit_identities/bonko_identity.tres |
+| Bonko | bonko | brawler | brawler.attrition_dps | sustain, ramp, on_hit_effect | res://data/identity/unit_identities/bonko_identity.tres |
 | Brute | brute | tank | tank.frontline_absorb | engage, damage_reduction, lockdown | res://data/identity/unit_identities/brute_identity.tres |
 | Caldera | caldera | tank | tank.initiate_fight | engage, zone, aoe | res://data/identity/unit_identities/caldera_identity.tres |
 | Mara | mara | mage | mage.pick_burst | burst | res://data/identity/unit_identities/mara_identity.tres |

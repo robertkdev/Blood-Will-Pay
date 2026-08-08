@@ -95,6 +95,8 @@ func run_all(settings: RGASettings) -> int:
 			# Orientation 2: swapped (attacker=B vs defender=A)
 			if include_swapped:
 				var j2: DataModels.SimJob = _clone_job_swapped(base, settings, sim_idx)
+				# Orientation is the treatment; keep RNG paired with orientation 1.
+				j2.seed = j1.seed
 				sim_idx += 1
 				_sim_counter += 1
 				var sim2 := LockstepSimulator.new()

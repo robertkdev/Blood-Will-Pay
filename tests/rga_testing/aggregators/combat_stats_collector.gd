@@ -18,6 +18,7 @@ var _mana_last_a: Array = []
 var _mana_last_b: Array = []
 var _death_time_a: Array = []
 var _death_time_b: Array = []
+var _has_committed_cast_signal: bool = false
 
 func attach(engine, state: BattleState, player_is_team_a: bool) -> void:
     _engine = engine
@@ -36,6 +37,7 @@ func attach(engine, state: BattleState, player_is_team_a: bool) -> void:
     _mana_last_b = []
     _death_time_a = []
     _death_time_b = []
+    _has_committed_cast_signal = false
     _init_unit_arrays()
     _connect_engine_signals()
 
@@ -50,6 +52,8 @@ func _disconnect_engine_signals() -> void:
         return
     if _engine.has_signal("hit_applied") and _engine.is_connected("hit_applied", Callable(self, "_on_hit_applied")):
         _engine.hit_applied.disconnect(_on_hit_applied)
+    if _engine.has_signal("redirected_damage_applied") and _engine.is_connected("redirected_damage_applied", Callable(self, "_on_redirected_damage_applied")):
+        _engine.redirected_damage_applied.disconnect(_on_redirected_damage_applied)
     if _engine.has_signal("heal_applied") and _engine.is_connected("heal_applied", Callable(self, "_on_heal_applied")):
         _engine.heal_applied.disconnect(_on_heal_applied)
     if _engine.has_signal("shield_absorbed") and _engine.is_connected("shield_absorbed", Callable(self, "_on_shield_absorbed")):
@@ -60,12 +64,17 @@ func _disconnect_engine_signals() -> void:
         _engine.hit_overkill.disconnect(_on_hit_overkill)
     if _engine.has_signal("hit_components") and _engine.is_connected("hit_components", Callable(self, "_on_hit_components")):
         _engine.hit_components.disconnect(_on_hit_components)
+    if _engine.has_signal("ability_committed") and _engine.is_connected("ability_committed", Callable(self, "_on_ability_committed")):
+        _engine.ability_committed.disconnect(_on_ability_committed)
+    _has_committed_cast_signal = false
 
 func _connect_engine_signals() -> void:
     if _engine == null:
         return
     if _engine.has_signal("hit_applied") and not _engine.is_connected("hit_applied", Callable(self, "_on_hit_applied")):
         _engine.hit_applied.connect(_on_hit_applied)
+    if _engine.has_signal("redirected_damage_applied") and not _engine.is_connected("redirected_damage_applied", Callable(self, "_on_redirected_damage_applied")):
+        _engine.redirected_damage_applied.connect(_on_redirected_damage_applied)
     if _engine.has_signal("heal_applied") and not _engine.is_connected("heal_applied", Callable(self, "_on_heal_applied")):
         _engine.heal_applied.connect(_on_heal_applied)
     if _engine.has_signal("shield_absorbed") and not _engine.is_connected("shield_absorbed", Callable(self, "_on_shield_absorbed")):
@@ -76,6 +85,10 @@ func _connect_engine_signals() -> void:
         _engine.hit_overkill.connect(_on_hit_overkill)
     if _engine.has_signal("hit_components") and not _engine.is_connected("hit_components", Callable(self, "_on_hit_components")):
         _engine.hit_components.connect(_on_hit_components)
+    if _engine.has_signal("ability_committed"):
+        _has_committed_cast_signal = true
+        if not _engine.is_connected("ability_committed", Callable(self, "_on_ability_committed")):
+            _engine.ability_committed.connect(_on_ability_committed)
 
 func _init_unit_arrays() -> void:
     _units["a"] = []
@@ -151,13 +164,13 @@ func tick(delta_s: float) -> void:
     for i in range(min(arr_a.size(), _mana_last_a.size())):
         var unit_a = arr_a[i]
         var mana_now := int(unit_a.mana) if unit_a else 0
-        if _mana_last_a[i] > 0 and mana_now == 0:
+        if not _has_committed_cast_signal and _mana_last_a[i] > 0 and mana_now == 0:
             _inc_cast("a", i)
         _mana_last_a[i] = mana_now
     for j in range(min(arr_b.size(), _mana_last_b.size())):
         var unit_b = arr_b[j]
         var mana_now_b := int(unit_b.mana) if unit_b else 0
-        if _mana_last_b[j] > 0 and mana_now_b == 0:
+        if not _has_committed_cast_signal and _mana_last_b[j] > 0 and mana_now_b == 0:
             _inc_cast("b", j)
         _mana_last_b[j] = mana_now_b
 
@@ -220,6 +233,20 @@ func _on_hit_applied(team: String, sidx: int, tidx: int, _rolled: int, dealt: in
         _mark_death(dst_key, tidx)
         _increment_team_and_unit(src_key, sidx, "kills")
 
+func _on_redirected_damage_applied(source_team: String, source_index: int, _original_target_team: String, _original_target_index: int, redirect_team: String, redirect_index: int, dealt_damage: int, _before_hp: int, after_hp: int, _kind: String) -> void:
+    var source_side: String = _team_key(source_team)
+    var redirect_side: String = _team_key(redirect_team)
+    var amount: int = max(0, dealt_damage)
+    if source_side == "" or redirect_side == "" or amount <= 0:
+        return
+    _add_team_and_unit(source_side, source_index, "damage", amount)
+    _increase_unit(redirect_side, redirect_index, "incoming", amount)
+    _increase_unit(redirect_side, redirect_index, "post_mit_incoming", amount)
+    _maybe_set_first_hit(source_side, source_index)
+    if after_hp <= 0:
+        _mark_death(redirect_side, redirect_index)
+        _increment_team_and_unit(source_side, source_index, "kills")
+
 func _on_heal_applied(_st: String, _si: int, tt: String, ti: int, healed: int, _overheal: int, _bhp: int, _ahp: int) -> void:
     var dst_key := _team_key(tt)
     if dst_key == "":
@@ -249,6 +276,12 @@ func _on_hit_overkill(st: String, si: int, _tt: String, _ti: int, overkill: int)
 
 func _on_hit_components(_st: String, _si: int, _tt: String, _ti: int, _phys: int, _mag: int, _tru: int) -> void:
     pass
+
+func _on_ability_committed(source_team: String, source_index: int, _ability_id: String, _target_team: String, _target_index: int, _position: Vector2, _cooldown_s: float, _commitment_kind: String) -> void:
+    var side: String = _team_key(source_team)
+    if side == "":
+        return
+    _inc_cast(side, source_index)
 
 func _source_team_key(team_str: String) -> String:
     var t := String(team_str)
