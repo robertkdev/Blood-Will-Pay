@@ -12,6 +12,10 @@ func configure(catalog: UnitCatalog, rng: ShopRng) -> void:
 	_catalog = catalog
 	_rng = rng
 
+func clear_runtime() -> void:
+	_catalog = null
+	_rng = null
+
 func roll(level: int, count: int = ShopConfig.SLOT_COUNT) -> Array[ShopOffer]:
 	# Generate up to `count` offers using odds by level and the unit catalog.
 	var out: Array[ShopOffer] = []

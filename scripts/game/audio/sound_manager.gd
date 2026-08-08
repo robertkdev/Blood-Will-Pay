@@ -23,6 +23,7 @@ func _ready() -> void:
 	_catalog.reload()
 
 func _exit_tree() -> void:
+	clear_runtime()
 	_key_by_id.clear()
 	if _pool != null:
 		if _pool.is_connected("playback_finished", Callable(self, "_on_pool_playback_finished")):
@@ -34,6 +35,13 @@ func _exit_tree() -> void:
 		_catalog.clear()
 		_catalog.free()
 		_catalog = null
+
+func clear_runtime() -> void:
+	_key_by_id.clear()
+	if _pool != null:
+		_pool.stop_all()
+	if _catalog != null:
+		_catalog.clear()
 
 func reload() -> void:
 	_catalog.reload()
@@ -63,9 +71,10 @@ func play(key_or_path: String, options: Dictionary = {}) -> int:
 		# Attempt loading directly if a res:// path was provided
 		var path: String = String(key_or_path)
 		if path.begins_with("res://") and ResourceLoader.exists(path):
-			var res = load(path)
-			if res is AudioStream:
-				stream = res
+			var resource: Resource = ResourceLoader.load(path, "AudioStream", ResourceLoader.CACHE_MODE_IGNORE)
+			var direct_stream: AudioStream = resource as AudioStream
+			if direct_stream != null:
+				stream = direct_stream
 				# If loaded directly, also register under id for future use
 				# (Optional; skip to avoid mutation of catalog state)
 	if stream == null:

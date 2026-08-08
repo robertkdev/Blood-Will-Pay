@@ -1,10 +1,11 @@
 extends AbilityImplBase
 
-const DAMAGE_BASE: Array[int] = [165, 250, 380]
-const DOT_DAMAGE: Array[int] = [38, 58, 88]
+const DAMAGE_BASE: Array[int] = [205, 310, 470]
+const DOT_DAMAGE: Array[int] = [48, 72, 110]
 const SP_RATIO: float = 0.95
-const HEALTH_COST_PCT: float = 0.07
-const HEAL_PCT: float = 0.34
+const HEALTH_COST_PCT: float = 0.04
+const MANA_REFUND: int = 20
+const HEAL_PCT: float = 0.40
 const DOT_TICKS: int = 6
 const DOT_INTERVAL: float = 0.45
 
@@ -18,7 +19,6 @@ func cast(ctx: AbilityContext) -> bool:
 	var caster: Unit = ctx.unit_at(ctx.caster_team, ctx.caster_index)
 	if caster == null or not caster.is_alive():
 		return false
-	_spend_health(ctx, caster)
 	var targets: Array[int] = ctx.two_nearest_enemies(ctx.caster_team)
 	if targets.is_empty():
 		var fallback: int = ctx.lowest_hp_enemy(ctx.caster_team)
@@ -26,6 +26,8 @@ func cast(ctx: AbilityContext) -> bool:
 			targets.append(fallback)
 	if targets.is_empty():
 		return false
+	_spend_health(ctx, caster)
+	ctx.request_post_cast_mana_refund(MANA_REFUND)
 	var level_index: int = _level_index(caster)
 	var damage: float = float(DAMAGE_BASE[level_index]) + SP_RATIO * float(caster.spell_power)
 	for target_index: int in targets:
@@ -33,9 +35,12 @@ func cast(ctx: AbilityContext) -> bool:
 		if bool(result.get("processed", false)):
 			var dealt: float = float(result.get("dealt", damage))
 			ctx.heal_single(ctx.caster_team, ctx.caster_index, dealt * HEAL_PCT)
+			_record_dot_debuff_presence(ctx, target_team, target_index, level_index)
 			if ctx.engine.ability_system != null:
+				var static_center: Vector2 = ctx.position_of(target_team, target_index)
 				ctx.engine.ability_system.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, DOT_INTERVAL, {
 					"target_index": target_index,
+					"center": static_center,
 					"damage": DOT_DAMAGE[level_index],
 					"damage_type": "magic",
 					"ticks_left": DOT_TICKS,
@@ -45,6 +50,20 @@ func cast(ctx: AbilityContext) -> bool:
 				})
 	ctx.log("Red Static: chained through %d targets" % targets.size())
 	return true
+
+func _record_dot_debuff_presence(ctx: AbilityContext, target_team: String, target_index: int, level_index: int) -> void:
+	if ctx.buff_system == null:
+		return
+	# The source stack is deliberately nestable: direct-contract casts need an
+	# explicit owner, while AbilitySystem casts retain their outer owner after
+	# this balanced push/pop pair.
+	ctx.buff_system.push_source(ctx.caster_team, ctx.caster_index, "ability")
+	ctx.buff_system.record_debuff(ctx.state, target_team, target_index, "noxley_red_static_dot", {
+		"damage_per_tick": DOT_DAMAGE[level_index],
+		"ticks": DOT_TICKS,
+		"interval": DOT_INTERVAL
+	}, float(DOT_DAMAGE[level_index] * DOT_TICKS), float(DOT_TICKS) * DOT_INTERVAL)
+	ctx.buff_system.pop_source()
 
 func _spend_health(ctx: AbilityContext, caster: Unit) -> void:
 	var cost: int = int(max(1.0, round(float(caster.max_hp) * HEALTH_COST_PCT)))

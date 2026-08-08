@@ -22,6 +22,8 @@ func _run() -> void:
 	var hexeon_zero_bonus_result: Dictionary = _run_case("hexeon_zero_bonus", HEXEON_ID, 120, 0, 120, 20, 0.30, 0.20)
 	var morrak_zero_bonus_result: Dictionary = _run_case("morrak_zero_bonus", MORRAK_ID, 120, 0, 120, 20, 0.30, 0.20)
 	var weak_result: Dictionary = _run_case("weak_execute", HEXEON_ID, 120, 0, 200, 80, 0.30, 0.40)
+	var threshold_window_result: Dictionary = _run_case("morrak_threshold_window", MORRAK_ID, 0, 40, 120, 40, 0.35, 0.333333333333333)
+	var sparse_metric: Dictionary = _run_sparse_metric(MORRAK_ID, morrak_full_result.get("result", {}))
 
 	var hexeon_full_rec: Dictionary = hexeon_full_result.get("rec", {})
 	var morrak_full_rec: Dictionary = morrak_full_result.get("rec", {})
@@ -32,6 +34,7 @@ func _run() -> void:
 	var hexeon_zero_metric: Dictionary = hexeon_zero_bonus_result.get("metric", {})
 	var morrak_zero_metric: Dictionary = morrak_zero_bonus_result.get("metric", {})
 	var weak_metric: Dictionary = weak_result.get("metric", {})
+	var threshold_window_metric: Dictionary = threshold_window_result.get("metric", {})
 
 	var hexeon_full_pass: bool = bool(hexeon_full_metric.get("pass", false))
 	var morrak_full_pass: bool = bool(morrak_full_metric.get("pass", false))
@@ -40,6 +43,8 @@ func _run() -> void:
 	var hexeon_zero_pass: bool = bool(hexeon_zero_metric.get("pass", false))
 	var morrak_zero_pass: bool = bool(morrak_zero_metric.get("pass", false))
 	var weak_pass: bool = bool(weak_metric.get("pass", false))
+	var sparse_pass: bool = bool(sparse_metric.get("pass", false))
+	var threshold_window_pass: bool = bool(threshold_window_metric.get("pass", false))
 	var hexeon_bonus_share: float = float(hexeon_full_rec.get("execute_bonus_damage_share", 0.0))
 	var morrak_bonus_share: float = float(morrak_full_rec.get("execute_bonus_damage_share", 0.0))
 	var hexeon_full_bonus_span: bool = _has_span(hexeon_full_metric, "subject_execute_bonus_damage_share", true)
@@ -49,6 +54,8 @@ func _run() -> void:
 	var hexeon_zero_bonus_span: bool = _has_span(hexeon_zero_metric, "subject_execute_bonus_damage_share", false)
 	var morrak_zero_bonus_span: bool = _has_span(morrak_zero_metric, "subject_execute_bonus_damage_share", false)
 	var weak_low_hp_kill_span: bool = _has_span(weak_metric, "subject_low_hp_kills", true)
+	var sparse_bonus_share_span: bool = _has_span(sparse_metric, "subject_execute_bonus_damage_share", true)
+	var threshold_window_kill_diagnostic: bool = _has_diagnostic_span(threshold_window_metric, "subject_low_hp_kills", "direct_execute_conversion_satisfied")
 
 	print("ExecuteBonusApproachProbe: hexeon_full_pass=", hexeon_full_pass,
 		" hexeon_bonus_share=", hexeon_bonus_share,
@@ -62,6 +69,10 @@ func _run() -> void:
 		" hexeon_zero_bonus_fail_span=", hexeon_zero_bonus_span,
 		" morrak_zero_pass=", morrak_zero_pass,
 		" morrak_zero_bonus_fail_span=", morrak_zero_bonus_span,
+		" sparse_pass=", sparse_pass,
+		" sparse_bonus_share_span=", sparse_bonus_share_span,
+		" threshold_window_pass=", threshold_window_pass,
+		" threshold_window_kill_diagnostic=", threshold_window_kill_diagnostic,
 		" weak_pass=", weak_pass)
 
 	var failed: bool = false
@@ -85,6 +96,12 @@ func _run() -> void:
 		failed = true
 	if not morrak_zero_pass or not morrak_zero_bonus_span:
 		printerr("ExecuteBonusApproachProbe: FAIL Morrak zero-bonus aggregate path did not preserve the failed bonus-share span")
+		failed = true
+	if not sparse_pass or not sparse_bonus_share_span:
+		printerr("ExecuteBonusApproachProbe: FAIL one real execute was erased by zero-event scenario rows")
+		failed = true
+	if not threshold_window_pass or not threshold_window_kill_diagnostic:
+		printerr("ExecuteBonusApproachProbe: FAIL a direct execute inside its own threshold was rejected by the generic 30% kill bucket")
 		failed = true
 	if weak_pass or weak_low_hp_kill_span:
 		printerr("ExecuteBonusApproachProbe: FAIL weak above-threshold control passed execute")
@@ -132,7 +149,49 @@ func _run_case(case_id: String, subject_id: String, base_damage: int, bonus_dama
 	kernel.call("detach")
 	return {
 		"rec": rec,
-		"metric": metric_result
+		"metric": metric_result,
+		"result": result
+	}
+
+func _run_sparse_metric(subject_id: String, active_kernel_result: Dictionary) -> Dictionary:
+	var sims: Dictionary = {}
+	for index: int in range(5):
+		var kernel_result: Dictionary = active_kernel_result if index == 0 else _empty_execute_kernel(subject_id)
+		sims["sparse_%d" % index] = {
+			"context": {
+				"team_a_ids": [subject_id],
+				"team_b_ids": [TARGET_ID]
+			},
+			"kernels": kernel_result
+		}
+	var metric: Variant = ExecuteApproachTest.new()
+	return metric.call("run_metric", {
+		"context": {
+			"scenario": "neutral",
+			"sims": sims
+		},
+		"subject_unit_ids": [subject_id]
+	})
+
+func _empty_execute_kernel(subject_id: String) -> Dictionary:
+	return {
+		"combat_patterns": {
+			"per_unit": {
+				"a": {
+					subject_id: {
+						"execute_bonus_events": 0,
+						"execute_bonus_damage": 0.0,
+						"execute_bonus_damage_share": 0.0,
+						"execute_bonus_targets": 0,
+						"execute_bonus_outside_threshold_events": 0,
+						"kill_count": 0,
+						"low_hp_kill_count": 0,
+						"overkill_rate": 0.0
+					}
+				},
+				"b": {}
+			}
+		}
 	}
 
 func _make_state(subject_id: String, target_max_hp: int, target_hp: int) -> BattleState:

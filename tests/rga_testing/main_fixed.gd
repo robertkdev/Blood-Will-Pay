@@ -24,19 +24,19 @@ func _ready() -> void:
 func _run() -> void:
 	# Use only user-provided args (after "--") so editor defaults apply
 	var args: PackedStringArray = OS.get_cmdline_user_args()
-	var extras: Dictionary
-	var use_editor := (args.size() == 0 and bool(use_editor_params))
+	var extras: Dictionary = {}
+	var use_editor: bool = args.size() == 0 and bool(use_editor_params)
 	if use_editor:
 		extras = _build_editor_extras()
 	else:
 		extras = _parse_kv(args)
 
-	var profile_name := String(extras.get("profile", "")).strip_edges().to_lower()
-	var base_path := String(extras.get("config", "")).strip_edges()
-	var cli_cfg := _cli_to_settings_dict(extras)
-	var profile_path := _resolve_profile_path(profile_name)
+	var profile_name: String = String(extras.get("profile", "")).strip_edges().to_lower()
+	var base_path: String = String(extras.get("config", "")).strip_edges()
+	var cli_cfg: Dictionary = _cli_to_settings_dict(extras)
+	var profile_path: String = _resolve_profile_path(profile_name)
 
-	var merged := RGAConfigLoader.merge_all(
+	var merged: Dictionary = RGAConfigLoader.merge_all(
 		RGAConfigLoader.load_config(base_path),
 		RGAConfigLoader.load_config(profile_path),
 		cli_cfg
@@ -47,18 +47,26 @@ func _run() -> void:
 	# Early thresholds sanity: warn if required keys are missing
 	if RolesThresholdsChecker != null:
 		RolesThresholdsChecker.check_and_warn()
-	var pipeline := HeadlessSimPipeline.new()
-	var rows := pipeline.run_all(settings)
+	var pipeline: HeadlessSimPipeline = HeadlessSimPipeline.new()
+	var rows: int = pipeline.run_all(settings)
 	print("RGATesting: completed. rows=", rows, " out=", settings.out_path)
+	var pipeline_passed: bool = rows > 0
+	if not pipeline_passed:
+		push_error("RGATesting: pipeline produced no telemetry rows")
 
 	# Optional: run role_* metrics (e.g., Tank identity) after pipeline if enabled in editor.
+	var role_metrics_passed: bool = true
 	if profile_settings != null and bool(profile_settings.run_roles_metrics):
-		_run_roles_metrics(extras)
+		if pipeline_passed:
+			role_metrics_passed = _run_roles_metrics(extras)
+		else:
+			role_metrics_passed = false
+	var run_passed: bool = pipeline_passed and role_metrics_passed
 	if get_tree():
-		get_tree().quit()
+		get_tree().quit(0 if run_passed else 1)
 
 func _build_editor_extras() -> Dictionary:
-	var out := {}
+	var out: Dictionary = {}
 	if profile_settings != null:
 		if String(profile_settings.profile) != "":
 			out["profile"] = String(profile_settings.profile)
@@ -67,34 +75,45 @@ func _build_editor_extras() -> Dictionary:
 			out[k] = overrides[k]
 	return out
 
-func _run_roles_metrics(extras: Dictionary) -> void:
+func _run_roles_metrics(extras: Dictionary) -> bool:
 	# Determine scenario hint from intents path (editor override if present)
-	var intents_path := String(extras.get("intents", ""))
-	var scenario_hint := _scenario_hint_from_path(intents_path)
+	var intents_path: String = String(extras.get("intents", ""))
+	var scenario_hint: String = _scenario_hint_from_path(intents_path)
 	# Build metrics context from telemetry output
-	var read_path := _resolve_read_path(settings.out_path, settings.run_id)
-	var ctx := RoleMetricsContextBuilder.build(read_path, TelemetryCapabilities.all_caps(), scenario_hint)
-	var caps_present := PackedStringArray(ctx.get("caps_present", []))
+	var read_path: String = _resolve_read_path(settings.out_path, settings.run_id)
+	var ctx: Dictionary = RoleMetricsContextBuilder.build(read_path, TelemetryCapabilities.all_caps(), scenario_hint)
+	var caps_present: PackedStringArray = PackedStringArray(ctx.get("caps_present", []))
 	# Decide which metrics to run: explicit IDs, else all role_*
-	var ids: Array = []
-	var raw_ids := String(profile_settings.role_metric_ids).strip_edges()
+	var ids: Array[String] = []
+	var raw_ids: String = String(profile_settings.role_metric_ids).strip_edges()
 	if raw_ids != "":
-		for part in raw_ids.split(",", false):
-			var id := String(part).strip_edges()
-			if id != "":
-				ids.append(id)
+		for part: String in raw_ids.split(",", false):
+			var metric_id: String = String(part).strip_edges()
+			if metric_id != "":
+				ids.append(metric_id)
 	else:
 		ids = _list_role_metric_ids()
-	var result := MetricRegistry.run_all(caps_present, ctx, ids)
+	if ids.is_empty():
+		push_error("RolesMetrics: no requested role metrics were resolved")
+		return false
+	var result: Dictionary = MetricRegistry.run_all(caps_present, ctx, ids)
 	_print_summary(result)
+	var metrics: Array = result.get("metrics", []) as Array
+	var failed: int = int(result.get("failed_count", 0))
+	var skipped: int = int(result.get("skipped_count", 0))
+	var errors: int = int(result.get("error_count", 0))
+	var all_requested_resolved: bool = not metrics.is_empty() and metrics.size() == ids.size()
+	if not all_requested_resolved:
+		printerr("RolesMetrics: requested=", ids.size(), " resolved=", metrics.size())
+	return bool(result.get("passed", false)) and failed == 0 and skipped == 0 and errors == 0 and all_requested_resolved
 
-func _list_role_metric_ids() -> Array:
-	var descs := MetricRegistry.list_metrics([])
-	var out: Array = []
-	for d in descs:
-		var id := String(d.get("id", ""))
-		if id.begins_with("role_"):
-			out.append(id)
+func _list_role_metric_ids() -> Array[String]:
+	var descs: Array = MetricRegistry.list_metrics([])
+	var out: Array[String] = []
+	for d: Dictionary in descs:
+		var metric_id: String = String(d.get("id", ""))
+		if metric_id.begins_with("role_"):
+			out.append(metric_id)
 	return out
 
 func _print_summary(result: Dictionary) -> void:
@@ -102,42 +121,43 @@ func _print_summary(result: Dictionary) -> void:
 	var failed: int = int(result.get("failed_count", 0))
 	var skipped: int = int(result.get("skipped_count", 0))
 	var errors: int = int(result.get("error_count", 0))
-	var metrics: Array = result.get("metrics", [])
-	if passed_all:
+	var metrics: Array = result.get("metrics", []) as Array
+	var summary_passed: bool = passed_all and failed == 0 and skipped == 0 and errors == 0 and not metrics.is_empty()
+	if summary_passed:
 		print("RolesMetrics: PASS (failed=", failed, ", skipped=", skipped, ", errors=", errors, ")")
 	else:
 		printerr("RolesMetrics: FAIL (failed=", failed, ", skipped=", skipped, ", errors=", errors, ")")
-		for m in metrics:
-			var status := String(m.get("status", "pass"))
+		for m: Dictionary in metrics:
+			var status: String = String(m.get("status", "pass"))
 			if status != "pass":
 				printerr("  ", m.get("id"), " -> ", status, " :: ", String(m.get("message", "")))
 
 func _resolve_read_path(base: String, run_id: String) -> String:
-	var root := String(base)
+	var root: String = String(base)
 	if root.strip_edges() == "":
 		root = "user://rga_out"
-	var s := root.to_lower()
+	var s: String = root.to_lower()
 	# If explicit file (jsonl/ndjson), return it; else compute run directory
 	if s.ends_with(".jsonl") or s.ends_with(".ndjson"):
 		return root
-	var rid := String(run_id)
+	var rid: String = String(run_id)
 	if rid.strip_edges() == "":
 		rid = "default"
-	var dir := "%s/run_%s" % [root.rstrip("/\\"), rid]
+	var dir: String = "%s/run_%s" % [root.rstrip("/\\"), rid]
 	_check_dir(dir)
 	return dir
 
 func _check_dir(path: String) -> bool:
-	var trimmed := String(path).strip_edges()
+	var trimmed: String = String(path).strip_edges()
 	if trimmed == "":
 		return false
-	var err := DirAccess.make_dir_recursive_absolute(trimmed)
+	var err: Error = DirAccess.make_dir_recursive_absolute(trimmed)
 	if err == OK:
 		return true
 	return DirAccess.dir_exists_absolute(trimmed)
 
 func _scenario_hint_from_path(p: String) -> String:
-	var s := String(p).strip_edges().to_lower()
+	var s: String = String(p).strip_edges().to_lower()
 	if s == "":
 		return ""
 	if s.find("neutral") >= 0:
@@ -147,7 +167,7 @@ func _scenario_hint_from_path(p: String) -> String:
 	return ""
 
 func _resolve_profile_path(name: String) -> String:
-	var n := String(name).strip_edges().to_lower()
+	var n: String = String(name).strip_edges().to_lower()
 	if n == "" or n == "none":
 		return ""
 	if n.ends_with(".json") or n.ends_with(".tres") or n.find("//") >= 0 or n.find("/") >= 0 or n.find("\\") >= 0:
@@ -165,9 +185,9 @@ func _resolve_profile_path(name: String) -> String:
 			return ""
 
 func _cli_to_settings_dict(kv: Dictionary) -> Dictionary:
-	var d := {}
-	var keys := ["run_id", "sim_seed_start", "deterministic", "team_sizes", "repeats", "timeout", "abilities", "ability_metrics", "out", "aggregates_only", "include_swapped"]
-	for key in keys:
+	var d: Dictionary = {}
+	var keys: Array[String] = ["run_id", "sim_seed_start", "deterministic", "team_sizes", "repeats", "timeout", "abilities", "ability_metrics", "out", "aggregates_only", "include_swapped"]
+	for key: String in keys:
 		if kv.has(key):
 			d[_map_key(key)] = kv[key]
 	if kv.has("role"):
@@ -194,16 +214,16 @@ func _map_key(k: String) -> String:
 			return k
 
 func _parse_kv(argv: PackedStringArray) -> Dictionary:
-	var out := {}
-	var seen_sep := false
-	for a in argv:
+	var out: Dictionary = {}
+	var seen_sep: bool = false
+	for a: String in argv:
 		if a == "--":
 			seen_sep = true
 			continue
-		var s := String(a)
+		var s: String = String(a)
 		if (not seen_sep) and (not s.contains("=")):
 			continue
-		var parts := s.split("=", false, 2)
+		var parts: PackedStringArray = s.split("=", false, 2)
 		if parts.size() == 2:
 			out[parts[0].lstrip("-")] = parts[1]
 	return out

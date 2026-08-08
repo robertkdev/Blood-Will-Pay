@@ -414,13 +414,32 @@ func get_button_bar() -> HBoxContainer:
 func _ensure_message_label() -> void:
 	if _message_label and is_instance_valid(_message_label):
 		return
-	var host := (_panel.get_host_container() if _panel else null)
+	var host: Control = _parent as Control
+	if host == null and _panel != null:
+		host = _panel.get_host_container()
 	if host == null:
 		return
 	_message_label = Label.new()
+	_message_label.name = "ShopMessageOverlay"
 	_message_label.modulate = Color(1,0.6,0.6,0.95)
+	_message_label.visible = false
+	_message_label.z_index = 175
+	_message_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_message_label.anchor_left = 0.5
+	_message_label.anchor_right = 0.5
+	_message_label.anchor_top = 1.0
+	_message_label.anchor_bottom = 1.0
+	_message_label.offset_left = -260.0
+	_message_label.offset_right = 260.0
+	_message_label.offset_top = -214.0
+	_message_label.offset_bottom = -174.0
+	_message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_message_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_message_label.add_theme_font_size_override("font_size", 15)
+	_message_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.56, 0.98))
+	_message_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
+	_message_label.add_theme_constant_override("outline_size", 2)
 	host.add_child(_message_label)
-	host.move_child(_message_label, 1) # below buttons
 	if _message_timer == null or not is_instance_valid(_message_timer):
 		_message_timer = Timer.new()
 		_message_timer.one_shot = true

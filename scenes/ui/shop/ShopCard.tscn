@@ -29,7 +29,6 @@ texture = SubResource("GradientTexture2D_1ap5a")
 metadata/_edit_use_anchors_ = true
 
 [node name="Icon" type="TextureRect" parent="."]
-custom_minimum_size = Vector2(112, 112)
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.0138889
@@ -114,12 +113,13 @@ anchor_top = 1.0
 anchor_right = 0.76
 anchor_bottom = 1.0
 offset_left = 8.0
-offset_top = -23.0
+offset_top = -25.0
 offset_right = -4.0
-offset_bottom = -2.0
+offset_bottom = -5.0
 grow_vertical = 0
 text = "?"
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Price" type="Label" parent="."]
 modulate = Color(0.95, 0.72, 0.36, 0.95)
@@ -130,11 +130,12 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 0.0
-offset_top = -23.0
+offset_top = -25.0
 offset_right = -8.0
-offset_bottom = -2.0
+offset_bottom = -5.0
 grow_horizontal = 0
 grow_vertical = 0
 size_flags_horizontal = 8
 text = "0g"
 horizontal_alignment = 1
+vertical_alignment = 1

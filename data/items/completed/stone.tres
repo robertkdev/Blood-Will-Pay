@@ -9,7 +9,8 @@ name = "Stone"
 type = "completed"
 icon_path = "res://assets/items/stone_icon.png"
 stat_mods = {"flat_armor": 80, "flat_mr": 80}
-effects = []
+effects = ["stone"]
 components = ["plate", "veil"]
 tags = PackedStringArray("tank")
+build_axes = PackedStringArray("armor", "frontline", "magic_resist", "anti_control")
 

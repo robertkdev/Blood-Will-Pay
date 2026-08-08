@@ -12,4 +12,5 @@ stat_mods = {"pct_as": 0.60}
 effects = ["hyperstone"]
 components = ["crystal", "crystal"]
 tags = PackedStringArray("marksman")
+build_axes = PackedStringArray("attack_speed", "ramp", "on_hit")
 

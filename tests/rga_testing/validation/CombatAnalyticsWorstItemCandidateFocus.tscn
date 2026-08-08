@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/combat_analytics_gauntlet.gd" id="1"]
+
+[node name="CombatAnalyticsWorstItemCandidateFocus" type="Node"]
+script = ExtResource("1")
+output_label = "worst_item_candidate_focus"
+tile_size_px = 1.0
+unit_seeds_per_matchup = 1
+trait_seeds_per_matchup = 0
+focus_unit_ids = PackedStringArray("creep", "noxley", "saffron", "quorra", "teller", "hexeon")
+run_trait_stack = false
+candidate_item_loadouts_path = "res://tests/rga_testing/validation/worst_item_candidate_loadouts.json"
+progress_every_rows = 250

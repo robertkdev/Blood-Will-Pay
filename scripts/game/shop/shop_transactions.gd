@@ -22,6 +22,15 @@ func configure(roller: ShopRoller, roster = null) -> void:
 	_combiner = CombineService.new()
 	_combiner.configure(_roster if _roster != null else (Roster if Engine.has_singleton("Roster") else null))
 
+func clear_runtime() -> void:
+	_roller = null
+	_roster = null
+	if _combiner != null and _combiner.has_method("clear_runtime"):
+		_combiner.clear_runtime()
+	_combiner = null
+	_remove_from_board_cb = Callable()
+	_board_team_provider = Callable()
+
 func set_board_team_provider(cb: Callable) -> void:
 	_board_team_provider = cb if cb != null else Callable()
 	if _combiner != null and cb != null:
@@ -195,10 +204,21 @@ func sell_unit(u: Unit) -> Dictionary:
 		removed = _remove_from_board(u)
 		if not removed:
 			return { "ok": false, "error": ShopErrors.NOT_FOUND }
-	if Engine.has_singleton("Items") and Items.has_method("remove_all"):
-		Items.remove_all(u)
+	var items: Node = _items_singleton()
+	if items != null and items.has_method("remove_all"):
+		items.call("remove_all", u)
 	var value: int = _calculate_sell_value(u)
 	return { "ok": true, "gold_gained": value }
+
+func _items_singleton() -> Node:
+	if Engine.has_singleton("Items"):
+		return Items
+	var loop: MainLoop = Engine.get_main_loop()
+	if loop is SceneTree:
+		var tree: SceneTree = loop as SceneTree
+		if tree.root != null:
+			return tree.root.get_node_or_null("/root/Items")
+	return null
 
 func _effective_roster():
 	if _roster != null:

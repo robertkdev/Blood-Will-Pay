@@ -103,7 +103,24 @@ func _exit_tree() -> void:
 	if _effect_player != null and is_instance_valid(_effect_player) and _effect_player.has_method("dispose"):
 		_effect_player.dispose()
 	_effect_player = null
+	if sprite != null and is_instance_valid(sprite):
+		sprite.texture = null
+	if focus_plate != null and is_instance_valid(focus_plate):
+		focus_plate.remove_theme_stylebox_override("panel")
+	if bar_plate != null and is_instance_valid(bar_plate):
+		bar_plate.remove_theme_stylebox_override("panel")
+	if hp_bar != null and is_instance_valid(hp_bar):
+		hp_bar.remove_theme_stylebox_override("background")
+		hp_bar.remove_theme_stylebox_override("fill")
+	if mana_bar != null and is_instance_valid(mana_bar):
+		mana_bar.remove_theme_stylebox_override("background")
+		mana_bar.remove_theme_stylebox_override("fill")
+	if shield_bar != null and is_instance_valid(shield_bar):
+		shield_bar.remove_theme_stylebox_override("background")
+		shield_bar.remove_theme_stylebox_override("fill")
 	unit = null
+	_texture_signature_cache = ""
+	_bar_signature_cache = ""
 
 func _ensure_focus_plate() -> void:
 	if focus_plate and is_instance_valid(focus_plate):
