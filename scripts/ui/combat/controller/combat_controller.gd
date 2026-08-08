@@ -3408,6 +3408,7 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 	_set_root_control_visible("GothicItemsPlate", planning_visible)
 	_set_root_control_visible("GothicGoldPlate", planning_visible)
 	_set_root_control_visible("GothicWagerSummaryPlate", planning_visible)
+	_set_root_control_visible("GothicCommitRailPlate", planning_visible)
 	var record_mark: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	if record_mark != null:
 		record_mark.text = "FIELD RECORD // ACTIVE THREAT // NO RETREAT" if in_combat else "FIELD RECORD // DEPLOYMENT COPY // COMMIT PENDING"
