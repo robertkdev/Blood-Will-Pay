@@ -1,0 +1,612 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-24T18:20:15.795Z",
+  "modelVersion": "1.0.0",
+  "sourceCommit": "1debe922aa4482ebdc48bddf3cb6783cfa80da4b",
+  "passed": true,
+  "summary": {
+    "checks": 621,
+    "failures": 0,
+    "traits": 21,
+    "bridgeUnits": 23,
+    "plannedRoster": 72,
+    "archetypes": 9,
+    "counterPairs": 36,
+    "promisedDoubleVerticals": 4
+  },
+  "finalTraitCounts": {
+    "Aegis": 10,
+    "Arcanist": 10,
+    "Blessed": 8,
+    "Bulwark": 5,
+    "Cartel": 5,
+    "Catalyst": 4,
+    "Chronomancer": 4,
+    "Executioner": 10,
+    "Exile": 6,
+    "Fortified": 10,
+    "Harmony": 4,
+    "Kaleidoscope": 5,
+    "Liaison": 6,
+    "Mentor": 5,
+    "Overload": 7,
+    "Sanguine": 7,
+    "Scholar": 7,
+    "Striker": 10,
+    "Titan": 10,
+    "Trader": 7,
+    "Vindicator": 8
+  },
+  "traitCostCoverage": {
+    "Aegis": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "Arcanist": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "Blessed": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "Bulwark": [
+      1,
+      2,
+      4
+    ],
+    "Cartel": [
+      1,
+      3,
+      4
+    ],
+    "Catalyst": [
+      1,
+      3,
+      4,
+      5
+    ],
+    "Chronomancer": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "Executioner": [
+      1,
+      3,
+      4,
+      5
+    ],
+    "Exile": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "Fortified": [
+      1,
+      2,
+      3,
+      5
+    ],
+    "Harmony": [
+      1,
+      3,
+      5
+    ],
+    "Kaleidoscope": [
+      2,
+      3,
+      5
+    ],
+    "Liaison": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "Mentor": [
+      1,
+      2,
+      4,
+      5
+    ],
+    "Overload": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "Sanguine": [
+      1,
+      2,
+      3,
+      5
+    ],
+    "Scholar": [
+      1,
+      2,
+      3,
+      5
+    ],
+    "Striker": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "Titan": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "Trader": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "Vindicator": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "finalRoles": {
+    "assassin": 12,
+    "brawler": 12,
+    "mage": 12,
+    "marksman": 12,
+    "support": 12,
+    "tank": 12
+  },
+  "finalCosts": {
+    "1": 21,
+    "2": 18,
+    "3": 16,
+    "4": 11,
+    "5": 6
+  },
+  "matrix": {
+    "bastion": {
+      "bastion": 0,
+      "dive": 2,
+      "zone": -2,
+      "attrition": 1,
+      "wombo": -2,
+      "control": 1,
+      "wide": -1,
+      "long_siege": -1,
+      "flex": 2
+    },
+    "dive": {
+      "bastion": -2,
+      "dive": 0,
+      "zone": 1,
+      "attrition": -1,
+      "wombo": -1,
+      "control": -2,
+      "wide": 2,
+      "long_siege": 2,
+      "flex": 1
+    },
+    "zone": {
+      "bastion": 2,
+      "dive": -1,
+      "zone": 0,
+      "attrition": 1,
+      "wombo": 2,
+      "control": -1,
+      "wide": -2,
+      "long_siege": 1,
+      "flex": -2
+    },
+    "attrition": {
+      "bastion": -1,
+      "dive": 1,
+      "zone": -1,
+      "attrition": 0,
+      "wombo": 1,
+      "control": 2,
+      "wide": -2,
+      "long_siege": -2,
+      "flex": 2
+    },
+    "wombo": {
+      "bastion": 2,
+      "dive": 1,
+      "zone": -2,
+      "attrition": -1,
+      "wombo": 0,
+      "control": -2,
+      "wide": 1,
+      "long_siege": 2,
+      "flex": -1
+    },
+    "control": {
+      "bastion": -1,
+      "dive": 2,
+      "zone": 1,
+      "attrition": -2,
+      "wombo": 2,
+      "control": 0,
+      "wide": 1,
+      "long_siege": -1,
+      "flex": -2
+    },
+    "wide": {
+      "bastion": 1,
+      "dive": -2,
+      "zone": 2,
+      "attrition": 2,
+      "wombo": -1,
+      "control": -1,
+      "wide": 0,
+      "long_siege": -2,
+      "flex": 1
+    },
+    "long_siege": {
+      "bastion": 1,
+      "dive": -2,
+      "zone": -1,
+      "attrition": 2,
+      "wombo": -2,
+      "control": 1,
+      "wide": 2,
+      "long_siege": 0,
+      "flex": -1
+    },
+    "flex": {
+      "bastion": -2,
+      "dive": -1,
+      "zone": 2,
+      "attrition": -2,
+      "wombo": 1,
+      "control": 2,
+      "wide": -1,
+      "long_siege": 1,
+      "flex": 0
+    }
+  },
+  "simulations": [
+    {
+      "winner": "bastion",
+      "loser": "dive",
+      "strength": "hard",
+      "reason": "Redirect and peel deny the first reset kill.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7126
+    },
+    {
+      "winner": "bastion",
+      "loser": "flex",
+      "strength": "hard",
+      "reason": "Layered defense punishes a low-commitment or incorrect pivot.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7202
+    },
+    {
+      "winner": "dive",
+      "loser": "wide",
+      "strength": "hard",
+      "reason": "Backline access removes the amplifier before distributed value stabilizes.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.725
+    },
+    {
+      "winner": "dive",
+      "loser": "long_siege",
+      "strength": "hard",
+      "reason": "The firing line collapses once assassins breach it.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7206
+    },
+    {
+      "winner": "zone",
+      "loser": "bastion",
+      "strength": "hard",
+      "reason": "Hazards tax the clumped protection shell and route around its anchor.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.724
+    },
+    {
+      "winner": "zone",
+      "loser": "wombo",
+      "strength": "hard",
+      "reason": "Dangerous paths split engage timing before the detonation window.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7174
+    },
+    {
+      "winner": "attrition",
+      "loser": "control",
+      "strength": "hard",
+      "reason": "Delay without enough damage feeds the sustain-and-ramp clock.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7152
+    },
+    {
+      "winner": "attrition",
+      "loser": "flex",
+      "strength": "hard",
+      "reason": "A committed engine outscales shallow counter pieces.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7264
+    },
+    {
+      "winner": "wombo",
+      "loser": "bastion",
+      "strength": "hard",
+      "reason": "The protected clump supplies the ideal synchronized burst target.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7248
+    },
+    {
+      "winner": "wombo",
+      "loser": "long_siege",
+      "strength": "hard",
+      "reason": "Hard engage closes distance before siege accrues enough uptime.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7186
+    },
+    {
+      "winner": "control",
+      "loser": "dive",
+      "strength": "hard",
+      "reason": "Lockdown denies the first takedown and therefore the reset chain.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.726
+    },
+    {
+      "winner": "control",
+      "loser": "wombo",
+      "strength": "hard",
+      "reason": "Disabling the engage source breaks the cast sequence.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7192
+    },
+    {
+      "winner": "wide",
+      "loser": "attrition",
+      "strength": "hard",
+      "reason": "Distributed threats and debuff access overload one sustain axis.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7166
+    },
+    {
+      "winner": "wide",
+      "loser": "zone",
+      "strength": "hard",
+      "reason": "Spread formation reduces the value of each hazard cell.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7222
+    },
+    {
+      "winner": "long_siege",
+      "loser": "wide",
+      "strength": "hard",
+      "reason": "Source-priority range removes exposed amp and link pieces.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7122
+    },
+    {
+      "winner": "long_siege",
+      "loser": "attrition",
+      "strength": "hard",
+      "reason": "Sustained shred wins before melee uptime reaches the firing line.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.715
+    },
+    {
+      "winner": "flex",
+      "loser": "zone",
+      "strength": "hard",
+      "reason": "Source-kill and mobility pivots invalidate the chosen hazard plan.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7168
+    },
+    {
+      "winner": "flex",
+      "loser": "control",
+      "strength": "hard",
+      "reason": "Cleanse and immunity pivots turn the main lockdown investment off.",
+      "trials": 5000,
+      "expected": 0.72,
+      "observed": 0.7162
+    },
+    {
+      "winner": "bastion",
+      "loser": "attrition",
+      "strength": "soft",
+      "reason": "Peel preserves the carry long enough to race the slower engine.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.5992
+    },
+    {
+      "winner": "attrition",
+      "loser": "dive",
+      "strength": "soft",
+      "reason": "Durable midline bodies can survive imperfect threshold access.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.616
+    },
+    {
+      "winner": "dive",
+      "loser": "zone",
+      "strength": "soft",
+      "reason": "Untargetable timing can cross one hazard window, but not every lane.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6126
+    },
+    {
+      "winner": "zone",
+      "loser": "attrition",
+      "strength": "soft",
+      "reason": "Uptime denial taxes healing and ramp without directly deleting them.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.605
+    },
+    {
+      "winner": "attrition",
+      "loser": "wombo",
+      "strength": "soft",
+      "reason": "If the opener is diffuse, sustain recovers before cleanup.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6
+    },
+    {
+      "winner": "wombo",
+      "loser": "dive",
+      "strength": "soft",
+      "reason": "A clean opener can catch divers before they fan out.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6244
+    },
+    {
+      "winner": "dive",
+      "loser": "flex",
+      "strength": "soft",
+      "reason": "Fast commitment punishes a pivot that spends too long scouting.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6144
+    },
+    {
+      "winner": "flex",
+      "loser": "wombo",
+      "strength": "soft",
+      "reason": "Spread and immunity pivots can tax one scripted engage.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6146
+    },
+    {
+      "winner": "wombo",
+      "loser": "wide",
+      "strength": "soft",
+      "reason": "Distributed threats still create enough bodies for area payoff.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6062
+    },
+    {
+      "winner": "wide",
+      "loser": "bastion",
+      "strength": "soft",
+      "reason": "Multiple damage channels stretch a single protection plan.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6144
+    },
+    {
+      "winner": "bastion",
+      "loser": "control",
+      "strength": "soft",
+      "reason": "Cleanse timing and redundant carries reduce single-target control value.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6182
+    },
+    {
+      "winner": "control",
+      "loser": "zone",
+      "strength": "soft",
+      "reason": "Locking the zone source can open one safe route.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6168
+    },
+    {
+      "winner": "zone",
+      "loser": "long_siege",
+      "strength": "soft",
+      "reason": "A well-placed denial lane can force the firing line off ideal tiles.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.603
+    },
+    {
+      "winner": "long_siege",
+      "loser": "control",
+      "strength": "soft",
+      "reason": "Source pressure can remove control pieces before repeated casts.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6064
+    },
+    {
+      "winner": "control",
+      "loser": "wide",
+      "strength": "soft",
+      "reason": "Targeting the link hub temporarily collapses part of the web.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.606
+    },
+    {
+      "winner": "wide",
+      "loser": "flex",
+      "strength": "soft",
+      "reason": "Breadth makes one specific pivot insufficient.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.614
+    },
+    {
+      "winner": "flex",
+      "loser": "long_siege",
+      "strength": "soft",
+      "reason": "A correctly scouted engage or immunity package taxes static range.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6138
+    },
+    {
+      "winner": "long_siege",
+      "loser": "bastion",
+      "strength": "soft",
+      "reason": "Shred and reach can pressure the anchor without entering peel range.",
+      "trials": 5000,
+      "expected": 0.61,
+      "observed": 0.6082
+    }
+  ],
+  "failures": []
+}
