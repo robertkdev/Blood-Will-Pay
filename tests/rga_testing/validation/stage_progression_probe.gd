@@ -65,6 +65,7 @@ func _expected_kind_for_round(round_index: int) -> String:
 func _validate_creep_round(chapter: int, round_index: int, spec: Dictionary, failures: Array[String]) -> void:
 	var ids: Array = spec.get(StageTypes.KEY_IDS, [])
 	_expect(not ids.is_empty(), "creep round should have units at chapter %d round %d" % [chapter, round_index], failures)
+	_expect(ids.size() >= 2, "creep round should have multiple reward enemies at chapter %d round %d, got %d" % [chapter, round_index, ids.size()], failures)
 	for raw_id: String in ids:
 		var unit_id: String = String(raw_id).strip_edges()
 		_expect(UnitFactory.is_creep_id(unit_id), "non-creep id '%s' in creep round chapter %d round %d" % [unit_id, chapter, round_index], failures)

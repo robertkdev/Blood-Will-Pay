@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/combat_analytics_gauntlet.gd" id="1"]
+
+[node name="CombatAnalyticsGauntlet" type="Node"]
+script = ExtResource("1")
+output_label = "latest"
+tile_size_px = 1.0
+unit_seeds_per_matchup = 2
+trait_seeds_per_matchup = 1

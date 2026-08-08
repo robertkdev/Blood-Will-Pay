@@ -25,7 +25,6 @@ const COLOR_ENEMY: Color = Color(0.52, 0.045, 0.070, 0.95)
 @onready var stats_grid: GridContainer = $"VBox/StatsGrid"
 @onready var dps_label: Label = $"VBox/Footer/DPSLabel"
 @onready var casts_label: Label = $"VBox/Footer/CastsLabel"
-
 var tracker: StatsTracker = null
 var team: String = "player"
 var index: int = -1
@@ -37,6 +36,7 @@ var attack_info_label: Label = null
 var attack_targeting_label: Label = null
 var ability_info_label: Label = null
 var ability_targeting_label: Label = null
+var _compact_layout: bool = false
 
 static var diagnostics_enabled: bool = false
 static var diagnostic_dynamic_refresh_calls: int = 0
@@ -61,6 +61,16 @@ func _ready() -> void:
     _ensure_identity_styles()
     _apply_static_styles()
     set_process(false)
+
+func set_compact_layout(enabled: bool) -> void:
+    var next_compact: bool = bool(enabled)
+    if _compact_layout == next_compact:
+        return
+    _compact_layout = next_compact
+    _apply_static_styles()
+    if unit_ref != null:
+        _build_stats_grid()
+        _refresh_combat_info()
 
 func _exit_tree() -> void:
     teardown()
@@ -153,7 +163,7 @@ func _make_info_label(label_name: String) -> Label:
     label.name = label_name
     label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    label.add_theme_font_size_override("font_size", 12)
+    label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
     label.add_theme_color_override("font_color", COLOR_TEXT)
     label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.70))
     label.add_theme_constant_override("outline_size", 1)
@@ -164,37 +174,57 @@ func _ensure_identity_styles() -> void:
         role_badge.add_theme_stylebox_override("normal", _make_badge_style())
 
 func _apply_static_styles() -> void:
-    custom_minimum_size = Vector2(max(custom_minimum_size.x, 294.0), max(custom_minimum_size.y, 360.0))
+    var panel_min_width: float = 252.0 if _compact_layout else 294.0
+    custom_minimum_size = Vector2(panel_min_width, max(custom_minimum_size.y, 360.0))
     var root_box: VBoxContainer = $"VBox"
     if root_box != null:
-        root_box.add_theme_constant_override("separation", 10)
+        root_box.add_theme_constant_override("separation", 7 if _compact_layout else 10)
     var header: HBoxContainer = $"VBox/Header"
     if header != null:
-        header.add_theme_constant_override("separation", 12)
-        header.custom_minimum_size = Vector2(0.0, 78.0)
+        header.add_theme_constant_override("separation", 8 if _compact_layout else 12)
+        header.custom_minimum_size = Vector2(0.0, 64.0 if _compact_layout else 78.0)
     if portrait != null:
-        portrait.custom_minimum_size = Vector2(72.0, 72.0)
+        var portrait_size: float = 56.0 if _compact_layout else 72.0
+        portrait.custom_minimum_size = Vector2(portrait_size, portrait_size)
         portrait.modulate = Color(0.96, 0.91, 0.84, 1.0)
     if name_label != null:
-        name_label.add_theme_font_size_override("font_size", 18)
+        name_label.add_theme_font_size_override("font_size", 16 if _compact_layout else 18)
         name_label.add_theme_color_override("font_color", COLOR_TEXT)
         name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.74))
         name_label.add_theme_constant_override("outline_size", 1)
     if goal_label != null:
-        goal_label.add_theme_font_size_override("font_size", 12)
+        goal_label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
         goal_label.add_theme_color_override("font_color", COLOR_MUTED)
     if traits_label != null:
-        traits_label.add_theme_font_size_override("font_size", 13)
+        traits_label.add_theme_font_size_override("font_size", 12 if _compact_layout else 13)
         traits_label.add_theme_color_override("font_color", Color(0.84, 0.78, 0.68, 1.0))
         traits_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _style_info_labels()
+    _style_approach_tags()
     if stats_grid != null:
-        stats_grid.add_theme_constant_override("h_separation", 7)
-        stats_grid.add_theme_constant_override("v_separation", 7)
+        stats_grid.columns = 3 if _compact_layout else 4
+        stats_grid.add_theme_constant_override("h_separation", 5 if _compact_layout else 7)
+        stats_grid.add_theme_constant_override("v_separation", 5 if _compact_layout else 7)
     var footer: FlowContainer = $"VBox/Footer"
     if footer != null:
-        footer.add_theme_constant_override("h_separation", 6)
-        footer.add_theme_constant_override("v_separation", 6)
+        footer.add_theme_constant_override("h_separation", 4 if _compact_layout else 6)
+        footer.add_theme_constant_override("v_separation", 4 if _compact_layout else 6)
     _style_footer_labels()
+
+func _style_info_labels() -> void:
+    var labels: Array[Label] = [attack_info_label, attack_targeting_label, ability_info_label, ability_targeting_label]
+    for label: Label in labels:
+        if label == null or not is_instance_valid(label):
+            continue
+        label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
+
+func _style_approach_tags() -> void:
+    if approach_tags == null or not is_instance_valid(approach_tags):
+        return
+    for child: Node in approach_tags.get_children():
+        var label: Label = child as Label
+        if label != null:
+            label.add_theme_font_size_override("font_size", 11 if _compact_layout else 13)
 
 func _refresh_header() -> void:
     var tex: Texture2D = null
@@ -277,7 +307,7 @@ func _set_approach_tags(approaches: Array) -> void:
         lbl.text = label_text
         lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        lbl.add_theme_font_size_override("font_size", 13)
+        lbl.add_theme_font_size_override("font_size", 11 if _compact_layout else 13)
         lbl.add_theme_color_override("font_color", COLOR_TEXT)
         lbl.add_theme_stylebox_override("normal", _make_tag_style())
         approach_tags.add_child(lbl)
@@ -317,7 +347,7 @@ func _refresh_combat_info() -> void:
     var attack_period: float = 1.0 / max(0.01, float(unit_ref.attack_speed))
     var crit_chance: int = int(round(float(unit_ref.crit_chance) * 100.0))
     var crit_damage: String = String.num(float(unit_ref.crit_damage), 2)
-    attack_info_label.text = "Attack: basic hit deals %s physical damage every %ss at %d tiles. Crit %d%% for %sx damage." % [
+    attack_info_label.text = "Attack: %s dmg | %ss | range %d | crit %d%% x%s" % [
         _fmt(unit_ref.attack_damage),
         String.num(attack_period, 2),
         int(unit_ref.attack_range),
@@ -345,9 +375,9 @@ func _refresh_combat_info() -> void:
         description = String(ability_def.description).strip_edges()
         if int(ability_def.base_cost) > 0:
             cost = int(ability_def.base_cost)
-    var cost_text: String = " Cost: %d mana." % cost if cost > 0 else ""
-    ability_info_label.text = "Ability: %s.%s %s" % [ability_name, cost_text, description]
-    ability_info_label.tooltip_text = ability_info_label.text
+    var cost_text: String = " | %d mana" % cost if cost > 0 else ""
+    ability_info_label.text = "Ability: %s%s" % [ability_name, cost_text]
+    ability_info_label.tooltip_text = "%s\n%s" % [ability_info_label.text, description] if description != "" else ability_info_label.text
     ability_targeting_label.text = UnitTargetingText.ability_targeting_line(unit_ref)
     ability_targeting_label.tooltip_text = ability_targeting_label.text
     ability_targeting_label.visible = ability_targeting_label.text.strip_edges() != ""
@@ -379,7 +409,7 @@ func _build_stats_grid() -> void:
     ]
     for e: Array in entries:
         var card: PanelContainer = PanelContainer.new()
-        card.custom_minimum_size = Vector2(64.0, 50.0)
+        card.custom_minimum_size = Vector2(56.0 if _compact_layout else 64.0, 46.0 if _compact_layout else 50.0)
         card.add_theme_stylebox_override("panel", _make_stat_card_style())
         var box: VBoxContainer = VBoxContainer.new()
         box.add_theme_constant_override("separation", 2)
@@ -387,12 +417,12 @@ func _build_stats_grid() -> void:
         var icon: Label = Label.new()
         icon.text = String(e[0])
         icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        icon.add_theme_font_size_override("font_size", 11)
+        icon.add_theme_font_size_override("font_size", 10 if _compact_layout else 11)
         icon.add_theme_color_override("font_color", COLOR_MUTED)
         var val: Label = Label.new()
         val.text = String(e[1])
         val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        val.add_theme_font_size_override("font_size", 16)
+        val.add_theme_font_size_override("font_size", 14 if _compact_layout else 16)
         val.add_theme_color_override("font_color", COLOR_TEXT)
         val.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.72))
         val.add_theme_constant_override("outline_size", 1)
@@ -467,8 +497,8 @@ func _make_badge_style() -> StyleBoxFlat:
     sb.corner_radius_top_right = 7
     sb.corner_radius_bottom_right = 7
     sb.corner_radius_bottom_left = 7
-    sb.content_margin_left = 10
-    sb.content_margin_right = 10
+    sb.content_margin_left = 7 if _compact_layout else 10
+    sb.content_margin_right = 7 if _compact_layout else 10
     sb.content_margin_top = 4
     sb.content_margin_bottom = 4
     return sb
@@ -485,8 +515,8 @@ func _make_tag_style() -> StyleBoxFlat:
     sb.corner_radius_top_right = 6
     sb.corner_radius_bottom_right = 6
     sb.corner_radius_bottom_left = 6
-    sb.content_margin_left = 6
-    sb.content_margin_right = 6
+    sb.content_margin_left = 4 if _compact_layout else 6
+    sb.content_margin_right = 4 if _compact_layout else 6
     sb.content_margin_top = 2
     sb.content_margin_bottom = 2
     return sb
@@ -535,6 +565,6 @@ func _style_footer_labels() -> void:
         var label: Label = child as Label
         if label == null:
             continue
-        label.add_theme_font_size_override("font_size", 12)
+        label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
         label.add_theme_color_override("font_color", COLOR_TEXT)
         label.add_theme_stylebox_override("normal", _make_footer_chip_style())

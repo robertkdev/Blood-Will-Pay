@@ -415,9 +415,11 @@ func _apply_responsive_layout() -> void:
 	# spine; support rails become quieter, while Team Metrics receives enough
 	# width to keep its labels honest.
 	var maximum_scale_layout: bool = ui_scale >= 1.5 and effective_size.x <= 900.0 and effective_size.y <= 500.0
+	var ultrawide_planning_field: bool = effective_size.x >= 2200.0 and effective_size.y >= 800.0
 	set_meta("compact_layout", compact)
 	set_meta("tight_scale_layout", tight_compact)
 	set_meta("maximum_scale_layout", maximum_scale_layout)
+	set_meta("ultrawide_planning_field", ultrawide_planning_field)
 	set_meta("persisted_ui_scale", ui_scale)
 	set_meta("effective_ui_size", effective_size)
 	set_meta("physical_window_size", physical_window_size)
@@ -431,7 +433,7 @@ func _apply_responsive_layout() -> void:
 		# Keep a physical 8px escape gutter below the shop chrome at enlarged UI
 		# scale. Without it, a valid internal ShopBottomGutter can still be hidden
 		# by the framebuffer edge after container rounding.
-		margin.add_theme_constant_override("margin_bottom", 8 if tight_compact else 8 if compact else 18)
+		margin.add_theme_constant_override("margin_bottom", 4 if maximum_scale_layout else 8 if tight_compact else 8 if compact else 18)
 	stage_label.visible = not compact
 	stage_label.custom_minimum_size = Vector2.ZERO if compact else Vector2(0.0, 64.0)
 	if planning_timer_label != null:
@@ -439,8 +441,8 @@ func _apply_responsive_layout() -> void:
 		# out of the vertical planning budget even if an older fixture reveals it.
 		planning_timer_label.visible = false
 	_set_minimum_size("MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
-	var battle_height: float = 212.0 if tight_compact else 330.0 if compact else 604.0
-	var board_half_height: float = 102.0 if tight_compact else 160.0 if compact else 264.0
+	var battle_height: float = 212.0 if maximum_scale_layout else 232.0 if tight_compact else 330.0 if compact else 604.0
+	var board_half_height: float = 102.0 if maximum_scale_layout else 112.0 if tight_compact else 160.0 if compact else 264.0
 	var large_planning_field: bool = not tight_compact and effective_size.x >= 1500.0 and effective_size.y >= 800.0
 	var battle_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	if battle_area != null:
@@ -460,12 +462,13 @@ func _apply_responsive_layout() -> void:
 		board_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if planning_area != null:
 		planning_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(160.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
 	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
 	_apply_side_panel_layout(compact, tight_compact)
+	_apply_planning_focus_hierarchy(compact, tight_compact)
 	for half_path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea",
@@ -504,18 +507,19 @@ func _apply_responsive_layout() -> void:
 	wager_summary.autowrap_mode = TextServer.AUTOWRAP_OFF
 	wager_summary.clip_text = false
 	_set_box_separation("MarginContainer/VBoxContainer", 2 if tight_compact else 3 if compact else 3)
-	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 10 if tight_compact else 14 if compact else 20)
+	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 6 if maximum_scale_layout else 10 if tight_compact else 14 if compact else 20)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", 2 if tight_compact else 8 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn", 6 if compact else 8)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea", 2 if tight_compact else 6 if compact else 8)
 	_set_grid_separation(enemy_grid, 4 if tight_compact else 6 if compact else 8)
 	_set_grid_separation(player_grid, 4 if tight_compact else 6 if compact else 8)
-	_set_box_separation("MarginContainer/VBoxContainer/BottomStorageArea", 6 if compact else 10)
+	_set_box_separation("MarginContainer/VBoxContainer/BottomStorageArea", 2 if maximum_scale_layout else 6 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/ActionsRow", 6 if tight_compact else 10 if compact else 18)
 	_apply_shop_compact_layout(compact, tight_compact)
 	_apply_shop_action_bar_layout(compact, tight_compact)
 	_apply_functional_typography(compact, tight_compact)
 	_apply_planning_action_hierarchy(compact, tight_compact)
+	_apply_compact_commit_rail(compact, tight_compact)
 	_sync_compact_resource_strip()
 	if controller != null and controller.economy_ui != null:
 		controller.economy_ui.refresh()
@@ -569,13 +573,14 @@ func _set_grid_separation(grid: GridContainer, separation: int) -> void:
 
 func _apply_board_tile_size(compact: bool, tight_compact: bool, large_planning_field: bool) -> void:
 	var effective_size: Vector2 = get_meta("effective_ui_size", Vector2.ZERO) as Vector2
+	var ultrawide_planning_field: bool = bool(get_meta("ultrawide_planning_field", false))
 	var wide_tight_field: bool = tight_compact and effective_size.x >= 1200.0
 	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	# Ultrawide planning has enough horizontal room to let the deployment grid
 	# read as the battlefield, rather than a small island floating between rails.
 	# The increase is limited to the authored grid cells; side-panel behavior and
 	# compact breakpoints stay unchanged.
-	var tile_size: Vector2 = Vector2(58.0, 26.0) if wide_tight_field else Vector2(44.0, 26.0) if maximum_scale_layout else Vector2(42.0, 26.0) if tight_compact else Vector2(112.0, 54.0) if large_planning_field else Vector2(62.0, 46.0) if compact else Vector2(88.0, 72.0)
+	var tile_size: Vector2 = Vector2(148.0, 74.0) if ultrawide_planning_field else Vector2(58.0, 26.0) if wide_tight_field else Vector2(44.0, 26.0) if maximum_scale_layout else Vector2(46.0, 28.0) if tight_compact else Vector2(124.0, 62.0) if large_planning_field else Vector2(68.0, 50.0) if compact else Vector2(96.0, 76.0)
 	var grid_separation: int = 4 if tight_compact else 6 if compact else 8
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		if grid == null:
@@ -586,7 +591,7 @@ func _apply_board_tile_size(compact: bool, tight_compact: bool, large_planning_f
 				tile.custom_minimum_size = tile_size
 		_center_planning_grid(grid, tile_size, grid_separation)
 	if bench_grid != null:
-		var bench_size: Vector2 = Vector2(46.0, 36.0) if tight_compact else Vector2(74.0, 56.0) if large_planning_field else Vector2(64.0, 48.0) if compact else Vector2(88.0, 78.0)
+		var bench_size: Vector2 = Vector2(86.0, 64.0) if ultrawide_planning_field else Vector2(46.0, 36.0) if tight_compact else Vector2(74.0, 56.0) if large_planning_field else Vector2(64.0, 48.0) if compact else Vector2(88.0, 78.0)
 		bench_grid.add_theme_constant_override("h_separation", 4 if tight_compact else 8 if compact else 12)
 		bench_grid.add_theme_constant_override("v_separation", 2 if tight_compact else 4 if compact else 8)
 		for child: Node in bench_grid.get_children():
@@ -665,7 +670,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			136.0 if tight_compact else 172.0 if compact else 286.0,
 			34.0 if tight_compact else 44.0 if compact else 48.0,
 			26.0 if tight_compact else 34.0 if compact else 40.0,
-			tight_compact
+			compact
 		)
 	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	if stats_area != null:
@@ -716,6 +721,33 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		stats_title.clip_text = false
 
+func _apply_planning_focus_hierarchy(compact: bool, tight_compact: bool) -> void:
+	# At readable 125/150% scales the deployment board is the decision spine.
+	# Keep item/metric context present, but lower its visual urgency so the eye
+	# lands on placement and the primary commit action before secondary telemetry.
+	var rail_alpha: float = 0.92 if tight_compact else 0.87 if compact else 1.0
+	var lower_support_alpha: float = 0.88 if tight_compact else 0.92 if compact else 1.0
+	var left_item_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
+	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
+	var planning_surface: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea") as Control
+	var bench_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as Control
+	var bottom_storage: Control = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as Control
+	if left_item_area != null:
+		left_item_area.modulate = Color(1.0, 1.0, 1.0, rail_alpha)
+		left_item_area.set_meta("planning_support_rail", true)
+	if stats_area != null:
+		stats_area.modulate = Color(1.0, 1.0, 1.0, rail_alpha)
+		stats_area.set_meta("planning_support_rail", true)
+	if planning_surface != null:
+		planning_surface.modulate = Color(1.0, 0.985, 0.96, 1.0)
+		planning_surface.set_meta("planning_priority", "primary_board_spine")
+	if bench_area != null:
+		bench_area.modulate = Color(1.0, 1.0, 1.0, lower_support_alpha)
+		bench_area.set_meta("planning_support_rail", true)
+	if bottom_storage != null:
+		bottom_storage.modulate = Color(1.0, 1.0, 1.0, lower_support_alpha)
+		bottom_storage.set_meta("planning_support_rail", true)
+
 func _sync_item_storage_header() -> void:
 	var header: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
 	if header == null:
@@ -737,6 +769,8 @@ func _sync_item_storage_header() -> void:
 func _apply_planning_landmarks(compact: bool, tight_compact: bool, large_planning_field: bool) -> void:
 	var geometry: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry") as Control
 	if geometry != null:
+		geometry.modulate = Color(1.0, 1.0, 1.0, 0.70 if tight_compact else 0.76 if compact else 1.0)
+		geometry.set_meta("compact_decorative_priority", "secondary_to_deployment_and_commit" if compact else "normal")
 		var lane_half_width: float = 24.0 if tight_compact else 44.0 if compact else 64.0
 		for lane_name: String in ["DeploymentLaneLeft", "DeploymentLaneCenter", "DeploymentLaneRight"]:
 			var lane: ColorRect = geometry.get_node_or_null(lane_name) as ColorRect
@@ -749,7 +783,8 @@ func _apply_planning_landmarks(compact: bool, tight_compact: bool, large_plannin
 		if commit_rule != null:
 			commit_rule.offset_top = -2.0
 			commit_rule.offset_bottom = 2.0
-			commit_rule.color = Color(0.92, 0.10, 0.08, 0.48)
+			commit_rule.color = Color(0.92, 0.10, 0.08, 0.70 if tight_compact else 0.60)
+			commit_rule.set_meta("deployment_commit_affordance", "primary")
 	_apply_planning_landmark_to_half(
 		get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea") as Control,
 		true,
@@ -821,7 +856,9 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	label_plate.bg_color = Color(0.012, 0.010, 0.013, 0.91)
 	label_plate.border_color = Color(0.82, 0.07, 0.09, 0.92) if enemy_side else Color(0.76, 0.62, 0.38, 0.90)
 	label_plate.border_width_left = 4 if enemy_side else 1
-	label_plate.border_width_right = 1 if enemy_side else 4
+	# A terminal right rule reads like a clipped text delimiter beside the
+	# intentionally shortened maximum-scale "HOLD LINE" label.
+	label_plate.border_width_right = 0 if maximum_scale_layout and not enemy_side else 1 if enemy_side else 4
 	label_plate.content_margin_left = 8.0
 	label_plate.content_margin_right = 8.0
 	label.add_theme_stylebox_override("normal", label_plate)
@@ -881,6 +918,7 @@ func _enforce_compact_metric_badges() -> void:
 			_apply_compact_metric_badge(row, true)
 
 func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
+	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var card_size: Vector2 = Vector2(120.0, 52.0) if tight_compact else Vector2(132.0, 86.0) if compact else Vector2(144.0, 124.0)
 	if shop_grid != null:
 		shop_grid.add_theme_constant_override("h_separation", 6 if tight_compact else 10 if compact else 16)
@@ -904,13 +942,15 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 					var name_label: Label = control.find_child("Name", true, false) as Label
 					var price_label: Label = control.find_child("Price", true, false) as Label
 					if name_label != null:
-						name_label.add_theme_font_size_override("font_size", 14 if tight_compact else 18)
+						name_label.add_theme_font_size_override("font_size", 14 if maximum_scale_layout else 16 if tight_compact else 19)
 						VisualTypeSystem.set_utility_bold(name_label)
+						name_label.add_theme_color_override("font_color", Color(1.0, 0.90, 0.72, 1.0))
+						name_label.set_meta("compact_decision_card_label", true)
 						name_label.clip_text = tight_compact
 						if tight_compact:
 							name_label.custom_minimum_size.x = 0.0
 					if price_label != null:
-						price_label.add_theme_font_size_override("font_size", 16 if tight_compact else 19)
+						price_label.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 18 if tight_compact else 20)
 						price_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.47, 1.0))
 						VisualTypeSystem.set_utility_bold(price_label)
 						price_label.clip_text = tight_compact
@@ -996,6 +1036,7 @@ func _apply_tight_shop_placeholder(placeholder: Control) -> void:
 			label.clip_text = true
 
 func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
+	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 	if bottom_storage == null:
 		return
@@ -1020,8 +1061,8 @@ func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
 				var text_width: float = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size).x
 				var minimum_width: float = maxf(66.0, text_width + (16.0 if tight_compact else 22.0))
 				if primary_commit:
-					minimum_width = maxf(minimum_width, 176.0 if tight_compact else 236.0 if compact else 304.0)
-				button.custom_minimum_size = Vector2(minimum_width, (38.0 if tight_compact else 46.0 if compact else 54.0) if primary_commit else (30.0 if tight_compact else 34.0 if compact else 40.0))
+					minimum_width = maxf(minimum_width, 176.0 if maximum_scale_layout else 190.0 if tight_compact else 236.0 if compact else 304.0)
+				button.custom_minimum_size = Vector2(minimum_width, (38.0 if maximum_scale_layout else 42.0 if tight_compact else 46.0 if compact else 54.0) if primary_commit else (30.0 if tight_compact else 34.0 if compact else 40.0))
 				continue
 			var label: Label = action_child as Label
 			if label != null:
@@ -1097,12 +1138,18 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		}
 		for status_name: String in status_widths:
 			var status_label: Label = board_status_row.get_node_or_null(status_name) as Label
-			if status_label != null and tight_compact:
-				status_label.custom_minimum_size.x = status_widths[status_name]
+			if status_label != null:
+				status_label.add_theme_font_size_override("font_size", 15 if tight_compact else 17 if compact else 20)
+				status_label.modulate = Color(1.0, 1.0, 1.0, 0.88 if tight_compact else 0.86 if compact else 1.0)
+				status_label.set_meta("planning_status_priority", "secondary_to_commit" if compact else "primary")
+				if tight_compact:
+					status_label.custom_minimum_size.x = status_widths[status_name]
 	var board_status_plate: Panel = find_child("BoardStatusBackplate", true, false) as Panel
 	if board_status_plate != null:
 		board_status_plate.offset_left = -240.0 if tight_compact else -278.0
 		board_status_plate.offset_right = 240.0 if tight_compact else 278.0
+		board_status_plate.modulate = Color(1.0, 1.0, 1.0, 0.64 if tight_compact else 0.86 if compact else 1.0)
+		board_status_plate.set_meta("planning_status_priority", "secondary_to_commit" if compact else "primary")
 	var planning_directive: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
 		planning_directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
@@ -1111,16 +1158,16 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		planning_directive.offset_right = 246.0 if tight_compact else 286.0
 		planning_directive.offset_top = 0.0 if tight_compact else 12.0
 		planning_directive.offset_bottom = 34.0 if tight_compact else 54.0
-		planning_directive.visible = true
+		planning_directive.visible = not maximum_scale_layout
 		planning_directive.z_index = 110
 		planning_directive.z_as_relative = false
 		planning_directive.set_meta("planning_action_order", "deploy>wager>commit")
-		planning_directive.set_meta("maximum_scale_disclosure", "persistent_ordered_command")
+		planning_directive.set_meta("maximum_scale_disclosure", "hidden_redundant_instruction" if maximum_scale_layout else "persistent_ordered_command")
 	if continue_button != null:
 		continue_button.set_meta("visual_role", "primary_commit")
 		continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		continue_button.custom_minimum_size = Vector2(176.0 if tight_compact else 236.0 if compact else 304.0, 38.0 if tight_compact else 46.0 if compact else 54.0)
-		continue_button.add_theme_font_size_override("font_size", 20 if tight_compact else 23 if compact else 26)
+		continue_button.custom_minimum_size = Vector2(176.0 if maximum_scale_layout else 190.0 if tight_compact else 236.0 if compact else 304.0, 38.0 if maximum_scale_layout else 42.0 if tight_compact else 46.0 if compact else 54.0)
+		continue_button.add_theme_font_size_override("font_size", 20 if maximum_scale_layout else 22 if tight_compact else 23 if compact else 26)
 		VisualTypeSystem.set_action(continue_button)
 		var primary_style: StyleBoxFlat = _make_field_panel_style(Color(0.94, 0.075, 0.105, 0.98))
 		primary_style.bg_color = Color(0.24, 0.018, 0.034, 0.99)
@@ -1130,6 +1177,7 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		primary_style.border_width_bottom = 6
 		primary_style.shadow_size = 12
 		continue_button.add_theme_stylebox_override("normal", primary_style)
+		continue_button.set_meta("compact_commit_rail_action", true)
 	var bet_row: HBoxContainer = bet_slider.get_parent() as HBoxContainer if bet_slider != null else null
 	if bet_row != null:
 		bet_row.set_meta("visual_role", "planning_utility_group")
@@ -1149,6 +1197,37 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		bet_value.custom_minimum_size = Vector2(34.0 if tight_compact else 42.0, 34.0 if tight_compact else 40.0)
 		bet_value.add_theme_font_size_override("font_size", 20 if tight_compact else 22)
 
+func _apply_compact_commit_rail(compact: bool, tight_compact: bool) -> void:
+	var vbox: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
+	var actions_row: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
+	if vbox == null or actions_row == null or wager_summary == null:
+		return
+	var summary_index: int = wager_summary.get_index()
+	var actions_index: int = actions_row.get_index()
+	if compact:
+		# Keep the economy readout and the commit controls as one decision rail
+		# immediately above the shop. This removes a vertical scan between risk
+		# information and the action that locks it in.
+		if summary_index > actions_index:
+			vbox.move_child(wager_summary, actions_index)
+		wager_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		# Preserve the accessibility-sized outcome line established by the base
+		# layout; compacting the rail changes placement, not legibility.
+		wager_summary.add_theme_font_size_override("font_size", 17 if tight_compact else 18)
+		wager_summary.modulate = Color(1.0, 1.0, 1.0, 0.72 if tight_compact else 0.84)
+		wager_summary.set_meta("compact_commit_rail", true)
+		actions_row.set_meta("compact_commit_rail", true)
+		if continue_button != null:
+			continue_button.set_meta("compact_commit_rail_action", true)
+	else:
+		# Preserve the authored desktop order when leaving the compact tiers.
+		if actions_index > summary_index:
+			vbox.move_child(actions_row, summary_index)
+		wager_summary.modulate = Color.WHITE
+		wager_summary.set_meta("compact_commit_rail", false)
+		actions_row.set_meta("compact_commit_rail", false)
+
+
 func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool, tight_compact: bool) -> void:
 	if action_bar == null:
 		return
@@ -1158,7 +1237,8 @@ func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool, tight_co
 		var button: Button = child as Button
 		if button != null:
 			if button.name == "ContinueButton":
-				button.custom_minimum_size = Vector2(176.0 if tight_compact else 236.0 if compact else 304.0, 38.0 if tight_compact else 46.0 if compact else 54.0)
+				var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
+				button.custom_minimum_size = Vector2(176.0 if maximum_scale_layout else 190.0 if tight_compact else 236.0 if compact else 304.0, 38.0 if maximum_scale_layout else 42.0 if tight_compact else 46.0 if compact else 54.0)
 				button.add_theme_font_size_override("font_size", 20 if tight_compact else 23 if compact else 26)
 			else:
 				var button_font_size: int = 16 if tight_compact else 18 if compact else 20
@@ -1288,7 +1368,7 @@ func _make_field_panel_style(accent: Color) -> StyleBoxFlat:
 func _update_external_backplates() -> void:
 	var tight_scale_layout: bool = bool(get_meta("tight_scale_layout", false))
 	var compact_layout: bool = bool(get_meta("compact_layout", false))
-	for plate_name: String in ["GothicShopPlate", "GothicItemsPlate", "GothicStatsAreaPlate", "GothicBenchPlate"]:
+	for plate_name: String in ["GothicShopPlate", "GothicItemsPlate", "GothicStatsAreaPlate", "GothicPlanningSpinePlate", "GothicBenchPlate", "GothicCommitRailPlate"]:
 		var plate: Panel = get_node_or_null(plate_name) as Panel
 		if plate == null or not plate.has_meta("target_path"):
 			continue
@@ -1308,6 +1388,14 @@ func _update_external_backplates() -> void:
 			continue
 		var authored_pad: float = float(plate.get_meta("pad", 0.0))
 		var pad: float = minf(authored_pad, 2.0) if tight_scale_layout else minf(authored_pad, 3.0) if compact_layout else authored_pad
+		if plate_name == "GothicCommitRailPlate":
+			var summary: Control = get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Control
+			if summary != null and summary.is_visible_in_tree() and target.is_visible_in_tree():
+				var rail_rect: Rect2 = target.get_global_rect().merge(summary.get_global_rect())
+				plate.visible = true
+				plate.global_position = rail_rect.position - Vector2(pad, pad)
+				plate.size = rail_rect.size + Vector2(pad * 2.0, pad * 2.0)
+				continue
 		if plate_name == "GothicShopPlate" and target.get_global_rect().end.y >= get_viewport_rect().end.y - 1.0:
 			# The grid can terminate at the framebuffer, but its compact cards
 			# retain an authored internal gutter. Keep the exterior plate inside

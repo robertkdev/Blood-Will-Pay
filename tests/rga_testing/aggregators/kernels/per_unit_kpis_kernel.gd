@@ -5,6 +5,7 @@ extends RefCounted
 #  - time_on_target_pct
 #  - attack_distance_median_tiles
 #  - attacks_over_2_tiles_pct
+#  - damage_over_2_tiles_pct
 #  - damage_to_frontline_pct
 #  - kiting_tax (proxy)
 
@@ -31,6 +32,7 @@ var _hits_total: Dictionary = { SIDE_A: {}, SIDE_B: {} }        # side -> idx ->
 var _hits_over_2: Dictionary = { SIDE_A: {}, SIDE_B: {} }       # side -> idx -> int
 var _dmg_total: Dictionary = { SIDE_A: {}, SIDE_B: {} }         # side -> idx -> float
 var _dmg_front: Dictionary = { SIDE_A: {}, SIDE_B: {} }         # side -> idx -> float
+var _dmg_over_2: Dictionary = { SIDE_A: {}, SIDE_B: {} }        # side -> idx -> float
 
 func attach(engine, team_sizes: Dictionary, context_tags: Dictionary = {}, player_is_team_a: bool = true) -> void:
     detach()
@@ -163,6 +165,7 @@ func _reset_accumulators() -> void:
         var ho2: Dictionary = {}
         var dtt: Dictionary = {}
         var dtf: Dictionary = {}
+        var dto2: Dictionary = {}
         var ont: Dictionary = {}
         for i in range(n):
             obs[i] = 0.0
@@ -172,6 +175,7 @@ func _reset_accumulators() -> void:
             ho2[i] = 0
             dtt[i] = 0.0
             dtf[i] = 0.0
+            dto2[i] = 0.0
             ont[i] = false
         _obs_time[side] = obs
         _on_target_time[side] = tgt
@@ -180,6 +184,7 @@ func _reset_accumulators() -> void:
         _hits_over_2[side] = ho2
         _dmg_total[side] = dtt
         _dmg_front[side] = dtf
+        _dmg_over_2[side] = dto2
         _on_target[side] = ont
 
 func _on_target_start(source_team: String, source_index: int, _target_team: String, _target_index: int) -> void:
@@ -214,6 +219,7 @@ func _on_hit_applied(team: String, source_index: int, target_index: int, _rolled
         _hits_total[src_side][sidx] = int(_hits_total[src_side].get(sidx, 0)) + 1
         if dist_tiles >= 2.0:
             _hits_over_2[src_side][sidx] = int(_hits_over_2[src_side].get(sidx, 0)) + 1
+            _dmg_over_2[src_side][sidx] = float(_dmg_over_2[src_side].get(sidx, 0.0)) + max(0, int(dealt))
 
 func _get_position(side: String, idx: int) -> Vector2:
     if _engine == null:
@@ -242,6 +248,7 @@ func _summarize_side(side: String) -> Dictionary:
         var d_front: float = float(_dmg_front[side].get(i, 0.0))
         var time_on_target_pct: float = (on_t / max(0.001, obs))
         var attacks_over_2_tiles_pct: float = (float(over2) / max(1.0, float(hits)))
+        var damage_over_2_tiles_pct: float = (float(_dmg_over_2[side].get(i, 0.0)) / max(0.001, d_all)) if d_all > 0.0 else 0.0
         var damage_to_frontline_pct: float = (d_front / max(0.001, d_all)) if d_all > 0.0 else 0.0
         var med_dist: float = _median(_hit_dists[side].get(i, []))
         # Kiting tax (proxy): lower when high hits per second while on target
@@ -253,6 +260,7 @@ func _summarize_side(side: String) -> Dictionary:
             "time_on_target_pct": time_on_target_pct,
             "attack_distance_median_tiles": med_dist,
             "attacks_over_2_tiles_pct": attacks_over_2_tiles_pct,
+            "damage_over_2_tiles_pct": damage_over_2_tiles_pct,
             "damage_to_frontline_pct": damage_to_frontline_pct,
             "kiting_tax": kiting_tax
         }

@@ -1004,13 +1004,23 @@ func _layout_system_menu_button() -> void:
 		)
 		_system_panel.set_meta("compact_settings_route_safe", compact)
 	if _system_stack != null:
-		_system_stack.add_theme_constant_override("separation", 6 if compact else 11)
+		_system_stack.add_theme_constant_override("separation", 8 if compact else 11)
 	for action_button: Button in [_resume_button, _settings_button, _new_run_button, _black_ledger_system_button, _return_title_button, _quit_game_button]:
 		if action_button == null:
 			continue
-		action_button.custom_minimum_size.y = 42.0 if compact else 52.0
+		action_button.custom_minimum_size.y = 46.0 if compact and action_button == _resume_button else 40.0 if compact else 52.0
 		action_button.custom_minimum_size.x = minf(action_button.custom_minimum_size.x, maxf(286.0, viewport_size.x - 84.0))
 		action_button.add_theme_font_size_override("font_size", 18 if compact else (21 if action_button == _return_title_button or action_button == _quit_game_button else 23))
+	var assembly_layer: Control = _system_panel.find_child("SystemAssemblyLayer", false, false) as Control if _system_panel != null else null
+	if assembly_layer != null:
+		# The compact interruption surface keeps its filing hierarchy but removes
+		# peripheral scars and footer marks so action spacing, especially Resume and
+		# destructive routes, remains the dominant read at 1280x720.
+		for decoration_name: String in ["PanelScars", "TopBinding", "RightRepair", "FilingCut", "InterruptionStamp"]:
+			var decoration: Control = assembly_layer.get_node_or_null(decoration_name) as Control
+			if decoration != null:
+				decoration.visible = not compact
+		assembly_layer.set_meta("compact_decoration_reduction", compact)
 	_system_menu_button.set_meta("compact_safe_placement", compact)
 	VisualTypeSystem.set_utility_bold(_system_menu_button)
 	if compact:

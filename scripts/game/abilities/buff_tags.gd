@@ -12,6 +12,10 @@ const TAG_BONKO_EMPOWER := "bonko_empower"
 const TAG_BEREBELL := "berebell_unstable_active"
 const TAG_SARI_ON_HIT := "sari_on_hit_active"
 
+# Temporarily removes a unit from hostile target selection. Area and persistent
+# effects remain eligible to hit the unit; this tag is not invulnerability.
+const TAG_UNTARGETABLE := "untargetable"
+
 # Generic ability-damage amplifier tag; data may include { ability_damage_amp: 0.40 }
 const TAG_ABILITY_AMP := "ability_amp"
 
@@ -30,6 +34,12 @@ const TAG_CATALYST_META := "catalyst_meta"
 
 # Healing/shield modulation (used by traits like Blessed)
 const TAG_HEALING_MODS := "healing_mods"
+# Temporary negative healing/shield modulation. Keep this separate so an
+# anti-sustain effect cannot overwrite a battle-long positive trait modifier.
+const TAG_HEALING_REDUCTION := "healing_reduction"
+const TAG_HEALING_REDUCTION_JUNO := "healing_reduction_juno"
+const TAG_HEALING_REDUCTION_RAVEL := "healing_reduction_ravel"
+const TAG_HEALING_REDUCTION_HEXEON := "healing_reduction_hexeon"
 
 # Exile upgrades (exact-count tiers). Data includes { level: 1|2|3 }
 const TAG_EXILE_UPGRADE := "exile_upgrade"

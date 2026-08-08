@@ -12,4 +12,5 @@ stat_mods = {"pct_as": 0.25, "pct_crit_chance": 0.20}
 effects = ["bandana"]
 components = ["crystal", "spike"]
 tags = PackedStringArray("marksman", "assassin")
+build_axes = PackedStringArray("attack_speed", "crit")
 

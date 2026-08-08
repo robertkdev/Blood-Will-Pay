@@ -15,7 +15,8 @@ func _run() -> void:
 	job.run_id = "on_hit_proc_probe"
 	job.sim_index = 0
 	job.seed = 525600
-	job.team_a_ids = ["repo", "kythera", "morrak", "teller", "hexeon", "luna"]
+	var team_a_ids: Array[String] = [subject_unit_id, "kythera", "morrak", "teller", "hexeon", "luna"]
+	job.team_a_ids = team_a_ids
 	job.team_b_ids = ["brute", "berebell", "teller", "hexeon", "paisley", "axiom"]
 	job.team_size = 6
 	job.scenario_id = "open_field"

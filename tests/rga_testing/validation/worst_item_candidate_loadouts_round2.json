@@ -1,0 +1,244 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "round2_noxley_mageheart_orb_clockwork",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "orb_on_a_stick", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_noxley_mageheart_orb_arc_dice",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "orb_on_a_stick", "arc_dice"]}
+    },
+    {
+      "scenario_id": "round2_noxley_mageheart_orb_largewand",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "orb_on_a_stick", "largewand"]}
+    },
+    {
+      "scenario_id": "round2_noxley_mageheart_orb_spellblade",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "orb_on_a_stick", "spellblade"]}
+    },
+    {
+      "scenario_id": "round2_noxley_mageheart_orb_conductor",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "orb_on_a_stick", "conductor"]}
+    },
+    {
+      "scenario_id": "round2_noxley_mageheart_clockwork_arc_dice",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "clockwork", "arc_dice"]}
+    },
+    {
+      "scenario_id": "round2_noxley_mageheart_clockwork_largewand",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["mageheart", "clockwork", "largewand"]}
+    },
+    {
+      "scenario_id": "round2_noxley_orb_arc_dice_largewand",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["orb_on_a_stick", "arc_dice", "largewand"]}
+    },
+    {
+      "scenario_id": "round2_noxley_orb_arc_dice_clockwork",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["orb_on_a_stick", "arc_dice", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_noxley_orb_largewand_clockwork",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["orb_on_a_stick", "largewand", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_noxley_codex_orb_clockwork",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["codex", "orb_on_a_stick", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_noxley_codex_orb_mageheart",
+      "focus_unit_ids": ["noxley"],
+      "items_by_unit": {"noxley": ["codex", "orb_on_a_stick", "mageheart"]}
+    },
+    {
+      "scenario_id": "round2_saffron_anchor_orb_conductor",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["anchor", "orb_on_a_stick", "conductor"]}
+    },
+    {
+      "scenario_id": "round2_saffron_conductor_orb_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["conductor", "orb_on_a_stick", "vital_battery"]}
+    },
+    {
+      "scenario_id": "round2_saffron_codex_orb_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["codex", "orb_on_a_stick", "vital_battery"]}
+    },
+    {
+      "scenario_id": "round2_saffron_windwall_orb_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["windwall", "orb_on_a_stick", "vital_battery"]}
+    },
+    {
+      "scenario_id": "round2_saffron_codex_orb_conductor",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["codex", "orb_on_a_stick", "conductor"]}
+    },
+    {
+      "scenario_id": "round2_saffron_mageheart_orb_conductor",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["mageheart", "orb_on_a_stick", "conductor"]}
+    },
+    {
+      "scenario_id": "round2_saffron_largewand_orb_conductor",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["largewand", "orb_on_a_stick", "conductor"]}
+    },
+    {
+      "scenario_id": "round2_saffron_arc_dice_orb_conductor",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["arc_dice", "orb_on_a_stick", "conductor"]}
+    },
+    {
+      "scenario_id": "round2_saffron_anchor_conductor_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["anchor", "conductor", "vital_battery"]}
+    },
+    {
+      "scenario_id": "round2_saffron_anchor_codex_conductor",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["anchor", "codex", "conductor"]}
+    },
+    {
+      "scenario_id": "round2_saffron_anchor_orb_vital",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["anchor", "orb_on_a_stick", "vital_battery"]}
+    },
+    {
+      "scenario_id": "round2_saffron_conductor_orb_clockwork",
+      "focus_unit_ids": ["saffron"],
+      "items_by_unit": {"saffron": ["conductor", "orb_on_a_stick", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_teller_bandana_clockwork_dagger",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["bandana", "clockwork", "dagger"]}
+    },
+    {
+      "scenario_id": "round2_teller_dagger_shiv_lifetaker",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["dagger", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "round2_teller_dagger_shiv_doubleblade",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["dagger", "shiv", "doubleblade"]}
+    },
+    {
+      "scenario_id": "round2_teller_dagger_bandana_shiv",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["dagger", "bandana", "shiv"]}
+    },
+    {
+      "scenario_id": "round2_teller_doubleblade_bandana_clockwork",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["doubleblade", "bandana", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_teller_doubleblade_hyperstone_bandana",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["doubleblade", "hyperstone", "bandana"]}
+    },
+    {
+      "scenario_id": "round2_teller_doubleblade_dagger_clockwork",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["doubleblade", "dagger", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_teller_doubleblade_shiv_bandana",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["doubleblade", "shiv", "bandana"]}
+    },
+    {
+      "scenario_id": "round2_teller_dagger_clockwork_hyperstone",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["dagger", "clockwork", "hyperstone"]}
+    },
+    {
+      "scenario_id": "round2_teller_shiv_spellblade_dagger",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["shiv", "spellblade", "dagger"]}
+    },
+    {
+      "scenario_id": "round2_teller_rendsaw_dagger_clockwork",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["rendsaw", "dagger", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_teller_lifetaker_dagger_clockwork",
+      "focus_unit_ids": ["teller"],
+      "items_by_unit": {"teller": ["lifetaker", "dagger", "clockwork"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_mind_siphon_shiv_lifetaker",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["mind_siphon", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_relay_shiv_lifetaker",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["relay", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_relay_shiv_gamblers_eye",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["relay", "shiv", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_dagger_shiv_gamblers_eye",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["dagger", "shiv", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_dagger_shiv_lifetaker",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["dagger", "shiv", "lifetaker"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_dagger_relay_gamblers_eye",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["dagger", "relay", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_arc_dice_orb_relay",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["arc_dice", "orb_on_a_stick", "relay"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_largewand_orb_relay",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["largewand", "orb_on_a_stick", "relay"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_arc_dice_relay_gamblers_eye",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["arc_dice", "relay", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_largewand_relay_gamblers_eye",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["largewand", "relay", "gamblers_eye"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_mageheart_orb_relay",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["mageheart", "orb_on_a_stick", "relay"]}
+    },
+    {
+      "scenario_id": "round2_hexeon_spellblade_relay_shiv",
+      "focus_unit_ids": ["hexeon"],
+      "items_by_unit": {"hexeon": ["spellblade", "relay", "shiv"]}
+    }
+  ]
+}

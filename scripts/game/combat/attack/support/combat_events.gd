@@ -52,6 +52,20 @@ func amp_output_applied(source_team: String, source_index: int, beneficiary_team
 func damage_redirected(source_team: String, source_index: int, original_target_team: String, original_target_index: int, redirect_team: String, redirect_index: int, amount: int, kind: String) -> void:
 	_emit("damage_redirected", [source_team, source_index, original_target_team, original_target_index, redirect_team, redirect_index, int(amount), String(kind)])
 
+func redirected_damage_applied(source_team: String, source_index: int, original_target_team: String, original_target_index: int, redirect_team: String, redirect_index: int, dealt_damage: int, before_hp: int, after_hp: int, kind: String) -> void:
+	_emit("redirected_damage_applied", [
+		source_team,
+		source_index,
+		original_target_team,
+		original_target_index,
+		redirect_team,
+		redirect_index,
+		int(dealt_damage),
+		int(before_hp),
+		int(after_hp),
+		String(kind),
+	])
+
 func redirect_semantic_applied(source_team: String, source_index: int, target_team: String, target_index: int, kind: String, duration_s: float, amount: float, risk_s: float) -> void:
 	_emit("redirect_semantic_applied", [source_team, source_index, target_team, target_index, String(kind), max(0.0, float(duration_s)), max(0.0, float(amount)), max(0.0, float(risk_s))])
 

@@ -58,7 +58,7 @@ func on_ability_cast(ctx, team: String, index: int, _ability_id: String):
 	var mem: Array[int] = StackUtils.members(ctx, team, TRAIT_ID)
 	if mem.find(int(index)) < 0:
 		return
-	var key := _key(team, index)
+	var key: String = _key(team, index)
 	var current: int = StackUtils.get_count(ctx, team, index, TRAIT_ID)
 	var last: int = int(_last_stack_seen.get(key, -1))
 	# If we have seen a prior value and current increased, assume ability already added; just record and return.
@@ -108,7 +108,18 @@ func _apply_regen_pulse(ctx, team: String) -> void:
 		# then enforce Titan T4 shield cap separately.
 		var hres2: Dictionary = HealingService.apply_heal(ctx.state, ctx.buff_system, team, i, float(heal_amt))
 		var healed: int = int(hres2.get("healed", 0))
-		var overheal: int = max(0, heal_amt - healed)
+		var overheal: int = int(hres2.get("overheal", 0))
+		if ctx.engine != null and ctx.engine.has_method("_resolver_emit_heal_applied"):
+			ctx.engine._resolver_emit_heal_applied(
+				team,
+				i,
+				team,
+				i,
+				healed,
+				overheal,
+				int(hres2.get("before_hp", 0)),
+				int(hres2.get("after_hp", 0))
+			)
 		if shield_cap_pct > 0.0 and overheal > 0 and ctx.buff_system != null:
 			var cap: int = int(floor(shield_cap_pct * float(u.max_hp)))
 			var have: int = int(u.ui_shield)

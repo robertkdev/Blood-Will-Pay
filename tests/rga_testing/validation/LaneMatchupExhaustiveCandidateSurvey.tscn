@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/lane_matchup_gauntlet.gd" id="1"]
+
+[node name="LaneMatchupExhaustiveCandidateSurvey" type="Node"]
+script = ExtResource("1")
+ranked_candidate_audit_limit = 16
+fail_on_ranked_candidate_audit_issues = false
+output_path = "user://lane_matchup_exhaustive_candidate_audit.json"

@@ -12,4 +12,5 @@ stat_mods = {}
 effects = ["remover"]
 components = []
 tags = PackedStringArray("support")
+build_axes = PackedStringArray("utility")
 

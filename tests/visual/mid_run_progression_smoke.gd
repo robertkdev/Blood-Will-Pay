@@ -641,4 +641,5 @@ func _finish_mid_run_progression() -> void:
 		print("%s: results=%s" % [MID_RUN_SMOKE_NAME, JSON.stringify(_mid_run_results)])
 		exit_code = 1
 	_cleanup_runtime()
-	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+	await get_tree().create_timer(2.0, true, false, true).timeout
+	get_tree().quit(exit_code)
