@@ -71,6 +71,8 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Godot resource import failed with exit code $($process.ExitCode)" }
 
       - name: Export checked-in Windows preset
+        id: export
+        continue-on-error: true
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -84,15 +86,20 @@ jobs:
           $completed = Wait-Process -Id $process.Id -Timeout 300 -ErrorAction SilentlyContinue
           if (-not $completed) {
             Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+            Copy-Item $stdout "$env:GITHUB_WORKSPACE\godot-export.stdout.log" -Force -ErrorAction SilentlyContinue
+            Copy-Item $stderr "$env:GITHUB_WORKSPACE\godot-export.stderr.log" -Force -ErrorAction SilentlyContinue
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
             throw "Godot Windows export timed out after 300 seconds"
           }
           $process.Refresh()
           Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+          Copy-Item $stdout "$env:GITHUB_WORKSPACE\godot-export.stdout.log" -Force -ErrorAction SilentlyContinue
+          Copy-Item $stderr "$env:GITHUB_WORKSPACE\godot-export.stderr.log" -Force -ErrorAction SilentlyContinue
           if ($process.ExitCode -ne 0) { throw "Godot Windows export failed with exit code $($process.ExitCode)" }
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")) { throw "Windows executable was not produced" }
 
       - name: Run packaged resource smoke
+        if: ${{ steps.export.outcome == 'success' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -110,5 +117,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-package-smoke-${{ github.sha }}
-          path: packaged-resource-smoke.log
+          path: |
+            packaged-resource-smoke.log
+            godot-export.stdout.log
+            godot-export.stderr.log
           if-no-files-found: warn
