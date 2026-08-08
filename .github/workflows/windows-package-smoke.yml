@@ -76,7 +76,14 @@ jobs:
           $stdout = Join-Path $env:RUNNER_TEMP "godot-export.stdout.log"
           $stderr = Join-Path $env:RUNNER_TEMP "godot-export.stderr.log"
           $arguments = @("--headless", "--path", $env:GITHUB_WORKSPACE, "--export-release=Windows Desktop", "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")
-          $process = Start-Process -FilePath $runner -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+          $process = Start-Process -FilePath $runner -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          $completed = Wait-Process -Id $process.Id -Timeout 300 -ErrorAction SilentlyContinue
+          if (-not $completed) {
+            Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw "Godot Windows export timed out after 300 seconds"
+          }
+          $process.Refresh()
           Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
           if ($process.ExitCode -ne 0) { throw "Godot Windows export failed with exit code $($process.ExitCode)" }
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")) { throw "Windows executable was not produced" }
