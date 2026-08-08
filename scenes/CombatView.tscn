@@ -526,7 +526,7 @@ theme_override_constants/separation = 13
 
 [node name="GoldLabel" type="Label" parent="MarginContainer/VBoxContainer/ActionsRow"]
 layout_mode = 2
-text = "Gold: 2"
+text = "Blood Reserve: 2"
 
 [node name="AttackButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow"]
 visible = false
@@ -543,7 +543,7 @@ layout_mode = 2
 
 [node name="BetLabel" type="Label" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
 layout_mode = 2
-text = "Bet:"
+text = "Wager:"
 
 [node name="BetSlider" type="HSlider" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
 custom_minimum_size = Vector2(300, 0)

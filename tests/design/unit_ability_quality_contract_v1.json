@@ -137,14 +137,14 @@
       "core_promise": "Convert a precisely timed kill into combat economy.",
       "player_explanation": "Mara blasts one enemy and has a hidden chance to bank currency when the blast kills.",
       "effect_families": ["damage", "economy"],
-      "team_utility": "Provides an early economy gamble through kill timing.", "signature_moment": "A kill stamps the Arcane Ledger and sends one coin into the Stake meter.",
+      "team_utility": "Provides an early economy gamble through kill timing.", "signature_moment": "A kill stamps the Arcane Ledger and transfers one measured blood Stake into the reserve.",
       "counterplay": {"levers": ["shield or heal the intended victim", "deny Mara the last hit", "control Mara before casting"], "failure_state": "A nonlethal blast grants no economy; a deterministic cap should prevent farming."},
       "verdict": "keep", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 1, "player_clarity": 2, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 2},
       "problem": "The current 25 percent kill lottery is opaque and uncapped despite a strong two-family concept.",
       "direction": "Keep blast-on-kill economy but make one Stake deterministic and capped once per combat.",
       "test_cases": [
         {"id": "mara_ledger_contract", "type": "counterplay", "assertions": ["one lethal cast grants one Stake once", "nonlethal casts grant none", "later kills cannot farm more"]},
-        {"id": "mara_ledger_temporal", "type": "visual", "assertions": ["lethal impact stamps the ledger", "one coin travels to the meter", "nonlethal impact shows no economy cue"]}
+        {"id": "mara_ledger_temporal", "type": "visual", "assertions": ["lethal impact stamps the ledger", "one measured blood transfer reaches the reserve", "nonlethal impact shows no economy cue"]}
       ]
     },
     {
@@ -309,11 +309,11 @@
       "traits": ["Exile", "Mogul"], "primary_role": "marksman", "primary_goal": "marksman.backline_siege", "approaches": ["long_range", "burst", "aoe"],
       "core_promise": "Collect on two farthest targets through body-blockable contract shots.", "player_explanation": "Teller fires two long shots with overflow, can gain a third from Exile, and may earn currency on kills.",
       "effect_families": ["damage", "economy"],
-      "team_utility": "Threatens distant carries while rewarding precise kill timing.", "signature_moment": "Two red contract lines appear before separate collection shots and one possible coin payout.",
+      "team_utility": "Threatens distant carries while rewarding precise kill timing.", "signature_moment": "Two red contract lines appear before separate collection shots and one possible measured blood payout.",
       "counterplay": {"levers": ["body-block with a durable frontliner", "offset the formation", "deny the killing blow"], "failure_state": "A blocked nonlethal shot grants no currency and may not reach the carry."},
       "verdict": "simplify", "scores": {"cohesion": 2, "uniqueness": 2, "team_utility": 2, "player_clarity": 1, "visual_satisfaction": 1, "counterplay": 2, "cost_fit": 2},
       "problem": "The kit is burst/backline siege, not sustained DPS or true AoE, and generic VFX hide the multiple contracts.", "direction": "Keep mechanics, relabel backline siege with long-range and burst, and expose both shot paths before firing.",
-      "test_cases": [{"id": "teller_margin_contract", "type": "rga", "assertions": ["body-block limits overflow", "Exile counts one three five add exactly one shot", "only ability kills can award currency"]}, {"id": "teller_margin_temporal", "type": "visual", "assertions": ["setup shows two contract lines", "impact resolves separate shots", "coin payout is tied to the lethal target"]}]
+      "test_cases": [{"id": "teller_margin_contract", "type": "rga", "assertions": ["body-block limits overflow", "Exile counts one three five add exactly one shot", "only ability kills can award currency"]}, {"id": "teller_margin_temporal", "type": "visual", "assertions": ["setup shows two contract lines", "impact resolves separate shots", "blood payout is tied to the lethal target"]}]
     },
     {
       "unit_id": "totem", "ability_id": "totem_cleanse", "cost": 2,

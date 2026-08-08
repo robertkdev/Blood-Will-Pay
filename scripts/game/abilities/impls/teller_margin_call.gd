@@ -2,7 +2,7 @@ extends AbilityImplBase
 
 # Teller — Margin Call
 # Fires two line shots at the two furthest enemies, each dealing 440/660/1035 × AD physical damage to the first unit hit;
-# excess damage continues to the next unit in that line. On kill, 25% chance to drop 1 gold.
+# excess damage continues to the next unit in that line. On kill, 25% chance to award 1 blood Stake.
 # Exile trait active at 1, 3, or 5 adds +1 extra shot (total 3).
 
 # Reduced damage multipliers keep repeated line shots from deleting tanks.
@@ -49,7 +49,7 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 		var roll: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 		if roll < DROP_CHANCE:
 			_award_gold(1)
-			ctx.log("Margin Call: +1U")
+			ctx.log("Margin Call: +1 blood Stake")
 	# Overflow to next in line: use remaining raw damage not applied to primary (post-mitigation remainder)
 	var leftover: int = max(0, raw_dmg - dealt)
 	if leftover > 0 and scored.size() > 1:
@@ -61,7 +61,7 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 			var roll2: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 			if roll2 < DROP_CHANCE:
 				_award_gold(1)
-				ctx.log("Margin Call: +1U")
+				ctx.log("Margin Call: +1 blood Stake")
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:
