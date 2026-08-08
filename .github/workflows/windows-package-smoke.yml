@@ -79,7 +79,7 @@ jobs:
           if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
           $stdout = Join-Path $env:RUNNER_TEMP "godot-export.stdout.log"
           $stderr = Join-Path $env:RUNNER_TEMP "godot-export.stderr.log"
-          $arguments = @("--headless", "--path", $env:GITHUB_WORKSPACE, "--export-release=Windows Desktop", "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")
+          $arguments = @("--headless", "--path", $env:GITHUB_WORKSPACE, '--export-release="Windows Desktop"', "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")
           $process = Start-Process -FilePath $runner -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
           $completed = Wait-Process -Id $process.Id -Timeout 300 -ErrorAction SilentlyContinue
           if (-not $completed) {
