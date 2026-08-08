@@ -13,6 +13,7 @@ func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_main = MAIN_SCENE.instantiate() as Control
 	add_child(_main)
+	_expect(_main.get_node_or_null("CombatView") != null, "Main scene is missing the CombatView runtime contract")
 	await _settle_frames(4)
 
 	await _ensure_unit_select()
