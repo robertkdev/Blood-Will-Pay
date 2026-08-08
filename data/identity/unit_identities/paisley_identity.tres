@@ -7,4 +7,4 @@ script = ExtResource( 1 )
 primary_role = "support"
 primary_goal = "support.peel_carry"
 approaches = ["aoe", "peel"]
-alt_goals = []
+alt_goals = ["mage.area_denial_zone", "support.peel_carry"]

@@ -21,10 +21,12 @@ var primary_role: String = ""
 var primary_goal: String = ""
 var approaches: Array[String] = []
 var alt_goals: Array[String] = []
+var build_affinities: Dictionary = {}
 var identity: UnitIdentity = null
 var targeting_approach_mask_cache: int = -1
 var targeting_role_cache: String = ""
 var targeting_goal_cache: String = ""
+var targeting_mode_override: String = ""
 
 # Health
 var max_hp: int = int(UnitDefaults.BASELINE_STATS["max_hp"])
@@ -101,11 +103,12 @@ func summary() -> String:
 		int(block_chance * 100.0), hp_regen
 	]
 
-func set_identity_data(primary_role_value: String, primary_goal_value: String, approaches_value: Array[String], alt_goals_value: Array[String] = [], identity_resource: UnitIdentity = null) -> void:
+func set_identity_data(primary_role_value: String, primary_goal_value: String, approaches_value: Array[String], alt_goals_value: Array[String] = [], identity_resource: UnitIdentity = null, build_affinities_value: Dictionary = {}) -> void:
 	primary_role = String(primary_role_value)
 	primary_goal = String(primary_goal_value)
 	approaches = _to_string_array(approaches_value)
 	alt_goals = _to_string_array(alt_goals_value)
+	build_affinities = build_affinities_value.duplicate(true)
 	identity = identity_resource
 	targeting_approach_mask_cache = -1
 	targeting_role_cache = String(primary_role).strip_edges().to_lower()
@@ -131,12 +134,21 @@ func get_approaches() -> Array[String]:
 func get_alt_goals() -> Array[String]:
 	return alt_goals.duplicate()
 
+func get_build_affinities() -> Dictionary:
+	return build_affinities.duplicate(true)
+
 func has_approach(approach_id: String) -> bool:
 	var key: String = String(approach_id)
 	for a in approaches:
 		if String(a) == key:
 			return true
 	return false
+
+func set_targeting_mode_override(mode_id: String) -> void:
+	targeting_mode_override = String(mode_id).strip_edges().to_lower()
+
+func clear_targeting_mode_override() -> void:
+	targeting_mode_override = ""
 
 func _to_string_array(values) -> Array[String]:
 	var out: Array[String] = []

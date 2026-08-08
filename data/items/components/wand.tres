@@ -12,3 +12,4 @@ stat_mods = {"flat_sp": 40.0}
 effects = []
 components = []
 tags = PackedStringArray("mage")
+build_axes = PackedStringArray("spell_power")

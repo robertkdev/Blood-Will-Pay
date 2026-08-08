@@ -56,6 +56,15 @@ func attach_card(card: Node) -> void:
 	if not card.is_connected(sig, drop_callable):
 		card.connect(sig, drop_callable)
 
+func detach_card(card: Node) -> void:
+	if card == null:
+		return
+	if card.has_method("set_drop_targets"):
+		card.set_drop_targets([])
+	var sig: StringName = &"dropped_on_target"
+	var drop_callable: Callable = Callable(self, "_on_card_dropped").bind(card)
+	if card.is_connected(sig, drop_callable):
+		card.disconnect(sig, drop_callable)
 
 func _on_card_dropped(grid: Variant, tile_idx: int, card: Variant) -> void:
 	if grid == null or tile_idx < 0 or card == null:

@@ -4,4 +4,4 @@
 
 [resource]
 script = ExtResource( 1 )
-base_stats = {"max_hp": 450, "hp_regen": 0.0, "attack_damage": 50.0, "spell_power": 0.0, "attack_speed": 0.75, "crit_chance": 0.0, "crit_damage": 1.5, "true_damage": 0.0, "lifesteal": 0.0, "attack_range": 1, "armor": 14.0, "magic_resist": 12.0, "armor_pen_flat": 0.0, "armor_pen_pct": 0.0, "mr_pen_flat": 0.0, "mr_pen_pct": 0.0, "mana_max": 0, "mana_regen": 0.0, "mana_start": 0, "cast_speed": 1.0, "mana_gain_per_attack": 60}
+base_stats = {"max_hp": 450, "hp_regen": 0.0, "attack_damage": 50.0, "spell_power": 0.0, "attack_speed": 0.75, "crit_chance": 0.0, "crit_damage": 1.5, "true_damage": 0.0, "lifesteal": 0.0, "attack_range": 1, "armor": 18.0, "magic_resist": 17.0, "armor_pen_flat": 0.0, "armor_pen_pct": 0.0, "mr_pen_flat": 0.0, "mr_pen_pct": 0.0, "mana_max": 0, "mana_regen": 0.0, "mana_start": 0, "cast_speed": 1.0, "mana_gain_per_attack": 60}

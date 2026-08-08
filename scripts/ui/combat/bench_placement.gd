@@ -29,7 +29,10 @@ func teardown() -> void:
     if bench_grid_helper != null:
         bench_grid_helper.clear()
     if _overlay_layer != null and is_instance_valid(_overlay_layer):
-        _overlay_layer.queue_free()
+        var overlay_parent: Node = _overlay_layer.get_parent()
+        if overlay_parent != null:
+            overlay_parent.remove_child(_overlay_layer)
+        _overlay_layer.free()
     tiles.clear()
     _prev_units.clear()
     bench_grid_helper = null
