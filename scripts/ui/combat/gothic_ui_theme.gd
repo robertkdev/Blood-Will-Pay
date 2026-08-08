@@ -6,7 +6,6 @@ const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.
 const CombatVfxInstallerScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_installer.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 const TITLE_WOODLAND_TEXTURE_PATH: String = "res://assets/ui/title/blood_will_pay_title_screen_4k.png"
-const BloodMeterHandle: Texture2D = preload("res://assets/ui/blood_meter_handle.svg")
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
 const COLOR_PANEL: Color = Color(0.050, 0.044, 0.056, 0.97)
@@ -887,6 +886,7 @@ class ArenaPressurePainter:
 				draw_line(crater_points[edge_index], crater_points[edge_index + 1], Color(0.56, 0.18, 0.070, 0.34), 3.0, true)
 
 static var _theme: Theme = null
+static var _blood_meter_handle: Texture2D = null
 
 static func apply(root: Control) -> void:
 	if root == null:
@@ -930,9 +930,26 @@ static func _get_theme() -> Theme:
 	_theme.set_stylebox("grabber_area", "HSlider", _style(COLOR_BLOOD, Color(0.0, 0.0, 0.0, 0.0), 0, 3))
 	_theme.set_stylebox("grabber_area_highlight", "HSlider", _style(COLOR_BLOOD_HOT, Color(0.0, 0.0, 0.0, 0.0), 0, 3))
 	_theme.set_stylebox("slider", "HSlider", _style(COLOR_IRON_DIM, Color(0.0, 0.0, 0.0, 0.0), 0, 3))
-	_theme.set_icon("grabber", "HSlider", BloodMeterHandle)
-	_theme.set_icon("grabber_highlight", "HSlider", BloodMeterHandle)
+	var blood_meter_handle: Texture2D = _blood_meter_handle_texture()
+	if blood_meter_handle != null:
+		_theme.set_icon("grabber", "HSlider", blood_meter_handle)
+		_theme.set_icon("grabber_highlight", "HSlider", blood_meter_handle)
 	return _theme
+
+static func _blood_meter_handle_texture() -> Texture2D:
+	if _blood_meter_handle != null:
+		return _blood_meter_handle
+	var svg_text: String = FileAccess.get_file_as_string("res://assets/ui/blood_meter_handle.svg")
+	if svg_text.is_empty():
+		push_warning("Blood meter handle SVG is unavailable; using the default slider grabber.")
+		return null
+	var image: Image = Image.new()
+	var load_error: Error = image.load_svg_from_string(svg_text)
+	if load_error != OK:
+		push_warning("Blood meter handle SVG could not be parsed; using the default slider grabber.")
+		return null
+	_blood_meter_handle = ImageTexture.create_from_image(image)
+	return _blood_meter_handle
 
 static func _apply_root(root: Control) -> void:
 	root.add_theme_color_override("font_color", COLOR_TEXT)
