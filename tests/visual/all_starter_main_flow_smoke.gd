@@ -67,9 +67,33 @@ func _finish_all_starters() -> void:
 		for failure: String in _technical_failures():
 			push_error("%s: %s" % [_smoke_name(), failure])
 		exit_code = 1
+	_write_terminal_evidence(exit_code)
 	_cleanup_runtime()
 	_clear_isolated_account_profile(ALL_STARTER_PROFILE_PATH, ALL_STARTER_JOURNAL_PATH)
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
+
+func _write_terminal_evidence(exit_code: int) -> void:
+	var output_dir: String = ProjectSettings.globalize_path("user://playtest_results")
+	var mkdir_error: Error = DirAccess.make_dir_recursive_absolute(output_dir)
+	if mkdir_error != OK:
+		push_warning("%s: could not create terminal evidence directory error=%d" % [_smoke_name(), int(mkdir_error)])
+		return
+	var output_path: String = output_dir.path_join("%s.json" % _smoke_name())
+	var output_file: FileAccess = FileAccess.open(output_path, FileAccess.WRITE)
+	if output_file == null:
+		push_warning("%s: could not write terminal evidence path=%s" % [_smoke_name(), output_path])
+		return
+	var payload: Dictionary = {
+		"smoke": _smoke_name(),
+		"exit_code": exit_code,
+		"passed": exit_code == 0,
+		"failures": _technical_failures(),
+		"summary": _all_starter_summary(),
+		"starter_results": _starter_results,
+	}
+	output_file.store_string(JSON.stringify(payload, "\t"))
+	output_file.close()
+	print("%s: terminal_evidence=%s" % [_smoke_name(), output_path])
 
 func _smoke_name() -> String:
 	return ALL_SMOKE_NAME

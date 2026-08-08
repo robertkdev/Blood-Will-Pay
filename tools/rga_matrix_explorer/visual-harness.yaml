@@ -1,0 +1,59 @@
+version: 1
+project: Gamble Battle RGA Matrix Explorer
+scenarios:
+- id: rga-explorer
+  title: RGA Matrix Explorer Runtime Review
+  adapter: generic
+  objective: Verify that a non-technical player can immediately understand how
+    rows and columns map to their team and the enemy team, can read every
+    strategy name without unexplained shorthand, can interpret each score, and
+    can use the glossary at desktop and mobile sizes in the real browser runtime.
+  required_groups:
+  - overview
+  - interaction
+  - responsive
+  captures:
+  - path: visual-evidence\desktop-overview.jpg
+    label: Desktop overview
+    group: overview
+    role: actual
+  - path: visual-evidence\desktop-matrix.jpg
+    label: Desktop matchup chart with reading guide
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-glossary.jpg
+    label: Desktop score legend and plain-language strategy glossary
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-traits.jpg
+    label: Desktop trait atlas
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-bridges.jpg
+    label: Desktop numbered bridge roster
+    group: interaction
+    role: actual
+  - path: visual-evidence\desktop-team-lab.jpg
+    label: Desktop double-vertical proof lab
+    group: interaction
+    role: actual
+  - path: visual-evidence\mobile-overview.jpg
+    label: Mobile overview at 390 by 844
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-matrix-clip.jpg
+    label: Mobile matchup reading guide
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-legend.jpg
+    label: Mobile score legend and selected matchup explanation
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-traits-filtered.jpg
+    label: Mobile trait atlas filtered to Arcanist
+    group: responsive
+    role: actual
+  - path: visual-evidence\mobile-team-lab.jpg
+    label: Mobile double-vertical proof lab
+    group: responsive
+    role: actual

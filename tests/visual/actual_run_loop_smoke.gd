@@ -733,7 +733,9 @@ func _button_with_text_disabled(text: String) -> bool:
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
-		if button != null and button.text == text:
+		# Current hardcore controls append live economy costs (for example,
+		# "Reroll — 2g"). Match the stable action name, not stale full copy.
+		if button != null and button.text.begins_with(text):
 			return button.disabled
 	return false
 

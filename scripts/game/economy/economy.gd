@@ -124,7 +124,7 @@ func set_bet(amount: int) -> bool:
 		bet_changed.emit(current_bet)
 	return current_bet > 0
 
-func start_combat() -> void:
+func start_combat(locked_quote_multiplier: float = -1.0) -> void:
 	# Escrow the bet at combat start
 	var b: int = max(0, current_bet)
 	# Mark combat active before emitting signals so reactive UI cannot change the bet mid-combat
@@ -132,7 +132,7 @@ func start_combat() -> void:
 	# Capture snapshot of gold and bet at the start for next-round heuristics
 	last_gold_start = gold
 	last_bet_start = b
-	_locked_gross_multiplier = quoted_gross_multiplier
+	_locked_gross_multiplier = locked_quote_multiplier if locked_quote_multiplier > 0.0 else quoted_gross_multiplier
 	if b > 0:
 		gold = max(0, gold - b)
 		gold_changed.emit(gold)
