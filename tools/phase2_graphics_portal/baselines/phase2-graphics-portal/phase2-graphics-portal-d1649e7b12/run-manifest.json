@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "run_id": "phase2-graphics-portal-d1649e7b12",
+  "project": "Gamble Battle",
+  "scenario_id": "phase2-graphics-portal",
+  "title": "Phase II portal",
+  "objective": "Verify that the real browser gallery presents twelve current repository-backed Gamble Battle directions in a readable side-by-side wall, clearly distinguishes repaired, reinspection, and later user-locked redesign status, preserves each full concept without card cropping, provides a large inspection view, and remains legible and operable on desktop and mobile.",
+  "adapter": "generic",
+  "created_utc": "2026-07-27T05:03:38.071645+00:00",
+  "source_root": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal",
+  "run_root": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12",
+  "panels": [
+    {
+      "id": "P001",
+      "label": "Before: desktop identities below the fold",
+      "group": "overview",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\captures\\P001.png",
+      "sha256": "e36ce9306c912aed503288d317e4b24031661f3ed2e621a65eb2bdfb5dab78fc",
+      "width": 1425,
+      "height": 990,
+      "pair": "desktop_identity",
+      "role": "before",
+      "state": "desktop",
+      "viewport": "desktop-1440x1000",
+      "camera": "browser",
+      "layer": "final",
+      "variant": null,
+      "event": "gallery_loaded",
+      "timestamp_ms": 0,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\staged\\desktop-top-before.png",
+      "source_mtime_utc": "2026-07-27T05:03:37.913000+00:00",
+      "captured_utc": "2026-07-27T05:03:37.983645+00:00",
+      "metadata": {
+        "runtime": "Vinext local web runtime in Codex in-app browser",
+        "source": "http://localhost:3000/",
+        "source_sha256": "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9",
+        "build": "npm test / vinext build",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    },
+    {
+      "id": "P002",
+      "label": "After: desktop identities visible",
+      "group": "overview",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\captures\\P002.png",
+      "sha256": "843b8241ba4a39f65849aba737ff4f018a458b79b134e57bd2029c1aa698cb0d",
+      "width": 1425,
+      "height": 990,
+      "pair": "desktop_identity",
+      "role": "after",
+      "state": "desktop",
+      "viewport": "desktop-1440x1000",
+      "camera": "browser",
+      "layer": "final",
+      "variant": null,
+      "event": "gallery_loaded",
+      "timestamp_ms": 100,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\staged\\desktop-top.png",
+      "source_mtime_utc": "2026-07-27T05:03:37.914000+00:00",
+      "captured_utc": "2026-07-27T05:03:38.002643+00:00",
+      "metadata": {
+        "runtime": "Vinext local web runtime in Codex in-app browser",
+        "source": "http://localhost:3000/",
+        "source_sha256": "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9",
+        "build": "npm test / vinext build",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    },
+    {
+      "id": "P003",
+      "label": "Knoll full-size inspection",
+      "group": "overview",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\captures\\P003.png",
+      "sha256": "9203f0263269021ff35d342ebd65e5a78eb8c7308359d08cd1ea9ff1940b2999",
+      "width": 1425,
+      "height": 990,
+      "pair": null,
+      "role": "actual",
+      "state": "desktop_inspection",
+      "viewport": "desktop-1440x1000",
+      "camera": "browser",
+      "layer": "final",
+      "variant": null,
+      "event": "inspect_knoll",
+      "timestamp_ms": 200,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\staged\\desktop-knoll-modal.png",
+      "source_mtime_utc": "2026-07-27T05:03:37.915000+00:00",
+      "captured_utc": "2026-07-27T05:03:38.018650+00:00",
+      "metadata": {
+        "runtime": "Vinext local web runtime in Codex in-app browser",
+        "source": "http://localhost:3000/",
+        "source_sha256": "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9",
+        "build": "npm test / vinext build",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    },
+    {
+      "id": "P004",
+      "label": "Before: mobile identity below the fold",
+      "group": "overview",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\captures\\P004.png",
+      "sha256": "b1296d43ad0aa64cbcaa04e5c64af427b3517e852bee313956c9766864b82bbf",
+      "width": 375,
+      "height": 812,
+      "pair": "mobile_identity",
+      "role": "before",
+      "state": "mobile",
+      "viewport": "mobile-390x844",
+      "camera": "browser",
+      "layer": "final",
+      "variant": null,
+      "event": "gallery_loaded",
+      "timestamp_ms": 300,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\staged\\mobile-top-before.png",
+      "source_mtime_utc": "2026-07-27T05:03:37.916000+00:00",
+      "captured_utc": "2026-07-27T05:03:38.035643+00:00",
+      "metadata": {
+        "runtime": "Vinext local web runtime in Codex in-app browser",
+        "source": "http://localhost:3000/",
+        "source_sha256": "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9",
+        "build": "npm test / vinext build",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    },
+    {
+      "id": "P005",
+      "label": "After: mobile identity visible",
+      "group": "overview",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\captures\\P005.png",
+      "sha256": "c48594a81d4d304b524cdda048e42e27e1396b82654a39012126dc577f1f6c03",
+      "width": 375,
+      "height": 812,
+      "pair": "mobile_identity",
+      "role": "after",
+      "state": "mobile",
+      "viewport": "mobile-390x844",
+      "camera": "browser",
+      "layer": "final",
+      "variant": null,
+      "event": "gallery_loaded",
+      "timestamp_ms": 400,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\staged\\mobile-top.png",
+      "source_mtime_utc": "2026-07-27T05:03:37.917000+00:00",
+      "captured_utc": "2026-07-27T05:03:38.051645+00:00",
+      "metadata": {
+        "runtime": "Vinext local web runtime in Codex in-app browser",
+        "source": "http://localhost:3000/",
+        "source_sha256": "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9",
+        "build": "npm test / vinext build",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    },
+    {
+      "id": "P006",
+      "label": "Locked filter: two directions",
+      "group": "overview",
+      "path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\captures\\P006.png",
+      "sha256": "d7bddcbaa30f31ae20a68b43afd53f6e65473863c40410fb3ce52a1ead86e0e0",
+      "width": 375,
+      "height": 812,
+      "pair": null,
+      "role": "actual",
+      "state": "mobile_locked",
+      "viewport": "mobile-390x844",
+      "camera": "browser",
+      "layer": "final",
+      "variant": null,
+      "event": "filter_locked",
+      "timestamp_ms": 500,
+      "source_path": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\staged\\mobile-locked-filter.png",
+      "source_mtime_utc": "2026-07-27T05:03:37.918000+00:00",
+      "captured_utc": "2026-07-27T05:03:38.070646+00:00",
+      "metadata": {
+        "runtime": "Vinext local web runtime in Codex in-app browser",
+        "source": "http://localhost:3000/",
+        "source_sha256": "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9",
+        "build": "npm test / vinext build",
+        "capture_manifest": "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\captures.json",
+        "changed_by_capture_command": true,
+        "capture_manifest_changed": true
+      }
+    }
+  ],
+  "packet_images": [
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\packet\\00-agent-review-instructions.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\packet\\01-overview-board-01.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\packet\\02-reference-comparison-01.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\packet\\02-reference-comparison-02.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\packet\\03-camera-layer-matrix.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\packet\\07-review-acceptance.png",
+    "C:\\Users\\Flipm\\.codex\\continuity\\worktrees\\810803c9e723dc16\\019fa1ca-f909-7570-ba37-b06572d2af78\\tools\\phase2_graphics_portal\\visual-evidence\\vdh-runs\\phase2-graphics-portal-d1649e7b12\\packet\\99-final-verdict-board.png"
+  ],
+  "missing_groups": [],
+  "missing_evidence": [],
+  "verdict": "pass",
+  "findings": [],
+  "metadata": {
+    "capture_started_utc": "2026-07-27T05:03:37.861647+00:00",
+    "runtime_provenance": {
+      "runtime": "Vinext local web runtime in Codex in-app browser",
+      "source": "http://localhost:3000/",
+      "source_sha256": "5450cb438712b6ddb75c0ab9c94c37ef2248567ee1479efbe31851230b76bbd9",
+      "build": "npm test / vinext build"
+    },
+    "evidence_profile": {
+      "required_groups": [],
+      "required_cameras": [
+        "browser"
+      ],
+      "required_layers": [
+        "final"
+      ],
+      "required_states": [],
+      "required_viewports": [],
+      "required_events": [
+        "gallery_loaded",
+        "inspect_knoll",
+        "filter_locked"
+      ],
+      "required_pairs": {
+        "desktop_identity": [
+          "before",
+          "after"
+        ],
+        "mobile_identity": [
+          "before",
+          "after"
+        ]
+      },
+      "required_combinations": [
+        {
+          "state": "desktop",
+          "viewport": "desktop-1440x1000"
+        },
+        {
+          "state": "desktop_inspection",
+          "viewport": "desktop-1440x1000"
+        },
+        {
+          "state": "mobile",
+          "viewport": "mobile-390x844"
+        },
+        {
+          "state": "mobile_locked",
+          "viewport": "mobile-390x844"
+        }
+      ],
+      "min_temporal_frames": 0,
+      "max_source_age_seconds": 600,
+      "require_runtime_provenance": true,
+      "required_runtime_fields": [
+        "runtime",
+        "source",
+        "source_sha256",
+        "build"
+      ]
+    }
+  }
+}
