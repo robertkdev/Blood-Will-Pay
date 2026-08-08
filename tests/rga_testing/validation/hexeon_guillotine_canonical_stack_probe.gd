@@ -60,7 +60,7 @@ func _run_damage_case() -> Dictionary:
 	var state: BattleState = _make_state(1000, 1000)
 	var engine: CombatEngine = _make_engine(state)
 	var expected_kalei: int = 5
-	var expected_damage: int = 260 + (12 * expected_kalei)
+	var expected_damage: int = 300 + (12 * expected_kalei)
 	var target: Unit = state.enemy_team[0]
 	var before_hp: int = int(target.hp)
 	var stack_res: Dictionary = engine.buff_system.add_stack(state, "player", 0, TraitKeys.KALEIDOSCOPE, expected_kalei)

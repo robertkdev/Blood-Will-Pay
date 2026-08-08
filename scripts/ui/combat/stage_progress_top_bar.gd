@@ -236,9 +236,9 @@ func _stage_tooltip_for(chapter: int, stage_number: int) -> String:
 		var puzzle: String = String(challenge.get("puzzle", "")).strip_edges()
 		if puzzle != "":
 			lines.append("Plan: %s" % puzzle)
-	var theme: String = String(rules.get("theme", "")).strip_edges()
-	if theme != "" and challenge.is_empty():
-		lines.append("Theme: %s" % theme.replace("_", " ").capitalize())
+	var theme_id: String = String(rules.get("theme", "")).strip_edges()
+	if theme_id != "" and challenge.is_empty():
+		lines.append("Theme: %s" % theme_id.replace("_", " ").capitalize())
 	if rules.has("difficulty_rating") or rules.has("target_rating"):
 		lines.append("Rating: %d/%d" % [int(rules.get("difficulty_rating", 0)), int(rules.get("target_rating", 0))])
 	return "\n".join(lines)

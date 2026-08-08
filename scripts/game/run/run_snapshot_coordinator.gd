@@ -17,7 +17,10 @@ static func capture(controller: Variant) -> Dictionary:
 	if roster_node != null:
 		var live_bench_slots: Array = roster_node.get("bench_slots") as Array
 		for unit: Unit in live_bench_slots:
-			bench_records.append(_serialize_unit(unit) if unit != null else null)
+			if unit != null:
+				bench_records.append(_serialize_unit(unit))
+			else:
+				bench_records.append(null)
 	var placements: Array[int] = []
 	if controller.grid_placement != null and controller.grid_placement.has_method("get_player_placements"):
 		placements = _int_array(controller.grid_placement.call("get_player_placements"))

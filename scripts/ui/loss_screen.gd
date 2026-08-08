@@ -472,7 +472,7 @@ func _ensure_frame_damage() -> void:
 	VisualTypeSystem.set_action(forfeit_stamp)
 	_frame_damage_layer.add_child(forfeit_stamp)
 
-func _add_frame_rupture(node_name: String, from_anchor: Vector2, to_anchor: Vector2, rotation: float, thickness: float, color: Color) -> void:
+func _add_frame_rupture(node_name: String, from_anchor: Vector2, to_anchor: Vector2, rotation_angle: float, thickness: float, color: Color) -> void:
 	if _frame_damage_layer == null:
 		return
 	var rupture: ColorRect = ColorRect.new()
@@ -485,7 +485,7 @@ func _add_frame_rupture(node_name: String, from_anchor: Vector2, to_anchor: Vect
 	rupture.anchor_bottom = to_anchor.y
 	rupture.offset_top = -thickness * 0.5
 	rupture.offset_bottom = thickness * 0.5
-	rupture.rotation_degrees = rotation
+	rupture.rotation_degrees = rotation_angle
 	_frame_damage_layer.add_child(rupture)
 
 func _ensure_record_labels() -> void:
@@ -772,7 +772,7 @@ func _ensure_pressure_layer() -> void:
 		_casualty_ghost_label.z_index = 30
 		_pressure_layer.add_child(_casualty_ghost_label)
 
-func _add_woodland_rupture(parent: Control, node_name: String, position_value: Vector2, size_value: Vector2, rotation: float, color: Color) -> void:
+func _add_woodland_rupture(parent: Control, node_name: String, position_value: Vector2, size_value: Vector2, rotation_angle: float, color: Color) -> void:
 	if parent == null:
 		return
 	var rupture: ColorRect = ColorRect.new()
@@ -780,7 +780,7 @@ func _add_woodland_rupture(parent: Control, node_name: String, position_value: V
 	rupture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rupture.position = position_value
 	rupture.size = size_value
-	rupture.rotation_degrees = rotation
+	rupture.rotation_degrees = rotation_angle
 	rupture.color = color
 	parent.add_child(rupture)
 

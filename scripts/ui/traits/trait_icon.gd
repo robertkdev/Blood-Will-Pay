@@ -210,7 +210,7 @@ func _clear_global_tooltips() -> void:
 		if node != null and node != _tooltip and is_instance_valid(node):
 			node.queue_free()
 
-func _apply_hover_motion(_active: bool) -> void:
+func _apply_hover_motion(_is_active: bool) -> void:
 	if _hover_tween != null and is_instance_valid(_hover_tween):
 		_hover_tween.kill()
 	_hover_tween = create_tween()

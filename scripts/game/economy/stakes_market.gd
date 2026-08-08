@@ -10,10 +10,12 @@ const MAX_SAFE_GOLD: int = 9000000000000000000
 
 static func denomination_for_rank(rank: int) -> int:
 	var safe_rank: int = max(0, int(rank))
+	@warning_ignore("integer_division")
 	var cycle: int = safe_rank / 3
 	var offset: int = safe_rank % 3
 	var multiplier: int = 1
 	for _index: int in range(cycle):
+		@warning_ignore("integer_division")
 		if multiplier > MAX_SAFE_GOLD / 10:
 			return MAX_SAFE_GOLD
 		multiplier *= 10
@@ -22,6 +24,7 @@ static func denomination_for_rank(rank: int) -> int:
 		base = 2
 	elif offset == 2:
 		base = 5
+	@warning_ignore("integer_division")
 	if multiplier > MAX_SAFE_GOLD / base:
 		return MAX_SAFE_GOLD
 	return base * multiplier
@@ -50,6 +53,7 @@ static func eligible_stake_rank(chapter: int, peak_bankroll: int, current_rank: 
 		var next_unit: int = denomination_for_rank(rank + 1)
 		if next_unit <= denomination_for_rank(rank):
 			break
+		@warning_ignore("integer_division")
 		if next_unit > MAX_SAFE_GOLD / HEALTHY_RESERVE_UNITS:
 			break
 		var promotion_threshold: int = next_unit * HEALTHY_RESERVE_UNITS
@@ -65,6 +69,7 @@ static func action_price(stake_units: int, stake_unit: int) -> int:
 	return _safe_product(max(0, int(stake_units)), max(MIN_STAKE_UNIT, int(stake_unit)), 1)
 
 static func premium_package_level(stake_rank: int) -> int:
+	@warning_ignore("integer_division")
 	return clamp(
 		1 + max(0, int(stake_rank)) / 3,
 		1,
@@ -83,6 +88,7 @@ static func _safe_product(a: int, b: int, c: int) -> int:
 	for value: int in values:
 		if value == 0:
 			return 0
+		@warning_ignore("integer_division")
 		if product > MAX_SAFE_GOLD / value:
 			return MAX_SAFE_GOLD
 		product *= value

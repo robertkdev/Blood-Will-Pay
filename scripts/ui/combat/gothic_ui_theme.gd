@@ -598,7 +598,8 @@ class ArenaPressurePainter:
 			draw_colored_polygon(clod_patch, clod_color)
 			draw_circle(clod_center + Vector2(-clod_radius * 0.22, -clod_radius * 0.20), clod_radius * 0.32, Color(0.44, 0.14, 0.044, 0.30), true)
 		for scar_index: int in range(5):
-			var scar_center: Vector2 = center + Vector2((float(scar_index % 3) - 1.0) * width * 0.31, (float(scar_index / 3) - 1.0) * height * 0.34)
+			var scar_row: float = float(floori(float(scar_index) / 3.0))
+			var scar_center: Vector2 = center + Vector2((float(scar_index % 3) - 1.0) * width * 0.31, (scar_row - 1.0) * height * 0.34)
 			var scar_angle: float = -0.24 + float((scar_index * 5) % 7) * 0.075
 			var scar_length: float = width * (0.075 + float(scar_index % 3) * 0.018)
 			var scar_direction: Vector2 = Vector2(cos(scar_angle), sin(scar_angle))
@@ -2859,6 +2860,7 @@ static func _focus_outline(radius: int) -> StyleBoxFlat:
 	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
 	style.border_color = COLOR_GOLD_HOT
 	style.set_border_width_all(2)
+	style.set_corner_radius_all(max(0, radius))
 	style.expand_margin_left = 2.0
 	style.expand_margin_top = 2.0
 	style.expand_margin_right = 2.0

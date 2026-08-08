@@ -9,27 +9,27 @@ class_name TraitHandler
 # - Restrict side effects to BuffSystem stacks/buffs and unit stat adjustments.
 # - Be deterministic; avoid reading mutable global state outside ctx/state.
 
-func on_battle_start(ctx):
+func on_battle_start(_ctx: TraitContext) -> void:
 	# Apply start-of-combat effects only.
 	pass
 
-func on_ability_cast(ctx, team: String, index: int, ability_id: String):
+func on_ability_cast(_ctx: TraitContext, _team: String, _index: int, _ability_id: String) -> void:
 	# Respond to a successful cast (e.g., add stacks).
 	pass
 
-func on_hit_applied(ctx, event: Dictionary):
+func on_hit_applied(_ctx: TraitContext, _event: Dictionary) -> void:
 	# Pure reaction to a resolved hit.
 	# event: { team, source_index, target_index, rolled, dealt, crit, before_hp, after_hp, player_cd, enemy_cd }
 	pass
 
-func on_unit_killed(ctx, source_team: String, source_index: int, target_team: String, target_index: int):
+func on_unit_killed(_ctx: TraitContext, _source_team: String, _source_index: int, _target_team: String, _target_index: int) -> void:
 	# Fired when any unit is killed by a source (attack or ability).
 	pass
 
-func on_tick(ctx, delta: float):
+func on_tick(_ctx: TraitContext, _delta: float) -> void:
 	# Lightweight periodic timers.
 	pass
 
-func on_battle_end(ctx):
+func on_battle_end(_ctx: TraitContext) -> void:
 	# Cleanup if needed (should be minimal).
 	pass

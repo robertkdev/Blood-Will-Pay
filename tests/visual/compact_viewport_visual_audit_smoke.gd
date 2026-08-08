@@ -1041,7 +1041,7 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
 	if wager_summary != null:
 		_expect(wager_summary.get_theme_font_size("font_size") >= (14 if tight else 18), "%s wager outcome metadata is too small" % context)
-		for required_copy: String in ["Wager", "Win", "After win", "After loss"]:
+		for required_copy: String in ["DECISION", "RISK", "WIN", "RESERVE", "W", "L"]:
 			_expect(wager_summary.text.contains(required_copy), "%s wager outcome metadata omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)

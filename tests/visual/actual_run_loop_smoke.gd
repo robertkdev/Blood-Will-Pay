@@ -277,6 +277,9 @@ func _select_starter(unit_id: String) -> void:
 	if button == null:
 		_expect(false, "starter button missing for %s" % unit_id)
 		return
+	if select.scroll != null:
+		select.scroll.ensure_control_visible(button)
+		await _settle_frames(4)
 	await _click_button(button, "starter button %s" % unit_id)
 	await _settle_frames(2)
 	var start: Button = select.get_node_or_null("Center/HBox/Right/StartButton") as Button
@@ -587,8 +590,12 @@ func _click_button(button: Button, label: String) -> bool:
 
 func _visible_click_point(control: Control) -> Vector2:
 	var rect: Rect2 = control.get_global_rect()
-	var viewport_rect: Rect2 = _viewport_rect()
-	var visible_rect: Rect2 = rect.intersection(viewport_rect)
+	var visible_rect: Rect2 = rect.intersection(_viewport_rect())
+	var ancestor: Control = control.get_parent() as Control
+	while ancestor != null and visible_rect.size.x > 0.0 and visible_rect.size.y > 0.0:
+		if ancestor.clip_contents or ancestor is ScrollContainer:
+			visible_rect = visible_rect.intersection(ancestor.get_global_rect())
+		ancestor = ancestor.get_parent() as Control
 	if visible_rect.size.x > 4.0 and visible_rect.size.y > 4.0:
 		return visible_rect.get_center()
 	return rect.get_center()

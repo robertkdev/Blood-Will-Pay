@@ -302,7 +302,7 @@ static func _draw_control_map(image: Image, snapshot: Dictionary[String, Variant
 			var text: String = str(control.get("text", "")).strip_edges()
 			if text == "":
 				text = str(control.get("name", ""))
-			_draw_text(image, _truncate(text.to_upper(), max(4, int(rect.size.x / 9))), rect.position.x + 3, rect.position.y + 3, color.lightened(0.28), 1)
+			_draw_text(image, _truncate(text.to_upper(), max(4, floori(float(rect.size.x) / 9.0))), rect.position.x + 3, rect.position.y + 3, color.lightened(0.28), 1)
 
 static func _draw_text_panel(image: Image, snapshot: Dictionary[String, Variant]) -> void:
 	_fill_rect(image, Rect2i(TEXT_LEFT - 14, TEXT_TOP - 10, SOFTWARE_WIDTH - TEXT_LEFT, SOFTWARE_HEIGHT - 28), Color(0.022, 0.018, 0.020, 1.0))

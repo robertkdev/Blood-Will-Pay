@@ -30,6 +30,7 @@ func cast(ctx: AbilityContext) -> bool:
 	ctx.request_post_cast_mana_refund(MANA_REFUND)
 	var level_index: int = _level_index(caster)
 	var damage: float = float(DAMAGE_BASE[level_index]) + SP_RATIO * float(caster.spell_power)
+	var target_team: String = ctx._other_team(ctx.caster_team)
 	for target_index: int in targets:
 		var result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, damage, "magic")
 		if bool(result.get("processed", false)):

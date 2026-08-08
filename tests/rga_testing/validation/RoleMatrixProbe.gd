@@ -619,12 +619,12 @@ func _scenarios_from_intents(csv: String) -> Array:
 				out.append({"label": String(k), "map_params": {}})
 	return out
 
-func _run_subject_metrics(caps_present: PackedStringArray, ctx: Dictionary, metric_ids: Array, subject_ids: Array) -> Dictionary:
-	if metric_ids.is_empty() or not _ctx_has_counterplay_sims(ctx):
-		return MetricRegistry.run_all(caps_present, ctx, metric_ids, subject_ids)
+func _run_subject_metrics(caps_present: PackedStringArray, ctx: Dictionary, requested_metric_ids: Array, subject_ids: Array) -> Dictionary:
+	if requested_metric_ids.is_empty() or not _ctx_has_counterplay_sims(ctx):
+		return MetricRegistry.run_all(caps_present, ctx, requested_metric_ids, subject_ids)
 	var normal_metric_ids: Array = []
 	var counterplay_metric_ids: Array = []
-	for raw_metric_id in metric_ids:
+	for raw_metric_id in requested_metric_ids:
 		var metric_id: String = String(raw_metric_id)
 		if _is_counterplay_metric_id(metric_id):
 			counterplay_metric_ids.append(metric_id)
@@ -632,9 +632,9 @@ func _run_subject_metrics(caps_present: PackedStringArray, ctx: Dictionary, metr
 			normal_metric_ids.append(metric_id)
 	if counterplay_metric_ids.is_empty():
 		var normal_only_ctx: Dictionary = _ctx_without_counterplay_sims(ctx)
-		return MetricRegistry.run_all(caps_present, normal_only_ctx, metric_ids, subject_ids)
+		return MetricRegistry.run_all(caps_present, normal_only_ctx, requested_metric_ids, subject_ids)
 	if normal_metric_ids.is_empty():
-		return MetricRegistry.run_all(caps_present, ctx, metric_ids, subject_ids)
+		return MetricRegistry.run_all(caps_present, ctx, requested_metric_ids, subject_ids)
 	var baseline_ctx: Dictionary = _ctx_without_counterplay_sims(ctx)
 	var normal_result: Dictionary = MetricRegistry.run_all(caps_present, baseline_ctx, normal_metric_ids, subject_ids)
 	var counterplay_result: Dictionary = MetricRegistry.run_all(caps_present, ctx, counterplay_metric_ids, subject_ids)

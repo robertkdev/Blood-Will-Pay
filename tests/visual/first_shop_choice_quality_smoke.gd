@@ -17,6 +17,7 @@ const TARGET_HELPERS: Dictionary = {
 }
 const FIRST_FIGHT_TIMEOUT: float = 30.0
 const SECOND_FIGHT_TIMEOUT: float = 35.0
+const TEST_ACCOUNT_PROFILE_PATH: String = "user://first_shop_choice_quality_account_profile.json"
 
 var _shop_errors: Array[Dictionary] = []
 var _choice_results: Array[Dictionary] = []
@@ -33,6 +34,7 @@ func _run() -> void:
 	Engine.time_scale = 8.0
 	if Shop != null and not Shop.is_connected("error", Callable(self, "_on_shop_error")):
 		Shop.error.connect(_on_shop_error)
+	_expect(_seed_isolated_account_profile(TEST_ACCOUNT_PROFILE_PATH, TARGET_STARTERS), "choice-quality profile should unlock every sampled starter")
 
 	for starter_id: String in TARGET_STARTERS:
 		var starter_result: Dictionary = await _run_starter_choice_sweep(starter_id)
@@ -69,6 +71,7 @@ func _finish_choice_quality() -> void:
 			push_error("%s: %s" % [SMOKE_NAME, failure])
 		exit_code = 1
 	_cleanup_runtime()
+	AccountProfileStoreScript.clear(TEST_ACCOUNT_PROFILE_PATH)
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, 10), CONNECT_ONE_SHOT)
 
 func _run_starter_choice_sweep(starter_id: String) -> Dictionary:
@@ -102,6 +105,7 @@ func _capture_first_shop_snapshot(starter_id: String) -> Dictionary:
 	_start_main_scene()
 	await _settle_frames(4)
 	await _ensure_unit_select()
+	await _apply_choice_account_profile()
 	await _select_starter(starter_id)
 	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	_expect(combat_opened, "choice snapshot %s combat view did not open" % starter_id)
@@ -135,6 +139,7 @@ func _run_offer_slot_trial(starter_id: String, offers: Array[ShopOffer], gold_be
 	_start_main_scene()
 	await _settle_frames(4)
 	await _ensure_unit_select()
+	await _apply_choice_account_profile()
 	await _select_starter(starter_id)
 	var combat_opened: bool = await _wait_for_combat_view_visible(20.0)
 	_expect(combat_opened, "choice trial %s slot %d combat view did not open" % [starter_id, slot_index])
@@ -224,6 +229,17 @@ func _seed_isolated_account_profile(profile_path: String, unlocked_starter_ids: 
 	profile["unlocked_starter_ids"] = unlocked_starter_ids.duplicate()
 	var saved: Dictionary = AccountProfileStoreScript.save_profile(profile, profile_path)
 	return bool(saved.get("ok", false))
+
+func _apply_choice_account_profile() -> void:
+	var select: UnitSelect = _main.get_node_or_null("UnitSelect") as UnitSelect if _main != null else null
+	if select == null:
+		_expect(false, "choice-quality account profile could not find UnitSelect")
+		return
+	_flush_synthetic_input()
+	select.account_profile_path = TEST_ACCOUNT_PROFILE_PATH
+	select.call("_populate_units")
+	select.reset_selection()
+	await _settle_frames(8)
 
 func _apply_isolated_account_profile(profile_path: String) -> void:
 	var select: UnitSelect = _main.get_node_or_null("UnitSelect") as UnitSelect if _main != null else null

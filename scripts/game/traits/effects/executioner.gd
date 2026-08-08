@@ -99,7 +99,7 @@ func on_tick(ctx, delta: float):
             next.append(b)
     _bleeds = next
 
-func on_battle_end(ctx):
+func on_battle_end(_ctx):
     _bleeds.clear()
 
 func on_unit_killed(ctx, source_team: String, source_index: int, _target_team: String, _target_index: int):

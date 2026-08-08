@@ -52,6 +52,7 @@ var _tooltip_lines: Array[String] = []
 var _status_tip: String = ""
 var _package_level: int = 1
 var _package_kind: String = "standard"
+var _price_value: int = 0
 
 func _resolve_child(paths: Array) -> Node:
 	for p in paths:
@@ -79,6 +80,7 @@ func set_data(props: Dictionary) -> void:
 	offer_id = String(props.get("id", ""))
 	var title := String(props.get("name", "?"))
 	var price_i := int(props.get("price", props.get("cost", 0)))
+	_price_value = price_i
 	_package_level = max(1, int(props.get("package_level", 1)))
 	_package_kind = String(props.get("package_kind", "standard"))
 	var img_path := String(props.get("image_path", props.get("sprite_path", "")))
@@ -98,7 +100,7 @@ func set_data(props: Dictionary) -> void:
 	if _name_label:
 		_name_label.text = "%s • Lv%d" % [title, _package_level] if _package_kind != "standard" else title
 	if _price_label:
-		_price_label.text = "%d blood" % price_i
+		_price_label.text = _price_copy()
 	if _name_label and _package_kind == "current_grade":
 		_name_label.text = "CAPITAL %s • Lv%d" % [title, _package_level]
 	if _icon:
@@ -213,6 +215,7 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if enabled else TextServer.OVERRUN_NO_TRIMMING
 		_name_label.add_theme_font_size_override("font_size", 14 if _tight_presentation else 16 if enabled else 20)
 	if _price_label != null:
+		_price_label.text = _price_copy()
 		_price_label.anchor_left = 0.72 if enabled else 0.76
 		_price_label.anchor_top = 0.61 if _tight_presentation else 0.66 if enabled else 1.0
 		_price_label.anchor_right = 1.0
@@ -227,6 +230,9 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_price_label.add_theme_font_size_override("font_size", 16 if _tight_presentation else 17 if enabled else 20)
 	set_meta("compact_presentation", enabled)
 	set_meta("tight_presentation", _tight_presentation)
+
+func _price_copy() -> String:
+	return "B%d" % _price_value if _compact_presentation else "%d blood" % _price_value
 
 func set_affordable(affordable: bool) -> void:
 	var ok: bool = bool(affordable)
@@ -248,8 +254,8 @@ func set_shop_disabled(reason) -> void:
 	modulate = Color(1, 1, 1, 0.6)
 	_refresh_cursor()
 
-func set_status_tip(text: String) -> void:
-	_status_tip = String(text).strip_edges()
+func set_status_tip(tip_text: String) -> void:
+	_status_tip = String(tip_text).strip_edges()
 	tooltip_text = ""
 	if _hovered:
 		_show_tooltip()
@@ -463,19 +469,15 @@ func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bo
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = COLOR_PANEL
 	style.border_color = COLOR_IRON
-	var modulate: Color = Color.WHITE
 	if highlighted:
 		style.bg_color = Color(0.092, 0.054, 0.062, 0.99)
 		style.border_color = COLOR_GOLD
-		modulate = Color(1.14, 1.05, 0.92, 1.0)
 	if pressed_state:
 		style.bg_color = Color(0.13, 0.026, 0.040, 0.98)
 		style.border_color = COLOR_BLOOD
-		modulate = Color(0.92, 0.82, 0.78, 1.0)
 	if disabled_state:
 		style.bg_color = Color(0.038, 0.032, 0.040, 0.96)
 		style.border_color = Color(0.33, 0.29, 0.29, 0.88)
-		modulate = Color(0.50, 0.48, 0.46, 0.82)
 	style.border_width_left = 2
 	style.border_width_top = 2
 	style.border_width_right = 2
@@ -645,9 +647,9 @@ func _current_tooltip_lines() -> Array[String]:
 			lines.append(line)
 	return lines
 
-func _add_tooltip_label(parent: VBoxContainer, text: String, font_size: int, color: Color) -> void:
+func _add_tooltip_label(parent: VBoxContainer, label_text: String, font_size: int, color: Color) -> void:
 	var label: Label = Label.new()
-	label.text = String(text)
+	label.text = String(label_text)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size.x = 0.0 if _compact_presentation else TOOLTIP_WIDTH - 24.0
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
