@@ -6,6 +6,7 @@ const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.
 const CombatVfxInstallerScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_installer.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 const TITLE_WOODLAND_TEXTURE_PATH: String = "res://assets/ui/title/blood_will_pay_title_screen_4k.png"
+const BloodMeterHandle: Texture2D = preload("res://assets/ui/blood_meter_handle.svg")
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
 const COLOR_PANEL: Color = Color(0.050, 0.044, 0.056, 0.97)
@@ -929,8 +930,8 @@ static func _get_theme() -> Theme:
 	_theme.set_stylebox("grabber_area", "HSlider", _style(COLOR_BLOOD, Color(0.0, 0.0, 0.0, 0.0), 0, 3))
 	_theme.set_stylebox("grabber_area_highlight", "HSlider", _style(COLOR_BLOOD_HOT, Color(0.0, 0.0, 0.0, 0.0), 0, 3))
 	_theme.set_stylebox("slider", "HSlider", _style(COLOR_IRON_DIM, Color(0.0, 0.0, 0.0, 0.0), 0, 3))
-	_theme.set_icon("grabber", "HSlider", _circle_texture(COLOR_GOLD, 18))
-	_theme.set_icon("grabber_highlight", "HSlider", _circle_texture(Color(1.0, 0.82, 0.45, 1.0), 20))
+	_theme.set_icon("grabber", "HSlider", BloodMeterHandle)
+	_theme.set_icon("grabber_highlight", "HSlider", BloodMeterHandle)
 	return _theme
 
 static func _apply_root(root: Control) -> void:

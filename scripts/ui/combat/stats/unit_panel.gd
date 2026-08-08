@@ -25,8 +25,6 @@ const COLOR_ENEMY: Color = Color(0.52, 0.045, 0.070, 0.95)
 @onready var stats_grid: GridContainer = $"VBox/StatsGrid"
 @onready var dps_label: Label = $"VBox/Footer/DPSLabel"
 @onready var casts_label: Label = $"VBox/Footer/CastsLabel"
-var _extra_labels_added: bool = false
-
 var tracker: StatsTracker = null
 var team: String = "player"
 var index: int = -1
@@ -116,60 +114,14 @@ func _refresh_dynamic() -> void:
     # Live DPS (3s) and casts
     var dps3: float = 0.0
     var casts: float = 0.0
-    var hps3: float = 0.0
-    var absorbed_total: float = 0.0
-    var kills: float = 0.0
-    var deaths: float = 0.0
-    var time_alive: float = 0.0
     if tracker != null and index >= 0:
         dps3 = tracker.get_value(team, index, "dps", "3S")
         casts = tracker.get_value(team, index, "casts", "ALL")
-        hps3 = tracker.get_value(team, index, "hps", "3S")
-        absorbed_total = tracker.get_value(team, index, "absorbed", "ALL")
-        kills = tracker.get_value(team, index, "kills", "ALL")
-        deaths = tracker.get_value(team, index, "deaths", "ALL")
-        time_alive = tracker.get_value(team, index, "time", "ALL")
     dps_label.text = "DPS (3s): " + _fmt(dps3)
     casts_label.text = "Casts: " + str(int(round(casts)))
-    _ensure_extra_footer()
-    var f: FlowContainer = $"VBox/Footer"
-    if f != null and f.get_child_count() >= 6:
-        var hps_lbl: Label = f.get_child(2) as Label
-        var ab_lbl: Label = f.get_child(3) as Label
-        var ko_lbl: Label = f.get_child(4) as Label
-        var tim_lbl: Label = f.get_child(5) as Label
-        if hps_lbl is Label:
-            (hps_lbl as Label).text = "HPS (3s): " + _fmt(hps3)
-        if ab_lbl is Label:
-            (ab_lbl as Label).text = "Shield: " + _fmt(absorbed_total)
-        if ko_lbl is Label:
-            (ko_lbl as Label).text = "K/D: %d/%d" % [int(kills), int(deaths)]
-        if tim_lbl is Label:
-            (tim_lbl as Label).text = "Time: " + String.num(time_alive, 1) + "s"
     _style_footer_labels()
     # Bars track current unit stats
     _refresh_bars()
-
-func _ensure_extra_footer() -> void:
-    if _extra_labels_added:
-        return
-    var f: FlowContainer = $"VBox/Footer"
-    if f == null:
-        return
-    var hps_lbl: Label = Label.new()
-    hps_lbl.text = "HPS (3s): 0"
-    f.add_child(hps_lbl)
-    var ab_lbl: Label = Label.new()
-    ab_lbl.text = "Shield: 0"
-    f.add_child(ab_lbl)
-    var ko_lbl: Label = Label.new()
-    ko_lbl.text = "K/D: 0/0"
-    f.add_child(ko_lbl)
-    var tim_lbl: Label = Label.new()
-    tim_lbl.text = "Time: 0s"
-    f.add_child(tim_lbl)
-    _extra_labels_added = true
-    _style_footer_labels()
 
 func _ensure_bars() -> void:
     if hp_bar == null:
