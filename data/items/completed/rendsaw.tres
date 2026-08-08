@@ -9,7 +9,8 @@ name = "Rendsaw"
 type = "completed"
 icon_path = "res://assets/items/rendsaw_icon.png"
 stat_mods = {"pct_ad": 0.20, "flat_armor": 30}
-effects = []
+effects = ["rendsaw"]
 components = ["hammer", "plate"]
 tags = PackedStringArray("brawler")
+build_axes = PackedStringArray("attack_damage", "armor", "frontline", "anti_sustain", "tank_shred")
 

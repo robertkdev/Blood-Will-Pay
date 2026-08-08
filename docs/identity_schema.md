@@ -5,6 +5,7 @@ This module introduces three core concepts for unit design:
 - **Primary Role** — one of Tank, Brawler, Assassin, Marksman, Mage, Support. Role profiles live in data/identity/primary_role_profiles/ and drive base stat expectations.
 - **Primary Goal** — the unit's win condition for a round. Goals are GoalDef resources in data/identity/goals/ and restrict which roles may select them.
 - **Approaches** — specific mechanics a unit employs (burst, sustain, engage, etc.). Approach definitions are ApproachDef resources in data/identity/approaches/.
+- **Build Lanes** — alternate ways to build a unit around stat/item axes, bridge traits, and matchup answers. Primary lane stays tied to the unit's primary goal; off-lane and meme-lane goals are listed in `alt_goals` and expanded through build affinities.
 
 ## Key Scripts
 
@@ -15,10 +16,13 @@ This module introduces three core concepts for unit design:
 - scripts/game/identity/identity_validator.gd: validates a primary role/goal/approach combination.
 - scripts/game/identity/unit_identity.gd: resource container used by units.
 - scripts/game/identity/unit_identity_factory.gd: build/serialize/validate helper.
+- scripts/game/identity/build_affinity_catalog.gd: loads generated build-lane affinities from `data/identity/unit_build_affinities.json`.
 - scripts/game/identity/identity_registry.gd: convenience API exposing catalogs and validation in one place.
 - data/identity/unit_identities/*.tres: per-unit identity resources referenced by UnitProfile assets.
 - scripts/game/units/role_library.gd: loads primary role profiles and exposes lookup/validation helpers.
 - scripts/unit_factory.gd: applies role profile stat templates and fills goal/approach defaults when instantiating units.
+- docs/unit_build_lane_matrix_2026-07-05.md: generated 51-unit lane matrix and audit for alternate goals, item axes, cost-1 answer coverage, and vertical branching.
+- tests/rga_testing/validation/LaneMatchupGauntlet.tscn: live seeded combat gauntlet proving each generated lane can find at least one beat target and one counter target.
 
 ## Stat Ownership
 
@@ -34,7 +38,10 @@ This module introduces three core concepts for unit design:
 3. Reference identity keys from IdentityKeys to avoid magic strings when authoring units.
 4. Always run IdentityRegistry.ensure_identity(...) (or IdentityValidator) when creating or editing a unit profile so misconfigured identity data fails fast.
 5. Keep unit profiles thin: once an identity resource is attached, avoid duplicating role/goal/approach strings inline.
-6. When adjusting unit metadata, run the `tests/lint/UnitStatLint.tscn` headless scene to confirm no banned combat stat keys slipped back into `data/units/`. For non-playables under `data/other_units/`, apply the same rule; these are not scanned by the shop.
+6. Populate `alt_goals` with real goal IDs when a unit has planned off-lanes, and keep lane details in `data/identity/unit_build_affinities.json` instead of adding combat stats to unit resources.
+7. When adjusting unit metadata, run the `tests/lint/UnitStatLint.tscn` headless scene to confirm no banned combat stat keys slipped back into `data/units/`. For non-playables under `data/other_units/`, apply the same rule; these are not scanned by the shop.
+8. Run `tests/rga_testing/validation/BuildLaneAudit.tscn` after changing `alt_goals`, item `build_axes`, or generated build-affinity data.
+9. Run `tests/rga_testing/validation/LaneMatchupGauntlet.tscn` after changing lane matchups, item axes/effects, or counter claims. The gauntlet uses bridge-compatible allies for beat cases and small counter boards for counter cases, then writes `user://lane_matchup_gauntlet.json`.
 
 ## Specificity Policy
 

@@ -9,7 +9,8 @@ name = "Gambler's Eye"
 type = "completed"
 icon_path = "res://assets/items/gamblers_eye_icon.png"
 stat_mods = {"pct_crit_chance": 0.40, "flat_crit_damage": 0.10}
-effects = []
+effects = ["gamblers_eye"]
 components = ["spike", "spike"]
 tags = PackedStringArray("marksman", "assassin")
+build_axes = PackedStringArray("crit", "execute", "burst")
 

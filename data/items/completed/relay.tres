@@ -9,7 +9,8 @@ name = "Relay"
 type = "completed"
 icon_path = "res://assets/items/relay_icon.png"
 stat_mods = {"pct_crit_chance": 0.20, "flat_start_mana": 20}
-effects = []
+effects = ["relay"]
 components = ["spike", "orb"]
 tags = PackedStringArray("marksman", "assassin")
+build_axes = PackedStringArray("crit", "mana", "tempo", "execute")
 
