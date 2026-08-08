@@ -12,6 +12,7 @@ const MentorLink := preload("res://scripts/game/traits/runtime/mentor_link.gd")
 const ShopTransactions := preload("res://scripts/game/shop/shop_transactions.gd")
 const CombatEngineScript := preload("res://scripts/game/combat/combat_engine.gd")
 const BattleStateScript := preload("res://scripts/game/combat/battle_state.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 
 const SMOKE_NAME: String = "ItemTraitSystemsProbe"
 const EPSILON: float = 0.001
@@ -396,9 +397,12 @@ func _resource_ids_in_dir(path: String) -> Array[String]:
 		var entry: String = dir.get_next()
 		if entry == "":
 			break
-		if dir.current_is_dir() or entry.begins_with(".") or not entry.ends_with(".tres"):
+		if dir.current_is_dir() or entry.begins_with("."):
 			continue
-		ids.append(entry.get_basename())
+		var resource_entry: String = ResourcePathNormalizer.source_name(entry)
+		if not resource_entry.ends_with(".tres"):
+			continue
+		ids.append(resource_entry.get_basename())
 	dir.list_dir_end()
 	ids.sort()
 	return ids

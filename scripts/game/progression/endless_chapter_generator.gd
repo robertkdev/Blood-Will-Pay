@@ -5,6 +5,7 @@ const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const RgaStageChallengeDirector := preload("res://scripts/game/progression/rga_stage_challenge_director.gd")
 const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 
 const PLAYABLE_UNIT_ROOT := "res://data/units"
 const DEFAULT_SEED := 730711
@@ -725,9 +726,12 @@ static func _load_unit_catalog() -> Array[Dictionary]:
 		var entry: String = dir.get_next()
 		if entry == "":
 			break
-		if dir.current_is_dir() or not entry.ends_with(".tres"):
+		if dir.current_is_dir():
 			continue
-		var path: String = PLAYABLE_UNIT_ROOT + "/" + entry
+		var resource_entry: String = ResourcePathNormalizer.source_name(entry)
+		if not resource_entry.ends_with(".tres"):
+			continue
+		var path: String = PLAYABLE_UNIT_ROOT + "/" + resource_entry
 		var res: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
 		if not (res is UnitProfile):
 			continue

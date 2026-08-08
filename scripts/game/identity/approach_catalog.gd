@@ -2,6 +2,7 @@ extends Object
 class_name ApproachCatalog
 
 const ApproachDef := preload("res://scripts/game/identity/approach_def.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 const APPROACH_DIR := "res://data/identity/approaches"
 
 static var _loaded: bool = false
@@ -19,9 +20,12 @@ static func reload() -> void:
 		var entry := dir.get_next()
 		if entry == "":
 			break
-		if dir.current_is_dir() or not entry.ends_with(".tres"):
+		if dir.current_is_dir():
 			continue
-		var path := "%s/%s" % [APPROACH_DIR, entry]
+		var resource_entry: String = ResourcePathNormalizer.source_name(entry)
+		if not resource_entry.ends_with(".tres"):
+			continue
+		var path: String = "%s/%s" % [APPROACH_DIR, resource_entry]
 		if not ResourceLoader.exists(path):
 			continue
 		var res := ResourceLoader.load(path)

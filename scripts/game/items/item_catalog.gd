@@ -2,6 +2,7 @@ extends Object
 class_name ItemCatalog
 
 const ItemDef := preload("res://scripts/game/items/item_def.gd")
+const ResourcePathNormalizer: GDScript = preload("res://scripts/util/resource_path_normalizer.gd")
 
 static var _loaded: bool = false
 static var _items_by_id: Dictionary = {}           # id -> ItemDef
@@ -42,8 +43,10 @@ static func _scan_dir(path: String) -> void:
 		if dir.current_is_dir():
 			_scan_dir(full)
 		else:
-			if not name.ends_with(".tres"):
+			var resource_name: String = ResourcePathNormalizer.source_name(name)
+			if not resource_name.ends_with(".tres"):
 				continue
+			full = path + "/" + resource_name
 			if not ResourceLoader.exists(full):
 				continue
 			var res = load(full)
