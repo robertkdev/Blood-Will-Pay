@@ -26,6 +26,9 @@ Godot/app_userdata/
 __pycache__/
 *.py[cod]
 
+# Local source of truth for browser-based unit-art review decisions
+/tools/art/unit-art-review-state.json
+
 # OS junk
 .DS_Store
 Thumbs.db
