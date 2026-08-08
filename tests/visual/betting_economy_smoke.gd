@@ -253,7 +253,7 @@ func _start_and_verify_locked_max_bet() -> void:
 	_expect(int(Economy.gold) == max(0, starting_gold - selected_bet), "combat should escrow selected bet")
 	_expect(int(Economy.last_gold_start) == starting_gold, "combat should capture pre-escrow gold")
 	_expect(int(Economy.last_bet_start) == selected_bet, "combat should capture selected bet")
-	_expect(int(Economy.combat_credit_base) == expected_credit, "combat credit base should derive from the locked odds quote")
+	_expect(int(Economy.combat_credit_base) == expected_credit, "combat credit base should derive from the locked odds quote expected=%d actual=%d locked=%.4f current=%.4f" % [expected_credit, int(Economy.combat_credit_base), float(Economy.get("_locked_gross_multiplier")), float(Economy.quoted_gross_multiplier)])
 	_expect(not slider.visible, "bet slider should hide while combat is active")
 	_expect(not slider.editable, "bet slider should lock while combat is active")
 	_expect(String(value_label.text) == "Bet: %d (locked)" % selected_bet, "combat should show locked bet copy, got %s" % String(value_label.text))
