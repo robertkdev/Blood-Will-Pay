@@ -456,6 +456,12 @@ var _phase_transition_bridge: Control = null
 var _phase_transition_hide_tween: Tween = null
 var phase_transition: PhaseTransitionController = null
 var _arena_prepared_for_transition: bool = false
+var _pre_unfreeze_gate_snapshot: Dictionary[String, Variant] = {}
+var combat_broadcast_strip: PanelContainer = null
+var combat_broadcast_phase: Label = null
+var combat_broadcast_wager: Label = null
+var combat_broadcast_odds: Label = null
+var combat_broadcast_health: Label = null
 var _post_combat_return_started: bool = false
 var _post_combat_return_complete: bool = false
 var _post_combat_planning_prepared: bool = false
@@ -527,6 +533,13 @@ func teardown() -> void:
 	if phase_transition != null:
 		phase_transition.teardown()
 		phase_transition = null
+	if combat_broadcast_strip != null and is_instance_valid(combat_broadcast_strip):
+		combat_broadcast_strip.queue_free()
+	combat_broadcast_strip = null
+	combat_broadcast_phase = null
+	combat_broadcast_wager = null
+	combat_broadcast_odds = null
+	combat_broadcast_health = null
 	_end_combat_resolving_feedback()
 	_disconnect_controller_signals()
 	var shop_node: Node = _shop_singleton()
@@ -858,6 +871,8 @@ func initialize() -> void:
 	phase_transition.countdown_finished.connect(_on_combat_countdown_finished)
 	phase_transition.entry_visual_finished.connect(_on_combat_entry_visual_finished)
 	phase_transition.return_visual_finished.connect(_on_combat_return_visual_finished)
+	phase_transition.field_progress_changed.connect(_on_transition_field_progress_changed)
+	_ensure_combat_broadcast_strip()
 
 	projectile_bridge = ProjectileBridge.new()
 	projectile_bridge.configure(parent, arena_bridge, player_grid_helper, enemy_grid_helper, manager, view_rng)
@@ -1171,7 +1186,7 @@ func _apply_grid_dimensions(tile: int) -> void:
 		bottom_area.custom_minimum_size.y = player_top_pad + float(grid_h) + player_bottom_pad
 
 func process(_delta: float) -> void:
-	if arena_container and arena_container.visible and not _post_combat_return_started:
+	if arena_container and arena_container.visible and not _post_combat_return_started and (phase_transition == null or not phase_transition.is_transition_active()):
 		_sync_arena_units()
 	_sync_bottom_combat_visibility()
 	sync_tactical_phase_visuals()
@@ -1180,10 +1195,12 @@ func process(_delta: float) -> void:
 	_update_result_hold(_delta)
 	_update_pending_battle_start(_delta)
 	_update_combat_resolving_feedback(_delta)
+	_sync_combat_broadcast_strip()
 
 func _init_game() -> void:
 	clear_log()
 	_arena_prepared_for_transition = false
+	_pre_unfreeze_gate_snapshot.clear()
 	_post_combat_return_started = false
 	_post_combat_return_complete = false
 	_post_combat_planning_prepared = false
@@ -1531,7 +1548,9 @@ func _queue_battle_start() -> void:
 	if phase_transition == null:
 		call_deferred("_execute_pending_battle_start", _battle_start_generation)
 		return
+	phase_transition.set_encounter_focus(_committed_confrontation_centroid())
 	phase_transition.start_countdown(_reduced_motion_enabled())
+	_sync_combat_broadcast_strip(true)
 
 func _on_combat_countdown_finished() -> void:
 	if not _battle_start_pending:
@@ -1558,11 +1577,7 @@ func _on_battle_prepared(_stage: int, _enemy: Unit) -> void:
 		enemy_views = grid_placement.get_enemy_views()
 		grid_placement.rebuild_player_views(manager.player_team, false)
 		player_views = grid_placement.get_player_views()
-	# Promote the planning shell to the authored full combat field before the
-	# arena is laid out. The next-frame barrier lets Godot settle containers, so
-	# actor bounds and readouts are born in the same geometry the player sees.
-	_sync_bottom_combat_visibility(true)
-	_update_tactical_shell_layout(true)
+	_prepare_transition_combat_layout()
 	var tree: SceneTree = parent.get_tree() if parent != null else null
 	if tree != null:
 		tree.process_frame.connect(Callable(self, "_begin_prepared_arena_crossfade"), CONNECT_ONE_SHOT)
@@ -1574,7 +1589,11 @@ func _begin_prepared_arena_crossfade() -> void:
 		return
 	_arena_prepared_for_transition = true
 	if arena_bridge != null:
-		arena_bridge.enter_arena(player_views, enemy_views, false)
+		if phase_transition != null:
+			phase_transition.capture_entry_target_rect()
+		var target_rect: Rect2 = phase_transition.get_entry_target_rect() if phase_transition != null else arena_container.get_global_rect()
+		var source_rect: Rect2 = phase_transition.get_planning_commit_rect() if phase_transition != null else planning_area.get_global_rect()
+		arena_bridge.enter_arena(player_views, enemy_views, false, true, target_rect, source_rect)
 		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
 	if phase_transition != null:
 		phase_transition.start_entry_crossfade()
@@ -1584,6 +1603,14 @@ func _begin_prepared_arena_crossfade() -> void:
 func _on_combat_entry_visual_finished() -> void:
 	if not _battle_start_pending or manager == null:
 		return
+	if arena_bridge != null:
+		arena_bridge.finish_continuous_entry()
+	_pre_unfreeze_gate_snapshot = {
+		"captured_at_usec": Time.get_ticks_usec(),
+		"engine_running": bool(manager.is_engine_running()) if manager.has_method("is_engine_running") else false,
+		"economy_combat_active": bool(Economy.combat_active) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else false,
+		"transition_state": phase_transition.get_state_name() if phase_transition != null else "none",
+	}
 	if not manager.has_method("begin_prepared_stage") or not bool(manager.begin_prepared_stage()):
 		_recover_pending_battle_start("prepared battle could not begin")
 
@@ -3512,6 +3539,152 @@ func _sync_bottom_combat_visibility(force: bool = false) -> void:
 	_set_root_control_visible("GothicShopPlate", planning_visible)
 	_set_root_control_visible("GothicShopCommandPlate", planning_visible)
 
+func _prepare_transition_combat_layout() -> void:
+	for path: String in [
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
+		"MarginContainer/VBoxContainer/ActionsRow",
+		"MarginContainer/VBoxContainer/WagerSummary",
+		"MarginContainer/VBoxContainer/BenchArea",
+		"MarginContainer/VBoxContainer/BottomStorageArea",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusRow",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusBackplate",
+	]:
+		_set_control_visible(path, false)
+	if board_status_row != null and is_instance_valid(board_status_row):
+		board_status_row.visible = false
+		var board_status_plate: Control = board_status_row.get_parent().get_node_or_null("BoardStatusBackplate") as Control if board_status_row.get_parent() != null else null
+		if board_status_plate != null:
+			board_status_plate.visible = false
+	var planning_geometry: Control = planning_area.get_node_or_null("PlanningDeploymentGeometry") as Control if planning_area != null else null
+	if planning_geometry != null:
+		planning_geometry.visible = false
+	for node_name: String in [
+		"GothicStatsAreaPlate",
+		"GothicItemsPlate",
+		"GothicGoldPlate",
+		"GothicWagerSummaryPlate",
+		"GothicCommitRailPlate",
+		"GothicBenchPlate",
+		"GothicShopPlate",
+		"GothicShopCommandPlate",
+	]:
+		_set_root_control_visible(node_name, false)
+	_update_tactical_shell_layout(true)
+
+func _on_transition_field_progress_changed(progress: float) -> void:
+	if arena_bridge != null:
+		arena_bridge.apply_field_progress(progress)
+	_sync_combat_broadcast_strip(true)
+
+func get_pre_unfreeze_gate_snapshot() -> Dictionary[String, Variant]:
+	return _pre_unfreeze_gate_snapshot.duplicate(true)
+
+func _committed_confrontation_centroid() -> Vector2:
+	var player_centroid: Vector2 = _team_view_centroid(player_views, player_grid_helper)
+	var enemy_centroid: Vector2 = _team_view_centroid(enemy_views, enemy_grid_helper)
+	if player_centroid != Vector2.INF and enemy_centroid != Vector2.INF:
+		return (player_centroid + enemy_centroid) * 0.5
+	if player_centroid != Vector2.INF:
+		return player_centroid
+	if enemy_centroid != Vector2.INF:
+		return enemy_centroid
+	return planning_area.get_global_rect().get_center() if planning_area != null else parent.get_viewport_rect().get_center()
+
+func _team_view_centroid(views: Array[UnitSlotView], grid_helper: BoardGrid) -> Vector2:
+	if views.is_empty() or grid_helper == null:
+		return Vector2.INF
+	var centroid: Vector2 = Vector2.ZERO
+	var count: int = 0
+	for slot: UnitSlotView in views:
+		if slot == null or slot.tile_idx < 0:
+			continue
+		centroid += grid_helper.get_center(slot.tile_idx)
+		count += 1
+	return centroid / float(count) if count > 0 else Vector2.INF
+
+func _ensure_combat_broadcast_strip() -> void:
+	if combat_broadcast_strip != null and is_instance_valid(combat_broadcast_strip):
+		return
+	if parent == null:
+		return
+	combat_broadcast_strip = PanelContainer.new()
+	combat_broadcast_strip.name = "CombatBroadcastStrip"
+	combat_broadcast_strip.z_as_relative = false
+	combat_broadcast_strip.z_index = 470
+	combat_broadcast_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	combat_broadcast_strip.anchor_left = 0.5
+	combat_broadcast_strip.anchor_right = 0.5
+	combat_broadcast_strip.offset_left = -320.0
+	combat_broadcast_strip.offset_right = 320.0
+	combat_broadcast_strip.offset_top = 58.0
+	combat_broadcast_strip.offset_bottom = 90.0
+	var strip_style: StyleBoxFlat = StyleBoxFlat.new()
+	strip_style.bg_color = Color(0.018, 0.014, 0.018, 0.92)
+	strip_style.border_color = Color(0.58, 0.08, 0.10, 0.88)
+	strip_style.border_width_bottom = 2
+	strip_style.border_width_left = 1
+	strip_style.border_width_right = 1
+	combat_broadcast_strip.add_theme_stylebox_override("panel", strip_style)
+	parent.add_child(combat_broadcast_strip)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.name = "BroadcastReadouts"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	combat_broadcast_strip.add_child(row)
+	combat_broadcast_phase = _make_broadcast_label("BroadcastPhase")
+	combat_broadcast_wager = _make_broadcast_label("BroadcastWager")
+	combat_broadcast_odds = _make_broadcast_label("BroadcastOdds")
+	combat_broadcast_health = _make_broadcast_label("BroadcastHealth")
+	for label: Label in [combat_broadcast_phase, combat_broadcast_wager, combat_broadcast_odds, combat_broadcast_health]:
+		row.add_child(label)
+	combat_broadcast_strip.visible = false
+	combat_broadcast_strip.set_meta("broadcast_role", "compact_round_wager_odds_team_health")
+
+func _make_broadcast_label(label_name: String) -> Label:
+	var label: Label = Label.new()
+	label.name = label_name
+	label.custom_minimum_size = Vector2(145.0, 28.0)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.72, 1.0))
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
+	label.add_theme_constant_override("outline_size", 2)
+	VisualTypeSystem.set_utility_bold(label)
+	return label
+
+func _sync_combat_broadcast_strip(force: bool = false) -> void:
+	_ensure_combat_broadcast_strip()
+	if combat_broadcast_strip == null:
+		return
+	var in_combat: bool = false
+	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
+		in_combat = int(GameState.phase) == int(GameState.GamePhase.COMBAT)
+	var should_show: bool = _battle_start_pending or in_combat
+	if force or combat_broadcast_strip.visible != should_show:
+		combat_broadcast_strip.visible = should_show
+	if not should_show:
+		return
+	combat_broadcast_phase.text = "FIGHT %d" % int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else "FIGHT"
+	var wager: int = int(Economy.current_bet) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else 0
+	combat_broadcast_wager.text = "WAGER %d BLOOD" % wager
+	combat_broadcast_odds.text = String(win_odds_label.text).replace("Win Odds", "ODDS") if win_odds_label != null else "ODDS --"
+	var player_health: Vector2i = _team_health_total(manager.player_team if manager != null else [])
+	var enemy_health: Vector2i = _team_health_total(manager.enemy_team if manager != null else [])
+	combat_broadcast_health.text = "HP %d/%d  //  %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]
+
+func _team_health_total(team: Array[Unit]) -> Vector2i:
+	var current: int = 0
+	var maximum: int = 0
+	for unit: Unit in team:
+		if unit == null:
+			continue
+		current += maxi(0, unit.hp)
+		maximum += maxi(0, unit.max_hp)
+	return Vector2i(current, maximum)
+
 func sync_tactical_phase_visuals(force: bool = false) -> void:
 	if parent == null:
 		return
@@ -3531,6 +3704,8 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 	_set_control_visible("MarginContainer/VBoxContainer/ActionsRow", planning_visible and actions_embedded)
 	_set_control_visible("MarginContainer/VBoxContainer/WagerSummary", planning_visible)
 	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry", planning_visible)
+	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusRow", planning_visible)
+	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusBackplate", planning_visible)
 	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary", in_combat)
 	_set_root_control_visible("GothicStatsAreaPlate", planning_visible)
 	_set_root_control_visible("GothicItemsPlate", planning_visible)
@@ -3582,8 +3757,7 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 		arena_container.set_meta("use_full_combat_bounds", in_combat)
 	var arena_objective: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
 	if arena_objective != null:
-		arena_objective.text = "SURVIVE"
-		arena_objective.add_theme_font_size_override("font_size", 26)
+		_configure_compact_objective_signal(arena_objective)
 	var planning_directive: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
 		var tight_scale_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
@@ -3591,6 +3765,19 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 		planning_directive.add_theme_font_size_override("font_size", 18)
 	if in_combat and parent.has_method("_update_external_backplates"):
 		parent.call_deferred("_update_external_backplates")
+
+func _configure_compact_objective_signal(objective: Label) -> void:
+	objective.text = "LIVE // SURVIVE"
+	objective.offset_left = -100.0
+	objective.offset_right = 100.0
+	objective.offset_top = 36.0
+	objective.offset_bottom = 58.0
+	objective.add_theme_font_size_override("font_size", 14)
+	objective.add_theme_color_override("font_color", Color(0.86, 0.78, 0.66, 0.92))
+	objective.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	VisualTypeSystem.set_utility_bold(objective)
+	objective.set_meta("persistent_copy_uses_utility_face", true)
+	objective.set_meta("persistent_copy_uses_impact_face", false)
 
 func _update_environmental_pressure(delta: float) -> void:
 	if parent == null or _tactical_phase_visual_state != 1:
@@ -3900,16 +4087,14 @@ func _protect_persistent_hud_chrome() -> void:
 		instruction_ribbon.self_modulate = Color.WHITE
 		# The result card owns the actual advance affordance. Keep the persistent
 		# combat ribbon as a quiet record stamp so the two prompts do not compete.
-		instruction_ribbon.text = "/// RECORD SEALED" if result_visible else "SURVIVE"
-		instruction_ribbon.add_theme_font_size_override("font_size", 20 if result_visible else 26)
+		instruction_ribbon.text = "/// RECORD SEALED" if result_visible else "LIVE // SURVIVE"
 		if result_visible:
+			instruction_ribbon.add_theme_font_size_override("font_size", 20)
 			VisualTypeSystem.set_utility_bold(instruction_ribbon)
 			instruction_ribbon.set_meta("persistent_copy_uses_utility_face", true)
 			instruction_ribbon.set_meta("persistent_copy_uses_impact_face", false)
 		else:
-			VisualTypeSystem.set_impact(instruction_ribbon)
-			instruction_ribbon.set_meta("persistent_copy_uses_utility_face", false)
-			instruction_ribbon.set_meta("persistent_copy_uses_impact_face", true)
+			_configure_compact_objective_signal(instruction_ribbon)
 		instruction_ribbon.set_meta("persistent_combat_hierarchy", true)
 	var exchange_signal: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatExchangeSignal") as Label
 	if exchange_signal != null:
