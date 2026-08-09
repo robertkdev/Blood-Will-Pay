@@ -47,6 +47,7 @@ func _run() -> void:
 	await _press_continue(true, "transition probe")
 	await _wait_for_countdown_value(combat, "3", 1.0)
 	_capture("01_countdown_3")
+	_assert_countdown_is_unframed(combat)
 	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 3")
 	await _wait_for_countdown_value(combat, "2", 1.0)
 	_capture("02_countdown_2")
@@ -57,7 +58,7 @@ func _run() -> void:
 	var crossfade_seen: bool = await _wait_for_transition_state(transition, "entry_crossfade", 1.2)
 	_expect(crossfade_seen, "entry crossfade did not follow the countdown")
 	await get_tree().create_timer(0.26).timeout
-	_capture("04_fight_crossfade")
+	_capture("04_grid_crossfade")
 	_expect(manager.has_method("is_stage_prepared") and bool(manager.is_stage_prepared()), "battle should be prepared during the grid crossfade")
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started before the grid crossfade completed")
 	var combat_seen: bool = await _wait_for_combat_active(2.0)
@@ -117,6 +118,14 @@ func _wait_for_transition_state(transition: Variant, expected: String, timeout_s
 			return true
 		await get_tree().process_frame
 	return false
+
+func _assert_countdown_is_unframed(combat: Control) -> void:
+	var overlay: Control = combat.get_node_or_null("CombatPhaseTransitionLayer") as Control
+	var countdown: Label = combat.get_node_or_null("CombatPhaseTransitionLayer/CountdownValue") as Label
+	_expect(overlay != null and overlay.get_child_count() == 1, "countdown overlay should contain only the numeral")
+	_expect(countdown != null and countdown.get_global_rect().get_center().x >= 900.0 and countdown.get_global_rect().get_center().x <= 1020.0, "countdown numeral should be horizontally centered")
+	_expect(countdown != null and countdown.get_global_rect().position.y < 270.0, "countdown numeral should stay at the top of the board")
+	_expect(combat.get_node_or_null("CombatPhaseTransitionLayer/CountdownField") == null, "countdown must not use a framed panel")
 
 func _run_reduced_motion_contract() -> void:
 	var host: Control = Control.new()

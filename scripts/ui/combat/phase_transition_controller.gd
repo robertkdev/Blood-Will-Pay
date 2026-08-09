@@ -46,8 +46,6 @@ var _planning_area: Control = null
 var _arena_container: Control = null
 var _overlay: Control = null
 var _countdown_label: Label = null
-var _detail_label: Label = null
-var _stamp_label: Label = null
 var _active_tween: Tween = null
 var _state: TransitionState = TransitionState.IDLE
 var _reduced_motion: bool = false
@@ -69,8 +67,6 @@ func teardown() -> void:
 		_overlay.queue_free()
 	_overlay = null
 	_countdown_label = null
-	_detail_label = null
-	_stamp_label = null
 	_host = null
 	_planning_area = null
 	_arena_container = null
@@ -101,11 +97,11 @@ func start_countdown(reduced_motion: bool) -> void:
 		stage_label.visible = false
 	_capture_planning_transform()
 	_capture_records(_peripheral_records, _peripheral_controls())
-	_show_overlay("3", "CONTACT LOCKED // HOLD THE LINE", "BLOOD WILL PAY // CONTACT RECORD")
+	_show_overlay("3")
 	_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_overlay.set_meta("transition_kind", "planning_to_combat")
 	_overlay.set_meta("transition_phase", "countdown")
-	_overlay.set_meta("countdown_sequence", "3,2,1,FIGHT")
+	_overlay.set_meta("countdown_sequence", "3,2,1")
 	_overlay.set_meta("countdown_duration_seconds", COUNTDOWN_DURATION_SECONDS + ENTRY_CROSSFADE_SECONDS)
 	_overlay.set_meta("transition_respects_reduced_motion", true)
 	_overlay.set_meta("reduced_motion_active", _reduced_motion)
@@ -130,9 +126,7 @@ func start_entry_crossfade() -> void:
 	_state = TransitionState.ENTRY_CROSSFADE
 	_capture_records(_planning_records, _planning_grid_controls())
 	if _countdown_label != null:
-		_countdown_label.text = "FIGHT"
-	if _detail_label != null:
-		_detail_label.text = "LINE OPEN // HOLD OR DIE"
+		_countdown_label.visible = false
 	if _overlay != null:
 		_overlay.set_meta("transition_phase", "grid_crossfade")
 	if _arena_container != null and is_instance_valid(_arena_container):
@@ -244,22 +238,22 @@ func _begin_return_after_layout() -> void:
 func _set_countdown_progress(progress: float) -> void:
 	if _countdown_label == null:
 		return
-	if progress < 1.0 / 3.0:
-		_countdown_label.text = "3"
-	elif progress < 2.0 / 3.0:
-		_countdown_label.text = "2"
-	else:
-		_countdown_label.text = "1"
+	var sequence_progress: float = clampf(progress, 0.0, 0.9999) * 3.0
+	var beat_index: int = mini(2, floori(sequence_progress))
+	var beat_progress: float = sequence_progress - float(beat_index)
+	_countdown_label.text = str(3 - beat_index)
+	_countdown_label.pivot_offset = _countdown_label.size * 0.5
+	_countdown_label.scale = Vector2.ONE * lerpf(0.90, 1.08, ease(beat_progress, 0.65))
+	var beat_alpha: float = 1.0 if beat_progress <= 0.55 else lerpf(1.0, 0.28, (beat_progress - 0.55) / 0.45)
+	_set_alpha(_countdown_label, beat_alpha)
 	_overlay.set_meta("countdown_visible_value", _countdown_label.text)
 
 func _finish_countdown() -> void:
 	_active_tween = null
 	if _state != TransitionState.COUNTDOWN:
 		return
-	if _countdown_label != null:
-		_countdown_label.text = "FIGHT"
 	if _overlay != null:
-		_overlay.set_meta("countdown_visible_value", "FIGHT")
+		_overlay.set_meta("countdown_visible_value", "1")
 	countdown_finished.emit()
 
 func _finish_entry_crossfade() -> void:
@@ -342,13 +336,14 @@ func _set_alpha(control: Control, alpha: float) -> void:
 	color.a = clampf(alpha, 0.0, 1.0)
 	control.modulate = color
 
-func _show_overlay(headline_text: String, detail_text: String, stamp_text: String) -> void:
+func _show_overlay(headline_text: String) -> void:
 	_ensure_overlay()
 	if _overlay == null:
 		return
 	_countdown_label.text = headline_text
-	_detail_label.text = detail_text
-	_stamp_label.text = stamp_text
+	_countdown_label.visible = true
+	_countdown_label.scale = Vector2.ONE * 0.90
+	_set_alpha(_countdown_label, 1.0)
 	_overlay.visible = true
 	_overlay.modulate = Color.WHITE
 	_overlay.set_meta("transition_active", true)
@@ -364,68 +359,21 @@ func _ensure_overlay() -> void:
 	_overlay.z_index = 500
 	_overlay.visible = false
 	_host.add_child(_overlay)
-	var field: Panel = Panel.new()
-	field.name = "CountdownField"
-	field.anchor_left = 0.39
-	field.anchor_right = 0.61
-	field.anchor_top = 0.32
-	field.anchor_bottom = 0.68
-	field.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.012, 0.008, 0.010, 0.50)
-	style.border_color = Color(0.78, 0.10, 0.065, 0.96)
-	style.border_width_left = 7
-	style.border_width_top = 2
-	style.border_width_right = 3
-	style.border_width_bottom = 6
-	style.set_corner_radius_all(8)
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.88)
-	style.shadow_size = 18
-	style.shadow_offset = Vector2(0.0, 6.0)
-	field.add_theme_stylebox_override("panel", style)
-	_overlay.add_child(field)
 	_countdown_label = Label.new()
 	_countdown_label.name = "CountdownValue"
-	_countdown_label.anchor_left = 0.05
-	_countdown_label.anchor_right = 0.95
-	_countdown_label.anchor_top = 0.04
-	_countdown_label.anchor_bottom = 0.58
+	_countdown_label.anchor_left = 0.40
+	_countdown_label.anchor_right = 0.60
+	_countdown_label.anchor_top = 0.075
+	_countdown_label.anchor_bottom = 0.245
 	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_countdown_label.add_theme_font_size_override("font_size", 84)
-	_countdown_label.add_theme_color_override("font_color", Color(0.98, 0.78, 0.61, 1.0))
+	_countdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_countdown_label.add_theme_font_size_override("font_size", 96)
+	_countdown_label.add_theme_color_override("font_color", Color(0.96, 0.93, 0.86, 1.0))
 	_countdown_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
-	_countdown_label.add_theme_constant_override("outline_size", 6)
+	_countdown_label.add_theme_constant_override("outline_size", 5)
 	VisualTypeSystem.set_impact(_countdown_label)
-	field.add_child(_countdown_label)
-	_detail_label = Label.new()
-	_detail_label.name = "CountdownDetail"
-	_detail_label.anchor_left = 0.08
-	_detail_label.anchor_right = 0.92
-	_detail_label.anchor_top = 0.58
-	_detail_label.anchor_bottom = 0.79
-	_detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_detail_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_detail_label.clip_text = false
-	_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail_label.add_theme_font_size_override("font_size", 16)
-	_detail_label.add_theme_color_override("font_color", Color(0.88, 0.80, 0.68, 1.0))
-	_detail_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.96))
-	_detail_label.add_theme_constant_override("outline_size", 2)
-	VisualTypeSystem.set_utility_bold(_detail_label)
-	field.add_child(_detail_label)
-	_stamp_label = Label.new()
-	_stamp_label.name = "CountdownRecordStamp"
-	_stamp_label.anchor_left = 0.08
-	_stamp_label.anchor_right = 0.92
-	_stamp_label.anchor_top = 0.80
-	_stamp_label.anchor_bottom = 0.96
-	_stamp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_stamp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_stamp_label.add_theme_font_size_override("font_size", 12)
-	_stamp_label.add_theme_color_override("font_color", Color(0.78, 0.18, 0.12, 1.0))
-	VisualTypeSystem.set_utility_bold(_stamp_label)
-	field.add_child(_stamp_label)
+	_overlay.add_child(_countdown_label)
 
 func _kill_tween() -> void:
 	if _active_tween != null and _active_tween.is_valid():
