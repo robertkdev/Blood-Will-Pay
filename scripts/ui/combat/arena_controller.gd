@@ -167,10 +167,11 @@ func configure(_arena_container: Control, _arena_units: Control, _player_grid_he
 	unit_actor_class = _unit_actor_class
 	tile_size = _tile_size
 
-func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
+func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView], continuous_entry: bool = false) -> void:
 	Trace.step("ArenaController.enter_arena: begin")
 	_clear()
-	var actor_size: Vector2 = Vector2.ONE * float(tile_size) * COMBAT_ACTOR_SIZE_SCALE
+	var actor_scale: float = 1.0 if continuous_entry else COMBAT_ACTOR_SIZE_SCALE
+	var actor_size: Vector2 = Vector2.ONE * float(tile_size) * actor_scale
 	var player_summary: Array[String] = []
 	for i in range(player_views.size()):
 		var player_view: UnitSlotView = player_views[i]
@@ -188,6 +189,10 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
 		arena_units.add_child(player_actor)
 		player_actor.set_size_px(actor_size)
 		player_actor.set_screen_position(player_position)
+		player_actor.set_meta("one_arena_presentation_id", player_actor.get_instance_id())
+		player_actor.set_meta("committed_field_anchor", player_position)
+		if player_actor.has_method("set_entry_presentation_progress"):
+			player_actor.call("set_entry_presentation_progress", 0.0 if continuous_entry else 1.0)
 		player_actor.visible = player_view.unit != null and player_view.unit.is_alive()
 		player_actors.append(player_actor)
 	if not player_summary.is_empty():
@@ -211,12 +216,17 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
 		arena_units.add_child(enemy_actor)
 		enemy_actor.set_size_px(actor_size)
 		enemy_actor.set_screen_position(enemy_position)
+		enemy_actor.set_meta("one_arena_presentation_id", enemy_actor.get_instance_id())
+		enemy_actor.set_meta("committed_field_anchor", enemy_position)
+		if enemy_actor.has_method("set_entry_presentation_progress"):
+			enemy_actor.call("set_entry_presentation_progress", 0.0 if continuous_entry else 1.0)
 		enemy_actor.visible = enemy_view.unit != null and enemy_view.unit.is_alive()
 		enemy_actors.append(enemy_actor)
 	if not enemy_summary.is_empty():
 		Debug.log("Arena", "Enemy positions %s" % [Strings.join(enemy_summary, ", ")])
-	_apply_combat_presentation_spacing()
-	reflow_combat_readouts()
+	if not continuous_entry:
+		_apply_combat_presentation_spacing()
+		reflow_combat_readouts()
 	Trace.step("ArenaController.enter_arena: done")
 
 func sync_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
