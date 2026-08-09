@@ -158,13 +158,13 @@ func buy_contract(index: int) -> Dictionary:
 		return {"ok": false, "error": "NO_CONTRACT_SERVICE"}
 	if _is_combat_phase():
 		return _combat_phase_error("buy_contract", {"contract_index": int(index)})
-	var available_gold: int = int(Economy.gold) if _has_autoload("Economy") else 0
+	var available_buckets: int = int(Economy.blood_buckets) if _has_autoload("Economy") else 0
 	var offers: Array[Dictionary] = get_contract_offers()
 	if index < 0 or index >= offers.size():
 		return {"ok": false, "error": "INVALID_CONTRACT"}
 	var price: int = max(0, int(offers[index].get("price", 0)))
 	var bet: int = int(Economy.current_bet) if _has_autoload("Economy") else 0
-	var affordability: Dictionary = ShopAffordability.can_afford(available_gold, bet, price, false, 0)
+	var affordability: Dictionary = ShopAffordability.can_afford(available_buckets, bet, price, false, 0)
 	if not bool(affordability.get("ok", false)):
 		return {
 			"ok": false,
@@ -172,12 +172,12 @@ func buy_contract(index: int) -> Dictionary:
 			"need_more": int(affordability.get("need_more", 0)),
 			"reason": String(affordability.get("reason", "")),
 		}
-	var result: Dictionary = _contracts.choose(index, available_gold)
+	var result: Dictionary = _contracts.choose(index, available_buckets)
 	if not bool(result.get("ok", false)):
 		return result
 	var cost: int = max(0, int(result.get("gold_spent", 0)))
 	if cost > 0 and _has_autoload("Economy"):
-		Economy.add_gold(-cost, false, "chapter_contract")
+		Economy.add_blood_buckets(-cost, false, "chapter_contract")
 		Economy.set_payout_modifier(float(result.get("pit_payout_multiplier", 1.0)))
 	_sync_roster_max_team_size()
 	return result
@@ -298,26 +298,26 @@ func toggle_lock() -> void:
 		locked_changed.emit(state.locked)
 
 func reroll() -> Dictionary:
-	# Spends gold when successful; updates internal state and emits signals.
+	# Spends blood buckets when successful; updates internal state and emits signals.
 	if _is_combat_phase():
 		return _combat_phase_error("reroll")
 	var lvl: int = get_level()
-	var gold: int = int(Economy.gold) if _has_autoload("Economy") else 0
+	var available_buckets: int = int(Economy.blood_buckets) if _has_autoload("Economy") else 0
 	var opening_starter_id: String = _opening_starter_id if _should_apply_opening_shop_guard() else ""
-	var res: Dictionary = _tx.reroll(state, lvl, gold, opening_starter_id, get_reroll_price())
+	var res: Dictionary = _tx.reroll(state, lvl, available_buckets, opening_starter_id, get_reroll_price())
 	if not bool(res.get("ok", false)):
 		error.emit(String(res.get("error", "UNKNOWN")), _error_context("reroll", res))
 		return res
 	if opening_starter_id != "":
 		_opening_helper_shops_consumed += 1
 	var cost: int = int(res.get("gold_spent", 0))
-	# Spend gold or record combat spend
+	# Spend buckets or record combat spend.
 	if cost > 0 and _has_autoload("Economy"):
 		paid_rerolls += 1
 		if _is_combat_phase() and Economy.has_method("adjust_combat_spent"):
 			Economy.adjust_combat_spent(cost)
 		else:
-			Economy.add_gold(-cost)
+			Economy.add_blood_buckets(-cost)
 	state = (res.get("state") as ShopState)
 	_quote_unpriced_offers(state.offers)
 	_emit_all()
@@ -345,8 +345,8 @@ func _should_apply_opening_shop_guard() -> bool:
 func buy_xp() -> Dictionary:
 	if _is_combat_phase():
 		return _combat_phase_error("buy_xp")
-	var gold: int = int(Economy.gold) if _has_autoload("Economy") else 0
-	var res: Dictionary = _tx.buy_xp(_progress, gold, get_progression_price())
+	var available_buckets: int = int(Economy.blood_buckets) if _has_autoload("Economy") else 0
+	var res: Dictionary = _tx.buy_xp(_progress, available_buckets, get_progression_price())
 	if not bool(res.get("ok", false)):
 		error.emit(String(res.get("error", "UNKNOWN")), _error_context("buy_xp", res))
 		return res
@@ -360,7 +360,7 @@ func buy_xp() -> Dictionary:
 		if _is_combat_phase() and Economy.has_method("adjust_combat_spent"):
 			Economy.adjust_combat_spent(cost)
 		else:
-			Economy.add_gold(-cost)
+			Economy.add_blood_buckets(-cost)
 	_sync_roster_max_team_size()
 	# Offers unchanged; emit reroll/free_rerolls unchanged; but UI may want progress snapshot via getters
 	return res
@@ -474,9 +474,9 @@ func buy_unit(slot_index: int) -> Dictionary:
 	if _is_combat_phase():
 		return _combat_phase_error("buy_unit", {"slot": int(slot_index)})
 	var lvl: int = get_level()
-	var gold: int = int(Economy.gold) if _has_autoload("Economy") else 0
+	var available_buckets: int = int(Economy.blood_buckets) if _has_autoload("Economy") else 0
 	_quote_unpriced_offers(state.offers)
-	var res: Dictionary = _tx.buy_unit(state, int(slot_index), gold, lvl)
+	var res: Dictionary = _tx.buy_unit(state, int(slot_index), available_buckets, lvl)
 	if not bool(res.get("ok", false)):
 		error.emit(String(res.get("error", "UNKNOWN")), _error_context("buy_unit", res, {"slot": int(slot_index)}))
 		return res
@@ -485,7 +485,7 @@ func buy_unit(slot_index: int) -> Dictionary:
 		if _is_combat_phase() and Economy.has_method("adjust_combat_spent"):
 			Economy.adjust_combat_spent(cost)
 		else:
-			Economy.add_gold(-cost)
+			Economy.add_blood_buckets(-cost)
 	state = (res.get("state") as ShopState)
 	_emit_all()
 	return res
@@ -500,7 +500,7 @@ func sell_unit(u: Unit) -> Dictionary:
 			# Selling during combat should free up credit as well
 			if _is_combat_phase() and Economy.has_method("adjust_combat_spent"):
 				Economy.adjust_combat_spent(-g)
-		Economy.add_gold(g, false, "unit_sale")
+		Economy.add_blood_buckets(g, false, "unit_sale")
 	else:
 		error.emit(String(res.get("error", "UNKNOWN")), _error_context("sell_unit", res))
 	return res

@@ -526,7 +526,7 @@ theme_override_constants/separation = 13
 
 [node name="GoldLabel" type="Label" parent="MarginContainer/VBoxContainer/ActionsRow"]
 layout_mode = 2
-text = "Blood Reserve: 2"
+text = "Blood Reserve: 2 buckets"
 
 [node name="AttackButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow"]
 visible = false
@@ -557,7 +557,7 @@ value = 1.0
 
 [node name="BetValue" type="Label" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
 layout_mode = 2
-text = "1"
+text = "1 bucket"
 
 [node name="AllInButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow/BetRow"]
 layout_mode = 2
@@ -566,7 +566,7 @@ text = "All In"
 [node name="WagerSummary" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Wager 1g | Win 50% | Gross 2g | After win 3g | After loss 1g"
+text = "DECISION // RISK 1 bucket // WIN CHANCE 50% // WIN RESERVE 3 buckets // LOSS RESERVE 1 bucket"
 horizontal_alignment = 1
 autowrap_mode = 2
 

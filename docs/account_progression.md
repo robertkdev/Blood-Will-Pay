@@ -36,5 +36,5 @@ Accessible starters can be bought in any order. These unlocks are options, not r
 ## Validation
 
 - `tests/rga_testing/validation/AccountProgressionProbe.tscn` verifies migration, exact rank thresholds, one-Omen victories, repeatable Writ payouts, first-clear Bounties, purchases, Red Ink unlock gates, backup recovery, and replay protection.
-- `tests/rga_testing/validation/LivingLedgerRuntimeProbe.tscn` verifies real Economy/Shop integration, run-start loadout freezing, starting-gold/free-reroll Edicts, Red Ink stat pressure, and save/resume preservation.
+- `tests/rga_testing/validation/LivingLedgerRuntimeProbe.tscn` verifies real Economy/Shop integration, run-start loadout freezing, the starting-blood-bucket/free-reroll Edicts, Red Ink stat pressure, and save/resume preservation.
 - `tests/visual/BlackLedgerSmoke.tscn` and `tests/visual/BlackLedgerCompactSmoke.tscn` verify desktop and compact dossier rendering, navigation, controls, scrolling, and text fit from the real Godot framebuffer.

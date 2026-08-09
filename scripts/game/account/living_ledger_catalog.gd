@@ -25,7 +25,7 @@ const WRITS: Array[Dictionary] = [
 ]
 
 const EDICTS: Array[Dictionary] = [
-	{"id": "debtors_mercy", "name": "Debtor's Mercy", "rank": 3, "cost": 8, "effect": "+1 starting gold every run."},
+	{"id": "debtors_mercy", "name": "Debtor's Mercy", "rank": 3, "cost": 8, "effect": "+1 starting blood bucket every run."},
 	{"id": "house_courtesy", "name": "House Courtesy", "rank": 8, "cost": 20, "effect": "The first paid reroll each run is free."},
 	{"id": "foremans_seal", "name": "Foreman's Seal", "rank": 25, "cost": 60, "effect": "Completed Writs pay 10% more Omens."},
 	{"id": "third_margin", "name": "Third Margin", "rank": 30, "cost": 100, "effect": "Track one additional repeatable Writ."},

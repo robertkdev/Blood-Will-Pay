@@ -11,6 +11,8 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
+const StakesMarket: GDScript = preload("res://scripts/game/economy/stakes_market.gd")
 
 const ArenaBridge := preload("res://scripts/ui/combat/arena_bridge.gd")
 const GridPlacement := preload("res://scripts/ui/combat/grid_placement.gd")
@@ -51,18 +53,18 @@ const RESOLVING_STUCK_WARNING_SECONDS: int = 10
 const RESOLVING_FALLBACK_TEXT: String = "Battle resolved by failsafe"
 const InteractionLatencyBudget: GDScript = preload("res://scripts/ui/interaction_latency_budget.gd")
 const FIRST_DEPLOY_BENCH_TOOLTIP: String = "Drag this bench unit to a highlighted board cell."
-const OPENING_RETRY_MIN_GOLD: int = 3
+const OPENING_RETRY_MIN_BUCKETS: int = 3
 const FIRST_BOSS_PREP_CHAPTER: int = 1
 const FIRST_BOSS_PREP_ROUND: int = 4
-const FIRST_BOSS_PREP_MIN_GOLD: int = 6
+const FIRST_BOSS_PREP_MIN_BUCKETS: int = 6
 const CHAPTER_TWO_STABILITY_CHAPTER: int = 2
 const CHAPTER_TWO_STABILITY_FIRST_ROUND: int = 2
 const CHAPTER_TWO_STABILITY_LAST_ROUND: int = 5
-const CHAPTER_TWO_STABILITY_MIN_GOLD: int = 4
+const CHAPTER_TWO_STABILITY_MIN_BUCKETS: int = 4
 const CHAPTER_THREE_STABILITY_CHAPTER: int = 3
 const CHAPTER_THREE_STABILITY_FIRST_ROUND: int = 2
 const CHAPTER_THREE_STABILITY_LAST_ROUND: int = 5
-const CHAPTER_THREE_STABILITY_MIN_GOLD: int = 4
+const CHAPTER_THREE_STABILITY_MIN_BUCKETS: int = 4
 const BOSS_PREP_MIN_CHAPTER: int = 3
 const BOSS_PREP_ROUND: int = 4
 const RESULT_MINIMUM_DWELL_SECONDS: float = 6.0
@@ -73,12 +75,12 @@ const COMBAT_PRESSURE_MIDFIGHT_CASUALTIES: float = 0.12
 const COMBAT_PRESSURE_COLLAPSE_CASUALTIES: float = 0.35
 const LEGACY_PHASE_BRIDGE_HOLD_SECONDS: float = 0.62
 const LEGACY_PHASE_BRIDGE_FADE_SECONDS: float = 0.16
-const BOSS_PREP_MIN_GOLD: int = 4
+const BOSS_PREP_MIN_BUCKETS: int = 4
 const EARLY_RETRY_RECOVERY_MAX_CHAPTER: int = 2
-# Preserve a meaningful next decision after an early non-broke loss. Six gold
-# buys one level-up (4g) and still leaves the one-gold betting reserve, so a
+# Preserve a meaningful next decision after an early non-broke loss. Six buckets
+# buy one level-up (4 buckets) and still leave a one-bucket wager, so a
 # full board with a bench can actually unlock the next deployment slot.
-const EARLY_RETRY_RECOVERY_MIN_GOLD: int = 6
+const EARLY_RETRY_RECOVERY_MIN_BUCKETS: int = 6
 
 class ResultAftermathPainter:
 	extends Control
@@ -661,8 +663,8 @@ func _disconnect_controller_signals() -> void:
 		Items.action_log.disconnect(_on_items_action_log)
 	if Engine.has_singleton("Roster") and Roster.is_connected("bench_changed", Callable(self, "_on_bench_changed")):
 		Roster.bench_changed.disconnect(_on_bench_changed)
-	if Engine.has_singleton("Economy") and Economy.is_connected("gold_changed", Callable(self, "_on_economy_gold_changed_for_save")):
-		Economy.gold_changed.disconnect(_on_economy_gold_changed_for_save)
+	if Engine.has_singleton("Economy") and Economy.is_connected("blood_buckets_changed", Callable(self, "_on_economy_blood_buckets_changed_for_save")):
+		Economy.blood_buckets_changed.disconnect(_on_economy_blood_buckets_changed_for_save)
 	if Engine.has_singleton("Shop") and Shop.is_connected("offers_changed", Callable(self, "_on_shop_offers_changed_for_save")):
 		Shop.offers_changed.disconnect(_on_shop_offers_changed_for_save)
 	if Engine.has_singleton("Shop") and Shop.is_connected("locked_changed", Callable(self, "_on_shop_locked_changed_for_save")):
@@ -839,8 +841,8 @@ func initialize() -> void:
 		Roster.bench_changed.connect(_on_bench_changed)
 	if Roster and not Roster.is_connected("max_team_size_changed", Callable(self, "_on_roster_max_team_size_changed")):
 		Roster.max_team_size_changed.connect(_on_roster_max_team_size_changed)
-	if Economy and not Economy.is_connected("gold_changed", Callable(self, "_on_economy_gold_changed_for_save")):
-		Economy.gold_changed.connect(_on_economy_gold_changed_for_save)
+	if Economy and not Economy.is_connected("blood_buckets_changed", Callable(self, "_on_economy_blood_buckets_changed_for_save")):
+		Economy.blood_buckets_changed.connect(_on_economy_blood_buckets_changed_for_save)
 	if Shop and not Shop.is_connected("offers_changed", Callable(self, "_on_shop_offers_changed_for_save")):
 		Shop.offers_changed.connect(_on_shop_offers_changed_for_save)
 	if Shop and not Shop.is_connected("locked_changed", Callable(self, "_on_shop_locked_changed_for_save")):
@@ -917,7 +919,7 @@ func initialize() -> void:
 		# Move economy + start controls into the shop button bar for a single top row.
 		var bar := (shop_presenter.get_button_bar() if shop_presenter and shop_presenter.has_method("get_button_bar") else null)
 		if bar:
-			# Preserve order: reroll, lock, buy xp, lvl, gold, start battle, bet
+			# Preserve order: reroll, lock, buy XP, level, blood reserve, start battle, wager.
 			if gold_label and gold_label.get_parent() != bar:
 				var prev := gold_label.get_parent()
 				if prev: prev.remove_child(gold_label)
@@ -1104,7 +1106,14 @@ func _update_board_status() -> void:
 				if economy_node.has_method("quoted_payout"):
 					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
 			win_odds_label.text = "Win Odds %d%%" % odds
-			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f%s. Quote: %dg -> %dg gross (%.2fx)." % [player_rating, odds_enemy_rating, " (escalation-adjusted)" if boss_preview_factor > 1.0 else "", quoted_bet, quoted_payout, gross_multiplier]
+			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f%s. Quote: %s -> %s gross (%.2fx)." % [
+				player_rating,
+				odds_enemy_rating,
+				" (escalation-adjusted)" if boss_preview_factor > 1.0 else "",
+				BloodBuckets.format_amount(quoted_bet),
+				BloodBuckets.format_amount(quoted_payout),
+				gross_multiplier,
+			]
 	if economy_ui != null:
 		economy_ui.refresh()
 	_sync_contract_market_overlay()
@@ -1450,9 +1459,9 @@ func _on_continue_pressed() -> void:
 			if Debug.enabled:
 				print("[CombatView] Economy not found")
 			return
-		var bet_val: int = int(bet_slider.value) if bet_slider else int(Economy.current_bet)
-		# Auto-bump bet to 1 when player has gold but slider is 0 (post-combat edge)
-		if bet_val <= 0 and (Engine.has_singleton("Economy") and int(Economy.gold) > 0):
+		var bet_val: int = economy_ui.selected_wager() if economy_ui != null else int(Economy.current_bet)
+		# Auto-bump the wager to one bucket when the reserve is positive but the slider is zero.
+		if bet_val <= 0 and (Engine.has_singleton("Economy") and int(Economy.blood_buckets) > 0):
 			bet_val = 1
 			if bet_slider:
 				bet_slider.value = 1
@@ -1523,7 +1532,8 @@ func _on_continue_pressed() -> void:
 		if Debug.enabled:
 			print("[CombatView] Economy not found")
 		return
-	var bet_ok2: bool = Economy.set_bet(int(bet_slider.value))
+	var selected_wager: int = economy_ui.selected_wager() if economy_ui != null else int(Economy.current_bet)
+	var bet_ok2: bool = Economy.set_bet(selected_wager)
 	if not bet_ok2:
 		if Debug.enabled:
 			print("[CombatView] Place a bet > 0 to continue")
@@ -1688,7 +1698,7 @@ func _on_bench_changed() -> void:
 	_update_first_deploy_assist()
 	_update_board_status()
 
-func _on_economy_gold_changed_for_save(_gold: int) -> void:
+func _on_economy_blood_buckets_changed_for_save(_buckets: int) -> void:
 	_queue_active_run_save()
 
 func _on_shop_offers_changed_for_save(_offers: Array) -> void:
@@ -1939,10 +1949,10 @@ func _show_contract_market() -> void:
 		var offer: Dictionary = offers[index] as Dictionary
 		var button: Button = Button.new()
 		button.name = "ContractChoice%d" % index
-		button.text = "[%s] %s  •  PRICE %dg\nREWARD — %s\nRISK — %s\nNEXT FIGHT — %s" % [
+		button.text = "[%s] %s  •  PRICE %s\nREWARD — %s\nRISK — %s\nNEXT FIGHT — %s" % [
 			String(offer.get("family", "contract")).to_upper(),
 			String(offer.get("name", "Contract")),
-			int(offer.get("price", 0)),
+			BloodBuckets.format_amount(int(offer.get("price", 0)), true),
 			String(offer.get("reward", offer.get("description", "Unknown reward."))),
 			String(offer.get("drawback", "No listed drawback.")),
 			String(offer.get("fight_impact", "No visible fight impact listed.")),
@@ -2654,26 +2664,37 @@ func _build_result_economy_detail(outcome: String, bounty_result: Dictionary = {
 	var economy: Node = _autoload_node("Economy")
 	if economy == null:
 		if outcome == "victory":
-			return "WAGER 0g /// RETURN +0g\nRESULTING BANK 0g"
+			return "WAGER 0 buckets /// RETURN 0 buckets\nRESULTING RESERVE 0 buckets"
 		if outcome == "tie":
-			return "WAGER 0g RETURNED\nRESULTING BANK 0g"
-		return "WAGER 0g LOST\nRESULTING BANK 0g"
-	var wager: int = int(economy.get("last_bet_start"))
-	var precombat_bank: int = int(economy.get("last_gold_start"))
+			return "WAGER 0 buckets RETURNED\nRESULTING RESERVE 0 buckets"
+		return "WAGER 0 buckets LOST\nRESULTING RESERVE 0 buckets"
+	var wager: int = int(economy.get("last_wager_start"))
+	var precombat_bank: int = int(economy.get("last_blood_reserve_start"))
 	var combat_spent: int = int(economy.get("combat_spent"))
-	var escrow_bank: int = max(0, int(economy.get("gold")))
+	var escrow_bank: int = max(0, int(economy.get("blood_buckets")))
 	var gross: int = int(economy.call("quoted_payout", wager)) if economy.has_method("quoted_payout") else 0
 	var projected_bank: int = escrow_bank
 	var result_line: String = ""
 	if outcome == "victory":
-		projected_bank = max(0, escrow_bank + gross - combat_spent)
-		result_line = "WAGER %dg /// RETURN +%dg\nRESULTING BANK %dg" % [wager, gross, projected_bank]
+		projected_bank = StakesMarket.MAX_SAFE_BLOOD_BUCKETS if escrow_bank > StakesMarket.MAX_SAFE_BLOOD_BUCKETS - gross else escrow_bank + gross
+		projected_bank = 0 if combat_spent >= projected_bank else projected_bank - combat_spent
+		result_line = "WAGER %s /// RETURN %s\nRESULTING RESERVE %s" % [
+			BloodBuckets.format_amount(wager),
+			BloodBuckets.format_delta(gross),
+			BloodBuckets.format_amount(projected_bank),
+		]
 	elif outcome == "tie":
 		projected_bank = precombat_bank
-		result_line = "WAGER %dg RETURNED\nRESULTING BANK %dg" % [wager, projected_bank]
+		result_line = "WAGER %s RETURNED\nRESULTING RESERVE %s" % [
+			BloodBuckets.format_amount(wager),
+			BloodBuckets.format_amount(projected_bank),
+		]
 	else:
 		projected_bank = max(0, escrow_bank - combat_spent)
-		result_line = "WAGER %dg LOST\nRESULTING BANK %dg" % [wager, projected_bank]
+		result_line = "WAGER %s LOST\nRESULTING RESERVE %s" % [
+			BloodBuckets.format_amount(wager),
+			BloodBuckets.format_amount(projected_bank),
+		]
 	var awards: Array = bounty_result.get("awards", []) as Array
 	if awards.is_empty():
 		return result_line
@@ -2798,10 +2819,10 @@ func _prepare_post_combat_planning_return() -> void:
 					Economy.resolve_tie()
 				else:
 					Economy.resolve(win)
-					_apply_first_boss_prep_gold_floor(win)
-					_apply_chapter_two_stability_gold_floor(win)
-					_apply_chapter_three_stability_gold_floor(win)
-					_apply_boss_prep_gold_floor(win)
+					_apply_first_boss_prep_bucket_floor(win)
+					_apply_chapter_two_stability_bucket_floor(win)
+					_apply_chapter_three_stability_bucket_floor(win)
+					_apply_boss_prep_bucket_floor(win)
 					_apply_opening_retry_recovery(win)
 					_apply_early_run_retry_recovery(win)
 			if economy_ui:
@@ -2922,7 +2943,7 @@ func _finalize_post_combat_return() -> void:
 		_last_result_latency["waiting_for_grid_return"] = false
 		_last_result_latency["cleanup_steps_ms"] = _post_combat_cleanup_steps_ms.duplicate(true)
 
-func _apply_first_boss_prep_gold_floor(win: bool) -> void:
+func _apply_first_boss_prep_bucket_floor(win: bool) -> void:
 	if not win:
 		return
 	if not (Engine.has_singleton("Economy") or (parent != null and parent.has_node("/root/Economy"))):
@@ -2933,13 +2954,13 @@ func _apply_first_boss_prep_gold_floor(win: bool) -> void:
 		return
 	if int(GameState.stage_in_chapter) != FIRST_BOSS_PREP_ROUND:
 		return
-	var missing_gold: int = max(0, FIRST_BOSS_PREP_MIN_GOLD - int(Economy.gold))
-	if missing_gold <= 0:
+	var missing_buckets: int = max(0, FIRST_BOSS_PREP_MIN_BUCKETS - int(Economy.blood_buckets))
+	if missing_buckets <= 0:
 		return
-	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("First boss prep allocation: +%d blood." % missing_gold)
+	Economy.add_blood_buckets(missing_buckets, false, "recovery")
+	_on_log_line("First boss prep allocation: %s." % BloodBuckets.format_delta(missing_buckets))
 
-func _apply_chapter_two_stability_gold_floor(win: bool) -> void:
+func _apply_chapter_two_stability_bucket_floor(win: bool) -> void:
 	if not win:
 		return
 	if not (Engine.has_singleton("Economy") or (parent != null and parent.has_node("/root/Economy"))):
@@ -2951,13 +2972,13 @@ func _apply_chapter_two_stability_gold_floor(win: bool) -> void:
 	var round: int = int(GameState.stage_in_chapter)
 	if round < CHAPTER_TWO_STABILITY_FIRST_ROUND or round > CHAPTER_TWO_STABILITY_LAST_ROUND:
 		return
-	var missing_gold: int = max(0, CHAPTER_TWO_STABILITY_MIN_GOLD - int(Economy.gold))
-	if missing_gold <= 0:
+	var missing_buckets: int = max(0, CHAPTER_TWO_STABILITY_MIN_BUCKETS - int(Economy.blood_buckets))
+	if missing_buckets <= 0:
 		return
-	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Chapter 2 stability allocation: +%d blood." % missing_gold)
+	Economy.add_blood_buckets(missing_buckets, false, "recovery")
+	_on_log_line("Chapter 2 stability allocation: %s." % BloodBuckets.format_delta(missing_buckets))
 
-func _apply_chapter_three_stability_gold_floor(win: bool) -> void:
+func _apply_chapter_three_stability_bucket_floor(win: bool) -> void:
 	if not win:
 		return
 	if not (Engine.has_singleton("Economy") or (parent != null and parent.has_node("/root/Economy"))):
@@ -2969,13 +2990,13 @@ func _apply_chapter_three_stability_gold_floor(win: bool) -> void:
 	var round: int = int(GameState.stage_in_chapter)
 	if round < CHAPTER_THREE_STABILITY_FIRST_ROUND or round > CHAPTER_THREE_STABILITY_LAST_ROUND:
 		return
-	var missing_gold: int = max(0, CHAPTER_THREE_STABILITY_MIN_GOLD - int(Economy.gold))
-	if missing_gold <= 0:
+	var missing_buckets: int = max(0, CHAPTER_THREE_STABILITY_MIN_BUCKETS - int(Economy.blood_buckets))
+	if missing_buckets <= 0:
 		return
-	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Chapter 3 stability allocation: +%d blood." % missing_gold)
+	Economy.add_blood_buckets(missing_buckets, false, "recovery")
+	_on_log_line("Chapter 3 stability allocation: %s." % BloodBuckets.format_delta(missing_buckets))
 
-func _apply_boss_prep_gold_floor(win: bool) -> void:
+func _apply_boss_prep_bucket_floor(win: bool) -> void:
 	if not win:
 		return
 	if not (Engine.has_singleton("Economy") or (parent != null and parent.has_node("/root/Economy"))):
@@ -2986,11 +3007,11 @@ func _apply_boss_prep_gold_floor(win: bool) -> void:
 		return
 	if int(GameState.stage_in_chapter) != BOSS_PREP_ROUND:
 		return
-	var missing_gold: int = max(0, BOSS_PREP_MIN_GOLD - int(Economy.gold))
-	if missing_gold <= 0:
+	var missing_buckets: int = max(0, BOSS_PREP_MIN_BUCKETS - int(Economy.blood_buckets))
+	if missing_buckets <= 0:
 		return
-	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Boss prep allocation: +%d blood." % missing_gold)
+	Economy.add_blood_buckets(missing_buckets, false, "recovery")
+	_on_log_line("Boss prep allocation: %s." % BloodBuckets.format_delta(missing_buckets))
 
 func _apply_opening_retry_recovery(win: bool) -> void:
 	if win:
@@ -3006,11 +3027,11 @@ func _apply_opening_retry_recovery(win: bool) -> void:
 	if Engine.has_singleton("Shop") or (parent != null and parent.has_node("/root/Shop")):
 		if Shop.has_method("mark_opening_retry_shop"):
 			Shop.call("mark_opening_retry_shop")
-	var missing_gold: int = max(0, OPENING_RETRY_MIN_GOLD - int(Economy.gold))
-	if missing_gold <= 0:
+	var missing_buckets: int = max(0, OPENING_RETRY_MIN_BUCKETS - int(Economy.blood_buckets))
+	if missing_buckets <= 0:
 		return
-	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Opening retry transfusion: +%d blood." % missing_gold)
+	Economy.add_blood_buckets(missing_buckets, false, "recovery")
+	_on_log_line("Opening retry transfusion: %s." % BloodBuckets.format_delta(missing_buckets))
 
 func _apply_early_run_retry_recovery(win: bool) -> void:
 	if win:
@@ -3025,11 +3046,11 @@ func _apply_early_run_retry_recovery(win: bool) -> void:
 		return
 	if int(GameState.chapter) == 1 and int(GameState.stage_in_chapter) == 1:
 		return
-	var missing_gold: int = max(0, EARLY_RETRY_RECOVERY_MIN_GOLD - int(Economy.gold))
-	if missing_gold <= 0:
+	var missing_buckets: int = max(0, EARLY_RETRY_RECOVERY_MIN_BUCKETS - int(Economy.blood_buckets))
+	if missing_buckets <= 0:
 		return
-	Economy.add_gold(missing_gold, false, "recovery")
-	_on_log_line("Early retry transfusion: +%d blood." % missing_gold)
+	Economy.add_blood_buckets(missing_buckets, false, "recovery")
+	_on_log_line("Early retry transfusion: %s." % BloodBuckets.format_delta(missing_buckets))
 
 func _start_auto_loop() -> void:
 	if not auto_combat:
@@ -3256,8 +3277,10 @@ func _build_account_victory_snapshot() -> Dictionary:
 		"team_slots": team_slots,
 		"team_signature": "|".join(team_identity_keys),
 		"top_damage_unit_id": top_damage_unit_id,
-		"precombat_bankroll": int(economy.get("last_gold_start")) if economy != null else 0,
-		"wager": int(economy.get("last_bet_start")) if economy != null else 0,
+		"precombat_blood_buckets": int(economy.get("last_blood_reserve_start")) if economy != null else 0,
+		"wager_blood_buckets": int(economy.get("last_wager_start")) if economy != null else 0,
+		"precombat_bankroll": int(economy.get("last_blood_reserve_start")) if economy != null else 0,
+		"wager": int(economy.get("last_wager_start")) if economy != null else 0,
 		"projected_win_probability": float(economy.get("projected_win_probability")) if economy != null else 1.0,
 		"paid_rerolls": int(shop.get("paid_rerolls")) if shop != null else 0,
 		"paid_xp_purchases": int(shop.get("paid_xp_purchases")) if shop != null else 0,

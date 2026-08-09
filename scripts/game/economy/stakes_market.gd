@@ -6,7 +6,8 @@ const DEPTH_GROWTH_PER_CHAPTER: float = 1.22
 const HEALTHY_RESERVE_UNITS: int = 75
 const MAX_DIRECT_SHOP_PACKAGE_LEVEL: int = 3
 const MIN_STAKE_UNIT: int = 1
-const MAX_SAFE_GOLD: int = 9000000000000000000
+const MAX_SAFE_BLOOD_BUCKETS: int = 9000000000000000000
+const MAX_SAFE_GOLD: int = MAX_SAFE_BLOOD_BUCKETS # Legacy compatibility alias.
 
 static func denomination_for_rank(rank: int) -> int:
 	var safe_rank: int = max(0, int(rank))
@@ -16,8 +17,8 @@ static func denomination_for_rank(rank: int) -> int:
 	var multiplier: int = 1
 	for _index: int in range(cycle):
 		@warning_ignore("integer_division")
-		if multiplier > MAX_SAFE_GOLD / 10:
-			return MAX_SAFE_GOLD
+		if multiplier > MAX_SAFE_BLOOD_BUCKETS / 10:
+			return MAX_SAFE_BLOOD_BUCKETS
 		multiplier *= 10
 	var base: int = 1
 	if offset == 1:
@@ -25,8 +26,8 @@ static func denomination_for_rank(rank: int) -> int:
 	elif offset == 2:
 		base = 5
 	@warning_ignore("integer_division")
-	if multiplier > MAX_SAFE_GOLD / base:
-		return MAX_SAFE_GOLD
+	if multiplier > MAX_SAFE_BLOOD_BUCKETS / base:
+		return MAX_SAFE_BLOOD_BUCKETS
 	return base * multiplier
 
 static func rank_for_denomination(value: int) -> int:
@@ -42,8 +43,8 @@ static func rank_for_denomination(value: int) -> int:
 static func depth_reference_bankroll(chapter: int) -> int:
 	var safe_chapter: int = max(1, int(chapter))
 	var projected: float = STARTING_BANKROLL * pow(DEPTH_GROWTH_PER_CHAPTER, float(safe_chapter - 1))
-	if is_inf(projected) or projected >= float(MAX_SAFE_GOLD):
-		return MAX_SAFE_GOLD
+	if is_inf(projected) or projected >= float(MAX_SAFE_BLOOD_BUCKETS):
+		return MAX_SAFE_BLOOD_BUCKETS
 	return max(1, int(round(projected)))
 
 static func eligible_stake_rank(chapter: int, peak_bankroll: int, current_rank: int = 0) -> int:
@@ -54,7 +55,7 @@ static func eligible_stake_rank(chapter: int, peak_bankroll: int, current_rank: 
 		if next_unit <= denomination_for_rank(rank):
 			break
 		@warning_ignore("integer_division")
-		if next_unit > MAX_SAFE_GOLD / HEALTHY_RESERVE_UNITS:
+		if next_unit > MAX_SAFE_BLOOD_BUCKETS / HEALTHY_RESERVE_UNITS:
 			break
 		var promotion_threshold: int = next_unit * HEALTHY_RESERVE_UNITS
 		if target_bankroll < promotion_threshold:
@@ -89,7 +90,7 @@ static func _safe_product(a: int, b: int, c: int) -> int:
 		if value == 0:
 			return 0
 		@warning_ignore("integer_division")
-		if product > MAX_SAFE_GOLD / value:
-			return MAX_SAFE_GOLD
+		if product > MAX_SAFE_BLOOD_BUCKETS / value:
+			return MAX_SAFE_BLOOD_BUCKETS
 		product *= value
 	return product

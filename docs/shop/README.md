@@ -4,7 +4,7 @@ Shop Configuration
 Stakes Pricing
 --------------
 
-`ShopOffer.cost` remains the 1-5 rarity tier used by odds, identity, and combat scaling. `ShopOffer.price` is the actual gold quote.
+`ShopOffer.cost` remains the 1-5 rarity tier used by odds, identity, and combat scaling. `ShopOffer.price` is the actual blood-bucket quote. One bucket is 10 L; compact UI may abbreviate it as `bkt`.
 
 - Standard unit: `cost * U`
 - Reroll: `2U`
@@ -27,8 +27,8 @@ Key Constants
 - `REPLACE_PURCHASE_WITH_EMPTY`: purchased slots remain as SOLD/EMPTY placeholders; layout stays stable.
 - `FIRST_SHOP_HELPERS_BY_STARTER`: starter-specific level-1 opening-shop safety net for starters whose first-shop matrix needs a proven advancing helper in the first visible/default-click slot.
 - `FIRST_SHOP_BLOCKED_HELPERS_BY_STARTER`: starter-specific known-bad helper suppression for the first level-1 post-opener shop only.
-- `REROLL_COST`: gold cost per shop refresh.
-- `BUY_XP_COST` / `XP_PER_BUY`: gold cost and XP gain for XP purchases.
+- `REROLL_COST`: Stake-unit cost per shop refresh; the live quote is paid in blood buckets.
+- `BUY_XP_COST` / `XP_PER_BUY`: Stake-unit cost and XP gain for XP purchases.
 - `STARTING_LEVEL`, `MIN_LEVEL`, `MAX_LEVEL`: player level band.
 - `XP_TO_REACH_LEVEL`: XP needed to go from (level-1) -> level.
 - Lock rules:
@@ -40,7 +40,7 @@ Key Constants
 - `DEFAULT_ROLL_LEVEL`: fallback for undefined levels.
 
 Odds & Costs
-- Rarity remains a 1-5 identity tier. It is not the final gold price.
+- Rarity remains a 1-5 identity tier. It is not the final blood-bucket price.
 - The current Stakes denomination is `U`. Standard unit price is `rarity × U × package multiplier`.
 - Reroll costs `2U`; Buy XP or Command Research costs `4U`.
 - Higher Stakes markets directly sell level-2/3 packages. Four slots trail one package grade behind and one slot is current-grade. Level-4 power remains an earned combine/upgrade endpoint rather than a one-click shop purchase.
@@ -65,15 +65,15 @@ Change Guidelines
 
 Card UX Notes
 - Shop shows a fixed number of slots horizontally.
-- Clicking a card buys the unit if you have enough gold and bench space.
+- Clicking a card buys the unit if you have enough blood buckets and bench space.
 - When purchased, that slot becomes a SOLD placeholder (no shifting / no gap closing).
 - If bench is full, cards show a disabled state with tooltip.
-- If you cannot afford a card, the price is tinted and a tooltip indicates "Not enough gold".
+- If you cannot afford a card, the price is tinted and its tooltip reports the exact missing blood buckets and liters.
 
 Premium Recruit Identity
 ------------------------
 
-The current-grade slot is a CAPITAL recruit rather than only a larger copy bundle. Its role assigns one persistent charter at purchase, disclosed on the shop card before gold is spent:
+The current-grade slot is a CAPITAL recruit rather than only a larger copy bundle. Its role assigns one persistent charter at purchase, disclosed on the shop card before blood buckets are spent:
 
 - Blood Engine (mages, marksmen, assassins, and other damage roles): +20% attack speed for the fight, but enters every fight at 70% health.
 - Iron Retinue (tanks, brawlers, and supports): opens with a 25% max-health shield for 12 seconds, but attacks 15% slower for the fight.
@@ -94,11 +94,11 @@ Correctness Contract
 - Normal rolls keep `ALLOW_DUPLICATES=true`: repeated units are legitimate shop outcomes, not an error by themselves.
 - The guarded opening roll must put a configured helper in slot 0 and filter that starter's blocked IDs. When at least two eligible units exist in the rolled cost tier, the guard preserves at least two distinct choices; it does not fill every slot with the helper.
 - Seeded rolls must route every draw through `ShopRng`; weighted cost tiers are traversed in numeric order so a seed maps to the same offers on replay.
-- At player level 14, the progression purchase becomes Command Research. Once every doctrine is complete, the transaction returns `COMMAND_RESEARCH_COMPLETE` and spends no gold.
+- At player level 14, the progression purchase becomes Command Research. Once every doctrine is complete, the transaction returns `COMMAND_RESEARCH_COMPLETE` and spends no blood buckets.
 
 Lifecycle
 - New Run: `Shop.reset_run()` clears state; `PlayerProgress` resets to level 1, XP 0.
-- Reroll: `Shop.reroll()` spends `REROLL_COST` gold (unless a free reroll is available) and populates `SLOT_COUNT` offers.
+- Reroll: `Shop.reroll()` spends the current `REROLL_COST` blood-bucket quote (unless a free reroll is available) and populates `SLOT_COUNT` offers.
 - Opening shop: after the first Chapter 1 Stage 1 victory, or after a non-broke Chapter 1 Stage 1 retry state where the bet has resolved to 0, `Shop.reroll()` uses the selected starter id once. For configured first-shop-sensitive starters, the roller first replaces known-bad helper offers from `FIRST_SHOP_BLOCKED_HELPERS_BY_STARTER`, then ensures slot 0 contains a configured helper from `FIRST_SHOP_HELPERS_BY_STARTER`. Later rerolls stay generic.
 - Lock: `Shop.toggle_lock()` flips lock; reroll clears lock when `CLEAR_LOCK_ON_REROLL=true`.
 - Buy Unit: `Shop.buy_unit(slot)` spends the offer's quoted price, spawns its exact package level, records acquisition value, places it on the bench, replaces the slot with an empty placeholder, then runs `CombineService`.
@@ -115,8 +115,8 @@ Signals
 Phase Rules
 - Buying, rerolling, locking, progression, contracts, doctrine assignment, and unit selling are planning/post-combat actions. Combat attempts return `COMBAT_PHASE`.
 - Planning purchases must preserve the configured survival/reserve floor. Failed affordability surfaces as `WOULD_KILL_YOU` with a user-facing tooltip.
-- The wager is funded from gold remaining after shopping, then escrowed at combat start. Its probability-based gross payout quote is locked for that fight.
-- A non-broke Chapter 1 Stage 1 defeat receives enough opening retry recovery to return to 2 gold, so a support starter can buy exactly one 1-cost helper while still keeping the 1-health planning reserve. Axiom's configured retry helpers are guarded by `AxiomRetryChoiceQualitySmoke` and the production retry-shop slot 0 path is covered by `AxiomRetryEconomySmoke`.
+- The wager is funded from blood buckets remaining after shopping, then escrowed at combat start. Its probability-based gross payout quote is locked for that fight.
+- A non-broke Chapter 1 Stage 1 defeat receives enough opening retry recovery to return to 3 buckets, so a support starter can buy exactly one 1-bucket helper while still keeping a one-bucket planning wager. Axiom's configured retry helpers are guarded by `AxiomRetryChoiceQualitySmoke` and the production retry-shop slot 0 path is covered by `AxiomRetryEconomySmoke`.
 
 Error Codes
 - `UNKNOWN`, `COMBAT_PHASE`, `INVALID_SLOT`, `NO_OFFERS`, `INSUFFICIENT_GOLD`, `BENCH_FULL`, `SHOP_LOCKED`, `INVALID_UNIT`, `NOT_FOUND`, `ACTION_FAILED`, `MAX_LEVEL`.
@@ -126,7 +126,7 @@ Extension Points
 - Catalog: place playable unit `.tres` in `res://data/units` as `UnitProfile`; `UnitCatalog` scans and groups by cost. Non-playables (creeps/dummies) live under `res://data/other_units/...` and are excluded from the shop.
 - Combining: `CombineService` promotes three-of-a-kind on bench post-purchase; adjust rules there.
 - UI: `ShopPresenter` mediates Shop -> UI; buttons/labels live under `shop_buttons.gd`, cards in `shop_panel.gd` and `ShopCard.tscn`.
-- Economy: `Economy` singleton provides gold and bet; all spending/credits route through it.
+- Economy: `Economy` exposes canonical `blood_buckets` and wager state; all spending and credits route through it. Legacy `gold` identifiers remain compatibility aliases only.
 
 Developer Debug Toggles
 - `DEBUG_VERBOSE` (bool): enable verbose logging in Shop internals (default: false).

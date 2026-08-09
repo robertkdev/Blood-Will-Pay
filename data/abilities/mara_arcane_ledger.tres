@@ -6,7 +6,7 @@
 script = ExtResource( 1 )
 id = "mara_arcane_ledger"
 name = "Arcane Ledger"
-description = "Blasts one enemy. If the blast kills, gain 1 blood Stake, once per combat."
+description = "Blasts one enemy. If the blast kills, gain 1 bucket-scaled blood Stake, once per combat."
 targeting_summary = "Current attack target."
 base_cost = 70
 tags = ["damage", "economy"]

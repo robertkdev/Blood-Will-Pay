@@ -395,7 +395,7 @@ func _build_stats_grid() -> void:
         return
     var entries: Array[Array] = [
         ["LVL", str(unit_ref.level)],
-        ["Cost", "%dg" % int(unit_ref.cost)],
+        ["Rarity", "Tier %d" % int(unit_ref.cost)],
         ["HP", str(unit_ref.max_hp)],
         ["AD", _fmt(unit_ref.attack_damage)],
         ["SP", _fmt(unit_ref.spell_power)],

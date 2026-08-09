@@ -136,6 +136,6 @@ offset_bottom = -5.0
 grow_horizontal = 0
 grow_vertical = 0
 size_flags_horizontal = 8
-text = "0g"
+text = "0 bkt"
 horizontal_alignment = 1
 vertical_alignment = 1

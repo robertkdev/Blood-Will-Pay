@@ -11,6 +11,7 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
 const COLOR_MUTED: Color = Color(0.66, 0.60, 0.52, 1.0)
@@ -146,11 +147,11 @@ func set_data(props: Dictionary) -> void:
 	else:
 		tooltip_text = title
 	_tooltip_title = title
-	_tooltip_subtitle = "%d blood • %s Lv%d" % [price_i, "Current Grade" if _package_kind == "current_grade" else "Depth Grade", _package_level] if _package_kind != "standard" else "%d blood" % price_i
+	_tooltip_subtitle = "%s • %s Lv%d" % [BloodBuckets.describe(price_i), "Current Grade" if _package_kind == "current_grade" else "Depth Grade", _package_level] if _package_kind != "standard" else BloodBuckets.describe(price_i)
 	_tooltip_lines = _build_tooltip_lines(display_role, display_goal, approaches, alt_goals, traits)
 	if _package_kind == "current_grade":
 		var capital_charter: Dictionary = UnitUpgradePaths.charter_definition(UnitUpgradePaths.charter_for_role(primary_role))
-		_tooltip_subtitle = "%d blood • CAPITAL Lv%d" % [price_i, _package_level]
+		_tooltip_subtitle = "%s • CAPITAL Lv%d" % [BloodBuckets.describe(price_i), _package_level]
 		_tooltip_lines.push_front("DRAWBACK — %s" % String(capital_charter.get("drawback", "")))
 		_tooltip_lines.push_front("BENEFIT — %s" % String(capital_charter.get("benefit", "")))
 		_tooltip_lines.push_front("CAPITAL CHARTER — %s" % String(capital_charter.get("name", "")))
@@ -204,7 +205,7 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	if _name_label != null:
 		_name_label.anchor_left = 0.0
 		_name_label.anchor_top = 0.61 if _tight_presentation else 0.66 if enabled else 1.0
-		_name_label.anchor_right = 0.72 if enabled else 0.76
+		_name_label.anchor_right = 0.52 if enabled else 0.76
 		_name_label.anchor_bottom = 1.0
 		_name_label.offset_left = 4.0 if enabled else 8.0
 		_name_label.offset_top = 0.0 if enabled else -23.0
@@ -216,7 +217,7 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_name_label.add_theme_font_size_override("font_size", 14 if _tight_presentation else 16 if enabled else 20)
 	if _price_label != null:
 		_price_label.text = _price_copy()
-		_price_label.anchor_left = 0.72 if enabled else 0.76
+		_price_label.anchor_left = 0.52 if enabled else 0.76
 		_price_label.anchor_top = 0.61 if _tight_presentation else 0.66 if enabled else 1.0
 		_price_label.anchor_right = 1.0
 		_price_label.anchor_bottom = 1.0
@@ -232,7 +233,7 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	set_meta("tight_presentation", _tight_presentation)
 
 func _price_copy() -> String:
-	return "B%d" % _price_value if _compact_presentation else "%d blood" % _price_value
+	return BloodBuckets.format_amount(_price_value, _compact_presentation)
 
 func set_affordable(affordable: bool) -> void:
 	var ok: bool = bool(affordable)
@@ -243,7 +244,7 @@ func set_affordable(affordable: bool) -> void:
 		disabled = not ok
 	if _price_label:
 		_price_label.modulate = Color(1, 1, 0.8, 0.95) if ok else Color(1, 0.5, 0.5, 0.85)
-	set_status_tip("" if ok else "Not enough blood in reserve")
+	set_status_tip("" if ok else "Not enough Blood Reserve for " + BloodBuckets.describe(_price_value))
 	_refresh_cursor()
 
 func set_shop_disabled(reason) -> void:

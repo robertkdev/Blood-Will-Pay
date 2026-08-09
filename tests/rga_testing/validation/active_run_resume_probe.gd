@@ -108,13 +108,31 @@ func _test_full_payload_round_trip() -> void:
 	var restored_offer: Dictionary = restored_offers[0] as Dictionary
 	var restored_bench: Array = restored.get("bench", []) as Array
 	var restored_bench_unit: Dictionary = restored_bench[1] as Dictionary
-	_expect(int((restored.get("economy", {}) as Dictionary).get("gold", 0)) == 9007199254741999, "large bankroll should remain exact")
+	var restored_economy: Dictionary = restored.get("economy", {}) as Dictionary
+	_expect(int(restored_economy.get("gold", 0)) == 9007199254741999, "legacy large reserve should remain exact")
+	Economy.restore_run_record(restored_economy)
+	_expect(int(Economy.blood_buckets) == 9007199254741999, "legacy active-run reserve should migrate into canonical blood buckets")
 	_expect(int((restored.get("board_placements", []) as Array)[0]) == 17, "board placement should round-trip")
 	_expect(String(restored_offer.get("id", "")) == "bonko", "locked shop identity should round-trip")
 	_expect(int(restored_bench_unit.get("level", 0)) == 2, "bench package level should round-trip")
 	MirrorBoardStore.clear_runtime()
 	MirrorBoardStore.restore_runtime(restored.get("mirror_boards", {}) as Dictionary)
 	_expect(MirrorBoardStore.snapshot_ids(4) == ["bonko"], "mirror chapter keys should normalize after JSON round-trip")
+	var canonical_record: Dictionary = Economy.snapshot_run_record()
+	canonical_record["blood_buckets"] = 9007199254742999
+	canonical_record["gold"] = 7
+	canonical_record["current_wager_buckets"] = 125000
+	canonical_record["current_bet"] = 3
+	restored["economy"] = canonical_record
+	var canonical_saved: Dictionary = RunStateStore.save_snapshot(restored, TEST_PATH)
+	_expect(bool(canonical_saved.get("ok", false)), "canonical active-run economy should save")
+	var canonical_loaded: Dictionary = RunStateStore.load_snapshot(TEST_PATH)
+	_expect(bool(canonical_loaded.get("ok", false)), "canonical active-run economy should load")
+	var canonical_snapshot: Dictionary = canonical_loaded.get("snapshot", {}) as Dictionary
+	var canonical_economy: Dictionary = canonical_snapshot.get("economy", {}) as Dictionary
+	Economy.restore_run_record(canonical_economy)
+	_expect(int(Economy.blood_buckets) == 9007199254742999, "canonical reserve should win over conflicting legacy gold after persistence")
+	_expect(int(Economy.current_bet) == 125000, "canonical wager should win over conflicting legacy bet after persistence")
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

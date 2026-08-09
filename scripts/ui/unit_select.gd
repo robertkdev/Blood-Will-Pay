@@ -13,6 +13,7 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const AccountProgressionScript: GDScript = preload("res://scripts/game/account/account_progression.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 const COLOR_VOID: Color = Color(0.012, 0.010, 0.014, 1.0)
 const COLOR_PANEL: Color = Color(0.034, 0.029, 0.039, 0.94)
@@ -689,7 +690,7 @@ func _build_detail_lines(id: String, it: Dictionary) -> Array[String]:
 		trait_text = _format_list(_duplicate_strings(it.get("approaches", PackedStringArray())), 5)
 	if trait_text != "":
 		lines.append("Traits: %s" % trait_text)
-	lines.append("Cost: %d blood" % int(it.get("cost", 0)))
+	lines.append("Rarity Tier: %d" % int(it.get("cost", 0)))
 	var alt_goals: String = _format_list(_duplicate_strings(it.get("alt_goals", PackedStringArray())), 3)
 	if alt_goals != "":
 		lines.append("Alt Goals: %s" % alt_goals)

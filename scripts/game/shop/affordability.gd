@@ -20,7 +20,7 @@ static func can_afford(gold: int, bet: int, cost: int, in_combat: bool, spent_so
 
 	if in_combat:
 		# Allow borrowing against this round's bet, but not beyond (must be >= 1 after win payout).
-		# Available = gold + (2*bet - 1) - spent_so_far
+		# Available = blood reserve + combat credit - spent_so_far.
 		var available: int = g + (2 * b - 1) - spent
 		if c <= available:
 			return { "ok": true, "reason": REASON_OK, "need_more": 0 }
@@ -30,6 +30,6 @@ static func can_afford(gold: int, bet: int, cost: int, in_combat: bool, spent_so
 		var available2: int = g - PLANNING_RESERVE_FLOOR
 		if c <= available2:
 			return { "ok": true, "reason": REASON_OK, "need_more": 0 }
-		# Distinguish between simple lack of gold vs reserve floor breach (for clearer tooltips).
+		# Distinguish simple shortfall from reserve-floor breach for clearer tooltips.
 		var need: int = max(0, c - available2)
 		return { "ok": false, "reason": REASON_RESERVE_FLOOR if g > 0 else REASON_INSUFFICIENT, "need_more": need }

@@ -9,13 +9,21 @@ static func load_records(path: String = DEFAULT_PATH) -> Dictionary:
 	var error: Error = config.load(path)
 	if error != OK:
 		return _empty_records()
+	var best_earned: int = max(0, int(config.get_value(SECTION, "best_blood_buckets_earned", config.get_value(SECTION, "best_total_earned", 0))))
+	var peak_reserve: int = max(0, int(config.get_value(SECTION, "peak_blood_buckets", config.get_value(SECTION, "peak_bankroll", 0))))
+	var biggest_wager: int = max(0, int(config.get_value(SECTION, "biggest_wager_buckets_won", config.get_value(SECTION, "biggest_wager_won", 0))))
+	var richest_payout: int = max(0, int(config.get_value(SECTION, "richest_blood_bucket_payout", config.get_value(SECTION, "richest_fight", 0))))
 	return {
-		"best_total_earned": max(0, int(config.get_value(SECTION, "best_total_earned", 0))),
+		"best_blood_buckets_earned": best_earned,
+		"best_total_earned": best_earned,
 		"best_stage": max(0, int(config.get_value(SECTION, "best_stage", 0))),
 		"best_chapter": max(0, int(config.get_value(SECTION, "best_chapter", 0))),
-		"peak_bankroll": max(0, int(config.get_value(SECTION, "peak_bankroll", 0))),
-		"biggest_wager_won": max(0, int(config.get_value(SECTION, "biggest_wager_won", 0))),
-		"richest_fight": max(0, int(config.get_value(SECTION, "richest_fight", 0))),
+		"peak_blood_buckets": peak_reserve,
+		"peak_bankroll": peak_reserve,
+		"biggest_wager_buckets_won": biggest_wager,
+		"biggest_wager_won": biggest_wager,
+		"richest_blood_bucket_payout": richest_payout,
+		"richest_fight": richest_payout,
 		"runs_completed": max(0, int(config.get_value(SECTION, "runs_completed", 0))),
 		"known_identities": _string_array(config.get_value(SECTION, "known_identities", [])),
 		"contract_discoveries": _string_array(config.get_value(SECTION, "contract_discoveries", [])),
@@ -31,12 +39,20 @@ static func submit_run(record: Dictionary, path: String = DEFAULT_PATH) -> Dicti
 		current["deduped"] = true
 		return current
 	var next: Dictionary = current.duplicate(true)
-	next["best_total_earned"] = max(int(current["best_total_earned"]), int(record.get("total_money_earned", 0)))
+	var best_earned: int = max(int(current["best_blood_buckets_earned"]), int(record.get("total_blood_buckets_earned", record.get("total_money_earned", 0))))
+	var peak_reserve: int = max(int(current["peak_blood_buckets"]), int(record.get("peak_blood_buckets", record.get("peak_bankroll", 0))))
+	var biggest_wager: int = max(int(current["biggest_wager_buckets_won"]), int(record.get("biggest_wager_buckets_won", record.get("biggest_wager_won", 0))))
+	var richest_payout: int = max(int(current["richest_blood_bucket_payout"]), int(record.get("richest_blood_bucket_payout", record.get("richest_fight", 0))))
+	next["best_blood_buckets_earned"] = best_earned
+	next["best_total_earned"] = best_earned
 	next["best_stage"] = max(int(current["best_stage"]), int(record.get("stage", 0)))
 	next["best_chapter"] = max(int(current["best_chapter"]), int(record.get("chapter", 0)))
-	next["peak_bankroll"] = max(int(current["peak_bankroll"]), int(record.get("peak_bankroll", 0)))
-	next["biggest_wager_won"] = max(int(current["biggest_wager_won"]), int(record.get("biggest_wager_won", 0)))
-	next["richest_fight"] = max(int(current["richest_fight"]), int(record.get("richest_fight", 0)))
+	next["peak_blood_buckets"] = peak_reserve
+	next["peak_bankroll"] = peak_reserve
+	next["biggest_wager_buckets_won"] = biggest_wager
+	next["biggest_wager_won"] = biggest_wager
+	next["richest_blood_bucket_payout"] = richest_payout
+	next["richest_fight"] = richest_payout
 	next["runs_completed"] = int(current["runs_completed"]) + 1
 	next["known_identities"] = _merge_strings(
 		_string_array(current.get("known_identities", [])),
@@ -61,11 +77,15 @@ static func submit_run(record: Dictionary, path: String = DEFAULT_PATH) -> Dicti
 
 static func _empty_records() -> Dictionary:
 	return {
+		"best_blood_buckets_earned": 0,
 		"best_total_earned": 0,
 		"best_stage": 0,
 		"best_chapter": 0,
+		"peak_blood_buckets": 0,
 		"peak_bankroll": 0,
+		"biggest_wager_buckets_won": 0,
 		"biggest_wager_won": 0,
+		"richest_blood_bucket_payout": 0,
 		"richest_fight": 0,
 		"runs_completed": 0,
 		"known_identities": [],

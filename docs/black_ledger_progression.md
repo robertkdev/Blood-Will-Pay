@@ -90,7 +90,7 @@ The required boss must be defeated at the account's current maximum tier. Repeat
 
 | Edict | Rank | Cost | Effect |
 | --- | ---: | ---: | --- |
-| Debtor's Mercy | 3 | 8 | +1 starting gold every run |
+| Debtor's Mercy | 3 | 8 | +1 starting blood bucket every run |
 | House Courtesy | 8 | 20 | First paid reroll each run is free |
 | Foreman's Seal | 25 | 60 | +10% completed-Writ payout |
 | Third Margin | 30 | 100 | One additional selected Writ |

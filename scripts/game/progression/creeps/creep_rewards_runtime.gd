@@ -5,6 +5,7 @@ const ItemCatalog := preload("res://scripts/game/items/item_catalog.gd")
 const CreepRewardPool := preload("res://scripts/game/progression/creeps/reward_pool.gd")
 const CreepRewardEntry := preload("res://scripts/game/progression/creeps/reward_entry.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 const LOG_PREFIX := "[Rewards] "
 const DEBUG_REWARD_LOGS: bool = false
@@ -179,7 +180,7 @@ func _execute_action(action_id: String, params: Dictionary) -> void:
 				var eco: Node = _get_autoload("Economy")
 				if eco != null and eco.has_method("add_stake_units"):
 					var awarded: int = int(eco.call("add_stake_units", amt, true, "creep_reward"))
-					_log("Creep reward: +%d blood (%dU)" % [awarded, amt])
+					_log("Creep reward: %s (%d Stake%s)" % [BloodBuckets.format_delta(awarded), amt, "" if amt == 1 else "s"])
 					_debug_log("action grant_gold: +%dU = %d" % [amt, awarded])
 				else:
 					_debug_log("action grant_gold skipped: Economy missing")

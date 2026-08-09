@@ -1,5 +1,7 @@
 extends Node
 
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
+
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const UNIT_SELECT_SCENE: PackedScene = preload("res://scenes/UnitSelect.tscn")
 const SHOP_CARD_SCENE: PackedScene = preload("res://scenes/ui/shop/ShopCard.tscn")
@@ -201,18 +203,18 @@ func _audit_command_text_states(combat: Control) -> void:
 	_expect(action_bar != null, "Live compact action bar missing")
 	_expect(continue_button != null, "ContinueButton missing")
 	if gold_label != null:
-		gold_label.text = "Gold: 999,999"
+		gold_label.text = "Blood Reserve: " + BloodBuckets.format_amount(999999)
 	if bet_value != null:
-		bet_value.text = "999"
+		bet_value.text = BloodBuckets.format_amount(999)
 	for command_text: String in COMMAND_TEXTS:
 		if continue_button != null:
 			continue_button.text = command_text
 		await _settle_frames(3)
 		_audit(action_bar, "compact command %s" % command_text)
 	if gold_label != null:
-		gold_label.text = "Gold: 9"
+		gold_label.text = "Blood Reserve: " + BloodBuckets.format_amount(9)
 	if bet_value != null:
-		bet_value.text = "1"
+		bet_value.text = BloodBuckets.format_amount(1)
 	if continue_button != null:
 		continue_button.text = "Start Battle"
 	await _settle_frames(3)

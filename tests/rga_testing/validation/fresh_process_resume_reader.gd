@@ -18,8 +18,11 @@ func _ready() -> void:
 	var placements: Array = snapshot.get("board_placements", []) as Array
 	var roster_catalog: Dictionary = snapshot.get("roster_catalog", {}) as Dictionary
 	var mirror_boards: Dictionary = snapshot.get("mirror_boards", {}) as Dictionary
-	_expect(int(economy.get("gold", 0)) == 9007199254743117, "large bankroll should survive a fresh process")
-	_expect(int(economy.get("current_bet", 0)) == 125000, "committed wager should survive a fresh process")
+	_expect(int(economy.get("blood_buckets", 0)) == 9007199254743117, "large canonical reserve should survive a fresh process")
+	_expect(int(economy.get("current_wager_buckets", 0)) == 125000, "canonical committed wager should survive a fresh process")
+	Economy.restore_run_record(economy)
+	_expect(int(Economy.blood_buckets) == 9007199254743117, "canonical reserve should win over legacy gold in a fresh process")
+	_expect(int(Economy.current_bet) == 125000, "canonical wager should win over legacy bet in a fresh process")
 	_expect(bool(shop.get("locked", false)) and offers.size() == 2, "locked shop offers should survive a fresh process")
 	_expect(int(shop.get("rng_state", 0)) == 9007199254742999, "shop RNG state should remain exact")
 	_expect(int(contracts.get("stable_board_bonus", 0)) == 2 and int(contracts.get("pending_chapter", 0)) == 38, "contract history and pending choice should survive")

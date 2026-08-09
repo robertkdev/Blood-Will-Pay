@@ -2,6 +2,7 @@ extends CanvasLayer
 class_name AuditPanel
 
 const VisionSnapshot := preload("res://scripts/util/vision_snapshot.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 const OUTPUT_DIR: String = "user://audit_exports"
 const HELD_TIMER_SECONDS: float = 9999.0
 
@@ -166,10 +167,11 @@ func _refresh_summary() -> void:
 	var roster: Dictionary = state.get("roster", {})
 	var shop: Dictionary = state.get("shop", {})
 	var combat: Dictionary = state.get("combat_view", {})
+	var reserve_buckets: int = int(state.get("blood_buckets", state.get("gold", 0)))
 	summary_label.text = "phase=%s stage=%s blood=%s level=%s xp=%s/%s\nboard=%s\nbench=%s\ncontinue=%s timer=%s speed=%.1f" % [
 		str(state.get("phase_name", "")),
 		str(state.get("stage_label", "")),
-		str(state.get("gold", "")),
+		BloodBuckets.format_amount(reserve_buckets),
 		str(shop.get("level", "")),
 		str(shop.get("xp", "")),
 		str(shop.get("xp_to_next", "")),
@@ -279,7 +281,8 @@ func _collect_state(include_paths: bool) -> Dictionary:
 		"stage": _game_state_int("stage", 1),
 		"stage_in_chapter": _game_state_int("stage_in_chapter", 1),
 		"stage_label": "C%d-S%d" % [_game_state_int("chapter", 1), _game_state_int("stage_in_chapter", 1)],
-		"gold": _economy_int("gold", 0),
+		"blood_buckets": _economy_int("blood_buckets", 0),
+		"gold": _economy_int("blood_buckets", 0),
 		"bet": _economy_int("current_bet", 0),
 		"combat_active": _economy_bool("combat_active", false),
 		"engine_time_scale": Engine.time_scale,

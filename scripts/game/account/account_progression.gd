@@ -78,8 +78,12 @@ static func max_edict_slots(current: Dictionary) -> int:
 static func has_equipped_edict(edict_id: String, path: String = AccountProfileStoreScript.DEFAULT_PATH) -> bool:
 	return _has_equipped_edict(profile(path), edict_id)
 
-static func starting_gold_bonus(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> int:
+static func starting_blood_bucket_bonus(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> int:
 	return 1 if has_equipped_edict("debtors_mercy", path) else 0
+
+static func starting_gold_bonus(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> int:
+	# Legacy compatibility for callers that predate the blood-bucket economy.
+	return starting_blood_bucket_bonus(path)
 
 static func red_ink_enemy_multiplier(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> float:
 	var current: Dictionary = profile(path)
@@ -505,8 +509,8 @@ static func _save_journal(journal: Dictionary, path: String) -> Dictionary:
 	return {"ok": true, "path": path}
 
 static func _is_high_wager(snapshot: Dictionary, ratio: float) -> bool:
-	var bankroll: int = max(0, int(snapshot.get("precombat_bankroll", 0)))
-	var wager: int = max(0, int(snapshot.get("wager", 0)))
+	var bankroll: int = max(0, int(snapshot.get("precombat_blood_buckets", snapshot.get("precombat_bankroll", 0))))
+	var wager: int = max(0, int(snapshot.get("wager_blood_buckets", snapshot.get("wager", 0))))
 	return bankroll > 0 and float(wager) >= float(bankroll) * ratio
 
 static func _has_unit(units: Array[Dictionary], unit_id: String, minimum_level: int, require_alive: bool) -> bool:

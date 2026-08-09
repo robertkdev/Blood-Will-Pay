@@ -33,7 +33,7 @@ func set_level(new_level: int) -> void:
 	xp_changed.emit(0, xp)
 
 func add_xp(amount: int) -> void:
-	# Pure XP addition; no gold logic here. Levels up as thresholds are met.
+	# Pure XP addition; no currency logic here. Levels up as thresholds are met.
 	if is_at_max_level():
 		return
 	var inc: int = max(0, int(amount))
