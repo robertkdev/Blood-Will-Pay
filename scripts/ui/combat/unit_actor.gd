@@ -12,6 +12,12 @@ const COMBAT_READOUT_MIN_WIDTH: float = 92.0
 # collisions in presentation space only.
 const COMBAT_READOUT_BASE_TOP: float = -34.0
 const COMBAT_READOUT_PLATE_HEIGHT: float = 38.0
+const COMBAT_FOCUS_PLATE_SIDE_OFFSET: float = 18.0
+const COMBAT_FOCUS_PLATE_TOP_OFFSET: float = 5.0
+const COMBAT_FOCUS_PLATE_BOTTOM_OFFSET: float = 18.0
+# The authored base casts a 14px shadow. Reserve a little air beyond it so the
+# hard arena clip never turns that soft edge into a visibly sliced silhouette.
+const COMBAT_FOCUS_PLATE_SHADOW_SAFE_EXTENT: float = 20.0
 
 var unit: Unit
 var focus_plate: Panel
@@ -135,10 +141,10 @@ func _ensure_focus_plate() -> void:
 	focus_plate.anchor_top = 0.0
 	focus_plate.anchor_right = 1.0
 	focus_plate.anchor_bottom = 1.0
-	focus_plate.offset_left = -18.0
-	focus_plate.offset_top = -5.0
-	focus_plate.offset_right = 18.0
-	focus_plate.offset_bottom = 18.0
+	focus_plate.offset_left = -COMBAT_FOCUS_PLATE_SIDE_OFFSET
+	focus_plate.offset_top = -COMBAT_FOCUS_PLATE_TOP_OFFSET
+	focus_plate.offset_right = COMBAT_FOCUS_PLATE_SIDE_OFFSET
+	focus_plate.offset_bottom = COMBAT_FOCUS_PLATE_BOTTOM_OFFSET
 	add_child(focus_plate)
 	_apply_focus_plate_style()
 
@@ -403,7 +409,22 @@ func get_combat_readout_bounds_for_center(center: Vector2, offset: Vector2) -> R
 func get_combat_presentation_bounds_for_center(center: Vector2, readout_offset: Vector2) -> Rect2:
 	var body_bounds: Rect2 = Rect2(center - size * 0.5, size)
 	var readout_bounds: Rect2 = get_combat_readout_bounds_for_center(center, readout_offset)
-	return body_bounds.merge(readout_bounds)
+	var focus_bounds: Rect2 = get_combat_focus_bounds_for_center(center)
+	return body_bounds.merge(readout_bounds).merge(focus_bounds)
+
+func get_combat_focus_bounds_for_center(center: Vector2) -> Rect2:
+	var actor_top_left: Vector2 = center - size * 0.5
+	var safe_left: float = COMBAT_FOCUS_PLATE_SIDE_OFFSET + COMBAT_FOCUS_PLATE_SHADOW_SAFE_EXTENT
+	var safe_top: float = COMBAT_FOCUS_PLATE_TOP_OFFSET + COMBAT_FOCUS_PLATE_SHADOW_SAFE_EXTENT
+	var safe_right: float = COMBAT_FOCUS_PLATE_SIDE_OFFSET + COMBAT_FOCUS_PLATE_SHADOW_SAFE_EXTENT
+	var safe_bottom: float = COMBAT_FOCUS_PLATE_BOTTOM_OFFSET + COMBAT_FOCUS_PLATE_SHADOW_SAFE_EXTENT
+	return Rect2(
+		actor_top_left - Vector2(safe_left, safe_top),
+		size + Vector2(safe_left + safe_right, safe_top + safe_bottom)
+	)
+
+func get_combat_presentation_bounds() -> Rect2:
+	return get_combat_presentation_bounds_for_center(get_global_rect().get_center(), _combat_readout_offset)
 
 func get_combat_readout_bounds() -> Rect2:
 	if bar_plate != null and is_instance_valid(bar_plate):

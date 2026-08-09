@@ -354,7 +354,7 @@ func _apply_combat_presentation_spacing() -> void:
 		arena_container.set_meta("combat_actor_formation", "none_simulation_positions_preserved")
 		arena_container.set_meta("combat_rga_positions_authoritative", true)
 		arena_container.set_meta("combat_presentation_bounds", presentation_bounds)
-		arena_container.set_meta("combat_presentation_bounds_contract", "actor_and_readout_extents_contained")
+		arena_container.set_meta("combat_presentation_bounds_contract", "actor_focus_shadow_and_readout_extents_contained")
 
 func refresh_combat_presentation_spacing() -> void:
 	_apply_combat_presentation_spacing()
