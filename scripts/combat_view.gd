@@ -694,6 +694,8 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_panel.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
 		stats_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_panel.clip_contents = false
+		if stats_panel.has_method("set_responsive_layout"):
+			stats_panel.call("set_responsive_layout", compact, tight_compact)
 		var stats_vbox: VBoxContainer = stats_panel.get_node_or_null("VBox") as VBoxContainer
 		if stats_vbox != null:
 			stats_vbox.add_theme_constant_override("separation", 3 if tight_compact else 5 if compact else 10)

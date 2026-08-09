@@ -137,6 +137,11 @@ func _audit_combat_surfaces() -> void:
 	_save_capture("06_compact_post_shop_1280x720.png", _main)
 	await _audit_unit_panel_catalog(combat)
 	_save_capture("07_compact_unit_detail_1280x720.png", _main)
+	await _audit_natural_unit_detail_bounds(combat)
+	_configure_viewport()
+	if combat != null and combat.has_method("_apply_responsive_layout"):
+		combat.call("_apply_responsive_layout")
+	await _settle_frames(6)
 	if _main.has_method("_open_system_menu"):
 		_main.call("_open_system_menu")
 	await _settle_frames(5)
@@ -236,6 +241,42 @@ func _audit_unit_panel_catalog(combat: Control) -> void:
 		await _settle_frames(3)
 		var unit_frame: Control = stats_panel.find_child("UnitPanelFrame", true, false) as Control
 		_audit(unit_frame, "compact unit detail %s" % unit_id)
+
+func _audit_natural_unit_detail_bounds(combat: Control) -> void:
+	if combat == null:
+		return
+	var natural_size: Vector2i = Vector2i(1920, 1080)
+	DisplayServer.window_set_size(natural_size)
+	var window: Window = get_window()
+	if window != null:
+		window.size = natural_size
+		window.content_scale_size = natural_size
+	if combat.has_method("_apply_responsive_layout"):
+		combat.call("_apply_responsive_layout")
+	await _settle_frames(8)
+	var stats_panel: Control = combat.find_child("StatsPanel", true, false) as Control
+	var sari: Unit = UNIT_FACTORY_SCRIPT.spawn("sari") as Unit
+	_expect(stats_panel != null and sari != null, "natural unit-detail bounds prerequisites missing")
+	if stats_panel == null or sari == null:
+		return
+	if stats_panel.has_method("show_unit_metrics_ctx"):
+		stats_panel.call("show_unit_metrics_ctx", "player", 0, sari)
+	await _settle_frames(6)
+	var unit_frame: Control = stats_panel.find_child("UnitPanelFrame", true, false) as Control
+	var unit_scroll: ScrollContainer = stats_panel.find_child("UnitScroll", true, false) as ScrollContainer
+	var unit_panel: Control = stats_panel.find_child("UnitPanel", true, false) as Control
+	_expect(unit_frame != null and unit_scroll != null and unit_panel != null, "natural Sari unit-detail shell missing")
+	if unit_frame == null or unit_scroll == null or unit_panel == null:
+		return
+	_expect_control_in_viewport(unit_frame, "natural Sari unit-detail frame")
+	_expect_control_in_viewport(unit_scroll, "natural Sari unit-detail scroll viewport")
+	var scroll_rect: Rect2 = unit_scroll.get_global_rect()
+	var panel_rect: Rect2 = unit_panel.get_global_rect()
+	_expect(panel_rect.position.x >= scroll_rect.position.x - 1.0, "natural Sari unit-detail left edge escaped its scroll viewport")
+	_expect(panel_rect.end.x <= scroll_rect.end.x + 1.0, "natural Sari unit-detail right edge escaped its scroll viewport")
+	_expect(unit_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "natural Sari unit-detail enables horizontal scrolling")
+	_expect(String(unit_panel.get_meta("responsive_detail_layout", "")) == "compact_vertical_scroll", "natural Sari unit-detail did not enter compact reflow")
+	_audit(unit_frame, "natural Sari unit detail")
 
 func _catalog_ids() -> Array[String]:
 	var ids: Array[String] = []

@@ -391,10 +391,19 @@ func set_combat_readout_placement(offset: Vector2, lane: int) -> void:
 	set_meta("combat_readout_offset", _combat_readout_offset)
 
 func get_combat_readout_bounds_for_offset(offset: Vector2) -> Rect2:
+	return get_combat_readout_bounds_for_center(get_global_rect().get_center(), offset)
+
+func get_combat_readout_bounds_for_center(center: Vector2, offset: Vector2) -> Rect2:
 	var readout_width: float = maxf(COMBAT_READOUT_MIN_WIDTH, size_px.x * COMBAT_READOUT_WIDTH_RATIO)
 	var readout_left: float = (size_px.x - readout_width) * 0.5 + offset.x - 4.0
 	var readout_top: float = COMBAT_READOUT_BASE_TOP + offset.y
-	return Rect2(global_position + Vector2(readout_left, readout_top), Vector2(readout_width + 8.0, COMBAT_READOUT_PLATE_HEIGHT))
+	var actor_top_left: Vector2 = center - size * 0.5
+	return Rect2(actor_top_left + Vector2(readout_left, readout_top), Vector2(readout_width + 8.0, COMBAT_READOUT_PLATE_HEIGHT))
+
+func get_combat_presentation_bounds_for_center(center: Vector2, readout_offset: Vector2) -> Rect2:
+	var body_bounds: Rect2 = Rect2(center - size * 0.5, size)
+	var readout_bounds: Rect2 = get_combat_readout_bounds_for_center(center, readout_offset)
+	return body_bounds.merge(readout_bounds)
 
 func get_combat_readout_bounds() -> Rect2:
 	if bar_plate != null and is_instance_valid(bar_plate):

@@ -13,6 +13,8 @@ var manager: CombatManager = null
 var _tracker: StatsTracker = null
 var _unit_panel_frame: PanelContainer = null
 var _unit_scroll: ScrollContainer = null
+var _compact_layout: bool = false
+var _tight_compact_layout: bool = false
 
 @onready var title_label: Label = $"VBox/Header/Title"
 @onready var btn_all: Button = $"VBox/Header/WindowAll"
@@ -27,6 +29,8 @@ var _unit_index: int = -1
 func _ready() -> void:
     _configure_input_routing()
     _ensure_unit_scroll_frame()
+    if not resized.is_connected(Callable(self, "_apply_unit_detail_layout")):
+        resized.connect(_apply_unit_detail_layout)
     _apply_gothic_window_button_styles()
     set_process(false)
     # Wire header window buttons
@@ -57,6 +61,12 @@ func _ready() -> void:
     # Defaults
     show_team_metrics()
     set_process_unhandled_input(true)
+
+func set_responsive_layout(compact: bool, tight_compact: bool) -> void:
+    _compact_layout = bool(compact)
+    _tight_compact_layout = bool(tight_compact)
+    _apply_unit_detail_layout()
+    call_deferred("_apply_unit_detail_layout")
 
 func _exit_tree() -> void:
     teardown()
@@ -155,6 +165,8 @@ func show_unit_metrics(u: Unit) -> void:
         _unit_panel_frame.visible = true
     if scoreboard:
         scoreboard.visible = false
+    _apply_unit_detail_layout()
+    call_deferred("_apply_unit_detail_layout")
 
 func _ensure_unit_scroll_frame() -> void:
     var body: Control = $"VBox/Body" as Control
@@ -195,7 +207,36 @@ func _ensure_unit_scroll_frame() -> void:
         _unit_scroll.add_child(unit_panel)
     unit_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     unit_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    unit_panel.custom_minimum_size = Vector2(294.0, 620.0)
+    _apply_unit_detail_layout()
+
+func _apply_unit_detail_layout() -> void:
+    if unit_panel == null or not is_instance_valid(unit_panel):
+        return
+    var frame_margin: MarginContainer = _unit_panel_frame.get_node_or_null("Margin") as MarginContainer if _unit_panel_frame != null else null
+    var content_width: float = _unit_scroll.size.x if _unit_scroll != null else 0.0
+    var use_compact_detail: bool = _compact_layout or content_width < 300.0
+    if unit_panel.has_method("set_compact_layout"):
+        unit_panel.call("set_compact_layout", use_compact_detail)
+    if frame_margin != null:
+        var inset: int = 6 if _tight_compact_layout else 8 if use_compact_detail else 10
+        frame_margin.add_theme_constant_override("margin_left", inset)
+        frame_margin.add_theme_constant_override("margin_top", inset)
+        frame_margin.add_theme_constant_override("margin_right", inset)
+        frame_margin.add_theme_constant_override("margin_bottom", inset)
+    if _unit_scroll != null:
+        _unit_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        _unit_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        _unit_scroll.clip_contents = true
+    # UnitPanel's authored desktop minimum is useful on wide layouts, but it
+    # cannot be allowed to force a 294px child through a compact stats rail.
+    # The rail owns width; the detail sheet reflows and preserves the full
+    # record behind its vertical scroll viewport.
+    unit_panel.custom_minimum_size = Vector2(0.0, 360.0 if use_compact_detail else 620.0)
+    var stats_grid: GridContainer = unit_panel.get_node_or_null("VBox/StatsGrid") as GridContainer
+    if stats_grid != null:
+        stats_grid.columns = 2 if content_width < 190.0 else 3 if use_compact_detail else 4
+    unit_panel.set_meta("responsive_detail_layout", "compact_vertical_scroll" if use_compact_detail else "desktop_vertical_scroll")
+    unit_panel.set_meta("responsive_detail_content_width", content_width)
 
 func _make_unit_frame_style() -> StyleBox:
     var fallback: StyleBoxFlat = StyleBoxFlat.new()

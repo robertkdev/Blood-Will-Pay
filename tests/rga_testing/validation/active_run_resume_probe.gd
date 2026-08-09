@@ -6,6 +6,7 @@ const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd
 const MirrorBoardStore := preload("res://scripts/game/progression/mirror_board_store.gd")
 const UnitFactory := preload("res://scripts/unit_factory.gd")
 const CombineService := preload("res://scripts/game/shop/combine_service.gd")
+const RunSnapshotCoordinator := preload("res://scripts/game/run/run_snapshot_coordinator.gd")
 
 const TEST_PATH: String = "user://active_run_resume_probe.json"
 var _failures: Array[String] = []
@@ -16,6 +17,7 @@ func _ready() -> void:
 	_test_mirror_resume()
 	_test_duplicate_item_resume()
 	_test_itemized_promotion_reproducibility()
+	_test_zero_timer_resume_recovery()
 	_test_full_payload_round_trip()
 	RunStateStore.clear(TEST_PATH)
 	_finish()
@@ -78,6 +80,12 @@ func _test_itemized_promotion_reproducibility() -> void:
 	_expect(promoted.level == 2, "itemized promotion should reach level 2")
 	_expect(promoted.max_hp == expected.max_hp, "flat HP item should not be multiplied by promotion")
 	_expect(is_equal_approx(promoted.attack_damage, expected.attack_damage), "itemized promotion should match direct level package stats")
+
+func _test_zero_timer_resume_recovery() -> void:
+	var expired_snapshot: Dictionary = {"planning_time_left": 0.0}
+	var positive_snapshot: Dictionary = {"planning_time_left": 19.75}
+	_expect(is_equal_approx(RunSnapshotCoordinator._restored_planning_time(expired_snapshot, 120.0), 120.0), "countdown-boundary resume should restore a usable planning window")
+	_expect(is_equal_approx(RunSnapshotCoordinator._restored_planning_time(positive_snapshot, 120.0), 19.75), "positive saved planning time should resume exactly")
 
 func _test_full_payload_round_trip() -> void:
 	var mirror_snapshot: Dictionary = MirrorBoardStore.snapshot_runtime()

@@ -44,9 +44,11 @@ var _settings_button: Button
 var _quit_game_button: Button
 var _system_panel: PanelContainer
 var _system_stack: VBoxContainer
+var _preserve_recovery_notice: Label
 var _audit_panel: CanvasLayer
 var _system_menu_open: bool = false
 var _new_run_confirmation_pending: bool = false
+var _runtime_settings_combat_was_visible: bool = false
 var _title_page: Control
 var _starter_transition_pending: bool = false
 var _pending_starter_id: String = ""
@@ -61,6 +63,10 @@ var account_journal_path: String = "user://omen_run_journal_v1.json"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Window-close requests must pass through the same verified preserve gate as
+	# the explicit Quit action. The default SceneTree behavior exits immediately
+	# after NOTIFICATION_WM_CLOSE_REQUEST and cannot honor a failed save.
+	get_tree().auto_accept_quit = false
 	Debug.set_enabled(false)
 	var trace_script: Variant = load("res://scripts/util/trace.gd")
 	if trace_script and trace_script.has_method("set_enabled"):
@@ -76,7 +82,8 @@ func _ready() -> void:
 	if unit_select:
 		unit_select.process_mode = Node.PROCESS_MODE_PAUSABLE
 	if title_menu:
-		title_menu.process_mode = Node.PROCESS_MODE_PAUSABLE
+		# Runtime Settings is an input-owning modal while the game tree is paused.
+		title_menu.process_mode = Node.PROCESS_MODE_ALWAYS
 		if title_menu.has_signal("runtime_settings_closed") and not title_menu.is_connected("runtime_settings_closed", Callable(self, "_on_runtime_settings_closed")):
 			title_menu.connect("runtime_settings_closed", Callable(self, "_on_runtime_settings_closed"))
 	_build_system_menu()
@@ -124,15 +131,16 @@ func _on_start() -> void:
 	_sync_system_menu_button()
 
 func _on_quit() -> void:
-	if combat_view != null and combat_view.has_method("save_active_run_now"):
-		combat_view.call("save_active_run_now")
+	var save_result: Dictionary = _preserve_active_run_for_exit()
+	if not bool(save_result.get("ok", false)):
+		_show_preserve_recovery(save_result)
+		return
 	get_tree().paused = false
 	get_tree().quit()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if combat_view != null and combat_view.has_method("save_active_run_now"):
-			combat_view.call("save_active_run_now")
+		_on_quit()
 
 func go_to_menu() -> void:
 	request_return_to_title()
@@ -214,12 +222,55 @@ func request_return_to_title() -> void:
 	# title in that window must invalidate the queued transition before the
 	# combat view can be reactivated behind the title page.
 	_set_starter_transition_pending(false)
+	var save_result: Dictionary = _preserve_active_run_for_exit()
+	if not bool(save_result.get("ok", false)):
+		_show_preserve_recovery(save_result)
+		return
 	_close_system_menu()
-	if combat_view != null and combat_view.has_method("save_active_run_now"):
-		combat_view.call("save_active_run_now")
 	_remove_runtime_overlays()
 	_show_title_page()
 	_refresh_continue_run_button()
+
+func _preserve_active_run_for_exit() -> Dictionary:
+	# Only a visible combat view owns an in-memory run that can be lost by an
+	# exit route. Runtime Settings temporarily hides that same live view, so its
+	# remembered visibility remains part of the active-run contract.
+	var active_run_visible: bool = combat_view != null and (combat_view.visible or _runtime_settings_combat_was_visible)
+	if not active_run_visible:
+		return {"ok": true, "skipped": true}
+	if not combat_view.has_method("save_active_run_now"):
+		return {"ok": false, "error": "SAVE_UNAVAILABLE"}
+	var raw_result: Variant = combat_view.call("save_active_run_now")
+	if raw_result is Dictionary:
+		return raw_result as Dictionary
+	return {"ok": false, "error": "SAVE_RESULT_INVALID"}
+
+func _show_preserve_recovery(save_result: Dictionary) -> void:
+	if _system_overlay == null:
+		return
+	if title_menu != null and bool(title_menu.get_meta("runtime_settings_active", false)) and title_menu.has_method("close_runtime_settings"):
+		# Return to the unchanged run before presenting recovery. This avoids
+		# layering two input-owning modals when a window-close request arrives
+		# from Runtime Settings.
+		title_menu.call("close_runtime_settings")
+	_system_menu_open = true
+	_system_overlay.visible = true
+	get_tree().paused = true
+	if _preserve_recovery_notice != null:
+		_preserve_recovery_notice.text = _preserve_recovery_copy(String(save_result.get("error", "SAVE_FAILED")))
+		_preserve_recovery_notice.visible = true
+	if _resume_button != null:
+		_resume_button.grab_focus()
+	_sync_system_menu_button()
+
+func _preserve_recovery_copy(error_code: String) -> String:
+	match error_code:
+		"UNSTABLE_PHASE", "MIDCOMBAT_SAVE_REJECTED":
+			return "RUN NOT PRESERVED: combat is still resolving. Resume, wait for the next planning phase, then try Return or Quit again. The game remains open."
+		"NO_ACTIVE_TEAM":
+			return "RUN NOT PRESERVED: no recoverable team is available. Resume to inspect the current run before leaving. The game remains open."
+		_:
+			return "RUN NOT PRESERVED: the save could not be verified. Resume to keep this run open, then try again from planning."
 
 func request_new_run() -> void:
 	_close_system_menu()
@@ -354,6 +405,14 @@ func _build_system_menu() -> void:
 	rule.name = "Rule"
 	rule.custom_minimum_size = Vector2(0.0, 3.0)
 	_system_stack.add_child(rule)
+	_preserve_recovery_notice = Label.new()
+	_preserve_recovery_notice.name = "PreserveRecoveryNotice"
+	_preserve_recovery_notice.visible = false
+	_preserve_recovery_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_preserve_recovery_notice.add_theme_font_size_override("font_size", 16)
+	_preserve_recovery_notice.add_theme_color_override("font_color", Color(1.0, 0.77, 0.50, 1.0))
+	VisualTypeSystem.set_action(_preserve_recovery_notice)
+	_system_stack.add_child(_preserve_recovery_notice)
 
 	_resume_button = _make_menu_button("ResumeButton", "Resume")
 	_resume_button.pressed.connect(_close_system_menu)
@@ -395,11 +454,17 @@ func _open_runtime_settings() -> void:
 	_system_menu_open = false
 	if _system_overlay != null:
 		_system_overlay.visible = false
+	_runtime_settings_combat_was_visible = combat_view != null and combat_view.visible
+	if combat_view != null:
+		combat_view.visible = false
 	title_menu.call("open_runtime_settings")
 	get_tree().paused = true
 	_sync_system_menu_button()
 
 func _on_runtime_settings_closed() -> void:
+	if combat_view != null:
+		combat_view.visible = _runtime_settings_combat_was_visible
+	_runtime_settings_combat_was_visible = false
 	get_tree().paused = false
 	_sync_system_menu_button()
 	if _system_menu_button != null and _system_menu_button.visible:
@@ -949,6 +1014,7 @@ func _open_system_menu() -> void:
 	if _system_overlay == null:
 		return
 	_reset_new_run_confirmation()
+	_clear_preserve_recovery()
 	_system_menu_open = true
 	_system_overlay.visible = true
 	_sync_system_menu_button()
@@ -958,11 +1024,17 @@ func _open_system_menu() -> void:
 
 func _close_system_menu() -> void:
 	_reset_new_run_confirmation()
+	_clear_preserve_recovery()
 	_system_menu_open = false
 	if _system_overlay != null:
 		_system_overlay.visible = false
 	get_tree().paused = false
 	_sync_system_menu_button()
+
+func _clear_preserve_recovery() -> void:
+	if _preserve_recovery_notice != null:
+		_preserve_recovery_notice.visible = false
+		_preserve_recovery_notice.text = ""
 
 func _on_new_run_menu_pressed() -> void:
 	if not RunStateStore.has_save():
