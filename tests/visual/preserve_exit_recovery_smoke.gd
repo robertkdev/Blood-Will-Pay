@@ -31,6 +31,12 @@ func _run() -> void:
 	failed_combat.visible = true
 	_main.add_child(failed_combat)
 	_main.set("combat_view", failed_combat)
+	var ledger_layer: CanvasLayer = CanvasLayer.new()
+	var ledger: Control = Control.new()
+	_main.add_child(ledger_layer)
+	ledger_layer.add_child(ledger)
+	_main.set("_black_ledger_layer", ledger_layer)
+	_main.set("_black_ledger", ledger)
 
 	_main.call("request_return_to_title")
 	await _settle_frames(2)
@@ -38,6 +44,7 @@ func _run() -> void:
 	_expect(get_tree().paused, "failed preserve must keep the run paused behind recovery")
 	_expect(title_page != null and not title_page.visible, "failed preserve must not leave for the title page")
 	_expect(_overlay_visible(), "failed preserve must expose the system recovery path")
+	_expect(_main.get("_black_ledger") == null and _main.get("_black_ledger_layer") == null, "failed preserve recovery must close any higher input-owning ledger modal")
 	var recovery_notice: Label = _main.find_child("PreserveRecoveryNotice", true, false) as Label
 	_expect(recovery_notice != null and recovery_notice.visible and recovery_notice.text.contains("combat is still resolving"), "recovery must explain how to keep the run and retry safely")
 

@@ -147,7 +147,7 @@ func _audit_combat_surfaces() -> void:
 	await _settle_frames(5)
 	var system_overlay: Control = _main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay") as Control
 	_audit(system_overlay, "compact system menu")
-	_save_capture("08_compact_system_menu_1280x720.png", _main)
+	_save_capture("09_compact_system_menu_1280x720.png", _main)
 
 func _build_post_shop_state() -> void:
 	for path: String in ["TitlePage", "TitleMenu", "UnitSelect"]:
@@ -276,7 +276,13 @@ func _audit_natural_unit_detail_bounds(combat: Control) -> void:
 	_expect(panel_rect.end.x <= scroll_rect.end.x + 1.0, "natural Sari unit-detail right edge escaped its scroll viewport")
 	_expect(unit_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "natural Sari unit-detail enables horizontal scrolling")
 	_expect(String(unit_panel.get_meta("responsive_detail_layout", "")) == "compact_vertical_scroll", "natural Sari unit-detail did not enter compact reflow")
+	_expect(String(unit_panel.get_meta("compact_header_reflow", "")) == "identity_full_width_no_portrait", "natural Sari unit-detail did not give identity copy the full compact width")
+	var compact_portrait: TextureRect = unit_panel.get_node_or_null("VBox/Header/Portrait") as TextureRect
+	var compact_info: Control = unit_panel.get_node_or_null("VBox/Header/Info") as Control
+	_expect(compact_portrait != null and not compact_portrait.visible, "natural Sari compact header still spends its narrow rail on the portrait")
+	_expect(compact_info != null and compact_info.size.x >= 130.0, "natural Sari compact identity column remains too narrow for readable labels")
 	_audit(unit_frame, "natural Sari unit detail")
+	_save_capture("08_natural_sari_unit_detail_1920x1080.png", _main)
 
 func _catalog_ids() -> Array[String]:
 	var ids: Array[String] = []

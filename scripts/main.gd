@@ -248,6 +248,10 @@ func _preserve_active_run_for_exit() -> Dictionary:
 func _show_preserve_recovery(save_result: Dictionary) -> void:
 	if _system_overlay == null:
 		return
+	if _black_ledger != null or _black_ledger_layer != null:
+		# The ledger lives above the system layer and owns input. Recovery must be
+		# the sole active modal so its focused Resume path is immediately usable.
+		_close_black_ledger()
 	if title_menu != null and bool(title_menu.get_meta("runtime_settings_active", false)) and title_menu.has_method("close_runtime_settings"):
 		# Return to the unchanged run before presenting recovery. This avoids
 		# layering two input-owning modals when a window-close request arrives
