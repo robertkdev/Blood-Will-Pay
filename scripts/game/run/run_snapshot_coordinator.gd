@@ -127,12 +127,22 @@ static func restore(controller: Variant, snapshot: Dictionary) -> Dictionary:
 	game_state_node.call("set_phase", 1)
 	if controller.parent != null:
 		var current_planning_time: float = float(controller.parent.get("planning_time_left"))
-		controller.parent.set("planning_time_left", max(0.0, float(snapshot.get("planning_time_left", current_planning_time))))
+		controller.parent.set("planning_time_left", _restored_planning_time(snapshot, current_planning_time))
 	if controller.economy_ui != null:
 		controller.economy_ui.refresh()
 	controller._update_stage_label()
 	controller._update_board_status()
 	return {"ok": true}
+
+static func _restored_planning_time(snapshot: Dictionary, reset_planning_time: float) -> float:
+	var saved_planning_time: float = float(snapshot.get("planning_time_left", reset_planning_time))
+	if saved_planning_time > 0.0:
+		return saved_planning_time
+	# A deferred preview save can land during the visual combat countdown, after
+	# the planning timer reached zero but before GameState enters COMBAT. Resume
+	# that safe pre-combat snapshot with the freshly reset planning window rather
+	# than stranding the player forever at Plan 0:00.
+	return max(1.0, reset_planning_time)
 
 static func _serialize_unit(unit: Unit) -> Dictionary:
 	if unit == null:

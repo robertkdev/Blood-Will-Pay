@@ -184,7 +184,11 @@ func _apply_static_styles() -> void:
         header.add_theme_constant_override("separation", 8 if _compact_layout else 12)
         header.custom_minimum_size = Vector2(0.0, 64.0 if _compact_layout else 78.0)
     if portrait != null:
-        var portrait_size: float = 56.0 if _compact_layout else 72.0
+        # The compact stats rail is narrower than the desktop portrait-plus-
+        # identity row. Give identity copy the full width instead of clipping
+        # role, goal, and approach labels behind a decorative portrait.
+        portrait.visible = not _compact_layout
+        var portrait_size: float = 0.0 if _compact_layout else 72.0
         portrait.custom_minimum_size = Vector2(portrait_size, portrait_size)
         portrait.modulate = Color(0.96, 0.91, 0.84, 1.0)
     if name_label != null:
@@ -210,6 +214,7 @@ func _apply_static_styles() -> void:
         footer.add_theme_constant_override("h_separation", 4 if _compact_layout else 6)
         footer.add_theme_constant_override("v_separation", 4 if _compact_layout else 6)
     _style_footer_labels()
+    set_meta("compact_header_reflow", "identity_full_width_no_portrait" if _compact_layout else "desktop_portrait_identity_row")
 
 func _style_info_labels() -> void:
     var labels: Array[Label] = [attack_info_label, attack_targeting_label, ability_info_label, ability_targeting_label]

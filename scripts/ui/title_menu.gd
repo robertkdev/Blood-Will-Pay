@@ -91,6 +91,10 @@ var _settings_pressed_surface_active: bool = false
 var _settings_integrity_shell: Panel = null
 
 func _ready() -> void:
+	# Main uses this control as the in-run Settings modal while the gameplay
+	# tree is paused, so its input and close controls must remain live.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_process(true)
 	UserSettingsScript.initialize(get_window())
 	set_meta("effective_ui_scale", _actual_ui_scale())

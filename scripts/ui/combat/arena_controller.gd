@@ -11,6 +11,9 @@ const Strings := preload("res://scripts/util/strings.gd")
 const COMBAT_ACTOR_SIZE_SCALE: float = 2.64
 const COMBAT_ACTOR_MINIMUM_CLEARANCE: float = 22.0
 const COMBAT_ACTOR_SPACING_ITERATIONS: int = 22
+const COMBAT_READOUT_BOUNDS_OFFSET: Vector2 = Vector2(0.0, -38.0)
+const COMBAT_READOUT_OUT_OF_BOUNDS_PENALTY: float = 10000000.0
+const COMBAT_READOUT_OUT_OF_BOUNDS_AREA_WEIGHT: float = 1000.0
 const COMBAT_READOUT_OFFSETS: Array[Vector2] = [
 	# These candidates are deliberately local to the rendered silhouette. The
 	# collision solver can still fan them out when needed, but the default read
@@ -301,9 +304,12 @@ func _apply_combat_presentation_spacing() -> void:
 	for actor: UnitActor in enemy_actors:
 		if actor != null and is_instance_valid(actor) and actor.visible:
 			visible_actors.append(actor)
+	var presentation_bounds: Rect2 = _combat_presentation_bounds()
 	if visible_actors.size() < 2:
 		for actor: UnitActor in visible_actors:
-			actor.set_combat_presentation_offset(Vector2.ZERO)
+			var source_center: Vector2 = actor.get_combat_unspaced_center()
+			var bounded_center: Vector2 = _clamp_actor_center_to_presentation_bounds(actor, source_center, presentation_bounds)
+			actor.set_combat_presentation_offset(bounded_center - source_center)
 		return
 	var source_centers: Array[Vector2] = []
 	var spaced_centers: Array[Vector2] = []
@@ -313,7 +319,7 @@ func _apply_combat_presentation_spacing() -> void:
 		# Begin at the exact RGA-provided combat position. The loop below only
 		# resolves a rendered-body collision; it never seeds a replacement team
 		# formation or writes back into the simulation positions.
-		spaced_centers.append(center)
+		spaced_centers.append(_clamp_actor_center_to_presentation_bounds(actor, center, presentation_bounds))
 	for _iteration: int in range(COMBAT_ACTOR_SPACING_ITERATIONS):
 		var found_overlap: bool = false
 		for first_index: int in range(visible_actors.size() - 1):
@@ -331,8 +337,8 @@ func _apply_combat_presentation_spacing() -> void:
 				var spacing_axis: Vector2 = _combat_spacing_axis(first_actor, second_actor, delta, first_index, second_index)
 				var separation: float = horizontal_overlap if absf(spacing_axis.x) > 0.0 else vertical_overlap
 				var correction: Vector2 = spacing_axis * (separation * 0.5 + 0.5)
-				spaced_centers[first_index] -= correction
-				spaced_centers[second_index] += correction
+				spaced_centers[first_index] = _clamp_actor_center_to_presentation_bounds(first_actor, spaced_centers[first_index] - correction, presentation_bounds)
+				spaced_centers[second_index] = _clamp_actor_center_to_presentation_bounds(second_actor, spaced_centers[second_index] + correction, presentation_bounds)
 		if not found_overlap:
 			break
 	for actor_index: int in range(visible_actors.size()):
@@ -347,6 +353,8 @@ func _apply_combat_presentation_spacing() -> void:
 		arena_container.set_meta("combat_actor_spacing_count", visible_actors.size())
 		arena_container.set_meta("combat_actor_formation", "none_simulation_positions_preserved")
 		arena_container.set_meta("combat_rga_positions_authoritative", true)
+		arena_container.set_meta("combat_presentation_bounds", presentation_bounds)
+		arena_container.set_meta("combat_presentation_bounds_contract", "actor_focus_shadow_and_readout_extents_contained")
 
 func refresh_combat_presentation_spacing() -> void:
 	_apply_combat_presentation_spacing()
@@ -364,6 +372,38 @@ func _combat_spacing_axis(first_actor: UnitActor, second_actor: UnitActor, delta
 	var fallback_sign: float = 1.0 if (first_index + second_index) % 2 == 0 else -1.0
 	return Vector2(fallback_sign, 0.0)
 
+func _combat_presentation_bounds() -> Rect2:
+	if arena_container != null and is_instance_valid(arena_container):
+		var container_bounds: Rect2 = arena_container.get_global_rect()
+		if container_bounds.size.x > 1.0 and container_bounds.size.y > 1.0:
+			return container_bounds
+	if arena_units != null and is_instance_valid(arena_units):
+		return arena_units.get_global_rect()
+	return Rect2()
+
+func _clamp_actor_center_to_presentation_bounds(actor: UnitActor, center: Vector2, presentation_bounds: Rect2) -> Vector2:
+	if presentation_bounds.size.x <= 1.0 or presentation_bounds.size.y <= 1.0:
+		return center
+	# The top-most compact readout lane is included in the reserved extent. This
+	# makes every later lane choice safe while keeping RGA's center untouched.
+	var reserved_bounds: Rect2 = actor.get_combat_presentation_bounds_for_center(center, COMBAT_READOUT_BOUNDS_OFFSET)
+	var bounded_center: Vector2 = center
+	if reserved_bounds.size.x <= presentation_bounds.size.x:
+		if reserved_bounds.position.x < presentation_bounds.position.x:
+			bounded_center.x += presentation_bounds.position.x - reserved_bounds.position.x
+		elif reserved_bounds.end.x > presentation_bounds.end.x:
+			bounded_center.x -= reserved_bounds.end.x - presentation_bounds.end.x
+	else:
+		bounded_center.x = presentation_bounds.get_center().x
+	if reserved_bounds.size.y <= presentation_bounds.size.y:
+		if reserved_bounds.position.y < presentation_bounds.position.y:
+			bounded_center.y += presentation_bounds.position.y - reserved_bounds.position.y
+		elif reserved_bounds.end.y > presentation_bounds.end.y:
+			bounded_center.y -= reserved_bounds.end.y - presentation_bounds.end.y
+	else:
+		bounded_center.y = presentation_bounds.get_center().y
+	return bounded_center
+
 func reflow_combat_readouts() -> void:
 	var visible_actors: Array[UnitActor] = []
 	for actor: UnitActor in player_actors:
@@ -373,6 +413,7 @@ func reflow_combat_readouts() -> void:
 		if actor != null and is_instance_valid(actor) and actor.visible:
 			visible_actors.append(actor)
 	var occupied_readouts: Array[Rect2] = []
+	var presentation_bounds: Rect2 = _combat_presentation_bounds()
 	for actor: UnitActor in visible_actors:
 		var best_offset: Vector2 = COMBAT_READOUT_OFFSETS[0]
 		var best_lane: int = 0
@@ -381,6 +422,7 @@ func reflow_combat_readouts() -> void:
 			var candidate_offset: Vector2 = COMBAT_READOUT_OFFSETS[lane_index]
 			var candidate_bounds: Rect2 = actor.get_combat_readout_bounds_for_offset(candidate_offset)
 			var candidate_score: float = _combat_readout_collision_score(actor, candidate_bounds, visible_actors, occupied_readouts)
+			candidate_score += _combat_readout_bounds_penalty(candidate_bounds, presentation_bounds)
 			if candidate_score < best_score:
 				best_score = candidate_score
 				best_offset = candidate_offset
@@ -391,7 +433,17 @@ func reflow_combat_readouts() -> void:
 		arena_container.set_meta("combat_readout_layout", "collision_aware_compact_lanes")
 		arena_container.set_meta("combat_readout_actor_count", visible_actors.size())
 		arena_container.set_meta("combat_readout_priority", "silhouettes_before_telemetry")
+		arena_container.set_meta("combat_readout_bounds_contract", "readout_lanes_contained_by_hard_clip")
 	_refresh_combat_exchange_focus()
+
+func _combat_readout_bounds_penalty(readout_bounds: Rect2, presentation_bounds: Rect2) -> float:
+	if presentation_bounds.size.x <= 1.0 or presentation_bounds.size.y <= 1.0:
+		return 0.0
+	var visible_bounds: Rect2 = readout_bounds.intersection(presentation_bounds)
+	var overflow_area: float = maxf(0.0, readout_bounds.get_area() - visible_bounds.get_area())
+	if overflow_area <= 0.01:
+		return 0.0
+	return COMBAT_READOUT_OUT_OF_BOUNDS_PENALTY + overflow_area * COMBAT_READOUT_OUT_OF_BOUNDS_AREA_WEIGHT
 
 func _combat_readout_collision_score(actor: UnitActor, candidate_bounds: Rect2, visible_actors: Array[UnitActor], occupied_readouts: Array[Rect2]) -> float:
 	var score: float = 0.0

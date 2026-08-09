@@ -800,8 +800,9 @@ func _assert_dense_combat_readability_contract(combat: Control, manager: CombatM
 	_expect(arena != null and String(arena.get_meta("combat_actor_presentation_spacing", "")) == "simulation_anchored_collision_separation", "dense combat review did not declare simulation-anchored visual collision separation")
 	_expect(arena != null and String(arena.get_meta("combat_actor_formation", "")) == "none_simulation_positions_preserved", "dense combat review replaced RGA positions with a presentation formation")
 	_expect(arena != null and bool(arena.get_meta("combat_rga_positions_authoritative", false)), "dense combat review did not retain RGA positions as authoritative")
+	_expect(arena != null and String(arena.get_meta("combat_presentation_bounds_contract", "")) == "actor_focus_shadow_and_readout_extents_contained", "dense combat review lacks an actor/focus/readout hard-clip containment contract")
 	_expect(arena_units != null and arena_units.is_visible_in_tree() and arena_units.get_child_count() >= 8, "dense combat review did not render the eight combat actors")
-	if arena_units == null:
+	if arena == null or arena_units == null:
 		return
 	var visible_actors: Array[UnitActor] = []
 	var actor_slots: Dictionary[String, bool] = {}
@@ -827,11 +828,16 @@ func _assert_dense_combat_readability_contract(combat: Control, manager: CombatM
 		_expect(visual_offset_meta is Vector2, "dense combat review did not isolate collision separation as a visual offset")
 		var readout_tether: Control = actor.get_node_or_null("HealthReadoutTether") as Control
 		var readout_bounds: Rect2 = actor.get_combat_readout_bounds()
+		var actor_bounds: Rect2 = actor.get_global_rect()
+		var presentation_bounds: Rect2 = actor.get_combat_presentation_bounds()
 		var actor_center: Vector2 = actor.get_global_rect().get_center()
 		var readout_distance: float = readout_bounds.get_center().distance_to(actor_center)
 		_expect(readout_tether != null and String(readout_tether.get_meta("combat_readout_tether", "")) == "near_silhouette", "dense combat review lost an actor-owned telemetry tether")
 		_expect(String(actor.get_meta("combat_readout_anchor", "")) == "tight_tether_to_silhouette", "dense combat review lost the actor-owned telemetry anchor")
 		_expect(readout_distance <= maxf(166.0, actor.size.y * 0.92), "dense combat review left a health readout visually detached from its actor")
+		_expect(arena.get_global_rect().encloses(actor_bounds), "dense combat review pushed an actor beyond the arena hard clip")
+		_expect(arena.get_global_rect().encloses(readout_bounds), "dense combat review pushed a health readout beyond the arena hard clip")
+		_expect(arena.get_global_rect().encloses(presentation_bounds), "dense combat review clipped an actor base or its soft focus edge")
 		if visual_offset_meta is Vector2:
 			var visual_offset: Vector2 = visual_offset_meta as Vector2
 			_expect(actor.get_global_rect().get_center().is_equal_approx(actor.get_combat_unspaced_center() + visual_offset), "dense combat review visual collision offset leaked into the simulation position")

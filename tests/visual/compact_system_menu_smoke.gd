@@ -19,10 +19,13 @@ func _run() -> void:
 	await _settle_frames(6)
 	var title_menu: Control = main.get_node_or_null("TitleMenu") as Control
 	var title_page: Control = main.get("_title_page") as Control
+	var combat_view: Control = main.get_node_or_null("CombatView") as Control
 	if title_menu != null:
 		title_menu.visible = false
 	if title_page != null:
 		title_page.visible = false
+	if combat_view != null:
+		combat_view.visible = true
 	main.call("_open_system_menu")
 	await _settle_frames(6)
 	var overlay: Control = main.get("_system_overlay") as Control
@@ -55,6 +58,9 @@ func _run() -> void:
 		var return_to_run: Button = title_menu.find_child("ReturnToRunButton", true, false) as Button if title_menu != null else null
 		var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
 		_expect(not overlay.visible and title_menu != null and title_menu.visible, "System Settings route did not open the existing Settings experience")
+		_expect(title_menu != null and title_menu.process_mode == Node.PROCESS_MODE_ALWAYS, "runtime Settings must keep processing while the tree is paused")
+		_expect(get_tree().paused, "runtime Settings should keep the run paused")
+		_expect(combat_view != null and not combat_view.visible, "runtime Settings must fully hide CombatView while its modal is open")
 		_expect(title_menu != null and bool(title_menu.get_meta("runtime_settings_preserves_run", false)), "runtime Settings did not publish its run-preservation contract")
 		_expect(return_to_run != null and return_to_run.visible and bool(return_to_run.get_meta("preserves_active_run", false)), "runtime Settings should provide a clear Return to Run route")
 		_expect(ui_scale_option != null and ui_scale_option.visible and ui_scale_option.item_count == 3, "System Settings route did not render the existing Settings controls")
@@ -69,6 +75,7 @@ func _run() -> void:
 			return_to_run.emit_signal("pressed")
 			await _settle_frames(4)
 			_expect(not title_menu.visible and not get_tree().paused, "Return to Run did not safely close runtime Settings")
+			_expect(combat_view != null and combat_view.visible, "Return to Run did not restore the unchanged CombatView")
 	await _verify_compact_shop_detail_contract()
 	get_tree().paused = false
 	remove_child(main)
