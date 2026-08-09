@@ -80,6 +80,16 @@ func _verify_compact_identity_contract(team: String, unit_name: String) -> void:
 	_expect(name_label != null and String(name_label.get_meta("compact_team_marker", "")) == ("FOE" if team == "enemy" else "YOU"), "compact identity lost its team metadata for %s" % unit_name)
 	_expect(name_label != null and String(name_label.get_meta("compact_identity_mode", "")) == "name_only_team_in_chrome", "narrow compact identity should deliberately move team identity into row chrome")
 	_expect(name_label != null and value_well != null and name_label.get_global_rect().end.x <= value_well.get_global_rect().position.x - 4.0, "compact identity collides with its boxed numeric value for %s" % unit_name)
+	row_node.size = Vector2(178.0, 40.0)
+	await get_tree().process_frame
+	row_node.set_compact_layout(true)
+	row_node.set_exact_compact_values(true)
+	await get_tree().process_frame
+	row_node.refresh_compact_identity()
+	var intermediate_copy: String = name_label.text if name_label != null else ""
+	_expect(intermediate_copy.contains(unit_name.to_upper()), "150-percent rail fixture lost %s: %s" % [unit_name.to_upper(), intermediate_copy])
+	_expect(not intermediate_copy.begins_with("Y ") and not intermediate_copy.begins_with("F "), "150-percent rail fixture uses a clipped-looking one-letter team prefix: %s" % intermediate_copy)
+	_expect(name_label != null and value_well != null and name_label.get_global_rect().end.x <= value_well.get_global_rect().position.x - 4.0, "150-percent rail identity collides with its boxed numeric value for %s" % unit_name)
 	row_node.size = Vector2(240.0, 40.0)
 	await get_tree().process_frame
 	row_node.set_compact_layout(true)

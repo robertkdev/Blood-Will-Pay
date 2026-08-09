@@ -186,7 +186,7 @@ func _format_reserve_label(amount: int) -> String:
 	return "Blood: " + BloodBuckets.format_amount(amount, true) if _uses_narrow_compact_copy() else "Blood Reserve: " + BloodBuckets.format_amount(amount)
 
 func _format_bet_value(amount: int) -> String:
-	return BloodBuckets.format_amount(amount, _uses_narrow_compact_copy())
+	return BloodBuckets.format_amount(amount, _is_tight_compact_layout() or _uses_narrow_compact_copy())
 
 func _refresh_bet_value_width() -> void:
 	if bet_value == null:
@@ -335,7 +335,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		risk_prefix = "ALL IN // " if compact_decision else "ALL IN ARMED // "
 	if compact_decision:
 		var locked_suffix: String = " LOCKED" if in_combat else ""
-		wager_summary.text = "DECISION // %sRISK %s%s // EST %d-%d%% // RESERVE W%s / L%s" % [
+		wager_summary.text = "DECISION // %sRISK %s%s // WIN %d-%d%% // RESERVE W%s / L%s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager, true),
 			locked_suffix,

@@ -514,7 +514,7 @@ func _apply_responsive_layout() -> void:
 	# Make the wager quote a decision line rather than a tertiary footnote. The
 	# battle field retains its scale because the flexible BattleArea absorbs this
 	# two-pixel increase before the fixed shop/gutter stack does.
-	wager_summary.add_theme_font_size_override("font_size", 17 if tight_compact else 18 if compact else 19)
+	wager_summary.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 17 if tight_compact else 18 if compact else 19)
 	wager_summary.custom_minimum_size = Vector2(0.0, 24.0 if tight_compact else 22.0)
 	wager_summary.autowrap_mode = TextServer.AUTOWRAP_OFF
 	wager_summary.clip_text = false
@@ -1213,6 +1213,7 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 func _apply_compact_commit_rail(compact: bool, tight_compact: bool) -> void:
 	var vbox: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
 	var actions_row: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
+	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	if vbox == null or actions_row == null or wager_summary == null:
 		return
 	var summary_index: int = wager_summary.get_index()
@@ -1226,7 +1227,7 @@ func _apply_compact_commit_rail(compact: bool, tight_compact: bool) -> void:
 		wager_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		# Preserve the accessibility-sized outcome line established by the base
 		# layout; compacting the rail changes placement, not legibility.
-		wager_summary.add_theme_font_size_override("font_size", 17 if tight_compact else 18)
+		wager_summary.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 17 if tight_compact else 18)
 		wager_summary.modulate = Color(1.0, 1.0, 1.0, 0.72 if tight_compact else 0.84)
 		wager_summary.set_meta("compact_commit_rail", true)
 		actions_row.set_meta("compact_commit_rail", true)

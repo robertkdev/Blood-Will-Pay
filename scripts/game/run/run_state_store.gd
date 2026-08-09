@@ -90,7 +90,10 @@ static func _load_snapshot_file(path: String) -> Dictionary:
 		return {"ok": false, "error": "OPEN_FAILED", "path": path}
 	var text: String = file.get_as_text()
 	file.close()
-	var parsed: Variant = JSON.parse_string(text)
+	var document_result: Dictionary = _parse_json(text)
+	if not bool(document_result.get("ok", false)):
+		return {"ok": false, "error": "CORRUPT", "path": path}
+	var parsed: Variant = document_result.get("value")
 	if not parsed is Dictionary:
 		return {"ok": false, "error": "CORRUPT", "path": path}
 	var parsed_dictionary: Dictionary = parsed as Dictionary
@@ -113,7 +116,10 @@ static func _load_snapshot_file(path: String) -> Dictionary:
 		var actual_checksum: String = _checksum_text(payload_json)
 		if expected_checksum == "" or expected_checksum != actual_checksum:
 			return {"ok": false, "error": "CHECKSUM_MISMATCH", "path": path}
-		encoded_payload = JSON.parse_string(payload_json)
+		var payload_result: Dictionary = _parse_json(payload_json)
+		if not bool(payload_result.get("ok", false)):
+			return {"ok": false, "error": "CORRUPT", "path": path}
+		encoded_payload = payload_result.get("value")
 		if not encoded_payload is Dictionary:
 			return {"ok": false, "error": "CORRUPT", "path": path}
 	var decoded: Variant = _decode_large_ints(encoded_payload)
@@ -137,6 +143,17 @@ static func _load_snapshot_file(path: String) -> Dictionary:
 	if String(payload.get("phase", "preview")).to_lower() == "combat":
 		return {"ok": false, "error": "MIDCOMBAT_SAVE_REJECTED", "path": path}
 	return {"ok": true, "snapshot": payload, "path": path, "legacy_schema": legacy_schema}
+
+static func _parse_json(text: String) -> Dictionary:
+	# JSON.parse_string logs malformed input as an engine ERROR even when the
+	# caller deliberately treats corruption as a recoverable save condition.
+	# The instance parser returns the same failure as data, keeping expected
+	# backup recovery quiet while preserving strict CI error-log scanning.
+	var parser: JSON = JSON.new()
+	var parse_error: Error = parser.parse(text)
+	if parse_error != OK:
+		return {"ok": false, "error": int(parse_error)}
+	return {"ok": true, "value": parser.data}
 
 static func clear(path: String = DEFAULT_PATH) -> bool:
 	var cleared: bool = true

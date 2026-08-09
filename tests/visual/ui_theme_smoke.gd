@@ -219,6 +219,8 @@ func _run() -> void:
 		_expect(traits_title != null and traits_title.get_theme_font("font") == VisualTypeSystemLib.FONT_UTILITY_BOLD, "Trait metadata shell should use the legibility face", failures)
 		_verify_trait_activation_checkpoint_sort(failures)
 	var scoreboard_row: ScoreboardRow = SCOREBOARD_ROW_SCENE.instantiate() as ScoreboardRow
+	scoreboard_row.custom_minimum_size = Vector2(240.0, 48.0)
+	scoreboard_row.size = Vector2(240.0, 48.0)
 	add_child(scoreboard_row)
 	await get_tree().process_frame
 	_expect(scoreboard_row.get_node_or_null("HBox/Content/Name") != null, "Scoreboard row name label missing", failures)
@@ -227,7 +229,8 @@ func _run() -> void:
 	scoreboard_row.set_row_data({"team": "player", "display_name": "Morrak", "value": 17.0, "share": 1.0, "metric": "damage"})
 	var compact_identity: Label = scoreboard_row.get_node_or_null("HBox/Content/Name") as Label
 	var compact_copy: String = compact_identity.text if compact_identity != null else ""
-	_expect(compact_identity != null and (compact_copy.begins_with("YOU ") or compact_copy.begins_with("Y ")) and compact_copy.contains("MORRAK"), "Compact scoreboard should preserve a readable team marker and stable unit identity", failures)
+	_expect(compact_identity != null and compact_copy == "YOU MORRAK", "Wide compact scoreboard should preserve the full team badge and stable unit identity", failures)
+	_expect(compact_identity != null and String(compact_identity.get_meta("compact_identity_mode", "")) == "full_badge", "Wide compact scoreboard did not enter full-badge identity mode", failures)
 	_expect(compact_identity != null and bool(compact_identity.get_meta("compact_identity_complete", false)), "Compact scoreboard identity lacks its completeness contract", failures)
 	scoreboard_row.queue_free()
 	if failures.size() > 0:
