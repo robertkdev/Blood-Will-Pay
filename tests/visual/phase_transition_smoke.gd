@@ -59,6 +59,9 @@ func _run() -> void:
 	var countdown_label: Label = combat.get_node_or_null("CombatPhaseTransitionLayer/CountdownValue") as Label
 	_expect(countdown_label != null and countdown_label.scale == Vector2.ONE, "countdown numeral should remain scale-stable")
 	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 1")
+	await get_tree().create_timer(0.40).timeout
+	_expect(countdown_label != null and countdown_label.text == "1" and countdown_label.modulate.a >= 0.99, "terminal countdown numeral should hold hard through the cut")
+	_capture("03b_countdown_1_terminal")
 	var crossfade_seen: bool = await _wait_for_transition_state(transition, "entry_crossfade", 1.2)
 	_expect(crossfade_seen, "entry crossfade did not follow the countdown")
 	# Full-resolution PNG encoding blocks the main frame long enough for the next
@@ -70,11 +73,13 @@ func _run() -> void:
 	_capture("04b_planning_fade_120ms")
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started during planning fade")
 	await get_tree().create_timer(0.12).timeout
-	_capture("04c_arena_delay_240ms")
+	_capture("04c_transfer_low_point_240ms")
 	_assert_handoff_alpha(combat, 0.30, 0.10, "240ms handoff")
 	await get_tree().create_timer(0.08).timeout
-	_capture("04d_transfer_low_point_320ms")
-	_assert_handoff_alpha(combat, 0.08, 0.30, "320ms handoff")
+	_capture("04d_arena_emerges_320ms")
+	_assert_handoff_alpha(combat, 0.08, 0.65, "320ms handoff")
+	var arena_low_point: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	_expect(arena_low_point != null and arena_low_point.modulate.a >= 0.25, "arena identity did not emerge decisively after the transfer low point")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04e_arena_takeover_440ms")
 	_assert_handoff_alpha(combat, 0.05, 1.0, "440ms handoff")
@@ -220,11 +225,25 @@ func _run_reduced_motion_contract() -> void:
 	var overlay: Control = host.get_node_or_null("CombatPhaseTransitionLayer") as Control
 	var countdown: Label = host.get_node_or_null("CombatPhaseTransitionLayer/CountdownValue") as Label
 	_expect(overlay != null and bool(overlay.get_meta("reduced_motion_active", false)), "reduced motion countdown metadata missing")
+	transition.call("_set_countdown_progress", 0.98)
+	_expect(countdown != null and countdown.text == "1" and countdown.modulate.a >= 0.99, "terminal countdown numeral should hold hard through the cut")
 	await get_tree().create_timer(0.72).timeout
 	_expect(countdown != null and countdown.scale == Vector2.ONE, "reduced motion countdown should not scale its numeral")
 	transition.start_entry_crossfade()
 	await get_tree().create_timer(0.30).timeout
 	_expect(planning.scale == Vector2.ONE, "reduced motion handoff should not scale the planning grid")
+	arena.position = Vector2(96.0, 72.0)
+	arena.size = Vector2(620.0, 420.0)
+	transition.capture_combat_rect()
+	arena.position = Vector2(24.0, 18.0)
+	arena.size = Vector2(420.0, 300.0)
+	var reduced_return_position: Vector2 = arena.position
+	var reduced_return_size: Vector2 = arena.size
+	transition.start_return(true)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_expect(arena.position.is_equal_approx(reduced_return_position), "reduced motion return should not jump arena position")
+	_expect(arena.size.is_equal_approx(reduced_return_size), "reduced motion return should not jump arena size")
 	transition.teardown()
 	remove_child(host)
 	host.free()
