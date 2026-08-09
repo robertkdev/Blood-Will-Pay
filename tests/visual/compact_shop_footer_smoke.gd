@@ -417,10 +417,11 @@ func _assert_compact_decision_record(viewport_rect: Rect2) -> void:
 	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "150-percent footer hid blood/level/XP")
 	if resource_strip != null:
 		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "150-percent blood/level/XP mirror is incomplete")
-		for required_copy: String in ["BLOOD", "LVL", "XP"]:
+		for required_copy: String in ["BLOOD", "BUCKET", "LVL", "XP"]:
 			_expect(resource_strip.text.contains(required_copy), "150-percent resource record omitted %s" % required_copy)
 		var gold_source: Label = _view.find_child("GoldLabel", true, false) as Label
-		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "150-percent resource record does not mirror live blood")
+		var reserve_copy: String = gold_source.text.get_slice(":", 1).strip_edges().to_upper() if gold_source != null else ""
+		_expect(gold_source != null and resource_strip.text.contains(reserve_copy), "150-percent resource record does not mirror live blood")
 		var progress_source: Label = _find_progress_source()
 		_expect(progress_source != null, "150-percent footer has no live level/XP source")
 		if progress_source != null:
@@ -432,7 +433,7 @@ func _assert_compact_decision_record(viewport_rect: Rect2) -> void:
 		_expect_inside(resource_strip, viewport_rect, "150-percent resource record")
 	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "150-percent footer hid wager outcomes")
 	if wager_summary != null:
-		for required_copy: String in ["Wager", "Win", "After win", "After loss"]:
+		for required_copy: String in ["DECISION", "RISK", "WIN", "RESERVE W", "/ L"]:
 			_expect(wager_summary.text.contains(required_copy), "150-percent wager record omitted %s" % required_copy)
 		_expect_inside(wager_summary, viewport_rect, "150-percent wager record")
 

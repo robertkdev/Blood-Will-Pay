@@ -1,5 +1,7 @@
 extends AbilityImplBase
 
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
+
 # Teller — Margin Call
 # Fires two line shots at the two furthest enemies, each dealing 440/660/1035 × AD physical damage to the first unit hit;
 # excess damage continues to the next unit in that line. On kill, 25% chance to award 1 blood Stake.
@@ -15,10 +17,10 @@ func _level_index(u: Unit) -> int:
 	var lvl: int = (int(u.level) if u != null else 1)
 	return clamp(lvl - 1, 0, 2)
 
-func _award_gold(n: int) -> void:
+func _award_blood_stakes(n: int) -> int:
 	if n <= 0:
-		return
-	Economy.add_stake_units(n, true, "teller_margin_call")
+		return 0
+	return int(Economy.add_stake_units(n, true, "teller_margin_call"))
 
 func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> void:
 	var hits: Array[int] = ctx.enemies_in_line(ctx.caster_team, ctx.caster_index, target_idx, LINE_LEN_TILES, LINE_WIDTH_TILES)
@@ -48,8 +50,8 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 	if killed:
 		var roll: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 		if roll < DROP_CHANCE:
-			_award_gold(1)
-			ctx.log("Margin Call: +1 blood Stake")
+			var awarded: int = _award_blood_stakes(1)
+			ctx.log("Margin Call: %s (1 Stake)" % BloodBuckets.format_delta(awarded))
 	# Overflow to next in line: use remaining raw damage not applied to primary (post-mitigation remainder)
 	var leftover: int = max(0, raw_dmg - dealt)
 	if leftover > 0 and scored.size() > 1:
@@ -60,8 +62,8 @@ func _apply_line_shot(ctx: AbilityContext, target_idx: int, raw_dmg: int) -> voi
 		if killed2:
 			var roll2: float = (ctx.rng.randf() if ctx.rng != null else 0.0)
 			if roll2 < DROP_CHANCE:
-				_award_gold(1)
-				ctx.log("Margin Call: +1 blood Stake")
+				var awarded: int = _award_blood_stakes(1)
+				ctx.log("Margin Call: %s (1 Stake)" % BloodBuckets.format_delta(awarded))
 
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:

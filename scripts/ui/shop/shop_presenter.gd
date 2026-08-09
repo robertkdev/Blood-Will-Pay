@@ -6,6 +6,7 @@ const ShopPanel := preload("res://scripts/ui/shop/shop_panel.gd")
 const ShopButtons := preload("res://scripts/ui/shop/shop_buttons.gd")
 const ShopErrors := preload("res://scripts/game/shop/shop_errors.gd")
 const ShopAffordability := preload("res://scripts/game/shop/affordability.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 const OPENING_FIGHT_LABEL: String = "OPENING FIGHT"
 const OPENING_FIGHT_HINT: String = "Win this opener to unlock the shop"
@@ -24,7 +25,7 @@ signal promotions_emitted(promotions)
 signal first_purchase_needs_deploy(unit_id: String, bench_slot: int)
 
 func _root() -> Node:
-	var tree := (_parent.get_tree() if _parent else null)
+	var tree: SceneTree = _parent.get_tree() if _parent != null else null
 	return tree.root if tree else null
 
 func _has_shop() -> bool:
@@ -105,8 +106,8 @@ func _wire() -> void:
 		Shop.error.connect(_on_shop_error)
 	# React to economy/phase changes for live affordability/tooltip updates
 	if _has_economy():
-		if not Economy.is_connected("gold_changed", Callable(self, "_on_economy_changed")):
-			Economy.gold_changed.connect(_on_economy_changed)
+		if not Economy.is_connected("blood_buckets_changed", Callable(self, "_on_economy_changed")):
+			Economy.blood_buckets_changed.connect(_on_economy_changed)
 		if not Economy.is_connected("bet_changed", Callable(self, "_on_economy_changed")):
 			Economy.bet_changed.connect(_on_economy_changed)
 	if _has_game_state():
@@ -122,8 +123,8 @@ func _unwire() -> void:
 		if Shop.is_connected("error", Callable(self, "_on_shop_error")):
 			Shop.error.disconnect(_on_shop_error)
 	if Engine.has_singleton("Economy"):
-		if Economy.is_connected("gold_changed", Callable(self, "_on_economy_changed")):
-			Economy.gold_changed.disconnect(_on_economy_changed)
+		if Economy.is_connected("blood_buckets_changed", Callable(self, "_on_economy_changed")):
+			Economy.blood_buckets_changed.disconnect(_on_economy_changed)
 		if Economy.is_connected("bet_changed", Callable(self, "_on_economy_changed")):
 			Economy.bet_changed.disconnect(_on_economy_changed)
 	if Engine.has_singleton("GameState") and GameState.is_connected("phase_changed", Callable(self, "_on_phase_changed")):
@@ -193,9 +194,9 @@ func _is_shop_locked_by_combat() -> bool:
 func _refresh_cards_state() -> void:
 	if _panel == null:
 		return
-	var gold: int = 0
+	var blood_buckets: int = 0
 	if _has_economy():
-		gold = int(Economy.gold)
+		blood_buckets = int(Economy.blood_buckets)
 	var bench_full: bool = false
 	var roster: Node = _roster_node()
 	if roster != null and roster.has_method("first_empty_slot"):
@@ -231,17 +232,17 @@ func _refresh_cards_state() -> void:
 				var off: Variant = Shop.state.offers[idx]
 				if off != null:
 					price = int(off.price) if int(off.price) > 0 else int(off.cost)
-			var aff := ShopAffordability.can_afford(gold, bet, price, in_combat, spent)
+			var aff: Dictionary = ShopAffordability.can_afford(blood_buckets, bet, price, in_combat, spent)
 			var affordable: bool = bool(aff.get("ok", false))
 			sc.set_affordable(affordable)
 			if not affordable:
 				var need: int = int(aff.get("need_more", 0))
-				var msg := "Not enough blood in reserve"
-				var reason := String(aff.get("reason", ""))
+				var msg: String = "Not enough Blood Reserve"
+				var reason: String = String(aff.get("reason", ""))
 				if reason == ShopAffordability.REASON_RESERVE_FLOOR:
-					msg = "Must keep at least 1 blood in reserve (need +%d)" % max(1, need)
+					msg = "Must keep %s in reserve (need %s more)" % [BloodBuckets.describe(1), BloodBuckets.describe(max(1, need))]
 				elif reason == ShopAffordability.REASON_CREDIT_LIMIT:
-					msg = "Exceeds combat credit (need +%d)" % max(1, need)
+					msg = "Exceeds combat credit (need %s more)" % BloodBuckets.describe(max(1, need))
 				if sc.has_method("set_status_tip"):
 					sc.call("set_status_tip", msg)
 				else:
@@ -264,31 +265,31 @@ func _refresh_cards_state() -> void:
 		return
 	if _buttons:
 		var r_cost: int = int(Shop.get_reroll_price()) if _has_shop() and Shop.has_method("get_reroll_price") else int(ShopConfig.REROLL_COST)
-		var aff_r := ShopAffordability.can_afford(gold, bet, r_cost, in_combat, spent)
-		var msg_r := ""
+		var aff_r: Dictionary = ShopAffordability.can_afford(blood_buckets, bet, r_cost, in_combat, spent)
+		var msg_r: String = ""
 		if not bool(aff_r.get("ok", false)):
 			var need_r: int = int(aff_r.get("need_more", 0))
-			var reason_r := String(aff_r.get("reason", ""))
+			var reason_r: String = String(aff_r.get("reason", ""))
 			if reason_r == ShopAffordability.REASON_RESERVE_FLOOR:
-				msg_r = "Must keep at least 1 blood in reserve (need +%d)" % max(1, need_r)
+				msg_r = "Must keep %s in reserve (need %s more)" % [BloodBuckets.describe(1), BloodBuckets.describe(max(1, need_r))]
 			elif reason_r == ShopAffordability.REASON_CREDIT_LIMIT:
-				msg_r = "Exceeds combat credit (need +%d)" % max(1, need_r)
+				msg_r = "Exceeds combat credit (need %s more)" % BloodBuckets.describe(max(1, need_r))
 			else:
-				msg_r = "Not enough blood in reserve"
+				msg_r = "Not enough Blood Reserve"
 		_buttons.set_reroll_tooltip(msg_r)
 
 		var x_cost: int = int(Shop.get_progression_price()) if _has_shop() and Shop.has_method("get_progression_price") else int(ShopConfig.BUY_XP_COST)
-		var aff_x := ShopAffordability.can_afford(gold, bet, x_cost, in_combat, spent)
-		var msg_x := ""
+		var aff_x: Dictionary = ShopAffordability.can_afford(blood_buckets, bet, x_cost, in_combat, spent)
+		var msg_x: String = ""
 		if not bool(aff_x.get("ok", false)):
 			var need_x: int = int(aff_x.get("need_more", 0))
-			var reason_x := String(aff_x.get("reason", ""))
+			var reason_x: String = String(aff_x.get("reason", ""))
 			if reason_x == ShopAffordability.REASON_RESERVE_FLOOR:
-				msg_x = "Must keep at least 1 blood in reserve (need +%d)" % max(1, need_x)
+				msg_x = "Must keep %s in reserve (need %s more)" % [BloodBuckets.describe(1), BloodBuckets.describe(max(1, need_x))]
 			elif reason_x == ShopAffordability.REASON_CREDIT_LIMIT:
-				msg_x = "Exceeds combat credit (need +%d)" % max(1, need_x)
+				msg_x = "Exceeds combat credit (need %s more)" % BloodBuckets.describe(max(1, need_x))
 			else:
-				msg_x = "Not enough blood in reserve"
+				msg_x = "Not enough Blood Reserve"
 		_buttons.set_buy_xp_tooltip(msg_x)
 
 func _on_card_clicked(slot_index: int) -> void:
@@ -471,10 +472,10 @@ func _shop_error_message(code: String, context: Dictionary) -> String:
 	if code == ShopErrors.WOULD_KILL_YOU and need_more > 0:
 		var op: String = String(context.get("op", ""))
 		if op == "buy_xp":
-			return "Need +%d blood to buy XP and keep 1 in reserve." % max(1, need_more)
+			return "Need %s more to buy XP and keep %s in reserve." % [BloodBuckets.describe(max(1, need_more)), BloodBuckets.describe(1)]
 		if op == "reroll":
-			return "Need +%d blood to reroll and keep 1 in reserve." % max(1, need_more)
+			return "Need %s more to reroll and keep %s in reserve." % [BloodBuckets.describe(max(1, need_more)), BloodBuckets.describe(1)]
 		if op == "buy_unit":
-			return "Need +%d blood in reserve to buy safely." % max(1, need_more)
-		return "Need +%d blood to keep 1 in reserve." % max(1, need_more)
+			return "Need %s more in Blood Reserve to buy safely." % BloodBuckets.describe(max(1, need_more))
+		return "Need %s more to keep %s in reserve." % [BloodBuckets.describe(max(1, need_more)), BloodBuckets.describe(1)]
 	return ShopErrors.message(code)

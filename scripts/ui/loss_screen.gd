@@ -6,6 +6,7 @@ const HighScore := preload("res://scripts/util/high_score.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 const BACKDROP_COLOR: Color = Color(0.006, 0.005, 0.008, 1.0)
 const FRAME_COLOR: Color = Color(0.024, 0.006, 0.010, 0.90)
@@ -114,23 +115,30 @@ func _populate() -> void:
 	economy_record["chapter"] = chapter_reached
 	economy_record["identities"] = _run_identity_ids()
 	economy_record["contract_discoveries"] = _contract_discovery_ids()
+	var total_earned: int = int(economy_record.get("total_blood_buckets_earned", economy_record.get("total_money_earned", 0)))
 	if stage_label:
-		stage_label.text = "TOTAL EARNED %dg  //  CHAPTER %d  //  STAGE %d" % [
-			int(economy_record.get("total_money_earned", 0)),
+		stage_label.text = "TOTAL BLOOD EARNED %s  //  CHAPTER %d  //  STAGE %d" % [
+			BloodBuckets.format_amount(total_earned),
 			chapter_reached,
 			stage_reached,
 		]
+		stage_label.tooltip_text = BloodBuckets.describe(total_earned)
 	var records: Dictionary = HighScore.submit_run(economy_record)
 	if high_label:
-		high_label.text = "BEST HAUL %dg  //  PEAK BANK %dg" % [
-			int(records.get("best_total_earned", 0)),
-			int(records.get("peak_bankroll", 0)),
+		var best_haul: int = int(records.get("best_blood_buckets_earned", records.get("best_total_earned", 0)))
+		var peak_reserve: int = int(records.get("peak_blood_buckets", records.get("peak_bankroll", 0)))
+		high_label.text = "BEST BLOOD HAUL %s  //  PEAK RESERVE %s" % [
+			BloodBuckets.format_amount(best_haul),
+			BloodBuckets.format_amount(peak_reserve),
 		]
+		high_label.tooltip_text = "Best haul: %s\nPeak reserve: %s" % [BloodBuckets.describe(best_haul), BloodBuckets.describe(peak_reserve)]
 
 	# Interesting run stats (from last battle tracker)
 	var lines: Array[String] = []
-	lines.append("Biggest Wager Won: %dg" % int(economy_record.get("biggest_wager_won", 0)))
-	lines.append("Richest Fight: %dg" % int(economy_record.get("richest_fight", 0)))
+	var biggest_wager: int = int(economy_record.get("biggest_wager_buckets_won", economy_record.get("biggest_wager_won", 0)))
+	var richest_fight: int = int(economy_record.get("richest_blood_bucket_payout", economy_record.get("richest_fight", 0)))
+	lines.append("Biggest Wager Won: %s" % BloodBuckets.format_amount(biggest_wager))
+	lines.append("Richest Fight: %s" % BloodBuckets.format_amount(richest_fight))
 	if _tracker != null:
 		var use_run_totals: bool = _tracker.has_run_values("player")
 		var dmg_total: float = _tracker.get_run_team_total("player", "damage") if use_run_totals else _tracker.get_team_total("player", "damage", "ALL")

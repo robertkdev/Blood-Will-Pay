@@ -2,6 +2,7 @@ extends RefCounted
 class_name ShopButtons
 
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 signal reroll_pressed()
 signal lock_pressed()
@@ -102,14 +103,16 @@ func set_progress(level: int, xp: int, xp_to_next: int) -> void:
 
 func set_action_prices(reroll_price: int, progression_price: int, progression_mode: String, command_rank: int = 0) -> void:
 	if _reroll != null:
-		_reroll.text = "Reroll — %dg" % max(0, int(reroll_price))
+		_reroll.text = "Reroll — %s" % BloodBuckets.format_amount(max(0, int(reroll_price)), true)
+		_reroll.tooltip_text = BloodBuckets.describe(max(0, int(reroll_price)))
 	if _buy_xp != null:
 		if String(progression_mode) == "command":
-			_buy_xp.text = "Command Research — %dg" % max(0, int(progression_price))
+			_buy_xp.text = "Command Research — %s" % BloodBuckets.format_amount(max(0, int(progression_price)), true)
 			if _progress_label != null:
 				_progress_label.text = "Command Rank %d" % max(0, int(command_rank))
 		else:
-			_buy_xp.text = "Buy XP — %dg" % max(0, int(progression_price))
+			_buy_xp.text = "Buy XP — %s" % BloodBuckets.format_amount(max(0, int(progression_price)), true)
+		_buy_xp.tooltip_text = BloodBuckets.describe(max(0, int(progression_price)))
 
 func set_progression_available(available: bool, progression_mode: String) -> void:
 	if _buy_xp == null:

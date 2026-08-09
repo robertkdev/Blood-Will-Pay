@@ -3,6 +3,7 @@ extends "res://tests/visual/actual_run_loop_smoke.gd"
 const SMOKE_NAME: String = "BettingEconomySmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/betting_economy_pass"
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 const CLARITY_CAPTURE_SETTINGS_PATH: String = "user://phase5_clarity_capture_settings.cfg"
 
 @export var viewport_size: Vector2i = Vector2i(1920, 1080)
@@ -202,7 +203,7 @@ func _verify_post_shop_bet_controls() -> void:
 	_expect(int(slider.value) == max_bet, "All In should select the maximum wager")
 	_expect(int(Economy.current_bet) == max_bet, "max-bet slider should update Economy.current_bet")
 	_expect(int(Economy.preferred_bet) == max_bet, "max-bet slider should update Economy.preferred_bet")
-	_expect(String(value_label.text) == "%d blood" % max_bet, "max-bet slider should repaint BetValue to %d blood, got %s" % [max_bet, String(value_label.text)])
+	_expect(String(value_label.text) == BloodBuckets.format_amount(max_bet), "max-bet slider should repaint BetValue to bucket copy %s, got %s" % [BloodBuckets.format_amount(max_bet), String(value_label.text)])
 	if all_in_button != null:
 		var armed_style: StyleBoxTexture = all_in_button.get_theme_stylebox("normal") as StyleBoxTexture
 		_expect(String(all_in_button.text) == "ALL IN!", "armed all-in control should switch to emphatic action copy")
@@ -210,8 +211,8 @@ func _verify_post_shop_bet_controls() -> void:
 	if wager_summary != null:
 		var summary_copy: String = String(wager_summary.text)
 		_expect(summary_copy.begins_with("DECISION //"), "wager summary should identify the planning decision: %s" % summary_copy)
-		_expect(summary_copy.contains("ALL IN") and summary_copy.contains("RISK %d BLOOD" % max_bet), "all-in summary should expose its armed wager: %s" % summary_copy)
-		_expect(summary_copy.contains("WIN ") and summary_copy.contains("RESERVE W") and summary_copy.contains(" / L"), "wager summary should show odds and both reserve outcomes: %s" % summary_copy)
+		_expect(summary_copy.contains("ALL IN") and summary_copy.contains("RISK " + BloodBuckets.format_amount(max_bet)), "all-in summary should expose its armed wager: %s" % summary_copy)
+		_expect(summary_copy.contains("WIN CHANCE ") and summary_copy.contains("WIN RESERVE ") and summary_copy.contains("LOSS RESERVE "), "wager summary should show odds and both reserve outcomes: %s" % summary_copy)
 	var bottom_storage: Control = _main.find_child("BottomStorageArea", true, false) as Control if _main != null else null
 	var shop_grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer if _main != null else null
 	_expect_control_inside_viewport(bottom_storage, "post-shop footer")
@@ -245,6 +246,8 @@ func _start_and_verify_locked_max_bet() -> void:
 	var expected_credit: int = max(0, int(Economy.quoted_payout(selected_bet)) - 1)
 	_expect(selected_bet == int(slider.max_value), "selected bet should still be max before combat")
 	await _press_continue(false, "betting smoke max-bet fight")
+	var combat_started: bool = await _wait_for_combat_active(10.0)
+	_expect(combat_started, "max-bet Start Battle should reach combat before locked-wager verification")
 	await _settle_frames(4)
 	_save_capture("03_combat_bet_locked.png")
 	_expect(int(GameState.phase) == int(GameState.GamePhase.COMBAT), "max-bet Start Battle should enter combat phase")
@@ -256,7 +259,7 @@ func _start_and_verify_locked_max_bet() -> void:
 	_expect(int(Economy.combat_credit_base) == expected_credit, "combat credit base should derive from the locked odds quote expected=%d actual=%d locked=%.4f current=%.4f" % [expected_credit, int(Economy.combat_credit_base), float(Economy.get("_locked_gross_multiplier")), float(Economy.quoted_gross_multiplier)])
 	_expect(not slider.visible, "bet slider should hide while combat is active")
 	_expect(not slider.editable, "bet slider should lock while combat is active")
-	_expect(String(value_label.text) == "Wager: %d blood (locked)" % selected_bet, "combat should show locked bet copy, got %s" % String(value_label.text))
+	_expect(String(value_label.text) == "Wager: %s (locked)" % BloodBuckets.format_amount(selected_bet), "combat should show locked bucket copy, got %s" % String(value_label.text))
 	var wager_summary: Label = _main.find_child("WagerSummary", true, false) as Label if _main != null else null
 	_expect(wager_summary != null and String(wager_summary.text).to_upper().contains("LOCKED"), "combat should show visibly locked wager summary")
 	var ignored_ok: bool = Economy.set_bet(1)
@@ -265,7 +268,7 @@ func _start_and_verify_locked_max_bet() -> void:
 	slider.value = 1
 	await _settle_frames(2)
 	_expect(int(Economy.current_bet) == selected_bet, "hidden combat slider changes should not alter wager")
-	_expect(String(value_label.text) == "Wager: %d blood (locked)" % selected_bet, "hidden combat slider changes should not repaint locked copy")
+	_expect(String(value_label.text) == "Wager: %s (locked)" % BloodBuckets.format_amount(selected_bet), "hidden combat slider changes should not repaint locked bucket copy")
 
 func _bet_slider() -> HSlider:
 	return _main.find_child("BetSlider", true, false) as HSlider if _main != null else null

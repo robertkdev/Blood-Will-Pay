@@ -1,6 +1,7 @@
 extends TraitHandler
 
 const StackUtils := preload("res://scripts/game/traits/runtime/stack_utils.gd")
+const BloodBuckets := preload("res://scripts/game/economy/blood_buckets.gd")
 
 const TRAIT_ID := "Mogul"
 
@@ -20,18 +21,12 @@ func on_battle_end(ctx):
     if _pending_player <= 0:
         return
     # Guard: only award if player would survive without the payout.
-    # If an Economy singleton exists and gold is already 0, skip (fatal round).
+    # If the blood reserve is already empty, skip the payout on a fatal round.
     var can_award: bool = true
     var econ: Node = _autoload_node("/root/Economy")
     if econ != null:
-        var g: int = 0
-        # Prefer property via get(); falls back to method if present
-        var gv: Variant = econ.get("gold") if econ.has_method("get") else null
-        if gv != null:
-            g = int(gv)
-        elif econ.has_method("gold"):
-            g = int(econ.gold())
-        can_award = (g > 0)
+        var reserve_buckets: int = int(econ.get("blood_buckets"))
+        can_award = reserve_buckets > 0
     if not can_award:
         _pending_player = 0
         return
@@ -42,7 +37,7 @@ func on_battle_end(ctx):
     if economy != null and economy.has_method("add_stake_units"):
         var awarded: int = int(economy.call("add_stake_units", amt, true, "mogul"))
         if ctx.engine != null and ctx.engine.has_method("_resolver_emit_log"):
-            ctx.engine._resolver_emit_log("Mogul payout: +%d blood (%d Stakes)" % [awarded, amt])
+            ctx.engine._resolver_emit_log("Mogul payout: %s (%d Stake%s)" % [BloodBuckets.format_delta(awarded), amt, "" if amt == 1 else "s"])
         return
     # Fallback: try to bubble to UI via log (UI can listen and award).
     if ctx.engine != null and ctx.engine.has_method("_resolver_emit_log"):

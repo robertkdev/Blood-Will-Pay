@@ -560,33 +560,33 @@ func _click_button(button: Button, label: String) -> bool:
 	if button.disabled:
 		_expect(false, "%s is disabled" % label)
 		return false
-	var pressed_seen: bool = false
+	var pressed_state: Array[bool] = [false]
 	var pressed_callback: Callable = func() -> void:
-		pressed_seen = true
+		pressed_state[0] = true
 	button.pressed.connect(pressed_callback, CONNECT_ONE_SHOT)
 	var center: Vector2 = _visible_click_point(button)
 	var use_synthetic: bool = _use_synthetic_input()
 	if use_synthetic:
 		await _mouse_click(center)
 		await _settle_frames(CLICK_SETTLE_FRAMES)
-		if not pressed_seen:
+		if not pressed_state[0]:
 			if not is_instance_valid(button) or not button.is_visible_in_tree() or button.disabled:
-				pressed_seen = true
+				pressed_state[0] = true
 			elif button.toggle_mode and button.button_pressed:
-				pressed_seen = true
-	if not pressed_seen and is_instance_valid(button) and not button.disabled and _allow_button_signal_fallback():
+				pressed_state[0] = true
+	if not pressed_state[0] and is_instance_valid(button) and not button.disabled and _allow_button_signal_fallback():
 		if not _reported_button_fallback:
 			if use_synthetic:
 				print("ActualRunLoopSmoke: MCP synthetic mouse did not trigger Button internals; using pressed signal fallback")
 			_reported_button_fallback = true
 		button.emit_signal("pressed")
-		pressed_seen = true
+		pressed_state[0] = true
 		await _settle_frames(CLICK_SETTLE_FRAMES)
 	if is_instance_valid(button) and button.is_connected("pressed", pressed_callback):
 		button.pressed.disconnect(pressed_callback)
 	var rect: Rect2 = button.get_global_rect() if is_instance_valid(button) else Rect2()
-	_expect(pressed_seen, "%s did not receive a real mouse click; rect=%s center=%s viewport=%s visible_in_tree=%s disabled=%s mouse_filter=%d" % [label, str(rect), str(center), str(_viewport_rect()), str(button.is_visible_in_tree() if is_instance_valid(button) else false), str(button.disabled if is_instance_valid(button) else true), int(button.mouse_filter if is_instance_valid(button) else -1)])
-	return pressed_seen
+	_expect(pressed_state[0], "%s did not receive a real mouse click; rect=%s center=%s viewport=%s visible_in_tree=%s disabled=%s mouse_filter=%d" % [label, str(rect), str(center), str(_viewport_rect()), str(button.is_visible_in_tree() if is_instance_valid(button) else false), str(button.disabled if is_instance_valid(button) else true), int(button.mouse_filter if is_instance_valid(button) else -1)])
+	return pressed_state[0]
 
 func _visible_click_point(control: Control) -> Vector2:
 	var rect: Rect2 = control.get_global_rect()
@@ -616,12 +616,11 @@ func _drag_control_to(control: Control, target_pos: Vector2, label: String) -> b
 	if not control.visible:
 		_expect(false, "%s source is hidden" % label)
 		return false
-	var drag_started: bool = false
-	var drag_ended: bool = false
+	var drag_state: Array[bool] = [false, false]
 	var began_callback: Callable = func() -> void:
-		drag_started = true
+		drag_state[0] = true
 	var ended_callback: Callable = func() -> void:
-		drag_ended = true
+		drag_state[1] = true
 	if control.has_signal("began_drag"):
 		control.connect("began_drag", began_callback, CONNECT_ONE_SHOT)
 	if control.has_signal("ended_drag"):
@@ -638,7 +637,7 @@ func _drag_control_to(control: Control, target_pos: Vector2, label: String) -> b
 		await _settle_frames(4)
 	if not is_instance_valid(control):
 		return true
-	if not drag_started and control.has_method("_begin_drag_internal") and control.has_method("_end_drag_internal") and _allow_drag_lifecycle_fallback():
+	if not drag_state[0] and control.has_method("_begin_drag_internal") and control.has_method("_end_drag_internal") and _allow_drag_lifecycle_fallback():
 		if not _reported_drag_fallback:
 			if use_synthetic:
 				print("ActualRunLoopSmoke: MCP synthetic gui input did not start drag; using direct drag lifecycle fallback")
@@ -649,17 +648,17 @@ func _drag_control_to(control: Control, target_pos: Vector2, label: String) -> b
 		else:
 			await _move_mouse(target_pos, true)
 			await _mouse_button(target_pos, false)
-		drag_started = true
-		drag_ended = true
+		drag_state[0] = true
+		drag_state[1] = true
 		await _settle_frames(4)
 	if is_instance_valid(control):
 		if control.has_signal("began_drag") and control.is_connected("began_drag", began_callback):
 			control.disconnect("began_drag", began_callback)
 		if control.has_signal("ended_drag") and control.is_connected("ended_drag", ended_callback):
 			control.disconnect("ended_drag", ended_callback)
-	_expect(drag_started, "%s did not begin drag" % label)
-	_expect(drag_ended, "%s did not end drag" % label)
-	return drag_started and drag_ended
+	_expect(drag_state[0], "%s did not begin drag" % label)
+	_expect(drag_state[1], "%s did not end drag" % label)
+	return drag_state[0] and drag_state[1]
 
 func _control_mouse_button(control: Control, position: Vector2, pressed: bool) -> void:
 	get_viewport().warp_mouse(position)

@@ -12,6 +12,7 @@ const TEXT_LEFT: int = 820
 const TEXT_TOP: int = 24
 const MAX_CONTROLS: int = 260
 const MAX_TEXT_LINES: int = 34
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 static var GLYPHS: Dictionary[String, PackedStringArray] = {
 	" ": PackedStringArray(["000", "000", "000", "000", "000", "000", "000"]),
@@ -187,14 +188,18 @@ static func _game_state() -> Dictionary[String, Variant]:
 	var economy: Node = root.get_node_or_null("Economy") if root != null else null
 	var shop: Node = root.get_node_or_null("Shop") if root != null else null
 	var phase_value: int = int(game_state.get("phase")) if game_state != null else -1
+	var blood_buckets: int = int(economy.get("blood_buckets")) if economy != null else -1
+	var wager_buckets: int = int(economy.get("current_bet")) if economy != null else -1
 	return {
 		"phase": phase_value,
 		"phase_name": _phase_name(phase_value),
 		"chapter": int(game_state.get("chapter")) if game_state != null else -1,
 		"stage": int(game_state.get("stage")) if game_state != null else -1,
 		"stage_in_chapter": int(game_state.get("stage_in_chapter")) if game_state != null else -1,
-		"gold": int(economy.get("gold")) if economy != null else -1,
-		"bet": int(economy.get("current_bet")) if economy != null else -1,
+		"blood_buckets": blood_buckets,
+		"wager_buckets": wager_buckets,
+		"gold": blood_buckets,
+		"bet": wager_buckets,
 		"combat_active": bool(economy.get("combat_active")) if economy != null else false,
 		"shop_level": int(shop.call("get_level")) if shop != null and shop.has_method("get_level") else -1,
 		"shop_xp": int(shop.call("get_xp")) if shop != null and shop.has_method("get_xp") else -1
@@ -257,12 +262,16 @@ static func _draw_header(image: Image, snapshot: Dictionary[String, Variant]) ->
 	_fill_rect(image, Rect2i(0, 0, SOFTWARE_WIDTH, 172), Color(0.035, 0.028, 0.032, 1.0))
 	_draw_text(image, "VISION SNAPSHOT: " + str(snapshot.get("label", "")).to_upper(), 22, 22, Color(0.96, 0.82, 0.46, 1.0), 3)
 	var state: Dictionary = snapshot.get("state", {}) as Dictionary
+	var reserve_buckets: int = int(state.get("blood_buckets", state.get("gold", -1)))
+	var wager_buckets: int = int(state.get("wager_buckets", state.get("bet", -1)))
+	var reserve_text: String = BloodBuckets.format_amount(reserve_buckets, true).to_upper() if reserve_buckets >= 0 else "--"
+	var wager_text: String = BloodBuckets.format_amount(wager_buckets, true).to_upper() if wager_buckets >= 0 else "--"
 	var line_a: String = "PHASE %s   C%s R%s   BLOOD %s   WAGER %s   SHOP L%s XP %s" % [
 		str(state.get("phase_name", "")),
 		str(state.get("chapter", "")),
 		str(state.get("stage_in_chapter", "")),
-		str(state.get("gold", "")),
-		str(state.get("bet", "")),
+		reserve_text,
+		wager_text,
 		str(state.get("shop_level", "")),
 		str(state.get("shop_xp", ""))
 	]
