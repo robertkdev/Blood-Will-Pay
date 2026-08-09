@@ -667,6 +667,15 @@ func set_size_px(new_size: Vector2) -> void:
 	_update_visuals()
 	_update_screen_position()
 
+func set_entry_presentation_progress(progress: float) -> void:
+	var reveal: float = clampf((progress - 0.58) / 0.42, 0.0, 1.0)
+	for combat_readout: CanvasItem in [focus_plate, bar_plate, hp_bar, hp_ticks, mana_bar, mana_ticks, shield_bar, shield_ticks, hp_readout, _health_readout_tether]:
+		if combat_readout != null and is_instance_valid(combat_readout):
+			var readout_color: Color = combat_readout.modulate
+			readout_color.a = reveal
+			combat_readout.modulate = readout_color
+	set_meta("one_arena_combat_readout_progress", reveal)
+
 func set_team_tint(color: Color) -> void:
 	_team_tint = color
 	_ensure_focus_plate()

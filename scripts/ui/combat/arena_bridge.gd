@@ -28,6 +28,12 @@ var _initial_combatant_count: int = 0
 var _living_combatant_count: int = 0
 var _last_removed_combatant_count: int = 0
 var _casualty_event_index: int = 0
+var _entry_source_player: Array[Vector2] = []
+var _entry_source_enemy: Array[Vector2] = []
+var _entry_target_player: Array[Vector2] = []
+var _entry_target_enemy: Array[Vector2] = []
+var _entry_source_views: Array[Dictionary] = []
+var _continuous_entry_active: bool = false
 
 func configure(_arena_container: Control, _arena_units: Control, _planning_area: Control, _arena_background: Control, _player_grid_helper: BoardGrid, _enemy_grid_helper: BoardGrid, _unit_actor_class: Script, _tile_size: int) -> void:
     arena_container = _arena_container
@@ -110,13 +116,18 @@ func _sync_container_to_planning_rect() -> void:
 func _rect_close(a: Rect2, b: Rect2, tolerance: float) -> bool:
     return a.position.distance_to(b.position) <= tolerance and a.size.distance_to(b.size) <= tolerance
 
-func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView], hide_planning_immediately: bool = true) -> void:
+func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView], hide_planning_immediately: bool = true, continuous_entry: bool = false, target_rect: Rect2 = Rect2(), source_rect: Rect2 = Rect2()) -> void:
     if arena == null:
         return
     Trace.step("ArenaBridge.enter_arena: begin")
-    _sync_container_to_planning_rect()
+    _continuous_entry_active = continuous_entry
+    if not continuous_entry:
+        _sync_container_to_planning_rect()
     arena.configure(arena_container, arena_units, player_grid_helper, enemy_grid_helper, unit_actor_class, tile_size)
-    arena.enter_arena(player_views, enemy_views)
+    arena.enter_arena(player_views, enemy_views, continuous_entry)
+    if continuous_entry:
+        _set_container_rect(source_rect if source_rect.size.x > 1.0 and source_rect.size.y > 1.0 else _planning_field_rect())
+        _capture_continuous_entry(player_views, enemy_views, target_rect, source_rect)
     _initial_combatant_count = _count_living_views(player_views) + _count_living_views(enemy_views)
     _living_combatant_count = _initial_combatant_count
     _last_removed_combatant_count = 0
@@ -174,6 +185,7 @@ func exit_arena() -> void:
     _living_combatant_count = 0
     _last_removed_combatant_count = 0
     _casualty_event_index = 0
+    _clear_continuous_entry()
     if arena:
         arena.exit_arena()
     if arena_container:
@@ -211,6 +223,69 @@ func teardown() -> void:
     _living_combatant_count = 0
     _last_removed_combatant_count = 0
     _casualty_event_index = 0
+    _clear_continuous_entry()
+
+func apply_field_progress(progress: float) -> void:
+    if arena == null or not _continuous_entry_active:
+        return
+    var field_progress: float = clampf(progress, 0.0, 1.0)
+    var actor_size: Vector2 = Vector2.ONE * lerpf(float(tile_size), float(tile_size) * COMBAT_ACTOR_SIZE_SCALE, field_progress)
+    for index: int in range(mini(arena.player_actors.size(), mini(_entry_source_player.size(), _entry_target_player.size()))):
+        _apply_actor_entry(arena.player_actors[index], _entry_source_player[index], _entry_target_player[index], actor_size, field_progress)
+    for index: int in range(mini(arena.enemy_actors.size(), mini(_entry_source_enemy.size(), _entry_target_enemy.size()))):
+        _apply_actor_entry(arena.enemy_actors[index], _entry_source_enemy[index], _entry_target_enemy[index], actor_size, field_progress)
+    var local_swap: float = clampf(field_progress / 0.16, 0.0, 1.0)
+    for record: Dictionary in _entry_source_views:
+        var view_ref: WeakRef = record.get("view_ref", null) as WeakRef
+        var source_view: Control = view_ref.get_ref() as Control if view_ref != null else null
+        if source_view == null:
+            continue
+        var original_alpha: float = float(record.get("alpha", 1.0))
+        var source_color: Color = source_view.modulate
+        source_color.a = original_alpha * (1.0 - local_swap)
+        source_view.modulate = source_color
+    if arena_container != null:
+        arena_container.set_meta("one_arena_field_progress", field_progress)
+        arena_container.set_meta("one_arena_visible_actor_swap", local_swap)
+
+func finish_continuous_entry() -> void:
+    if arena == null or not _continuous_entry_active:
+        return
+    apply_field_progress(1.0)
+    arena.refresh_combat_presentation_spacing()
+
+func get_entry_player_positions() -> Array[Vector2]:
+    return _entry_target_player.duplicate()
+
+func get_entry_enemy_positions() -> Array[Vector2]:
+    return _entry_target_enemy.duplicate()
+
+func get_transition_debug_snapshot() -> Dictionary[String, Variant]:
+    var presentations: Array[Dictionary] = []
+    var planning_sources: Array[Dictionary] = []
+    if arena != null:
+        for actor: UnitActor in arena.player_actors:
+            presentations.append(_actor_snapshot(actor, "player"))
+        for actor: UnitActor in arena.enemy_actors:
+            presentations.append(_actor_snapshot(actor, "enemy"))
+    for record: Dictionary in _entry_source_views:
+        planning_sources.append({
+            "team": String(record.get("team", "")),
+            "roster_index": int(record.get("roster_index", -1)),
+            "unit_instance_id": int(record.get("unit_instance_id", 0)),
+            "global_center": record.get("global_center", Vector2.ZERO) as Vector2,
+        })
+    return {
+        "continuous_entry_active": _continuous_entry_active,
+        "field_rect": arena_container.get_global_rect() if arena_container != null else Rect2(),
+        "player_source_positions": _entry_source_player.duplicate(),
+        "enemy_source_positions": _entry_source_enemy.duplicate(),
+        "player_target_positions": _entry_target_player.duplicate(),
+        "enemy_target_positions": _entry_target_enemy.duplicate(),
+        "unit_presentations": presentations,
+        "planning_sources": planning_sources,
+        "requested_field_rect": arena_container.get_meta("one_arena_requested_field_rect", Rect2()) if arena_container != null else Rect2(),
+    }
 
 func get_battlefield_casualty_pressure() -> float:
     if _initial_combatant_count <= 0:
@@ -280,7 +355,7 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
     for i in range(_player_views.size()):
         var pv: UnitSlotView = _player_views[i]
         var idx: int = pv.tile_idx
-        var pos: Vector2 = player_grid_helper.get_center(idx) if player_grid_helper and idx >= 0 else Vector2.ZERO
+        var pos: Vector2 = _entry_target_player[i] if _continuous_entry_active and i < _entry_target_player.size() else player_grid_helper.get_center(idx) if player_grid_helper and idx >= 0 else Vector2.ZERO
         ppos.append(pos)
         # Summarize planned placements by index, tile, and unit name (first few only)
         if i < 8:
@@ -289,7 +364,7 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
     for j in range(_enemy_views.size()):
         var ev: UnitSlotView = _enemy_views[j]
         var idx2: int = ev.tile_idx
-        var pos2: Vector2 = enemy_grid_helper.get_center(idx2) if enemy_grid_helper and idx2 >= 0 else Vector2.ZERO
+        var pos2: Vector2 = _entry_target_enemy[j] if _continuous_entry_active and j < _entry_target_enemy.size() else enemy_grid_helper.get_center(idx2) if enemy_grid_helper and idx2 >= 0 else Vector2.ZERO
         epos.append(pos2)
         if j < 8:
             var ename: String = (ev.unit.name if ev and ev.unit else "?")
@@ -297,9 +372,9 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
     # Planning preserves board-relative bounds; combat promotes the same
     # formations into the full survival field after its side UI is removed.
     var bounds: Rect2 = get_engine_arena_bounds()
-    if arena_container != null and bool(arena_container.get_meta("use_full_combat_bounds", false)) and bounds.size.x > 1.0 and bounds.size.y > 1.0:
-        _recenter_team_formation(ppos, bounds, Vector2(0.44, 0.66))
-        _recenter_team_formation(epos, bounds, Vector2(0.56, 0.34))
+    # The field camera supplies one shared affine mapping for both teams.
+    # Never recenter formations independently: committed cells must remain the
+    # visible starting formation when simulation unfreezes.
     if bounds.size.y <= 1.0 or bounds.size.x <= 1.0:
         var all_pts: Array[Vector2] = []
         for v in ppos:
@@ -358,25 +433,152 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
         print("[Arena] tile=", ts, " bounds=", bounds)
     _log_start_positions_and_targets(manager)
 
-func _recenter_team_formation(positions: Array[Vector2], bounds: Rect2, target_ratio: Vector2) -> void:
-    if positions.is_empty() or bounds.size.x <= 1.0 or bounds.size.y <= 1.0:
+func _capture_continuous_entry(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView], target_rect: Rect2, committed_source_rect: Rect2) -> void:
+    _entry_source_player.clear()
+    _entry_source_enemy.clear()
+    _entry_target_player.clear()
+    _entry_target_enemy.clear()
+    _entry_source_views.clear()
+    for index: int in range(player_views.size()):
+        var player_slot: UnitSlotView = player_views[index]
+        var source_position: Vector2 = player_grid_helper.get_center(player_slot.tile_idx) if player_grid_helper != null and player_slot.tile_idx >= 0 else Vector2.ZERO
+        _entry_source_player.append(source_position)
+        _capture_source_view(player_slot, "player", index)
+    for index: int in range(enemy_views.size()):
+        var enemy_slot: UnitSlotView = enemy_views[index]
+        var source_position: Vector2 = enemy_grid_helper.get_center(enemy_slot.tile_idx) if enemy_grid_helper != null and enemy_slot.tile_idx >= 0 else Vector2.ZERO
+        _entry_source_enemy.append(source_position)
+        _capture_source_view(enemy_slot, "enemy", index)
+    var source_rect: Rect2 = committed_source_rect if committed_source_rect.size.x > 1.0 and committed_source_rect.size.y > 1.0 else _planning_field_rect()
+    var target_safe: Rect2 = _safe_bounds_for_rect(target_rect)
+    _entry_target_player = _map_shared_formation(_entry_source_player, source_rect, target_safe)
+    _entry_target_enemy = _map_shared_formation(_entry_source_enemy, source_rect, target_safe)
+    _center_mapped_confrontation(target_safe)
+    for actor: UnitActor in arena.player_actors:
+        actor.modulate = Color(1.0, 1.0, 1.0, 0.0)
+    for actor: UnitActor in arena.enemy_actors:
+        actor.modulate = Color(1.0, 1.0, 1.0, 0.0)
+    apply_field_progress(0.0)
+    for actor: UnitActor in arena.player_actors:
+        actor.set_meta("handoff_global_center", actor.get_global_rect().get_center())
+    for actor: UnitActor in arena.enemy_actors:
+        actor.set_meta("handoff_global_center", actor.get_global_rect().get_center())
+
+func _capture_source_view(slot: UnitSlotView, team: String, roster_index: int) -> void:
+    if slot == null or slot.view == null or not is_instance_valid(slot.view):
+        return
+    _entry_source_views.append({
+        "view_ref": weakref(slot.view),
+        "alpha": slot.view.modulate.a,
+        "team": team,
+        "roster_index": roster_index,
+        "unit_instance_id": slot.unit.get_instance_id() if slot.unit != null else 0,
+        "global_center": slot.view.get_global_rect().get_center(),
+    })
+
+func _map_shared_formation(source_positions: Array[Vector2], source_rect: Rect2, target_rect: Rect2) -> Array[Vector2]:
+    var mapped: Array[Vector2] = []
+    if source_rect.size.x <= 1.0 or source_rect.size.y <= 1.0 or target_rect.size.x <= 1.0 or target_rect.size.y <= 1.0:
+        return source_positions.duplicate()
+    for source_position: Vector2 in source_positions:
+        var ratio: Vector2 = Vector2(
+            clampf((source_position.x - source_rect.position.x) / source_rect.size.x, 0.0, 1.0),
+            clampf((source_position.y - source_rect.position.y) / source_rect.size.y, 0.0, 1.0)
+        )
+        mapped.append(target_rect.position + target_rect.size * ratio)
+    return mapped
+
+func _center_mapped_confrontation(target_rect: Rect2) -> void:
+    var all_targets: Array[Vector2] = []
+    all_targets.append_array(_entry_target_player)
+    all_targets.append_array(_entry_target_enemy)
+    if all_targets.is_empty() or target_rect.size.x <= 1.0 or target_rect.size.y <= 1.0:
         return
     var centroid: Vector2 = Vector2.ZERO
-    for position_value: Vector2 in positions:
-        centroid += position_value
-    centroid /= float(positions.size())
-    var target: Vector2 = bounds.position + bounds.size * target_ratio
-    var shift: Vector2 = target - centroid
-    var actor_size: float = maxf(28.0, float(tile_size) * COMBAT_ACTOR_SIZE_SCALE)
-    var inset: Vector2 = Vector2(maxf(38.0, actor_size * 0.55), maxf(44.0, actor_size * 0.65))
-    var minimum: Vector2 = bounds.position + inset
-    var maximum: Vector2 = bounds.end - inset
-    for index: int in range(positions.size()):
-        var shifted: Vector2 = positions[index] + shift
-        positions[index] = Vector2(
-            clampf(shifted.x, minimum.x, maximum.x),
-            clampf(shifted.y, minimum.y, maximum.y)
-        )
+    for target_position: Vector2 in all_targets:
+        centroid += target_position
+    centroid /= float(all_targets.size())
+    var shared_shift: Vector2 = target_rect.get_center() - centroid
+    for index: int in range(_entry_target_player.size()):
+        _entry_target_player[index] = (_entry_target_player[index] + shared_shift).clamp(target_rect.position, target_rect.end)
+    for index: int in range(_entry_target_enemy.size()):
+        _entry_target_enemy[index] = (_entry_target_enemy[index] + shared_shift).clamp(target_rect.position, target_rect.end)
+    if arena_container != null:
+        arena_container.set_meta("entry_confrontation_centroid", target_rect.get_center())
+        arena_container.set_meta("entry_camera_focus_mode", "shared_confrontation_centroid")
+
+func _safe_bounds_for_rect(render_rect: Rect2) -> Rect2:
+    if render_rect.size.x <= 1.0 or render_rect.size.y <= 1.0:
+        return render_rect
+    var half_actor: float = maxf(28.0, float(tile_size) * COMBAT_ACTOR_SIZE_SCALE * 0.5)
+    var inset_start: Vector2 = Vector2(half_actor + ACTOR_EXTRA_HORIZONTAL, half_actor + ACTOR_EXTRA_TOP)
+    var inset_end: Vector2 = Vector2(half_actor + ACTOR_EXTRA_HORIZONTAL, half_actor + ACTOR_EXTRA_BOTTOM)
+    var safe_size: Vector2 = render_rect.size - inset_start - inset_end
+    return Rect2(render_rect.position + inset_start, safe_size) if safe_size.x > 1.0 and safe_size.y > 1.0 else render_rect
+
+func _planning_field_rect() -> Rect2:
+    if planning_area == null or not is_instance_valid(planning_area):
+        return Rect2()
+    var result: Rect2 = Rect2()
+    var has_rect: bool = false
+    for node_name: String in ["TopArea", "BottomArea"]:
+        var field_half: Control = planning_area.get_node_or_null(node_name) as Control
+        if field_half == null:
+            continue
+        var field_rect: Rect2 = field_half.get_global_rect()
+        result = result.merge(field_rect) if has_rect else field_rect
+        has_rect = true
+    return result
+
+func _set_container_rect(rect: Rect2) -> void:
+    if arena_container == null or not is_instance_valid(arena_container) or rect.size.x <= 1.0 or rect.size.y <= 1.0:
+        return
+    arena_container.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+    var parent_control: Control = arena_container.get_parent() as Control
+    arena_container.position = parent_control.get_global_transform_with_canvas().affine_inverse() * rect.position if parent_control != null else rect.position
+    arena_container.size = rect.size
+    arena_container.clip_contents = true
+    arena_container.set_meta("one_arena_requested_field_rect", rect)
+    _last_container_bounds = rect
+    _has_container_bounds = true
+
+func _apply_actor_entry(actor: UnitActor, source_position: Vector2, target_position: Vector2, actor_size: Vector2, progress: float) -> void:
+    if actor == null or not is_instance_valid(actor):
+        return
+    actor.set_size_px(actor_size)
+    actor.set_screen_position(source_position.lerp(target_position, progress))
+    var actor_color: Color = actor.modulate
+    actor_color.a = 1.0
+    actor.modulate = actor_color
+    actor.set_entry_presentation_progress(progress)
+
+func _actor_snapshot(actor: UnitActor, team: String) -> Dictionary:
+    if actor == null or not is_instance_valid(actor):
+        return {}
+    return {
+        "unit_instance_id": actor.unit.get_instance_id() if actor.unit != null else 0,
+        "team": team,
+        "presentation_instance_id": actor.get_instance_id(),
+        "global_center": actor.get_global_rect().get_center(),
+        "field_anchor": actor.get_meta("committed_field_anchor", Vector2.ZERO),
+        "handoff_global_center": actor.get_meta("handoff_global_center", Vector2.INF),
+        "visible": actor.visible and actor.modulate.a > 0.01,
+    }
+
+func _clear_continuous_entry() -> void:
+    for record: Dictionary in _entry_source_views:
+        var view_ref: WeakRef = record.get("view_ref", null) as WeakRef
+        var source_view: Control = view_ref.get_ref() as Control if view_ref != null else null
+        if source_view != null:
+            var source_color: Color = source_view.modulate
+            source_color.a = float(record.get("alpha", 1.0))
+            source_view.modulate = source_color
+    _entry_source_player.clear()
+    _entry_source_enemy.clear()
+    _entry_target_player.clear()
+    _entry_target_enemy.clear()
+    _entry_source_views.clear()
+    _continuous_entry_active = false
 
 func _ensure_position_signal(manager: CombatManager) -> bool:
     if manager == null:
