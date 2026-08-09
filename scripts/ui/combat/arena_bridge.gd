@@ -8,7 +8,11 @@ const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.
 const ACTOR_EXTRA_HORIZONTAL: float = 18.0
 const ACTOR_EXTRA_TOP: float = 72.0
 const ACTOR_EXTRA_BOTTOM: float = 18.0
-const COMBAT_ACTOR_SIZE_SCALE: float = 2.64
+# Combat actors remain visibly promoted from their planning cells, but the
+# former 2.64 multiplier crowded six-plus-six encounters and pushed right-edge
+# silhouettes/readouts into the hard clip. Keep this in lockstep with
+# ArenaController.COMBAT_ACTOR_SIZE_SCALE; this is presentation-only.
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.24
 
 var arena: ArenaController = null
 var arena_container: Control

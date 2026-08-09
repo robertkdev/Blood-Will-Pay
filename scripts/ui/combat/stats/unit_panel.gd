@@ -174,7 +174,10 @@ func _ensure_identity_styles() -> void:
         role_badge.add_theme_stylebox_override("normal", _make_badge_style())
 
 func _apply_static_styles() -> void:
-    var panel_min_width: float = 252.0 if _compact_layout else 294.0
+    # The stats rail owns width at enlarged UI scales. Retaining the authored
+    # desktop minimum here forces the detail sheet through the right viewport
+    # edge before its ScrollContainer can reflow it.
+    var panel_min_width: float = 0.0 if _compact_layout else 294.0
     custom_minimum_size = Vector2(panel_min_width, max(custom_minimum_size.y, 360.0))
     var root_box: VBoxContainer = $"VBox"
     if root_box != null:
@@ -182,7 +185,7 @@ func _apply_static_styles() -> void:
     var header: HBoxContainer = $"VBox/Header"
     if header != null:
         header.add_theme_constant_override("separation", 8 if _compact_layout else 12)
-        header.custom_minimum_size = Vector2(0.0, 64.0 if _compact_layout else 78.0)
+        header.custom_minimum_size = Vector2(0.0, 92.0 if _compact_layout else 78.0)
     if portrait != null:
         # The compact stats rail is narrower than the desktop portrait-plus-
         # identity row. Give identity copy the full width instead of clipping
@@ -192,12 +195,15 @@ func _apply_static_styles() -> void:
         portrait.custom_minimum_size = Vector2(portrait_size, portrait_size)
         portrait.modulate = Color(0.96, 0.91, 0.84, 1.0)
     if name_label != null:
-        name_label.add_theme_font_size_override("font_size", 16 if _compact_layout else 18)
+        name_label.add_theme_font_size_override("font_size", 14 if _compact_layout else 18)
+        name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if _compact_layout else TextServer.AUTOWRAP_OFF
+        name_label.clip_text = false
         name_label.add_theme_color_override("font_color", COLOR_TEXT)
         name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.74))
         name_label.add_theme_constant_override("outline_size", 1)
     if goal_label != null:
         goal_label.add_theme_font_size_override("font_size", 11 if _compact_layout else 12)
+        goal_label.clip_text = false
         goal_label.add_theme_color_override("font_color", COLOR_MUTED)
     if traits_label != null:
         traits_label.add_theme_font_size_override("font_size", 12 if _compact_layout else 13)

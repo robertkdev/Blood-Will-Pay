@@ -8,7 +8,7 @@ const Strings := preload("res://scripts/util/strings.gd")
 # Keep the rendered fighter footprint legible inside the authored combat cells.
 # This changes presentation scale only; unit art, animation, and behavior
 # remain untouched.
-const COMBAT_ACTOR_SIZE_SCALE: float = 2.64
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.24
 const COMBAT_ACTOR_MINIMUM_CLEARANCE: float = 22.0
 const COMBAT_ACTOR_SPACING_ITERATIONS: int = 22
 const COMBAT_READOUT_BOUNDS_OFFSET: Vector2 = Vector2(0.0, -38.0)

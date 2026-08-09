@@ -190,11 +190,23 @@ func _validate_profile_and_cast(
 	var mana_before: int = int(caster.mana)
 	var commits: Array[Dictionary] = []
 	var commit_callback: Callable = _on_ability_committed.bind(commits)
+	var semantic_events: Array[String] = []
+	var target_callback: Callable = _on_semantic_target.bind(semantic_events)
+	var buff_callback: Callable = _on_semantic_buff.bind(semantic_events)
+	var debuff_callback: Callable = _on_semantic_debuff.bind(semantic_events)
+	var zone_callback: Callable = _on_semantic_zone_exposure.bind(semantic_events)
 	engine.ability_committed.connect(commit_callback)
+	engine.target_start.connect(target_callback)
+	engine.buff_applied.connect(buff_callback)
+	engine.debuff_applied.connect(debuff_callback)
+	engine.zone_exposure_applied.connect(zone_callback)
 	var before: Dictionary[String, Variant] = _effect_snapshot(state, engine)
 	var result: Dictionary = engine.ability_system.try_cast("player", 0)
 	var after: Dictionary[String, Variant] = _effect_snapshot(state, engine)
 	var evidence: Array[String] = _effect_categories(before, after)
+	for semantic_event: String in semantic_events:
+		if not evidence.has(semantic_event):
+			evidence.append(semantic_event)
 	var authoritative_evidence: Array[String] = _authoritative_categories(evidence)
 
 	_unit_expect(bool(result.get("cast", false)), label,
@@ -217,6 +229,14 @@ func _validate_profile_and_cast(
 
 	if engine.ability_committed.is_connected(commit_callback):
 		engine.ability_committed.disconnect(commit_callback)
+	if engine.target_start.is_connected(target_callback):
+		engine.target_start.disconnect(target_callback)
+	if engine.buff_applied.is_connected(buff_callback):
+		engine.buff_applied.disconnect(buff_callback)
+	if engine.debuff_applied.is_connected(debuff_callback):
+		engine.debuff_applied.disconnect(debuff_callback)
+	if engine.zone_exposure_applied.is_connected(zone_callback):
+		engine.zone_exposure_applied.disconnect(zone_callback)
 	print("AllPlayableAbilityLivenessProbe: ", label, " -> ", ability_id,
 		" cast=", bool(result.get("cast", false)), " evidence=", ",".join(evidence))
 	_teardown_fixture(engine)
@@ -297,6 +317,10 @@ func _make_ally(index: int) -> Unit:
 	unit.magic_resist = magic_resist_values[index - 1]
 	unit.mana_max = 100
 	unit.mana = 0
+	if index == 1:
+		# Quillith's Final Exam contract requires a living Pupil with a castable
+		# ability. Kett supplies a deterministic scheduled-effect recast fixture.
+		unit.ability_id = "kett_union_breaker"
 	var approaches: Array[String] = []
 	for value: Variant in approaches_by_index[index - 1]:
 		approaches.append(String(value))
@@ -475,11 +499,64 @@ func _effect_categories(before: Dictionary[String, Variant], after: Dictionary[S
 	return categories
 
 func _authoritative_categories(categories: Array[String]) -> Array[String]:
-	var output: Array[String] = []
+	# Scheduling is the immediate authoritative state for deliberately delayed
+	# abilities; semantic engine events cover transient marks, buffs, and zones
+	# that are not retained in the generic state snapshot.
+	var authoritative: Array[String] = []
 	for category: String in categories:
-		if category != "scheduled_event":
-			output.append(category)
-	return output
+		# Target acquisition alone is telemetry, not proof that the ability applied
+		# its contractual effect.
+		if category != "semantic_target":
+			authoritative.append(category)
+	return authoritative
+
+func _on_semantic_target(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0:
+		sink.append("semantic_target")
+
+func _on_semantic_buff(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		kind: String,
+		fields: Dictionary,
+		magnitude: float,
+		duration: float,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
+		sink.append("semantic_buff")
+
+func _on_semantic_debuff(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		kind: String,
+		fields: Dictionary,
+		magnitude: float,
+		duration: float,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
+		sink.append("semantic_debuff")
+
+func _on_semantic_zone_exposure(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		kind: String,
+		duration_s: float,
+		damage: float,
+		radius_tiles: float,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
+		sink.append("semantic_zone")
 
 func _on_ability_committed(
 		source_team: String,

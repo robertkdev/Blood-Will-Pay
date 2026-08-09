@@ -70,7 +70,7 @@ func _validate_default_preview() -> void:
 	var win_odds_label: Label = _main.find_child("WinOddsLabel", true, false) as Label
 	_expect(win_odds_label != null, "procedural default win odds label missing")
 	if win_odds_label != null:
-		_expect(String(win_odds_label.text).begins_with("Win Odds "), "procedural default odds label should show Win Odds, got %s" % win_odds_label.text)
+		_expect(String(win_odds_label.text).begins_with("Est. Win ") and String(win_odds_label.text).contains("-"), "procedural default odds label should show an estimated range, got %s" % win_odds_label.text)
 	var spec: Dictionary = RosterCatalog.get_spec(FIRST_CHAPTER, FIRST_ROUND)
 	var rules: Dictionary = spec.get(StageTypes.KEY_RULES, {})
 	_expect(String(spec.get(StageTypes.KEY_KIND, "")) == StageTypes.KIND_CREEPS, "opening round should be generated creeps")

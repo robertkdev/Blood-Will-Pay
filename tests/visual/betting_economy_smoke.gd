@@ -212,7 +212,7 @@ func _verify_post_shop_bet_controls() -> void:
 		var summary_copy: String = String(wager_summary.text)
 		_expect(summary_copy.begins_with("DECISION //"), "wager summary should identify the planning decision: %s" % summary_copy)
 		_expect(summary_copy.contains("ALL IN") and summary_copy.contains("RISK " + BloodBuckets.format_amount(max_bet)), "all-in summary should expose its armed wager: %s" % summary_copy)
-		_expect(summary_copy.contains("WIN CHANCE ") and summary_copy.contains("WIN RESERVE ") and summary_copy.contains("LOSS RESERVE "), "wager summary should show odds and both reserve outcomes: %s" % summary_copy)
+		_expect(summary_copy.contains("EST. WIN ") and summary_copy.contains("-") and summary_copy.contains("WIN RESERVE ") and summary_copy.contains("LOSS RESERVE "), "wager summary should show an estimated range and both reserve outcomes: %s" % summary_copy)
 	var bottom_storage: Control = _main.find_child("BottomStorageArea", true, false) as Control if _main != null else null
 	var shop_grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer if _main != null else null
 	_expect_control_inside_viewport(bottom_storage, "post-shop footer")

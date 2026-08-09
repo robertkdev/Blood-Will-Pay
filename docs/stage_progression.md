@@ -26,6 +26,12 @@ Enemy composition lives in `scripts/game/progression/roster_catalog.gd`. The old
 
 `scripts/game/progression/endless_chapter_generator.gd` builds generated StageSpecs by difficulty rating. `RosterCatalog` caches those specs in chapter/stage order so planning preview and combat receive identical generated boards. Normal stages include `rga_challenge` metadata, boss stages are generated from the same difficulty budget system, and mirror stages still use the boss-entry board snapshot. Generated normal/boss difficulty includes raw unit level rating plus active enemy trait pressure; item pressure is currently exposed by `tests/rga_testing/validation/DifficultyRatingAudit.tscn` but is not part of generated boards until enemies start receiving generated item loadouts.
 
-Player-facing naming remains the original chapter pattern. `ChapterCatalog.display_name_for()` returns `Chapter N` for Chapter 1 and all later generated chapters; the top bar and logs should not show an endless-mode label.
+Player-facing naming remains the original chapter pattern. Chapters 1-10 have
+authored flavor names; Chapter 11 onward deliberately falls back to `Chapter N`.
+Those ten names are an opening arc, not a campaign cap. The procedural run has
+no fixed final chapter. Player level caps at 14 and board capacity tops out at
+16 slots; later chapters continue against scaling generated encounters with
+that mature roster. The top bar and logs should not show a separate
+endless-mode label.
 
 Mirror fights use `scripts/game/progression/mirror_board_store.gd`. The combat manager snapshots the player's board when the boss fight starts, then the mirror rule applies that snapshot to the next stage's enemy team, including unit order, levels, combat stats, and equipped item IDs.

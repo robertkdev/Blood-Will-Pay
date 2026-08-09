@@ -106,7 +106,7 @@ func _ready() -> void:
 	if new_game_button != null and return_title_button != null:
 		_expect(new_game_button.custom_minimum_size.x > return_title_button.custom_minimum_size.x and new_game_button.custom_minimum_size.y > return_title_button.custom_minimum_size.y, "Start New Run should remain dominant over Return to Title", failures)
 	if stage_label != null:
-		_expect(stage_label.text == "TOTAL EARNED 8g  //  CHAPTER 1  //  STAGE 3", "StageLabel did not use live run score and GameState", failures)
+		_expect(stage_label.text == "TOTAL BLOOD EARNED 8 buckets  //  CHAPTER 1  //  STAGE 3", "StageLabel did not use live blood-bucket score and GameState", failures)
 		_expect(bool(stage_label.get_meta("status_copy_uses_utility_face", false)), "Loss stage status regressed to condensed display type", failures)
 	if stage_label != null:
 		_expect(_luminance(stage_label.get_theme_color("font_color")) >= 0.42, "Loss stage summary should use high-luminance ink over grunge", failures)

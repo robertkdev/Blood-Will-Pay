@@ -9,6 +9,7 @@ const CombatEngine = preload("res://scripts/game/combat/combat_engine.gd")
 const TraitRuntimeLib = preload("res://scripts/game/traits/runtime/trait_runtime.gd")
 const MentorLink = preload("res://scripts/game/traits/runtime/mentor_link.gd")
 const StageRuleRunner = preload("res://scripts/game/progression/stage_rule_runner.gd")
+const SimulationItemRuntime = preload("res://tests/rga_testing/core/simulation_item_runtime.gd")
 
 # Runs a single SimJob through the CombatEngine in deterministic lockstep.
 # Optionally accepts a base stats collector that will be attached and ticked during the run.
@@ -47,6 +48,29 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 		engine.emit_position_telemetry = requested_caps.has(TelemetryCapabilities.CAP_MOBILITY) or requested_caps.has(TelemetryCapabilities.CAP_ZONES)
 		engine.emit_target_telemetry = requested_caps.has(TelemetryCapabilities.CAP_TARGETS)
 	engine.configure(state, BattleState.first_alive(state.player_team), 1, Callable())
+	# Item loadouts are test metadata, not a live autoload contract. Apply them
+	# through the same catalog modifiers and EffectRegistry handlers used by
+	# runtime combat, with strict validation so an invalid experiment cannot
+	# silently produce a misleading no-item result.
+	var item_runtime: SimulationItemRuntime = null
+	if meta_root.has("team_a_items") or meta_root.has("team_b_items"):
+		item_runtime = SimulationItemRuntime.new()
+		var item_setup: Dictionary = item_runtime.configure(
+			engine,
+			state,
+			meta_root.get("team_a_items", null),
+			meta_root.get("team_b_items", null)
+		)
+		if not bool(item_setup.get("ok", false)):
+			result["simulation_input_error"] = String(item_setup.get("reason", "invalid item loadout"))
+			item_runtime.teardown()
+			if engine.has_method("teardown"):
+				engine.teardown()
+			return result
+		result["item_loadouts"] = {
+			"team_a": item_setup.get("team_a", []),
+			"team_b": item_setup.get("team_b", []),
+		}
 	# Perf: allow overriding position emit interval (reduces per-second event churn when headless)
 	var meta2: Dictionary = meta_root
 	if meta2 is Dictionary and meta2.has("perf_pos_emit_interval"):
@@ -214,6 +238,8 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 		collector.attach(engine, state, true)
 	engine.start()
 	trait_runtime.on_battle_start()
+	if item_runtime != null:
+		item_runtime.on_battle_started()
 	while String(outcome_ref.get("value", "")) == "" and sim_time < float(job.timeout_s):
 		var dt_used: float = delta_s
 		if perf_adaptive:
@@ -348,6 +374,8 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 		collector.detach()
 	if trait_runtime != null:
 		trait_runtime.unwire_signals()
+	if item_runtime != null:
+		item_runtime.teardown()
 	_disconnect_engine_connections(engine)
 	if engine != null and engine.has_method("teardown"):
 		engine.teardown()

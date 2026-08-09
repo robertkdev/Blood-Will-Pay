@@ -57,6 +57,14 @@ The probe summaries are written to `user://team_odds_calibration.json` and
 also retain per-row player/enemy power, stage specs, model version, predicted
 odds, result, timeout and seed data.
 
+Player-facing odds are presented as a range rather than a point promise.
+`TeamOddsEstimator.CALIBRATION_ERROR_POINTS` adds a conservative `+/- 15`
+percentage-point band around the model midpoint; the fresh 144-combat
+calibration's largest populated-bucket miss was 12.4 points. The wager panel
+continues to show exact reserves after a win or loss and explains that its
+contractual payout is quoted from the midpoint. This keeps the economic terms
+precise while making model uncertainty visible before blood is risked.
+
 ### Normal stages
 
 The clean-base diagnostic had 144 rows, no timeouts, overall prediction 50.0%

@@ -385,12 +385,16 @@ func _build_stage_report(stage_number: int, stage_events: Array[Dictionary], nex
 	# not the stage's initial preview; otherwise the metric counts every combat
 	# retry as "shop decision" time and reports a false 160-second stall.
 	var shop_anchor_time: float = _last_time_before(stage_events, "phase_preview", shop_action_time)
-	var result_dwell: float = _difference(_first_time(stage_events, "phase_post_combat"), outcome_time)
 	var post_combat_time: float = _first_time(stage_events, "phase_post_combat")
 	var recovery_preview_time: float = _first_time_after(stage_events, "phase_preview", outcome_time)
 	if recovery_preview_time < 0.0 and not next_stage_events.is_empty():
 		recovery_preview_time = _first_time(next_stage_events, "phase_preview")
-	var recovery: float = _difference(recovery_preview_time, post_combat_time)
+	# The result presentation begins at POST_COMBAT and remains player-visible
+	# until the next PREVIEW. The previous labels were inverted: the immediate
+	# outcome-to-phase transition was reported as result dwell while the actual
+	# six-second result card was reported as recovery.
+	var result_dwell: float = _difference(recovery_preview_time, post_combat_time)
+	var recovery: float = _difference(post_combat_time, outcome_time)
 	var combat_duration: float = _difference(outcome_time, combat_start)
 	return {
 		"global_stage": stage_number,
@@ -481,16 +485,12 @@ static func _is_expected_gap(previous_type: String, current_type: String) -> boo
 	var combat_types: Array[String] = ["combat_started", "phase_combat", "outcome_victory", "outcome_defeat", "outcome_tie", "phase_post_combat"]
 	if combat_types.has(previous_type) and combat_types.has(current_type):
 		return true
-	# Preview-to-combat is the explicit player planning window. Its duration is
-	# already measured by planning_time_use_seconds; counting it again as dead
-	# time would turn deliberate board/shop decisions into a false stall.
-	if previous_type == "phase_preview" and (current_type == "phase_combat" or current_type == "combat_started"):
-		return true
-	# A chapter contract pass is another explicit planning boundary before the
-	# next fight; its decision wait is already represented in planning time.
-	if previous_type == "contract_passed" and (current_type == "phase_combat" or current_type == "combat_started"):
-		return true
 	var planning_types: Array[String] = ["phase_preview", "stage_changed", "chapter_changed", "shop_offers_ready", "shop_card_clicked", "shop_buy_xp", "shop_reroll", "shop_lock", "start_battle_pressed", "bench_changed", "deployment", "deployment_assist", "contract_passed"]
+	# Any last observed planning action can legitimately precede combat. Planning
+	# time is already measured directly, so this gap is deliberate play, not a
+	# frozen or unresponsive runtime.
+	if planning_types.has(previous_type) and (current_type == "phase_combat" or current_type == "combat_started"):
+		return true
 	if planning_types.has(previous_type) and planning_types.has(current_type):
 		return true
 	var onboarding_types: Array[String] = ["runtime_ready", "onboarding_start", "starter_selected", "phase_preview", "combat_started"]

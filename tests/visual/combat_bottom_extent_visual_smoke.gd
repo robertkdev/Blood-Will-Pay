@@ -2,7 +2,8 @@ extends Node
 
 const OUTPUT_DIR: String = "res://outputs/visual_iter/combat_bottom_extent_pass"
 const CAPTURE_NAME: String = "01_dense_bottom_extent_1920x1080.png"
-const ACTOR_SIZE: Vector2 = Vector2.ONE * 72.0 * 2.64
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.24
+const ACTOR_SIZE: Vector2 = Vector2.ONE * 72.0 * COMBAT_ACTOR_SIZE_SCALE
 const UnitActorScript: GDScript = preload("res://scripts/ui/combat/unit_actor.gd")
 const ArenaControllerScript: GDScript = preload("res://scripts/ui/combat/arena_controller.gd")
 const UnitFactoryScript: GDScript = preload("res://scripts/unit_factory.gd")

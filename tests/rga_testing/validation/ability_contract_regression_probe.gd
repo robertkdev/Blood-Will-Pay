@@ -57,7 +57,7 @@ func _run() -> void:
 	_check_sable_transactional_refund(failures)
 	print("AbilityContractRegressionProbe: teller")
 	await get_tree().process_frame
-	_check_teller_overflow(failures)
+	_check_teller_margin_call(failures)
 	print("AbilityContractRegressionProbe: velour")
 	await get_tree().process_frame
 	_check_velour_self_exclusion(failures)
@@ -450,14 +450,27 @@ func _check_sable_transactional_refund(failures: Array[String]) -> void:
 	_expect(int(sable.mana) == 34, "Sable refund was not preserved after the shared mana reset", failures)
 	_teardown_fixture(engine)
 
-func _check_teller_overflow(failures: Array[String]) -> void:
+func _check_teller_margin_call(failures: Array[String]) -> void:
+	var teller: Unit = _make_unit("teller", 2200)
+	teller.attack_damage = 100.0
+	var body_blocker: Unit = _make_unit("teller_body_blocker", 100)
+	body_blocker.armor = 100.0
+	var backliner: Unit = _make_unit("teller_backliner", 2000)
+	backliner.armor = 0.0
+	var fixture: Dictionary = _make_fixture([teller], [body_blocker, backliner])
+	var state: BattleState = fixture["state"] as BattleState
+	var engine: CombatEngine = fixture["engine"] as CombatEngine
+	_set_positions(engine, [Vector2(64.0, 128.0)], [Vector2(256.0, 128.0), Vector2(320.0, 128.0)])
+	var ctx: AbilityContext = _context(engine, state)
 	var ability: Variant = TellerMarginCall.new()
-	var nonlethal: Dictionary = {"dealt": 200, "before_hp": 500, "before_cap": 350, "after_hp": 300}
-	var lethal: Dictionary = {"dealt": 100, "before_hp": 100, "before_cap": 350, "after_hp": 0}
-	var mitigated_lethal: Dictionary = {"dealt": 100, "before_hp": 100, "before_cap": 100, "after_hp": 0}
-	_expect(int(ability.call("_overflow_damage", nonlethal, false)) == 0, "Teller overflowed from a surviving target", failures)
-	_expect(int(ability.call("_overflow_damage", lethal, true)) == 250, "Teller did not preserve actual lethal HP overkill", failures)
-	_expect(int(ability.call("_overflow_damage", mitigated_lethal, true)) == 0, "Teller treated mitigation loss as overflow", failures)
+	_expect(bool(ability.call("cast", ctx)), "Teller Margin Call public cast failed", failures)
+	_expect(int(body_blocker.hp) == 0, "Teller Margin Call should kill the mitigated body blocker", failures)
+	# First shot: 350 raw becomes 175 through 100 Armor, leaving 175 raw
+	# overflow. The second line shot then deals its full 350 to the backliner.
+	_expect(int(backliner.hp) == 1475, "Teller Margin Call should carry 175 remaining raw damage through the line before its second 350-damage shot", failures)
+	backliner.hp = 0
+	_expect(not bool(ability.call("cast", ctx)), "Teller Margin Call should reject a cast with no living targets", failures)
+	_teardown_fixture(engine)
 
 func _check_velour_self_exclusion(failures: Array[String]) -> void:
 	var velour: Unit = _make_unit("velour", 1000)

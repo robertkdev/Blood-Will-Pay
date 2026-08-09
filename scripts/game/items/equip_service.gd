@@ -38,44 +38,9 @@ func recompute_for(unit) -> Dictionary:
 			equipped.pop_back()
 
 	var base: Dictionary = _base[unit]
-	var acc := _aggregate_mods(equipped)
-
-	# Derived values from base + mods
-	var nv_ad: float = float(base.attack_damage) * (1.0 + float(acc[ItemModSchema.PCT_AD]))
-	var nv_as: float = clamp(float(base.attack_speed) * (1.0 + float(acc[ItemModSchema.PCT_AS])), 0.01, MAX_ATTACK_SPEED)
-	var nv_sp: float = float(base.spell_power) + float(acc[ItemModSchema.FLAT_SP])
-	var nv_armor: float = max(0.0, float(base.armor) + float(acc[ItemModSchema.FLAT_ARMOR]))
-	var nv_mr: float = max(0.0, float(base.magic_resist) + float(acc[ItemModSchema.FLAT_MR]))
-	var nv_mrgn: float = max(0.0, float(base.mana_regen) * (1.0 + float(acc[ItemModSchema.PCT_MANA_REGEN])) + float(acc[ItemModSchema.FLAT_MANA_REGEN]))
-	var nv_cc: float = clamp(float(base.crit_chance) + float(acc[ItemModSchema.PCT_CRIT_CHANCE]), 0.0, 0.95)
-	var nv_cd: float = max(1.0, float(base.crit_damage) + float(acc[ItemModSchema.FLAT_CRIT_DAMAGE]))
-	var nv_ls: float = clamp(float(base.lifesteal) + float(acc[ItemModSchema.PCT_LIFESTEAL]), 0.0, 0.9)
-	var nv_dr: float = clamp(float(base.damage_reduction) + float(acc[ItemModSchema.PCT_DAMAGE_REDUCTION]), 0.0, 0.9)
-	var nv_ten: float = clamp(float(base.tenacity) + float(acc[ItemModSchema.PCT_TENACITY]), 0.0, 0.95)
-	var nv_ms: int = int(clamp(float(base.mana_start) + float(acc[ItemModSchema.FLAT_START_MANA]), 0.0, float(unit.mana_max)))
-	var nv_hpmax: int = max(1, int(round(float(base.max_hp) + float(acc[ItemModSchema.FLAT_HP]))))
-
-	# Apply to unit
-	unit.attack_damage = nv_ad
-	unit.attack_speed = nv_as
-	unit.spell_power = nv_sp
-	unit.armor = nv_armor
-	unit.magic_resist = nv_mr
-	unit.mana_regen = nv_mrgn
-	unit.crit_chance = nv_cc
-	unit.crit_damage = nv_cd
-	unit.lifesteal = nv_ls
-	unit.damage_reduction = nv_dr
-	unit.tenacity = nv_ten
-	unit.mana_start = nv_ms
-	# Max HP and clamp current HP
-	unit.max_hp = nv_hpmax
-	if unit.hp > unit.max_hp:
-		unit.hp = unit.max_hp
-
-	# Start mana semantics: outside combat, sync current mana to new start
-	if not _is_combat_phase():
-		unit.mana = min(int(unit.mana_max), int(unit.mana_start))
+	var applied: Dictionary = apply_item_stat_modifiers(unit, base, equipped, not _is_combat_phase())
+	if not bool(applied.get("ok", false)):
+		return applied
 
 	result.ok = true
 	result["equipped_count"] = equipped.size()
@@ -131,6 +96,47 @@ func restore_base_snapshot(unit, snapshot: Dictionary) -> void:
 		return
 	_base[unit] = snapshot.duplicate(true)
 
+static func capture_base_stats(unit: Unit) -> Dictionary:
+	if unit == null:
+		return {}
+	return {
+		"attack_damage": float(unit.attack_damage),
+		"attack_speed": float(unit.attack_speed),
+		"spell_power": float(unit.spell_power),
+		"armor": float(unit.armor),
+		"magic_resist": float(unit.magic_resist),
+		"mana_regen": float(unit.mana_regen),
+		"crit_chance": float(unit.crit_chance),
+		"crit_damage": float(unit.crit_damage),
+		"lifesteal": float(unit.lifesteal),
+		"damage_reduction": float(unit.damage_reduction),
+		"tenacity": float(unit.tenacity),
+		"mana_start": int(unit.mana_start),
+		"max_hp": int(unit.max_hp),
+	}
+
+static func apply_item_stat_modifiers(unit: Unit, base: Dictionary, equipped: Array[String], sync_current_mana: bool) -> Dictionary:
+	if unit == null or base.is_empty():
+		return {"ok": false, "reason": "missing_unit_or_base"}
+	var acc: Dictionary = aggregate_mods(equipped)
+	unit.attack_damage = float(base.get("attack_damage", unit.attack_damage)) * (1.0 + float(acc[ItemModSchema.PCT_AD]))
+	unit.attack_speed = clampf(float(base.get("attack_speed", unit.attack_speed)) * (1.0 + float(acc[ItemModSchema.PCT_AS])), 0.01, MAX_ATTACK_SPEED)
+	unit.spell_power = float(base.get("spell_power", unit.spell_power)) + float(acc[ItemModSchema.FLAT_SP])
+	unit.armor = maxf(0.0, float(base.get("armor", unit.armor)) + float(acc[ItemModSchema.FLAT_ARMOR]))
+	unit.magic_resist = maxf(0.0, float(base.get("magic_resist", unit.magic_resist)) + float(acc[ItemModSchema.FLAT_MR]))
+	unit.mana_regen = maxf(0.0, float(base.get("mana_regen", unit.mana_regen)) * (1.0 + float(acc[ItemModSchema.PCT_MANA_REGEN])) + float(acc[ItemModSchema.FLAT_MANA_REGEN]))
+	unit.crit_chance = clampf(float(base.get("crit_chance", unit.crit_chance)) + float(acc[ItemModSchema.PCT_CRIT_CHANCE]), 0.0, 0.95)
+	unit.crit_damage = maxf(1.0, float(base.get("crit_damage", unit.crit_damage)) + float(acc[ItemModSchema.FLAT_CRIT_DAMAGE]))
+	unit.lifesteal = clampf(float(base.get("lifesteal", unit.lifesteal)) + float(acc[ItemModSchema.PCT_LIFESTEAL]), 0.0, 0.9)
+	unit.damage_reduction = clampf(float(base.get("damage_reduction", unit.damage_reduction)) + float(acc[ItemModSchema.PCT_DAMAGE_REDUCTION]), 0.0, 0.9)
+	unit.tenacity = clampf(float(base.get("tenacity", unit.tenacity)) + float(acc[ItemModSchema.PCT_TENACITY]), 0.0, 0.95)
+	unit.mana_start = clampi(int(float(base.get("mana_start", unit.mana_start)) + float(acc[ItemModSchema.FLAT_START_MANA])), 0, int(unit.mana_max))
+	unit.max_hp = max(1, int(round(float(base.get("max_hp", unit.max_hp)) + float(acc[ItemModSchema.FLAT_HP]))))
+	unit.hp = min(int(unit.hp), int(unit.max_hp))
+	if sync_current_mana:
+		unit.mana = min(int(unit.mana_max), int(unit.mana_start))
+	return {"ok": true, "equipped_count": equipped.size()}
+
 # -- Internals --
 
 func _is_combat_phase() -> bool:
@@ -153,24 +159,10 @@ func _snapshot_base_if_needed(unit) -> void:
 		_base[unit] = _capture_base(unit)
 
 func _capture_base(unit) -> Dictionary:
-	return {
-		"attack_damage": float(unit.attack_damage),
-		"attack_speed": float(unit.attack_speed),
-		"spell_power": float(unit.spell_power),
-		"armor": float(unit.armor),
-		"magic_resist": float(unit.magic_resist),
-		"mana_regen": float(unit.mana_regen),
-		"crit_chance": float(unit.crit_chance),
-		"crit_damage": float(unit.crit_damage),
-		"lifesteal": float(unit.lifesteal),
-		"damage_reduction": float(unit.damage_reduction),
-		"tenacity": float(unit.tenacity),
-		"mana_start": int(unit.mana_start),
-		"max_hp": int(unit.max_hp),
-	}
+	return capture_base_stats(unit as Unit)
 
-func _aggregate_mods(equipped: Array[String]) -> Dictionary:
-	var acc := {
+static func aggregate_mods(equipped: Array[String]) -> Dictionary:
+	var acc: Dictionary = {
 		ItemModSchema.PCT_AD: 0.0,
 		ItemModSchema.PCT_AS: 0.0,
 		ItemModSchema.PCT_MANA_REGEN: 0.0,
@@ -186,15 +178,15 @@ func _aggregate_mods(equipped: Array[String]) -> Dictionary:
 		ItemModSchema.FLAT_START_MANA: 0.0,
 		ItemModSchema.FLAT_CRIT_DAMAGE: 0.0,
 	}
-	for id in equipped:
-		var def = ItemCatalogLib.get_def(String(id))
+	for id: String in equipped:
+		var def: ItemDef = ItemCatalogLib.get_def(String(id))
 		if def == null:
 			continue
 		var mods: Dictionary = def.stat_mods
 		if mods == null:
 			continue
-		for k in mods.keys():
-			var v = mods[k]
+		for k: Variant in mods.keys():
+			var v: Variant = mods[k]
 			match String(k):
 				ItemModSchema.PCT_AD: acc[ItemModSchema.PCT_AD] += float(v)
 				ItemModSchema.PCT_AS: acc[ItemModSchema.PCT_AS] += float(v)

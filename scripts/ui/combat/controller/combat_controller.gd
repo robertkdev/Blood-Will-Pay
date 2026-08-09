@@ -1084,7 +1084,7 @@ func _update_board_status() -> void:
 		board_capacity_label.tooltip_text = "Deployed units / board slots. Buy XP to add slots."
 	if win_odds_label != null:
 		if manager == null or manager.player_team.is_empty() or manager.enemy_team.is_empty():
-			win_odds_label.text = "Win Odds --"
+			win_odds_label.text = "Est. Win --"
 			win_odds_label.tooltip_text = "Preview odds appear when both teams are visible."
 		else:
 			var player_rating: float = TeamOddsEstimator.team_rating(manager.player_team)
@@ -1105,8 +1105,11 @@ func _update_board_status() -> void:
 				quoted_bet = int(economy_node.get("current_bet"))
 				if economy_node.has_method("quoted_payout"):
 					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
-			win_odds_label.text = "Win Odds %d%%" % odds
-			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f%s. Quote: %s -> %s gross (%.2fx)." % [
+			var odds_range: Vector2i = TeamOddsEstimator.estimate_range(odds)
+			win_odds_label.text = "Est. Win %d-%d%%" % [odds_range.x, odds_range.y]
+			win_odds_label.tooltip_text = "Model midpoint %d%% with a calibrated +/- %d-point uncertainty band. Your board rating %.0f vs enemy %.0f%s. The exact payout contract uses the midpoint: %s -> %s gross (%.2fx)." % [
+				odds,
+				TeamOddsEstimator.CALIBRATION_ERROR_POINTS,
 				player_rating,
 				odds_enemy_rating,
 				" (escalation-adjusted)" if boss_preview_factor > 1.0 else "",
@@ -3693,7 +3696,7 @@ func _sync_combat_broadcast_strip(force: bool = false) -> void:
 	combat_broadcast_phase.text = "FIGHT %d" % int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else "FIGHT"
 	var wager: int = int(Economy.current_bet) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else 0
 	combat_broadcast_wager.text = "WAGER %d BLOOD" % wager
-	combat_broadcast_odds.text = String(win_odds_label.text).replace("Win Odds", "ODDS") if win_odds_label != null else "ODDS --"
+	combat_broadcast_odds.text = String(win_odds_label.text).replace("Est. Win", "ODDS") if win_odds_label != null else "ODDS --"
 	var player_health: Vector2i = _team_health_total(manager.player_team if manager != null else [])
 	var enemy_health: Vector2i = _team_health_total(manager.enemy_team if manager != null else [])
 	combat_broadcast_health.text = "HP %d/%d  //  %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]

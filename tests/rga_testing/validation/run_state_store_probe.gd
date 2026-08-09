@@ -74,6 +74,33 @@ func _test_checksum_and_backup_recovery(first_snapshot: Dictionary) -> void:
 	_expect(String(recovered.get("primary_error", "")) == "CHECKSUM_MISMATCH", "tampered primary should fail checksum validation")
 	var recovered_snapshot: Dictionary = recovered.get("snapshot", {}) as Dictionary
 	_expect(int(recovered_snapshot.get("chapter", 0)) == 28, "backup should contain the previous complete snapshot")
+	var remove_primary_error: Error = DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PATH))
+	_expect(remove_primary_error == OK, "backup-only recovery fixture should remove the corrupt primary")
+	_expect(RunStateStore.has_save(TEST_PATH), "a valid backup-only save should keep Continue available")
+	var backup_only: Dictionary = RunStateStore.load_snapshot(TEST_PATH)
+	_expect(bool(backup_only.get("ok", false)), "valid backup should recover when the primary is missing")
+	_expect(bool(backup_only.get("recovered_from_backup", false)), "backup-only recovery should be explicit")
+	_expect(String(backup_only.get("primary_error", "")) == "NOT_FOUND", "backup-only recovery should identify the missing primary")
+	var backup_only_snapshot: Dictionary = backup_only.get("snapshot", {}) as Dictionary
+	_expect(int(backup_only_snapshot.get("chapter", 0)) == 28, "backup-only recovery should preserve the last complete snapshot")
+	var after_recovery: Dictionary = first_snapshot.duplicate(true)
+	after_recovery["chapter"] = 30
+	var after_recovery_saved: Dictionary = RunStateStore.save_snapshot(after_recovery, TEST_PATH)
+	_expect(bool(after_recovery_saved.get("ok", false)), "backup-only state should accept a new atomic save")
+	_expect(FileAccess.file_exists(TEST_PATH), "backup-only save should promote a new primary")
+	_expect(FileAccess.file_exists("%s.bak" % TEST_PATH), "backup-only save should retain the sole prior recovery copy")
+	var promoted: Dictionary = RunStateStore.load_snapshot(TEST_PATH)
+	_expect(int((promoted.get("snapshot", {}) as Dictionary).get("chapter", 0)) == 30, "promoted primary should contain the new snapshot")
+	var retained_backup: Dictionary = RunStateStore.load_snapshot("%s.bak" % TEST_PATH)
+	_expect(int((retained_backup.get("snapshot", {}) as Dictionary).get("chapter", 0)) == 28, "retained backup should contain the prior complete snapshot")
+	RunStateStore.clear(TEST_PATH)
+	var corrupt_backup: FileAccess = FileAccess.open("%s.bak" % TEST_PATH, FileAccess.WRITE)
+	if corrupt_backup == null:
+		_failures.append("corrupt backup-only fixture should open")
+		return
+	corrupt_backup.store_string("not-json")
+	corrupt_backup.close()
+	_expect(not RunStateStore.has_save(TEST_PATH), "corrupt backup-only data must not expose Continue")
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
