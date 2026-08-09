@@ -218,7 +218,7 @@ func _build_pit_offer(chapter: int, stake_unit: int) -> Dictionary:
 			"description": "Stronger enemies fight beneath three timed furnace eruptions.",
 			"price": StakesMarket.action_price(16, stake_unit),
 			"enemy_multiplier": 1.25,
-			"payout_multiplier": 1.0,
+			"payout_multiplier": 1.25,
 			"battle_modifier": {
 				"enabled": true,
 				"id": "cinder_clock",
@@ -230,7 +230,7 @@ func _build_pit_offer(chapter: int, stake_unit: int) -> Dictionary:
 				"enemy_max_hp_damage_pct": 0.02,
 				"intensity": 2,
 			},
-			"reward": "Harder quoted odds can produce a richer wager payout.",
+			"reward": "Raises encounter-tier wager returns by 25% for the rest of this chapter.",
 			"drawback": "Enemies are 25% stronger and each eruption burns allies harder than enemies.",
 			"fight_impact": "Three visible CINDER CLOCK arena pulses reshape the next fights.",
 			"chapter": chapter,
@@ -243,7 +243,7 @@ func _build_pit_offer(chapter: int, stake_unit: int) -> Dictionary:
 			"description": "A single late bell taxes every living unit, especially your team.",
 			"price": StakesMarket.action_price(20, stake_unit),
 			"enemy_multiplier": 1.15,
-			"payout_multiplier": 1.0,
+			"payout_multiplier": 1.25,
 			"battle_modifier": {
 				"enabled": true,
 				"id": "mortal_bell",
@@ -255,7 +255,7 @@ func _build_pit_offer(chapter: int, stake_unit: int) -> Dictionary:
 				"enemy_max_hp_damage_pct": 0.04,
 				"intensity": 3,
 			},
-			"reward": "A dangerous late swing creates a high-variance wager opportunity.",
+			"reward": "Raises encounter-tier wager returns by 25% for the rest of this chapter.",
 			"drawback": "Enemies are 15% stronger and the bell takes 10% allied max health.",
 			"fight_impact": "One large THE MORTAL BELL TOLLS pulse interrupts longer fights.",
 			"chapter": chapter,
@@ -267,7 +267,7 @@ func _build_pit_offer(chapter: int, stake_unit: int) -> Dictionary:
 		"description": "The crowd collects blood twice while stronger enemies protect the house.",
 		"price": StakesMarket.action_price(14, stake_unit),
 		"enemy_multiplier": 1.20,
-		"payout_multiplier": 1.0,
+		"payout_multiplier": 1.25,
 		"battle_modifier": {
 			"enabled": true,
 			"id": "blood_odds",
@@ -279,7 +279,7 @@ func _build_pit_offer(chapter: int, stake_unit: int) -> Dictionary:
 			"enemy_max_hp_damage_pct": 0.0,
 			"intensity": 1,
 		},
-		"reward": "Harder quoted odds can produce a richer wager payout.",
+		"reward": "Raises encounter-tier wager returns by 25% for the rest of this chapter.",
 		"drawback": "Enemies are 20% stronger and only your team pays the crowd's blood tithe.",
 		"fight_impact": "Two visible crowd-cut pulses punish slow fights.",
 		"chapter": chapter,
@@ -299,7 +299,7 @@ func _apply_offer(offer: Dictionary) -> void:
 		stable_shield_duration_s = max(stable_shield_duration_s, float(offer.get("shield_duration_s", stable_shield_duration_s)))
 	elif family == FAMILY_PIT:
 		pit_enemy_multiplier = min(3.0, pit_enemy_multiplier * max(1.0, float(offer.get("enemy_multiplier", 1.0))))
-		pit_payout_multiplier = 1.0
+		pit_payout_multiplier = max(1.0, float(offer.get("payout_multiplier", 1.0)))
 		var battle_modifier_value: Variant = offer.get("battle_modifier", {})
 		pit_battle_modifier = (battle_modifier_value as Dictionary).duplicate(true) if battle_modifier_value is Dictionary else {}
 

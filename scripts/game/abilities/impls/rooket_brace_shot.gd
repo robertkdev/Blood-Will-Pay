@@ -43,17 +43,17 @@ func cast(ctx: AbilityContext) -> bool:
 	if aim_direction.length() > 0.001 and ctx.engine.has_method("_resolver_emit_vfx_beam_line"):
 		var aim_end: Vector2 = aim_start + aim_direction.normalized() * LINE_LENGTH_TILES * ctx.tile_size()
 		ctx.engine._resolver_emit_vfx_beam_line(aim_start, aim_end, Color(0.95, 0.58, 0.18, 0.9), 5.0, WINDUP_DURATION)
-	buff_system.apply_stats_buff(ctx.state, ctx.caster_team, ctx.caster_index, {
+	ctx.apply_stats_buff(ctx.caster_team, ctx.caster_index, {
 		"damage_reduction": 0.28
 	}, BRACE_DURATION)
 	buff_system.apply_tag(ctx.state, ctx.caster_team, ctx.caster_index, BuffTags.TAG_CC_IMMUNE, WINDUP_DURATION, {
 		"kind": "rooket_brace"
 	})
-	buff_system.apply_tag(ctx.state, ctx.caster_team, ctx.caster_index, "root", WINDUP_DURATION, {
+	ctx.apply_cc_tag(ctx.caster_team, ctx.caster_index, "root", WINDUP_DURATION, {
 		"kind": "rooket_locked_facing"
 	})
 	var damage: float = float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage)
-	ctx.engine.ability_system.schedule_event("rooket_brace_fire", ctx.caster_team, ctx.caster_index, WINDUP_DURATION, {
+	ctx.schedule_event("rooket_brace_fire", ctx.caster_team, ctx.caster_index, WINDUP_DURATION, {
 		"target_index": target_index,
 		"damage": max(0.0, damage),
 		"line_length_tiles": LINE_LENGTH_TILES,

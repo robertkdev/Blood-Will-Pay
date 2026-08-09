@@ -66,7 +66,8 @@ func _ready() -> void:
 func set_responsive_layout(compact: bool, tight_compact: bool) -> void:
     _compact_layout = bool(compact)
     _tight_compact_layout = bool(tight_compact)
-    _team_minimum_width = custom_minimum_size.x
+    if mode == Mode.TEAM:
+        _team_minimum_width = custom_minimum_size.x
     _apply_unit_detail_layout()
     call_deferred("_apply_unit_detail_layout")
 

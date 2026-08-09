@@ -56,7 +56,7 @@ func cast(ctx: AbilityContext) -> bool:
 
 	# Apply CC-immune tag and temporary damage reduction while spinning
 	bs.apply_tag(ctx.state, ctx.caster_team, ctx.caster_index, BuffTags.TAG_CC_IMMUNE, duration, {"block_mana_gain": true})
-	bs.apply_stats_buff(ctx.state, ctx.caster_team, ctx.caster_index, {"damage_reduction": DR_DURING_SPIN}, duration)
+	ctx.apply_stats_buff(ctx.caster_team, ctx.caster_index, {"damage_reduction": DR_DURING_SPIN}, duration)
 
 	# Schedule ticking damage via AbilitySystem events
 	var data: Dictionary = {
@@ -72,7 +72,7 @@ func cast(ctx: AbilityContext) -> bool:
 		"shred_dur": 3.0
 	}
 	if ctx.engine != null and ctx.engine.ability_system != null:
-		ctx.engine.ability_system.schedule_event("creep_eaves_tick", ctx.caster_team, ctx.caster_index, 0.0, data)
+		ctx.schedule_event("creep_eaves_tick", ctx.caster_team, ctx.caster_index, 0.0, data)
 	ctx.log("Eavesdropping: spin %.2fs, %d ticks, %d per tick" % [duration, ticks, per_tick_damage])
 	return true
 

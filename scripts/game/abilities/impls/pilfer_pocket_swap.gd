@@ -18,7 +18,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var target_position: Vector2 = ctx.position_of(target_team, target_index)
 	_set_position(ctx, ctx.caster_team, ctx.caster_index, target_position)
 	_set_position(ctx, target_team, target_index, caster_position)
-	ctx.buff_system.apply_tag(ctx.state, target_team, target_index, "disarm", DISARM_DURATION, {
+	ctx.apply_cc_tag(target_team, target_index, "disarm", DISARM_DURATION, {
 		"is_debuff": true,
 		"cleanseable": true,
 		"kind": "pilfer_pocket_swap_disarm"

@@ -28,11 +28,9 @@ func cast(ctx: AbilityContext) -> bool:
 	if target_index < 0:
 		return false
 	var center: Vector2 = ctx.position_of(_enemy_team(ctx.caster_team), target_index)
-	ctx.emit_zone_exposure(_enemy_team(ctx.caster_team), target_index, "orielle_spell_debt_warning", DETONATION_DELAY, 0.0, RADIUS_TILES)
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null:
+	if not ctx.schedule_implementation_callback(self, "_detonate", DETONATION_DELAY, [ctx, center]):
 		return false
-	tree.create_timer(DETONATION_DELAY).timeout.connect(Callable(self, "_detonate").bind(ctx, center), CONNECT_ONE_SHOT)
+	ctx.emit_zone_exposure(_enemy_team(ctx.caster_team), target_index, "orielle_spell_debt_warning", DETONATION_DELAY, 0.0, RADIUS_TILES)
 	ctx.log("Spell Debt: marked a delayed detonation zone")
 	return true
 
@@ -51,9 +49,9 @@ func _detonate(ctx: AbilityContext, center: Vector2) -> void:
 		ctx.damage_single(ctx.caster_team, ctx.caster_index, victim_index, damage, "magic")
 		ctx.emit_zone_exposure(target_team, victim_index, "orielle_spell_debt_zone", ZONE_INTERVAL * float(ZONE_TICKS), damage, RADIUS_TILES)
 		if ctx.buff_system != null:
-			ctx.buff_system.apply_stats_labeled(ctx.state, target_team, victim_index, "orielle_debt_timing_tax", {"mana_regen": MANA_SLOW}, DEBT_DURATION)
+			ctx.apply_stats_labeled(target_team, victim_index, "orielle_debt_timing_tax", {"mana_regen": MANA_SLOW}, DEBT_DURATION)
 	if ctx.engine.ability_system != null:
-		ctx.engine.ability_system.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, ZONE_INTERVAL, {
+		ctx.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, ZONE_INTERVAL, {
 			"center": center, "radius": RADIUS_TILES, "damage": TICK_DAMAGE[level_index], "damage_type": "magic",
 			"ticks_left": ZONE_TICKS, "interval": ZONE_INTERVAL, "dot_kind": "orielle_spell_debt_tick", "zone_kind": "orielle_spell_debt_zone"
 		})

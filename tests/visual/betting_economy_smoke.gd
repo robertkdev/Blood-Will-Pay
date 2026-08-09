@@ -4,6 +4,8 @@ const SMOKE_NAME: String = "BettingEconomySmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/betting_economy_pass"
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
+const CombatControllerScript: GDScript = preload("res://scripts/ui/combat/controller/combat_controller.gd")
+const RosterCatalog: GDScript = preload("res://scripts/game/progression/roster_catalog.gd")
 const CLARITY_CAPTURE_SETTINGS_PATH: String = "user://phase5_clarity_capture_settings.cfg"
 
 @export var viewport_size: Vector2i = Vector2i(1920, 1080)
@@ -130,6 +132,29 @@ func _verify_direct_economy_contract() -> void:
 	var starting_gold: int = int(Economy.STARTING_GOLD)
 	_expect(int(Economy.gold) == starting_gold, "reset_run should start with configured starting gold")
 	_expect(int(Economy.current_bet) == 1, "reset_run should start with bet 1")
+	var normal_quote: float = float(Economy.gross_payout_multiplier())
+	Economy.set_projected_win_probability(0.10)
+	_expect(is_equal_approx(float(Economy.gross_payout_multiplier()), normal_quote), "projected win estimate must not price a wager")
+	Economy.set_projected_win_probability(0.99)
+	_expect(is_equal_approx(float(Economy.gross_payout_multiplier()), normal_quote), "changing projected win estimate must leave the wager quote unchanged")
+	Economy.set_encounter_quote_kind("CREEPS")
+	_expect(is_equal_approx(float(Economy.gross_payout_multiplier()), 1.5), "Creeps should use the 1.5x encounter-tier wager quote")
+	Economy.set_encounter_quote_kind("BOSS")
+	_expect(is_equal_approx(float(Economy.gross_payout_multiplier()), 3.0), "Boss should use the 3.0x encounter-tier wager quote")
+	Economy.set_encounter_quote_kind("NORMAL")
+	_expect(is_equal_approx(float(Economy.gross_payout_multiplier()), normal_quote), "Normal should restore the 2.0x encounter-tier wager quote")
+	Economy.set_encounter_quote_kind("ELITE")
+	Economy.set_payout_modifier(1.25)
+	var persisted_quote: float = float(Economy.gross_payout_multiplier())
+	var economy_record: Dictionary = Economy.snapshot_run_record()
+	Economy.set_encounter_quote_kind("NORMAL")
+	Economy.set_payout_modifier(1.0)
+	Economy.restore_run_record(economy_record)
+	_expect(String(Economy.encounter_quote_kind) == "ELITE", "encounter quote kind should round-trip through an active-run record")
+	_expect(is_equal_approx(float(Economy.payout_modifier), 1.25), "Pit payout modifier should round-trip through an active-run record")
+	_expect(is_equal_approx(float(Economy.quoted_gross_multiplier), persisted_quote), "restored encounter and Pit modifiers should reproduce the exact wager quote")
+	Economy.reset_run()
+	_verify_stage_quote_capture_boundary()
 	_expect(Economy.set_bet(starting_gold), "set_bet should accept an all-in starting-gold wager")
 	Economy.start_combat()
 	_expect(bool(Economy.combat_active), "start_combat should mark combat active")
@@ -138,6 +163,9 @@ func _verify_direct_economy_contract() -> void:
 	_expect(int(Economy.last_gold_start) == starting_gold, "start_combat should capture starting gold")
 	_expect(int(Economy.last_bet_start) == starting_gold, "start_combat should capture starting bet")
 	var locked_bet: int = int(Economy.current_bet)
+	var locked_quote: float = float(Economy.get("_locked_gross_multiplier"))
+	Economy.set_encounter_quote_kind("BOSS")
+	_expect(is_equal_approx(float(Economy.get("_locked_gross_multiplier")), locked_quote), "combat must retain its exact locked encounter-tier quote")
 	var ignored_ok: bool = Economy.set_bet(1)
 	_expect(ignored_ok, "set_bet during combat should still report an active positive wager")
 	_expect(int(Economy.current_bet) == locked_bet, "set_bet during combat should not change current_bet")
@@ -152,9 +180,29 @@ func _verify_direct_economy_contract() -> void:
 	Economy.start_combat()
 	Economy.resolve(false)
 	_expect(not bool(Economy.combat_active), "resolve loss should clear combat_active")
-	_expect(int(Economy.gold) == 0, "2-gold all-in loss should leave 0 gold")
+	_expect(int(Economy.gold) == 0, "starting-reserve all-in loss should leave 0 gold")
 	_expect(int(Economy.current_bet) == 0, "resolve should clear current_bet after loss")
 	Economy.reset_run()
+
+func _verify_stage_quote_capture_boundary() -> void:
+	if get_tree().root.get_node_or_null("/root/GameState") == null:
+		_expect(false, "GameState autoload missing for quote-capture boundary")
+		return
+	var original_chapter: int = int(GameState.chapter)
+	var original_stage: int = int(GameState.stage_in_chapter)
+	var controller: CombatController = CombatControllerScript.new() as CombatController
+	for stage_index: int in [1, 5]:
+		GameState.chapter = 1
+		GameState.stage_in_chapter = stage_index
+		var stage_spec: Dictionary = RosterCatalog.get_spec(1, stage_index)
+		var expected_kind: String = String(stage_spec.get("kind", "NORMAL"))
+		Economy.set_encounter_quote_kind("CREEPS" if expected_kind != "CREEPS" else "BOSS")
+		var captured_quote: float = float(controller.call("_capture_current_encounter_quote_multiplier"))
+		var expected_quote: float = float(Economy.encounter_quote_multiplier(expected_kind))
+		_expect(is_equal_approx(captured_quote, expected_quote), "battle-start quote capture did not resolve stage %d kind %s (expected %.2f, got %.2f)" % [stage_index, expected_kind, expected_quote, captured_quote])
+	GameState.chapter = original_chapter
+	GameState.stage_in_chapter = original_stage
+	Economy.set_encounter_quote_kind("NORMAL")
 
 func _prepare_fresh_run() -> void:
 	if get_tree().root.get_node_or_null("/root/Economy") != null:

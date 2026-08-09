@@ -356,7 +356,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 			BloodBuckets.format_amount(after_loss),
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
-	wager_summary.tooltip_text = "Risk %s. Win reserve %s; loss reserve %s. Model midpoint %d%%; calibrated uncertainty band +/- %d points. Gross return includes the wager and is quoted from the midpoint." % [BloodBuckets.describe(wager), BloodBuckets.describe(after_win), BloodBuckets.describe(after_loss), odds_percent, TeamOddsEstimator.CALIBRATION_ERROR_POINTS]
+	wager_summary.tooltip_text = "Risk %s. Win reserve %s; loss reserve %s. Rough model estimate %d%%; abilities, items, placement, hazards, and targeting can move the result outside this range. Gross return includes the wager and is priced by the encounter tier, not the estimate." % [BloodBuckets.describe(wager), BloodBuckets.describe(after_win), BloodBuckets.describe(after_loss), odds_percent]
 
 func set_bet_editable(editable: bool) -> void:
 	if bet_slider:

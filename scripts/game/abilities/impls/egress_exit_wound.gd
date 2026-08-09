@@ -42,7 +42,7 @@ func cast(ctx: AbilityContext) -> bool:
 		})
 	if ctx.engine.ability_system == null:
 		return false
-	ctx.engine.ability_system.schedule_event("egress_exit_wound_strike", ctx.caster_team, ctx.caster_index, TELL_DURATION, {
+	ctx.schedule_event("egress_exit_wound_strike", ctx.caster_team, ctx.caster_index, TELL_DURATION, {
 		"target_team": target_team,
 		"target_index": target_index,
 		"damage": base_damage,

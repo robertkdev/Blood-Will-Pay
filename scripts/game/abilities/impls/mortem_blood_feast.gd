@@ -37,7 +37,7 @@ func cast(ctx: AbilityContext) -> bool:
 		for hit_index: int in hits:
 			var result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, hit_index, cleave_damage, "magic")
 			total_dealt += float(result.get("dealt", 0.0))
-		ctx.heal_single(ctx.caster_team, ctx.caster_index, total_dealt * CLEAVE_HEAL_RATIO)
+		ctx.heal_from_dealt(ctx.caster_team, ctx.caster_index, total_dealt * CLEAVE_HEAL_RATIO)
 		ctx.log("Blood Feast: third slash cleaved %d and healed from damage" % hits.size())
 	ctx.buff_system.add_stack(ctx.state, ctx.caster_team, ctx.caster_index, COMBO_KEY, 1)
 	return true

@@ -26,7 +26,8 @@ func cast(ctx: AbilityContext) -> bool:
 	if linked_allies.size() < 2:
 		return false
 	for ally_index: int in linked_allies:
-		_grant_mana(ctx, ally_index, MANA_GRANT[level_index])
+		var mana_grant: int = int(round(ctx.scale_power(float(MANA_GRANT[level_index]))))
+		_grant_mana(ctx, ally_index, mana_grant)
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var line_start: Vector2 = ctx.position_of(ctx.caster_team, linked_allies[0])
 	var line_end: Vector2 = ctx.position_of(ctx.caster_team, linked_allies[1])

@@ -20,11 +20,12 @@ func cast(ctx: AbilityContext) -> bool:
 	if ally == null:
 		return false
 	var heal_amount: float = float(HEAL_BASE[_level_index(caster)]) + 0.65 * float(caster.spell_power)
+	var scaled_heal_amount: float = ctx.scale_power(heal_amount)
 	var missing_hp: int = max(0, int(ally.max_hp) - int(ally.hp))
 	var heal_result: Dictionary = ctx.heal_single(ctx.caster_team, ally_index, heal_amount)
-	var overheal: int = max(0, int(round(heal_amount)) - missing_hp)
+	var overheal: int = max(0, int(round(scaled_heal_amount)) - missing_hp)
 	if overheal > 0 and ctx.buff_system != null:
-		ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, ally_index, overheal, SHIELD_DURATION)
+		ctx.apply_shield(ctx.caster_team, ally_index, overheal, SHIELD_DURATION, {"power_already_scaled": true})
 		ctx.buff_system.record_buff(ctx.state, ctx.caster_team, ally_index, "saffron_overheal_shield", {"overheal": overheal}, float(overheal), SHIELD_DURATION)
 	ctx.log("Golden Poultice: healed ally %d and converted %d overheal into shield" % [ally_index, overheal])
 	return bool(heal_result.get("processed", false))

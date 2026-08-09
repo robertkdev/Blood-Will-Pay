@@ -26,7 +26,7 @@ The implementation branch currently contains:
 
 - A pure Stakes market model and chapter-boundary promotion logic.
 - Economy records for total earned, peak bankroll, richest fight, and biggest wager won.
-- Probability-derived gross payout quotes with a contract payout modifier.
+- Encounter-tier gross payout quotes with a contract payout modifier; the rough win estimate is informational and does not price the wager.
 - Separate shop rarity and actual gold price.
 - Scaled reroll and XP/Command prices.
 - One current-grade premium package per higher-Stakes shop.
@@ -194,15 +194,13 @@ Selected milestones:
 
 The checked-in CSV is authoritative for exact rounded milestones.
 
-## Odds and Payout Proposal
+## Odds and Payout Contract
 
-Use projected win probability to quote a gross payout:
-
-`gross payout multiplier = clamp((1 + 0.45) / projected_win_probability, 1.05, 4.0)`
-
-At the 68% target, this is a 2.1324x gross return on the wager.
-
-The `0.45` term is deliberately not described as fair-market odds. It is a provisional growth subsidy/player edge chosen by the simulation so that ordinary strategies can both spend and survive. It must be recalibrated against a larger combat-odds sample and real player behavior.
+Projected win probability is informational and never prices a paid wager. The
+gross return is a deterministic encounter-tier quote: CREEPS `1.5x`,
+NORMAL/MIRROR `2.0x`, ELITE/EVENT `2.5x`, and BOSS `3.0x`; an explicit Pit
+contract modifier composes with that tier. The quote is locked at combat start
+and settlement uses that exact locked multiplier.
 
 Recommended wager UX:
 
@@ -246,10 +244,10 @@ Changes team construction:
 
 Changes the fight, wager, or reward environment:
 
-- Add a visible hazard or boss modifier for better odds/reward.
+- Add a visible hazard or boss modifier with an explicit encounter-tier reward modifier.
 - Let the player select one of several enemy mutators.
 - Introduce bounty targets, side objectives, or escalating crowd conditions.
-- Trade safer projected odds for a richer payout.
+- Trade a harder authored encounter for a richer, exact payout tier.
 - Add a readable arena-wide rule that affects both teams.
 
 All three offers use fixed chapter prices. The player's bankroll affects which choices are affordable, not what they cost.
@@ -336,7 +334,7 @@ These are option families, not a commitment to implement all of them.
 
 ### Economy and Betting
 
-- Odds-based payout quote.
+- Encounter-tier payout quote with explicit contract modifiers.
 - Bounty side bet.
 - Parlay across a five-fight chapter.
 - Insurance that reduces loss but costs expected value.
@@ -451,8 +449,8 @@ The first production slice now locks the following choices:
 - Player level caps at 14; unit combining caps at level 4.
 - Post-cap XP purchases unlock six targeting doctrines with real targeting behavior.
 - Chapter contract market offers Champion, Stable, and Pit choices with a free pass.
-- Pit raises enemy strength only; lower estimated win odds naturally improve the payout quote, avoiding double compensation.
-- Wager payout is quoted from projected win probability, clamped to 1.05x-4x gross, locked at combat start, and calculated with saturating arithmetic.
+- Pit raises enemy strength and applies an explicit payout modifier to the encounter-tier quote.
+- Wager payout is quoted from the deterministic encounter tier plus explicit contract modifier, locked at combat start, and calculated with saturating arithmetic.
 - Economic unit abilities, traits, and creep gold rewards pay in Stakes units.
 - Total gross money earned is the primary run score; recovery stipends and unit sales do not inflate it.
 - Planning-state Continue Run and identity-only career records are implemented.

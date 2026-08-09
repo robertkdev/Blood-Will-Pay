@@ -26,7 +26,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var level_index: int = _level_index(caster)
 	if ctx.buff_system != null:
-		ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, "ivara_open_bid", {
+		ctx.apply_stats_labeled(target_team, target_index, "ivara_open_bid", {
 			"armor": -ARMOR_SHRED,
 			"magic_resist": -MR_SHRED
 		}, SHRED_DURATION)

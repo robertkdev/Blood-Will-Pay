@@ -22,7 +22,7 @@ func cast(ctx: AbilityContext) -> bool:
 	if student_index < 0 or enemy_index < 0:
 		return false
 	var shield_amount: int = int(round(float(SHIELD_BASE[_level_index(caster)]) + SP_RATIO * float(caster.spell_power)))
-	ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, student_index, shield_amount, SHIELD_DURATION)
+	ctx.apply_shield(ctx.caster_team, student_index, shield_amount, SHIELD_DURATION)
 	var student_position: Vector2 = ctx.position_of(ctx.caster_team, student_index)
 	var enemy_position: Vector2 = ctx.position_of(ctx._other_team(ctx.caster_team), enemy_index)
 	var direction: Vector2 = enemy_position - student_position

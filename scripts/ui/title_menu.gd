@@ -1393,7 +1393,7 @@ func _render_rga() -> void:
 	count += _count_card(_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition"))
 	count += _count_card(_add_card("Approach", "The toolkit a unit uses to reach its goal: peel, ramp, sustain, lockdown, dive, zone control, and similar combat patterns.", "approach toolkit peel ramp sustain lockdown dive zone"))
 	count += _count_card(_add_card("Active Trait", "A trait turns on when enough matching units are on your board. Active thresholds are highlighted on trait hover cards.", "trait active threshold board"))
-	count += _count_card(_add_card("Estimated Win Range", "A calibrated range for current board strength. The wager panel shows the exact reserve after either outcome.", "estimated win range odds board strength warning wager reserve"))
+	count += _count_card(_add_card("Estimated Win Range", "A rough board-strength estimate. Abilities, items, placement, hazards, and targeting can move the result outside its range; the wager panel shows exact reserves from its encounter-tier quote.", "estimated win range odds board strength warning wager reserve"))
 	count += _count_card(_add_card("Bench", "Bought units wait on the bench until you drag them to the board. Dropping a bench unit onto a board unit swaps their positions.", "bench drag swap positions"))
 	_add_heading("Roles")
 	count += _render_role_cards(false)

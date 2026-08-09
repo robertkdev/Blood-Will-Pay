@@ -23,7 +23,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var threat_position: Vector2 = ctx.position_of(threat_team, threat_index)
 	if ctx.engine.has_method("_resolver_emit_vfx_beam_line"):
 		ctx.engine._resolver_emit_vfx_beam_line(ally_position, threat_position, Color(0.86, 0.42, 0.82, 0.95), 4.0, KNOT_DURATION)
-	ctx.buff_system.apply_tag(ctx.state, threat_team, threat_index, "root", KNOT_DURATION, {
+	ctx.apply_cc_tag(threat_team, threat_index, "root", KNOT_DURATION, {
 		"is_debuff": true,
 		"cleanseable": true,
 		"kind": "velour_silk_knot"

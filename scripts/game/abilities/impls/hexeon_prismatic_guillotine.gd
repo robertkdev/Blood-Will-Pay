@@ -69,15 +69,18 @@ func _strike(ctx: AbilityContext, target_idx: int, power_scale: float) -> Dictio
     if not ctx.is_alive(target_team, target_idx):
         res["killed"] = true
     if not bool(res.get("executed", false)) and target_before != null and target_before.is_alive() and bs != null:
+        var sustain_scale: float = ctx.scale_power(max(0.0, power_scale))
+        var healing_reduction: float = HEALING_REDUCTION_PCT * sustain_scale
+        var shield_reduction: float = SHIELD_REDUCTION_PCT * sustain_scale
         bs.apply_tag(ctx.state, target_team, target_idx, BuffTags.TAG_HEALING_REDUCTION_HEXEON, SUSTAIN_FRACTURE_DURATION_S, {
-            "healing_received_pct": HEALING_REDUCTION_PCT,
-            "shield_strength_pct": SHIELD_REDUCTION_PCT,
+            "healing_received_pct": healing_reduction,
+            "shield_strength_pct": shield_reduction,
             "kind": "hexeon_sustain_fracture",
         })
         bs.record_debuff(ctx.state, target_team, target_idx, "hexeon_sustain_fracture", {
-            "healing_received_pct": HEALING_REDUCTION_PCT,
-            "shield_strength_pct": SHIELD_REDUCTION_PCT,
-        }, abs(HEALING_REDUCTION_PCT) + abs(SHIELD_REDUCTION_PCT), SUSTAIN_FRACTURE_DURATION_S)
+            "healing_received_pct": healing_reduction,
+            "shield_strength_pct": shield_reduction,
+        }, abs(healing_reduction) + abs(shield_reduction), SUSTAIN_FRACTURE_DURATION_S)
     return res
 
 func _priority_backline_enemy(ctx: AbilityContext) -> int:

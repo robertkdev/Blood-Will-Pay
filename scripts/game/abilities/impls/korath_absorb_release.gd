@@ -26,7 +26,7 @@ func cast(ctx: AbilityContext) -> bool:
         return false
 
     var lvl: int = max(1, int(caster.level))
-    var pct: float = PCT_BY_LVL[min(2, lvl - 1)]
+    var pct: float = ctx.scale_power(PCT_BY_LVL[min(2, lvl - 1)])
 
     # Read unified Titan stack key managed by trait systems; do not add here (DRY)
     var stacks_at_cast: int = int(bs.get_stack(ctx.state, ctx.caster_team, ctx.caster_index, TraitKeys.TITAN))
@@ -42,9 +42,12 @@ func cast(ctx: AbilityContext) -> bool:
             protected_indices.append(ally_index)
 
     # Apply timed absorbing tag; also block mana gain while active
+    var pool_state: RefCounted = RefCounted.new()
+    pool_state.set_meta("amount", 0)
     var meta: Dictionary[String, Variant] = {
         "pct": pct,
         "pool": 0,
+        "pool_state": pool_state,
         "stacks_at_cast": stacks_at_cast,
         "heal_only": true,
         "block_mana_gain": true,
@@ -54,7 +57,7 @@ func cast(ctx: AbilityContext) -> bool:
 
     # Schedule release event via AbilitySystem; store meta reference so absorbed pool accumulates
     if ctx.engine.ability_system != null and ctx.engine.ability_system.has_method("schedule_event"):
-        ctx.engine.ability_system.schedule_event("korath_release", ctx.caster_team, ctx.caster_index, RELEASE_DELAY_S, {"meta": meta})
+        ctx.schedule_event("korath_release", ctx.caster_team, ctx.caster_index, RELEASE_DELAY_S, {"meta": meta})
 
     ctx.log("Absorb & Release: absorbing %.0f%% of damage for %.1fs" % [pct * 100.0, RELEASE_DELAY_S])
     return true

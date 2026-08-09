@@ -42,6 +42,6 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var shield_amount: int = int(round(float(SHIELD_BASE[_level_index(caster)]) + SHIELD_SP_RATIO * float(caster.spell_power)))
 	ctx.buff_system.cleanse(ctx.state, ctx.caster_team, ally_index)
-	ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, ally_index, shield_amount, SHIELD_DURATION)
+	ctx.apply_shield(ctx.caster_team, ally_index, shield_amount, SHIELD_DURATION)
 	ctx.log("Cleanse: cleansed and shielded carry %d" % ally_index)
 	return true

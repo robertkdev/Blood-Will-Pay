@@ -24,7 +24,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var center: Vector2 = _dash_to_enemy_backline(ctx, target_team, target_index)
 	# Playable Creep chooses damage reduction, not immunity. Enemy control can
 	# interrupt the committed backline spin and deny its takedown chase.
-	bs.apply_stats_buff(ctx.state, ctx.caster_team, ctx.caster_index, {"damage_reduction": DR_DURING_SPIN}, duration)
+	ctx.apply_stats_buff(ctx.caster_team, ctx.caster_index, {"damage_reduction": DR_DURING_SPIN}, duration)
 	var event_data: Dictionary[String, Variant] = {
 		"center": center,
 		"damage": per_tick_damage,
@@ -38,6 +38,6 @@ func cast(ctx: AbilityContext) -> bool:
 		"shred_dur": 0.0
 	}
 	if ctx.engine.ability_system != null:
-		ctx.engine.ability_system.schedule_event("creep_eaves_tick", ctx.caster_team, ctx.caster_index, 0.0, event_data)
+		ctx.schedule_event("creep_eaves_tick", ctx.caster_team, ctx.caster_index, 0.0, event_data)
 	ctx.log("Eavesdropping: committed spin %.2fs, %d ticks, %d per tick" % [duration, ticks, per_tick_damage])
 	return true

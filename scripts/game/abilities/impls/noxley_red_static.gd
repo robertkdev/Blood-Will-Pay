@@ -35,11 +35,11 @@ func cast(ctx: AbilityContext) -> bool:
 		var result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, damage, "magic")
 		if bool(result.get("processed", false)):
 			var dealt: float = float(result.get("dealt", damage))
-			ctx.heal_single(ctx.caster_team, ctx.caster_index, dealt * HEAL_PCT)
+			ctx.heal_from_dealt(ctx.caster_team, ctx.caster_index, dealt * HEAL_PCT)
 			_record_dot_debuff_presence(ctx, target_team, target_index, level_index)
 			if ctx.engine.ability_system != null:
 				var static_center: Vector2 = ctx.position_of(target_team, target_index)
-				ctx.engine.ability_system.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, DOT_INTERVAL, {
+				ctx.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, DOT_INTERVAL, {
 					"target_index": target_index,
 					"center": static_center,
 					"damage": DOT_DAMAGE[level_index],

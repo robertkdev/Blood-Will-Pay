@@ -1003,6 +1003,10 @@ func _expect_scaled_unit_detail(context: String) -> void:
 	if unit_frame != null:
 		for issue: String in UI_FIT_AUDITOR.audit(unit_frame, context):
 			_failures.append(issue)
+	if stats_panel.has_method("set_responsive_layout"):
+		stats_panel.call("set_responsive_layout", true, true)
+	await _settle_frames(2)
+	_expect(stats_area.size.x >= 210.0, "%s lost its detail width after a responsive refresh: %.1f" % [context, stats_area.size.x])
 	_save_capture("06a_unit_detail_1920x1080_150pct.png", _main)
 	if stats_panel.has_method("show_team_metrics"):
 		stats_panel.call("show_team_metrics")

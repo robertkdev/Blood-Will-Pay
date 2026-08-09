@@ -26,15 +26,13 @@ func cast(ctx: AbilityContext) -> bool:
 	if target_index < 0:
 		return false
 	var target_team: String = _enemy_team(ctx.caster_team)
+	if not ctx.schedule_implementation_callback(self, "_resolve_last_word", MARK_DURATION, [ctx, target_team, target_index]):
+		return false
 	if ctx.buff_system != null:
 		ctx.buff_system.record_debuff(ctx.state, target_team, target_index, "nullora_last_word_mark", {"execute_threshold": EXECUTE_THRESHOLD}, EXECUTE_THRESHOLD, MARK_DURATION)
 	ctx.emit_zone_exposure(target_team, target_index, "nullora_last_word_mark", MARK_DURATION, 0.0, 0.25)
 	if ctx.engine.has_signal("target_start"):
 		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, target_team, target_index)
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null:
-		return false
-	tree.create_timer(MARK_DURATION).timeout.connect(Callable(self, "_resolve_last_word").bind(ctx, target_team, target_index), CONNECT_ONE_SHOT)
 	ctx.log("Last Word: marked enemy carry %d for 1.5 seconds" % target_index)
 	return true
 

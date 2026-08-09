@@ -29,13 +29,13 @@ func cast(ctx: AbilityContext) -> bool:
 	var target_team: String = _enemy_team(ctx.caster_team)
 	var ally_index: int = _intersecting_low_hp_ally(ctx, ctx.position_of(target_team, target_index))
 	if ally_index >= 0 and ctx.buff_system != null:
-		ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, ally_index, SHIELD_BASE[level_index], SHIELD_DURATION)
+		ctx.apply_shield(ctx.caster_team, ally_index, SHIELD_BASE[level_index], SHIELD_DURATION)
 	if ctx.engine.has_signal("target_start"):
 		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, target_team, target_index)
 	var damage: float = float(DAMAGE_BASE[level_index]) + AD_RATIO * float(caster.attack_damage)
 	ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, damage, "physical")
 	if ctx.buff_system != null:
-		ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, "marble_sanctuary_bolt", {
+		ctx.apply_stats_labeled(target_team, target_index, "marble_sanctuary_bolt", {
 			"attack_speed": ATTACK_SPEED_SLOW
 		}, DEBUFF_DURATION)
 	ctx.log("Sanctuary Bolt: shielded ally %d and tagged enemy %d" % [ally_index, target_index])

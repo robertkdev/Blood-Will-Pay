@@ -6,7 +6,7 @@ At chapter entry the run prepares three mutually exclusive contract families:
 
 - Champion: installs a run-persistent targeting doctrine on an explicitly chosen owned unit; the assignment screen explains role fit before the player commits the bearer.
 - Stable: rotates between a bounded formation license, an opening team ward, and a first-death inheritance shield.
-- Pit: rotates between visible timed arena hazards while raising enemy difficulty; the resulting lower projected win odds naturally raise the quoted payout without a second reward multiplier.
+- Pit: rotates between visible timed arena hazards while raising enemy difficulty and applying an explicit 1.25x wager-return modifier to the encounter-tier quote. Projected win odds remain informational and do not price the wager.
 
 One selection expires the other offers. Passing is always valid. Contract prices derive from the current Stakes denomination rather than the player's current wallet. The market must show each offer's price, reward, drawback, and next-fight impact; purchased Stable and Pit effects are part of the run snapshot and survive resume.
 

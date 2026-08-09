@@ -9,7 +9,7 @@ const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
 
 const SUPPORTED_FIELDS := [
 	"armor", "magic_resist", "damage_reduction",
-	"attack_damage", "spell_power", "attack_speed",
+	"attack_damage", "spell_power", "attack_speed", "attack_range",
 	"crit_chance", "crit_damage",
 	"mana_regen",
 	"max_hp", "move_speed", "lifesteal", "lifesteel", # support both spellings
@@ -255,7 +255,7 @@ func apply_tag(state: BattleState, team: String, index: int, tag: String, durati
 	if lname == "root" or lname == "rooted":
 		_maybe_mark_first_cc(state, team, index, "root")
 	_emit_tag_presence(team, index, tag, buff["data"], dur)
-	return {"processed": true, "created": true, "remaining": duration_s, "data": buff["data"]}
+	return {"processed": true, "created": true, "remaining": dur, "data": buff["data"]}
 
 func has_tag(state: BattleState, team: String, index: int, tag: String) -> bool:
 	var u: Unit = _unit_at(state, team, index)
@@ -543,6 +543,8 @@ func _apply_fields(u: Unit, fields: Dictionary, sign: int) -> void:
 				u.damage_reduction = clamp(u.damage_reduction + delta, 0.0, 0.9)
 			"attack_speed":
 				u.attack_speed = clamp(u.attack_speed + delta, 0.01, MAX_ATTACK_SPEED)
+			"attack_range":
+				u.attack_range = max(0, int(round(float(u.attack_range) + delta)))
 			"lifesteal":
 				u.lifesteal = clamp(u.lifesteal + delta, 0.0, 0.9)
 			"lifesteel": # alias

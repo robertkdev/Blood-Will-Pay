@@ -115,7 +115,7 @@ Signals
 Phase Rules
 - Buying, rerolling, locking, progression, contracts, doctrine assignment, and unit selling are planning/post-combat actions. Combat attempts return `COMBAT_PHASE`.
 - Planning purchases must preserve the configured survival/reserve floor. Failed affordability surfaces as `WOULD_KILL_YOU` with a user-facing tooltip.
-- The wager is funded from blood buckets remaining after shopping, then escrowed at combat start. Its probability-based gross payout quote is locked for that fight.
+- The wager is funded from blood buckets remaining after shopping, then escrowed at combat start. Its deterministic encounter-tier gross payout quote (plus any explicit contract modifier) is locked for that fight; projected win odds are informational and do not set the return.
 - A non-broke Chapter 1 Stage 1 defeat receives enough opening retry recovery to return to 3 buckets, so a support starter can buy exactly one 1-bucket helper while still keeping a one-bucket planning wager. Axiom's configured retry helpers are guarded by `AxiomRetryChoiceQualitySmoke` and the production retry-shop slot 0 path is covered by `AxiomRetryEconomySmoke`.
 
 Error Codes

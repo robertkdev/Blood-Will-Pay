@@ -18,7 +18,7 @@ var cost_adapter: Variant = null
 
 # Per-unit cooldowns (seconds remaining)
 var _cooldowns: Dictionary = {} # Unit -> float
-var _events: Array = [] # Array[Dictionary]: { name, team, index, t, data }
+var _events: Array[Dictionary] = [] # { name, team, index, t, data }
 var _casting: Dictionary = {} # Unit -> bool reentrancy guard
 var _totem_autocast_used: Dictionary = {} # Unit -> bool, once per combat
 var emit_ability_logs: bool = false
@@ -29,6 +29,7 @@ const KORATH_RELEASE_MAX_DAMAGE_TARGETS: int = 2
 const KORATH_RELEASE_STUN_DURATION: float = 0.45
 
 func configure(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGenerator, _buffs: BuffSystem = null) -> void:
+	_cancel_queued_implementation_callbacks()
 	engine = _engine
 	state = _state
 	rng = _rng
@@ -38,8 +39,10 @@ func configure(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGen
 	cost_adapter = null
 	_cooldowns.clear()
 	_totem_autocast_used.clear()
+	_events.clear()
 
 func teardown() -> void:
+	_cancel_queued_implementation_callbacks()
 	if buff_system != null and buff_system.shield_ended.is_connected(_on_shield_ended):
 		buff_system.shield_ended.disconnect(_on_shield_ended)
 	engine = null
@@ -65,15 +68,20 @@ func tick(delta: float) -> void:
 	for u2 in to_erase:
 		_cooldowns.erase(u2)
 	# Timed ability events (e.g., Korath release)
-	var remaining: Array = []
-	for e in _events:
+	# Handlers may schedule follow-up work. Empty the active queue first so that
+	# callbacks scheduled during this pass remain owned by the next pass instead
+	# of being overwritten by the remaining-event assignment below.
+	var due_or_pending: Array[Dictionary] = _events
+	_events = []
+	var remaining: Array[Dictionary] = []
+	for e: Dictionary in due_or_pending:
 		var tleft: float = float(e.get("t", 0.0)) - delta
 		if tleft <= 0.0:
 			_handle_event(e)
 		else:
 			e["t"] = tleft
 			remaining.append(e)
-	_events = remaining
+	_events.append_array(remaining)
 
 	# Passive ability watchers (e.g., Totem Exile auto-cleanse)
 	_autocast_watchers()
@@ -88,6 +96,49 @@ func schedule_event(name: String, team: String, index: int, delay_s: float, data
 		"t": max(0.0, float(delay_s)),
 		"data": (data if data != null else {})
 	})
+
+func schedule_implementation_callback(implementation: Variant, method_name: String, team: String, index: int, delay_s: float, args: Array[Variant] = [], power_scale: float = 1.0, cancel_method_name: String = "") -> bool:
+	if implementation == null or method_name.is_empty() or not implementation.has_method(method_name):
+		return false
+	if engine == null or state == null:
+		return false
+	schedule_event("implementation_callback", team, index, delay_s, {
+		"implementation": implementation,
+		"method_name": method_name,
+		"cancel_method_name": cancel_method_name,
+		"args": args.duplicate(),
+		"ability_power_scale": clampf(power_scale, 0.0, 1.0)
+	})
+	return true
+
+func cast_implementation(implementation: Variant, ctx: AbilityContext, source_kind: String = "ability") -> bool:
+	if implementation == null or ctx == null or not implementation.has_method("cast"):
+		return false
+	var pushed: bool = _push_buff_source(ctx.caster_team, ctx.caster_index, source_kind)
+	var cast_ok: bool = bool(implementation.cast(ctx))
+	if pushed:
+		_pop_buff_source()
+	return cast_ok
+
+func _cancel_queued_implementation_callbacks() -> void:
+	for event: Dictionary in _events:
+		if String(event.get("name", "")) != "implementation_callback":
+			continue
+		var data_value: Variant = event.get("data", {})
+		var data: Dictionary = data_value if data_value is Dictionary else {}
+		var implementation: Variant = data.get("implementation", null)
+		var cancel_method_name: String = String(data.get("cancel_method_name", ""))
+		if implementation != null and not cancel_method_name.is_empty() and implementation.has_method(cancel_method_name):
+			implementation.call(cancel_method_name)
+
+func _event_power_scale(data: Dictionary) -> float:
+	return clampf(float(data.get("ability_power_scale", 1.0)), 0.0, 1.0)
+
+func _event_context(team: String, index: int, data: Dictionary) -> AbilityContext:
+	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
+	ctx.buff_system = buff_system
+	ctx.power_scale = _event_power_scale(data)
+	return ctx
 
 func _autocast_watchers() -> void:
 	# Totem Exile upgrade: auto-cast Cleanse when any ally is debuffed
@@ -127,10 +178,7 @@ func _autocast_totem_if_needed(team: String, index: int) -> void:
 		return
 	var cast_info: Dictionary = _emit_ability_cast_event(team, index, ability_id, ctx, team, index)
 	# Attempt to cast immediately, ignoring mana threshold; consume mana on success
-	var pushed: bool = _push_buff_source(team, index, "autocast")
-	var ok: bool = bool(impl.cast(ctx))
-	if pushed:
-		_pop_buff_source()
+	var ok: bool = cast_implementation(impl, ctx, "autocast")
 	if not ok:
 		return
 	_totem_autocast_used[unit] = true
@@ -147,36 +195,40 @@ func _handle_event(evt: Dictionary) -> void:
 	var name: String = String(evt.get("name", ""))
 	var source_team: String = String(evt.get("team", "player"))
 	var source_index: int = int(evt.get("index", -1))
+	var data_value: Variant = evt.get("data", {})
+	var data: Dictionary = data_value if data_value is Dictionary else {}
 	var pushed: bool = _push_buff_source(source_team, source_index, "scheduled")
 	match name:
+		"implementation_callback":
+			_handle_implementation_callback(data)
 		"korath_release":
-			_handle_korath_release(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_korath_release(source_team, source_index, data)
 		"veyra_harden_end":
 			_handle_veyra_harden_end(String(evt.get("team", "player")), int(evt.get("index", -1)))
 		"kythera_siphon_tick":
-			_handle_kythera_siphon_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_kythera_siphon_tick(source_team, source_index, data)
 		"kythera_siphon_end":
-			_handle_kythera_siphon_end(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_kythera_siphon_end(source_team, source_index, data)
 		"creep_eaves_tick":
-			_handle_creep_eaves_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_creep_eaves_tick(source_team, source_index, data)
 		"egress_exit_wound_strike":
-			_handle_egress_exit_wound_strike(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_egress_exit_wound_strike(source_team, source_index, data)
 		"kett_union_breaker_hit":
-			_handle_kett_union_breaker_hit(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_kett_union_breaker_hit(source_team, source_index, data)
 		"prisma_color_field_tick":
-			_handle_prisma_color_field_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_prisma_color_field_tick(source_team, source_index, data)
 		"quorra_timeplate_tick":
-			_handle_quorra_timeplate_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_quorra_timeplate_tick(source_team, source_index, data)
 		"cinder_fuse_tick":
-			_handle_cinder_fuse_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_cinder_fuse_tick(source_team, source_index, data)
 		"planned_area_tick":
-			_handle_planned_area_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_planned_area_tick(source_team, source_index, data)
 		"rooket_brace_fire":
-			_handle_rooket_brace_fire(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_rooket_brace_fire(source_team, source_index, data)
 		"bo_wos_dash_tick":
-			_handle_bo_wos_dash_tick(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_bo_wos_dash_tick(source_team, source_index, data)
 		"bo_wos_land":
-			_handle_bo_wos_land(String(evt.get("team", "player")), int(evt.get("index", -1)), evt.get("data", {}))
+			_handle_bo_wos_land(source_team, source_index, data)
 		"autocast_deferred":
 			# Deferred autocast to break synchronous recursion; best-effort try next tick
 			var t: String = String(evt.get("team", ""))
@@ -188,6 +240,17 @@ func _handle_event(evt: Dictionary) -> void:
 	if pushed:
 		_pop_buff_source()
 
+func _handle_implementation_callback(data: Dictionary) -> void:
+	var implementation: Variant = data.get("implementation", null)
+	var method_name: String = String(data.get("method_name", ""))
+	var args_value: Variant = data.get("args", [])
+	var args: Array[Variant] = []
+	if args_value is Array:
+		for arg: Variant in args_value:
+			args.append(arg)
+	if implementation != null and not method_name.is_empty() and implementation.has_method(method_name):
+		implementation.callv(method_name, args)
+
 func _on_shield_ended(target_team: String, target_index: int, reason: String, data: Dictionary) -> void:
 	if String(data.get("kind", "")) != "paisley_bubble_pop" or state == null or engine == null:
 		return
@@ -195,8 +258,8 @@ func _on_shield_ended(target_team: String, target_index: int, reason: String, da
 	var source_index: int = int(data.get("source_index", -1))
 	if source_index < 0 or target_index < 0:
 		return
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, source_team, source_index)
-	ctx.buff_system = buff_system
+	var ctx: AbilityContext = _event_context(source_team, source_index, data)
+	var source_pushed: bool = _push_buff_source(source_team, source_index, "scheduled")
 	var center: Vector2 = ctx.position_of(target_team, target_index)
 	var radius: float = max(0.1, float(data.get("radius_tiles", 1.0)))
 	var damage: float = max(0.0, float(data.get("damage", 0.0)))
@@ -205,9 +268,11 @@ func _on_shield_ended(target_team: String, target_index: int, reason: String, da
 	var victims: Array[int] = ctx.enemies_in_radius_at(source_team, center, radius)
 	for victim_index: int in victims:
 		if damage > 0.0:
-			AbilityEffects.damage_single(engine, state, source_team, source_index, victim_index, damage, "magic")
+			ctx.damage_single(source_team, source_index, victim_index, damage, "magic")
 		if stun_duration > 0.0:
-			AbilityEffects.stun(buff_system, engine, state, target_enemy_team, victim_index, stun_duration, source_team, source_index)
+			ctx.stun(target_enemy_team, victim_index, stun_duration)
+	if source_pushed:
+		_pop_buff_source()
 	engine._resolver_emit_log("Bubbles: %s pop at ally %d hit %d nearby enemies" % [reason, target_index, victims.size()])
 
 func _handle_rooket_brace_fire(team: String, index: int, data: Dictionary) -> void:
@@ -222,8 +287,7 @@ func _handle_rooket_brace_fire(team: String, index: int, data: Dictionary) -> vo
 	if target == null or not target.is_alive():
 		engine._resolver_emit_log("Brace Shot: target escaped before the shot")
 		return
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-	ctx.buff_system = buff_system
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var line_length: float = max(0.1, float(data.get("line_length_tiles", 6.0)))
 	var line_width: float = max(0.1, float(data.get("line_width_tiles", 0.75)))
 	var damage: float = max(0.0, float(data.get("damage", 0.0)))
@@ -235,7 +299,7 @@ func _handle_rooket_brace_fire(team: String, index: int, data: Dictionary) -> vo
 		hits.append(target_index)
 	for hit_index: int in hits:
 		ctx.damage_single(team, index, hit_index, damage, "physical")
-		buff_system.apply_stats_labeled(state, target_team, hit_index, "rooket_brace_shot_shred", {
+		ctx.apply_stats_labeled(target_team, hit_index, "rooket_brace_shot_shred", {
 			"armor": -armor_shred,
 			"attack_speed": attack_speed_slow
 		}, shred_duration)
@@ -265,8 +329,7 @@ func _handle_creep_eaves_tick(team: String, index: int, data: Dictionary) -> voi
 	if ticks_left <= 0:
 		return
 	# Build a context for geometric helpers
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-	ctx.buff_system = buff_system
+	var ctx: AbilityContext = _event_context(team, index, data)
 	# Gather victims within radius around center
 	var victims: Array[int] = ctx.enemies_in_radius_at(team, center, radius)
 	var tgt_team: String = ("enemy" if team == "player" else "player")
@@ -274,7 +337,7 @@ func _handle_creep_eaves_tick(team: String, index: int, data: Dictionary) -> voi
 	for vi in victims:
 		if vi < 0:
 			continue
-		var res: Dictionary = AbilityEffects.damage_single(engine, state, team, index, int(vi), dmg, "physical")
+		var res: Dictionary = ctx.damage_single(team, index, int(vi), float(dmg), "physical")
 		if bool(res.get("processed", false)):
 			var dealt_amount: float = float(res.get("dealt", dmg))
 			ctx.emit_zone_exposure(tgt_team, int(vi), "eavesdropping_spin_zone", interval, dealt_amount, radius)
@@ -287,7 +350,7 @@ func _handle_creep_eaves_tick(team: String, index: int, data: Dictionary) -> voi
 			if tgt != null and tgt.is_alive():
 				var eff: float = float(tgt.armor) * shred_pct
 				if eff > 0.0:
-					buff_system.apply_stats_buff(state, tgt_team, int(vi), {"armor": -eff}, shred_dur)
+					ctx.apply_stats_buff(tgt_team, int(vi), {"armor": -eff}, shred_dur)
 	# Chase logic (once)
 	if allow_chase and (not chase_used) and any_kill:
 		var next_idx: int = ctx.lowest_hp_enemy(team)
@@ -321,15 +384,14 @@ func _handle_egress_exit_wound_strike(team: String, index: int, data: Dictionary
 	var execute_threshold: float = clamp(float(data.get("execute_threshold", 0.30)), 0.0, 1.0)
 	var hp_pct_at_strike: float = float(target.hp) / max(1.0, float(target.max_hp))
 	var execute_armed: bool = hp_pct_at_strike <= execute_threshold
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var damage: float = max(0.0, float(data.get("damage", 0.0)))
-	var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, target_index, damage, "physical")
+	var result: Dictionary = ctx.damage_single(team, index, target_index, damage, "physical")
 	target = _unit_at(target_team, target_index)
 	if execute_armed and target != null and target.is_alive():
 		var execute_damage: float = float(target.hp) + 1.0
-		var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-		ctx.buff_system = buff_system
 		ctx.emit_execute_bonus(target_team, target_index, damage, execute_damage, execute_threshold, hp_pct_at_strike, "egress_exit_wound")
-		result = AbilityEffects.damage_single(engine, state, team, index, target_index, execute_damage, "true")
+		result = ctx.damage_single(team, index, target_index, execute_damage, "true")
 	target = _unit_at(target_team, target_index)
 	if bool(result.get("processed", false)) and (target == null or not target.is_alive()) and bool(data.get("retreat_on_kill", true)):
 		var sign_x: float = -1.0 if team == "player" else 1.0
@@ -357,18 +419,19 @@ func _handle_kett_union_breaker_hit(team: String, index: int, data: Dictionary) 
 	if target == null or not target.is_alive():
 		return
 	var hit_number: int = clampi(int(data.get("hit_number", 1)), 1, 3)
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var damage: float = max(0.0, float(data.get("damage", 0.0)))
-	var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, target_index, damage, "physical")
+	var result: Dictionary = ctx.damage_single(team, index, target_index, damage, "physical")
 	if not bool(result.get("processed", false)):
 		return
 	if buff_system != null:
 		var armor_shred: float = max(0.0, float(data.get("armor_shred", 0.0)))
 		var debuff_duration: float = max(0.05, float(data.get("debuff_duration", 4.5)))
-		buff_system.apply_stats_labeled(state, target_team, target_index, "kett_union_breaker_hit_%d" % hit_number, {"armor": -armor_shred}, debuff_duration)
+		ctx.apply_stats_labeled(target_team, target_index, "kett_union_breaker_hit_%d" % hit_number, {"armor": -armor_shred}, debuff_duration)
 	target = _unit_at(target_team, target_index)
 	if hit_number == 3 and target != null and target.is_alive():
 		var stun_duration: float = max(0.0, float(data.get("finisher_stun", 0.35)))
-		AbilityEffects.stun(buff_system, engine, state, target_team, target_index, stun_duration, team, index)
+		ctx.stun(target_team, target_index, stun_duration)
 		var target_position: Vector2 = engine.get_enemy_position(target_index) if target_team == "enemy" else engine.get_player_position(target_index)
 		var push_sign: float = 1.0 if target_team == "enemy" else -1.0
 		var push_tiles: float = max(0.0, float(data.get("finisher_push_tiles", 0.9)))
@@ -388,8 +451,7 @@ func _handle_prisma_color_field_tick(team: String, index: int, data: Dictionary)
 	var center_value: Variant = data.get("center", Vector2.ZERO)
 	var center: Vector2 = center_value if center_value is Vector2 else Vector2.ZERO
 	var radius: float = max(0.1, float(data.get("radius", 2.35)))
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-	ctx.buff_system = buff_system
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var target_team: String = "enemy" if team == "player" else "player"
 	var occupants: Array[int] = ctx.enemies_in_radius_at(team, center, radius)
 	var damage_applied: bool = bool(data.get("damage_applied", false))
@@ -397,7 +459,7 @@ func _handle_prisma_color_field_tick(team: String, index: int, data: Dictionary)
 	var mana_block_tag: String = String(data.get("mana_block_tag", "prisma_color_field_lock"))
 	for target_index: int in occupants:
 		if not damage_applied:
-			AbilityEffects.damage_single(engine, state, team, index, target_index, damage, "magic")
+			ctx.damage_single(team, index, target_index, damage, "magic")
 		if buff_system != null:
 			buff_system.apply_tag(state, target_team, target_index, mana_block_tag, interval * 1.25, {
 				"block_mana_gain": true,
@@ -428,7 +490,8 @@ func _handle_quorra_timeplate_tick(team: String, index: int, data: Dictionary) -
 		return
 	var damage: float = max(0.0, float(data.get("damage", 0.0)))
 	var damage_type: String = String(data.get("damage_type", "magic"))
-	var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, target_index, damage, damage_type)
+	var ctx: AbilityContext = _event_context(team, index, data)
+	var result: Dictionary = ctx.damage_single(team, index, target_index, damage, damage_type)
 	if bool(result.get("processed", false)) and engine.has_method("_resolver_emit_dot_tick_applied"):
 		engine._resolver_emit_dot_tick_applied(team, index, target_team, target_index, int(max(0, int(result.get("dealt", damage)))), "quorra_timeplate_clock")
 	ticks_left -= 1
@@ -488,12 +551,11 @@ func _handle_cinder_fuse_tick(team: String, index: int, data: Dictionary) -> voi
 	var debuff_tag: String = String(data.get("debuff_tag", ""))
 	var debuff_tag_data: Dictionary = data.get("debuff_tag_data", {}) if (data.get("debuff_tag_data", {}) is Dictionary) else {}
 	var debuff_tag_duration: float = max(interval, float(data.get("debuff_tag_duration", interval)))
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-	ctx.buff_system = buff_system
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var target_team: String = "enemy" if team == "player" else "player"
 	var victims: Array[int] = ctx.enemies_in_radius_at(team, center, radius)
 	for victim_index: int in victims:
-		var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, victim_index, damage, "magic")
+		var result: Dictionary = ctx.damage_single(team, index, victim_index, float(damage), "magic")
 		if bool(result.get("processed", false)):
 			var dealt_amount: int = int(max(0, int(result.get("dealt", damage))))
 			if engine.has_method("_resolver_emit_dot_tick_applied"):
@@ -502,7 +564,7 @@ func _handle_cinder_fuse_tick(team: String, index: int, data: Dictionary) -> voi
 			if buff_system != null:
 				buff_system.record_debuff(state, target_team, victim_index, "cinder_burn", {"burn": dealt_amount}, float(dealt_amount), interval)
 				if not debuff_fields.is_empty():
-					buff_system.apply_stats_labeled(state, target_team, victim_index, debuff_label, debuff_fields, debuff_duration)
+					ctx.apply_stats_labeled(target_team, victim_index, debuff_label, debuff_fields, debuff_duration)
 				if debuff_tag != "":
 					buff_system.apply_tag(state, target_team, victim_index, debuff_tag, debuff_tag_duration, debuff_tag_data)
 	ticks_left -= 1
@@ -529,8 +591,7 @@ func _handle_planned_area_tick(team: String, index: int, data: Dictionary) -> vo
 	var debuff_duration: float = max(interval, float(data.get("debuff_duration", interval)))
 	var debuff_fields: Dictionary = data.get("debuff_fields", {}) if (data.get("debuff_fields", {}) is Dictionary) else {}
 	var self_heal_pct: float = max(0.0, float(data.get("self_heal_pct", 0.0)))
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-	ctx.buff_system = buff_system
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var target_team: String = "enemy" if team == "player" else "player"
 	var victims: Array[int] = []
 	var target_index: int = int(data.get("target_index", -1))
@@ -542,7 +603,7 @@ func _handle_planned_area_tick(team: String, index: int, data: Dictionary) -> vo
 		if radius > 0.0:
 			victims = ctx.enemies_in_radius_at(team, center, radius)
 	for victim_index: int in victims:
-		var result: Dictionary = AbilityEffects.damage_single(engine, state, team, index, victim_index, damage, damage_type)
+		var result: Dictionary = ctx.damage_single(team, index, victim_index, float(damage), damage_type)
 		if not bool(result.get("processed", false)):
 			continue
 		var dealt_amount: int = int(max(0, int(result.get("dealt", damage))))
@@ -552,11 +613,11 @@ func _handle_planned_area_tick(team: String, index: int, data: Dictionary) -> vo
 			ctx.emit_zone_exposure(target_team, victim_index, zone_kind, interval, float(dealt_amount), radius)
 		if buff_system != null and not debuff_fields.is_empty():
 			if debuff_label != "":
-				buff_system.apply_stats_labeled(state, target_team, victim_index, debuff_label, debuff_fields, debuff_duration)
+				ctx.apply_stats_labeled(target_team, victim_index, debuff_label, debuff_fields, debuff_duration)
 			else:
-				buff_system.apply_stats_buff(state, target_team, victim_index, debuff_fields, debuff_duration)
+				ctx.apply_stats_buff(target_team, victim_index, debuff_fields, debuff_duration)
 		if self_heal_pct > 0.0 and dealt_amount > 0:
-			ctx.heal_single(team, index, float(dealt_amount) * self_heal_pct)
+			ctx.heal_from_dealt(team, index, float(dealt_amount) * self_heal_pct)
 	ticks_left -= 1
 	if ticks_left > 0:
 		data["ticks_left"] = ticks_left
@@ -576,6 +637,10 @@ func _handle_korath_release(team: String, index: int, data: Dictionary) -> void:
 	var stacks_at_cast: int = int(0)
 	if meta != null and typeof(meta) == TYPE_DICTIONARY:
 		pool = int(meta.get("pool", 0))
+		var pool_state_value: Variant = meta.get("pool_state", null)
+		if pool_state_value is Object:
+			var pool_state: Object = pool_state_value as Object
+			pool = int(pool_state.get_meta("amount", 0))
 		stacks_at_cast = int(meta.get("stacks_at_cast", 0))
 		# Clear remaining time on tag if still present (not required, but tidy)
 		if buff_system != null and buff_system.has_tag(state, team, index, BuffTags.TAG_KORATH):
@@ -598,12 +663,14 @@ func _handle_korath_release(team: String, index: int, data: Dictionary) -> void:
 		return
 	var tgt_team: String = team
 	var heal_base: int = int(floor(0.20 * float(caster.max_hp)))
-	var heal_amt: int = max(0, int(pool) + heal_base + 4 * int(stacks_at_cast))
+	var ctx: AbilityContext = _event_context(team, index, data)
+	# The absorbed pool was already reduced by the pupil's scaled absorb ratio.
+	# Scale only the authored base/stack bonus here, then apply the fully resolved
+	# release value without another power pass.
+	var authored_bonus: int = heal_base + 4 * int(stacks_at_cast)
+	var heal_amt: int = max(0, int(pool) + int(round(ctx.scale_power(float(authored_bonus)))))
 	var release_payload: int = heal_amt
-	# Use context helper so healing includes source metadata
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-	ctx.buff_system = buff_system
-	ctx.heal_single(tgt_team, best_idx, heal_amt)
+	AbilityEffects.heal_single(engine, state, tgt_team, best_idx, float(heal_amt), team, index)
 	if bool(meta.get("heal_only", false)):
 		engine._resolver_emit_log("Absorb & Release: healed %d (pool=%d, base=%d, stacks=%d)" % [heal_amt, pool, heal_base, stacks_at_cast])
 		return
@@ -621,7 +688,7 @@ func _handle_korath_release(team: String, index: int, data: Dictionary) -> void:
 				damaged_targets += 1
 				release_damage_total += int(max(0, int(damage_result.get("dealt", dmg_amt))))
 				# Brief stun to create a window to capitalize
-				AbilityEffects.stun(buff_system, engine, state, ("enemy" if team == "player" else "player"), enemy_idx, KORATH_RELEASE_STUN_DURATION, team, index)
+				ctx.stun(("enemy" if team == "player" else "player"), enemy_idx, KORATH_RELEASE_STUN_DURATION)
 	engine._resolver_emit_log("Absorb & Release: healed %d (pool=%d, base=%d, stacks=%d, release_damage=%d targets=%d)" % [heal_amt, pool, heal_base, stacks_at_cast, release_damage_total, damaged_targets])
 
 func _korath_release_damage_targets(ctx: AbilityContext, team: String, index: int) -> Array[int]:
@@ -722,39 +789,56 @@ func _handle_kythera_siphon_tick(team: String, index: int, data: Dictionary) -> 
 	var tgt: Unit = _unit_at(tgt_team, tgt_idx)
 	if tgt == null or not tgt.is_alive():
 		return
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var dmg: int = int(max(0, int(data.get("damage", 0))))
 	if dmg > 0:
-		AbilityEffects.damage_single(engine, state, team, index, tgt_idx, dmg, "magic")
-	# Apply incremental MR drain this tick and accumulate drained_total on caster tag
+		ctx.damage_single(team, index, tgt_idx, float(dmg), "magic")
+	# Combat-owned accumulation survives the internal marker expiring before this
+	# queue runs in CombatEngine's tick order.
 	if buff_system != null:
+		var drain_state_value: Variant = data.get("drain_state", null)
+		var drain_state: Object = drain_state_value as Object if drain_state_value is Object else null
+		var per_sec: float = max(0.0, float(data.get("per_sec", 0.0)))
+		var drained_total: float = float(drain_state.get_meta("drained_total", 0.0)) if drain_state != null else float(data.get("drained_total", 0.0))
+		var drain_capacity: float = float(drain_state.get_meta("capacity", drained_total + per_sec)) if drain_state != null else drained_total + per_sec
+		var remain: float = max(0.001, float(data.get("remain", 0.0)))
+		# Effective drain cannot exceed current MR or the target's resistance at
+		# this cast's start. The final tick receives a tiny lifetime so it can be
+		# measured before expiring on the following frame.
+		var cur_mr: float = float(tgt.magic_resist)
+		var output_scale: float = clampf(ctx.power_scale, 0.0, 1.0)
+		var available_output: float = max(0.0, drain_capacity * output_scale - drained_total)
+		var eff: float = 0.0
+		if output_scale > 0.0:
+			eff = min(per_sec, min(max(0.0, cur_mr) / output_scale, available_output / output_scale))
+		if eff > 0.0:
+			var drain_result: Dictionary = ctx.apply_stats_buff(tgt_team, tgt_idx, {"magic_resist": -eff}, remain)
+			var applied_fields: Dictionary = drain_result.get("applied", {}) if drain_result.get("applied", {}) is Dictionary else {}
+			drained_total += absf(float(applied_fields.get("magic_resist", 0.0)))
+		if drain_state != null:
+			drain_state.set_meta("drained_total", drained_total)
 		if buff_system.has_tag(state, team, index, BuffTags.TAG_KYTHERA):
 			var tag: Dictionary = buff_system.get_tag(state, team, index, BuffTags.TAG_KYTHERA)
 			var meta: Dictionary = tag.get("data", {})
-			var per_sec: float = float(meta.get("per_sec", 0.0))
-			var drained_total: float = float(meta.get("drained_total", 0.0))
-			var remain: float = float(data.get("remain", 0.0))
-			# Effective drain cannot exceed current MR
-			var cur_mr: float = float(tgt.magic_resist)
-			var eff: float = min(per_sec, max(0.0, cur_mr))
-			if eff > 0.0 and remain > 0.0:
-				buff_system.apply_stats_buff(state, tgt_team, tgt_idx, {"magic_resist": -eff}, remain)
-			drained_total += eff
 			meta["drained_total"] = drained_total
 			tag["data"] = meta
 
 func _handle_kythera_siphon_end(team: String, index: int, data: Dictionary) -> void:
 	if state == null or engine == null:
 		return
+	var drain_state_value: Variant = data.get("drain_state", null)
+	var drain_state: Object = drain_state_value as Object if drain_state_value is Object else null
+	var drained_total: float = float(drain_state.get_meta("drained_total", data.get("drained_total", 0.0))) if drain_state != null else float(data.get("drained_total", 0.0))
+	var gain_total: int = int(max(0, round(drained_total)))
 	var caster: Unit = _unit_at(team, index)
 	if caster == null or not caster.is_alive():
 		return
-	var gain_total: int = int(max(0, round(float(data.get("drained_total", 0.0)))))
 	var share_radius_tiles: float = float(data.get("share_radius_tiles", 0.0))
 	if buff_system != null:
 		if buff_system.has_tag(state, team, index, BuffTags.TAG_KYTHERA):
 			var tag: Dictionary = buff_system.get_tag(state, team, index, BuffTags.TAG_KYTHERA)
 			var meta: Dictionary = tag.get("data", {})
-			var drained_total: float = float(meta.get("drained_total", 0.0))
+			drained_total = float(meta.get("drained_total", drained_total))
 			gain_total = int(max(0, round(drained_total)))
 			share_radius_tiles = float(meta.get("share_radius_tiles", share_radius_tiles))
 			# Clear remaining time on tag
@@ -777,7 +861,6 @@ func _handle_kythera_siphon_end(team: String, index: int, data: Dictionary) -> v
 			buff_system.add_stack(state, team, ally_index, "kythera_siphon_mr", 1, {"magic_resist": float(gain_total)})
 			shared_count += 1
 	engine._resolver_emit_log("Siphon: shared +%d Magic Resist with %d nearby allies" % [gain_total, shared_count])
-
 func _handle_bo_wos_dash_tick(team: String, index: int, data: Dictionary) -> void:
 	if state == null or engine == null:
 		return
@@ -822,8 +905,7 @@ func _handle_bo_wos_dash_tick(team: String, index: int, data: Dictionary) -> voi
 	var half_w: float = max(0.0, width_tiles) * ts * 0.5 + eps
 	var fwd: Vector2 = (seg / seg_len) if seg_len > 0.0 else Vector2.ZERO
 	# Damage/CC enemies intersecting this sweep and not hit yet
-	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, team, index)
-	ctx.buff_system = buff_system
+	var ctx: AbilityContext = _event_context(team, index, data)
 	var tgt_team: String = ("enemy" if team == "player" else "player")
 	for vi in range((state.enemy_team.size() if team == "player" else state.player_team.size())):
 		var opp: Unit = _unit_at(tgt_team, vi)
@@ -842,10 +924,10 @@ func _handle_bo_wos_dash_tick(team: String, index: int, data: Dictionary) -> voi
 		var perp: float = abs(rel.cross(fwd))
 		if perp <= half_w:
 			# Hit once per dash
-			AbilityEffects.stun(buff_system, engine, state, tgt_team, vi, kdur, team, index)
+			ctx.stun(tgt_team, vi, kdur)
 			if engine and engine.has_method("_resolver_emit_vfx_knockup"):
 				engine._resolver_emit_vfx_knockup(tgt_team, vi, kdur)
-			AbilityEffects.damage_single(engine, state, team, index, vi, dmg, "physical")
+			ctx.damage_single(team, index, vi, float(dmg), "physical")
 			hit[vi] = true
 
 	# Reschedule next tick until remaining time elapses
@@ -926,18 +1008,20 @@ func try_cast(team: String, index: int) -> Dictionary:
 	# Guard against exceptions in ability scripts
 	# Mark as actively casting to prevent re-entrant chains (e.g., mana-on-attack during ability damage)
 	_casting[unit] = true
-	var pushed: bool = _push_buff_source(team, index, "ability")
-	ok = bool(impl.cast(ctx))
-	if pushed:
-		_pop_buff_source()
+	ok = cast_implementation(impl, ctx, "ability")
 	_casting.erase(unit)
 	
 	if not ok:
 		result.reason = "cast_failed"
 		return result
 	_log_ability_cast(team, index, ability_id)
-	# Success: reset mana and start cooldown (if present)
+	# Success: reset mana before applying implementation-requested refunds. Ability
+	# implementations must not mutate mana directly because that value is otherwise
+	# overwritten by this shared commit path.
 	unit.mana = 0
+	var post_cast_mana_refund: int = ctx.consume_post_cast_mana_refund()
+	if post_cast_mana_refund > 0:
+		unit.mana = mini(int(unit.mana_max), post_cast_mana_refund)
 	var cd_s: float = 0.0
 	if cd_s > 0.0:
 		_cooldowns[unit] = cd_s

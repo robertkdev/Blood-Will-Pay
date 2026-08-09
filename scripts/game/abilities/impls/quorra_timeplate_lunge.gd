@@ -42,7 +42,7 @@ func cast(ctx: AbilityContext) -> bool:
 			"source_index": ctx.caster_index
 		})
 	if ctx.engine.ability_system != null:
-		ctx.engine.ability_system.schedule_event("quorra_timeplate_tick", ctx.caster_team, ctx.caster_index, DOT_INTERVAL, {
+		ctx.schedule_event("quorra_timeplate_tick", ctx.caster_team, ctx.caster_index, DOT_INTERVAL, {
 			"target_team": target_team,
 			"target_index": target_index,
 			"damage": DOT_DAMAGE[level_index],

@@ -9,9 +9,16 @@ signal score_changed(record: Dictionary)
 const STARTING_BLOOD_BUCKETS: int = 3
 const STARTING_GOLD: int = STARTING_BLOOD_BUCKETS # Legacy compatibility alias.
 const DEFAULT_PROJECTED_WIN_PROBABILITY: float = 0.725
-const PAYOUT_SUBSIDY: float = 0.45
 const MIN_GROSS_PAYOUT_MULTIPLIER: float = 1.05
 const MAX_GROSS_PAYOUT_MULTIPLIER: float = 4.0
+const ENCOUNTER_QUOTE_MULTIPLIERS: Dictionary[String, float] = {
+	"CREEPS": 1.5,
+	"NORMAL": 2.0,
+	"MIRROR": 2.0,
+	"ELITE": 2.5,
+	"EVENT": 2.5,
+	"BOSS": 3.0,
+}
 const REROLL_STAKE_UNITS: int = 2
 const PROGRESSION_STAKE_UNITS: int = 4
 const PAYOUT_RATIO_SCALE: int = 1000000
@@ -41,6 +48,7 @@ var stake_rank: int = 0
 var projected_win_probability: float = DEFAULT_PROJECTED_WIN_PROBABILITY
 var quoted_gross_multiplier: float = 2.0
 var payout_modifier: float = 1.0
+var encounter_quote_kind: String = "NORMAL"
 var run_id: String = ""
 var ledger_loadout: Dictionary = {}
 var account_profile_path: String = "user://account_profile_v1.json"
@@ -86,8 +94,9 @@ func reset_run() -> void:
 	stake_rank = 0
 	projected_win_probability = DEFAULT_PROJECTED_WIN_PROBABILITY
 	payout_modifier = 1.0
+	encounter_quote_kind = "NORMAL"
 	run_id = "%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_msec()]
-	quoted_gross_multiplier = gross_payout_multiplier(projected_win_probability)
+	quoted_gross_multiplier = gross_payout_multiplier()
 	combat_active = false
 	combat_credit_base = 0
 	combat_spent = 0
@@ -111,17 +120,27 @@ func has_ledger_edict(edict_id: String) -> bool:
 
 func set_projected_win_probability(probability: float) -> void:
 	projected_win_probability = clampf(float(probability), 0.01, 1.0)
-	quoted_gross_multiplier = gross_payout_multiplier(projected_win_probability)
 
-func gross_payout_multiplier(probability: float = -1.0) -> float:
-	var input_probability: float = projected_win_probability if probability <= 0.0 else probability
-	var safe_probability: float = clampf(float(input_probability), 0.01, 1.0)
-	var base_multiplier: float = clampf((1.0 + PAYOUT_SUBSIDY) / safe_probability, MIN_GROSS_PAYOUT_MULTIPLIER, MAX_GROSS_PAYOUT_MULTIPLIER)
+func set_encounter_quote_kind(kind: String) -> void:
+	if combat_active:
+		return
+	encounter_quote_kind = String(kind).strip_edges().to_upper()
+	if not ENCOUNTER_QUOTE_MULTIPLIERS.has(encounter_quote_kind):
+		encounter_quote_kind = "NORMAL"
+	quoted_gross_multiplier = gross_payout_multiplier()
+
+func encounter_quote_multiplier(kind: String = encounter_quote_kind) -> float:
+	var normalized_kind: String = String(kind).strip_edges().to_upper()
+	return float(ENCOUNTER_QUOTE_MULTIPLIERS.get(normalized_kind, ENCOUNTER_QUOTE_MULTIPLIERS["NORMAL"]))
+
+func gross_payout_multiplier() -> float:
+	var base_multiplier: float = encounter_quote_multiplier()
 	return clampf(base_multiplier * max(1.0, payout_modifier), MIN_GROSS_PAYOUT_MULTIPLIER, MAX_GROSS_PAYOUT_MULTIPLIER)
 
 func set_payout_modifier(multiplier: float) -> void:
 	payout_modifier = max(1.0, float(multiplier))
-	quoted_gross_multiplier = gross_payout_multiplier(projected_win_probability)
+	if not combat_active:
+		quoted_gross_multiplier = gross_payout_multiplier()
 
 func unit_price(rarity_tier: int, package_multiplier: int = 1) -> int:
 	return StakesMarket.unit_price(rarity_tier, stake_unit, package_multiplier)
@@ -280,6 +299,7 @@ func snapshot_run_record() -> Dictionary:
 		"stake_rank": stake_rank,
 		"projected_win_probability": projected_win_probability,
 		"payout_modifier": payout_modifier,
+		"encounter_quote_kind": encounter_quote_kind,
 		"run_id": run_id,
 		"ledger_loadout": ledger_loadout.duplicate(true),
 	}
@@ -299,10 +319,13 @@ func restore_run_record(record: Dictionary) -> void:
 	stake_unit = StakesMarket.denomination_for_rank(stake_rank)
 	projected_win_probability = clampf(float(record.get("projected_win_probability", DEFAULT_PROJECTED_WIN_PROBABILITY)), 0.01, 1.0)
 	payout_modifier = max(1.0, float(record.get("payout_modifier", 1.0)))
+	encounter_quote_kind = String(record.get("encounter_quote_kind", "NORMAL")).strip_edges().to_upper()
+	if not ENCOUNTER_QUOTE_MULTIPLIERS.has(encounter_quote_kind):
+		encounter_quote_kind = "NORMAL"
 	run_id = String(record.get("run_id", "%d-%d" % [int(Time.get_unix_time_from_system()), Time.get_ticks_msec()]))
 	var ledger_value: Variant = record.get("ledger_loadout", {})
 	ledger_loadout = (ledger_value as Dictionary).duplicate(true) if ledger_value is Dictionary else {}
-	quoted_gross_multiplier = gross_payout_multiplier(projected_win_probability)
+	quoted_gross_multiplier = gross_payout_multiplier()
 	_locked_gross_multiplier = quoted_gross_multiplier
 	combat_active = false
 	combat_credit_base = 0

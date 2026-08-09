@@ -26,13 +26,11 @@ func cast(ctx: AbilityContext) -> bool:
 	if target_index < 0:
 		return false
 	var target_team: String = _enemy_team(ctx.caster_team)
+	if not ctx.schedule_implementation_callback(self, "_collect_fee", MARK_DURATION, [ctx, target_team, target_index]):
+		return false
 	if ctx.buff_system != null:
 		ctx.buff_system.record_debuff(ctx.state, target_team, target_index, "vesper_late_fee_mark", {"execute_threshold": EXECUTE_THRESHOLD}, EXECUTE_THRESHOLD, MARK_DURATION)
 	ctx.emit_zone_exposure(target_team, target_index, "vesper_late_fee_mark", MARK_DURATION, 0.0, 0.25)
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null:
-		return false
-	tree.create_timer(MARK_DURATION).timeout.connect(Callable(self, "_collect_fee").bind(ctx, target_team, target_index), CONNECT_ONE_SHOT)
 	ctx.log("Late Fee: marked cleanup target %d" % target_index)
 	return true
 

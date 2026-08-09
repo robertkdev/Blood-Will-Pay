@@ -17,7 +17,7 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var target_team: String = ctx._other_team(ctx.caster_team)
 	ctx.stun(target_team, target_index, STUN_DURATION)
-	ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, "knoll_receipt_mark", {
+	ctx.apply_stats_labeled(target_team, target_index, "knoll_receipt_mark", {
 		"armor": -DEFENSE_SHRED,
 		"magic_resist": -DEFENSE_SHRED
 	}, MARK_DURATION)

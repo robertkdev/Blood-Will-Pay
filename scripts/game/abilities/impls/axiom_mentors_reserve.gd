@@ -22,11 +22,12 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var level_index: int = _level_index(caster)
 	var before_mana: int = int(pupil.mana)
-	pupil.mana = min(int(pupil.mana_max), before_mana + int(MANA_GRANT[level_index]))
+	var mana_grant: int = int(round(ctx.scale_power(float(MANA_GRANT[level_index]))))
+	pupil.mana = min(int(pupil.mana_max), before_mana + mana_grant)
 	var granted: int = int(pupil.mana) - before_mana
 	ctx.engine._resolver_emit_unit_stat(ctx.caster_team, pupil_index, {"mana": pupil.mana})
 	ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, pupil_index, BuffTags.TAG_DAMAGE_AMP, PUPIL_AMP_DURATION, {
-		"damage_amp_pct": float(PUPIL_DAMAGE_AMP[level_index]),
+		"damage_amp_pct": ctx.scale_power(float(PUPIL_DAMAGE_AMP[level_index])),
 		"kind": "mentor_damage_amp"
 	})
 	ctx.log("Mentor's Reserve: Pupil gained %d mana and one damage amp" % granted)
