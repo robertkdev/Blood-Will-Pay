@@ -19,8 +19,8 @@ const COUNTDOWN_BEAT_SECONDS: float = 0.60
 const COUNTDOWN_DURATION_SECONDS: float = COUNTDOWN_BEAT_SECONDS * 3.0
 const ENTRY_CROSSFADE_SECONDS: float = 0.60
 const PLANNING_FADE_SECONDS: float = 0.32
-const ARENA_FADE_DELAY_SECONDS: float = 0.24
-const ARENA_FADE_SECONDS: float = 0.36
+const ARENA_FADE_DELAY_SECONDS: float = 0.16
+const ARENA_FADE_SECONDS: float = 0.44
 const RETURN_SECONDS: float = 0.75
 const REDUCED_MOTION_RETURN_SECONDS: float = 0.42
 const ENTRY_ZOOM_SCALE: float = 1.10
@@ -243,7 +243,7 @@ func _begin_return_after_layout() -> void:
 		return
 	var target_rect: Rect2 = _planning_area.get_global_rect()
 	var parent_control: Control = _arena_container.get_parent() as Control
-	if parent_control != null and _captured_combat_rect.size.x > 1.0 and _captured_combat_rect.size.y > 1.0:
+	if not _reduced_motion and parent_control != null and _captured_combat_rect.size.x > 1.0 and _captured_combat_rect.size.y > 1.0:
 		var parent_rect: Rect2 = parent_control.get_global_rect()
 		_arena_container.position = _captured_combat_rect.position - parent_rect.position
 		_arena_container.size = _captured_combat_rect.size
@@ -281,7 +281,9 @@ func _set_countdown_progress(progress: float) -> void:
 	var beat_progress: float = sequence_progress - float(beat_index)
 	_countdown_label.text = str(3 - beat_index)
 	_countdown_label.scale = Vector2.ONE
-	var beat_alpha: float = 1.0 if beat_progress <= 0.55 else lerpf(1.0, 0.28, (beat_progress - 0.55) / 0.45)
+	var beat_alpha: float = 1.0
+	if beat_index < 2 and beat_progress > 0.55:
+		beat_alpha = lerpf(1.0, 0.28, (beat_progress - 0.55) / 0.45)
 	_set_alpha(_countdown_label, beat_alpha)
 	_overlay.set_meta("countdown_visible_value", _countdown_label.text)
 
