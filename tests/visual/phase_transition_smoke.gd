@@ -46,21 +46,47 @@ func _run() -> void:
 		return
 	await _press_continue(true, "transition probe")
 	await _wait_for_countdown_value(combat, "3", 1.0)
+	await get_tree().create_timer(0.28).timeout
 	_capture("01_countdown_3")
 	_assert_countdown_is_unframed(combat)
+	_assert_countdown_focus(combat)
 	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 3")
 	await _wait_for_countdown_value(combat, "2", 1.0)
 	_capture("02_countdown_2")
 	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 2")
 	await _wait_for_countdown_value(combat, "1", 1.0)
 	_capture("03_countdown_1")
+	var countdown_label: Label = combat.get_node_or_null("CombatPhaseTransitionLayer/CountdownValue") as Label
+	_expect(countdown_label != null and countdown_label.scale == Vector2.ONE, "countdown numeral should remain scale-stable")
 	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 1")
 	var crossfade_seen: bool = await _wait_for_transition_state(transition, "entry_crossfade", 1.2)
 	_expect(crossfade_seen, "entry crossfade did not follow the countdown")
-	await get_tree().create_timer(0.26).timeout
-	_capture("04_grid_crossfade")
+	# Full-resolution PNG encoding blocks the main frame long enough for the next
+	# tween tick to leap ahead. Slow only this evidence window so each capture
+	# still represents its named production-time beat.
+	Engine.time_scale = 0.05
+	_capture("04a_handoff_start")
+	await get_tree().create_timer(0.12).timeout
+	_capture("04b_planning_fade_120ms")
+	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started during planning fade")
+	await get_tree().create_timer(0.12).timeout
+	_capture("04c_arena_delay_240ms")
+	_assert_handoff_alpha(combat, 0.30, 0.10, "240ms handoff")
+	await get_tree().create_timer(0.08).timeout
+	_capture("04d_transfer_low_point_320ms")
+	_assert_handoff_alpha(combat, 0.08, 0.30, "320ms handoff")
+	await get_tree().create_timer(0.12).timeout
+	_capture("04e_arena_takeover_440ms")
+	_assert_handoff_alpha(combat, 0.05, 1.0, "440ms handoff")
+	var arena_mid: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	_expect(arena_mid != null and arena_mid.modulate.a >= 0.30, "arena did not decisively take over after planning cleared")
 	_expect(manager.has_method("is_stage_prepared") and bool(manager.is_stage_prepared()), "battle should be prepared during the grid crossfade")
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started before the grid crossfade completed")
+	await get_tree().create_timer(0.12).timeout
+	_capture("04f_arena_settled_560ms")
+	var arena_late: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	_expect(arena_late != null and arena_late.modulate.a >= 0.80, "arena did not reach dominant opacity before combat")
+	Engine.time_scale = 1.0
 	var combat_seen: bool = await _wait_for_combat_active(2.0)
 	_expect(combat_seen, "combat did not begin after the entry crossfade")
 	await _settle_frames(3)
@@ -94,7 +120,8 @@ func _run() -> void:
 	_capture("09_planning_restored")
 	_expect(result_banner != null and not result_banner.visible, "result card should close after the return and skip gates complete")
 	_expect(not combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer").visible, "arena should be hidden after planning restoration")
-	_run_reduced_motion_contract()
+	await _capture_crowded_countdown_fixture(combat, controller, manager, transition)
+	await _run_reduced_motion_contract()
 	_write_manifest(transition)
 	_finish()
 
@@ -127,6 +154,48 @@ func _assert_countdown_is_unframed(combat: Control) -> void:
 	_expect(countdown != null and countdown.get_global_rect().position.y < 270.0, "countdown numeral should stay at the top of the board")
 	_expect(combat.get_node_or_null("CombatPhaseTransitionLayer/CountdownField") == null, "countdown must not use a framed panel")
 
+func _assert_countdown_focus(combat: Control) -> void:
+	var board: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea") as Control
+	var timer_context: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Control
+	var wager_context: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Control
+	var actions: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as Control
+	var directive: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry") as Control
+	var metrics: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
+	_expect(board != null and board.modulate.a >= 0.95, "countdown should keep the deployment board readable")
+	_expect(timer_context != null and timer_context.modulate.a >= 0.35, "countdown should retain board and odds context")
+	_expect(wager_context != null and wager_context.modulate.a >= 0.35, "countdown should retain wager context")
+	_expect(actions != null and (not actions.visible or actions.modulate.a <= 0.10), "countdown should suppress action chrome")
+	_expect(directive != null and directive.modulate.a <= 0.10, "countdown should suppress planning directive chrome")
+	_expect(metrics != null and metrics.modulate.a <= 0.10, "countdown should suppress peripheral metrics")
+
+func _assert_handoff_alpha(combat: Control, planning_max: float, arena_max: float, label: String) -> void:
+	var planning: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea") as Control
+	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	_expect(planning != null and planning.modulate.a <= planning_max, "%s planning opacity stayed too high" % label)
+	_expect(arena != null and arena.modulate.a <= arena_max, "%s arena appeared too early" % label)
+
+func _capture_crowded_countdown_fixture(combat: Control, controller: Variant, manager: CombatManager, transition: Variant) -> void:
+	var player_ids: Array[String] = ["bonko", "axiom", "morrak", "kett", "korath", "luna"]
+	var enemy_ids: Array[String] = ["creep", "knoll", "miri", "noxley", "pilfer", "sable"]
+	combat.call("set_player_team_ids", player_ids)
+	manager.enemy_team.clear()
+	for unit_id: String in enemy_ids:
+		var enemy: Unit = UnitFactory.spawn(unit_id)
+		if enemy != null:
+			manager.enemy_team.append(enemy)
+	var grid_placement: Variant = controller.get("grid_placement")
+	if grid_placement != null:
+		grid_placement.call("rebuild_player_views", manager.player_team, false)
+		grid_placement.call("rebuild_enemy_views", manager.enemy_team)
+	await _settle_frames(4)
+	_expect(manager.player_team.size() == player_ids.size(), "crowded countdown fixture did not build the player team")
+	_expect(manager.enemy_team.size() == enemy_ids.size(), "crowded countdown fixture did not build the enemy team")
+	transition.call("start_countdown", false)
+	await get_tree().create_timer(0.28).timeout
+	_capture("10_crowded_countdown")
+	_assert_countdown_focus(combat)
+	transition.call("reset")
+
 func _run_reduced_motion_contract() -> void:
 	var host: Control = Control.new()
 	host.size = Vector2(800.0, 600.0)
@@ -149,7 +218,13 @@ func _run_reduced_motion_contract() -> void:
 	transition.start_countdown(true)
 	_expect(planning.scale == Vector2.ONE, "reduced motion countdown should not scale the planning grid")
 	var overlay: Control = host.get_node_or_null("CombatPhaseTransitionLayer") as Control
+	var countdown: Label = host.get_node_or_null("CombatPhaseTransitionLayer/CountdownValue") as Label
 	_expect(overlay != null and bool(overlay.get_meta("reduced_motion_active", false)), "reduced motion countdown metadata missing")
+	await get_tree().create_timer(0.72).timeout
+	_expect(countdown != null and countdown.scale == Vector2.ONE, "reduced motion countdown should not scale its numeral")
+	transition.start_entry_crossfade()
+	await get_tree().create_timer(0.30).timeout
+	_expect(planning.scale == Vector2.ONE, "reduced motion handoff should not scale the planning grid")
 	transition.teardown()
 	remove_child(host)
 	host.free()

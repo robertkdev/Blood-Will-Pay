@@ -18,23 +18,36 @@ enum TransitionState {
 const COUNTDOWN_BEAT_SECONDS: float = 0.60
 const COUNTDOWN_DURATION_SECONDS: float = COUNTDOWN_BEAT_SECONDS * 3.0
 const ENTRY_CROSSFADE_SECONDS: float = 0.60
+const PLANNING_FADE_SECONDS: float = 0.32
+const ARENA_FADE_DELAY_SECONDS: float = 0.24
+const ARENA_FADE_SECONDS: float = 0.36
 const RETURN_SECONDS: float = 0.75
 const REDUCED_MOTION_RETURN_SECONDS: float = 0.42
 const ENTRY_ZOOM_SCALE: float = 1.10
 const ENTRY_FADE_ZOOM_SCALE: float = 1.14
-const PERIPHERAL_ENTRY_ALPHA: float = 0.18
+const CONTEXT_ENTRY_ALPHA: float = 0.42
+const CONTEXT_FADE_SECONDS: float = 0.36
+const CHROME_ENTRY_ALPHA: float = 0.04
+const CHROME_FADE_SECONDS: float = 0.24
 
-const PERIPHERAL_PATHS: Array[String] = [
+const CONTEXT_PATHS: Array[String] = [
+	"MarginContainer/VBoxContainer/PlanningTimerLabel",
+	"MarginContainer/VBoxContainer/WagerSummary",
+	"GothicWagerSummaryPlate",
+]
+
+const CHROME_PATHS: Array[String] = [
+	"MarginContainer/VBoxContainer/StageProgressTopBar",
 	"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
 	"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
+	"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry",
 	"MarginContainer/VBoxContainer/ActionsRow",
-	"MarginContainer/VBoxContainer/WagerSummary",
 	"MarginContainer/VBoxContainer/BenchArea",
 	"MarginContainer/VBoxContainer/BottomStorageArea",
+	"TopBar/MenuButton",
 	"GothicStatsAreaPlate",
 	"GothicItemsPlate",
 	"GothicGoldPlate",
-	"GothicWagerSummaryPlate",
 	"GothicCommitRailPlate",
 	"GothicBenchPlate",
 	"GothicShopPlate",
@@ -51,7 +64,8 @@ var _state: TransitionState = TransitionState.IDLE
 var _reduced_motion: bool = false
 var _planning_original_scale: Vector2 = Vector2.ONE
 var _planning_original_pivot: Vector2 = Vector2.ZERO
-var _peripheral_records: Array[Dictionary] = []
+var _context_records: Array[Dictionary] = []
+var _chrome_records: Array[Dictionary] = []
 var _planning_records: Array[Dictionary] = []
 var _captured_combat_rect: Rect2 = Rect2()
 
@@ -75,7 +89,8 @@ func reset() -> void:
 	_kill_tween()
 	_restore_planning_transform()
 	_restore_records(_planning_records)
-	_restore_records(_peripheral_records)
+	_restore_records(_context_records)
+	_restore_records(_chrome_records)
 	if _arena_container != null and is_instance_valid(_arena_container):
 		_set_alpha(_arena_container, 1.0)
 	if _overlay != null and is_instance_valid(_overlay):
@@ -96,7 +111,8 @@ func start_countdown(reduced_motion: bool) -> void:
 	if stage_label != null:
 		stage_label.visible = false
 	_capture_planning_transform()
-	_capture_records(_peripheral_records, _peripheral_controls())
+	_capture_records(_context_records, _context_controls())
+	_capture_records(_chrome_records, _chrome_controls())
 	_show_overlay("3")
 	_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_overlay.set_meta("transition_kind", "planning_to_combat")
@@ -113,10 +129,14 @@ func start_countdown(reduced_motion: bool) -> void:
 	_active_tween.tween_method(Callable(self, "_set_countdown_progress"), 0.0, 1.0, COUNTDOWN_DURATION_SECONDS)
 	if not _reduced_motion:
 		_active_tween.parallel().tween_property(_planning_area, "scale", Vector2.ONE * ENTRY_ZOOM_SCALE, COUNTDOWN_DURATION_SECONDS)
-	for record: Dictionary in _peripheral_records:
+	for record: Dictionary in _context_records:
 		var control: Control = _record_control(record)
 		if control != null:
-			_active_tween.parallel().tween_property(control, "modulate:a", PERIPHERAL_ENTRY_ALPHA, COUNTDOWN_DURATION_SECONDS)
+			_active_tween.parallel().tween_property(control, "modulate:a", CONTEXT_ENTRY_ALPHA, CONTEXT_FADE_SECONDS)
+	for record: Dictionary in _chrome_records:
+		var control: Control = _record_control(record)
+		if control != null:
+			_active_tween.parallel().tween_property(control, "modulate:a", CHROME_ENTRY_ALPHA, CHROME_FADE_SECONDS)
 	_active_tween.tween_callback(Callable(self, "_finish_countdown"))
 
 func start_entry_crossfade() -> void:
@@ -129,6 +149,9 @@ func start_entry_crossfade() -> void:
 		_countdown_label.visible = false
 	if _overlay != null:
 		_overlay.set_meta("transition_phase", "grid_crossfade")
+		_overlay.set_meta("planning_fade_seconds", PLANNING_FADE_SECONDS)
+		_overlay.set_meta("arena_fade_delay_seconds", ARENA_FADE_DELAY_SECONDS)
+		_overlay.set_meta("arena_fade_seconds", ARENA_FADE_SECONDS)
 	if _arena_container != null and is_instance_valid(_arena_container):
 		_arena_container.visible = true
 		_set_alpha(_arena_container, 0.0)
@@ -136,26 +159,32 @@ func start_entry_crossfade() -> void:
 	_active_tween.set_trans(Tween.TRANS_CUBIC)
 	_active_tween.set_ease(Tween.EASE_IN_OUT)
 	var added_step: bool = false
-	for record: Dictionary in _planning_records:
+	var fade_records: Array[Dictionary] = []
+	fade_records.append_array(_planning_records)
+	fade_records.append_array(_context_records)
+	fade_records.append_array(_chrome_records)
+	for record: Dictionary in fade_records:
 		var control: Control = _record_control(record)
 		if control == null:
 			continue
 		if not added_step:
-			_active_tween.tween_property(control, "modulate:a", 0.0, ENTRY_CROSSFADE_SECONDS)
+			_active_tween.tween_property(control, "modulate:a", 0.0, PLANNING_FADE_SECONDS)
 			added_step = true
 		else:
-			_active_tween.parallel().tween_property(control, "modulate:a", 0.0, ENTRY_CROSSFADE_SECONDS)
+			_active_tween.parallel().tween_property(control, "modulate:a", 0.0, PLANNING_FADE_SECONDS)
 	if _arena_container != null and is_instance_valid(_arena_container):
+		var arena_tweener: PropertyTweener = null
 		if added_step:
-			_active_tween.parallel().tween_property(_arena_container, "modulate:a", 1.0, ENTRY_CROSSFADE_SECONDS)
+			arena_tweener = _active_tween.parallel().tween_property(_arena_container, "modulate:a", 1.0, ARENA_FADE_SECONDS)
 		else:
-			_active_tween.tween_property(_arena_container, "modulate:a", 1.0, ENTRY_CROSSFADE_SECONDS)
+			arena_tweener = _active_tween.tween_property(_arena_container, "modulate:a", 1.0, ARENA_FADE_SECONDS)
 			added_step = true
+		arena_tweener.set_delay(ARENA_FADE_DELAY_SECONDS)
 	if not _reduced_motion and _planning_area != null:
 		if added_step:
-			_active_tween.parallel().tween_property(_planning_area, "scale", Vector2.ONE * ENTRY_FADE_ZOOM_SCALE, ENTRY_CROSSFADE_SECONDS)
+			_active_tween.parallel().tween_property(_planning_area, "scale", Vector2.ONE * ENTRY_FADE_ZOOM_SCALE, PLANNING_FADE_SECONDS)
 		else:
-			_active_tween.tween_property(_planning_area, "scale", Vector2.ONE * ENTRY_FADE_ZOOM_SCALE, ENTRY_CROSSFADE_SECONDS)
+			_active_tween.tween_property(_planning_area, "scale", Vector2.ONE * ENTRY_FADE_ZOOM_SCALE, PLANNING_FADE_SECONDS)
 	_active_tween.tween_callback(Callable(self, "_finish_entry_crossfade"))
 
 func mark_combat() -> void:
@@ -176,15 +205,20 @@ func start_return(reduced_motion: bool) -> void:
 	# the return tween would have no visible grid opacity to restore.
 	if _planning_records.is_empty():
 		_capture_records(_planning_records, _planning_grid_controls())
-	_capture_records(_peripheral_records, _peripheral_controls())
+	_capture_records(_context_records, _context_controls())
+	_capture_records(_chrome_records, _chrome_controls())
 	for record: Dictionary in _planning_records:
 		var planning_control: Control = _record_control(record)
 		if planning_control != null:
 			_set_alpha(planning_control, 0.0)
-	for record: Dictionary in _peripheral_records:
-		var peripheral: Control = _record_control(record)
-		if peripheral != null:
-			_set_alpha(peripheral, 0.0)
+	for record: Dictionary in _context_records:
+		var context_control: Control = _record_control(record)
+		if context_control != null:
+			_set_alpha(context_control, 0.0)
+	for record: Dictionary in _chrome_records:
+		var chrome_control: Control = _record_control(record)
+		if chrome_control != null:
+			_set_alpha(chrome_control, 0.0)
 	_arena_container.visible = true
 	_set_alpha(_arena_container, 1.0)
 	if _host.get_tree() != null:
@@ -229,10 +263,14 @@ func _begin_return_after_layout() -> void:
 		var planning_control: Control = _record_control(record)
 		if planning_control != null:
 			_active_tween.parallel().tween_property(planning_control, "modulate:a", float(record.get("alpha", 1.0)), duration)
-	for record: Dictionary in _peripheral_records:
-		var peripheral: Control = _record_control(record)
-		if peripheral != null:
-			_active_tween.parallel().tween_property(peripheral, "modulate:a", float(record.get("alpha", 1.0)), duration)
+	for record: Dictionary in _context_records:
+		var context_control: Control = _record_control(record)
+		if context_control != null:
+			_active_tween.parallel().tween_property(context_control, "modulate:a", float(record.get("alpha", 1.0)), duration)
+	for record: Dictionary in _chrome_records:
+		var chrome_control: Control = _record_control(record)
+		if chrome_control != null:
+			_active_tween.parallel().tween_property(chrome_control, "modulate:a", float(record.get("alpha", 1.0)), duration)
 	_active_tween.tween_callback(Callable(self, "_finish_return"))
 
 func _set_countdown_progress(progress: float) -> void:
@@ -242,8 +280,7 @@ func _set_countdown_progress(progress: float) -> void:
 	var beat_index: int = mini(2, floori(sequence_progress))
 	var beat_progress: float = sequence_progress - float(beat_index)
 	_countdown_label.text = str(3 - beat_index)
-	_countdown_label.pivot_offset = _countdown_label.size * 0.5
-	_countdown_label.scale = Vector2.ONE * lerpf(0.90, 1.08, ease(beat_progress, 0.65))
+	_countdown_label.scale = Vector2.ONE
 	var beat_alpha: float = 1.0 if beat_progress <= 0.55 else lerpf(1.0, 0.28, (beat_progress - 0.55) / 0.45)
 	_set_alpha(_countdown_label, beat_alpha)
 	_overlay.set_meta("countdown_visible_value", _countdown_label.text)
@@ -261,7 +298,8 @@ func _finish_entry_crossfade() -> void:
 	if _state != TransitionState.ENTRY_CROSSFADE:
 		return
 	_restore_planning_transform()
-	_restore_records(_peripheral_records)
+	_restore_records(_context_records)
+	_restore_records(_chrome_records)
 	if _overlay != null and is_instance_valid(_overlay):
 		_overlay.visible = false
 		_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -273,7 +311,8 @@ func _finish_return() -> void:
 	if _state != TransitionState.RETURNING:
 		return
 	_restore_records(_planning_records)
-	_restore_records(_peripheral_records)
+	_restore_records(_context_records)
+	_restore_records(_chrome_records)
 	_state = TransitionState.IDLE
 	return_visual_finished.emit()
 	_captured_combat_rect = Rect2()
@@ -321,14 +360,28 @@ func _planning_grid_controls() -> Array[Control]:
 			controls.append(control)
 	return controls
 
-func _peripheral_controls() -> Array[Control]:
+func _context_controls() -> Array[Control]:
 	var controls: Array[Control] = []
 	if _host == null:
 		return controls
-	for path: String in PERIPHERAL_PATHS:
+	for path: String in CONTEXT_PATHS:
 		var control: Control = _host.get_node_or_null(path) as Control
 		if control != null and control.visible:
 			controls.append(control)
+	return controls
+
+func _chrome_controls() -> Array[Control]:
+	var controls: Array[Control] = []
+	if _host == null:
+		return controls
+	for path: String in CHROME_PATHS:
+		var control: Control = _host.get_node_or_null(path) as Control
+		if control != null and control.visible:
+			controls.append(control)
+	var tree: SceneTree = _host.get_tree()
+	var system_menu: Control = tree.root.find_child("SystemMenuButton", true, false) as Control if tree != null else null
+	if system_menu != null and system_menu.visible and not controls.has(system_menu):
+		controls.append(system_menu)
 	return controls
 
 func _set_alpha(control: Control, alpha: float) -> void:
@@ -342,7 +395,7 @@ func _show_overlay(headline_text: String) -> void:
 		return
 	_countdown_label.text = headline_text
 	_countdown_label.visible = true
-	_countdown_label.scale = Vector2.ONE * 0.90
+	_countdown_label.scale = Vector2.ONE
 	_set_alpha(_countdown_label, 1.0)
 	_overlay.visible = true
 	_overlay.modulate = Color.WHITE
