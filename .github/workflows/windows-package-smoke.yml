@@ -13,7 +13,7 @@ permissions:
 jobs:
   windows-package-smoke:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Check out candidate
         uses: actions/checkout@v4
@@ -62,7 +62,7 @@ jobs:
           Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
           if ($process.ExitCode -ne 0) { throw "Godot resource import failed with exit code $($process.ExitCode)" }
 
-      - name: Run representative gameplay gates
+      - name: Run gameplay and audit regression gates
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -71,6 +71,18 @@ jobs:
           $scenes = @(
             "tests/lint/UnitStatLint.tscn",
             "tests/rga_testing/validation/RoleMatrixProbe.tscn",
+            "tests/rga_testing/validation/RunStateStoreProbe.tscn",
+            "tests/rga_testing/validation/ItemBalanceEvidenceProbe.tscn",
+            "tests/rga_testing/validation/ItemTraitSystemsProbe.tscn",
+            "tests/rga_testing/validation/AllPlayableAbilityLivenessProbe.tscn",
+            "tests/rga_testing/validation/AbilityContractRegressionProbe.tscn",
+            "tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn",
+            "tests/visual/BettingEconomySmoke.tscn",
+            "tests/visual/AccessibilitySettingsSmoke.tscn",
+            "tests/visual/LossScreenSmoke.tscn",
+            "tests/visual/CompactViewportVisualAuditSmoke.tscn",
+            "tests/visual/TextContainerFitSmoke.tscn",
+            "tests/visual/CombatArenaBoundsSmoke.tscn",
             "tests/visual/ActualRunLoopSmoke.tscn"
           )
           foreach ($scene in $scenes) {

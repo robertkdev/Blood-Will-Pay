@@ -465,9 +465,9 @@ func _check_teller_margin_call(failures: Array[String]) -> void:
 	var ability: Variant = TellerMarginCall.new()
 	_expect(bool(ability.call("cast", ctx)), "Teller Margin Call public cast failed", failures)
 	_expect(int(body_blocker.hp) == 0, "Teller Margin Call should kill the mitigated body blocker", failures)
-	# First shot: 350 raw becomes 175 through 100 Armor, leaving 175 raw
-	# overflow. The second line shot then deals its full 350 to the backliner.
-	_expect(int(backliner.hp) == 1475, "Teller Margin Call should carry 175 remaining raw damage through the line before its second 350-damage shot", failures)
+	# The blocker can lose only its remaining 100 HP, so 250 raw damage carries
+	# through the line. The second line shot then deals its full 350.
+	_expect(int(backliner.hp) == 1400, "Teller Margin Call should carry 250 overkill damage through the line before its second 350-damage shot", failures)
 	backliner.hp = 0
 	_expect(not bool(ability.call("cast", ctx)), "Teller Margin Call should reject a cast with no living targets", failures)
 	_teardown_fixture(engine)
