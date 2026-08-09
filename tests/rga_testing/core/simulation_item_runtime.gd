@@ -16,7 +16,10 @@ const MAX_SLOTS: int = 3
 var _state: BattleState = null
 var _engine: CombatEngine = null
 var _registry: EffectRegistry = null
-var _effects_by_unit: Dictionary[Unit, Array[String]] = {}
+# Godot 4.5 accepts a typed outer container here, but not a nested generic
+# value type such as Dictionary[Unit, Array[String]]. Keep the element values
+# explicitly normalized as Array[String] at every read/write boundary below.
+var _effects_by_unit: Dictionary[Variant, Array] = {}
 var _dispatch_depth: int = 0
 
 func configure(engine: CombatEngine, state: BattleState, team_a_items: Variant, team_b_items: Variant) -> Dictionary:
@@ -66,7 +69,7 @@ func teardown() -> void:
 func _normalize_team_loadouts(raw_value: Variant, units: Array[Unit], key: String) -> Dictionary:
 	var result: Dictionary = {"ok": false, "reason": "", "loadouts": []}
 	if raw_value == null:
-		var empty_loadouts: Array[Array[String]] = []
+		var empty_loadouts: Array[Array] = []
 		for _unit: Unit in units:
 			empty_loadouts.append([])
 		result["ok"] = true
@@ -79,7 +82,7 @@ func _normalize_team_loadouts(raw_value: Variant, units: Array[Unit], key: Strin
 	if raw_loadouts.size() != units.size():
 		result["reason"] = "%s count=%d does not match team size=%d" % [key, raw_loadouts.size(), units.size()]
 		return result
-	var normalized: Array[Array[String]] = []
+	var normalized: Array[Array] = []
 	for unit_index: int in range(raw_loadouts.size()):
 		var raw_loadout: Variant = raw_loadouts[unit_index]
 		if not (raw_loadout is Array or raw_loadout is PackedStringArray):

@@ -61,6 +61,8 @@ jobs:
           $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--editor", "--path", $env:GITHUB_WORKSPACE, "--quit") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
           Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
           if ($process.ExitCode -ne 0) { throw "Godot resource import failed with exit code $($process.ExitCode)" }
+          $importLog = (Get-Content $stdout -Raw -ErrorAction SilentlyContinue) + (Get-Content $stderr -Raw -ErrorAction SilentlyContinue)
+          if ($importLog -match "(?m)^ERROR:|SCRIPT ERROR|Parse Error|Compile Error|Failed to load script") { throw "Godot resource import reported engine or script errors" }
 
       - name: Run gameplay and audit regression gates
         shell: pwsh
@@ -85,10 +87,17 @@ jobs:
             "tests/visual/CombatArenaBoundsSmoke.tscn",
             "tests/visual/ActualRunLoopSmoke.tscn"
           )
+          $sceneIndex = 0
           foreach ($scene in $scenes) {
             Write-Host "Running $scene"
-            & $runner --headless --path $env:GITHUB_WORKSPACE "res://$scene"
-            if ($LASTEXITCODE -ne 0) { throw "Godot gate failed: $scene (exit code $LASTEXITCODE)" }
+            $stdout = Join-Path $env:RUNNER_TEMP "godot-gate-$sceneIndex.stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "godot-gate-$sceneIndex.stderr.log"
+            $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--path", $env:GITHUB_WORKSPACE, "res://$scene") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+            Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+            if ($process.ExitCode -ne 0) { throw "Godot gate failed: $scene (exit code $($process.ExitCode))" }
+            $sceneLog = (Get-Content $stdout -Raw -ErrorAction SilentlyContinue) + (Get-Content $stderr -Raw -ErrorAction SilentlyContinue)
+            if ($sceneLog -match "(?m)^ERROR:|SCRIPT ERROR|Parse Error|Compile Error|Failed to load script|ASSERT FAILED") { throw "Godot gate reported engine, script, or assertion errors: $scene" }
+            $sceneIndex += 1
           }
 
       - name: Export checked-in Windows preset
