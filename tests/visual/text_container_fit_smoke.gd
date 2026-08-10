@@ -8,11 +8,15 @@ const SHOP_CARD_SCENE: PackedScene = preload("res://scenes/ui/shop/ShopCard.tscn
 const UI_FIT_AUDITOR: GDScript = preload("res://tests/visual/ui_fit_auditor.gd")
 const UNIT_CATALOG_SCRIPT: GDScript = preload("res://scripts/game/shop/unit_catalog.gd")
 const UNIT_FACTORY_SCRIPT: GDScript = preload("res://scripts/unit_factory.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const VISION_SNAPSHOT: GDScript = preload("res://scripts/util/vision_snapshot.gd")
 
 const SMOKE_NAME: String = "TextContainerFitSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/text_container_fit_pass"
+const TEST_SETTINGS_PATH: String = "user://text_container_fit_smoke_settings.cfg"
+const TEST_UI_SCALE: float = 1.5
 const VIEWPORT_SIZE: Vector2i = Vector2i(1280, 720)
+const DESKTOP_VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
 const TITLE_SECTIONS: Array[String] = ["how_to_play", "units", "rga", "traits", "items", "settings"]
 const COMMAND_TEXTS: Array[String] = ["Start Opening Fight", "Start Battle", "Battle in progress", "Battle resolved by failsafe"]
 
@@ -21,11 +25,16 @@ var _unit_select: UnitSelect = null
 var _catalog: UnitCatalog = null
 var _failures: Array[String] = []
 var _capture_count: int = 0
+var _original_reduced_motion: bool = false
+var _original_scale: float = 1.0
+var _original_user_scale: float = 1.0
+var _original_window_size: Vector2i = Vector2i.ZERO
 
 func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	_configure_isolated_settings()
 	_configure_viewport()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
 	_catalog = UNIT_CATALOG_SCRIPT.new() as UnitCatalog
@@ -36,12 +45,36 @@ func _run() -> void:
 	await _audit_combat_surfaces()
 	_finish()
 
-func _configure_viewport() -> void:
-	DisplayServer.window_set_size(VIEWPORT_SIZE)
+func _configure_viewport(size: Vector2i = VIEWPORT_SIZE) -> void:
+	DisplayServer.window_set_size(size)
 	var window: Window = get_window()
 	if window != null:
-		window.size = VIEWPORT_SIZE
-		window.content_scale_size = VIEWPORT_SIZE
+		window.size = size
+		window.content_scale_size = size
+
+func _configure_isolated_settings() -> void:
+	var window: Window = get_window()
+	_original_scale = window.content_scale_factor if window != null else 1.0
+	_original_window_size = window.size if window != null else Vector2i.ZERO
+	_original_user_scale = UserSettingsScript.get_ui_scale()
+	_original_reduced_motion = UserSettingsScript.get_reduced_motion()
+	_remove_test_settings()
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	_set_test_ui_scale(TEST_UI_SCALE, "deterministic 150-percent text-fit fixture")
+	var motion_save_error: Error = UserSettingsScript.set_reduced_motion(true)
+	_expect(motion_save_error == OK, "failed to persist the reduced-motion text-fit fixture")
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	_expect(UserSettingsScript.get_reduced_motion(), "reduced-motion text-fit fixture did not survive reload")
+
+func _set_test_ui_scale(ui_scale: float, context: String) -> void:
+	var window: Window = get_window()
+	var scale_save_error: Error = UserSettingsScript.set_ui_scale(ui_scale, window)
+	_expect(scale_save_error == OK, "failed to persist the %s" % context)
+	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%s did not survive reload" % context)
 
 func _audit_title_surfaces() -> void:
 	_main = MAIN_SCENE.instantiate() as Control
@@ -102,31 +135,65 @@ func _audit_shop_card_catalog() -> void:
 	var host: CenterContainer = CenterContainer.new()
 	host.name = "ShopCardCatalogHost"
 	host.position = Vector2(24.0, 24.0)
-	host.size = Vector2(160.0, 120.0)
+	host.size = Vector2(180.0, 150.0)
 	get_tree().root.add_child(host)
 	for unit_id: String in _catalog_ids():
-		var card: ShopCard = SHOP_CARD_SCENE.instantiate() as ShopCard
-		host.add_child(card)
-		var props: Dictionary = _catalog.get_unit_meta(unit_id).duplicate(true)
-		props["id"] = unit_id
-		props["price"] = int(props.get("cost", 0))
-		card.set_data(props)
+		var card: ShopCard = _make_shop_card(host, unit_id)
 		await _settle_frames(3)
 		_audit(card, "compact shop card %s" % unit_id)
 		if card.has_method("_show_tooltip"):
 			card.call("_show_tooltip")
 		await _settle_frames(2)
 		var tooltip: Control = _first_shop_tooltip()
-		_expect(tooltip != null, "Shop tooltip missing for %s" % unit_id)
+		_expect(tooltip == null, "compact shop card opened an obstructive tooltip for %s" % unit_id)
+		_expect(String(card.get_meta("compact_tooltip_policy", "")) == "suppress_hover", "compact shop card did not publish tooltip suppression for %s" % unit_id)
+		_expect(bool(card.get_meta("tooltip_suppressed_for_compact", false)), "compact shop card did not record tooltip suppression for %s" % unit_id)
+		_expect(String(card.get_meta("compact_information_access", "")) == "card_summary_and_deliberate_purchase", "compact shop card lost its deliberate-purchase information contract for %s" % unit_id)
+		if card.has_method("_clear_tooltip"):
+			card.call("_clear_tooltip")
+		host.remove_child(card)
+		card.free()
+	_set_test_ui_scale(1.0, "desktop shop-tooltip fixture")
+	_configure_viewport(DESKTOP_VIEWPORT_SIZE)
+	# Exercise both bottom- and right-edge placement. With the source this low,
+	# the full desktop dossier must choose the authored above-card path and then
+	# clamp horizontally without covering its source.
+	host.position = Vector2(1640.0, 900.0)
+	await _settle_frames(4)
+	for unit_id: String in _catalog_ids():
+		var card: ShopCard = _make_shop_card(host, unit_id)
+		card.set_compact_presentation(false, false)
+		await _settle_frames(3)
+		_audit(card, "desktop shop card %s" % unit_id)
+		if card.has_method("_show_tooltip"):
+			card.call("_show_tooltip")
+		await _settle_frames(2)
+		var tooltip: Control = _first_shop_tooltip()
+		_expect(tooltip != null, "desktop shop tooltip missing for %s" % unit_id)
 		if tooltip != null:
-			_audit(tooltip, "shop tooltip %s" % unit_id)
-			_expect_control_in_viewport(tooltip, "shop tooltip %s" % unit_id)
+			_audit(tooltip, "desktop shop tooltip %s" % unit_id)
+			_expect_control_in_viewport(tooltip, "desktop shop tooltip %s" % unit_id)
+			_expect(int(tooltip.get_meta("source_card_instance_id", 0)) == card.get_instance_id(), "desktop shop tooltip source drifted for %s" % unit_id)
+			_expect(String(tooltip.get_meta("presentation_mode", "")) == "cursor_detail", "desktop shop tooltip used the wrong presentation mode for %s" % unit_id)
+			_expect(not tooltip.get_global_rect().intersects(card.get_global_rect()), "desktop shop tooltip covered its source card for %s" % unit_id)
 		if card.has_method("_clear_tooltip"):
 			card.call("_clear_tooltip")
 		host.remove_child(card)
 		card.free()
 	host.queue_free()
 	await _settle_frames(2)
+	_set_test_ui_scale(TEST_UI_SCALE, "deterministic 150-percent text-fit fixture")
+	_configure_viewport()
+	await _settle_frames(4)
+
+func _make_shop_card(host: CenterContainer, unit_id: String) -> ShopCard:
+	var card: ShopCard = SHOP_CARD_SCENE.instantiate() as ShopCard
+	host.add_child(card)
+	var props: Dictionary = _catalog.get_unit_meta(unit_id).duplicate(true)
+	props["id"] = unit_id
+	props["price"] = int(props.get("cost", 0))
+	card.set_data(props)
+	return card
 
 func _audit_combat_surfaces() -> void:
 	_build_post_shop_state()
@@ -164,6 +231,11 @@ func _build_post_shop_state() -> void:
 		return
 	combat.visible = true
 	combat.set_process(true)
+	var controller: Variant = combat.get("controller")
+	if controller != null:
+		# This visual fixture builds an in-memory preview and must not rotate the
+		# player's default active-run snapshot while exercising UI state changes.
+		controller.set("_active_run_restore_in_progress", true)
 	if combat.has_method("set_player_team_ids"):
 		combat.call("set_player_team_ids", ["bonko", "berebell"])
 	if combat.has_method("_init_game"):
@@ -184,7 +256,6 @@ func _build_post_shop_state() -> void:
 		manager.set("stage", 2)
 		if manager.has_method("setup_stage_preview"):
 			manager.setup_stage_preview()
-	var controller: Variant = combat.get("controller")
 	if controller != null:
 		if controller.has_method("refresh_all_views"):
 			controller.call("refresh_all_views")
@@ -278,9 +349,9 @@ func _audit_natural_unit_detail_bounds(combat: Control) -> void:
 	_expect(String(unit_panel.get_meta("responsive_detail_layout", "")) == "compact_vertical_scroll", "natural Sari unit-detail did not enter compact reflow")
 	_expect(String(unit_panel.get_meta("compact_header_reflow", "")) == "identity_full_width_no_portrait", "natural Sari unit-detail did not give identity copy the full compact width")
 	var compact_portrait: TextureRect = unit_panel.get_node_or_null("VBox/Header/Portrait") as TextureRect
-	var compact_info: Control = unit_panel.get_node_or_null("VBox/Header/Info") as Control
+	var compact_name: Label = unit_panel.get_node_or_null("VBox/Header/Info/Name") as Label
 	_expect(compact_portrait != null and not compact_portrait.visible, "natural Sari compact header still spends its narrow rail on the portrait")
-	_expect(compact_info != null and compact_info.size.x >= 130.0, "natural Sari compact identity column remains too narrow for readable labels")
+	_expect(compact_name != null and compact_name.visible and compact_name.text == String(sari.name), "natural Sari compact header did not retain the selected unit identity")
 	_audit(unit_frame, "natural Sari unit detail")
 	_save_capture("08_natural_sari_unit_detail_1920x1080.png", _main)
 
@@ -367,6 +438,7 @@ func _expect(condition: bool, message: String) -> void:
 		_failures.append(message)
 
 func _finish() -> void:
+	_restore_test_settings()
 	var exit_code: int = 0
 	if _failures.is_empty():
 		print("%s: OK captures=%d shop_cards=%d unit_panels=%d output=%s" % [SMOKE_NAME, _capture_count, _catalog_ids().size(), _catalog_ids().size(), ProjectSettings.globalize_path(OUTPUT_DIR)])
@@ -375,3 +447,21 @@ func _finish() -> void:
 			push_error("%s: %s" % [SMOKE_NAME, failure])
 		exit_code = 1
 	get_tree().quit(exit_code)
+
+func _restore_test_settings() -> void:
+	var window: Window = get_window()
+	if window != null:
+		if _original_window_size != Vector2i.ZERO:
+			window.size = _original_window_size
+			window.content_scale_size = _original_window_size
+	UserSettingsScript.configure_storage_path(UserSettingsScript.DEFAULT_SETTINGS_PATH)
+	UserSettingsScript.initialize(window)
+	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), _original_user_scale), "default UI scale changed while the isolated text-fit fixture ran")
+	_expect(UserSettingsScript.get_reduced_motion() == _original_reduced_motion, "default reduced-motion setting changed while the isolated text-fit fixture ran")
+	if window != null:
+		window.content_scale_factor = _original_scale
+	_remove_test_settings()
+
+func _remove_test_settings() -> void:
+	if FileAccess.file_exists(TEST_SETTINGS_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SETTINGS_PATH))

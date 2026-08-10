@@ -1190,7 +1190,7 @@ func _enforce_settings_surface_visible() -> void:
 func _render_home() -> void:
 	_set_content_header("FIELD ORDER // FIRST BLOOD", "The road behind you is closed. Muster a company, survive the forced opener, then spend and wager what remains.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search the field record: Field Manual, Combat Signs, settings..."
+		_search_field.placeholder_text = "Search: Field Manual, Combat Signs, settings..."
 	if _search_query() != "":
 		_render_global_search_results()
 		return

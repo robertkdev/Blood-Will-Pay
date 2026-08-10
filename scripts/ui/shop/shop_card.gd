@@ -23,6 +23,7 @@ const TOOLTIP_WIDTH: float = 400.0
 const TOOLTIP_CURSOR_OFFSET: Vector2 = Vector2(18.0, -14.0)
 const TOOLTIP_EDGE_PADDING: float = 12.0
 const COMPACT_TOOLTIP_MIN_HEIGHT: float = 76.0
+const COMPACT_NAME_SHARE: float = 0.62
 
 @onready var _icon: TextureRect = $Icon
 @onready var _name_label: Label = $Name
@@ -205,7 +206,7 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	if _name_label != null:
 		_name_label.anchor_left = 0.0
 		_name_label.anchor_top = 0.61 if _tight_presentation else 0.66 if enabled else 1.0
-		_name_label.anchor_right = 0.52 if enabled else 0.76
+		_name_label.anchor_right = COMPACT_NAME_SHARE if enabled else 0.76
 		_name_label.anchor_bottom = 1.0
 		_name_label.offset_left = 4.0 if enabled else 8.0
 		_name_label.offset_top = 0.0 if enabled else -23.0
@@ -217,7 +218,7 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_name_label.add_theme_font_size_override("font_size", 14 if _tight_presentation else 16 if enabled else 20)
 	if _price_label != null:
 		_price_label.text = _price_copy()
-		_price_label.anchor_left = 0.52 if enabled else 0.76
+		_price_label.anchor_left = COMPACT_NAME_SHARE if enabled else 0.76
 		_price_label.anchor_top = 0.61 if _tight_presentation else 0.66 if enabled else 1.0
 		_price_label.anchor_right = 1.0
 		_price_label.anchor_bottom = 1.0
