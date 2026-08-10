@@ -199,7 +199,7 @@ jobs:
           $process.Refresh()
           if ($process.ExitCode -ne 0) { throw "Packaged Windows executable exited with code $($process.ExitCode)" }
           $log = Get-Content "$env:GITHUB_WORKSPACE\packaged-resource-smoke.log" -Raw
-          if ($log -match "Cannot open file|Failed loading resource|Error loading resource|SCRIPT ERROR") { throw "Packaged runtime reported resource or script errors" }
+          if ($log -match "(?m)^ERROR:|Cannot open file|Failed loading resource|Error loading resource|SCRIPT ERROR") { throw "Packaged runtime reported resource or script errors" }
 
       - name: Upload package smoke evidence
         if: always()
