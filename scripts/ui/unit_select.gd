@@ -537,10 +537,15 @@ func _populate_units() -> void:
 		btn.custom_minimum_size = Vector2(150, 138)
 		btn.set_meta("unit_id", uid2)
 		var sp: String = String(it.get("sprite_path", ""))
-		if sp != "":
+		if sp == "":
+			push_error("UnitSelect starter portrait path is empty for %s" % uid2)
+		else:
 			var icon: Texture2D = TextureUtils.try_load_texture(sp)
 			if icon:
 				btn.icon = icon
+				print_verbose("UNIT_SELECT_PORTRAIT_READY id=%s path=%s" % [uid2, sp])
+			else:
+				push_error("UnitSelect failed to load starter portrait for %s: %s" % [uid2, sp])
 		var name_label: Label = Label.new()
 		name_label.name = "UnitName"
 		name_label.text = String(it.get("name", ""))
