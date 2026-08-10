@@ -70,11 +70,14 @@ jobs:
           $ErrorActionPreference = "Stop"
           $runner = "${{ steps.godot.outputs.godot_console }}"
           if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
+          $gateLogRoot = Join-Path $env:GITHUB_WORKSPACE "ci-logs\gameplay-gates"
+          New-Item -ItemType Directory -Force -Path $gateLogRoot | Out-Null
           $scenes = @(
             "tests/lint/UnitStatLint.tscn",
             "tests/rga_testing/validation/RoleMatrixProbe.tscn",
             "tests/rga_testing/validation/RunStateStoreProbe.tscn",
             "tests/rga_testing/validation/ItemBalanceEvidenceProbe.tscn",
+            "tests/rga_testing/validation/LockstepWallClockContractProbe.tscn",
             "tests/rga_testing/validation/ItemTraitSystemsProbe.tscn",
             "tests/rga_testing/validation/AllPlayableAbilityLivenessProbe.tscn",
             "tests/rga_testing/validation/AbilityContractRegressionProbe.tscn",
@@ -96,8 +99,37 @@ jobs:
             Write-Host "Running $scene"
             $stdout = Join-Path $env:RUNNER_TEMP "godot-gate-$sceneIndex.stdout.log"
             $stderr = Join-Path $env:RUNNER_TEMP "godot-gate-$sceneIndex.stderr.log"
-            $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--path", $env:GITHUB_WORKSPACE, "res://$scene") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+            $timeoutSeconds = 120
+            if ($scene -eq "tests/rga_testing/validation/AllPlayableAbilityLivenessProbe.tscn") {
+              $timeoutSeconds = 180
+            } elseif ($scene -in @(
+              "tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn",
+              "tests/visual/ActualRunLoopSmoke.tscn"
+            )) {
+              $timeoutSeconds = 300
+            }
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+            $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--path", $env:GITHUB_WORKSPACE, "res://$scene") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+            $completed = $process.WaitForExit($timeoutSeconds * 1000)
+            $reaped = $completed
+            if (-not $completed) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              $reaped = $process.WaitForExit(10000)
+              if (-not $reaped) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                $reaped = $process.WaitForExit(5000)
+              }
+            }
+            $stopwatch.Stop()
+            Copy-Item -LiteralPath $stdout -Destination (Join-Path $gateLogRoot ("gate-{0:D2}.stdout.log" -f $sceneIndex)) -Force -ErrorAction SilentlyContinue
+            Copy-Item -LiteralPath $stderr -Destination (Join-Path $gateLogRoot ("gate-{0:D2}.stderr.log" -f $sceneIndex)) -Force -ErrorAction SilentlyContinue
             Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+            if (-not $reaped) {
+              throw "Godot gate process could not be reaped after timeout: $scene"
+            }
+            if (-not $completed) {
+              throw "Godot gate timed out: $scene after $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 1))s (limit ${timeoutSeconds}s)"
+            }
             if ($process.ExitCode -ne 0) { throw "Godot gate failed: $scene (exit code $($process.ExitCode))" }
             $sceneLog = (Get-Content $stdout -Raw -ErrorAction SilentlyContinue) + (Get-Content $stderr -Raw -ErrorAction SilentlyContinue)
             if ($sceneLog -match "(?m)^ERROR:|SCRIPT ERROR|Parse Error|Compile Error|Failed to load script|ASSERT FAILED") { throw "Godot gate reported engine, script, or assertion errors: $scene" }
@@ -150,6 +182,7 @@ jobs:
         with:
           name: windows-package-smoke-${{ github.sha }}
           path: |
+            ci-logs/**
             packaged-resource-smoke.log
             godot-export.stdout.log
             godot-export.stderr.log

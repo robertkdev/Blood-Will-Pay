@@ -88,6 +88,7 @@ func _run() -> void:
 			"simulation_count": raw_runs.size(),
 			"combat_timeout_s": combat_timeout_s,
 			"max_wall_clock_ms": max_wall_clock_ms,
+			"wall_timeout_scope": "cooperative_between_simulation_steps",
 			"base_seed": BASE_SEED,
 		},
 		"catalog_coverage": catalog_evidence,
@@ -108,6 +109,7 @@ func _run() -> void:
 			"Healing and shield deltas depend on the live CombatStatsCollector signal surface; un-emitted sustain is not observable here.",
 			"Catalog coverage proves definition, handler, component, and primary-bundle reachability, not trigger magnitude correctness for every effect.",
 			"No subjective win-rate or power threshold is enforced; failures are limited to catalog/runtime integrity and invalid wall-clock evidence.",
+			"The per-simulation wall budget is cooperative between engine steps; the CI scene-process watchdog is the hard bound for a synchronous engine call that never returns.",
 		],
 	}
 	_write_report(report)
@@ -383,6 +385,8 @@ func _run_row(case_def: Dictionary[String, Variant], job: DataModels.SimJob, sim
 		"time_s": float(outcome.time_s) if outcome != null else -1.0,
 		"wall_timeout": bool(sim_out.get("wall_timeout", false)),
 		"wall_elapsed_ms": int(sim_out.get("wall_elapsed_ms", 0)),
+		"evidence_valid": bool(sim_out.get("evidence_valid", false)),
+		"evidence_invalid_reason": String(sim_out.get("terminal_reason", "")) if not bool(sim_out.get("evidence_valid", false)) else "",
 		"carrier_damage": float(carrier_metrics.get("damage", 0)),
 		"carrier_healing": float(carrier_metrics.get("healing", 0)),
 		"carrier_shield": float(carrier_metrics.get("shield", 0)),
@@ -396,6 +400,13 @@ func _run_row(case_def: Dictionary[String, Variant], job: DataModels.SimJob, sim
 	}
 
 func _causal_pair(case_def: Dictionary[String, Variant], baseline: Dictionary[String, Variant], equipped: Dictionary[String, Variant]) -> Dictionary[String, Variant]:
+	var evidence_valid: bool = bool(baseline.get("evidence_valid", false)) and bool(equipped.get("evidence_valid", false))
+	var evidence_invalid_reason: String = ""
+	if not evidence_valid:
+		evidence_invalid_reason = "baseline:%s equipped:%s" % [
+			String(baseline.get("evidence_invalid_reason", "invalid_evidence")),
+			String(equipped.get("evidence_invalid_reason", "invalid_evidence")),
+		]
 	var metrics: Array[String] = [
 		"carrier_win", "carrier_loss", "stall", "tie", "time_s",
 		"carrier_damage", "carrier_healing", "carrier_shield", "carrier_mitigated", "carrier_casts",
@@ -413,6 +424,8 @@ func _causal_pair(case_def: Dictionary[String, Variant], baseline: Dictionary[St
 		"carrier_side": String(baseline.get("carrier_side", "")),
 		"baseline_result": String(baseline.get("result", "")),
 		"equipped_result": String(equipped.get("result", "")),
+		"evidence_valid": evidence_valid,
+		"evidence_invalid_reason": evidence_invalid_reason,
 		"baseline": baseline.duplicate(true),
 		"equipped": equipped.duplicate(true),
 		"delta_item_minus_baseline": deltas,
@@ -420,10 +433,14 @@ func _causal_pair(case_def: Dictionary[String, Variant], baseline: Dictionary[St
 
 func _case_summary(case_def: Dictionary[String, Variant], causal_pairs: Array[Variant]) -> Dictionary[String, Variant]:
 	var selected: Array[Variant] = []
+	var invalid_pair_count: int = 0
 	for pair_value: Variant in causal_pairs:
 		var pair: Dictionary[String, Variant] = _string_variant_dictionary(pair_value)
 		if String(pair.get("case_id", "")) == String(case_def.get("case_id", "")):
-			selected.append(pair)
+			if bool(pair.get("evidence_valid", false)):
+				selected.append(pair)
+			else:
+				invalid_pair_count += 1
 	var metric_names: Array[String] = [
 		"carrier_win", "carrier_loss", "stall", "tie", "time_s",
 		"carrier_damage", "carrier_healing", "carrier_shield", "carrier_mitigated", "carrier_casts",
@@ -454,6 +471,7 @@ func _case_summary(case_def: Dictionary[String, Variant], causal_pairs: Array[Va
 		"item": String(case_def.get("item", "")),
 		"role": String(case_def.get("role", "")),
 		"paired_observations": selected.size(),
+		"invalid_paired_observations": invalid_pair_count,
 		"baseline_mean": baseline_means,
 		"one_item_mean": equipped_means,
 		"delta_item_minus_baseline": delta_means,

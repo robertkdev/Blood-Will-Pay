@@ -149,7 +149,6 @@ func _blink_near_target(ctx: AbilityContext, target_idx: int) -> void:
         return
     var target_team: String = ctx._other_team(ctx.caster_team)
     var target_pos: Vector2 = ctx.position_of(target_team, target_idx)
-    var start: Vector2 = ctx.position_of(ctx.caster_team, ctx.caster_index)
     var sign_x: float = 1.0 if ctx.caster_team == "player" else -1.0
     var backline_x: float = target_pos.x
     var found_enemy: bool = false

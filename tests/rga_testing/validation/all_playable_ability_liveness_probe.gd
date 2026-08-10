@@ -8,6 +8,8 @@ const UnitFactoryScript := preload("res://scripts/unit_factory.gd")
 const EXPECTED_PLAYABLE_COUNT: int = 51
 const TILE_SIZE: float = 100.0
 const ARENA_BOUNDS: Rect2 = Rect2(Vector2.ZERO, Vector2(1000.0, 800.0))
+const SCHEDULED_SIGNATURE_MAX_DEPTH: int = 3
+const SCHEDULED_SIGNATURE_MAX_ITEMS: int = 16
 
 # These resources are deliberately outside the one-profile/one-ability playable gate.
 # Playable Creep uses creep_playable_eavesdropping, whose implementation inherits
@@ -59,6 +61,9 @@ func _run() -> void:
 	var passed_count: int = 0
 	for profile: UnitProfile in profiles:
 		var before_failure_count: int = failures.size()
+		var progress_unit_id: String = String(profile.id).strip_edges() if profile != null else "<null>"
+		var progress_ability_id: String = String(profile.ability_id).strip_edges() if profile != null else "<null>"
+		print("AllPlayableAbilityLivenessProbe: START unit=%s ability=%s" % [progress_unit_id, progress_ability_id])
 		_validate_profile_and_cast(profile, seen_profile_ids, seen_ability_ids, failures)
 		if failures.size() == before_failure_count:
 			passed_count += 1
@@ -464,10 +469,64 @@ func _scheduled_snapshot(engine: CombatEngine) -> Array[String]:
 			String(event.get("team", "")),
 			int(event.get("index", -1)),
 			float(event.get("t", 0.0)),
-			var_to_str(event.get("data", {})),
+			_scheduled_event_data_signature(event.get("data", {})),
 		])
 	output.sort()
 	return output
+
+func _scheduled_event_data_signature(raw_data: Variant) -> String:
+	if not (raw_data is Dictionary):
+		return _scheduled_value_signature(raw_data)
+	var data: Dictionary[String, Variant] = {}
+	for raw_key: Variant in (raw_data as Dictionary).keys():
+		data[String(raw_key)] = (raw_data as Dictionary).get(raw_key, null)
+	var keys: Array[String] = []
+	for key: String in data.keys():
+		keys.append(key)
+	keys.sort()
+	var fields: Array[String] = []
+	for key: String in keys:
+		fields.append("%s=%s" % [key, _scheduled_value_signature(data.get(key, null), 0)])
+	return "{%s}" % ",".join(fields)
+
+func _scheduled_value_signature(value: Variant, depth: int = 0) -> String:
+	if value is Object:
+		var object_value: Object = value as Object
+		return "object:%s" % object_value.get_class()
+	var type_id: int = typeof(value)
+	match type_id:
+		TYPE_NIL:
+			return "null"
+		TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH:
+			return "scalar:%s" % var_to_str(value)
+		TYPE_ARRAY:
+			var array_size: int = (value as Array).size()
+			if depth >= SCHEDULED_SIGNATURE_MAX_DEPTH:
+				return "array:%d:max_depth" % array_size
+			var array_items: Array[String] = []
+			var array_limit: int = mini(array_size, SCHEDULED_SIGNATURE_MAX_ITEMS)
+			for item_index: int in range(array_limit):
+				array_items.append(_scheduled_value_signature((value as Array)[item_index], depth + 1))
+			return "array:%d[%s%s]" % [array_size, ",".join(array_items), ",..." if array_size > array_limit else ""]
+		TYPE_DICTIONARY:
+			var dictionary_size: int = (value as Dictionary).size()
+			if depth >= SCHEDULED_SIGNATURE_MAX_DEPTH:
+				return "dictionary:%d:max_depth" % dictionary_size
+			var dictionary_data: Dictionary[String, Variant] = {}
+			for raw_key: Variant in (value as Dictionary).keys():
+				dictionary_data[String(raw_key)] = (value as Dictionary).get(raw_key, null)
+			var dictionary_keys: Array[String] = []
+			for copied_key: String in dictionary_data.keys():
+				dictionary_keys.append(copied_key)
+			dictionary_keys.sort()
+			var dictionary_fields: Array[String] = []
+			var dictionary_limit: int = mini(dictionary_keys.size(), SCHEDULED_SIGNATURE_MAX_ITEMS)
+			for key_index: int in range(dictionary_limit):
+				var selected_key: String = dictionary_keys[key_index]
+				dictionary_fields.append("%s=%s" % [selected_key, _scheduled_value_signature(dictionary_data.get(selected_key, null), depth + 1)])
+			return "dictionary:%d{%s%s}" % [dictionary_size, ",".join(dictionary_fields), ",..." if dictionary_size > dictionary_limit else ""]
+		_:
+			return "value:%d:%s" % [type_id, var_to_str(value)]
 
 func _position_snapshot(engine: CombatEngine, team: String) -> Array[Vector2]:
 	if team == "player":
@@ -525,9 +584,9 @@ func _on_semantic_buff(
 		target_team: String,
 		target_index: int,
 		kind: String,
-		fields: Dictionary,
-		magnitude: float,
-		duration: float,
+		_fields: Dictionary,
+		_magnitude: float,
+		_duration: float,
 		sink: Array[String]) -> void:
 	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
 		sink.append("semantic_buff")
@@ -538,9 +597,9 @@ func _on_semantic_debuff(
 		target_team: String,
 		target_index: int,
 		kind: String,
-		fields: Dictionary,
-		magnitude: float,
-		duration: float,
+		_fields: Dictionary,
+		_magnitude: float,
+		_duration: float,
 		sink: Array[String]) -> void:
 	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
 		sink.append("semantic_debuff")
@@ -551,9 +610,9 @@ func _on_semantic_zone_exposure(
 		target_team: String,
 		target_index: int,
 		kind: String,
-		duration_s: float,
-		damage: float,
-		radius_tiles: float,
+		_duration_s: float,
+		_damage: float,
+		_radius_tiles: float,
 		sink: Array[String]) -> void:
 	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
 		sink.append("semantic_zone")

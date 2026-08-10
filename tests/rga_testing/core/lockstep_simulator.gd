@@ -11,6 +11,10 @@ const MentorLink = preload("res://scripts/game/traits/runtime/mentor_link.gd")
 const StageRuleRunner = preload("res://scripts/game/progression/stage_rule_runner.gd")
 const SimulationItemRuntime = preload("res://tests/rga_testing/core/simulation_item_runtime.gd")
 
+## Optional deterministic clock for contract probes. Evidence runs leave this
+## empty and use Time.get_ticks_msec().
+var wall_clock_msec_provider: Callable = Callable()
+
 # Runs a single SimJob through the CombatEngine in deterministic lockstep.
 # Optionally accepts a base stats collector that will be attached and ticked during the run.
 # Returns: { context, engine_outcome, aggregates?, events? }
@@ -22,6 +26,13 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	var meta_root: Dictionary = {}
 	if job.metadata is Dictionary:
 		meta_root = job.metadata
+	# This cooperative wall-clock budget is sampled between simulation steps. It
+	# invalidates partial evidence after an overrun, while the CI process watchdog
+	# remains the hard bound for a synchronous engine call that never returns.
+	var max_wall_clock_ms: int = max(0, int(meta_root.get("max_wall_clock_ms", 0)))
+	var wall_clock_started_ms: int = _wall_clock_now_ms()
+	var wall_timeout: bool = false
+	var wall_elapsed_ms: int = 0
 
 	# Scenario setup
 	var state: BattleState = BattleState.new()
@@ -241,6 +252,12 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	if item_runtime != null:
 		item_runtime.on_battle_started()
 	while String(outcome_ref.get("value", "")) == "" and sim_time < float(job.timeout_s):
+		wall_elapsed_ms = _wall_clock_now_ms() - wall_clock_started_ms
+		if max_wall_clock_ms > 0 and wall_elapsed_ms >= max_wall_clock_ms:
+			wall_timeout = true
+			outcome_ref["value"] = "wall_timeout"
+			outcome_reason_ref["value"] = "max_wall_clock_ms_exceeded"
+			break
 		var dt_used: float = delta_s
 		if perf_adaptive:
 			var try_dt: float = perf_fast_dt
@@ -321,6 +338,7 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 		outcome.reason = String(outcome_reason_ref.get("value", ""))
 		if outcome.reason == "":
 			outcome.reason = "engine_outcome"
+	wall_elapsed_ms = _wall_clock_now_ms() - wall_clock_started_ms
 	outcome.time_s = sim_time
 	outcome.frames = int(round(sim_time / delta_s))
 	outcome.team_a_alive = _alive_count(state.player_team)
@@ -384,7 +402,17 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	result["context"] = ctx
 	result["engine_outcome"] = outcome
 	result["events"] = (events if collect_events else [])
+	result["wall_timeout"] = wall_timeout
+	result["wall_elapsed_ms"] = wall_elapsed_ms
+	result["wall_timeout_scope"] = "cooperative_between_simulation_steps"
+	result["terminal_reason"] = outcome.reason
+	result["evidence_valid"] = not wall_timeout
 	return result
+
+func _wall_clock_now_ms() -> int:
+	if wall_clock_msec_provider.is_valid():
+		return int(wall_clock_msec_provider.call())
+	return Time.get_ticks_msec()
 
 func _apply_stage_spec(units: Array, raw_spec: Variant, metadata: Dictionary, side: String) -> void:
 	if not (raw_spec is Dictionary):
