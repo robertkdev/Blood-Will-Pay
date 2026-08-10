@@ -88,6 +88,7 @@ jobs:
             "tests/visual/CompactViewportVisualAuditSmoke.tscn",
             "tests/visual/TextContainerFitSmoke.tscn",
             "tests/visual/CombatArenaBoundsSmoke.tscn",
+            "tests/visual/DirectCustomCombatPresentationSmoke.tscn",
             "tests/visual/ActualRunLoopSmoke.tscn"
           )
           $sceneIndex = 0

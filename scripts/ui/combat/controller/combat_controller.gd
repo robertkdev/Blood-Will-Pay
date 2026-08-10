@@ -3665,8 +3665,8 @@ func _ensure_combat_broadcast_strip() -> void:
 	combat_broadcast_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	combat_broadcast_strip.anchor_left = 0.5
 	combat_broadcast_strip.anchor_right = 0.5
-	combat_broadcast_strip.offset_left = -320.0
-	combat_broadcast_strip.offset_right = 320.0
+	combat_broadcast_strip.offset_left = -360.0
+	combat_broadcast_strip.offset_right = 360.0
 	combat_broadcast_strip.offset_top = 58.0
 	combat_broadcast_strip.offset_bottom = 90.0
 	var strip_style: StyleBoxFlat = StyleBoxFlat.new()
@@ -3694,9 +3694,18 @@ func _ensure_combat_broadcast_strip() -> void:
 func _make_broadcast_label(label_name: String) -> Label:
 	var label: Label = Label.new()
 	label.name = label_name
-	label.custom_minimum_size = Vector2(145.0, 28.0)
+	var minimum_width: float = 145.0
+	match label_name:
+		"BroadcastPhase":
+			minimum_width = 100.0
+		"BroadcastWager":
+			minimum_width = 120.0
+		"BroadcastHealth":
+			minimum_width = 320.0
+	label.custom_minimum_size = Vector2(minimum_width, 28.0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = false
 	label.add_theme_font_size_override("font_size", 15)
 	label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.72, 1.0))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
@@ -3722,7 +3731,7 @@ func _sync_combat_broadcast_strip(force: bool = false) -> void:
 	combat_broadcast_odds.text = String(win_odds_label.text).replace("Est. Win", "ODDS") if win_odds_label != null else "ODDS --"
 	var player_health: Vector2i = _team_health_total(manager.player_team if manager != null else [])
 	var enemy_health: Vector2i = _team_health_total(manager.enemy_team if manager != null else [])
-	combat_broadcast_health.text = "HP %d/%d  //  %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]
+	combat_broadcast_health.text = "ALLY %d/%d // FOE %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]
 
 func _team_health_total(team: Array[Unit]) -> Vector2i:
 	var current: int = 0
