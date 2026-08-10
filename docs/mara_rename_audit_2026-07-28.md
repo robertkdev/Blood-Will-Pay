@@ -42,6 +42,10 @@ The preserved pale, platinum-haired ledger figure and its Vellum candidate are v
 
 Visual evidence: `C:\Users\Flipm\.codex\visualizations\2026\07\28\019fa8c0-3d71-7a93-97d2-c251c5ed1953\vdh-runs\mara-identity-audit-eb9717da28`.
 
+### 2026-08-09 Resolution
+
+The exact merged-player audit exposed an empty Mara starter card: the profile loaded, but the runtime deserialized `sprite_path` as empty. Removing the inline placeholder comments from the resource block and assigning the canonical asset resolved that load path. `assets/units/mara.png` now provides Mara's approved identity: the dark-haired Arcane Ledger mage carries an open ledger and a compact coin-and-tally sigil in a distinct oxblood-and-black battlefield silhouette. The retired Cashmere image remains provenance-only. `MaraArtContractSmoke.tscn` now gates the path, texture import, visible silhouette, and dark-frame readability in CI.
+
 ## Live Dirty Checkout Follow-Up
 
 The isolated task branch cannot safely absorb concurrent, uncommitted source-checkout work. Five live-only files still contain the retired technical ID and must be reconciled by their owner while preserving their other changes:

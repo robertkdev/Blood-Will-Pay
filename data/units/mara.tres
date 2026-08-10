@@ -7,9 +7,7 @@
 script = ExtResource( 1 )
 id = "mara"
 name = "Mara"
-# Retired-name artwork is retained only as an explicit temporary placeholder.
-# It must not be treated as approved Mara identity art.
-sprite_path = "res://assets/units/cashmere.png"
+sprite_path = "res://assets/units/mara.png"
 ability_id = "mara_arcane_ledger"
 traits = ["Arcanist", "Mogul"]
 roles = ["mage"]
