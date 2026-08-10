@@ -156,6 +156,11 @@ var _exchange_source_team: String = ""
 var _exchange_source_index: int = -1
 var _exchange_target_team: String = ""
 var _exchange_target_index: int = -1
+var _exchange_damage: int = 0
+var _exchange_critical: bool = false
+var _exchange_source_point: Vector2 = Vector2.ZERO
+var _exchange_target_point: Vector2 = Vector2.ZERO
+var _exchange_points_valid: bool = false
 
 func configure(_arena_container: Control, _arena_units: Control, _player_grid_helper: BoardGrid, _enemy_grid_helper: BoardGrid, _unit_actor_class: Script, _tile_size: int) -> void:
 	arena_container = _arena_container
@@ -464,9 +469,11 @@ func present_combat_exchange_focus(source_team: String, source_index: int, targe
 	_exchange_source_index = source_index
 	_exchange_target_team = target_team
 	_exchange_target_index = target_index
-	_refresh_combat_exchange_focus(damage, critical)
+	_exchange_damage = maxi(0, damage)
+	_exchange_critical = critical
+	_refresh_combat_exchange_focus()
 
-func _refresh_combat_exchange_focus(damage: int = 0, critical: bool = false) -> void:
+func _refresh_combat_exchange_focus() -> void:
 	if arena_container == null or not is_instance_valid(arena_container):
 		return
 	var painter: CombatExchangeFocusPainter = _ensure_exchange_focus_painter()
@@ -475,24 +482,31 @@ func _refresh_combat_exchange_focus(damage: int = 0, critical: bool = false) -> 
 		return
 	var source_actor: UnitActor = get_actor(_exchange_source_team, _exchange_source_index)
 	var target_actor: UnitActor = get_actor(_exchange_target_team, _exchange_target_index)
-	if source_actor == null or target_actor == null or not is_instance_valid(source_actor) or not is_instance_valid(target_actor):
+	var actors_available: bool = (
+		source_actor != null
+		and target_actor != null
+		and is_instance_valid(source_actor)
+		and is_instance_valid(target_actor)
+		and source_actor.visible
+		and target_actor.visible
+	)
+	if actors_available:
+		var arena_origin: Vector2 = arena_container.get_global_rect().position
+		_exchange_source_point = source_actor.get_global_rect().get_center() - arena_origin
+		_exchange_target_point = target_actor.get_global_rect().get_center() - arena_origin
+		_exchange_points_valid = true
+	elif not _exchange_points_valid or _exchange_damage <= 0:
 		_present_nearest_opposing_visual_anchor(painter)
 		return
-	if not source_actor.visible or not target_actor.visible:
-		_present_nearest_opposing_visual_anchor(painter)
-		return
-	var arena_origin: Vector2 = arena_container.get_global_rect().position
-	var source_center: Vector2 = source_actor.get_global_rect().get_center() - arena_origin
-	var target_center: Vector2 = target_actor.get_global_rect().get_center() - arena_origin
-	painter.present_exchange(source_center, target_center, false, damage, critical)
+	painter.present_exchange(_exchange_source_point, _exchange_target_point, false, _exchange_damage, _exchange_critical)
 	painter.set_meta("source_team", _exchange_source_team)
 	painter.set_meta("source_index", _exchange_source_index)
 	painter.set_meta("target_team", _exchange_target_team)
 	painter.set_meta("target_index", _exchange_target_index)
 	arena_container.set_meta("combat_exchange_focus", "source_to_target_breach")
 	arena_container.set_meta("combat_exchange_receipt", "engine_resolved_damage")
-	arena_container.set_meta("combat_exchange_damage", damage)
-	arena_container.set_meta("combat_exchange_critical", critical)
+	arena_container.set_meta("combat_exchange_damage", _exchange_damage)
+	arena_container.set_meta("combat_exchange_critical", _exchange_critical)
 
 func _present_nearest_opposing_visual_anchor(painter: CombatExchangeFocusPainter) -> void:
 	var closest_player: UnitActor = null
@@ -522,6 +536,9 @@ func _present_nearest_opposing_visual_anchor(painter: CombatExchangeFocusPainter
 	arena_container.set_meta("combat_exchange_focus", "nearest_opposing_presentation_wound")
 	arena_container.set_meta("combat_visual_contact_anchor", "nearest_opposing_presentation_pair")
 	arena_container.set_meta("combat_visual_contact_presentation_only", true)
+	arena_container.set_meta("combat_exchange_receipt", "default_contact_anchor")
+	arena_container.set_meta("combat_exchange_damage", 0)
+	arena_container.set_meta("combat_exchange_critical", false)
 
 func _ensure_exchange_focus_painter() -> CombatExchangeFocusPainter:
 	if _exchange_focus_painter != null and is_instance_valid(_exchange_focus_painter):
@@ -560,6 +577,11 @@ func _clear() -> void:
 	_exchange_source_index = -1
 	_exchange_target_team = ""
 	_exchange_target_index = -1
+	_exchange_damage = 0
+	_exchange_critical = false
+	_exchange_source_point = Vector2.ZERO
+	_exchange_target_point = Vector2.ZERO
+	_exchange_points_valid = false
 	if _exchange_focus_painter != null and is_instance_valid(_exchange_focus_painter):
 		_exchange_focus_painter.clear_exchange()
 

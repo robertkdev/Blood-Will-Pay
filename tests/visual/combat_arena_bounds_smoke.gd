@@ -2,6 +2,7 @@ extends Node
 
 const SMOKE_NAME: String = "CombatArenaBoundsSmoke"
 const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
+const PhaseTransitionControllerScript: GDScript = preload("res://scripts/ui/combat/phase_transition_controller.gd")
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const PLAYER_TEAM: Array[String] = ["mortem", "berebell", "bonko"]
 const VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
@@ -105,6 +106,7 @@ func _run() -> void:
 	_expect(engine_bounds.position.y >= arena_rect.position.y + 65.0, "engine bounds should reserve health-bar space above actors")
 	_expect(engine_bounds.end.x <= arena_rect.end.x - 51.0, "engine bounds should reserve the actor footprint on the right")
 	_expect(engine_bounds.end.y <= arena_rect.end.y - 51.0, "engine bounds should reserve the actor footprint below")
+	_assert_exchange_receipt_survives_layout(arena_container)
 	for child: Node in arena_units.get_children():
 		var control: Control = child as Control
 		if control == null or not control.visible:
@@ -127,6 +129,7 @@ func _run() -> void:
 	_expect(compact_engine_bounds.position.y >= compact_arena_rect.position.y + 65.0, "compact engine bounds should reserve health-bar space above actors")
 	_expect(compact_engine_bounds.end.x <= compact_arena_rect.end.x - 51.0, "compact engine bounds should reserve the actor footprint on the right")
 	_expect(compact_engine_bounds.end.y <= compact_arena_rect.end.y - 51.0, "compact engine bounds should reserve the actor footprint below")
+	await _assert_direct_battle_return_geometry()
 	await _finish()
 
 func _rect_close(a: Rect2, b: Rect2, tolerance: float) -> bool:
@@ -134,6 +137,81 @@ func _rect_close(a: Rect2, b: Rect2, tolerance: float) -> bool:
 
 func _rect_inside(inner: Rect2, outer: Rect2) -> bool:
 	return outer.has_point(inner.position) and outer.has_point(inner.end)
+
+
+func _assert_exchange_receipt_survives_layout(arena_container: Control) -> void:
+	var controller: Variant = _view.get("controller") if _view != null else null
+	var arena_bridge: Variant = controller.get("arena_bridge") if controller != null else null
+	var arena_controller: Variant = arena_bridge.get("arena") if arena_bridge != null else null
+	_expect(arena_controller != null and arena_controller.has_method("present_combat_exchange_focus"), "combat exchange presenter is missing")
+	if arena_controller == null or not arena_controller.has_method("present_combat_exchange_focus"):
+		return
+	arena_controller.call("present_combat_exchange_focus", "player", 0, "enemy", 0, 37, true)
+	_expect(int(arena_container.get_meta("combat_exchange_damage", 0)) == 37, "resolved exchange receipt did not record its damage")
+	if arena_controller.has_method("reflow_combat_readouts"):
+		arena_controller.call("reflow_combat_readouts")
+	var exchange_focus: Control = arena_container.get_node_or_null("CombatExchangeFocus") as Control
+	_expect(int(arena_container.get_meta("combat_exchange_damage", 0)) == 37, "readout layout erased the resolved exchange damage")
+	_expect(bool(arena_container.get_meta("combat_exchange_critical", false)), "readout layout erased the resolved critical flag")
+	_expect(exchange_focus != null and String(exchange_focus.get_meta("exchange_receipt", "")) == "engine_resolved_damage", "readout layout replaced the resolved exchange focus receipt")
+	var target_actor: UnitActor = arena_controller.call("get_actor", "enemy", 0) as UnitActor
+	_expect(target_actor != null, "exchange receipt target actor is missing")
+	if target_actor != null:
+		target_actor.visible = false
+		arena_controller.call("reflow_combat_readouts")
+		_expect(int(arena_container.get_meta("combat_exchange_damage", 0)) == 37, "target removal erased the last resolved exchange damage")
+		_expect(exchange_focus != null and String(exchange_focus.get_meta("exchange_receipt", "")) == "engine_resolved_damage", "target removal replaced the last resolved hit with a default anchor")
+		target_actor.visible = true
+
+
+func _assert_direct_battle_return_geometry() -> void:
+	var fixture_host: Control = Control.new()
+	fixture_host.name = "DirectBattleTransitionFixture"
+	fixture_host.position = Vector2.ZERO
+	fixture_host.size = Vector2(800.0, 600.0)
+	_viewport.add_child(fixture_host)
+	var planning_area: Control = Control.new()
+	planning_area.name = "PlanningArea"
+	planning_area.position = Vector2(100.0, 100.0)
+	planning_area.size = Vector2(400.0, 300.0)
+	fixture_host.add_child(planning_area)
+	var planning_top: Control = Control.new()
+	planning_top.name = "TopArea"
+	planning_top.position = Vector2.ZERO
+	planning_top.size = Vector2(400.0, 140.0)
+	planning_area.add_child(planning_top)
+	var planning_bottom: Control = Control.new()
+	planning_bottom.name = "BottomArea"
+	planning_bottom.position = Vector2(0.0, 160.0)
+	planning_bottom.size = Vector2(400.0, 140.0)
+	planning_area.add_child(planning_bottom)
+	var arena: Control = Control.new()
+	arena.name = "ArenaContainer"
+	arena.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fixture_host.add_child(arena)
+	await _settle_frames(2)
+	var transition: PhaseTransitionController = PhaseTransitionControllerScript.new() as PhaseTransitionController
+	transition.configure(fixture_host, planning_area, arena)
+	var combat_rect: Rect2 = arena.get_global_rect()
+	transition.mark_combat()
+	var planning_rect: Rect2 = transition.get_planning_commit_rect()
+	_expect(planning_rect.size.x > 1.0 and planning_rect.size.y > 1.0, "direct battle did not capture its planning return target")
+	_expect(_rect_close(arena.get_global_rect(), combat_rect, 1.0), "direct battle geometry normalization moved the live arena")
+	_expect(is_zero_approx(arena.anchor_left) and is_zero_approx(arena.anchor_right) and is_zero_approx(arena.anchor_top) and is_zero_approx(arena.anchor_bottom), "direct battle did not normalize arena anchors")
+	transition.capture_combat_rect()
+	transition.start_return(false)
+	await _settle_frames(2)
+	var return_start_rect: Rect2 = arena.get_global_rect()
+	await get_tree().create_timer(0.40).timeout
+	var return_mid_rect: Rect2 = arena.get_global_rect()
+	_expect(return_mid_rect.size.x < return_start_rect.size.x and return_mid_rect.size.y < return_start_rect.size.y, "direct battle return did not reverse the arena geometry")
+	await get_tree().create_timer(0.50).timeout
+	await _settle_frames(2)
+	_expect(transition.get_state_name() == "idle", "direct battle return did not finish")
+	_expect(_rect_close(arena.get_global_rect(), planning_rect, 2.0), "direct battle return missed its committed planning geometry")
+	transition.teardown()
+	_viewport.remove_child(fixture_host)
+	fixture_host.free()
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
