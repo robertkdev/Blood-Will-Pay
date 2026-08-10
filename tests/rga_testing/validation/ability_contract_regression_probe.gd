@@ -457,7 +457,7 @@ func _check_quillith_power_contracts(failures: Array[String]) -> void:
 	korath_state.player_pupil_map[0] = 1
 	_expect(_cast_success(korath_engine), "Quillith paired Korath cast failed", failures)
 	var korath_hit: Dictionary = korath_engine.attack_resolver.apply_ability_damage("enemy", 0, 2, 200.0, "true")
-	_expect(int(korath_hit.get("redirected_dealt", 0)) == 27 and int(korath_pupil.hp) == 973, "Quillith Korath must redirect exactly 55% of its authored absorb ratio", failures)
+	_expect(int(korath_hit.get("redirected", 0)) == 27 and int(korath_pupil.hp) == 973, "Quillith Korath must redirect exactly 55% of its authored absorb ratio", failures)
 	korath_engine.ability_system.tick(3.0)
 	_expect(int(korath_pupil.hp) == 1198, "Quillith Korath release must retain its redirected pool and scale only the authored base heal", failures)
 	_teardown_fixture(korath_engine)
