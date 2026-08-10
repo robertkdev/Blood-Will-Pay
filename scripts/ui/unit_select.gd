@@ -543,6 +543,7 @@ func _populate_units() -> void:
 			var icon: Texture2D = TextureUtils.try_load_texture(sp)
 			if icon:
 				btn.icon = icon
+				print_verbose("UNIT_SELECT_PORTRAIT_READY id=%s path=%s" % [uid2, sp])
 			else:
 				push_error("UnitSelect failed to load starter portrait for %s: %s" % [uid2, sp])
 		var name_label: Label = Label.new()

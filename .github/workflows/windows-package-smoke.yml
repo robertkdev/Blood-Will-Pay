@@ -182,7 +182,7 @@ jobs:
           $exe = "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe"
           $stdout = "$env:RUNNER_TEMP\blood-will-pay.stdout.log"
           $stderr = "$env:RUNNER_TEMP\blood-will-pay.stderr.log"
-          $process = Start-Process -FilePath $exe -ArgumentList "--headless", "--quit-after", "10" -WorkingDirectory "$env:GITHUB_WORKSPACE\build\windows" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          $process = Start-Process -FilePath $exe -ArgumentList "--headless", "--verbose", "--quit-after", "10" -WorkingDirectory "$env:GITHUB_WORKSPACE\build\windows" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
           $completed = $process.WaitForExit(60000)
           $reaped = $completed
           if (-not $completed) {
@@ -200,6 +200,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Packaged Windows executable exited with code $($process.ExitCode)" }
           $log = Get-Content "$env:GITHUB_WORKSPACE\packaged-resource-smoke.log" -Raw
           if ($log -match "(?m)^ERROR:|Cannot open file|Failed loading resource|Error loading resource|SCRIPT ERROR") { throw "Packaged runtime reported resource or script errors" }
+          if ($log -notmatch "UNIT_SELECT_PORTRAIT_READY id=mara path=res://assets/units/mara.png") { throw "Packaged runtime did not authenticate the Mara starter portrait" }
 
       - name: Upload package smoke evidence
         if: always()
