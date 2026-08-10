@@ -53,7 +53,9 @@ func _run() -> void:
 	var meta: Dictionary = tag.get("data", {}) if tag is Dictionary else {}
 	var per_sec: int = int(meta.get("per_sec", 0))
 
-	engine.ability_system.tick(3.1)
+	for _tick_index: int in range(3):
+		engine.buff_system.tick(state, 1.0)
+		engine.ability_system.tick(1.0)
 
 	var canonical_stacks: int = int(engine.buff_system.get_stack(state, "player", 0, TraitKeys.AEGIS))
 	var legacy_stacks: int = int(engine.buff_system.get_stack(state, "player", 0, "aegis_stacks"))
@@ -102,12 +104,44 @@ func _run() -> void:
 	if fortification_targets < 1:
 		printerr("KytheraSiphonCanonicalStackProbe: FAIL Siphon permanent MR gain did not emit source-owned fortification buff telemetry")
 		failed = true
+	if not _low_mr_gain_is_capped(1.0, 4):
+		printerr("KytheraSiphonCanonicalStackProbe: FAIL Siphon permanently gained more MR than a low-MR target could supply")
+		failed = true
+	if not _low_mr_gain_is_capped(0.55, 2):
+		printerr("KytheraSiphonCanonicalStackProbe: FAIL scaled Siphon exceeded its low-MR output cap")
+		failed = true
 
 	if failed:
 		_finish(engine, 1)
 		return
 	print("KytheraSiphonCanonicalStackProbe: PASS")
 	_finish(engine, 0)
+
+func _low_mr_gain_is_capped(power_scale: float, expected_gain: int) -> bool:
+	var state: BattleState = _make_state()
+	var kythera: Unit = state.player_team[0]
+	var target: Unit = state.enemy_team[0]
+	target.magic_resist = 4.0
+	var engine: CombatEngine = CombatEngineScript.new()
+	engine.configure(state, kythera, 2, Callable())
+	if engine.buff_system == null or engine.ability_system == null:
+		engine.teardown()
+		return false
+	engine.buff_system.add_stack(state, "player", 0, TraitKeys.AEGIS, 6)
+	var before_mr: float = float(kythera.magic_resist)
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = 27182
+	var ctx: AbilityContext = AbilityContext.new(engine, state, rng, "player", 0)
+	ctx.buff_system = engine.buff_system
+	ctx.power_scale = power_scale
+	var ability: Variant = KytheraSiphon.new()
+	var cast_ok: bool = bool(ability.call("cast", ctx))
+	for _tick_index: int in range(3):
+		engine.buff_system.tick(state, 1.0)
+		engine.ability_system.tick(1.0)
+	var gained_mr: int = int(round(float(kythera.magic_resist) - before_mr))
+	engine.teardown()
+	return cast_ok and gained_mr == expected_gain
 
 func _make_state() -> BattleState:
 	var state: BattleState = BattleStateScript.new()

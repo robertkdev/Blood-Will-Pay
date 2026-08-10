@@ -30,9 +30,10 @@ func cast(ctx: AbilityContext) -> bool:
 			"damage": pop_damage,
 			"radius_tiles": POP_RADIUS_TILES,
 			"stun_duration": POP_STUN_DURATION,
+			"ability_power_scale": clampf(ctx.power_scale, 0.0, 1.0),
 			"pop_on_break_or_expiry": true
 		}
-		ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, ally_index, shield_amount, SHIELD_DURATION, pop_data)
+		ctx.apply_shield(ctx.caster_team, ally_index, shield_amount, SHIELD_DURATION, pop_data)
 	ctx.log("Bubbles: shielded %d weak allies; each bubble pops locally" % targets.size())
 	return not targets.is_empty()
 

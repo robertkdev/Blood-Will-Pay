@@ -20,15 +20,17 @@ func cast(ctx: AbilityContext) -> bool:
 	var target_index: int = _highest_value_enemy(ctx)
 	if target_index < 0:
 		return false
+	if not ctx.schedule_implementation_callback(self, "_expire_mark", MARK_DURATION, [], "_expire_mark"):
+		return false
 	_active_ctx = ctx
 	_marked_team = _enemy_team(ctx.caster_team)
 	_marked_index = target_index
 	if ctx.buff_system != null:
-		ctx.buff_system.record_debuff(ctx.state, _marked_team, target_index, "gable_market_corner_mark", {"ricochet_ratio": RICOCHET_RATIO}, RICOCHET_RATIO, MARK_DURATION)
+		var effective_ratio: float = ctx.scale_power(RICOCHET_RATIO)
+		ctx.buff_system.record_debuff(ctx.state, _marked_team, target_index, "gable_market_corner_mark", {"ricochet_ratio": effective_ratio}, effective_ratio, MARK_DURATION)
 	var hit_callback: Callable = Callable(self, "_on_hit_applied")
 	if not ctx.engine.hit_applied.is_connected(hit_callback):
 		ctx.engine.hit_applied.connect(hit_callback)
-	_schedule_expiry()
 	if ctx.engine.has_signal("target_start"):
 		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, _marked_team, target_index)
 	ctx.log("Market Corner: marked high-value enemy %d for ricocheting attacks" % target_index)
@@ -76,12 +78,6 @@ func _nearest_other_enemy(ctx: AbilityContext, excluded_index: int) -> int:
 			best_distance = distance
 			best_index = index
 	return best_index
-
-func _schedule_expiry() -> void:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null:
-		return
-	tree.create_timer(MARK_DURATION).timeout.connect(Callable(self, "_expire_mark"), CONNECT_ONE_SHOT)
 
 func _expire_mark() -> void:
 	if _active_ctx != null and _active_ctx.engine != null:

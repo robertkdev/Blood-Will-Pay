@@ -8,7 +8,11 @@ const ArenaControllerClass := preload("res://scripts/ui/combat/arena_controller.
 const ACTOR_EXTRA_HORIZONTAL: float = 18.0
 const ACTOR_EXTRA_TOP: float = 72.0
 const ACTOR_EXTRA_BOTTOM: float = 18.0
-const COMBAT_ACTOR_SIZE_SCALE: float = 2.64
+# Combat actors remain visibly promoted from their planning cells, but the
+# former 2.64 multiplier crowded six-plus-six encounters and pushed right-edge
+# silhouettes/readouts into the hard clip. Keep this in lockstep with
+# ArenaController.COMBAT_ACTOR_SIZE_SCALE; this is presentation-only.
+const COMBAT_ACTOR_SIZE_SCALE: float = 2.24
 
 var arena: ArenaController = null
 var arena_container: Control
@@ -372,6 +376,16 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
     # Planning preserves board-relative bounds; combat promotes the same
     # formations into the full survival field after its side UI is removed.
     var bounds: Rect2 = get_engine_arena_bounds()
+    if not _continuous_entry_active and arena_container != null and bool(arena_container.get_meta("use_full_combat_bounds", false)):
+        var planning_bounds: Rect2 = _planning_field_rect()
+        if bounds.size.x > 1.0 and bounds.size.y > 1.0:
+            if planning_bounds.size.x > 1.0 and planning_bounds.size.y > 1.0:
+                ppos = _map_shared_formation(ppos, planning_bounds, bounds)
+                epos = _map_shared_formation(epos, planning_bounds, bounds)
+            var shared_shift: Vector2 = _center_confrontation_positions(ppos, epos, bounds)
+            arena_container.set_meta("direct_combat_camera_focus_mode", "shared_confrontation_centroid")
+            arena_container.set_meta("direct_combat_confrontation_centroid", _combined_centroid(ppos, epos))
+            arena_container.set_meta("direct_combat_shared_shift", shared_shift)
     # The field camera supplies one shared affine mapping for both teams.
     # Never recenter formations independently: committed cells must remain the
     # visible starting formation when simulation unfreezes.
@@ -489,23 +503,35 @@ func _map_shared_formation(source_positions: Array[Vector2], source_rect: Rect2,
     return mapped
 
 func _center_mapped_confrontation(target_rect: Rect2) -> void:
-    var all_targets: Array[Vector2] = []
-    all_targets.append_array(_entry_target_player)
-    all_targets.append_array(_entry_target_enemy)
-    if all_targets.is_empty() or target_rect.size.x <= 1.0 or target_rect.size.y <= 1.0:
-        return
-    var centroid: Vector2 = Vector2.ZERO
-    for target_position: Vector2 in all_targets:
-        centroid += target_position
-    centroid /= float(all_targets.size())
-    var shared_shift: Vector2 = target_rect.get_center() - centroid
-    for index: int in range(_entry_target_player.size()):
-        _entry_target_player[index] = (_entry_target_player[index] + shared_shift).clamp(target_rect.position, target_rect.end)
-    for index: int in range(_entry_target_enemy.size()):
-        _entry_target_enemy[index] = (_entry_target_enemy[index] + shared_shift).clamp(target_rect.position, target_rect.end)
+    _center_confrontation_positions(_entry_target_player, _entry_target_enemy, target_rect)
     if arena_container != null:
         arena_container.set_meta("entry_confrontation_centroid", target_rect.get_center())
         arena_container.set_meta("entry_camera_focus_mode", "shared_confrontation_centroid")
+
+func _center_confrontation_positions(player_positions: Array[Vector2], enemy_positions: Array[Vector2], target_rect: Rect2) -> Vector2:
+    var all_positions: Array[Vector2] = []
+    all_positions.append_array(player_positions)
+    all_positions.append_array(enemy_positions)
+    if all_positions.is_empty() or target_rect.size.x <= 1.0 or target_rect.size.y <= 1.0:
+        return Vector2.ZERO
+    var centroid: Vector2 = _combined_centroid(player_positions, enemy_positions)
+    var shared_shift: Vector2 = target_rect.get_center() - centroid
+    for index: int in range(player_positions.size()):
+        player_positions[index] = (player_positions[index] + shared_shift).clamp(target_rect.position, target_rect.end)
+    for index: int in range(enemy_positions.size()):
+        enemy_positions[index] = (enemy_positions[index] + shared_shift).clamp(target_rect.position, target_rect.end)
+    return shared_shift
+
+func _combined_centroid(player_positions: Array[Vector2], enemy_positions: Array[Vector2]) -> Vector2:
+    var centroid: Vector2 = Vector2.ZERO
+    var count: int = 0
+    for position_value: Vector2 in player_positions:
+        centroid += position_value
+        count += 1
+    for position_value: Vector2 in enemy_positions:
+        centroid += position_value
+        count += 1
+    return centroid / float(count) if count > 0 else Vector2.INF
 
 func _safe_bounds_for_rect(render_rect: Rect2) -> Rect2:
     if render_rect.size.x <= 1.0 or render_rect.size.y <= 1.0:

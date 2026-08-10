@@ -32,7 +32,7 @@ func cast(ctx: AbilityContext) -> bool:
 	for victim_index: int in victims:
 		var result: Dictionary = ctx.damage_single(ctx.caster_team, ctx.caster_index, victim_index, damage, "physical")
 		total_dealt += float(result.get("dealt", 0.0))
-	ctx.heal_single(ctx.caster_team, ctx.caster_index, total_dealt * float(HEAL_FROM_DAMAGE[level_index]))
+	ctx.heal_from_dealt(ctx.caster_team, ctx.caster_index, total_dealt * float(HEAL_FROM_DAMAGE[level_index]))
 	ctx.log("Crimson Harvest: cone hit %d and healed only from actual damage" % victims.size())
 	return not victims.is_empty()
 

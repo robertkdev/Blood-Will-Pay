@@ -4,6 +4,8 @@ const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const UNIT_SELECT_SCENE: PackedScene = preload("res://scenes/UnitSelect.tscn")
 const VisionSnapshot := preload("res://scripts/util/vision_snapshot.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const UI_FIT_AUDITOR: GDScript = preload("res://tests/visual/ui_fit_auditor.gd")
+const UNIT_FACTORY_SCRIPT: GDScript = preload("res://scripts/unit_factory.gd")
 const SMOKE_NAME: String = "CompactViewportVisualAuditSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/compact_viewport_audit"
 const TEST_SETTINGS_PATH: String = "user://compact_viewport_visual_audit_settings.cfg"
@@ -206,6 +208,7 @@ func _run() -> void:
 	_expect_no_button_text_overflow(combat, "150-percent post-shop combat")
 	_expect_compact_shop_detail_band("150-percent planning")
 	_save_capture("06_post_shop_planning_1920x1080_150pct.png", _main)
+	await _expect_scaled_unit_detail("150-percent unit detail")
 	await _finish()
 
 func _expect_compact_shop_detail_band(context: String) -> void:
@@ -883,6 +886,9 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 func _expect_scaled_decision_data(context: String) -> void:
 	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
 	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var bet_value: Label = combat.find_child("BetValue", true, false) as Label if combat != null else null
+	_expect(bet_value != null and bet_value.text.contains("bkt") and not bet_value.text.contains("bucket"), "%s wager control did not use its tight bucket copy" % context)
 	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "%s enlarged layout hid its blood/level/XP record" % context)
 	if resource_strip != null:
 		_expect(bool(resource_strip.get_meta("decision_data_complete", false)), "%s compact resource strip did not certify a complete source mirror" % context)
@@ -892,7 +898,8 @@ func _expect_scaled_decision_data(context: String) -> void:
 		var gold_source: Label = _main.get_node_or_null("CombatView/MarginContainer/VBoxContainer/ActionsRow/GoldLabel") as Label if _main != null else null
 		if gold_source == null and _main != null:
 			gold_source = _main.find_child("GoldLabel", true, false) as Label
-		_expect(gold_source != null and resource_strip.text.contains(gold_source.text.get_slice(":", 1).strip_edges()), "%s resource strip does not mirror the live gold value" % context)
+		var expected_blood_value: String = gold_source.text.get_slice(":", 1).strip_edges().to_upper() if gold_source != null else ""
+		_expect(gold_source != null and resource_strip.text.contains(expected_blood_value), "%s resource strip does not mirror the live gold value" % context)
 		var progress_source: Label = _find_progress_source()
 		_expect(progress_source != null, "%s live level/XP source is missing" % context)
 		if progress_source != null:
@@ -947,18 +954,14 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		_expect(bool(row.get_meta("compact_layout", false)), "%s visible metric row did not enter its compact contract" % context)
 		var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label
 		var value_label: Label = row.get_node_or_null("HBox/Content/Value") as Label
-		var has_team_badge: bool = name_label != null and (
-			name_label.text.begins_with("YOU ")
-			or name_label.text.begins_with("FOE ")
-			or name_label.text.begins_with("Y ")
-			or name_label.text.begins_with("F ")
-		)
-		_expect(has_team_badge, "%s metric row lost its intentional text team badge" % context)
+		var team_marker: String = String(name_label.get_meta("compact_team_marker", "")) if name_label != null else ""
+		_expect(team_marker == "YOU" or team_marker == "FOE", "%s metric row lost its team identity metadata" % context)
 		_expect(value_label != null and value_label.text.strip_edges() != "", "%s metric row lost its numeric value" % context)
 		if name_label != null:
 			_expect(bool(name_label.get_meta("compact_identity_complete", false)), "%s metric row reverted to raw unit-name truncation" % context)
 			_expect(not name_label.text.contains("//"), "%s metric row still exposes accidental identifier truncation" % context)
-			var identity_copy: String = name_label.text.trim_prefix("YOU ").trim_prefix("FOE ").trim_prefix("Y ").trim_prefix("F ").strip_edges()
+			_expect(not name_label.text.begins_with("Y ") and not name_label.text.begins_with("F "), "%s metric row uses a clipped-looking one-letter team prefix" % context)
+			var identity_copy: String = name_label.text.trim_prefix("YOU ").trim_prefix("FOE ").strip_edges()
 			found_bonko = found_bonko or identity_copy == "BONKO"
 			found_berebell = found_berebell or identity_copy == "BEREBELL" or (not full_berebell_fits and identity_copy.begins_with("BERE") and identity_copy.length() >= 4)
 			_expect(identity_copy != "BOKO", "%s corrupts BONKO into BOKO" % context)
@@ -974,6 +977,42 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		_expect(compact_rows > 0, "%s populated Team Metrics rail exposes no readable rows" % context)
 		_expect(found_bonko, "%s populated Team Metrics rail omits full BONKO" % context)
 		_expect(found_berebell, "%s populated Team Metrics rail omits full BEREBELL or an unambiguous tight fallback" % context)
+
+func _expect_scaled_unit_detail(context: String) -> void:
+	var stats_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel")
+	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
+	var sari: Unit = UNIT_FACTORY_SCRIPT.spawn("sari") as Unit
+	_expect(stats_panel != null and stats_area != null and sari != null, "%s prerequisites are missing" % context)
+	if stats_panel == null or stats_area == null or sari == null:
+		return
+	var team_width: float = stats_area.size.x
+	if stats_panel.has_method("show_unit_metrics_ctx"):
+		stats_panel.call("show_unit_metrics_ctx", "player", 0, sari)
+	await _settle_frames(8)
+	var unit_frame: Control = stats_panel.find_child("UnitPanelFrame", true, false) as Control
+	var unit_scroll: ScrollContainer = stats_panel.find_child("UnitScroll", true, false) as ScrollContainer
+	var unit_panel: Control = stats_panel.find_child("UnitPanel", true, false) as Control
+	_expect(unit_frame != null and unit_frame.is_visible_in_tree(), "%s frame is not visible" % context)
+	_expect(unit_scroll != null and unit_panel != null, "%s scroll shell is incomplete" % context)
+	_expect(stats_area.size.x >= 210.0 and stats_area.size.x > team_width + 20.0, "%s did not widen its temporary inspection rail: team=%.1f detail=%.1f" % [context, team_width, stats_area.size.x])
+	if unit_scroll != null and unit_panel != null:
+		var scroll_rect: Rect2 = unit_scroll.get_global_rect()
+		var panel_rect: Rect2 = unit_panel.get_global_rect()
+		_expect(unit_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s enables horizontal scrolling" % context)
+		_expect(panel_rect.position.x >= scroll_rect.position.x - 1.0 and panel_rect.end.x <= scroll_rect.end.x + 1.0, "%s panel escapes its horizontal viewport: panel=%s scroll=%s" % [context, str(panel_rect), str(scroll_rect)])
+	if unit_frame != null:
+		for issue: String in UI_FIT_AUDITOR.audit(unit_frame, context):
+			_failures.append(issue)
+	if stats_panel.has_method("set_responsive_layout"):
+		stats_panel.call("set_responsive_layout", true, true)
+	await _settle_frames(2)
+	_expect(stats_area.size.x >= 210.0, "%s lost its detail width after a responsive refresh: %.1f" % [context, stats_area.size.x])
+	_save_capture("06a_unit_detail_1920x1080_150pct.png", _main)
+	if stats_panel.has_method("show_team_metrics"):
+		stats_panel.call("show_team_metrics")
+	await _settle_frames(6)
+	_expect(stats_area.size.x <= team_width + 1.0, "%s did not restore the compact team rail: before=%.1f after=%.1f" % [context, team_width, stats_area.size.x])
+	_expect_scaled_team_metrics("%s restored Team Metrics" % context)
 
 func _expect_scaled_surface_separation(context: String) -> void:
 	var battle_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea")

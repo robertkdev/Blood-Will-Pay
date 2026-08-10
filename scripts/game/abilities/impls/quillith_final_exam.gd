@@ -3,22 +3,6 @@ extends AbilityImplBase
 const AbilityCatalog = preload("res://scripts/game/abilities/ability_catalog.gd")
 const RECAST_POWER: float = 0.55
 
-class ReducedAbilityContext extends AbilityContext:
-	var power_scale: float = 1.0
-
-	func _init(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGenerator, _caster_team: String, _caster_index: int, _power_scale: float) -> void:
-		super(_engine, _state, _rng, _caster_team, _caster_index)
-		power_scale = clamp(_power_scale, 0.0, 1.0)
-
-	func damage_single(source_team: String, source_index: int, target_index: int, amount: float, type: String = "physical") -> Dictionary:
-		return super.damage_single(source_team, source_index, target_index, amount * power_scale, type)
-
-	func heal_single(target_team: String, target_index: int, amount: float) -> Dictionary:
-		return super.heal_single(target_team, target_index, amount * power_scale)
-
-	func stun(target_team: String, target_index: int, duration_s: float) -> Dictionary:
-		return super.stun(target_team, target_index, duration_s * power_scale)
-
 func cast(ctx: AbilityContext) -> bool:
 	if ctx == null or ctx.engine == null or ctx.state == null:
 		return false
@@ -31,12 +15,17 @@ func cast(ctx: AbilityContext) -> bool:
 	var pupil: Unit = ctx.unit_at(ctx.caster_team, pupil_index)
 	if pupil == null or String(pupil.ability_id) == "" or String(pupil.ability_id) == "quillith_final_exam":
 		return false
+	if ctx.buff_system != null and ctx.buff_system.is_stunned(pupil):
+		return false
 	var impl: Variant = AbilityCatalog.new_instance(String(pupil.ability_id))
 	if impl == null or not impl.has_method("cast"):
 		return false
-	var recast_ctx: ReducedAbilityContext = ReducedAbilityContext.new(ctx.engine, ctx.state, ctx.rng, ctx.caster_team, pupil_index, RECAST_POWER)
+	if ctx.engine.ability_system == null:
+		return false
+	var recast_ctx: AbilityContext = AbilityContext.new(ctx.engine, ctx.state, ctx.rng, ctx.caster_team, pupil_index)
 	recast_ctx.buff_system = ctx.buff_system
-	var recast_ok: bool = bool(impl.cast(recast_ctx))
+	recast_ctx.power_scale = RECAST_POWER
+	var recast_ok: bool = ctx.engine.ability_system.cast_implementation(impl, recast_ctx, "quillith_pupil")
 	if not recast_ok:
 		return false
 	if ctx.engine.has_method("_resolver_emit_reset_triggered"):
@@ -50,17 +39,4 @@ func _pupil_index(ctx: AbilityContext) -> int:
 	var paired: Unit = ctx.unit_at(ctx.caster_team, paired_index)
 	if paired_index >= 0 and paired != null and paired.is_alive() and String(paired.ability_id) != "quillith_final_exam":
 		return paired_index
-	var allies: Array[Unit] = ctx.ally_team_array(ctx.caster_team)
-	var best_index: int = -1
-	var best_score: float = -INF
-	for index: int in range(allies.size()):
-		if index == ctx.caster_index:
-			continue
-		var ally: Unit = allies[index]
-		if ally == null or not ally.is_alive() or String(ally.ability_id) == "" or String(ally.ability_id) == "quillith_final_exam":
-			continue
-		var score: float = float(ally.cost * 200) + float(ally.attack_damage) + float(ally.spell_power)
-		if score > best_score:
-			best_score = score
-			best_index = index
-	return best_index
+	return -1

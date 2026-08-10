@@ -15,7 +15,7 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var targets: Array[int] = _allies_in_radius(ctx)
 	for ally_index: int in targets:
-		ctx.buff_system.apply_stats_buff(ctx.state, ctx.caster_team, ally_index, {"damage_reduction": DAMAGE_REDUCTION}, DURATION)
+		ctx.apply_stats_buff(ctx.caster_team, ally_index, {"damage_reduction": DAMAGE_REDUCTION}, DURATION)
 		ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, ally_index, BuffTags.TAG_CC_IMMUNE, DURATION, {"kind": "veyra_harden"})
 	ctx.log("Harden: %d nearby allies gained DR and CC immunity" % targets.size())
 	return not targets.is_empty()

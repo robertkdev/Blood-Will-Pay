@@ -2,14 +2,6 @@ name: Windows package smoke
 
 on:
   pull_request:
-    paths:
-      - "assets/audio/**"
-      - "scripts/game/audio/**"
-      - "scripts/util/resource_path_normalizer.gd"
-      - "tests/rga_testing/validation/PackagedResourceDiscoveryProbe.tscn"
-      - "tests/rga_testing/validation/packaged_resource_discovery_probe.gd"
-      - "export_presets.cfg"
-      - ".github/workflows/windows-package-smoke.yml"
   push:
     branches:
       - "codex/019f7639-package-resource-replay"
@@ -21,7 +13,7 @@ permissions:
 jobs:
   windows-package-smoke:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Check out candidate
         uses: actions/checkout@v4
@@ -69,10 +61,83 @@ jobs:
           $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--editor", "--path", $env:GITHUB_WORKSPACE, "--quit") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
           Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
           if ($process.ExitCode -ne 0) { throw "Godot resource import failed with exit code $($process.ExitCode)" }
+          $importLog = (Get-Content $stdout -Raw -ErrorAction SilentlyContinue) + (Get-Content $stderr -Raw -ErrorAction SilentlyContinue)
+          if ($importLog -match "(?m)^ERROR:|SCRIPT ERROR|Parse Error|Compile Error|Failed to load script") { throw "Godot resource import reported engine or script errors" }
+
+      - name: Run gameplay and audit regression gates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $runner = "${{ steps.godot.outputs.godot_console }}"
+          if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
+          $gateLogRoot = Join-Path $env:GITHUB_WORKSPACE "ci-logs\gameplay-gates"
+          New-Item -ItemType Directory -Force -Path $gateLogRoot | Out-Null
+          $scenes = @(
+            "tests/lint/UnitStatLint.tscn",
+            "tests/rga_testing/validation/RoleMatrixProbe.tscn",
+            "tests/rga_testing/validation/RunStateStoreProbe.tscn",
+            "tests/rga_testing/validation/ItemBalanceEvidenceProbe.tscn",
+            "tests/rga_testing/validation/LockstepWallClockContractProbe.tscn",
+            "tests/rga_testing/validation/ItemTraitSystemsProbe.tscn",
+            "tests/rga_testing/validation/AllPlayableAbilityLivenessProbe.tscn",
+            "tests/rga_testing/validation/AbilityContractRegressionProbe.tscn",
+            "tests/rga_testing/validation/KytheraSiphonCanonicalStackProbe.tscn",
+            "tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn",
+            "tests/rga_testing/validation/ChapterContractMarketProbe.tscn",
+            "tests/visual/BettingEconomySmoke.tscn",
+            "tests/visual/AccessibilitySettingsSmoke.tscn",
+            "tests/visual/CompactSystemMenuSmoke.tscn",
+            "tests/visual/LossScreenSmoke.tscn",
+            "tests/visual/CompactViewportVisualAuditSmoke.tscn",
+            "tests/visual/TextContainerFitSmoke.tscn",
+            "tests/visual/CombatArenaBoundsSmoke.tscn",
+            "tests/visual/DirectCustomCombatPresentationSmoke.tscn",
+            "tests/visual/ActualRunLoopSmoke.tscn"
+          )
+          $sceneIndex = 0
+          foreach ($scene in $scenes) {
+            Write-Host "Running $scene"
+            $stdout = Join-Path $env:RUNNER_TEMP "godot-gate-$sceneIndex.stdout.log"
+            $stderr = Join-Path $env:RUNNER_TEMP "godot-gate-$sceneIndex.stderr.log"
+            $timeoutSeconds = 120
+            if ($scene -eq "tests/rga_testing/validation/AllPlayableAbilityLivenessProbe.tscn") {
+              $timeoutSeconds = 180
+            } elseif ($scene -in @(
+              "tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn",
+              "tests/visual/ActualRunLoopSmoke.tscn"
+            )) {
+              $timeoutSeconds = 300
+            }
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+            $process = Start-Process -FilePath $runner -ArgumentList @("--headless", "--path", $env:GITHUB_WORKSPACE, "res://$scene") -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+            $completed = $process.WaitForExit($timeoutSeconds * 1000)
+            $reaped = $completed
+            if (-not $completed) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              $reaped = $process.WaitForExit(10000)
+              if (-not $reaped) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                $reaped = $process.WaitForExit(5000)
+              }
+            }
+            $stopwatch.Stop()
+            Copy-Item -LiteralPath $stdout -Destination (Join-Path $gateLogRoot ("gate-{0:D2}.stdout.log" -f $sceneIndex)) -Force -ErrorAction SilentlyContinue
+            Copy-Item -LiteralPath $stderr -Destination (Join-Path $gateLogRoot ("gate-{0:D2}.stderr.log" -f $sceneIndex)) -Force -ErrorAction SilentlyContinue
+            Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
+            if (-not $reaped) {
+              throw "Godot gate process could not be reaped after timeout: $scene"
+            }
+            if (-not $completed) {
+              throw "Godot gate timed out: $scene after $([Math]::Round($stopwatch.Elapsed.TotalSeconds, 1))s (limit ${timeoutSeconds}s)"
+            }
+            if ($process.ExitCode -ne 0) { throw "Godot gate failed: $scene (exit code $($process.ExitCode))" }
+            $sceneLog = (Get-Content $stdout -Raw -ErrorAction SilentlyContinue) + (Get-Content $stderr -Raw -ErrorAction SilentlyContinue)
+            if ($sceneLog -match "(?m)^ERROR:|SCRIPT ERROR|Parse Error|Compile Error|Failed to load script|ASSERT FAILED") { throw "Godot gate reported engine, script, or assertion errors: $scene" }
+            $sceneIndex += 1
+          }
 
       - name: Export checked-in Windows preset
         id: export
-        continue-on-error: true
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -81,33 +146,56 @@ jobs:
           if (-not $runner -or -not (Test-Path $runner)) { $runner = "${{ steps.godot.outputs.godot }}" }
           $stdout = Join-Path $env:RUNNER_TEMP "godot-export.stdout.log"
           $stderr = Join-Path $env:RUNNER_TEMP "godot-export.stderr.log"
-          $arguments = @("--headless", "--path", $env:GITHUB_WORKSPACE, '--export-release="Windows Desktop"', "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")
+          $exportPath = Join-Path $env:GITHUB_WORKSPACE "build\windows\BloodWillPay.exe"
+          $arguments = @(
+            "--headless",
+            "--verbose",
+            "--path", ('"{0}"' -f $env:GITHUB_WORKSPACE),
+            "--export-release", '"Windows Desktop"',
+            ('"{0}"' -f $exportPath)
+          )
           $process = Start-Process -FilePath $runner -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
-          $completed = Wait-Process -Id $process.Id -Timeout 300 -ErrorAction SilentlyContinue
+          $completed = $process.WaitForExit(300000)
+          $reaped = $completed
           if (-not $completed) {
-            Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
-            Copy-Item $stdout "$env:GITHUB_WORKSPACE\godot-export.stdout.log" -Force -ErrorAction SilentlyContinue
-            Copy-Item $stderr "$env:GITHUB_WORKSPACE\godot-export.stderr.log" -Force -ErrorAction SilentlyContinue
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-            throw "Godot Windows export timed out after 300 seconds"
+            $reaped = $process.WaitForExit(10000)
+            if (-not $reaped) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              $reaped = $process.WaitForExit(5000)
+            }
           }
-          $process.Refresh()
           Get-Content $stdout, $stderr -ErrorAction SilentlyContinue
           Copy-Item $stdout "$env:GITHUB_WORKSPACE\godot-export.stdout.log" -Force -ErrorAction SilentlyContinue
           Copy-Item $stderr "$env:GITHUB_WORKSPACE\godot-export.stderr.log" -Force -ErrorAction SilentlyContinue
+          if (-not $reaped) { throw "Godot Windows export process could not be reaped after timeout" }
+          if (-not $completed) { throw "Godot Windows export timed out after 300 seconds" }
+          $process.Refresh()
           if ($process.ExitCode -ne 0) { throw "Godot Windows export failed with exit code $($process.ExitCode)" }
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe")) { throw "Windows executable was not produced" }
 
       - name: Run packaged resource smoke
-        if: ${{ steps.export.outcome == 'success' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $exe = "$env:GITHUB_WORKSPACE\build\windows\BloodWillPay.exe"
           $stdout = "$env:RUNNER_TEMP\blood-will-pay.stdout.log"
           $stderr = "$env:RUNNER_TEMP\blood-will-pay.stderr.log"
-          $process = Start-Process -FilePath $exe -ArgumentList "--headless", "--quit-after", "10" -WorkingDirectory "$env:GITHUB_WORKSPACE\build\windows" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -Wait
+          $process = Start-Process -FilePath $exe -ArgumentList "--headless", "--quit-after", "10" -WorkingDirectory "$env:GITHUB_WORKSPACE\build\windows" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          $completed = $process.WaitForExit(60000)
+          $reaped = $completed
+          if (-not $completed) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            $reaped = $process.WaitForExit(10000)
+            if (-not $reaped) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              $reaped = $process.WaitForExit(5000)
+            }
+          }
           Get-Content $stdout, $stderr -ErrorAction SilentlyContinue | Set-Content "$env:GITHUB_WORKSPACE\packaged-resource-smoke.log"
+          if (-not $reaped) { throw "Packaged Windows executable could not be reaped after timeout" }
+          if (-not $completed) { throw "Packaged Windows executable timed out after 60 seconds" }
+          $process.Refresh()
           if ($process.ExitCode -ne 0) { throw "Packaged Windows executable exited with code $($process.ExitCode)" }
           $log = Get-Content "$env:GITHUB_WORKSPACE\packaged-resource-smoke.log" -Raw
           if ($log -match "Cannot open file|Failed loading resource|Error loading resource|SCRIPT ERROR") { throw "Packaged runtime reported resource or script errors" }
@@ -118,6 +206,7 @@ jobs:
         with:
           name: windows-package-smoke-${{ github.sha }}
           path: |
+            ci-logs/**
             packaged-resource-smoke.log
             godot-export.stdout.log
             godot-export.stderr.log

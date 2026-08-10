@@ -26,6 +26,12 @@ func _run() -> void:
 		title_page.visible = false
 	if combat_view != null:
 		combat_view.visible = true
+	GameState.set_phase(GameState.GamePhase.PREVIEW)
+	await _settle_frames(2)
+	if combat_view != null:
+		combat_view.set("planning_time_left", 18.0)
+	var phase_before_settings: int = int(GameState.phase)
+	var planning_time_before_settings: float = float(combat_view.get("planning_time_left")) if combat_view != null else -1.0
 	main.call("_open_system_menu")
 	await _settle_frames(6)
 	var overlay: Control = main.get("_system_overlay") as Control
@@ -76,6 +82,11 @@ func _run() -> void:
 			await _settle_frames(4)
 			_expect(not title_menu.visible and not get_tree().paused, "Return to Run did not safely close runtime Settings")
 			_expect(combat_view != null and combat_view.visible, "Return to Run did not restore the unchanged CombatView")
+			_expect(int(GameState.phase) == phase_before_settings, "runtime Settings changed the active game phase")
+			if combat_view != null:
+				var planning_time_after_settings: float = float(combat_view.get("planning_time_left"))
+				_expect(planning_time_after_settings <= planning_time_before_settings + 0.01, "runtime Settings reset the planning timer from %.2f to %.2f" % [planning_time_before_settings, planning_time_after_settings])
+				_expect(planning_time_after_settings >= planning_time_before_settings - 1.0, "runtime Settings consumed planning time while paused: before=%.2f after=%.2f" % [planning_time_before_settings, planning_time_after_settings])
 	await _verify_compact_shop_detail_contract()
 	get_tree().paused = false
 	remove_child(main)

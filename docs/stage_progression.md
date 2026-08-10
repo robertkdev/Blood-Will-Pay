@@ -6,7 +6,7 @@ At chapter entry the run prepares three mutually exclusive contract families:
 
 - Champion: installs a run-persistent targeting doctrine on an explicitly chosen owned unit; the assignment screen explains role fit before the player commits the bearer.
 - Stable: rotates between a bounded formation license, an opening team ward, and a first-death inheritance shield.
-- Pit: rotates between visible timed arena hazards while raising enemy difficulty; the resulting lower projected win odds naturally raise the quoted payout without a second reward multiplier.
+- Pit: rotates between visible timed arena hazards while raising enemy difficulty and applying an explicit 1.25x wager-return modifier to the encounter-tier quote. Projected win odds remain informational and do not price the wager.
 
 One selection expires the other offers. Passing is always valid. Contract prices derive from the current Stakes denomination rather than the player's current wallet. The market must show each offer's price, reward, drawback, and next-fight impact; purchased Stable and Pit effects are part of the run snapshot and survive resume.
 
@@ -26,6 +26,12 @@ Enemy composition lives in `scripts/game/progression/roster_catalog.gd`. The old
 
 `scripts/game/progression/endless_chapter_generator.gd` builds generated StageSpecs by difficulty rating. `RosterCatalog` caches those specs in chapter/stage order so planning preview and combat receive identical generated boards. Normal stages include `rga_challenge` metadata, boss stages are generated from the same difficulty budget system, and mirror stages still use the boss-entry board snapshot. Generated normal/boss difficulty includes raw unit level rating plus active enemy trait pressure; item pressure is currently exposed by `tests/rga_testing/validation/DifficultyRatingAudit.tscn` but is not part of generated boards until enemies start receiving generated item loadouts.
 
-Player-facing naming remains the original chapter pattern. `ChapterCatalog.display_name_for()` returns `Chapter N` for Chapter 1 and all later generated chapters; the top bar and logs should not show an endless-mode label.
+Player-facing naming remains the original chapter pattern. Chapters 1-10 have
+authored flavor names; Chapter 11 onward deliberately falls back to `Chapter N`.
+Those ten names are an opening arc, not a campaign cap. The procedural run has
+no fixed final chapter. Player level caps at 14 and board capacity tops out at
+16 slots; later chapters continue against scaling generated encounters with
+that mature roster. The top bar and logs should not show a separate
+endless-mode label.
 
 Mirror fights use `scripts/game/progression/mirror_board_store.gd`. The combat manager snapshots the player's board when the boss fight starts, then the mirror rule applies that snapshot to the next stage's enemy team, including unit order, levels, combat stats, and equipped item IDs.

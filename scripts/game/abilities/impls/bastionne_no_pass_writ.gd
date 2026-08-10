@@ -25,8 +25,10 @@ func cast(ctx: AbilityContext) -> bool:
 	var level_index: int = _level_index(caster)
 	ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, float(DAMAGE_BASE[level_index]) + 0.10 * float(caster.max_hp), "magic")
 	if ctx.buff_system != null:
-		ctx.buff_system.apply_tag(ctx.state, target_team, target_index, "root", ROOT_DURATION, {})
-		ctx.buff_system.record_debuff(ctx.state, target_team, target_index, "bastionne_gate_lock", {"duration": ROOT_DURATION}, ROOT_DURATION, ROOT_DURATION)
+		var root_result: Dictionary = ctx.apply_cc_tag(target_team, target_index, "root", ROOT_DURATION, {})
+		var root_duration: float = float(root_result.get("remaining", ctx.scale_power(ROOT_DURATION)))
+		if bool(root_result.get("processed", false)):
+			ctx.buff_system.record_debuff(ctx.state, target_team, target_index, "bastionne_gate_lock", {"duration": root_duration}, root_duration, root_duration)
 	_raise_gate(ctx, level_index)
 	ctx.emit_redirect_semantic(target_team, target_index, "no_pass_gate_wall", GATE_DURATION, float(SHIELD_BASE[level_index]), 0.35)
 	ctx.log("No-Pass Writ: rooted target %d and shielded allies behind the gate" % target_index)
@@ -62,4 +64,4 @@ func _raise_gate(ctx: AbilityContext, level_index: int) -> void:
 		var ally_position: Vector2 = ctx.position_of(ctx.caster_team, index)
 		var behind_gate: bool = (ally_position.x - caster_position.x) * forward_sign <= 0.0
 		if behind_gate:
-			ctx.buff_system.apply_shield(ctx.state, ctx.caster_team, index, SHIELD_BASE[level_index], GATE_DURATION)
+			ctx.apply_shield(ctx.caster_team, index, SHIELD_BASE[level_index], GATE_DURATION)

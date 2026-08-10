@@ -29,7 +29,7 @@ func cast(ctx: AbilityContext) -> bool:
 		ctx.engine.emit_signal("target_start", ctx.caster_team, ctx.caster_index, target_team, target_index)
 	if ctx.engine.ability_system == null:
 		return false
-	ctx.engine.ability_system.schedule_event("prisma_color_field_tick", ctx.caster_team, ctx.caster_index, 0.0, {
+	ctx.schedule_event("prisma_color_field_tick", ctx.caster_team, ctx.caster_index, 0.0, {
 		"center": center,
 		"radius": RADIUS_TILES,
 		"damage": DAMAGE_BASE[level_index],

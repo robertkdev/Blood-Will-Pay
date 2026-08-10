@@ -16,11 +16,11 @@ func cast(ctx: AbilityContext) -> bool:
 		return false
 	var target_team: String = ctx._other_team(ctx.caster_team)
 	var amount: float = float(RESIST_TRANSFER[_level_index(caster)])
-	ctx.buff_system.apply_stats_labeled(ctx.state, target_team, target_index, "repo_repossession_debit", {
+	ctx.apply_stats_labeled(target_team, target_index, "repo_repossession_debit", {
 		"armor": -amount,
 		"magic_resist": -amount
 	}, TRANSFER_DURATION)
-	ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, ctx.caster_index, "repo_repossession_credit", {
+	ctx.apply_stats_labeled(ctx.caster_team, ctx.caster_index, "repo_repossession_credit", {
 		"armor": amount,
 		"magic_resist": amount
 	}, TRANSFER_DURATION)

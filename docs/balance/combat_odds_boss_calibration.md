@@ -45,8 +45,8 @@ boss-only odds exception.
 
 Boss previews account for the live escalation phases through the shared
 `TeamOddsEstimator.BOSS_ESCALATION_PREVIEW_FACTOR` (`1.25`). The first
-procedural boss keeps a raw generator multiplier of `1.00` so the quoted odds
-are not double-counted; later bosses use the authored `2.65` target. The
+procedural boss keeps a raw generator multiplier of `1.00` so the preview
+estimate is not double-counted; later bosses use the authored `2.65` target. The
 runtime, generator, lockstep simulator, and player-facing label all use this
 same stage-aware contract.
 
@@ -57,15 +57,23 @@ The probe summaries are written to `user://team_odds_calibration.json` and
 also retain per-row player/enemy power, stage specs, model version, predicted
 odds, result, timeout and seed data.
 
+Player-facing odds are presented as a rough range rather than a point promise.
+The 144-combat open-field probe is useful regression evidence, but it does not
+cover abilities, equipped items, placement, hazards, contracts, targeting, or
+all generated encounter compositions; the displayed range is therefore not a
+calibrated bound for a live board. It is informational only and never prices a
+paid wager. The wager panel shows exact win and loss reserves from a deterministic
+encounter quote: CREEPS `1.5x`, NORMAL/MIRROR `2.0x`, ELITE/EVENT `2.5x`, and
+BOSS `3.0x`, multiplied by any explicit Pit contract modifier. That quote locks
+at combat start and settlement uses the locked value, so the monetary terms stay
+precise even when the model estimate is wrong.
+
 ### Normal stages
 
-The clean-base diagnostic had 144 rows, no timeouts, overall prediction 50.0%
-versus 50.7% observed, and Brier score 0.136. Its worst populated odds bucket
-gap was 17.7 percentage points. Final combined-build calibration uses a 1.55
-power-ratio exponent and produced 50.0% predicted versus 52.08% observed,
-Brier 0.1069, zero timeouts, and populated-bucket gaps between 7.6 and 12.4
-percentage points. The threshold stayed at 15 points; it was not weakened to
-make the model pass.
+The open-field diagnostic had 144 rows under its sampled conditions. Its
+prediction and bucket metrics are retained as regression signals, not as a
+universal probability guarantee. Timeout and calibration evidence must be
+interpreted against the exact sampled build and scenario set.
 
 ### Boss stages
 
@@ -78,7 +86,7 @@ overall gap, and zero simulation timeouts. Preparation win rates were
 This is the skill-plus-luck balance proof: better preparation raises the chance
 of winning by 44.45 percentage points, while the low tier still wins sometimes
 and the high tier still loses sometimes. Boss balance therefore does not depend
-on forcing a campaign to an arbitrary late stage; the calibrated prediction,
+on forcing a campaign to an arbitrary late stage; the sampled prediction,
 ordered preparation gradient, and non-deterministic outcomes are the acceptance
 gate.
 

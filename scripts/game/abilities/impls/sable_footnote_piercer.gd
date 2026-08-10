@@ -34,7 +34,7 @@ func cast(ctx: AbilityContext) -> bool:
 		ctx.damage_single(ctx.caster_team, ctx.caster_index, hit_index, damage, "physical")
 		if ctx.buff_system != null:
 			ctx.buff_system.push_source(ctx.caster_team, ctx.caster_index, "on_hit")
-			ctx.buff_system.apply_stats_labeled(ctx.state, target_team, hit_index, "sable_footnote_piercer", {
+			ctx.apply_stats_labeled(target_team, hit_index, "sable_footnote_piercer", {
 				"armor": -ARMOR_SHRED,
 				"magic_resist": -MR_SHRED
 			}, SHRED_DURATION)

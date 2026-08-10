@@ -34,6 +34,7 @@ const TraitsPresenter := preload("res://scripts/ui/traits/traits_presenter.gd")
 const LogSchema := preload("res://scripts/util/log_schema.gd")
 const ProgressionService := preload("res://scripts/game/progression/progression_service.gd")
 const ChapterCatalog := preload("res://scripts/game/progression/chapter_catalog.gd")
+const RosterCatalog := preload("res://scripts/game/progression/roster_catalog.gd")
 const RosterUtils := preload("res://scripts/game/progression/roster_utils.gd")
 const TeamOddsEstimator := preload("res://scripts/game/combat/team_odds_estimator.gd")
 const RunStateStore := preload("res://scripts/game/run/run_state_store.gd")
@@ -1084,7 +1085,7 @@ func _update_board_status() -> void:
 		board_capacity_label.tooltip_text = "Deployed units / board slots. Buy XP to add slots."
 	if win_odds_label != null:
 		if manager == null or manager.player_team.is_empty() or manager.enemy_team.is_empty():
-			win_odds_label.text = "Win Odds --"
+			win_odds_label.text = "Est. Win --"
 			win_odds_label.tooltip_text = "Preview odds appear when both teams are visible."
 		else:
 			var player_rating: float = TeamOddsEstimator.team_rating(manager.player_team)
@@ -1101,12 +1102,15 @@ func _update_board_status() -> void:
 			if economy_node != null:
 				if not bool(economy_node.get("combat_active")) and economy_node.has_method("set_projected_win_probability"):
 					economy_node.call("set_projected_win_probability", float(odds) / 100.0)
+				_sync_encounter_quote_kind(economy_node)
 				gross_multiplier = float(economy_node.get("quoted_gross_multiplier"))
 				quoted_bet = int(economy_node.get("current_bet"))
 				if economy_node.has_method("quoted_payout"):
 					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
-			win_odds_label.text = "Win Odds %d%%" % odds
-			win_odds_label.tooltip_text = "Your board rating %.0f vs enemy %.0f%s. Quote: %s -> %s gross (%.2fx)." % [
+			var odds_range: Vector2i = TeamOddsEstimator.estimate_range(odds)
+			win_odds_label.text = "Est. Win %d-%d%%" % [odds_range.x, odds_range.y]
+			win_odds_label.tooltip_text = "Rough model estimate %d%%. Abilities, items, placement, hazards, and live targeting can move the result outside this range. Your board rating %.0f vs enemy %.0f%s. The wager is priced by the encounter tier, not this estimate: %s -> %s gross (%.2fx)." % [
+				odds,
 				player_rating,
 				odds_enemy_rating,
 				" (escalation-adjusted)" if boss_preview_factor > 1.0 else "",
@@ -1550,7 +1554,7 @@ func _on_continue_pressed() -> void:
 func _queue_battle_start() -> void:
 	if _battle_start_pending:
 		return
-	_pending_combat_quote_multiplier = float(Economy.quoted_gross_multiplier) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else -1.0
+	_pending_combat_quote_multiplier = _capture_current_encounter_quote_multiplier()
 	_battle_start_pending = true
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
@@ -1561,6 +1565,28 @@ func _queue_battle_start() -> void:
 	phase_transition.set_encounter_focus(_committed_confrontation_centroid())
 	phase_transition.start_countdown(_reduced_motion_enabled())
 	_sync_combat_broadcast_strip(true)
+
+func _sync_encounter_quote_kind(economy_node: Node = null) -> void:
+	var active_economy: Node = economy_node if economy_node != null else _autoload_node("Economy")
+	if active_economy == null or bool(active_economy.get("combat_active")) or not active_economy.has_method("set_encounter_quote_kind"):
+		return
+	var encounter_kind: String = "NORMAL"
+	var game_state_node: Node = _autoload_node("GameState")
+	if game_state_node != null:
+		var chapter: int = int(game_state_node.get("chapter"))
+		var stage_in_chapter: int = int(game_state_node.get("stage_in_chapter"))
+		var stage_spec: Dictionary = RosterCatalog.get_spec(chapter, stage_in_chapter)
+		encounter_kind = String(stage_spec.get("kind", encounter_kind))
+	active_economy.call("set_encounter_quote_kind", encounter_kind)
+
+func _capture_current_encounter_quote_multiplier() -> float:
+	var economy_node: Node = _autoload_node("Economy")
+	if economy_node == null:
+		return -1.0
+	# Resolve the stage tier at the monetary lock boundary. Board-status refresh
+	# is presentation-only and may not have run in direct/programmatic starts.
+	_sync_encounter_quote_kind(economy_node)
+	return float(economy_node.get("quoted_gross_multiplier"))
 
 func _on_combat_countdown_finished() -> void:
 	if not _battle_start_pending:
@@ -3639,8 +3665,8 @@ func _ensure_combat_broadcast_strip() -> void:
 	combat_broadcast_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	combat_broadcast_strip.anchor_left = 0.5
 	combat_broadcast_strip.anchor_right = 0.5
-	combat_broadcast_strip.offset_left = -320.0
-	combat_broadcast_strip.offset_right = 320.0
+	combat_broadcast_strip.offset_left = -360.0
+	combat_broadcast_strip.offset_right = 360.0
 	combat_broadcast_strip.offset_top = 58.0
 	combat_broadcast_strip.offset_bottom = 90.0
 	var strip_style: StyleBoxFlat = StyleBoxFlat.new()
@@ -3668,9 +3694,18 @@ func _ensure_combat_broadcast_strip() -> void:
 func _make_broadcast_label(label_name: String) -> Label:
 	var label: Label = Label.new()
 	label.name = label_name
-	label.custom_minimum_size = Vector2(145.0, 28.0)
+	var minimum_width: float = 145.0
+	match label_name:
+		"BroadcastPhase":
+			minimum_width = 100.0
+		"BroadcastWager":
+			minimum_width = 120.0
+		"BroadcastHealth":
+			minimum_width = 320.0
+	label.custom_minimum_size = Vector2(minimum_width, 28.0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = false
 	label.add_theme_font_size_override("font_size", 15)
 	label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.72, 1.0))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
@@ -3693,10 +3728,10 @@ func _sync_combat_broadcast_strip(force: bool = false) -> void:
 	combat_broadcast_phase.text = "FIGHT %d" % int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else "FIGHT"
 	var wager: int = int(Economy.current_bet) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else 0
 	combat_broadcast_wager.text = "WAGER %d BLOOD" % wager
-	combat_broadcast_odds.text = String(win_odds_label.text).replace("Win Odds", "ODDS") if win_odds_label != null else "ODDS --"
+	combat_broadcast_odds.text = String(win_odds_label.text).replace("Est. Win", "ODDS") if win_odds_label != null else "ODDS --"
 	var player_health: Vector2i = _team_health_total(manager.player_team if manager != null else [])
 	var enemy_health: Vector2i = _team_health_total(manager.enemy_team if manager != null else [])
-	combat_broadcast_health.text = "HP %d/%d  //  %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]
+	combat_broadcast_health.text = "ALLY %d/%d // FOE %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]
 
 func _team_health_total(team: Array[Unit]) -> Vector2i:
 	var current: int = 0

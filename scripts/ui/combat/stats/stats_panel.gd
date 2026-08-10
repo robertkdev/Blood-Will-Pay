@@ -15,6 +15,7 @@ var _unit_panel_frame: PanelContainer = null
 var _unit_scroll: ScrollContainer = null
 var _compact_layout: bool = false
 var _tight_compact_layout: bool = false
+var _team_minimum_width: float = 0.0
 
 @onready var title_label: Label = $"VBox/Header/Title"
 @onready var btn_all: Button = $"VBox/Header/WindowAll"
@@ -65,6 +66,8 @@ func _ready() -> void:
 func set_responsive_layout(compact: bool, tight_compact: bool) -> void:
     _compact_layout = bool(compact)
     _tight_compact_layout = bool(tight_compact)
+    if mode == Mode.TEAM:
+        _team_minimum_width = custom_minimum_size.x
     _apply_unit_detail_layout()
     call_deferred("_apply_unit_detail_layout")
 
@@ -144,6 +147,8 @@ func show_team_metrics() -> void:
     if unit_panel:
         unit_panel.visible = false
         unit_panel.set_process(false)
+    _apply_unit_detail_layout()
+    call_deferred("_apply_unit_detail_layout")
 
 func show_unit_metrics_ctx(team: String, index: int, u: Unit) -> void:
     _unit_team = String(team)
@@ -215,6 +220,9 @@ func _apply_unit_detail_layout() -> void:
     var frame_margin: MarginContainer = _unit_panel_frame.get_node_or_null("Margin") as MarginContainer if _unit_panel_frame != null else null
     var content_width: float = _unit_scroll.size.x if _unit_scroll != null else 0.0
     var use_compact_detail: bool = _compact_layout or content_width < 300.0
+    var base_minimum_width: float = _team_minimum_width if _team_minimum_width > 0.0 else custom_minimum_size.x
+    var detail_minimum_width: float = 216.0 if use_compact_detail else base_minimum_width
+    custom_minimum_size.x = maxf(base_minimum_width, detail_minimum_width) if mode == Mode.UNIT else base_minimum_width
     if unit_panel.has_method("set_compact_layout"):
         unit_panel.call("set_compact_layout", use_compact_detail)
     if frame_margin != null:
@@ -237,6 +245,7 @@ func _apply_unit_detail_layout() -> void:
         stats_grid.columns = 2 if content_width < 190.0 else 3 if use_compact_detail else 4
     unit_panel.set_meta("responsive_detail_layout", "compact_vertical_scroll" if use_compact_detail else "desktop_vertical_scroll")
     unit_panel.set_meta("responsive_detail_content_width", content_width)
+    unit_panel.set_meta("responsive_detail_minimum_width", custom_minimum_size.x)
 
 func _make_unit_frame_style() -> StyleBox:
     var fallback: StyleBoxFlat = StyleBoxFlat.new()

@@ -527,16 +527,37 @@ func _run() -> void:
 		if combat != null and combat.has_method("_apply_responsive_layout"):
 			combat.call("_apply_responsive_layout")
 		await _settle_frames(6)
-		# Exercise the real post-combat handoff rather than painting a return lock
-		# over a frozen defeat card. The bridge must sit over the restored planning
-		# shop and deployment surface.
-		controller.set("_post_combat_outcome", "victory")
-		controller.call("_on_intermission_finished")
+		# Exercise the real outcome signal and post-combat handoff. The result card
+		# intentionally stays fixed while the arena returns toward the planning grid.
+		var active_engine: Variant = manager.get_engine() if manager != null else null
+		if active_engine != null and active_engine.has_method("stop"):
+			active_engine.stop()
+		if manager != null:
+			manager.set("_engine_running", false)
+			manager.emit_signal("defeat", int(GameState.stage))
+		_freeze_result_auto_advance(controller)
 		await _settle_frames(3)
-		_assert_phase_transition_bridge(combat, "combat_to_planning", "planning return bridge")
-		_assert_redeployed_planning_surface(combat, "planning return bridge")
-		await _capture("54_combat_to_planning_bridge_1920x1080.png", "combat_to_planning_bridge", DESKTOP_SIZE)
-		controller.call("_hide_phase_transition_bridge")
+		_assert_active_combat_return(combat, controller, "planning return bridge start")
+		var return_arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control if combat != null else null
+		var return_start_rect: Rect2 = return_arena.get_global_rect() if return_arena != null else Rect2()
+		var return_start_alpha: float = return_arena.modulate.a if return_arena != null else 0.0
+		Engine.time_scale = 1.0
+		await get_tree().create_timer(0.35, true, false, false).timeout
+		Engine.time_scale = 0.0
+		_assert_active_combat_return(combat, controller, "planning return bridge midpoint")
+		var return_mid_rect: Rect2 = return_arena.get_global_rect() if return_arena != null else Rect2()
+		var return_mid_alpha: float = return_arena.modulate.a if return_arena != null else 0.0
+		_expect(return_mid_rect.size.x < return_start_rect.size.x and return_mid_rect.size.y < return_start_rect.size.y, "planning return bridge did not reverse the field camera")
+		_expect(return_mid_alpha < return_start_alpha - 0.05, "planning return bridge did not visibly fade the combat field")
+		await _capture("54_combat_to_planning_bridge_1920x1080.png", "combat_to_planning_returning", DESKTOP_SIZE)
+		Engine.time_scale = 1.0
+		await get_tree().create_timer(0.55, true, false, false).timeout
+		await _settle_frames(3)
+		_assert_combat_return_finished_under_result(combat, controller, "planning return field completion")
+		controller.set("_result_hold_elapsed", 1.0)
+		controller.call("_skip_result_hold")
+		await _settle_frames(6)
+		_assert_completed_combat_return(combat, controller, "planning return completion")
 
 	Engine.time_scale = 1.0
 	_configure_window(DESKTOP_SIZE)
@@ -918,6 +939,40 @@ func _assert_redeployed_planning_surface(combat: Control, context: String) -> vo
 	_expect(continue_surface == null or continue_surface.is_visible_in_tree(), "%s leaves the planning action hidden beneath the bridge" % context)
 
 
+func _assert_active_combat_return(combat: Control, controller: Variant, context: String) -> void:
+	var transition: Variant = controller.get("phase_transition") if controller != null else null
+	_expect(transition != null and transition.has_method("get_state_name"), "%s missing the production phase transition" % context)
+	if transition != null and transition.has_method("get_state_name"):
+		_expect(String(transition.call("get_state_name")) == "returning", "%s is not in the production returning state" % context)
+	var result_banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
+	_expect(result_banner != null and result_banner.is_visible_in_tree(), "%s released the fixed result card before the field return completed" % context)
+	var shop_surface: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as Control if combat != null else null
+	_expect(shop_surface != null and not shop_surface.is_visible_in_tree(), "%s exposed the interactive shop before the field return completed" % context)
+
+
+func _assert_completed_combat_return(combat: Control, controller: Variant, context: String) -> void:
+	var transition: Variant = controller.get("phase_transition") if controller != null else null
+	_expect(transition != null and transition.has_method("get_state_name"), "%s missing the production phase transition" % context)
+	if transition != null and transition.has_method("get_state_name"):
+		_expect(String(transition.call("get_state_name")) == "idle", "%s did not finish the production return" % context)
+	var result_banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
+	_expect(result_banner == null or not result_banner.is_visible_in_tree(), "%s left the result card over planning" % context)
+	_expect(GameState.phase == GameState.GamePhase.PREVIEW, "%s did not unlock the preview phase" % context)
+	_assert_redeployed_planning_surface(combat, context)
+
+
+func _assert_combat_return_finished_under_result(combat: Control, controller: Variant, context: String) -> void:
+	var transition: Variant = controller.get("phase_transition") if controller != null else null
+	_expect(transition != null and transition.has_method("get_state_name"), "%s missing the production phase transition" % context)
+	if transition != null and transition.has_method("get_state_name"):
+		_expect(String(transition.call("get_state_name")) == "idle", "%s did not restore the planning grid behind the result" % context)
+	var result_banner: PanelContainer = _main.find_child("BattleResultBanner", true, false) as PanelContainer if _main != null else null
+	_expect(result_banner != null and result_banner.is_visible_in_tree(), "%s released the result card before player dismissal" % context)
+	_expect(GameState.phase == GameState.GamePhase.POST_COMBAT, "%s unlocked planning controls before player dismissal" % context)
+	var shop_surface: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as Control if combat != null else null
+	_expect(shop_surface != null and not shop_surface.is_visible_in_tree(), "%s exposed the interactive shop before player dismissal" % context)
+
+
 func _assert_title_gateway_contract(context: String, compact: bool) -> void:
 	var title_page: Control = _main.get_node_or_null("TitlePage") as Control if _main != null else null
 	var docket: PanelContainer = title_page.get_node_or_null("IncidentEvidenceDocket") as PanelContainer if title_page != null else null
@@ -1274,6 +1329,10 @@ func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
 	contract["instruction_visible"] = instruction != null and instruction.is_visible_in_tree()
 	contract["instruction_text"] = instruction.text if instruction != null else ""
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
+	var controller: Variant = combat.get("controller") if combat != null else null
+	var transition: Variant = controller.get("phase_transition") if controller != null else null
+	if transition != null and transition.has_method("get_state_name"):
+		contract["phase_transition_state"] = String(transition.call("get_state_name"))
 	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control if combat != null else null
 	if arena != null:
 		contract["battlefield_pressure_phase"] = String(arena.get_meta("battlefield_pressure_phase", ""))

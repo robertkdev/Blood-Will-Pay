@@ -8,6 +8,8 @@ const UnitFactoryScript := preload("res://scripts/unit_factory.gd")
 const EXPECTED_PLAYABLE_COUNT: int = 51
 const TILE_SIZE: float = 100.0
 const ARENA_BOUNDS: Rect2 = Rect2(Vector2.ZERO, Vector2(1000.0, 800.0))
+const SCHEDULED_SIGNATURE_MAX_DEPTH: int = 3
+const SCHEDULED_SIGNATURE_MAX_ITEMS: int = 16
 
 # These resources are deliberately outside the one-profile/one-ability playable gate.
 # Playable Creep uses creep_playable_eavesdropping, whose implementation inherits
@@ -59,6 +61,9 @@ func _run() -> void:
 	var passed_count: int = 0
 	for profile: UnitProfile in profiles:
 		var before_failure_count: int = failures.size()
+		var progress_unit_id: String = String(profile.id).strip_edges() if profile != null else "<null>"
+		var progress_ability_id: String = String(profile.ability_id).strip_edges() if profile != null else "<null>"
+		print("AllPlayableAbilityLivenessProbe: START unit=%s ability=%s" % [progress_unit_id, progress_ability_id])
 		_validate_profile_and_cast(profile, seen_profile_ids, seen_ability_ids, failures)
 		if failures.size() == before_failure_count:
 			passed_count += 1
@@ -190,11 +195,23 @@ func _validate_profile_and_cast(
 	var mana_before: int = int(caster.mana)
 	var commits: Array[Dictionary] = []
 	var commit_callback: Callable = _on_ability_committed.bind(commits)
+	var semantic_events: Array[String] = []
+	var target_callback: Callable = _on_semantic_target.bind(semantic_events)
+	var buff_callback: Callable = _on_semantic_buff.bind(semantic_events)
+	var debuff_callback: Callable = _on_semantic_debuff.bind(semantic_events)
+	var zone_callback: Callable = _on_semantic_zone_exposure.bind(semantic_events)
 	engine.ability_committed.connect(commit_callback)
+	engine.target_start.connect(target_callback)
+	engine.buff_applied.connect(buff_callback)
+	engine.debuff_applied.connect(debuff_callback)
+	engine.zone_exposure_applied.connect(zone_callback)
 	var before: Dictionary[String, Variant] = _effect_snapshot(state, engine)
 	var result: Dictionary = engine.ability_system.try_cast("player", 0)
 	var after: Dictionary[String, Variant] = _effect_snapshot(state, engine)
 	var evidence: Array[String] = _effect_categories(before, after)
+	for semantic_event: String in semantic_events:
+		if not evidence.has(semantic_event):
+			evidence.append(semantic_event)
 	var authoritative_evidence: Array[String] = _authoritative_categories(evidence)
 
 	_unit_expect(bool(result.get("cast", false)), label,
@@ -217,6 +234,14 @@ func _validate_profile_and_cast(
 
 	if engine.ability_committed.is_connected(commit_callback):
 		engine.ability_committed.disconnect(commit_callback)
+	if engine.target_start.is_connected(target_callback):
+		engine.target_start.disconnect(target_callback)
+	if engine.buff_applied.is_connected(buff_callback):
+		engine.buff_applied.disconnect(buff_callback)
+	if engine.debuff_applied.is_connected(debuff_callback):
+		engine.debuff_applied.disconnect(debuff_callback)
+	if engine.zone_exposure_applied.is_connected(zone_callback):
+		engine.zone_exposure_applied.disconnect(zone_callback)
 	print("AllPlayableAbilityLivenessProbe: ", label, " -> ", ability_id,
 		" cast=", bool(result.get("cast", false)), " evidence=", ",".join(evidence))
 	_teardown_fixture(engine)
@@ -297,6 +322,10 @@ func _make_ally(index: int) -> Unit:
 	unit.magic_resist = magic_resist_values[index - 1]
 	unit.mana_max = 100
 	unit.mana = 0
+	if index == 1:
+		# Quillith's Final Exam contract requires a living Pupil with a castable
+		# ability. Kett supplies a deterministic scheduled-effect recast fixture.
+		unit.ability_id = "kett_union_breaker"
 	var approaches: Array[String] = []
 	for value: Variant in approaches_by_index[index - 1]:
 		approaches.append(String(value))
@@ -440,10 +469,64 @@ func _scheduled_snapshot(engine: CombatEngine) -> Array[String]:
 			String(event.get("team", "")),
 			int(event.get("index", -1)),
 			float(event.get("t", 0.0)),
-			var_to_str(event.get("data", {})),
+			_scheduled_event_data_signature(event.get("data", {})),
 		])
 	output.sort()
 	return output
+
+func _scheduled_event_data_signature(raw_data: Variant) -> String:
+	if not (raw_data is Dictionary):
+		return _scheduled_value_signature(raw_data)
+	var data: Dictionary[String, Variant] = {}
+	for raw_key: Variant in (raw_data as Dictionary).keys():
+		data[String(raw_key)] = (raw_data as Dictionary).get(raw_key, null)
+	var keys: Array[String] = []
+	for key: String in data.keys():
+		keys.append(key)
+	keys.sort()
+	var fields: Array[String] = []
+	for key: String in keys:
+		fields.append("%s=%s" % [key, _scheduled_value_signature(data.get(key, null), 0)])
+	return "{%s}" % ",".join(fields)
+
+func _scheduled_value_signature(value: Variant, depth: int = 0) -> String:
+	if value is Object:
+		var object_value: Object = value as Object
+		return "object:%s" % object_value.get_class()
+	var type_id: int = typeof(value)
+	match type_id:
+		TYPE_NIL:
+			return "null"
+		TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH:
+			return "scalar:%s" % var_to_str(value)
+		TYPE_ARRAY:
+			var array_size: int = (value as Array).size()
+			if depth >= SCHEDULED_SIGNATURE_MAX_DEPTH:
+				return "array:%d:max_depth" % array_size
+			var array_items: Array[String] = []
+			var array_limit: int = mini(array_size, SCHEDULED_SIGNATURE_MAX_ITEMS)
+			for item_index: int in range(array_limit):
+				array_items.append(_scheduled_value_signature((value as Array)[item_index], depth + 1))
+			return "array:%d[%s%s]" % [array_size, ",".join(array_items), ",..." if array_size > array_limit else ""]
+		TYPE_DICTIONARY:
+			var dictionary_size: int = (value as Dictionary).size()
+			if depth >= SCHEDULED_SIGNATURE_MAX_DEPTH:
+				return "dictionary:%d:max_depth" % dictionary_size
+			var dictionary_data: Dictionary[String, Variant] = {}
+			for raw_key: Variant in (value as Dictionary).keys():
+				dictionary_data[String(raw_key)] = (value as Dictionary).get(raw_key, null)
+			var dictionary_keys: Array[String] = []
+			for copied_key: String in dictionary_data.keys():
+				dictionary_keys.append(copied_key)
+			dictionary_keys.sort()
+			var dictionary_fields: Array[String] = []
+			var dictionary_limit: int = mini(dictionary_keys.size(), SCHEDULED_SIGNATURE_MAX_ITEMS)
+			for key_index: int in range(dictionary_limit):
+				var selected_key: String = dictionary_keys[key_index]
+				dictionary_fields.append("%s=%s" % [selected_key, _scheduled_value_signature(dictionary_data.get(selected_key, null), depth + 1)])
+			return "dictionary:%d{%s%s}" % [dictionary_size, ",".join(dictionary_fields), ",..." if dictionary_size > dictionary_limit else ""]
+		_:
+			return "value:%d:%s" % [type_id, var_to_str(value)]
 
 func _position_snapshot(engine: CombatEngine, team: String) -> Array[Vector2]:
 	if team == "player":
@@ -475,11 +558,64 @@ func _effect_categories(before: Dictionary[String, Variant], after: Dictionary[S
 	return categories
 
 func _authoritative_categories(categories: Array[String]) -> Array[String]:
-	var output: Array[String] = []
+	# Scheduling is the immediate authoritative state for deliberately delayed
+	# abilities; semantic engine events cover transient marks, buffs, and zones
+	# that are not retained in the generic state snapshot.
+	var authoritative: Array[String] = []
 	for category: String in categories:
-		if category != "scheduled_event":
-			output.append(category)
-	return output
+		# Target acquisition alone is telemetry, not proof that the ability applied
+		# its contractual effect.
+		if category != "semantic_target":
+			authoritative.append(category)
+	return authoritative
+
+func _on_semantic_target(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0:
+		sink.append("semantic_target")
+
+func _on_semantic_buff(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		kind: String,
+		_fields: Dictionary,
+		_magnitude: float,
+		_duration: float,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
+		sink.append("semantic_buff")
+
+func _on_semantic_debuff(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		kind: String,
+		_fields: Dictionary,
+		_magnitude: float,
+		_duration: float,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
+		sink.append("semantic_debuff")
+
+func _on_semantic_zone_exposure(
+		source_team: String,
+		source_index: int,
+		target_team: String,
+		target_index: int,
+		kind: String,
+		_duration_s: float,
+		_damage: float,
+		_radius_tiles: float,
+		sink: Array[String]) -> void:
+	if source_team != "" and source_index >= 0 and target_team != "" and target_index >= 0 and kind != "":
+		sink.append("semantic_zone")
 
 func _on_ability_committed(
 		source_team: String,

@@ -9,7 +9,7 @@ const INT64_PREFIX: String = "i64:"
 const ENVELOPE_FORMAT: String = "gamble_battle_active_run"
 
 static func has_save(path: String = DEFAULT_PATH) -> bool:
-	return FileAccess.file_exists(path)
+	return bool(load_snapshot(path).get("ok", false))
 
 static func save_snapshot(snapshot: Dictionary, path: String = DEFAULT_PATH) -> Dictionary:
 	var validation: Dictionary = _validate_snapshot(snapshot)
@@ -40,17 +40,19 @@ static func save_snapshot(snapshot: Dictionary, path: String = DEFAULT_PATH) -> 
 	var global_temp: String = ProjectSettings.globalize_path(temp_path)
 	var global_target: String = ProjectSettings.globalize_path(path)
 	var global_backup: String = ProjectSettings.globalize_path(backup_path)
-	if FileAccess.file_exists(backup_path):
-		DirAccess.remove_absolute(global_backup)
+	var primary_rotated_to_backup: bool = false
 	if FileAccess.file_exists(path):
+		if FileAccess.file_exists(backup_path):
+			DirAccess.remove_absolute(global_backup)
 		var backup_error: Error = DirAccess.rename_absolute(global_target, global_backup)
 		if backup_error != OK:
 			DirAccess.remove_absolute(global_temp)
 			return {"ok": false, "error": "BACKUP_FAILED", "code": int(backup_error), "path": path}
+		primary_rotated_to_backup = true
 	var rename_error: Error = DirAccess.rename_absolute(global_temp, global_target)
 	if rename_error != OK:
 		DirAccess.remove_absolute(global_temp)
-		if FileAccess.file_exists(backup_path):
+		if primary_rotated_to_backup and not FileAccess.file_exists(path) and FileAccess.file_exists(backup_path):
 			DirAccess.rename_absolute(global_backup, global_target)
 		return {"ok": false, "error": "RENAME_FAILED", "code": int(rename_error), "path": path}
 	# Keep the last complete primary as a recovery point. It is replaced only
@@ -58,12 +60,20 @@ static func save_snapshot(snapshot: Dictionary, path: String = DEFAULT_PATH) -> 
 	return {"ok": true, "path": path, "schema_version": SCHEMA_VERSION}
 
 static func load_snapshot(path: String = DEFAULT_PATH) -> Dictionary:
+	var backup_path: String = "%s.bak" % path
 	if not FileAccess.file_exists(path):
-		return {"ok": false, "error": "NOT_FOUND", "path": path}
+		if not FileAccess.file_exists(backup_path):
+			return {"ok": false, "error": "NOT_FOUND", "path": path}
+		var backup_only: Dictionary = _load_snapshot_file(backup_path)
+		if bool(backup_only.get("ok", false)):
+			backup_only["path"] = path
+			backup_only["recovered_from_backup"] = true
+			backup_only["recovery_path"] = backup_path
+			backup_only["primary_error"] = "NOT_FOUND"
+		return backup_only
 	var primary: Dictionary = _load_snapshot_file(path)
 	if bool(primary.get("ok", false)):
 		return primary
-	var backup_path: String = "%s.bak" % path
 	if FileAccess.file_exists(backup_path):
 		var backup: Dictionary = _load_snapshot_file(backup_path)
 		if bool(backup.get("ok", false)):
@@ -80,7 +90,10 @@ static func _load_snapshot_file(path: String) -> Dictionary:
 		return {"ok": false, "error": "OPEN_FAILED", "path": path}
 	var text: String = file.get_as_text()
 	file.close()
-	var parsed: Variant = JSON.parse_string(text)
+	var document_result: Dictionary = _parse_json(text)
+	if not bool(document_result.get("ok", false)):
+		return {"ok": false, "error": "CORRUPT", "path": path}
+	var parsed: Variant = document_result.get("value")
 	if not parsed is Dictionary:
 		return {"ok": false, "error": "CORRUPT", "path": path}
 	var parsed_dictionary: Dictionary = parsed as Dictionary
@@ -103,7 +116,10 @@ static func _load_snapshot_file(path: String) -> Dictionary:
 		var actual_checksum: String = _checksum_text(payload_json)
 		if expected_checksum == "" or expected_checksum != actual_checksum:
 			return {"ok": false, "error": "CHECKSUM_MISMATCH", "path": path}
-		encoded_payload = JSON.parse_string(payload_json)
+		var payload_result: Dictionary = _parse_json(payload_json)
+		if not bool(payload_result.get("ok", false)):
+			return {"ok": false, "error": "CORRUPT", "path": path}
+		encoded_payload = payload_result.get("value")
 		if not encoded_payload is Dictionary:
 			return {"ok": false, "error": "CORRUPT", "path": path}
 	var decoded: Variant = _decode_large_ints(encoded_payload)
@@ -127,6 +143,17 @@ static func _load_snapshot_file(path: String) -> Dictionary:
 	if String(payload.get("phase", "preview")).to_lower() == "combat":
 		return {"ok": false, "error": "MIDCOMBAT_SAVE_REJECTED", "path": path}
 	return {"ok": true, "snapshot": payload, "path": path, "legacy_schema": legacy_schema}
+
+static func _parse_json(text: String) -> Dictionary:
+	# JSON.parse_string logs malformed input as an engine ERROR even when the
+	# caller deliberately treats corruption as a recoverable save condition.
+	# The instance parser returns the same failure as data, keeping expected
+	# backup recovery quiet while preserving strict CI error-log scanning.
+	var parser: JSON = JSON.new()
+	var parse_error: Error = parser.parse(text)
+	if parse_error != OK:
+		return {"ok": false, "error": int(parse_error)}
+	return {"ok": true, "value": parser.data}
 
 static func clear(path: String = DEFAULT_PATH) -> bool:
 	var cleared: bool = true

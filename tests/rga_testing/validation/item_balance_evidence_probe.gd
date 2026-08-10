@@ -61,6 +61,7 @@ func _run() -> void:
 	for case_value: Variant in SAMPLE_CASES:
 		var case_def: Dictionary[String, Variant] = _string_variant_dictionary(case_value)
 		case_summaries.append(_case_summary(case_def, causal_pairs))
+	_validate_runtime_application(raw_runs, failures)
 	_validate_causal_liveness(case_summaries, failures)
 	for run_value: Variant in raw_runs:
 		var run: Dictionary[String, Variant] = _string_variant_dictionary(run_value)
@@ -87,6 +88,7 @@ func _run() -> void:
 			"simulation_count": raw_runs.size(),
 			"combat_timeout_s": combat_timeout_s,
 			"max_wall_clock_ms": max_wall_clock_ms,
+			"wall_timeout_scope": "cooperative_between_simulation_steps",
 			"base_seed": BASE_SEED,
 		},
 		"catalog_coverage": catalog_evidence,
@@ -99,7 +101,7 @@ func _run() -> void:
 			"completed_catalog": "res://data/items/completed/*.tres via scripts/game/items/item_catalog.gd",
 			"effect_handlers": "res://scripts/game/items/effects/effect_registry.gd",
 			"primary_bundles": AFFINITIES_PATH,
-			"runtime": "res://tests/rga_testing/core/lockstep_simulator.gd with live CombatEngine, Items autoload, and item EffectRegistry wiring",
+			"runtime": "res://tests/rga_testing/core/lockstep_simulator.gd with live CombatEngine and test-isolated SimulationItemRuntime catalog modifiers plus EffectRegistry wiring",
 		},
 		"limitations": [
 			"The causal lane is a deliberately manageable eight-item, one-item-at-a-time 1v1 sample; it does not estimate all 36 items' teamfight power.",
@@ -107,6 +109,7 @@ func _run() -> void:
 			"Healing and shield deltas depend on the live CombatStatsCollector signal surface; un-emitted sustain is not observable here.",
 			"Catalog coverage proves definition, handler, component, and primary-bundle reachability, not trigger magnitude correctness for every effect.",
 			"No subjective win-rate or power threshold is enforced; failures are limited to catalog/runtime integrity and invalid wall-clock evidence.",
+			"The per-simulation wall budget is cooperative between engine steps; the CI scene-process watchdog is the hard bound for a synchronous engine call that never returns.",
 		],
 	}
 	_write_report(report)
@@ -335,6 +338,19 @@ func _simulate(case_def: Dictionary[String, Variant], seed: int, swapped: bool, 
 	var simulator: LockstepSimulator = LockstepSimulator.new()
 	var collector: CombatStatsCollector = CombatStatsCollector.new()
 	var sim_out: Dictionary[String, Variant] = _string_variant_dictionary(simulator.run(job, false, collector))
+	if sim_out.has("simulation_input_error"):
+		return {
+			"case_id": String(case_def.get("case_id", "")),
+			"carrier": carrier,
+			"opponent": opponent,
+			"item": item_id,
+			"role": String(case_def.get("role", "")),
+			"variant": variant,
+			"seed": seed,
+			"carrier_side": carrier_side,
+			"simulation_input_error": String(sim_out.get("simulation_input_error", "")),
+			"carrier_items": [],
+		}
 	return _run_row(case_def, job, sim_out, carrier_side, variant)
 
 func _run_row(case_def: Dictionary[String, Variant], job: DataModels.SimJob, sim_out: Dictionary[String, Variant], carrier_side: String, variant: String) -> Dictionary[String, Variant]:
@@ -344,6 +360,9 @@ func _run_row(case_def: Dictionary[String, Variant], job: DataModels.SimJob, sim
 	var carrier_metrics: Dictionary[String, Variant] = _string_variant_dictionary(teams.get(carrier_side, {}))
 	var opponent_side: String = "b" if carrier_side == "a" else "a"
 	var opponent_metrics: Dictionary[String, Variant] = _string_variant_dictionary(teams.get(opponent_side, {}))
+	var item_loadouts: Dictionary[String, Variant] = _string_variant_dictionary(sim_out.get("item_loadouts", {}))
+	var carrier_items: Array[String] = _side_first_loadout(item_loadouts, carrier_side)
+	var opponent_items: Array[String] = _side_first_loadout(item_loadouts, opponent_side)
 	var result: String = String(outcome.result) if outcome != null else "missing"
 	var carrier_win_result: String = "team_a" if carrier_side == "a" else "team_b"
 	var opponent_win_result: String = "team_b" if carrier_side == "a" else "team_a"
@@ -356,6 +375,8 @@ func _run_row(case_def: Dictionary[String, Variant], job: DataModels.SimJob, sim
 		"variant": variant,
 		"seed": int(job.seed),
 		"carrier_side": carrier_side,
+		"carrier_items": carrier_items,
+		"opponent_items": opponent_items,
 		"result": result,
 		"carrier_win": 1.0 if result == carrier_win_result else 0.0,
 		"carrier_loss": 1.0 if result == opponent_win_result else 0.0,
@@ -364,6 +385,8 @@ func _run_row(case_def: Dictionary[String, Variant], job: DataModels.SimJob, sim
 		"time_s": float(outcome.time_s) if outcome != null else -1.0,
 		"wall_timeout": bool(sim_out.get("wall_timeout", false)),
 		"wall_elapsed_ms": int(sim_out.get("wall_elapsed_ms", 0)),
+		"evidence_valid": bool(sim_out.get("evidence_valid", false)),
+		"evidence_invalid_reason": String(sim_out.get("terminal_reason", "")) if not bool(sim_out.get("evidence_valid", false)) else "",
 		"carrier_damage": float(carrier_metrics.get("damage", 0)),
 		"carrier_healing": float(carrier_metrics.get("healing", 0)),
 		"carrier_shield": float(carrier_metrics.get("shield", 0)),
@@ -377,6 +400,13 @@ func _run_row(case_def: Dictionary[String, Variant], job: DataModels.SimJob, sim
 	}
 
 func _causal_pair(case_def: Dictionary[String, Variant], baseline: Dictionary[String, Variant], equipped: Dictionary[String, Variant]) -> Dictionary[String, Variant]:
+	var evidence_valid: bool = bool(baseline.get("evidence_valid", false)) and bool(equipped.get("evidence_valid", false))
+	var evidence_invalid_reason: String = ""
+	if not evidence_valid:
+		evidence_invalid_reason = "baseline:%s equipped:%s" % [
+			String(baseline.get("evidence_invalid_reason", "invalid_evidence")),
+			String(equipped.get("evidence_invalid_reason", "invalid_evidence")),
+		]
 	var metrics: Array[String] = [
 		"carrier_win", "carrier_loss", "stall", "tie", "time_s",
 		"carrier_damage", "carrier_healing", "carrier_shield", "carrier_mitigated", "carrier_casts",
@@ -394,6 +424,8 @@ func _causal_pair(case_def: Dictionary[String, Variant], baseline: Dictionary[St
 		"carrier_side": String(baseline.get("carrier_side", "")),
 		"baseline_result": String(baseline.get("result", "")),
 		"equipped_result": String(equipped.get("result", "")),
+		"evidence_valid": evidence_valid,
+		"evidence_invalid_reason": evidence_invalid_reason,
 		"baseline": baseline.duplicate(true),
 		"equipped": equipped.duplicate(true),
 		"delta_item_minus_baseline": deltas,
@@ -401,10 +433,14 @@ func _causal_pair(case_def: Dictionary[String, Variant], baseline: Dictionary[St
 
 func _case_summary(case_def: Dictionary[String, Variant], causal_pairs: Array[Variant]) -> Dictionary[String, Variant]:
 	var selected: Array[Variant] = []
+	var invalid_pair_count: int = 0
 	for pair_value: Variant in causal_pairs:
 		var pair: Dictionary[String, Variant] = _string_variant_dictionary(pair_value)
 		if String(pair.get("case_id", "")) == String(case_def.get("case_id", "")):
-			selected.append(pair)
+			if bool(pair.get("evidence_valid", false)):
+				selected.append(pair)
+			else:
+				invalid_pair_count += 1
 	var metric_names: Array[String] = [
 		"carrier_win", "carrier_loss", "stall", "tie", "time_s",
 		"carrier_damage", "carrier_healing", "carrier_shield", "carrier_mitigated", "carrier_casts",
@@ -435,6 +471,7 @@ func _case_summary(case_def: Dictionary[String, Variant], causal_pairs: Array[Va
 		"item": String(case_def.get("item", "")),
 		"role": String(case_def.get("role", "")),
 		"paired_observations": selected.size(),
+		"invalid_paired_observations": invalid_pair_count,
 		"baseline_mean": baseline_means,
 		"one_item_mean": equipped_means,
 		"delta_item_minus_baseline": delta_means,
@@ -458,6 +495,32 @@ func _validate_causal_liveness(case_summaries: Array[Variant], failures: Array[S
 				break
 		if not any_change:
 			failures.append("sample %s showed no causal runtime change under its equipped item" % String(summary.get("case_id", "")))
+
+func _validate_runtime_application(raw_runs: Array[Variant], failures: Array[String]) -> void:
+	for run_value: Variant in raw_runs:
+		var run: Dictionary[String, Variant] = _string_variant_dictionary(run_value)
+		var case_id: String = String(run.get("case_id", ""))
+		var variant: String = String(run.get("variant", ""))
+		var expected_item: String = String(run.get("item", ""))
+		var input_error: String = String(run.get("simulation_input_error", ""))
+		if input_error != "":
+			failures.append("sample %s rejected its item loadout: %s" % [case_id, input_error])
+			continue
+		var carrier_items: Array[String] = _string_array(run.get("carrier_items", []))
+		if variant == "no_item" and not carrier_items.is_empty():
+			failures.append("sample %s baseline unexpectedly equipped %s" % [case_id, JSON.stringify(carrier_items)])
+		elif variant == "one_item" and (carrier_items.size() != 1 or carrier_items[0] != expected_item):
+			failures.append("sample %s expected equipped %s but simulator applied %s" % [case_id, expected_item, JSON.stringify(carrier_items)])
+
+func _side_first_loadout(loadouts: Dictionary[String, Variant], side: String) -> Array[String]:
+	var key: String = "team_a" if side == "a" else "team_b"
+	var team_value: Variant = loadouts.get(key, [])
+	if not (team_value is Array):
+		return []
+	var team_loadouts: Array = team_value as Array
+	if team_loadouts.is_empty() or not (team_loadouts[0] is Array):
+		return []
+	return _string_array(team_loadouts[0])
 
 func _is_sampled_item(item_id: String) -> bool:
 	for case_value: Variant in SAMPLE_CASES:

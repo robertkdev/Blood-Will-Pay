@@ -12,6 +12,9 @@ var rng: RandomNumberGenerator
 var caster_team: String = ""
 var caster_index: int = -1
 var buff_system: BuffSystem = null
+## Scales authored output when an ability is repeated by a mentor. Selection,
+## costs, delays, movement and buff lifetime deliberately remain unscaled.
+var power_scale: float = 1.0
 var _post_cast_mana_refund: int = 0
 
 func _init(_engine: CombatEngine, _state: BattleState, _rng: RandomNumberGenerator, _caster_team: String, _caster_index: int) -> void:
@@ -244,6 +247,63 @@ func consume_post_cast_mana_refund() -> int:
 	_post_cast_mana_refund = 0
 	return amount
 
+func scale_power(amount: float) -> float:
+	return amount * clampf(power_scale, 0.0, 1.0)
+
+func scale_power_fields(fields: Dictionary) -> Dictionary:
+	var scaled: Dictionary = {}
+	if fields == null:
+		return scaled
+	for key_value: Variant in fields:
+		var value: Variant = fields[key_value]
+		scaled[key_value] = scale_power(float(value)) if value is float or value is int else value
+	return scaled
+
+func apply_stats_buff(target_team: String, target_index: int, fields: Dictionary, duration_s: float) -> Dictionary:
+	if buff_system == null:
+		return {"processed": false}
+	return buff_system.apply_stats_buff(state, target_team, target_index, scale_power_fields(fields), duration_s)
+
+func apply_stats_labeled(target_team: String, target_index: int, label: String, fields: Dictionary, duration_s: float) -> Dictionary:
+	if buff_system == null:
+		return {"processed": false}
+	return buff_system.apply_stats_labeled(state, target_team, target_index, label, scale_power_fields(fields), duration_s)
+
+func apply_shield(target_team: String, target_index: int, amount: float, duration_s: float, data: Dictionary = {}) -> Dictionary:
+	if buff_system == null:
+		return {"processed": false}
+	var shield_data: Dictionary = data.duplicate(true) if data != null else {}
+	var already_scaled: bool = bool(shield_data.get("power_already_scaled", false))
+	shield_data.erase("power_already_scaled")
+	var effective_amount: int = int(round(max(0.0, amount if already_scaled else scale_power(amount))))
+	return buff_system.apply_shield(state, target_team, target_index, effective_amount, duration_s, shield_data)
+
+func apply_cc_tag(target_team: String, target_index: int, tag: String, duration_s: float, data: Dictionary = {}) -> Dictionary:
+	if buff_system == null:
+		return {"processed": false}
+	return buff_system.apply_tag(state, target_team, target_index, tag, max(0.0, duration_s), data)
+
+func schedule_event(name: String, team: String, index: int, delay_s: float, data: Dictionary = {}) -> bool:
+	if engine == null or engine.ability_system == null:
+		return false
+	var event_data: Dictionary = data.duplicate(true) if data != null else {}
+	event_data["ability_power_scale"] = clampf(power_scale, 0.0, 1.0)
+	engine.ability_system.schedule_event(name, team, index, delay_s, event_data)
+	return true
+
+func schedule_implementation_callback(implementation: Variant, method_name: String, delay_s: float, args: Array[Variant] = [], cancel_method_name: String = "") -> bool:
+	if engine == null or engine.ability_system == null:
+		return false
+	return engine.ability_system.schedule_implementation_callback(
+		implementation,
+		method_name,
+		caster_team,
+		caster_index,
+		delay_s,
+		args,
+		clampf(power_scale, 0.0, 1.0),
+		cancel_method_name)
+
 # --- Mentor–Pupil pairing ---
 func pupil_for(team: String, mentor_index: int) -> int:
 	if state == null or mentor_index < 0:
@@ -260,10 +320,15 @@ func pupil_for(team: String, mentor_index: int) -> int:
 # Deals physical/magic/true damage in-place using shared mitigation.
 # type: "physical" | "magic" | "true" | "hybrid"
 func damage_single(source_team: String, source_index: int, target_index: int, amount: float, type: String = "physical") -> Dictionary:
-	return AbilityEffects.damage_single(engine, state, source_team, source_index, target_index, amount, type)
+	return AbilityEffects.damage_single(engine, state, source_team, source_index, target_index, max(0.0, scale_power(amount)), type)
 
 func heal_single(target_team: String, target_index: int, amount: float) -> Dictionary:
-	return AbilityEffects.heal_single(engine, state, target_team, target_index, amount, caster_team, caster_index)
+	return AbilityEffects.heal_single(engine, state, target_team, target_index, max(0.0, scale_power(amount)), caster_team, caster_index)
+
+## Use only when the value was computed from damage already returned by
+## damage_single. Scaling it again would turn a 55% repeat into 30.25% healing.
+func heal_from_dealt(target_team: String, target_index: int, amount: float) -> Dictionary:
+	return AbilityEffects.heal_single(engine, state, target_team, target_index, max(0.0, amount), caster_team, caster_index)
 
 func emit_execute_bonus(target_team: String, target_index: int, base_damage: float, bonus_damage: float, threshold_pct: float, target_hp_pct: float, kind: String) -> void:
 	if engine == null:
@@ -316,7 +381,7 @@ func emit_redirect_semantic(target_team: String, target_index: int, kind: String
 		engine.emit_signal("redirect_semantic_applied", caster_team, caster_index, String(target_team), int(target_index), String(kind), duration, value, risk)
 
 func stun(target_team: String, target_index: int, duration_s: float) -> Dictionary:
-	return AbilityEffects.stun(buff_system, engine, state, target_team, target_index, duration_s, caster_team, caster_index)
+	return AbilityEffects.stun(buff_system, engine, state, target_team, target_index, max(0.0, duration_s), caster_team, caster_index)
 
 func log(text: String) -> void:
 	if text == "" or engine == null:

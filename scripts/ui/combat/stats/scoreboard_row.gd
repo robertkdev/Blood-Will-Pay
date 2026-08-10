@@ -141,30 +141,16 @@ func _compact_identity_for_width(unit_name: String, team_prefix: String, availab
 	if clean_name == "":
 		clean_name = "UNIT"
 	var font: Font = name_label.get_theme_font("font") if name_label != null else null
-	if available_width < 112.0:
-		_compact_identity_font_size = 14
-		var tight_badge: String = "%s %s" % [team_prefix.left(1), clean_name]
-		if _compact_text_width(tight_badge, font, _compact_identity_font_size) <= available_width:
-			_compact_identity_mode = "tight_team_marker"
-			return tight_badge
-		_compact_identity_mode = "coded_name_tight_team_marker"
-		return "%s %s" % [team_prefix.left(1), _compact_identity_name(clean_name)]
 	var full_badge: String = "%s %s" % [team_prefix, clean_name]
 	_compact_identity_font_size = 14
-	while _compact_identity_font_size > 14 and _compact_text_width(full_badge, font, _compact_identity_font_size) > available_width:
-		_compact_identity_font_size -= 1
 	if _compact_text_width(full_badge, font, _compact_identity_font_size) <= available_width:
 		_compact_identity_mode = "full_badge"
 		return full_badge
-	_compact_identity_font_size = 14
-	while _compact_identity_font_size > 14 and _compact_text_width(clean_name, font, _compact_identity_font_size) > available_width:
-		_compact_identity_font_size -= 1
 	if _compact_text_width(clean_name, font, _compact_identity_font_size) <= available_width:
 		_compact_identity_mode = "name_only_team_in_chrome"
 		return clean_name
-	_compact_identity_font_size = 14
 	_compact_identity_mode = "coded_name_team_in_chrome"
-	return _compact_identity_name(clean_name)
+	return _compact_identity_name_for_width(clean_name, available_width, font, _compact_identity_font_size)
 
 func _compact_identity_available_width() -> float:
 	if name_label == null:
@@ -200,6 +186,17 @@ func _compact_identity_name(unit_name: String) -> String:
 		var final_code: String = words[words.size() - 1].left(2).to_upper()
 		return "%s%s" % [first_code, final_code]
 	return "%s%s" % [clean_name.left(4).to_upper(), clean_name.right(2).to_upper()]
+
+func _compact_identity_name_for_width(unit_name: String, available_width: float, font: Font, font_size: int) -> String:
+	var coded_name: String = _compact_identity_name(unit_name)
+	if _compact_text_width(coded_name, font, font_size) <= available_width:
+		return coded_name
+	var duplicate_marker: int = coded_name.rfind("#")
+	var suffix: String = coded_name.substr(duplicate_marker) if duplicate_marker > 0 else ""
+	var base: String = coded_name.left(duplicate_marker) if duplicate_marker > 0 else coded_name
+	while base.length() > 1 and _compact_text_width(base + suffix, font, font_size) > available_width:
+		base = base.left(base.length() - 1)
+	return base + suffix
 
 func _ensure_layout() -> void:
 	if _frame == null:

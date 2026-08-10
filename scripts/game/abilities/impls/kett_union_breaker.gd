@@ -33,7 +33,7 @@ func cast(ctx: AbilityContext) -> bool:
 	if ctx.engine.ability_system == null:
 		return false
 	for hit_index: int in range(HIT_COUNT):
-		ctx.engine.ability_system.schedule_event("kett_union_breaker_hit", ctx.caster_team, ctx.caster_index, HIT_INTERVAL * float(hit_index), {
+		ctx.schedule_event("kett_union_breaker_hit", ctx.caster_team, ctx.caster_index, HIT_INTERVAL * float(hit_index), {
 			"target_team": target_team,
 			"target_index": target_index,
 			"hit_number": hit_index + 1,

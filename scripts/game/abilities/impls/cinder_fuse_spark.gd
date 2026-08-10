@@ -39,7 +39,7 @@ func cast(ctx: AbilityContext) -> bool:
 				"cleanseable": true
 			})
 	if ctx.engine.ability_system != null:
-		ctx.engine.ability_system.schedule_event("cinder_fuse_tick", ctx.caster_team, ctx.caster_index, BURN_INTERVAL, {
+		ctx.schedule_event("cinder_fuse_tick", ctx.caster_team, ctx.caster_index, BURN_INTERVAL, {
 			"center": center,
 			"radius": RADIUS_TILES,
 			"damage": int(BURN_TICK_BASE[level_index]),

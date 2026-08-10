@@ -31,7 +31,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var target_position: Vector2 = ctx.position_of(target_team, target_index)
 	_engage_toward(ctx, target_position)
 	if ctx.buff_system != null:
-		ctx.buff_system.apply_stats_buff(ctx.state, ctx.caster_team, ctx.caster_index, {"damage_reduction": 0.30}, DR_DURATION)
+		ctx.apply_stats_buff(ctx.caster_team, ctx.caster_index, {"damage_reduction": 0.30}, DR_DURATION)
 	var level_index: int = _level_index(caster)
 	var damage: int = int(max(1.0, round(float(DAMAGE_BASE[level_index]) + 0.35 * float(caster.max_hp) / 10.0)))
 	var victims: Array[int] = ctx.enemies_in_radius_at(ctx.caster_team, target_position, RADIUS_TILES)
@@ -40,7 +40,7 @@ func cast(ctx: AbilityContext) -> bool:
 		if bool(result.get("processed", false)):
 			ctx.emit_zone_exposure(target_team, victim_index, "caldera_molten_core", ZONE_INTERVAL, float(result.get("dealt", damage)), RADIUS_TILES)
 	if ctx.engine.ability_system != null:
-		ctx.engine.ability_system.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, ZONE_INTERVAL, {
+		ctx.schedule_event("planned_area_tick", ctx.caster_team, ctx.caster_index, ZONE_INTERVAL, {
 			"center": target_position,
 			"radius": RADIUS_TILES,
 			"damage": TICK_DAMAGE[level_index],

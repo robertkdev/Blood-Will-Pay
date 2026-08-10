@@ -4,6 +4,7 @@ class_name EconomyUI
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 const StakesMarket: GDScript = preload("res://scripts/game/economy/stakes_market.gd")
+const TeamOddsEstimator: GDScript = preload("res://scripts/game/combat/team_odds_estimator.gd")
 
 const MAX_EXACT_SLIDER_BUCKETS: int = 9007199254740991
 const NORMALIZED_WAGER_SLIDER_STEPS: int = 1000
@@ -185,7 +186,7 @@ func _format_reserve_label(amount: int) -> String:
 	return "Blood: " + BloodBuckets.format_amount(amount, true) if _uses_narrow_compact_copy() else "Blood Reserve: " + BloodBuckets.format_amount(amount)
 
 func _format_bet_value(amount: int) -> String:
-	return BloodBuckets.format_amount(amount, _uses_narrow_compact_copy())
+	return BloodBuckets.format_amount(amount, _is_tight_compact_layout() or _uses_narrow_compact_copy())
 
 func _refresh_bet_value_width() -> void:
 	if bet_value == null:
@@ -323,6 +324,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		wager = _wager_from_slider_value(bet_slider.value)
 	var probability: float = clampf(float(Economy.projected_win_probability), 0.01, 1.0)
 	var odds_percent: int = int(roundf(probability * 100.0))
+	var odds_range: Vector2i = TeamOddsEstimator.estimate_range(odds_percent)
 	var after_loss: int = max(0, int(Economy.blood_buckets))
 	if not in_combat:
 		after_loss = max(0, int(Economy.blood_buckets) - wager)
@@ -333,26 +335,28 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		risk_prefix = "ALL IN // " if compact_decision else "ALL IN ARMED // "
 	if compact_decision:
 		var locked_suffix: String = " LOCKED" if in_combat else ""
-		wager_summary.text = "DECISION // %sRISK %s%s // WIN %d%% // RESERVE W%s / L%s" % [
+		wager_summary.text = "DECISION // %sRISK %s%s // WIN %d-%d%% // RESERVE W%s / L%s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager, true),
 			locked_suffix,
-			odds_percent,
+			odds_range.x,
+			odds_range.y,
 			BloodBuckets.format_amount(after_win, true),
 			BloodBuckets.format_amount(after_loss, true),
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
 	else:
-		wager_summary.text = "DECISION // %sRISK %s%s // WIN CHANCE %d%% // WIN RESERVE %s // LOSS RESERVE %s" % [
+		wager_summary.text = "DECISION // %sRISK %s%s // EST. WIN %d-%d%% // WIN RESERVE %s // LOSS RESERVE %s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager),
 			" LOCKED" if in_combat else "",
-			odds_percent,
+			odds_range.x,
+			odds_range.y,
 			BloodBuckets.format_amount(after_win),
 			BloodBuckets.format_amount(after_loss),
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
-	wager_summary.tooltip_text = "Risk %s. Win reserve %s; loss reserve %s. Gross return includes the wager. Win odds are an estimate, not a guarantee." % [BloodBuckets.describe(wager), BloodBuckets.describe(after_win), BloodBuckets.describe(after_loss)]
+	wager_summary.tooltip_text = "Risk %s. Win reserve %s; loss reserve %s. Rough model estimate %d%%; abilities, items, placement, hazards, and targeting can move the result outside this range. Gross return includes the wager and is priced by the encounter tier, not the estimate." % [BloodBuckets.describe(wager), BloodBuckets.describe(after_win), BloodBuckets.describe(after_loss), odds_percent]
 
 func set_bet_editable(editable: bool) -> void:
 	if bet_slider:

@@ -17,11 +17,11 @@ func cast(ctx: AbilityContext) -> bool:
 	if caster == null or not caster.is_alive():
 		return false
 	var level_index: int = _level_index(caster)
-	ctx.buff_system.apply_stats_buff(ctx.state, ctx.caster_team, ctx.caster_index, {
+	ctx.apply_stats_buff(ctx.caster_team, ctx.caster_index, {
 		"lifesteal": float(ATTACK_HEALING[level_index])
 	}, DURATION)
 	ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, ctx.caster_index, BuffTags.TAG_BEREBELL, DURATION, {
-		"missing_pct": float(MISSING_HP_DAMAGE[level_index])
+		"missing_pct": ctx.scale_power(float(MISSING_HP_DAMAGE[level_index]))
 	})
 	ctx.log("Unstable: attacks punish wounded targets and heal Berebell for %.1fs" % DURATION)
 	return true

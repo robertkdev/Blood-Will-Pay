@@ -23,7 +23,7 @@ func cast(ctx: AbilityContext) -> bool:
 	var damage: float = float(MARK_DAMAGE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage)
 	ctx.damage_single(ctx.caster_team, ctx.caster_index, target_index, damage, "physical")
 	ctx.buff_system.apply_tag(ctx.state, ctx.caster_team, ctx.caster_index, BuffTags.TAG_SARI_ON_HIT, WINDOW_DURATION, {
-		"armor_shred": ARMOR_SHRED_PER_HIT,
+		"armor_shred": ctx.scale_power(ARMOR_SHRED_PER_HIT),
 		"duration": SHRED_DURATION,
 		"magnitude_pct": 0.0,
 		"hits_left": EMPOWERED_HITS,

@@ -1190,7 +1190,7 @@ func _enforce_settings_surface_visible() -> void:
 func _render_home() -> void:
 	_set_content_header("FIELD ORDER // FIRST BLOOD", "The road behind you is closed. Muster a company, survive the forced opener, then spend and wager what remains.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search the field record: Field Manual, Combat Signs, settings..."
+		_search_field.placeholder_text = "Search: Field Manual, Combat Signs, settings..."
 	if _search_query() != "":
 		_render_global_search_results()
 		return
@@ -1393,7 +1393,7 @@ func _render_rga() -> void:
 	count += _count_card(_add_card("Goal", "The specific way a unit wants to win a fight, such as protecting a carry, bursting a target, or winning through attrition.", "goal win condition protect burst attrition"))
 	count += _count_card(_add_card("Approach", "The toolkit a unit uses to reach its goal: peel, ramp, sustain, lockdown, dive, zone control, and similar combat patterns.", "approach toolkit peel ramp sustain lockdown dive zone"))
 	count += _count_card(_add_card("Active Trait", "A trait turns on when enough matching units are on your board. Active thresholds are highlighted on trait hover cards.", "trait active threshold board"))
-	count += _count_card(_add_card("Win Odds", "A quick read of current board strength. Use it as a warning light, not a promise.", "win odds board strength warning"))
+	count += _count_card(_add_card("Estimated Win Range", "A rough board-strength estimate. Abilities, items, placement, hazards, and targeting can move the result outside its range; the wager panel shows exact reserves from its encounter-tier quote.", "estimated win range odds board strength warning wager reserve"))
 	count += _count_card(_add_card("Bench", "Bought units wait on the bench until you drag them to the board. Dropping a bench unit onto a board unit swaps their positions.", "bench drag swap positions"))
 	_add_heading("Roles")
 	count += _render_role_cards(false)

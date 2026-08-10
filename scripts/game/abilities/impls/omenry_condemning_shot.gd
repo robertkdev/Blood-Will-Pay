@@ -47,14 +47,14 @@ func cast(ctx: AbilityContext) -> bool:
 	var bonus_mult: float = 1.0 + (ISOLATED_BONUS if isolated else 0.0) + exile_bonus
 	var damage: float = (float(DAMAGE_BASE[_level_index(caster)]) + AD_RATIO * float(caster.attack_damage)) * bonus_mult
 	if ctx.buff_system != null:
-		ctx.buff_system.apply_stats_labeled(ctx.state, ctx.caster_team, ctx.caster_index, "omenry_condemning_shot_range", {
+		ctx.apply_stats_labeled(ctx.caster_team, ctx.caster_index, "omenry_condemning_shot_range", {
 			"attack_range": SELF_RANGE
 		}, SHRED_DURATION)
 	for hit_index: int in hits:
 		ctx.damage_single(ctx.caster_team, ctx.caster_index, hit_index, damage, "physical")
 		if ctx.buff_system != null:
 			ctx.buff_system.push_source(ctx.caster_team, ctx.caster_index, "on_hit")
-			ctx.buff_system.apply_stats_labeled(ctx.state, target_team, hit_index, "omenry_condemning_shot_shred", {
+			ctx.apply_stats_labeled(target_team, hit_index, "omenry_condemning_shot_shred", {
 				"armor": -ARMOR_SHRED,
 				"magic_resist": -MR_SHRED
 			}, SHRED_DURATION)

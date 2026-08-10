@@ -201,6 +201,17 @@ func start_entry_crossfade() -> void:
 		_active_tween.tween_callback(Callable(self, "_finish_entry_crossfade"))
 
 func mark_combat() -> void:
+	# Direct/custom battles do not traverse countdown and entry crossfade. Capture
+	# the same committed planning target and normalize the live arena geometry so
+	# their post-combat return can use the production reverse-camera path.
+	if _state == TransitionState.IDLE and _arena_container != null and is_instance_valid(_arena_container):
+		_planning_commit_rect = _planning_grid_visual_rect()
+		var arena_visual_rect: Rect2 = _control_visual_rect(_arena_container)
+		var arena_parent: Control = _arena_container.get_parent() as Control
+		if arena_parent != null and _rect_is_valid(arena_visual_rect):
+			_arena_container.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+			_arena_container.position = _global_to_parent_position(arena_parent, arena_visual_rect.position)
+			_arena_container.size = arena_visual_rect.size
 	_state = TransitionState.COMBAT
 
 func capture_combat_rect() -> void:
