@@ -125,13 +125,18 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
         return
     Trace.step("ArenaBridge.enter_arena: begin")
     _continuous_entry_active = continuous_entry
-    if not continuous_entry:
+    if continuous_entry:
+        var committed_source_rect: Rect2 = source_rect if source_rect.size.x > 1.0 and source_rect.size.y > 1.0 else _planning_field_rect()
+        _capture_continuous_entry(player_views, enemy_views, target_rect, committed_source_rect)
+        _set_container_rect(committed_source_rect)
+    else:
         _sync_container_to_planning_rect()
     arena.configure(arena_container, arena_units, player_grid_helper, enemy_grid_helper, unit_actor_class, tile_size)
-    arena.enter_arena(player_views, enemy_views, continuous_entry)
+    arena.enter_arena(player_views, enemy_views, continuous_entry, _entry_source_player, _entry_source_enemy)
     if continuous_entry:
-        _set_container_rect(source_rect if source_rect.size.x > 1.0 and source_rect.size.y > 1.0 else _planning_field_rect())
-        _capture_continuous_entry(player_views, enemy_views, target_rect, source_rect)
+        # The actors are born at the committed planning centers. The first
+        # presentation frame therefore has no raw-grid placement to correct.
+        apply_field_progress(0.0)
     _initial_combatant_count = _count_living_views(player_views) + _count_living_views(enemy_views)
     _living_combatant_count = _initial_combatant_count
     _last_removed_combatant_count = 0
@@ -238,7 +243,10 @@ func apply_field_progress(progress: float) -> void:
         _apply_actor_entry(arena.player_actors[index], _entry_source_player[index], _entry_target_player[index], actor_size, field_progress)
     for index: int in range(mini(arena.enemy_actors.size(), mini(_entry_source_enemy.size(), _entry_target_enemy.size()))):
         _apply_actor_entry(arena.enemy_actors[index], _entry_source_enemy[index], _entry_target_enemy[index], actor_size, field_progress)
-    var local_swap: float = clampf(field_progress / 0.16, 0.0, 1.0)
+    # Ownership changes at the first committed transition frame. The planning
+    # unit views and combat actors share the same cell center there, so a second
+    # alpha tween only creates ghosted duplicates and a perceived teleport.
+    var local_swap: float = 1.0
     for record: Dictionary in _entry_source_views:
         var view_ref: WeakRef = record.get("view_ref", null) as WeakRef
         var source_view: Control = view_ref.get_ref() as Control if view_ref != null else null
@@ -256,6 +264,10 @@ func finish_continuous_entry() -> void:
     if arena == null or not _continuous_entry_active:
         return
     apply_field_progress(1.0)
+    # The manager is authoritative for the endpoint, but it must not compete
+    # with the registered field tween while the entry is visible. Release the
+    # guard only after the actors have reached that endpoint.
+    _continuous_entry_active = false
     arena.refresh_combat_presentation_spacing()
 
 func get_entry_player_positions() -> Array[Vector2]:
@@ -468,15 +480,6 @@ func _capture_continuous_entry(player_views: Array[UnitSlotView], enemy_views: A
     _entry_target_player = _map_shared_formation(_entry_source_player, source_rect, target_safe)
     _entry_target_enemy = _map_shared_formation(_entry_source_enemy, source_rect, target_safe)
     _center_mapped_confrontation(target_safe)
-    for actor: UnitActor in arena.player_actors:
-        actor.modulate = Color(1.0, 1.0, 1.0, 0.0)
-    for actor: UnitActor in arena.enemy_actors:
-        actor.modulate = Color(1.0, 1.0, 1.0, 0.0)
-    apply_field_progress(0.0)
-    for actor: UnitActor in arena.player_actors:
-        actor.set_meta("handoff_global_center", actor.get_global_rect().get_center())
-    for actor: UnitActor in arena.enemy_actors:
-        actor.set_meta("handoff_global_center", actor.get_global_rect().get_center())
 
 func _capture_source_view(slot: UnitSlotView, team: String, roster_index: int) -> void:
     if slot == null or slot.view == null or not is_instance_valid(slot.view):
@@ -517,9 +520,9 @@ func _center_confrontation_positions(player_positions: Array[Vector2], enemy_pos
     var centroid: Vector2 = _combined_centroid(player_positions, enemy_positions)
     var shared_shift: Vector2 = target_rect.get_center() - centroid
     for index: int in range(player_positions.size()):
-        player_positions[index] = (player_positions[index] + shared_shift).clamp(target_rect.position, target_rect.end)
+        player_positions[index] = player_positions[index] + shared_shift
     for index: int in range(enemy_positions.size()):
-        enemy_positions[index] = (enemy_positions[index] + shared_shift).clamp(target_rect.position, target_rect.end)
+        enemy_positions[index] = enemy_positions[index] + shared_shift
     return shared_shift
 
 func _combined_centroid(player_positions: Array[Vector2], enemy_positions: Array[Vector2]) -> Vector2:
@@ -577,6 +580,10 @@ func _apply_actor_entry(actor: UnitActor, source_position: Vector2, target_posit
     actor_color.a = 1.0
     actor.modulate = actor_color
     actor.set_entry_presentation_progress(progress)
+    if progress <= 0.0001 or not actor.has_meta("handoff_global_center"):
+        # Preserve the committed source center as an immutable handoff witness;
+        # the live global center is allowed to travel with the shared field tween.
+        actor.set_meta("handoff_global_center", actor.get_global_rect().get_center())
 
 func _actor_snapshot(actor: UnitActor, team: String) -> Dictionary:
     if actor == null or not is_instance_valid(actor):
@@ -665,7 +672,10 @@ func _remap_positions_between_bounds(positions: Array, source: Rect2, target: Re
         positions[index] = target.position + target.size * ratio
 
 func _on_manager_position_updated(team: String, index: int, x: float, y: float) -> void:
-    if arena == null:
+    if arena == null or _continuous_entry_active:
+        # configure_engine_arena installs the combat positions before the visual
+        # handoff, but those signals must not move actors or apply spacing over the
+        # source cell centers. The field tween owns presentation until its endpoint.
         return
     var actor: UnitActor = arena.get_actor(team, index)
     if actor == null or not is_instance_valid(actor):

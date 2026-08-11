@@ -79,37 +79,37 @@ func _run() -> void:
 	var previous_rect: Rect2 = arena_start.get_global_rect() if arena_start != null else Rect2()
 	var entry_source_rect: Rect2 = transition.call("get_entry_source_rect") as Rect2
 	var entry_target_rect: Rect2 = transition.call("get_entry_target_rect") as Rect2
-	_expect(entry_target_rect.get_area() >= entry_source_rect.get_area() * 1.20, "camera push endpoints do not provide a meaningful field zoom")
-	_expect(previous_rect.get_area() <= entry_target_rect.get_area() * 0.88, "camera push jumped to the combat field before its first visible frame")
+	_expect(entry_source_rect.get_area() >= entry_target_rect.get_area() * 1.05, "planning zoom did not provide a bounded source field larger than the combat safe rectangle")
+	_expect(_rect_between_endpoints(previous_rect, entry_source_rect, entry_target_rect), "camera push left the shared field outside its registered endpoints")
 	_assert_entry_ownership_overlap(entry_snapshot)
+	_assert_entry_targets_in_safe_bounds(entry_snapshot, entry_target_rect)
 	_capture("04a_camera_push_start")
-	# The first observable frame can already be one render tick into the fade.
-	# Keep this gate strict enough to reject the old planning=0 / arena=0.82 hard
-	# replacement while allowing the recorded 0.88 planning alpha seen here.
-	_assert_entry_crossfade_overlap(combat, 0.80, 1.0, 0.0, 0.25, "camera push start")
+	# Both surfaces are fully present at the shared source rect. Ownership of unit
+	# renderers has already switched, so there is no planning-to-arena alpha reveal.
+	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "camera push start")
 	_assert_one_arena_visible(combat, "camera push start")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04b_camera_push_120ms")
-	previous_rect = _assert_field_growth(combat, previous_rect, "120ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.55, 0.90, 0.12, 0.45, "120ms camera push")
+	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "120ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "120ms camera push")
 	_assert_one_arena_visible(combat, "120ms camera push")
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started during the field push")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04c_camera_push_240ms")
-	previous_rect = _assert_field_growth(combat, previous_rect, "240ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.30, 0.70, 0.30, 0.70, "240ms camera push")
+	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "240ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "240ms camera push")
 	_assert_one_arena_visible(combat, "240ms camera push")
 	await get_tree().create_timer(0.08).timeout
 	_capture("04d_camera_push_320ms")
-	previous_rect = _assert_field_growth(combat, previous_rect, "320ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.15, 0.55, 0.45, 0.85, "320ms camera push")
+	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "320ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "320ms camera push")
 	_assert_one_arena_visible(combat, "320ms camera push")
 	var arena_low_point: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	_expect(arena_low_point != null and arena_low_point.modulate.a >= 0.45, "arena did not rise visibly through the camera push")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04e_camera_push_440ms")
-	previous_rect = _assert_field_growth(combat, previous_rect, "440ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.03, 0.35, 0.65, 0.97, "440ms camera push")
+	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "440ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "440ms camera push")
 	_assert_one_arena_visible(combat, "440ms camera push")
 	var arena_mid: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	_expect(arena_mid != null and arena_mid.modulate.a >= 0.65, "arena did not decisively take over while planning was still fading")
@@ -117,12 +117,15 @@ func _run() -> void:
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started before the field push completed")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04f_camera_push_560ms")
-	previous_rect = _assert_field_growth(combat, previous_rect, "560ms camera push")
+	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "560ms camera push")
 	_expect(previous_rect.get_area() >= entry_target_rect.get_area() * 0.96, "camera push did not reach the authored combat field endpoint")
 	if String(transition.call("get_state_name")) == "entry_crossfade":
 		_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started before the camera endpoint")
 	var arena_late: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
-	_expect(arena_late != null and arena_late.modulate.a >= 0.80, "arena did not reach dominant opacity before combat")
+	_expect(arena_late != null and arena_late.modulate.a >= 0.99, "arena field should remain fully present through the camera push")
+	var entry_overlay: Control = combat.get_node_or_null("CombatPhaseTransitionLayer") as Control
+	_expect(entry_overlay != null and bool(entry_overlay.get_meta("transition_no_alpha_reveal", false)), "entry did not expose the no-alpha shared-field contract")
+	_expect(entry_overlay != null and not bool(entry_overlay.get_meta("planning_grid_reparented", true)), "entry reparented the planning grid")
 	Engine.time_scale = 1.0
 	var combat_seen: bool = await _wait_for_combat_active(2.0)
 	_expect(combat_seen, "combat did not begin after the one-arena camera push")
@@ -158,7 +161,7 @@ func _run() -> void:
 	await _settle_frames(18)
 	_capture("07_result_return_mid")
 	var return_mid_rect: Rect2 = arena_low_point.get_global_rect() if arena_low_point != null else Rect2()
-	_expect(return_mid_rect.size.x < return_start_rect.size.x and return_mid_rect.size.y < return_start_rect.size.y, "result underlay did not reverse the field camera")
+	_expect(return_mid_rect.size.x > return_start_rect.size.x and return_mid_rect.size.y > return_start_rect.size.y, "result underlay did not restore the zoomed planning field")
 	_expect(result_banner != null and result_banner.visible, "result card lost foreground priority during the reverse camera move")
 	var return_complete: bool = await _wait_for_transition_state(transition, "idle", 1.5)
 	_expect(return_complete, "grid return did not complete behind the result card")
@@ -218,8 +221,8 @@ func _assert_countdown_focus(combat: Control) -> void:
 	_expect(timer_context != null and timer_context.modulate.a >= 0.35, "countdown should retain board and odds context")
 	_expect(wager_context != null and wager_context.modulate.a >= 0.35, "countdown should retain wager context")
 	_expect(actions != null and (not actions.visible or actions.modulate.a <= 0.10), "countdown should suppress action chrome")
-	_expect(directive != null and directive.modulate.a <= 0.10, "countdown should suppress planning directive chrome")
-	_expect(metrics != null and metrics.modulate.a <= 0.10, "countdown should suppress peripheral metrics")
+	_expect(directive != null and (not directive.is_visible_in_tree() or directive.modulate.a <= 0.10), "countdown should suppress planning directive chrome")
+	_expect(metrics != null and (not metrics.is_visible_in_tree() or metrics.modulate.a <= 0.10), "countdown should suppress peripheral metrics")
 
 func _assert_joined_field_progress(combat: Control, maximum_gap: float, label: String) -> void:
 	var overlay: Control = combat.get_node_or_null("CombatPhaseTransitionLayer") as Control
@@ -243,16 +246,37 @@ func _assert_entry_crossfade_overlap(combat: Control, minimum_planning_alpha: fl
 	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	var planning_alpha: float = planning.modulate.a if planning != null else -1.0
 	var arena_alpha: float = arena.modulate.a if arena != null else -1.0
-	_expect(planning_alpha >= minimum_planning_alpha and planning_alpha <= maximum_planning_alpha, "%s planning field alpha %.2f did not follow the recorded fade" % [label, planning_alpha])
-	_expect(arena_alpha >= minimum_arena_alpha and arena_alpha <= maximum_arena_alpha, "%s arena alpha %.2f did not rise from transparent" % [label, arena_alpha])
+	_expect(planning_alpha >= minimum_planning_alpha and planning_alpha <= maximum_planning_alpha, "%s planning field alpha %.2f did not remain present during the shared transform" % [label, planning_alpha])
+	_expect(arena_alpha >= minimum_arena_alpha and arena_alpha <= maximum_arena_alpha, "%s arena alpha %.2f did not remain present during the shared transform" % [label, arena_alpha])
 	if minimum_planning_alpha > 0.0 and minimum_arena_alpha > 0.0:
 		_expect(planning_alpha > 0.05 and arena_alpha > 0.05, "%s lost meaningful planning-to-arena overlap" % label)
 
-func _assert_field_growth(combat: Control, previous_rect: Rect2, label: String) -> Rect2:
+func _rect_between_endpoints(candidate: Rect2, source: Rect2, target: Rect2) -> bool:
+	for axis: int in [0, 1]:
+		var candidate_position: float = candidate.position.x if axis == 0 else candidate.position.y
+		var source_position: float = source.position.x if axis == 0 else source.position.y
+		var target_position: float = target.position.x if axis == 0 else target.position.y
+		var candidate_size: float = candidate.size.x if axis == 0 else candidate.size.y
+		var source_size: float = source.size.x if axis == 0 else source.size.y
+		var target_size: float = target.size.x if axis == 0 else target.size.y
+		if candidate_position < minf(source_position, target_position) - 2.0 or candidate_position > maxf(source_position, target_position) + 2.0:
+			return false
+		if candidate_size < minf(source_size, target_size) - 2.0 or candidate_size > maxf(source_size, target_size) + 2.0:
+			return false
+	return true
+
+func _assert_field_toward_target(combat: Control, previous_rect: Rect2, target_rect: Rect2, label: String) -> Rect2:
 	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	var current_rect: Rect2 = arena.get_global_rect() if arena != null else Rect2()
-	_expect(current_rect.size.x + 1.0 >= previous_rect.size.x, "%s reversed field width" % label)
-	_expect(current_rect.size.y + 1.0 >= previous_rect.size.y, "%s reversed field height" % label)
+	_expect(_rect_between_endpoints(current_rect, previous_rect, target_rect), "%s left the shared field endpoints" % label)
+	var width_direction: float = target_rect.size.x - previous_rect.size.x
+	var height_direction: float = target_rect.size.y - previous_rect.size.y
+	var x_direction: float = target_rect.position.x - previous_rect.position.x
+	var y_direction: float = target_rect.position.y - previous_rect.position.y
+	_expect((current_rect.size.x - previous_rect.size.x) * width_direction >= -1.0, "%s reversed field width" % label)
+	_expect((current_rect.size.y - previous_rect.size.y) * height_direction >= -1.0, "%s reversed field height" % label)
+	_expect((current_rect.position.x - previous_rect.position.x) * x_direction >= -1.0, "%s reversed field x framing" % label)
+	_expect((current_rect.position.y - previous_rect.position.y) * y_direction >= -1.0, "%s reversed field y framing" % label)
 	return current_rect
 
 func _presentation_ids(snapshot: Dictionary) -> Dictionary:
@@ -281,6 +305,15 @@ func _assert_entry_ownership_overlap(snapshot: Dictionary) -> void:
 			var source_center: Vector2 = source.get("global_center", Vector2.ZERO) as Vector2
 			var handoff_center: Vector2 = matched_presentation.get("handoff_global_center", Vector2.INF) as Vector2
 			_expect(source_center.distance_to(handoff_center) <= 1.0, "entry ownership transfer moved a unit before the camera push")
+
+func _assert_entry_targets_in_safe_bounds(snapshot: Dictionary, target_rect: Rect2) -> void:
+	var target_keys: Array[String] = ["player_target_positions", "enemy_target_positions"]
+	for target_key: String in target_keys:
+		var positions: Array = snapshot.get(target_key, []) as Array
+		_expect(not positions.is_empty(), "%s did not register mapped combat centers" % target_key)
+		for raw_position: Variant in positions:
+			var position: Vector2 = raw_position as Vector2
+			_expect(target_rect.grow(-1.0).has_point(position), "%s mapped a combat center outside the safe rectangle: %s" % [target_key, str(position)])
 
 func _planning_unit_views_hidden(controller: Variant) -> bool:
 	for property_name: String in ["player_views", "enemy_views"]:

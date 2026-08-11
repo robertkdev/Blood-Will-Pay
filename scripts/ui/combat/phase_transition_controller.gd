@@ -69,7 +69,6 @@ var _arena_original_z_index: int = 10
 var _arena_original_z_as_relative: bool = true
 var _planning_original_separation: int = 16
 var _encounter_focus_global: Vector2 = Vector2.INF
-var _frozen_planning_geometry: Dictionary[String, Variant] = {}
 var _entry_finish_scheduled: bool = false
 
 func configure(host: Control, planning_area: Control, arena_container: Control) -> void:
@@ -90,7 +89,6 @@ func teardown() -> void:
 
 func reset() -> void:
 	_kill_tween()
-	_restore_frozen_planning_grid()
 	_restore_planning_transform()
 	_restore_records(_planning_records)
 	_restore_records(_context_records)
@@ -172,6 +170,9 @@ func start_entry_crossfade() -> void:
 	if _overlay != null:
 		_overlay.set_meta("transition_phase", "one_arena_camera_push")
 		_overlay.set_meta("spatial_zoom_seconds", ENTRY_CROSSFADE_SECONDS)
+		_overlay.set_meta("transition_surface", "shared_field_transform")
+		_overlay.set_meta("transition_no_alpha_reveal", true)
+		_overlay.set_meta("planning_grid_reparented", false)
 	if _arena_container != null and is_instance_valid(_arena_container):
 		_arena_container.visible = true
 		_arena_original_z_index = _arena_container.z_index
@@ -186,22 +187,18 @@ func start_entry_crossfade() -> void:
 			_arena_container.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
 			_arena_container.position = _global_to_parent_position(arena_parent, _entry_source_rect.position)
 			_arena_container.size = _entry_source_rect.size
-		# Keep the committed planning field on screen while the combat arena grows
-		# into it.  Starting the arena at zero prevents the first entry frame from
-		# reading as the old opaque-arena hard replacement.
-		_set_alpha(_arena_container, 0.0)
+		# The combat field is fully present at the committed planning rect. Actors
+		# are already registered to the same cell centers by ArenaBridge, so the
+		# visible handoff is a single field transform rather than an alpha reveal.
+		_set_alpha(_arena_container, 1.0)
 	if _reduced_motion:
 		_set_entry_progress(1.0)
-		_set_entry_alpha_progress(1.0)
 		_finish_entry_crossfade()
 	else:
 		_active_tween = _host.create_tween()
 		_active_tween.set_trans(Tween.TRANS_QUART)
 		_active_tween.set_ease(Tween.EASE_OUT)
 		_active_tween.tween_method(Callable(self, "_set_entry_progress"), 0.0, 1.0, ENTRY_CROSSFADE_SECONDS)
-		# The camera can retain its authored ease-out, but opacity must cover the
-		# full handoff duration so the planning grid and arena actually overlap.
-		_active_tween.parallel().tween_method(Callable(self, "_set_entry_alpha_progress"), 0.0, 1.0, ENTRY_CROSSFADE_SECONDS).set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
 		_active_tween.tween_callback(Callable(self, "_finish_entry_crossfade"))
 
 func mark_combat() -> void:
@@ -345,15 +342,6 @@ func _set_entry_progress(progress: float) -> void:
 		_overlay.set_meta("spatial_zoom_progress", eased_progress)
 	field_progress_changed.emit(eased_progress)
 
-func _set_entry_alpha_progress(progress: float) -> void:
-	var alpha_progress: float = clampf(progress, 0.0, 1.0)
-	if _arena_container != null and is_instance_valid(_arena_container):
-		_set_alpha(_arena_container, alpha_progress)
-	for record: Dictionary in _planning_records:
-		var planning_control: Control = _record_control(record)
-		if planning_control != null:
-			_set_alpha(planning_control, lerpf(float(record.get("alpha", 1.0)), 0.0, alpha_progress))
-
 func _set_return_progress(progress: float) -> void:
 	var eased_progress: float = clampf(progress, 0.0, 1.0)
 	if _overlay != null:
@@ -365,7 +353,6 @@ func _finish_countdown() -> void:
 	if _state != TransitionState.COUNTDOWN:
 		return
 	_planning_commit_rect = _planning_grid_visual_rect()
-	_freeze_planning_grid()
 	if _overlay != null:
 		_overlay.set_meta("countdown_visible_value", "1")
 	countdown_finished.emit()
@@ -389,7 +376,13 @@ func _finish_entry_after_first_arena_frame() -> void:
 	if _state != TransitionState.ENTRY_CROSSFADE or not _entry_finish_scheduled:
 		return
 	_entry_finish_scheduled = false
-	_restore_frozen_planning_grid()
+	# Switch ownership at the completed field endpoint. This is a hard endpoint
+	# swap, not a fade: the grid and actors have shared the same registered
+	# formation throughout the camera push.
+	for record: Dictionary in _planning_records:
+		var planning_control: Control = _record_control(record)
+		if planning_control != null:
+			_set_alpha(planning_control, 0.0)
 	if _arena_container != null and is_instance_valid(_arena_container):
 		_arena_container.z_index = _arena_original_z_index
 		_arena_container.z_as_relative = _arena_original_z_as_relative
@@ -426,56 +419,6 @@ func _restore_planning_transform() -> void:
 	_planning_area.scale = _planning_original_scale
 	_planning_area.pivot_offset = _planning_original_pivot
 	_planning_area.add_theme_constant_override("separation", _planning_original_separation)
-
-func _freeze_planning_grid() -> void:
-	if _planning_area == null or not is_instance_valid(_planning_area) or not _frozen_planning_geometry.is_empty() or _overlay == null:
-		return
-	var original_parent: Node = _planning_area.get_parent()
-	if original_parent == null:
-		return
-	var visual_rect: Rect2 = _control_visual_rect(_planning_area)
-	_frozen_planning_geometry = {
-		"parent_ref": weakref(original_parent),
-		"index": _planning_area.get_index(),
-		"position": _planning_area.position,
-		"size": _planning_area.size,
-		"scale": _planning_area.scale,
-		"pivot_offset": _planning_area.pivot_offset,
-		"z_index": _planning_area.z_index,
-		"z_as_relative": _planning_area.z_as_relative,
-	}
-	original_parent.remove_child(_planning_area)
-	_overlay.add_child(_planning_area)
-	_planning_area.scale = Vector2.ONE
-	_planning_area.pivot_offset = Vector2.ZERO
-	_planning_area.z_as_relative = false
-	_planning_area.z_index = 100
-	_planning_area.position = visual_rect.position - _overlay.get_global_rect().position
-	_planning_area.size = visual_rect.size
-	_planning_area.set_meta("one_arena_frozen_field", true)
-
-func _restore_frozen_planning_grid() -> void:
-	if _planning_area == null or not is_instance_valid(_planning_area) or _frozen_planning_geometry.is_empty():
-		return
-	var parent_ref: WeakRef = _frozen_planning_geometry.get("parent_ref", null) as WeakRef
-	var original_parent: Node = parent_ref.get_ref() as Node if parent_ref != null else null
-	if original_parent == null:
-		_frozen_planning_geometry.clear()
-		return
-	var current_parent: Node = _planning_area.get_parent()
-	if current_parent != null:
-		current_parent.remove_child(_planning_area)
-	original_parent.add_child(_planning_area)
-	var original_index: int = int(_frozen_planning_geometry.get("index", original_parent.get_child_count() - 1))
-	original_parent.move_child(_planning_area, clampi(original_index, 0, original_parent.get_child_count() - 1))
-	_planning_area.position = _frozen_planning_geometry.get("position", _planning_area.position) as Vector2
-	_planning_area.size = _frozen_planning_geometry.get("size", _planning_area.size) as Vector2
-	_planning_area.scale = _frozen_planning_geometry.get("scale", Vector2.ONE) as Vector2
-	_planning_area.pivot_offset = _frozen_planning_geometry.get("pivot_offset", Vector2.ZERO) as Vector2
-	_planning_area.z_index = int(_frozen_planning_geometry.get("z_index", 0))
-	_planning_area.z_as_relative = bool(_frozen_planning_geometry.get("z_as_relative", true))
-	_planning_area.remove_meta("one_arena_frozen_field")
-	_frozen_planning_geometry.clear()
 
 func _planning_grid_visual_rect() -> Rect2:
 	var combined_rect: Rect2 = Rect2()

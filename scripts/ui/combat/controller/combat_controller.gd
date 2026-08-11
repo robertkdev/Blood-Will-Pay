@@ -1568,8 +1568,26 @@ func _queue_battle_start() -> void:
 	if phase_transition == null:
 		call_deferred("_execute_pending_battle_start", _battle_start_generation)
 		return
+	# Commit the combat composition before the visible countdown. The board gets
+	# its larger combat-focused width once, then the transition only animates the
+	# registered field; hiding side rails after beat 1 was the source of the
+	# left/right camera correction in the previous handoff.
+	_prepare_transition_combat_layout(true)
+	var tree: SceneTree = parent.get_tree() if parent != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_start_battle_countdown_after_layout").bind(_battle_start_generation), CONNECT_ONE_SHOT)
+	else:
+		_start_battle_countdown_after_layout(_battle_start_generation)
+
+func _start_battle_countdown_after_layout(generation: int) -> void:
+	if not _battle_start_pending or generation != _battle_start_generation or phase_transition == null:
+		return
 	phase_transition.set_encounter_focus(_committed_confrontation_centroid())
 	phase_transition.start_countdown(_reduced_motion_enabled())
+	# A phase-visual sync can run between the preflight layout commit and the
+	# countdown callback. Re-assert the already-committed chrome state here,
+	# before any transition frame is presented.
+	_prepare_transition_combat_layout(true)
 	_sync_combat_broadcast_strip(true)
 
 func _sync_encounter_quote_kind(economy_node: Node = null) -> void:
@@ -3707,12 +3725,11 @@ func _sync_bottom_combat_visibility(force: bool = false) -> void:
 	_set_root_control_visible("GothicShopPlate", planning_visible)
 	_set_root_control_visible("GothicShopCommandPlate", planning_visible)
 
-func _prepare_transition_combat_layout() -> void:
+func _prepare_transition_combat_layout(preserve_countdown_context: bool = false) -> void:
 	for path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
 		"MarginContainer/VBoxContainer/ActionsRow",
-		"MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BenchArea",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry",
@@ -3720,6 +3737,8 @@ func _prepare_transition_combat_layout() -> void:
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusBackplate",
 	]:
 		_set_control_visible(path, false)
+	if not preserve_countdown_context:
+		_set_control_visible("MarginContainer/VBoxContainer/WagerSummary", false)
 	if board_status_row != null and is_instance_valid(board_status_row):
 		board_status_row.visible = false
 		var board_status_plate: Control = board_status_row.get_parent().get_node_or_null("BoardStatusBackplate") as Control if board_status_row.get_parent() != null else null

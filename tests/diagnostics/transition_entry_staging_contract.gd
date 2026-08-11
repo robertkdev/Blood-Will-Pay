@@ -27,9 +27,12 @@ func _ready() -> void:
 	_expect(crossfade_gate_body, "_transition_preparation_ready", "crossfade must wait for staged preparation", failures)
 	var finish_crossfade_body := _function_body(transition_source, "_finish_entry_crossfade")
 	_expect(finish_crossfade_body, "process_frame.connect", "entry cleanup must wait for a fully opaque arena frame", failures)
-	_expect_not(finish_crossfade_body, "_restore_frozen_planning_grid", "entry crossfade callback must not synchronously reparent the planning field", failures)
-	var deferred_finish_body := _function_body(transition_source, "_finish_entry_after_first_arena_frame")
-	_expect(deferred_finish_body, "_restore_frozen_planning_grid", "deferred entry cleanup must restore the planning field", failures)
+	_expect_not(transition_source, "_freeze_planning_grid", "continuous entry must not freeze and reparent the planning field", failures)
+	_expect_not(transition_source, "_restore_frozen_planning_grid", "continuous entry must not restore a reparented planning field", failures)
+	_expect_not(transition_source, "_set_entry_alpha_progress", "continuous entry must not reveal the arena through an alpha tween", failures)
+	var entry_body := _function_body(transition_source, "start_entry_crossfade")
+	_expect(entry_body, "transition_no_alpha_reveal", "entry must declare the shared-field no-alpha contract", failures)
+	_expect(entry_body, "planning_grid_reparented", "entry must declare that the planning grid remains in place", failures)
 	if not failures.is_empty():
 		for failure in failures:
 			push_error("%s: %s" % [SMOKE_NAME, failure])
