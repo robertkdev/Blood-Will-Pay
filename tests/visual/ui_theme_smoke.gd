@@ -79,6 +79,7 @@ func _run() -> void:
 	if continue_button != null:
 		var continue_width_floor: float = 132.0 if tight_layout else 142.0 if compact_layout else 220.0
 		_expect(continue_button.custom_minimum_size.x >= continue_width_floor, "ContinueButton is not visually prioritized for the active responsive layout: got %.1f, expected %.1f, viewport=%s" % [continue_button.custom_minimum_size.x, continue_width_floor, str(rendered_viewport_size)], failures)
+		_expect(continue_button.focus_mode == Control.FOCUS_NONE, "ContinueButton must remain mouse-only and not accept Space/Enter keyboard activation", failures)
 		var continue_style: StyleBox = continue_button.get_theme_stylebox("normal")
 		_expect(continue_style is StyleBoxFlat, "ContinueButton should use restrained flat field furniture", failures)
 		_expect(String(continue_button.get_meta("visual_role", "")) == "primary_commit", "ContinueButton should expose the dominant planning commitment role", failures)

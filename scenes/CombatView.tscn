@@ -536,6 +536,7 @@ text = "Attack"
 
 [node name="ContinueButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow"]
 layout_mode = 2
+focus_mode = 0
 disabled = true
 text = "Continue"
 
