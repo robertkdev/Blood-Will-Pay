@@ -531,6 +531,7 @@ text = "Blood Reserve: 2 buckets"
 [node name="AttackButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow"]
 visible = false
 layout_mode = 2
+focus_mode = 0
 text = "Attack"
 
 [node name="ContinueButton" type="Button" parent="MarginContainer/VBoxContainer/ActionsRow"]

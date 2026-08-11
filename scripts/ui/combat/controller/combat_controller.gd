@@ -4543,7 +4543,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	if hold_label != null:
 		hold_label.text = "READ THE COST // ACTION ARMS IN 1"
 	if skip_button != null:
-		skip_button.text = "HOLD // ENTER / SPACE"
+		skip_button.text = "CLICK // SKIP"
 		skip_button.disabled = true
 	_configure_result_aftermath(banner, title, accent_color, title_color)
 	banner.add_theme_stylebox_override("panel", _make_result_scrim_style(title))
@@ -4899,26 +4899,6 @@ func _set_result_underlay_visibility(restore_phase_visibility: bool) -> void:
 			field_label.visible = false
 			field_label.set_meta("suppressed_for_result_reading", true)
 
-func handle_result_input(event: InputEvent) -> bool:
-	if not _is_result_skip_event(event):
-		return false
-	if _intermission_finish_scheduled or _intermission_finish_in_progress:
-		_result_repeated_input_count += 1
-		return true
-	if not _result_hold_active or _result_banner == null or not is_instance_valid(_result_banner) or not _result_banner.visible:
-		return false
-	_skip_result_hold()
-	return true
-
-func _is_result_skip_event(event: InputEvent) -> bool:
-	if event == null or not event.is_pressed() or event.is_echo():
-		return false
-	var skip_requested: bool = event.is_action_pressed("ui_accept")
-	if event is InputEventKey:
-		var key_event: InputEventKey = event as InputEventKey
-		skip_requested = skip_requested or key_event.keycode == KEY_SPACE or key_event.physical_keycode == KEY_SPACE
-	return skip_requested
-
 func _update_result_hold(delta: float) -> void:
 	if not _result_hold_active or _result_banner == null or not is_instance_valid(_result_banner) or not _result_banner.visible:
 		return
@@ -4934,7 +4914,7 @@ func _update_result_hold(delta: float) -> void:
 		hold_label.text = "READ THE COST // ACTION ARMS IN %d" % ceili(RESULT_SKIP_GUARD_SECONDS - _result_hold_elapsed) if _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS else "AUTO-ADVANCE IN %d" % ceili(remaining)
 	if skip_button != null:
 		skip_button.disabled = _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS
-		skip_button.text = "HOLD // ENTER / SPACE" if skip_button.disabled else "ENTER / SPACE // ADVANCE"
+		skip_button.text = "CLICK // SKIP" if skip_button.disabled else "CLICK // ADVANCE"
 
 func _skip_result_hold() -> void:
 	if not _result_hold_active or _result_hold_finishing or _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS:
@@ -5225,81 +5205,18 @@ func _ensure_result_banner() -> PanelContainer:
 	hold_row.add_child(hold_label)
 	var skip_button: Button = Button.new()
 	skip_button.name = "ResultSkipButton"
-	skip_button.text = "ENTER / SPACE // SKIP"
+	skip_button.text = "CLICK // SKIP"
 	skip_button.custom_minimum_size = Vector2(250.0, 38.0)
 	skip_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	skip_button.focus_mode = Control.FOCUS_ALL
+	skip_button.focus_mode = Control.FOCUS_NONE
 	skip_button.add_theme_font_size_override("font_size", 18)
 	VisualTypeSystem.set_action(skip_button)
 	skip_button.add_theme_stylebox_override("normal", _make_result_skip_style(false))
 	skip_button.add_theme_stylebox_override("hover", _make_result_skip_style(true))
 	skip_button.add_theme_stylebox_override("pressed", _make_result_skip_style(true))
 	skip_button.add_theme_stylebox_override("disabled", _make_result_skip_style(false))
-	skip_button.add_theme_stylebox_override("focus", _make_result_skip_focus_style())
 	skip_button.add_theme_color_override("font_disabled_color", Color(0.92, 0.84, 0.72, 1.0))
 	skip_button.add_theme_color_override("font_color", Color(0.96, 0.90, 0.82, 1.0))
-	skip_button.add_theme_color_override("font_focus_color", Color(0.92, 0.97, 1.0, 1.0))
-	skip_button.set_meta("focus_visual_contract", "signal_blue_four_pixel_expanded_outline")
-	skip_button.set_meta("focused_state_visible", false)
-	var skip_focus_frame: Panel = Panel.new()
-	skip_focus_frame.name = "FocusFrame"
-	skip_button.add_child(skip_focus_frame)
-	skip_focus_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	skip_focus_frame.offset_left = -4.0
-	skip_focus_frame.offset_top = -4.0
-	skip_focus_frame.offset_right = 4.0
-	skip_focus_frame.offset_bottom = 4.0
-	skip_focus_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	skip_focus_frame.z_index = 8
-	skip_focus_frame.visible = false
-	skip_focus_frame.add_theme_stylebox_override("panel", _make_result_skip_focus_frame_style())
-	# Keep the keyboard-focus marker on the stable parent layer. Result cards can
-	# be rebuilt while consequence state settles; a marker parented to the card
-	# disappeared with that rebuild even though the next card represented the
-	# same focused action.
-	var skip_focus_signal: Panel = parent.get_node_or_null("ResultFocusSignalOverlay") as Panel
-	if skip_focus_signal == null:
-		skip_focus_signal = Panel.new()
-		skip_focus_signal.name = "ResultFocusSignalOverlay"
-		skip_focus_signal.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		skip_focus_signal.z_as_relative = false
-		skip_focus_signal.z_index = 4095
-		skip_focus_signal.visible = false
-		skip_focus_signal.add_theme_stylebox_override("panel", _make_result_skip_focus_signal_style())
-		parent.add_child(skip_focus_signal)
-		var edge_color: Color = Color(0.24, 0.58, 0.82, 1.0)
-		for edge_name: String in ["FocusTop", "FocusRight", "FocusBottom", "FocusLeft"]:
-			var edge: ColorRect = ColorRect.new()
-			edge.name = edge_name
-			edge.color = edge_color
-			edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			skip_focus_signal.add_child(edge)
-		var focus_top: ColorRect = skip_focus_signal.get_node("FocusTop") as ColorRect
-		focus_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-		focus_top.offset_bottom = 6.0
-		var focus_right: ColorRect = skip_focus_signal.get_node("FocusRight") as ColorRect
-		focus_right.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
-		focus_right.offset_left = -6.0
-		var focus_bottom: ColorRect = skip_focus_signal.get_node("FocusBottom") as ColorRect
-		focus_bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		focus_bottom.offset_top = -6.0
-		var focus_left: ColorRect = skip_focus_signal.get_node("FocusLeft") as ColorRect
-		focus_left.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-		focus_left.offset_right = 6.0
-		var focus_label: Label = Label.new()
-		focus_label.name = "FocusActionLabel"
-		focus_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		focus_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		focus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		focus_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		focus_label.add_theme_font_size_override("font_size", 18)
-		focus_label.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 1.0))
-		focus_label.add_theme_color_override("font_outline_color", Color(0.0, 0.03, 0.06, 0.96))
-		focus_label.add_theme_constant_override("outline_size", 3)
-		VisualTypeSystem.set_action(focus_label)
-		skip_focus_signal.add_child(focus_label)
-	skip_button.focus_entered.connect(_on_result_skip_focus_entered.bind(skip_button))
-	skip_button.focus_exited.connect(_on_result_skip_focus_exited.bind(skip_button))
 	skip_button.pressed.connect(_skip_result_hold)
 	hold_row.add_child(skip_button)
 	var impact_stamp: Label = Label.new()
@@ -5451,94 +5368,6 @@ func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 	style.shadow_size = 6
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.58)
 	return style
-
-func _make_result_skip_focus_style() -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.018, 0.022, 0.026, 0.99)
-	style.border_color = Color(0.30, 0.60, 0.82, 1.0)
-	style.set_border_width_all(4)
-	style.expand_margin_left = 3.0
-	style.expand_margin_top = 3.0
-	style.expand_margin_right = 3.0
-	style.expand_margin_bottom = 3.0
-	style.shadow_color = Color(0.10, 0.34, 0.54, 0.46)
-	style.shadow_size = 10
-	return style
-
-func _make_result_skip_focus_frame_style() -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.30, 0.60, 0.82, 1.0)
-	style.set_border_width_all(4)
-	style.shadow_color = Color(0.10, 0.34, 0.54, 0.52)
-	style.shadow_size = 8
-	return style
-
-
-func _make_result_skip_focus_signal_style() -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	# This sits above the button so its frame survives result-card redraws. Keep
-	# the fill transparent so the action label remains fully legible.
-	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.24, 0.58, 0.82, 1.0)
-	style.set_border_width_all(5)
-	style.shadow_color = Color(0.08, 0.30, 0.50, 0.72)
-	style.shadow_size = 10
-	return style
-
-
-func _sync_result_skip_focus_signal(skip_button: Button, visible_state: bool) -> void:
-	if parent == null:
-		return
-	var focus_signal: Panel = parent.get_node_or_null("ResultFocusSignalOverlay") as Panel
-	if focus_signal == null:
-		return
-	if not visible_state and bool(focus_signal.get_meta("focus_visual_capture_lock", false)):
-		return
-	if visible_state:
-		var button_rect: Rect2 = skip_button.get_global_rect()
-		var parent_rect: Rect2 = parent.get_global_rect()
-		var signal_margin: float = 10.0
-		focus_signal.position = button_rect.position - parent_rect.position - Vector2.ONE * signal_margin
-		focus_signal.size = button_rect.size + Vector2.ONE * signal_margin * 2.0
-		var focus_label: Label = focus_signal.get_node_or_null("FocusActionLabel") as Label
-		if focus_label != null:
-			focus_label.text = skip_button.text
-		focus_signal.set_meta("focus_signal_bounds", focus_signal.get_global_rect())
-	focus_signal.visible = visible_state
-
-
-func _on_result_skip_focus_entered(skip_button: Button) -> void:
-	if skip_button == null or skip_button.disabled:
-		return
-	# Godot's separate focus StyleBox can be obscured by the normal button pass
-	# in some renderer/layout combinations. Mirror it into the base pass so
-	# keyboard focus remains unmistakable in the authoritative runtime.
-	skip_button.add_theme_stylebox_override("normal", _make_result_skip_focus_style())
-	skip_button.add_theme_color_override("font_color", Color(0.92, 0.97, 1.0, 1.0))
-	skip_button.self_modulate = Color.WHITE
-	var focus_frame: Panel = skip_button.get_node_or_null("FocusFrame") as Panel
-	if focus_frame != null:
-		focus_frame.visible = true
-	_sync_result_skip_focus_signal(skip_button, true)
-	skip_button.set_meta("focused_state_visible", true)
-
-func _on_result_skip_focus_exited(skip_button: Button) -> void:
-	if skip_button == null:
-		return
-	# Graphical evidence capture can momentarily transfer OS/window focus while
-	# the framebuffer is read. Keep the already-entered keyboard-focus visual
-	# stable for that one synchronous draw; normal gameplay never sets this lock.
-	if bool(skip_button.get_meta("focus_visual_capture_lock", false)):
-		return
-	skip_button.add_theme_stylebox_override("normal", _make_result_skip_style(false))
-	skip_button.add_theme_color_override("font_color", Color(0.96, 0.90, 0.82, 1.0))
-	skip_button.self_modulate = Color.WHITE
-	var focus_frame: Panel = skip_button.get_node_or_null("FocusFrame") as Panel
-	if focus_frame != null:
-		focus_frame.visible = false
-	_sync_result_skip_focus_signal(skip_button, false)
-	skip_button.set_meta("focused_state_visible", false)
 
 func _make_result_record_texture(outcome: String, accent_color: Color) -> Texture2D:
 	var gradient: Gradient = Gradient.new()
