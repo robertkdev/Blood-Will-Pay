@@ -68,10 +68,10 @@ func _run() -> void:
 	_capture("03b_countdown_1_terminal")
 	var crossfade_seen: bool = await _wait_for_transition_state(transition, "entry_crossfade", 1.2)
 	_expect(crossfade_seen, "one-arena camera push did not follow the countdown")
-	# Full-resolution PNG encoding blocks the main frame long enough for the next
-	# tween tick to leap ahead. Slow only this evidence window so each capture
-	# still represents its named production-time beat.
-	Engine.time_scale = 0.05
+	# Keep the evidence window at production speed. The transition contract is
+	# temporal, so captured frames must reflect the same tween cadence the player
+	# sees rather than a slowed diagnostic replay.
+	Engine.time_scale = 1.0
 	var arena_bridge: Variant = controller.get("arena_bridge")
 	var entry_snapshot: Dictionary = arena_bridge.call("get_transition_debug_snapshot") if arena_bridge != null else {}
 	var presentation_ids: Dictionary = _presentation_ids(entry_snapshot)
