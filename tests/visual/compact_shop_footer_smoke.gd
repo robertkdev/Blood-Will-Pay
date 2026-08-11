@@ -433,7 +433,7 @@ func _assert_compact_decision_record(viewport_rect: Rect2) -> void:
 		_expect_inside(resource_strip, viewport_rect, "150-percent resource record")
 	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "150-percent footer hid wager outcomes")
 	if wager_summary != null:
-		for required_copy: String in ["DECISION", "RISK", "WIN", "RESERVE W", "/ L"]:
+		for required_copy: String in ["Wager", "Win", "After:", "W", "/ L"]:
 			_expect(wager_summary.text.contains(required_copy), "150-percent wager record omitted %s" % required_copy)
 		_expect_inside(wager_summary, viewport_rect, "150-percent wager record")
 
