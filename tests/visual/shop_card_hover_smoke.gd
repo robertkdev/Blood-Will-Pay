@@ -35,8 +35,10 @@ func _run() -> void:
 	if card == null:
 		_finish()
 		return
+	_expect(String(card.get_meta("tooltip_detail_state", "")) == "deferred", "shop card binding must defer tooltip-only unit previews")
 	_hover_card(card)
 	await _settle_frames(3)
+	_expect(String(card.get_meta("tooltip_detail_state", "")) == "resolved", "shop card hover must resolve deferred tooltip detail")
 	_expect(card.scale == Vector2.ONE, "shop hover should not scale cards inside the grid")
 	_expect(String(card.tooltip_text) == "", "shop card should not use native tooltip_text")
 	_expect(card.get_theme_stylebox("normal") is StyleBoxTexture, "shop card should use the generated card asset")

@@ -2333,9 +2333,30 @@ func _queue_active_run_save() -> void:
 	if int(GameState.phase) != int(GameState.GamePhase.PREVIEW):
 		return
 	_active_run_save_pending = true
-	call_deferred("_save_active_run_deferred")
+	# A reroll rebuild binds five cards in this idle turn. Snapshot serialization
+	# must not run ahead of that first visible result; coalesce it until a draw has
+	# completed, while retaining the pending flag so state changes remain durable.
+	call_deferred("_save_active_run_after_first_draw")
 
-func _save_active_run_deferred() -> void:
+func _save_active_run_after_first_draw() -> void:
+	# `frame_post_draw` is not guaranteed while minimized or on a headless driver.
+	# Two process frames still let card binding reach its first player-visible frame,
+	# while bounding persistence latency in every supported runtime.
+	if not is_instance_valid(parent) or parent.is_queued_for_deletion():
+		_active_run_save_pending = false
+		return
+	var tree: SceneTree = parent.get_tree()
+	if tree == null:
+		_active_run_save_pending = false
+		return
+	await tree.process_frame
+	if not is_instance_valid(parent) or parent.is_queued_for_deletion() or parent.get_tree() != tree:
+		_active_run_save_pending = false
+		return
+	await tree.process_frame
+	if not is_instance_valid(parent) or parent.is_queued_for_deletion() or parent.get_tree() != tree:
+		_active_run_save_pending = false
+		return
 	save_active_run_now()
 
 func _on_bet_changed(val: float) -> void:

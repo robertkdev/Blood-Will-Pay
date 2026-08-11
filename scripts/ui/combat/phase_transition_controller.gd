@@ -19,7 +19,6 @@ enum TransitionState {
 const COUNTDOWN_BEAT_SECONDS: float = 0.60
 const COUNTDOWN_DURATION_SECONDS: float = COUNTDOWN_BEAT_SECONDS * 3.0
 const ENTRY_CROSSFADE_SECONDS: float = 0.60
-const ARENA_ENTRY_ALPHA: float = 0.82
 const RETURN_SECONDS: float = 0.75
 const REDUCED_MOTION_RETURN_SECONDS: float = 0.42
 const ENTRY_ZOOM_SCALE: float = 1.10
@@ -185,19 +184,22 @@ func start_entry_crossfade() -> void:
 			_arena_container.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
 			_arena_container.position = _global_to_parent_position(arena_parent, _entry_source_rect.position)
 			_arena_container.size = _entry_source_rect.size
-		_set_alpha(_arena_container, ARENA_ENTRY_ALPHA)
-	for record: Dictionary in _planning_records:
-		var field_control: Control = _record_control(record)
-		if field_control != null:
-			_set_alpha(field_control, 0.0)
+		# Keep the committed planning field on screen while the combat arena grows
+		# into it.  Starting the arena at zero prevents the first entry frame from
+		# reading as the old opaque-arena hard replacement.
+		_set_alpha(_arena_container, 0.0)
 	if _reduced_motion:
 		_set_entry_progress(1.0)
+		_set_entry_alpha_progress(1.0)
 		_finish_entry_crossfade()
 	else:
 		_active_tween = _host.create_tween()
 		_active_tween.set_trans(Tween.TRANS_QUART)
 		_active_tween.set_ease(Tween.EASE_OUT)
 		_active_tween.tween_method(Callable(self, "_set_entry_progress"), 0.0, 1.0, ENTRY_CROSSFADE_SECONDS)
+		# The camera can retain its authored ease-out, but opacity must cover the
+		# full handoff duration so the planning grid and arena actually overlap.
+		_active_tween.parallel().tween_method(Callable(self, "_set_entry_alpha_progress"), 0.0, 1.0, ENTRY_CROSSFADE_SECONDS).set_trans(Tween.TRANS_LINEAR).set_ease(Tween.EASE_IN_OUT)
 		_active_tween.tween_callback(Callable(self, "_finish_entry_crossfade"))
 
 func mark_combat() -> void:
@@ -337,10 +339,18 @@ func _set_entry_progress(progress: float) -> void:
 		if parent_control != null:
 			_arena_container.position = _global_to_parent_position(parent_control, visual_rect.position)
 			_arena_container.size = visual_rect.size
-		_set_alpha(_arena_container, lerpf(ARENA_ENTRY_ALPHA, 1.0, eased_progress))
 	if _overlay != null:
 		_overlay.set_meta("spatial_zoom_progress", eased_progress)
 	field_progress_changed.emit(eased_progress)
+
+func _set_entry_alpha_progress(progress: float) -> void:
+	var alpha_progress: float = clampf(progress, 0.0, 1.0)
+	if _arena_container != null and is_instance_valid(_arena_container):
+		_set_alpha(_arena_container, alpha_progress)
+	for record: Dictionary in _planning_records:
+		var planning_control: Control = _record_control(record)
+		if planning_control != null:
+			_set_alpha(planning_control, lerpf(float(record.get("alpha", 1.0)), 0.0, alpha_progress))
 
 func _set_return_progress(progress: float) -> void:
 	var eased_progress: float = clampf(progress, 0.0, 1.0)

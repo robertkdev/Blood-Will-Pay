@@ -83,28 +83,33 @@ func _run() -> void:
 	_expect(previous_rect.get_area() <= entry_target_rect.get_area() * 0.88, "camera push jumped to the combat field before its first visible frame")
 	_assert_entry_ownership_overlap(entry_snapshot)
 	_capture("04a_camera_push_start")
+	_assert_entry_crossfade_overlap(combat, 0.90, 0.12, 0.0, 0.15, "camera push start")
 	_assert_one_arena_visible(combat, "camera push start")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04b_camera_push_120ms")
 	previous_rect = _assert_field_growth(combat, previous_rect, "120ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.55, 0.90, 0.12, 0.45, "120ms camera push")
 	_assert_one_arena_visible(combat, "120ms camera push")
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started during the field push")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04c_camera_push_240ms")
 	previous_rect = _assert_field_growth(combat, previous_rect, "240ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.30, 0.70, 0.30, 0.70, "240ms camera push")
 	_assert_one_arena_visible(combat, "240ms camera push")
 	await get_tree().create_timer(0.08).timeout
 	_capture("04d_camera_push_320ms")
 	previous_rect = _assert_field_growth(combat, previous_rect, "320ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.15, 0.55, 0.45, 0.85, "320ms camera push")
 	_assert_one_arena_visible(combat, "320ms camera push")
 	var arena_low_point: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
-	_expect(arena_low_point != null and arena_low_point.modulate.a >= 0.80, "shared arena surface did not remain present through the camera push")
+	_expect(arena_low_point != null and arena_low_point.modulate.a >= 0.45, "arena did not rise visibly through the camera push")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04e_camera_push_440ms")
 	previous_rect = _assert_field_growth(combat, previous_rect, "440ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.03, 0.35, 0.65, 0.97, "440ms camera push")
 	_assert_one_arena_visible(combat, "440ms camera push")
 	var arena_mid: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
-	_expect(arena_mid != null and arena_mid.modulate.a >= 0.30, "arena did not decisively take over after planning cleared")
+	_expect(arena_mid != null and arena_mid.modulate.a >= 0.65, "arena did not decisively take over while planning was still fading")
 	_expect(manager.has_method("is_stage_prepared") and bool(manager.is_stage_prepared()), "battle should be prepared during the field push")
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started before the field push completed")
 	await get_tree().create_timer(0.12).timeout
@@ -227,6 +232,18 @@ func _assert_one_arena_visible(combat: Control, label: String) -> void:
 	var arena_alpha: float = arena.modulate.a if arena != null else 0.0
 	_expect(planning_alpha + arena_alpha >= 0.80, "%s allowed the field to disappear" % label)
 	_expect(_main != null and _main.modulate.a >= 0.99 and _main.self_modulate.a >= 0.99, "%s faded the whole screen" % label)
+
+func _assert_entry_crossfade_overlap(combat: Control, minimum_planning_alpha: float, maximum_planning_alpha: float, minimum_arena_alpha: float, maximum_arena_alpha: float, label: String) -> void:
+	var planning: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea") as Control
+	if planning == null:
+		planning = combat.find_child("TopArea", true, false) as Control
+	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	var planning_alpha: float = planning.modulate.a if planning != null else -1.0
+	var arena_alpha: float = arena.modulate.a if arena != null else -1.0
+	_expect(planning_alpha >= minimum_planning_alpha and planning_alpha <= maximum_planning_alpha, "%s planning field alpha %.2f did not follow the recorded fade" % [label, planning_alpha])
+	_expect(arena_alpha >= minimum_arena_alpha and arena_alpha <= maximum_arena_alpha, "%s arena alpha %.2f did not rise from transparent" % [label, arena_alpha])
+	if minimum_planning_alpha > 0.0 and minimum_arena_alpha > 0.0:
+		_expect(planning_alpha > 0.05 and arena_alpha > 0.05, "%s lost meaningful planning-to-arena overlap" % label)
 
 func _assert_field_growth(combat: Control, previous_rect: Rect2, label: String) -> Rect2:
 	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
