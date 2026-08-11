@@ -1571,14 +1571,6 @@ func _queue_battle_start() -> void:
 	phase_transition.set_encounter_focus(_committed_confrontation_centroid())
 	phase_transition.start_countdown(_reduced_motion_enabled())
 	_sync_combat_broadcast_strip(true)
-	# Let the player receive the first authored countdown present before the
-	# preparation pipeline begins. The crossfade is independently gated below,
-	# so preparation cannot start it early.
-	var tree: SceneTree = parent.get_tree() if parent != null else null
-	if tree != null:
-		tree.process_frame.connect(Callable(self, "_execute_pending_battle_start").bind(_battle_start_generation), CONNECT_ONE_SHOT)
-	else:
-		call_deferred("_execute_pending_battle_start", _battle_start_generation)
 
 func _sync_encounter_quote_kind(economy_node: Node = null) -> void:
 	var active_economy: Node = economy_node if economy_node != null else _autoload_node("Economy")
@@ -1606,7 +1598,11 @@ func _on_combat_countdown_finished() -> void:
 	if not _battle_start_pending:
 		return
 	_countdown_finished_for_pending_start = true
-	_try_begin_prepared_arena_crossfade(_battle_start_generation)
+	# Preserve the planning/countdown contract: no combat engine or layout
+	# mutation exists during beats 3, 2, or 1. Once the committed planning rect is
+	# captured, prepare and stage the expensive handoff over bounded frames before
+	# entry begins.
+	call_deferred("_execute_pending_battle_start", _battle_start_generation)
 
 func _execute_pending_battle_start(generation: int) -> void:
 	if not _battle_start_pending or generation != _battle_start_generation:
@@ -1623,8 +1619,7 @@ func _execute_pending_battle_start(generation: int) -> void:
 func _on_battle_prepared(_stage: int, _enemy: Unit) -> void:
 	if not _battle_start_pending or manager == null:
 		return
-	# Keep preparation inside the authored countdown, but split its expensive UI
-	# and actor work over presented planning frames.  The entry-crossfade must
+	# Split expensive UI and actor work over presented post-countdown frames. The entry-crossfade must
 	# begin only after this work is complete, never in the same frame as it.
 	_transition_preparation_generation = _battle_start_generation
 	call_deferred("_stage_transition_enemy_views", _transition_preparation_generation)

@@ -16,7 +16,7 @@ static var diagnostic_circle_generations: int = 0
 # UI assets may be shared by live shop cards and other scenes. Reusing Godot's
 # resource cache avoids a redundant synchronous decode when a reroll binds a
 # newly visible card whose texture is already resident.
-const RESOURCE_LOAD_CACHE_MODE: int = ResourceLoader.CACHE_MODE_REUSE
+const RESOURCE_LOAD_CACHE_MODE = ResourceLoader.CACHE_MODE_REUSE
 
 static func clear_cache() -> void:
     _texture_cache.clear()
