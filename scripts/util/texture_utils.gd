@@ -13,6 +13,11 @@ static var diagnostic_circle_requests: int = 0
 static var diagnostic_circle_cache_hits: int = 0
 static var diagnostic_circle_generations: int = 0
 
+# UI assets may be shared by live shop cards and other scenes. Reusing Godot's
+# resource cache avoids a redundant synchronous decode when a reroll binds a
+# newly visible card whose texture is already resident.
+const RESOURCE_LOAD_CACHE_MODE: int = ResourceLoader.CACHE_MODE_REUSE
+
 static func clear_cache() -> void:
     _texture_cache.clear()
     _circle_cache.clear()
@@ -82,7 +87,7 @@ static func try_load_texture(path: String) -> Texture2D:
     if ResourceLoader.exists(normalized_path, "Texture2D"):
         if diagnostics_enabled:
             diagnostic_resource_load_attempts += 1
-        var resource: Resource = ResourceLoader.load(normalized_path, "Texture2D", ResourceLoader.CACHE_MODE_IGNORE)
+        var resource: Resource = ResourceLoader.load(normalized_path, "Texture2D", RESOURCE_LOAD_CACHE_MODE)
         var imported_texture: Texture2D = resource as Texture2D
         if imported_texture != null:
             _texture_cache[normalized_path] = imported_texture
@@ -98,6 +103,9 @@ static func try_load_texture(path: String) -> Texture2D:
     var texture: ImageTexture = ImageTexture.create_from_image(image)
     _texture_cache[normalized_path] = texture
     return texture
+
+static func resource_load_cache_mode() -> int:
+    return RESOURCE_LOAD_CACHE_MODE
 
 static func load_texture(path: String, fallback_color: Color, fallback_size: int) -> Texture2D:
     var texture: Texture2D = try_load_texture(path)

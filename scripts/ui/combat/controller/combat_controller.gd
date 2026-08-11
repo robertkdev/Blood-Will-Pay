@@ -429,6 +429,8 @@ var _battle_start_pending: bool = false
 var _battle_start_elapsed: float = 0.0
 var _battle_start_generation: int = 0
 var _pending_combat_quote_multiplier: float = -1.0
+var _countdown_finished_for_pending_start: bool = false
+var _transition_preparation_ready: bool = false
 var _hud_snapshot_signature: String = ""
 var _result_banner: PanelContainer = null
 var _result_hold_elapsed: float = 0.0
@@ -459,6 +461,8 @@ var _phase_transition_bridge: Control = null
 var _phase_transition_hide_tween: Tween = null
 var phase_transition: PhaseTransitionController = null
 var _arena_prepared_for_transition: bool = false
+var _transition_preparation_generation: int = -1
+var _post_start_presentation_token: int = 0
 var _pre_unfreeze_gate_snapshot: Dictionary[String, Variant] = {}
 var combat_broadcast_strip: PanelContainer = null
 var combat_broadcast_phase: Label = null
@@ -1558,6 +1562,8 @@ func _queue_battle_start() -> void:
 	_battle_start_pending = true
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_countdown_finished_for_pending_start = (phase_transition == null)
+	_transition_preparation_ready = false
 	Trace.step("Battle start queued generation=" + str(_battle_start_generation))
 	if phase_transition == null:
 		call_deferred("_execute_pending_battle_start", _battle_start_generation)
@@ -1565,6 +1571,14 @@ func _queue_battle_start() -> void:
 	phase_transition.set_encounter_focus(_committed_confrontation_centroid())
 	phase_transition.start_countdown(_reduced_motion_enabled())
 	_sync_combat_broadcast_strip(true)
+	# Let the player receive the first authored countdown present before the
+	# preparation pipeline begins. The crossfade is independently gated below,
+	# so preparation cannot start it early.
+	var tree: SceneTree = parent.get_tree() if parent != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_execute_pending_battle_start").bind(_battle_start_generation), CONNECT_ONE_SHOT)
+	else:
+		call_deferred("_execute_pending_battle_start", _battle_start_generation)
 
 func _sync_encounter_quote_kind(economy_node: Node = null) -> void:
 	var active_economy: Node = economy_node if economy_node != null else _autoload_node("Economy")
@@ -1591,7 +1605,8 @@ func _capture_current_encounter_quote_multiplier() -> float:
 func _on_combat_countdown_finished() -> void:
 	if not _battle_start_pending:
 		return
-	call_deferred("_execute_pending_battle_start", _battle_start_generation)
+	_countdown_finished_for_pending_start = true
+	_try_begin_prepared_arena_crossfade(_battle_start_generation)
 
 func _execute_pending_battle_start(generation: int) -> void:
 	if not _battle_start_pending or generation != _battle_start_generation:
@@ -1608,20 +1623,59 @@ func _execute_pending_battle_start(generation: int) -> void:
 func _on_battle_prepared(_stage: int, _enemy: Unit) -> void:
 	if not _battle_start_pending or manager == null:
 		return
+	# Keep preparation inside the authored countdown, but split its expensive UI
+	# and actor work over presented planning frames.  The entry-crossfade must
+	# begin only after this work is complete, never in the same frame as it.
+	_transition_preparation_generation = _battle_start_generation
+	call_deferred("_stage_transition_enemy_views", _transition_preparation_generation)
+
+func _transition_preparation_is_current(generation: int) -> bool:
+	return (
+		_battle_start_pending
+		and generation == _battle_start_generation
+		and manager != null
+		and is_instance_valid(manager)
+		and parent != null
+		and is_instance_valid(parent)
+		and not parent.is_queued_for_deletion()
+	)
+
+func _stage_transition_enemy_views(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
 	if grid_placement != null:
 		grid_placement.rebuild_enemy_views(manager.enemy_team)
 		enemy_views = grid_placement.get_enemy_views()
+	var tree: SceneTree = parent.get_tree()
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_stage_transition_player_views").bind(generation), CONNECT_ONE_SHOT)
+	else:
+		_stage_transition_player_views(generation)
+
+func _stage_transition_player_views(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
+	if grid_placement != null:
 		grid_placement.rebuild_player_views(manager.player_team, false)
 		player_views = grid_placement.get_player_views()
-	_prepare_transition_combat_layout()
-	var tree: SceneTree = parent.get_tree() if parent != null else null
+	var tree: SceneTree = parent.get_tree()
 	if tree != null:
-		tree.process_frame.connect(Callable(self, "_begin_prepared_arena_crossfade"), CONNECT_ONE_SHOT)
+		tree.process_frame.connect(Callable(self, "_stage_transition_combat_layout").bind(generation), CONNECT_ONE_SHOT)
 	else:
-		_begin_prepared_arena_crossfade()
+		_stage_transition_combat_layout(generation)
 
-func _begin_prepared_arena_crossfade() -> void:
-	if not _battle_start_pending or manager == null:
+func _stage_transition_combat_layout(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
+	_prepare_transition_combat_layout()
+	var tree: SceneTree = parent.get_tree()
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_stage_transition_arena").bind(generation), CONNECT_ONE_SHOT)
+	else:
+		_stage_transition_arena(generation)
+
+func _stage_transition_arena(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
 		return
 	_arena_prepared_for_transition = true
 	if arena_bridge != null:
@@ -1631,6 +1685,34 @@ func _begin_prepared_arena_crossfade() -> void:
 		var source_rect: Rect2 = phase_transition.get_planning_commit_rect() if phase_transition != null else planning_area.get_global_rect()
 		arena_bridge.enter_arena(player_views, enemy_views, false, true, target_rect, source_rect)
 		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
+	var tree: SceneTree = parent.get_tree()
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_mark_transition_preparation_ready").bind(generation), CONNECT_ONE_SHOT)
+	else:
+		_mark_transition_preparation_ready(generation)
+
+func _mark_transition_preparation_ready(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
+	_transition_preparation_ready = true
+	_try_begin_prepared_arena_crossfade(generation)
+
+func _try_begin_prepared_arena_crossfade(generation: int) -> void:
+	if not _transition_preparation_is_current(generation) or not _countdown_finished_for_pending_start or not _transition_preparation_ready:
+		return
+	_begin_prepared_arena_crossfade(generation)
+
+func _begin_prepared_arena_crossfade(generation: int = -1) -> void:
+	if generation >= 0 and not _transition_preparation_is_current(generation):
+		return
+	_transition_preparation_generation = -1
+	_transition_preparation_ready = false
+
+	if not _battle_start_pending or manager == null:
+		return
+	if phase_transition != null and phase_transition.get_state_name() != "countdown":
+		_recover_pending_battle_start("entry transition was reset before preparation completed")
+		return
 	if phase_transition != null:
 		phase_transition.start_entry_crossfade()
 	else:
@@ -1663,14 +1745,20 @@ func _complete_pending_battle_start() -> void:
 	_battle_start_pending = false
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_countdown_finished_for_pending_start = false
+	_transition_preparation_ready = false
 	_pending_combat_quote_multiplier = -1.0
 
 func _cancel_pending_battle_start() -> void:
 	_battle_start_pending = false
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_countdown_finished_for_pending_start = false
+	_transition_preparation_ready = false
 	_pending_combat_quote_multiplier = -1.0
 	_arena_prepared_for_transition = false
+	_transition_preparation_generation = -1
+	_post_start_presentation_token += 1
 
 func _recover_pending_battle_start(reason: String) -> void:
 	if not _battle_start_pending:
@@ -2376,16 +2464,16 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	_on_log_line("Prepare to fight.")
 	if projectile_bridge and projectile_bridge.has_method("set_visuals_enabled"):
 		projectile_bridge.set_visuals_enabled(true)
-	_refresh_hud()
-	_update_stage_label()
 	# Set COMBAT phase before starting Economy escrow so UI refresh sees correct phase
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.COMBAT)
-	_update_stage_label()
 	_sync_bottom_combat_visibility()
 	sync_tactical_phase_visuals(true)
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 		Economy.start_combat(locked_quote_multiplier)
+	# This progression event is a gameplay invariant, not presentation work. Keep
+	# it synchronous so an immediate battle resolution or scene teardown cannot
+	# lose the first-battle journal record.
 	var battle_snapshot: Dictionary = _build_account_victory_snapshot()
 	AccountProgressionScript.record_battle_start(battle_snapshot, account_journal_path)
 	if grid_placement and manager and not _arena_prepared_for_transition:
@@ -2401,18 +2489,33 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	_arena_prepared_for_transition = false
 	if phase_transition != null:
 		phase_transition.mark_combat()
-	# Optional: add layout prints here when debugging sizes
-	# Ensure economy UI reflects combat lock state immediately
+	_schedule_post_start_presentation()
+
+func _schedule_post_start_presentation() -> void:
+	_post_start_presentation_token += 1
+	var token: int = _post_start_presentation_token
+	var tree: SceneTree = parent.get_tree() if parent != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_finish_post_start_presentation").bind(token), CONNECT_ONE_SHOT)
+	else:
+		_finish_post_start_presentation(token)
+
+func _finish_post_start_presentation(token: int) -> void:
+	if token != _post_start_presentation_token or parent == null or not is_instance_valid(parent) or parent.is_queued_for_deletion():
+		return
+	if manager == null or not is_instance_valid(manager) or not manager.is_engine_running():
+		return
+	_refresh_hud()
+	_update_stage_label()
 	if economy_ui:
 		economy_ui.refresh()
-
-	# Provide ability system to stats panel if supported
-	var eng = (manager.get_engine() if manager and manager.has_method("get_engine") else null)
+	var eng = manager.get_engine() if manager.has_method("get_engine") else null
 	if eng and stats_panel and stats_panel.has_method("set_ability_system"):
 		stats_panel.set_ability_system(eng.ability_system)
-
-	# Attach selection overlays to arena actors
 	_attach_selection_to_arena()
+
+	# Optional: add layout prints here when debugging sizes
+	# Ensure economy UI reflects combat lock state immediately
 
 	# Debug: schedule a one-time broad hit flash to verify overlay rendering
 	# Gate behind Debug.enabled to avoid confusing real hit flashes.

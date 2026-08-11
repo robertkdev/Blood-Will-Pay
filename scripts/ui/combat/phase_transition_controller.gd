@@ -70,6 +70,7 @@ var _arena_original_z_as_relative: bool = true
 var _planning_original_separation: int = 16
 var _encounter_focus_global: Vector2 = Vector2.INF
 var _frozen_planning_geometry: Dictionary[String, Variant] = {}
+var _entry_finish_scheduled: bool = false
 
 func configure(host: Control, planning_area: Control, arena_container: Control) -> void:
 	_host = host
@@ -104,6 +105,7 @@ func reset() -> void:
 		_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_overlay.set_meta("transition_active", false)
 	_state = TransitionState.IDLE
+	_entry_finish_scheduled = false
 	_captured_combat_rect = Rect2()
 	_planning_commit_rect = Rect2()
 	_entry_target_rect = Rect2()
@@ -370,10 +372,24 @@ func _finish_countdown() -> void:
 
 func _finish_entry_crossfade() -> void:
 	_active_tween = null
-	if _state != TransitionState.ENTRY_CROSSFADE:
+	if _state != TransitionState.ENTRY_CROSSFADE or _entry_finish_scheduled:
 		return
-	_restore_frozen_planning_grid()
+	# Present one fully opaque arena frame before the heavy planning-field
+	# reparent/restore work. This keeps that layout invalidation outside the
+	# entry-crossfade's last presented frame.
+	_entry_finish_scheduled = true
 	_set_entry_progress(1.0)
+	var tree: SceneTree = _host.get_tree() if _host != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_finish_entry_after_first_arena_frame"), CONNECT_ONE_SHOT)
+	else:
+		_finish_entry_after_first_arena_frame()
+
+func _finish_entry_after_first_arena_frame() -> void:
+	if _state != TransitionState.ENTRY_CROSSFADE or not _entry_finish_scheduled:
+		return
+	_entry_finish_scheduled = false
+	_restore_frozen_planning_grid()
 	if _arena_container != null and is_instance_valid(_arena_container):
 		_arena_container.z_index = _arena_original_z_index
 		_arena_container.z_as_relative = _arena_original_z_as_relative
