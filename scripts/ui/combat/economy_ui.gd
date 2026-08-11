@@ -332,7 +332,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	var after_win: int = StakesMarket.MAX_SAFE_BLOOD_BUCKETS if after_loss > StakesMarket.MAX_SAFE_BLOOD_BUCKETS - gross_payout else after_loss + gross_payout
 	var risk_prefix: String = ""
 	if not in_combat and wager > 0 and wager >= int(Economy.blood_buckets):
-		risk_prefix = "ALL IN // " if compact_decision else "ALL IN ARMED // "
+		risk_prefix = "All in  •  "
 	if compact_decision:
 		var locked_suffix: String = " LOCKED" if in_combat else ""
 		wager_summary.text = "%sWager %s%s  •  Win %d-%d%%  •  After: W%s / L%s" % [
