@@ -52,7 +52,7 @@ const EXPECTED_FILES: Array[String] = [
 	"30_settings_pressed_1920x1080.png",
 	"31_settings_disabled_1920x1080.png",
 	"32_planning_ultrawide_2560x1080.png",
-	"33_result_skip_focus_1920x1080.png",
+	"33_result_skip_hover_1920x1080.png",
 	"46_settings_focus_hover_1280x720_150pct.png",
 	"47_settings_pressed_1280x720_150pct.png",
 	"48_settings_disabled_1280x720_150pct.png",
@@ -475,41 +475,15 @@ func _run() -> void:
 			result_skip.disabled = false
 			await _settle_frames(2)
 			_expect(not result_skip.disabled, "result skip did not reach its post-guard interactive state")
-			# Move the pointer away before taking keyboard focus. The graphical
-			# capture path can briefly hand focus back to the hovered control while
-			# it settles, which made the old awaited capture record the normal state
-			# even though this assertion had already observed keyboard focus.
-			DisplayServer.warp_mouse(Vector2(1.0, 1.0))
-			await _settle_frames(2)
-			result_skip.set_meta("focus_visual_capture_lock", true)
-			result_skip.grab_focus()
-			await get_tree().process_frame
-			# Reassert the public focus state and its renderer immediately before
-			# the synchronous framebuffer draw. This is the real focused control,
-			# not a synthetic replacement image.
-			result_skip.grab_focus()
-			controller.call("_on_result_skip_focus_entered", result_skip)
-			_expect(result_skip.has_focus(), "result skip focus state did not become authoritative")
-			_expect(bool(result_skip.get_meta("focused_state_visible", false)), "result skip focus was not mirrored into its visible base pass")
-			var skip_focus_frame: Panel = result_skip.get_node_or_null("FocusFrame") as Panel
-			_expect(skip_focus_frame != null and skip_focus_frame.visible and skip_focus_frame.size.x >= result_skip.size.x and skip_focus_frame.size.y >= result_skip.size.y, "result skip dedicated signal-blue focus frame was not visible at full button size")
-			var skip_focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel
-			if skip_focus_signal != null:
-				skip_focus_signal.set_meta("focus_visual_capture_lock", true)
-			var signal_rect: Rect2 = skip_focus_signal.get_global_rect() if skip_focus_signal != null else Rect2()
-			var skip_rect: Rect2 = result_skip.get_global_rect()
-			_expect(skip_focus_signal != null and skip_focus_signal.visible and signal_rect.grow(1.0).encloses(skip_rect) and signal_rect.size.x >= skip_rect.size.x + 16.0 and signal_rect.size.y >= skip_rect.size.y + 16.0, "result skip focused state lacks its card-level signal-blue outer frame")
-			var skip_normal_style: StyleBoxFlat = result_skip.get_theme_stylebox("normal") as StyleBoxFlat
-			_expect(skip_normal_style != null and skip_normal_style.border_color.b >= 0.78 and skip_normal_style.border_color.g >= 0.48 and skip_normal_style.border_color.r <= 0.55 and skip_normal_style.border_width_left >= 4, "result skip focus is not perceptibly distinct")
-		_capture_now("33_result_skip_focus_1920x1080.png", "defeat_skip_focus", DESKTOP_SIZE)
-		if result_skip != null:
-			var captured_focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel
-			if captured_focus_signal != null:
-				captured_focus_signal.set_meta("focus_visual_capture_lock", false)
-				captured_focus_signal.visible = false
-			result_skip.set_meta("focus_visual_capture_lock", false)
-			result_skip.release_focus()
-			controller.call("_on_result_skip_focus_exited", result_skip)
+			# The result action is deliberately mouse-only. Put the pointer over the
+			# real button so this capture proves its authored hover affordance without
+			# creating a keyboard-focus route.
+			DisplayServer.warp_mouse(result_skip.get_global_rect().get_center())
+			await _settle_frames(3)
+			_expect(result_skip.focus_mode == Control.FOCUS_NONE and not result_skip.has_focus(), "result skip action unexpectedly exposes keyboard focus")
+			var skip_hover_style: StyleBoxFlat = result_skip.get_theme_stylebox("hover") as StyleBoxFlat
+			_expect(skip_hover_style != null and skip_hover_style.border_color.r >= 0.90 and skip_hover_style.border_width_left >= 4, "result skip hover state is not perceptibly distinct")
+		_capture_now("33_result_skip_hover_1920x1080.png", "defeat_skip_hover", DESKTOP_SIZE)
 		if manager != null:
 			manager.process_mode = manager_process_mode_for_focus
 		if combat != null:
@@ -1240,7 +1214,7 @@ func _assert_result_outcome_contract(outcome: String) -> void:
 		_expect(stalemate_style != null and stalemate_style.border_color.r > stalemate_style.border_color.b * 2.0, "STALEMATE result regressed to a purple/lavender frame")
 		_expect(stalemate_title_color.r > 0.82 and stalemate_title_color.g > 0.76 and absf(stalemate_title_color.r - stalemate_title_color.b) < 0.24, "STALEMATE result regressed to a lavender headline")
 	_expect(hold_label != null and not hold_label.text.contains("."), "%s result leaked a decimal auto-advance telemetry readout" % outcome)
-	_expect(skip_button != null and not skip_button.text.contains("(") and skip_button.text.contains("ENTER / SPACE"), "%s result leaked its internal skip threshold" % outcome)
+	_expect(skip_button != null and not skip_button.text.contains("(") and skip_button.text.contains("CLICK") and not skip_button.text.contains("ENTER") and not skip_button.text.contains("SPACE") and skip_button.focus_mode == Control.FOCUS_NONE, "%s result should expose only a mouse-click advance affordance" % outcome)
 	_expect(system_menu != null and system_menu.tooltip_text.is_empty() and bool(system_menu.get_meta("native_tooltip_suppressed", false)), "%s result can be obscured by the native system-menu tooltip" % outcome)
 	_expect(hostile_field_label != null and not hostile_field_label.visible and survival_field_label != null and not survival_field_label.visible, "%s result leaks tactical field labels through its aftermath" % outcome)
 	_expect(traits_underlay != null and not traits_underlay.visible, "%s result leaks planning traits through its aftermath" % outcome)
@@ -1466,8 +1440,8 @@ func _record_capture_image(image: Image, filename: String, state: String, expect
 	if image == null or image.is_empty() or image.get_width() <= 0 or image.get_height() <= 0:
 		_expect(false, "%s blocked: viewport image unavailable" % filename)
 		return
-	if state == "defeat_skip_focus":
-		_assert_result_skip_focus_pixels(image)
+	if state == "defeat_skip_hover":
+		_assert_result_skip_hover_pixels(image)
 	var minimum_width: int = int(round(float(expected_size.x) * 0.95))
 	var minimum_height: int = int(round(float(expected_size.y) * 0.95))
 	if image.get_width() < minimum_width or image.get_height() < minimum_height:
@@ -1509,20 +1483,19 @@ func _record_capture_image(image: Image, filename: String, state: String, expect
 	print("%s: CAPTURE %s" % [CAPTURE_NAME, absolute_path])
 
 
-func _assert_result_skip_focus_pixels(image: Image) -> void:
+func _assert_result_skip_hover_pixels(image: Image) -> void:
 	var skip_button: Button = _active_result_skip_button()
-	var focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel if _main != null else null
-	_expect(focus_signal != null and focus_signal.visible, "focused result capture lost its stable keyboard-focus signal")
-	if focus_signal == null:
+	_expect(skip_button != null and skip_button.focus_mode == Control.FOCUS_NONE and not skip_button.has_focus(), "hovered result capture unexpectedly gained keyboard focus")
+	if skip_button == null:
 		return
-	var scan_rect: Rect2i = Rect2i(focus_signal.get_global_rect().grow(2.0)).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
-	var blue_pixels: int = 0
+	var scan_rect: Rect2i = Rect2i(skip_button.get_global_rect().grow(2.0)).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+	var hover_pixels: int = 0
 	for pixel_y: int in range(scan_rect.position.y, scan_rect.end.y):
 		for pixel_x: int in range(scan_rect.position.x, scan_rect.end.x):
 			var pixel: Color = image.get_pixel(pixel_x, pixel_y)
-			if pixel.b >= 0.78 and pixel.g >= 0.48 and pixel.r <= 0.38:
-				blue_pixels += 1
-	_expect(blue_pixels >= 240, "focused result capture lacks visible signal-blue frame pixels: found %d" % blue_pixels)
+			if pixel.r >= 0.75 and pixel.g <= 0.35 and pixel.b <= 0.40:
+				hover_pixels += 1
+	_expect(hover_pixels >= 240, "hovered result capture lacks visible red action pixels: found %d" % hover_pixels)
 
 
 func _active_result_skip_button() -> Button:

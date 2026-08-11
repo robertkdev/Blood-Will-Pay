@@ -68,7 +68,7 @@ func _run() -> void:
 	if _finish_if_failed():
 		return
 	var result_skip_requested: bool = await _request_result_skip()
-	_expect(result_skip_requested, "result hold did not accept its visible Enter/Space skip affordance")
+	_expect(result_skip_requested, "result hold did not accept its visible mouse-click skip affordance")
 
 	var restored: bool = await _wait_for_post_win_planning(8.0)
 	_expect(restored, "post-win planning did not restore after intermission")
@@ -163,7 +163,7 @@ func _assert_result_card() -> void:
 	_expect(hold_progress != null and hold_progress.max_value == 1.0, "result card should expose visible hold progress")
 	var hold_copy_valid: bool = hold_label != null and (hold_label.text.begins_with("READ THE COST // ACTION ARMS IN") or hold_label.text.begins_with("AUTO-ADVANCE IN"))
 	_expect(hold_copy_valid, "result card should expose either its protected reading gate or armed dwell state; got=%s" % (hold_label.text if hold_label != null else "<missing>"))
-	_expect(skip_button != null and skip_button.text.contains("ENTER / SPACE") and not skip_button.text.contains("("), "result card should expose a threshold-free keyboard advance affordance")
+	_expect(skip_button != null and skip_button.text.contains("CLICK") and not skip_button.text.contains("ENTER") and not skip_button.text.contains("SPACE") and skip_button.focus_mode == Control.FOCUS_NONE, "result card should expose a mouse-only advance affordance")
 	_assert_result_hold_copy_unobstructed(card, hold_progress, hold_label, skip_button, "VICTORY")
 	_assert_result_frame_inside_viewport(card, skip_button, "VICTORY")
 	_assert_persistent_combat_chrome("VICTORY result")
@@ -285,7 +285,7 @@ func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 	_expect(impact_stamp != null and impact_stamp.text != "FIELD RECORD CLOSED", "%s should carry an authored result-specific settlement stamp" % expected_title)
 	_expect(card != null and String(card.get_meta("result_variant", "")) == expected_title.to_lower(), "%s should expose a semantic visual variant" % expected_title)
 	_expect(hold_label != null and hold_label.text.begins_with("READ THE COST // ACTION ARMS IN ") and not hold_label.text.contains("."), "%s reading window should use natural integer copy rather than QA telemetry" % expected_title)
-	_expect(skip_button != null and skip_button.text.contains("ENTER / SPACE") and not skip_button.text.contains("("), "%s advance affordance should not expose a decimal guard threshold" % expected_title)
+	_expect(skip_button != null and skip_button.text.contains("CLICK") and not skip_button.text.contains("ENTER") and not skip_button.text.contains("SPACE") and skip_button.focus_mode == Control.FOCUS_NONE, "%s advance affordance should remain mouse-only without a decimal guard threshold" % expected_title)
 	_expect(aftermath != null and aftermath.visible and String(aftermath.get_meta("outcome_variant", "")) == expected_title.to_lower(), "%s should expose a matching environmental aftermath variant" % expected_title)
 	_expect(aftermath_art != null and aftermath_art.texture != null and aftermath_art.modulate.a >= 0.68, "%s should retain the physical battlefield behind its casualty record" % expected_title)
 	_expect(aftermath_wash != null and aftermath_wash.texture is GradientTexture2D, "%s should carry a material outcome wash" % expected_title)
@@ -512,9 +512,6 @@ func _assert_result_hold_copy_unobstructed(
 			_expect(not mark_rect.intersects(critical_rect), "%s decorative mark %s crosses hold/skip copy" % [outcome, String(mark.name)])
 
 func _request_result_skip() -> bool:
-	var controller: Variant = _combat_controller()
-	if controller == null or not controller.has_method("handle_result_input"):
-		return false
 	Engine.time_scale = maxf(1.0, Engine.time_scale)
 	var deadline: int = Time.get_ticks_msec() + 1500
 	var skip_button: Button = _main.find_child("ResultSkipButton", true, false) as Button
@@ -522,18 +519,7 @@ func _request_result_skip() -> bool:
 		await get_tree().process_frame
 		if skip_button != null and not skip_button.disabled:
 			break
-	if skip_button != null:
-		skip_button.grab_focus()
-		await get_tree().process_frame
-		var focus_signal: Panel = _main.find_child("ResultFocusSignalOverlay", true, false) as Panel
-		var skip_rect: Rect2 = skip_button.get_global_rect()
-		var signal_rect: Rect2 = focus_signal.get_global_rect() if focus_signal != null else Rect2()
-		_expect(skip_button.has_focus() and focus_signal != null and focus_signal.visible and signal_rect.grow(1.0).encloses(skip_rect) and signal_rect.size.x >= skip_rect.size.x + 16.0, "result skip keyboard focus lacks its card-level signal-blue outer frame")
-		_save_capture("result_skip_keyboard_focus.png")
-	var skip_event: InputEventAction = InputEventAction.new()
-	skip_event.action = "ui_accept"
-	skip_event.pressed = true
-	return bool(controller.call("handle_result_input", skip_event))
+	return await _click_button(skip_button, "result skip button")
 
 func _assert_result_detail_bounds(card: PanelContainer, detail_label: Label, outcome: String) -> void:
 	_expect(card != null, "%s result card missing for detail-bounds assertion" % outcome)

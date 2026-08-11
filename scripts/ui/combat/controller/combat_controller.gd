@@ -429,6 +429,8 @@ var _battle_start_pending: bool = false
 var _battle_start_elapsed: float = 0.0
 var _battle_start_generation: int = 0
 var _pending_combat_quote_multiplier: float = -1.0
+var _countdown_finished_for_pending_start: bool = false
+var _transition_preparation_ready: bool = false
 var _hud_snapshot_signature: String = ""
 var _result_banner: PanelContainer = null
 var _result_hold_elapsed: float = 0.0
@@ -459,6 +461,8 @@ var _phase_transition_bridge: Control = null
 var _phase_transition_hide_tween: Tween = null
 var phase_transition: PhaseTransitionController = null
 var _arena_prepared_for_transition: bool = false
+var _transition_preparation_generation: int = -1
+var _post_start_presentation_token: int = 0
 var _pre_unfreeze_gate_snapshot: Dictionary[String, Variant] = {}
 var combat_broadcast_strip: PanelContainer = null
 var combat_broadcast_phase: Label = null
@@ -1558,12 +1562,32 @@ func _queue_battle_start() -> void:
 	_battle_start_pending = true
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_countdown_finished_for_pending_start = (phase_transition == null)
+	_transition_preparation_ready = false
 	Trace.step("Battle start queued generation=" + str(_battle_start_generation))
 	if phase_transition == null:
 		call_deferred("_execute_pending_battle_start", _battle_start_generation)
 		return
+	# Commit the combat composition before the visible countdown. The board gets
+	# its larger combat-focused width once, then the transition only animates the
+	# registered field; hiding side rails after beat 1 was the source of the
+	# left/right camera correction in the previous handoff.
+	_prepare_transition_combat_layout(true)
+	var tree: SceneTree = parent.get_tree() if parent != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_start_battle_countdown_after_layout").bind(_battle_start_generation), CONNECT_ONE_SHOT)
+	else:
+		_start_battle_countdown_after_layout(_battle_start_generation)
+
+func _start_battle_countdown_after_layout(generation: int) -> void:
+	if not _battle_start_pending or generation != _battle_start_generation or phase_transition == null:
+		return
 	phase_transition.set_encounter_focus(_committed_confrontation_centroid())
 	phase_transition.start_countdown(_reduced_motion_enabled())
+	# A phase-visual sync can run between the preflight layout commit and the
+	# countdown callback. Re-assert the already-committed chrome state here,
+	# before any transition frame is presented.
+	_prepare_transition_combat_layout(true)
 	_sync_combat_broadcast_strip(true)
 
 func _sync_encounter_quote_kind(economy_node: Node = null) -> void:
@@ -1591,6 +1615,11 @@ func _capture_current_encounter_quote_multiplier() -> float:
 func _on_combat_countdown_finished() -> void:
 	if not _battle_start_pending:
 		return
+	_countdown_finished_for_pending_start = true
+	# Preserve the planning/countdown contract: no combat engine or layout
+	# mutation exists during beats 3, 2, or 1. Once the committed planning rect is
+	# captured, prepare and stage the expensive handoff over bounded frames before
+	# entry begins.
 	call_deferred("_execute_pending_battle_start", _battle_start_generation)
 
 func _execute_pending_battle_start(generation: int) -> void:
@@ -1608,20 +1637,58 @@ func _execute_pending_battle_start(generation: int) -> void:
 func _on_battle_prepared(_stage: int, _enemy: Unit) -> void:
 	if not _battle_start_pending or manager == null:
 		return
+	# Split expensive UI and actor work over presented post-countdown frames. The entry-crossfade must
+	# begin only after this work is complete, never in the same frame as it.
+	_transition_preparation_generation = _battle_start_generation
+	call_deferred("_stage_transition_enemy_views", _transition_preparation_generation)
+
+func _transition_preparation_is_current(generation: int) -> bool:
+	return (
+		_battle_start_pending
+		and generation == _battle_start_generation
+		and manager != null
+		and is_instance_valid(manager)
+		and parent != null
+		and is_instance_valid(parent)
+		and not parent.is_queued_for_deletion()
+	)
+
+func _stage_transition_enemy_views(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
 	if grid_placement != null:
 		grid_placement.rebuild_enemy_views(manager.enemy_team)
 		enemy_views = grid_placement.get_enemy_views()
+	var tree: SceneTree = parent.get_tree()
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_stage_transition_player_views").bind(generation), CONNECT_ONE_SHOT)
+	else:
+		_stage_transition_player_views(generation)
+
+func _stage_transition_player_views(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
+	if grid_placement != null:
 		grid_placement.rebuild_player_views(manager.player_team, false)
 		player_views = grid_placement.get_player_views()
-	_prepare_transition_combat_layout()
-	var tree: SceneTree = parent.get_tree() if parent != null else null
+	var tree: SceneTree = parent.get_tree()
 	if tree != null:
-		tree.process_frame.connect(Callable(self, "_begin_prepared_arena_crossfade"), CONNECT_ONE_SHOT)
+		tree.process_frame.connect(Callable(self, "_stage_transition_combat_layout").bind(generation), CONNECT_ONE_SHOT)
 	else:
-		_begin_prepared_arena_crossfade()
+		_stage_transition_combat_layout(generation)
 
-func _begin_prepared_arena_crossfade() -> void:
-	if not _battle_start_pending or manager == null:
+func _stage_transition_combat_layout(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
+	_prepare_transition_combat_layout()
+	var tree: SceneTree = parent.get_tree()
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_stage_transition_arena").bind(generation), CONNECT_ONE_SHOT)
+	else:
+		_stage_transition_arena(generation)
+
+func _stage_transition_arena(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
 		return
 	_arena_prepared_for_transition = true
 	if arena_bridge != null:
@@ -1631,6 +1698,34 @@ func _begin_prepared_arena_crossfade() -> void:
 		var source_rect: Rect2 = phase_transition.get_planning_commit_rect() if phase_transition != null else planning_area.get_global_rect()
 		arena_bridge.enter_arena(player_views, enemy_views, false, true, target_rect, source_rect)
 		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
+	var tree: SceneTree = parent.get_tree()
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_mark_transition_preparation_ready").bind(generation), CONNECT_ONE_SHOT)
+	else:
+		_mark_transition_preparation_ready(generation)
+
+func _mark_transition_preparation_ready(generation: int) -> void:
+	if not _transition_preparation_is_current(generation):
+		return
+	_transition_preparation_ready = true
+	_try_begin_prepared_arena_crossfade(generation)
+
+func _try_begin_prepared_arena_crossfade(generation: int) -> void:
+	if not _transition_preparation_is_current(generation) or not _countdown_finished_for_pending_start or not _transition_preparation_ready:
+		return
+	_begin_prepared_arena_crossfade(generation)
+
+func _begin_prepared_arena_crossfade(generation: int = -1) -> void:
+	if generation >= 0 and not _transition_preparation_is_current(generation):
+		return
+	_transition_preparation_generation = -1
+	_transition_preparation_ready = false
+
+	if not _battle_start_pending or manager == null:
+		return
+	if phase_transition != null and phase_transition.get_state_name() != "countdown":
+		_recover_pending_battle_start("entry transition was reset before preparation completed")
+		return
 	if phase_transition != null:
 		phase_transition.start_entry_crossfade()
 	else:
@@ -1663,14 +1758,20 @@ func _complete_pending_battle_start() -> void:
 	_battle_start_pending = false
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_countdown_finished_for_pending_start = false
+	_transition_preparation_ready = false
 	_pending_combat_quote_multiplier = -1.0
 
 func _cancel_pending_battle_start() -> void:
 	_battle_start_pending = false
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
+	_countdown_finished_for_pending_start = false
+	_transition_preparation_ready = false
 	_pending_combat_quote_multiplier = -1.0
 	_arena_prepared_for_transition = false
+	_transition_preparation_generation = -1
+	_post_start_presentation_token += 1
 
 func _recover_pending_battle_start(reason: String) -> void:
 	if not _battle_start_pending:
@@ -2333,9 +2434,30 @@ func _queue_active_run_save() -> void:
 	if int(GameState.phase) != int(GameState.GamePhase.PREVIEW):
 		return
 	_active_run_save_pending = true
-	call_deferred("_save_active_run_deferred")
+	# A reroll rebuild binds five cards in this idle turn. Snapshot serialization
+	# must not run ahead of that first visible result; coalesce it until a draw has
+	# completed, while retaining the pending flag so state changes remain durable.
+	call_deferred("_save_active_run_after_first_draw")
 
-func _save_active_run_deferred() -> void:
+func _save_active_run_after_first_draw() -> void:
+	# `frame_post_draw` is not guaranteed while minimized or on a headless driver.
+	# Two process frames still let card binding reach its first player-visible frame,
+	# while bounding persistence latency in every supported runtime.
+	if not is_instance_valid(parent) or parent.is_queued_for_deletion():
+		_active_run_save_pending = false
+		return
+	var tree: SceneTree = parent.get_tree()
+	if tree == null:
+		_active_run_save_pending = false
+		return
+	await tree.process_frame
+	if not is_instance_valid(parent) or parent.is_queued_for_deletion() or parent.get_tree() != tree:
+		_active_run_save_pending = false
+		return
+	await tree.process_frame
+	if not is_instance_valid(parent) or parent.is_queued_for_deletion() or parent.get_tree() != tree:
+		_active_run_save_pending = false
+		return
 	save_active_run_now()
 
 func _on_bet_changed(val: float) -> void:
@@ -2355,16 +2477,16 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	_on_log_line("Prepare to fight.")
 	if projectile_bridge and projectile_bridge.has_method("set_visuals_enabled"):
 		projectile_bridge.set_visuals_enabled(true)
-	_refresh_hud()
-	_update_stage_label()
 	# Set COMBAT phase before starting Economy escrow so UI refresh sees correct phase
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.COMBAT)
-	_update_stage_label()
 	_sync_bottom_combat_visibility()
 	sync_tactical_phase_visuals(true)
 	if Engine.has_singleton("Economy") or parent.has_node("/root/Economy"):
 		Economy.start_combat(locked_quote_multiplier)
+	# This progression event is a gameplay invariant, not presentation work. Keep
+	# it synchronous so an immediate battle resolution or scene teardown cannot
+	# lose the first-battle journal record.
 	var battle_snapshot: Dictionary = _build_account_victory_snapshot()
 	AccountProgressionScript.record_battle_start(battle_snapshot, account_journal_path)
 	if grid_placement and manager and not _arena_prepared_for_transition:
@@ -2380,18 +2502,33 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	_arena_prepared_for_transition = false
 	if phase_transition != null:
 		phase_transition.mark_combat()
-	# Optional: add layout prints here when debugging sizes
-	# Ensure economy UI reflects combat lock state immediately
+	_schedule_post_start_presentation()
+
+func _schedule_post_start_presentation() -> void:
+	_post_start_presentation_token += 1
+	var token: int = _post_start_presentation_token
+	var tree: SceneTree = parent.get_tree() if parent != null else null
+	if tree != null:
+		tree.process_frame.connect(Callable(self, "_finish_post_start_presentation").bind(token), CONNECT_ONE_SHOT)
+	else:
+		_finish_post_start_presentation(token)
+
+func _finish_post_start_presentation(token: int) -> void:
+	if token != _post_start_presentation_token or parent == null or not is_instance_valid(parent) or parent.is_queued_for_deletion():
+		return
+	if manager == null or not is_instance_valid(manager) or not manager.is_engine_running():
+		return
+	_refresh_hud()
+	_update_stage_label()
 	if economy_ui:
 		economy_ui.refresh()
-
-	# Provide ability system to stats panel if supported
-	var eng = (manager.get_engine() if manager and manager.has_method("get_engine") else null)
+	var eng = manager.get_engine() if manager.has_method("get_engine") else null
 	if eng and stats_panel and stats_panel.has_method("set_ability_system"):
 		stats_panel.set_ability_system(eng.ability_system)
-
-	# Attach selection overlays to arena actors
 	_attach_selection_to_arena()
+
+	# Optional: add layout prints here when debugging sizes
+	# Ensure economy UI reflects combat lock state immediately
 
 	# Debug: schedule a one-time broad hit flash to verify overlay rendering
 	# Gate behind Debug.enabled to avoid confusing real hit flashes.
@@ -3588,12 +3725,11 @@ func _sync_bottom_combat_visibility(force: bool = false) -> void:
 	_set_root_control_visible("GothicShopPlate", planning_visible)
 	_set_root_control_visible("GothicShopCommandPlate", planning_visible)
 
-func _prepare_transition_combat_layout() -> void:
+func _prepare_transition_combat_layout(preserve_countdown_context: bool = false) -> void:
 	for path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
 		"MarginContainer/VBoxContainer/ActionsRow",
-		"MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BenchArea",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry",
@@ -3601,6 +3737,8 @@ func _prepare_transition_combat_layout() -> void:
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusBackplate",
 	]:
 		_set_control_visible(path, false)
+	if not preserve_countdown_context:
+		_set_control_visible("MarginContainer/VBoxContainer/WagerSummary", false)
 	if board_status_row != null and is_instance_valid(board_status_row):
 		board_status_row.visible = false
 		var board_status_plate: Control = board_status_row.get_parent().get_node_or_null("BoardStatusBackplate") as Control if board_status_row.get_parent() != null else null
@@ -4405,7 +4543,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	if hold_label != null:
 		hold_label.text = "READ THE COST // ACTION ARMS IN 1"
 	if skip_button != null:
-		skip_button.text = "HOLD // ENTER / SPACE"
+		skip_button.text = "CLICK // SKIP"
 		skip_button.disabled = true
 	_configure_result_aftermath(banner, title, accent_color, title_color)
 	banner.add_theme_stylebox_override("panel", _make_result_scrim_style(title))
@@ -4761,26 +4899,6 @@ func _set_result_underlay_visibility(restore_phase_visibility: bool) -> void:
 			field_label.visible = false
 			field_label.set_meta("suppressed_for_result_reading", true)
 
-func handle_result_input(event: InputEvent) -> bool:
-	if not _is_result_skip_event(event):
-		return false
-	if _intermission_finish_scheduled or _intermission_finish_in_progress:
-		_result_repeated_input_count += 1
-		return true
-	if not _result_hold_active or _result_banner == null or not is_instance_valid(_result_banner) or not _result_banner.visible:
-		return false
-	_skip_result_hold()
-	return true
-
-func _is_result_skip_event(event: InputEvent) -> bool:
-	if event == null or not event.is_pressed() or event.is_echo():
-		return false
-	var skip_requested: bool = event.is_action_pressed("ui_accept")
-	if event is InputEventKey:
-		var key_event: InputEventKey = event as InputEventKey
-		skip_requested = skip_requested or key_event.keycode == KEY_SPACE or key_event.physical_keycode == KEY_SPACE
-	return skip_requested
-
 func _update_result_hold(delta: float) -> void:
 	if not _result_hold_active or _result_banner == null or not is_instance_valid(_result_banner) or not _result_banner.visible:
 		return
@@ -4796,7 +4914,7 @@ func _update_result_hold(delta: float) -> void:
 		hold_label.text = "READ THE COST // ACTION ARMS IN %d" % ceili(RESULT_SKIP_GUARD_SECONDS - _result_hold_elapsed) if _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS else "AUTO-ADVANCE IN %d" % ceili(remaining)
 	if skip_button != null:
 		skip_button.disabled = _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS
-		skip_button.text = "HOLD // ENTER / SPACE" if skip_button.disabled else "ENTER / SPACE // ADVANCE"
+		skip_button.text = "CLICK // SKIP" if skip_button.disabled else "CLICK // ADVANCE"
 
 func _skip_result_hold() -> void:
 	if not _result_hold_active or _result_hold_finishing or _result_hold_elapsed < RESULT_SKIP_GUARD_SECONDS:
@@ -5087,81 +5205,18 @@ func _ensure_result_banner() -> PanelContainer:
 	hold_row.add_child(hold_label)
 	var skip_button: Button = Button.new()
 	skip_button.name = "ResultSkipButton"
-	skip_button.text = "ENTER / SPACE // SKIP"
+	skip_button.text = "CLICK // SKIP"
 	skip_button.custom_minimum_size = Vector2(250.0, 38.0)
 	skip_button.mouse_filter = Control.MOUSE_FILTER_STOP
-	skip_button.focus_mode = Control.FOCUS_ALL
+	skip_button.focus_mode = Control.FOCUS_NONE
 	skip_button.add_theme_font_size_override("font_size", 18)
 	VisualTypeSystem.set_action(skip_button)
 	skip_button.add_theme_stylebox_override("normal", _make_result_skip_style(false))
 	skip_button.add_theme_stylebox_override("hover", _make_result_skip_style(true))
 	skip_button.add_theme_stylebox_override("pressed", _make_result_skip_style(true))
 	skip_button.add_theme_stylebox_override("disabled", _make_result_skip_style(false))
-	skip_button.add_theme_stylebox_override("focus", _make_result_skip_focus_style())
 	skip_button.add_theme_color_override("font_disabled_color", Color(0.92, 0.84, 0.72, 1.0))
 	skip_button.add_theme_color_override("font_color", Color(0.96, 0.90, 0.82, 1.0))
-	skip_button.add_theme_color_override("font_focus_color", Color(0.92, 0.97, 1.0, 1.0))
-	skip_button.set_meta("focus_visual_contract", "signal_blue_four_pixel_expanded_outline")
-	skip_button.set_meta("focused_state_visible", false)
-	var skip_focus_frame: Panel = Panel.new()
-	skip_focus_frame.name = "FocusFrame"
-	skip_button.add_child(skip_focus_frame)
-	skip_focus_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	skip_focus_frame.offset_left = -4.0
-	skip_focus_frame.offset_top = -4.0
-	skip_focus_frame.offset_right = 4.0
-	skip_focus_frame.offset_bottom = 4.0
-	skip_focus_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	skip_focus_frame.z_index = 8
-	skip_focus_frame.visible = false
-	skip_focus_frame.add_theme_stylebox_override("panel", _make_result_skip_focus_frame_style())
-	# Keep the keyboard-focus marker on the stable parent layer. Result cards can
-	# be rebuilt while consequence state settles; a marker parented to the card
-	# disappeared with that rebuild even though the next card represented the
-	# same focused action.
-	var skip_focus_signal: Panel = parent.get_node_or_null("ResultFocusSignalOverlay") as Panel
-	if skip_focus_signal == null:
-		skip_focus_signal = Panel.new()
-		skip_focus_signal.name = "ResultFocusSignalOverlay"
-		skip_focus_signal.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		skip_focus_signal.z_as_relative = false
-		skip_focus_signal.z_index = 4095
-		skip_focus_signal.visible = false
-		skip_focus_signal.add_theme_stylebox_override("panel", _make_result_skip_focus_signal_style())
-		parent.add_child(skip_focus_signal)
-		var edge_color: Color = Color(0.24, 0.58, 0.82, 1.0)
-		for edge_name: String in ["FocusTop", "FocusRight", "FocusBottom", "FocusLeft"]:
-			var edge: ColorRect = ColorRect.new()
-			edge.name = edge_name
-			edge.color = edge_color
-			edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			skip_focus_signal.add_child(edge)
-		var focus_top: ColorRect = skip_focus_signal.get_node("FocusTop") as ColorRect
-		focus_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-		focus_top.offset_bottom = 6.0
-		var focus_right: ColorRect = skip_focus_signal.get_node("FocusRight") as ColorRect
-		focus_right.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
-		focus_right.offset_left = -6.0
-		var focus_bottom: ColorRect = skip_focus_signal.get_node("FocusBottom") as ColorRect
-		focus_bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		focus_bottom.offset_top = -6.0
-		var focus_left: ColorRect = skip_focus_signal.get_node("FocusLeft") as ColorRect
-		focus_left.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-		focus_left.offset_right = 6.0
-		var focus_label: Label = Label.new()
-		focus_label.name = "FocusActionLabel"
-		focus_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		focus_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		focus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		focus_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		focus_label.add_theme_font_size_override("font_size", 18)
-		focus_label.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 1.0))
-		focus_label.add_theme_color_override("font_outline_color", Color(0.0, 0.03, 0.06, 0.96))
-		focus_label.add_theme_constant_override("outline_size", 3)
-		VisualTypeSystem.set_action(focus_label)
-		skip_focus_signal.add_child(focus_label)
-	skip_button.focus_entered.connect(_on_result_skip_focus_entered.bind(skip_button))
-	skip_button.focus_exited.connect(_on_result_skip_focus_exited.bind(skip_button))
 	skip_button.pressed.connect(_skip_result_hold)
 	hold_row.add_child(skip_button)
 	var impact_stamp: Label = Label.new()
@@ -5313,94 +5368,6 @@ func _make_result_skip_style(active: bool) -> StyleBoxFlat:
 	style.shadow_size = 6
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.58)
 	return style
-
-func _make_result_skip_focus_style() -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.018, 0.022, 0.026, 0.99)
-	style.border_color = Color(0.30, 0.60, 0.82, 1.0)
-	style.set_border_width_all(4)
-	style.expand_margin_left = 3.0
-	style.expand_margin_top = 3.0
-	style.expand_margin_right = 3.0
-	style.expand_margin_bottom = 3.0
-	style.shadow_color = Color(0.10, 0.34, 0.54, 0.46)
-	style.shadow_size = 10
-	return style
-
-func _make_result_skip_focus_frame_style() -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.30, 0.60, 0.82, 1.0)
-	style.set_border_width_all(4)
-	style.shadow_color = Color(0.10, 0.34, 0.54, 0.52)
-	style.shadow_size = 8
-	return style
-
-
-func _make_result_skip_focus_signal_style() -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	# This sits above the button so its frame survives result-card redraws. Keep
-	# the fill transparent so the action label remains fully legible.
-	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.24, 0.58, 0.82, 1.0)
-	style.set_border_width_all(5)
-	style.shadow_color = Color(0.08, 0.30, 0.50, 0.72)
-	style.shadow_size = 10
-	return style
-
-
-func _sync_result_skip_focus_signal(skip_button: Button, visible_state: bool) -> void:
-	if parent == null:
-		return
-	var focus_signal: Panel = parent.get_node_or_null("ResultFocusSignalOverlay") as Panel
-	if focus_signal == null:
-		return
-	if not visible_state and bool(focus_signal.get_meta("focus_visual_capture_lock", false)):
-		return
-	if visible_state:
-		var button_rect: Rect2 = skip_button.get_global_rect()
-		var parent_rect: Rect2 = parent.get_global_rect()
-		var signal_margin: float = 10.0
-		focus_signal.position = button_rect.position - parent_rect.position - Vector2.ONE * signal_margin
-		focus_signal.size = button_rect.size + Vector2.ONE * signal_margin * 2.0
-		var focus_label: Label = focus_signal.get_node_or_null("FocusActionLabel") as Label
-		if focus_label != null:
-			focus_label.text = skip_button.text
-		focus_signal.set_meta("focus_signal_bounds", focus_signal.get_global_rect())
-	focus_signal.visible = visible_state
-
-
-func _on_result_skip_focus_entered(skip_button: Button) -> void:
-	if skip_button == null or skip_button.disabled:
-		return
-	# Godot's separate focus StyleBox can be obscured by the normal button pass
-	# in some renderer/layout combinations. Mirror it into the base pass so
-	# keyboard focus remains unmistakable in the authoritative runtime.
-	skip_button.add_theme_stylebox_override("normal", _make_result_skip_focus_style())
-	skip_button.add_theme_color_override("font_color", Color(0.92, 0.97, 1.0, 1.0))
-	skip_button.self_modulate = Color.WHITE
-	var focus_frame: Panel = skip_button.get_node_or_null("FocusFrame") as Panel
-	if focus_frame != null:
-		focus_frame.visible = true
-	_sync_result_skip_focus_signal(skip_button, true)
-	skip_button.set_meta("focused_state_visible", true)
-
-func _on_result_skip_focus_exited(skip_button: Button) -> void:
-	if skip_button == null:
-		return
-	# Graphical evidence capture can momentarily transfer OS/window focus while
-	# the framebuffer is read. Keep the already-entered keyboard-focus visual
-	# stable for that one synchronous draw; normal gameplay never sets this lock.
-	if bool(skip_button.get_meta("focus_visual_capture_lock", false)):
-		return
-	skip_button.add_theme_stylebox_override("normal", _make_result_skip_style(false))
-	skip_button.add_theme_color_override("font_color", Color(0.96, 0.90, 0.82, 1.0))
-	skip_button.self_modulate = Color.WHITE
-	var focus_frame: Panel = skip_button.get_node_or_null("FocusFrame") as Panel
-	if focus_frame != null:
-		focus_frame.visible = false
-	_sync_result_skip_focus_signal(skip_button, false)
-	skip_button.set_meta("focused_state_visible", false)
 
 func _make_result_record_texture(outcome: String, accent_color: Color) -> Texture2D:
 	var gradient: Gradient = Gradient.new()

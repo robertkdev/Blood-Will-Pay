@@ -51,6 +51,8 @@ var _tooltip_scroll: ScrollContainer = null
 var _tooltip_title: String = ""
 var _tooltip_subtitle: String = ""
 var _tooltip_lines: Array[String] = []
+var _tooltip_detail_context: Dictionary = {}
+var _tooltip_details_built: bool = false
 var _status_tip: String = ""
 var _package_level: int = 1
 var _package_kind: String = "standard"
@@ -149,7 +151,18 @@ func set_data(props: Dictionary) -> void:
 		tooltip_text = title
 	_tooltip_title = title
 	_tooltip_subtitle = "%s • %s Lv%d" % [BloodBuckets.describe(price_i), "Current Grade" if _package_kind == "current_grade" else "Depth Grade", _package_level] if _package_kind != "standard" else BloodBuckets.describe(price_i)
-	_tooltip_lines = _build_tooltip_lines(display_role, display_goal, approaches, alt_goals, traits)
+	# Unit preview construction is tooltip-only work. Do not do it while a reroll
+	# is binding every visible card; wait until the player asks for detail.
+	_tooltip_lines.clear()
+	_tooltip_details_built = false
+	_tooltip_detail_context = {
+		"display_role": display_role,
+		"display_goal": display_goal,
+		"approaches": approaches,
+		"alt_goals": alt_goals,
+		"traits": traits,
+	}
+	set_meta("tooltip_detail_state", "deferred")
 	if _package_kind == "current_grade":
 		var capital_charter: Dictionary = UnitUpgradePaths.charter_definition(UnitUpgradePaths.charter_for_role(primary_role))
 		_tooltip_subtitle = "%s • CAPITAL Lv%d" % [BloodBuckets.describe(price_i), _package_level]
@@ -339,6 +352,22 @@ func _build_tooltip_lines(display_role: String, display_goal: String, approaches
 	if ability_targeting_text != "":
 		lines.append(ability_targeting_text)
 	return lines
+
+func _ensure_tooltip_details() -> void:
+	if _tooltip_details_built:
+		return
+	_tooltip_details_built = true
+	var capital_lines: Array[String] = _tooltip_lines.duplicate()
+	_tooltip_lines = _build_tooltip_lines(
+		String(_tooltip_detail_context.get("display_role", "")),
+		String(_tooltip_detail_context.get("display_goal", "")),
+		_coerce_array(_tooltip_detail_context.get("approaches", [])),
+		_coerce_array(_tooltip_detail_context.get("alt_goals", [])),
+		_coerce_array(_tooltip_detail_context.get("traits", []))
+	)
+	for index: int in range(capital_lines.size() - 1, -1, -1):
+		_tooltip_lines.push_front(capital_lines[index])
+	set_meta("tooltip_detail_state", "resolved")
 
 func _format_attack_info(unit: Unit) -> String:
 	if unit == null:
@@ -641,6 +670,7 @@ func _clear_global_tooltip_layers() -> void:
 		raw_child.free()
 
 func _current_tooltip_lines() -> Array[String]:
+	_ensure_tooltip_details()
 	var lines: Array[String] = []
 	if _status_tip != "":
 		lines.append(_status_tip)

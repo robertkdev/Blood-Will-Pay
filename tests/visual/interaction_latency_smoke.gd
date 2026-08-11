@@ -67,10 +67,16 @@ func _run_result_dismissal_probe() -> void:
 	# contaminates the following process-frame latency measurement.
 	_capture_runtime_frame("result_visible", Time.get_ticks_usec())
 	await _settle_frames(2)
+	var skip_button: Button = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
+	_expect(skip_button != null and not skip_button.disabled, "result latency probe did not expose an enabled mouse-click skip button")
+	if skip_button == null or skip_button.disabled:
+		return
+	var skip_center: Vector2 = _visible_click_point(skip_button)
+	await _move_mouse(skip_center, false)
 	var result_visible_usec: int = Time.get_ticks_usec()
-	var key_event: InputEventKey = _make_accept_event()
 	var input_accepted_usec: int = Time.get_ticks_usec()
-	Input.parse_input_event(key_event)
+	Input.parse_input_event(_make_mouse_event(skip_center, true))
+	Input.parse_input_event(_make_mouse_event(skip_center, false))
 	Input.flush_buffered_events()
 	var post_parse_usec: int = Time.get_ticks_usec()
 	var immediate_hidden: bool = not _result_banner.visible
@@ -78,7 +84,7 @@ func _run_result_dismissal_probe() -> void:
 	await get_tree().process_frame
 	var first_visible_response_usec: int = Time.get_ticks_usec()
 	var hold_label: Label = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label
-	var skip_button: Button = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
+	skip_button = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button
 	var first_frame_acknowledged: bool = (
 		hold_label != null
 		and hold_label.text == "FIELD RESET // REDEPLOYING"
@@ -89,8 +95,8 @@ func _run_result_dismissal_probe() -> void:
 	_record_timeline("dismiss_input_accepted", post_parse_usec)
 	_record_timeline("dismiss_frame_00", first_visible_response_usec)
 	for rapid_index: int in range(RAPID_RESULT_INPUT_COUNT):
-		var rapid_event: InputEventKey = _make_accept_event()
-		Input.parse_input_event(rapid_event)
+		Input.parse_input_event(_make_mouse_event(skip_center, true))
+		Input.parse_input_event(_make_mouse_event(skip_center, false))
 		Input.flush_buffered_events()
 		_record_timeline("dismiss_rapid_%02d" % rapid_index, Time.get_ticks_usec())
 	for frame_index: int in range(1, RESULT_FILMSTRIP_FRAMES):
@@ -120,7 +126,7 @@ func _run_result_dismissal_probe() -> void:
 	_expect(int(GameState.stage_in_chapter) == stage_after_settle, "rapid result inputs changed stage more than once")
 	_interaction_records.append({
 		"name": "result_dismissal",
-		"input_path": "Input.parse_input_event -> CombatView._unhandled_input",
+		"input_path": "mouse click -> ResultSkipButton.pressed",
 		"result_visible_at_usec": result_visible_usec,
 		"input_accepted_usec": input_accepted_usec,
 		"post_parse_usec": post_parse_usec,
@@ -318,12 +324,13 @@ func _wait_for_result_settled(timeout_seconds: float) -> bool:
 		await get_tree().process_frame
 	return false
 
-func _make_accept_event() -> InputEventKey:
-	var event: InputEventKey = InputEventKey.new()
-	event.keycode = KEY_SPACE
-	event.physical_keycode = KEY_SPACE
-	event.unicode = 32
-	event.pressed = true
+func _make_mouse_event(position: Vector2, pressed: bool) -> InputEventMouseButton:
+	var event: InputEventMouseButton = InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	event.position = position
+	event.global_position = position
+	event.pressed = pressed
 	return event
 
 func _capture_runtime_frame(label: String, captured_at_usec: int) -> void:

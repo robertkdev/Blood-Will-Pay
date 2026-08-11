@@ -7,6 +7,10 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	if TextureUtils.resource_load_cache_mode() != ResourceLoader.CACHE_MODE_REUSE:
+		push_error("PerfTextureUtils: UI texture loads must reuse Godot's resource cache")
+		get_tree().quit(1)
+		return
 	TextureUtils.clear_cache()
 	TextureUtils.set_diagnostics_enabled(true)
 	TextureUtils.reset_diagnostics()

@@ -175,7 +175,13 @@ func configure(_arena_container: Control, _arena_units: Control, _player_grid_he
 	unit_actor_class = _unit_actor_class
 	tile_size = _tile_size
 
-func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView], continuous_entry: bool = false) -> void:
+func enter_arena(
+	player_views: Array[UnitSlotView],
+	enemy_views: Array[UnitSlotView],
+	continuous_entry: bool = false,
+	initial_player_positions: Array[Vector2] = [],
+	initial_enemy_positions: Array[Vector2] = []
+) -> void:
 	Trace.step("ArenaController.enter_arena: begin")
 	_clear()
 	var actor_scale: float = 1.0 if continuous_entry else COMBAT_ACTOR_SIZE_SCALE
@@ -185,7 +191,9 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
 		var player_view: UnitSlotView = player_views[i]
 		var player_tile_index: int = player_view.tile_idx
 		var player_position: Vector2 = Vector2.ZERO
-		if player_grid_helper and player_tile_index >= 0:
+		if i < initial_player_positions.size():
+			player_position = initial_player_positions[i]
+		elif player_grid_helper and player_tile_index >= 0:
 			player_position = player_grid_helper.get_center(player_tile_index)
 		player_summary.append("%d:%s" % [i, player_position])
 		var player_actor: UnitActor = unit_actor_class.new() as UnitActor
@@ -212,7 +220,9 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
 		var enemy_view: UnitSlotView = enemy_views[j]
 		var enemy_tile_index: int = enemy_view.tile_idx
 		var enemy_position: Vector2 = Vector2.ZERO
-		if enemy_grid_helper and enemy_tile_index >= 0:
+		if j < initial_enemy_positions.size():
+			enemy_position = initial_enemy_positions[j]
+		elif enemy_grid_helper and enemy_tile_index >= 0:
 			enemy_position = enemy_grid_helper.get_center(enemy_tile_index)
 		enemy_summary.append("%d:%s" % [j, enemy_position])
 		var enemy_actor: UnitActor = unit_actor_class.new() as UnitActor

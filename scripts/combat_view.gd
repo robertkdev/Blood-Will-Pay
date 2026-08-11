@@ -138,12 +138,6 @@ func _on_menu_pressed() -> void:
 func _on_continue_pressed() -> void:
 	controller._on_continue_pressed()
 
-func _unhandled_input(event: InputEvent) -> void:
-	if controller != null and controller.has_method("handle_result_input"):
-		var handled: bool = bool(controller.call("handle_result_input", event))
-		if handled:
-			get_viewport().set_input_as_handled()
-
 func _auto_start_battle() -> void:
 	# Main schedules this call deferred after starter selection. A rapid New Run,
 	# Return to Title, or teardown can hide this view and clear its controller

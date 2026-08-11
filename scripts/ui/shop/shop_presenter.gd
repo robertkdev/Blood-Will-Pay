@@ -19,6 +19,7 @@ var _buttons: ShopButtons = null
 var _message_label: Label = null
 var _message_timer: Timer = null
 var _drop_grid: BoardGrid = null
+var _reroll_pending: bool = false
 
 signal grid_updated
 signal promotions_emitted(promotions)
@@ -72,6 +73,7 @@ func configure(parent: Node, grid: GridContainer) -> void:
 
 func teardown() -> void:
 	_unwire()
+	_clear_reroll_pending()
 	if _buttons != null and _buttons.has_method("teardown"):
 		_buttons.teardown()
 	if _panel != null and _panel.has_method("clear"):
@@ -334,6 +336,8 @@ func set_enabled(enabled: bool) -> void:
 		_buttons.set_enabled(bool(enabled))
 
 func _on_reroll() -> void:
+	if _reroll_pending:
+		return
 	if not _has_shop():
 		return
 	if _is_forced_first_fight():
@@ -343,9 +347,47 @@ func _on_reroll() -> void:
 		_show_message("Shop locked during battle", 2.0)
 		_refresh_cards_state()
 		return
+	_reroll_pending = true
+	if _buttons != null:
+		_buttons.set_reroll_pending(true)
+	call_deferred("_perform_reroll_after_feedback")
+
+func _perform_reroll_after_feedback() -> void:
+	if not _reroll_pending:
+		return
+	if not is_instance_valid(_parent) or _parent.is_queued_for_deletion():
+		_clear_reroll_pending()
+		return
+	var tree: SceneTree = _parent.get_tree()
+	if tree == null:
+		_clear_reroll_pending()
+		return
+	await tree.process_frame
+	if not _reroll_context_is_valid(tree):
+		_clear_reroll_pending()
+		return
+	await tree.process_frame
+	if not _reroll_context_is_valid(tree):
+		_clear_reroll_pending()
+		return
 	if Shop:
 		Shop.reroll()
+	_clear_reroll_pending()
 	_refresh_progress()
+	_refresh_cards_state()
+
+func _reroll_context_is_valid(tree: SceneTree) -> bool:
+	return (
+		_reroll_pending
+		and is_instance_valid(_parent)
+		and not _parent.is_queued_for_deletion()
+		and _parent.get_tree() == tree
+	)
+
+func _clear_reroll_pending() -> void:
+	_reroll_pending = false
+	if _buttons != null:
+		_buttons.set_reroll_pending(false)
 
 func _on_lock() -> void:
 	if not _has_shop():
