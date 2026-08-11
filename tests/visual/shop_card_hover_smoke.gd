@@ -73,7 +73,7 @@ func _run() -> void:
 	var reroll_result: Dictionary = Shop.reroll()
 	_expect(bool(reroll_result.get("ok", false)), "shop reroll should succeed during hover cleanup test")
 	_expect(_tooltip_count() == 0, "shop rebuild should synchronously clear tooltip from old hovered card")
-	var rebound_card: ShopCard = _first_shop_card()
+	var rebound_card: ShopCard = _first_shop_card_excluding(old_card_instance_id)
 	_expect(rebound_card != null, "shop card missing immediately after reroll binding")
 	if rebound_card != null:
 		_expect(String(rebound_card.get_meta("tooltip_detail_state", "")) == "deferred", "reroll binding must keep replacement-card tooltip detail deferred")
@@ -127,12 +127,15 @@ func _set_gold(value: int) -> void:
 		Economy.add_gold(delta)
 
 func _first_shop_card() -> ShopCard:
+	return _first_shop_card_excluding(0)
+
+func _first_shop_card_excluding(excluded_instance_id: int) -> ShopCard:
 	if _host == null:
 		return null
 	var cards: Array[Node] = _host.find_children("*", "ShopCard", true, false)
 	for node: Node in cards:
 		var card: ShopCard = node as ShopCard
-		if card != null and String(card.offer_id).strip_edges() != "":
+		if card != null and card.get_instance_id() != excluded_instance_id and String(card.offer_id).strip_edges() != "":
 			return card
 	return null
 
