@@ -448,6 +448,7 @@ var _encounter_banner_tween: Tween = null
 var _bottom_combat_visibility_state: int = -1
 var _layout_tile_size: int = UI.TILE_SIZE
 var _active_run_save_pending: bool = false
+var _active_run_save_timer: Timer = null
 var _active_run_restore_in_progress: bool = false
 var _encounter_escalations_seen: int = 0
 var _tactical_phase_visual_state: int = -1
@@ -531,6 +532,11 @@ func teardown() -> void:
 	if _teardown_done:
 		return
 	_teardown_done = true
+	if _active_run_save_timer != null and is_instance_valid(_active_run_save_timer):
+		_active_run_save_timer.stop()
+		_active_run_save_timer.queue_free()
+	_active_run_save_timer = null
+	_active_run_save_pending = false
 	_auto_loop_running = false
 	_intermission_finish_scheduled = false
 	_intermission_finish_in_progress = false
@@ -1006,7 +1012,7 @@ func _ensure_board_status_row() -> void:
 	board_phase_label = board_status_row.get_node_or_null("BoardPhaseLabel") as Label
 	if board_phase_label == null:
 		board_phase_label = _make_board_status_label("BoardPhaseLabel")
-		board_phase_label.text = "/// PLAN"
+		board_phase_label.text = "PLAN"
 		board_status_row.add_child(board_phase_label)
 	board_status_row.move_child(board_phase_label, 0)
 	board_timer_label = board_status_row.get_node_or_null("BoardTimerLabel") as Label
@@ -1077,7 +1083,7 @@ func _update_board_status() -> void:
 				phase_text = "AFTERMATH"
 		if _last_result_title != "" and phase_text == "PLAN":
 			phase_text = "%s / PLAN" % _last_result_title
-		board_phase_label.text = "/// " + phase_text
+		board_phase_label.text = phase_text
 		board_phase_label.tooltip_text = "Current run phase and most recent battle outcome."
 	if board_timer_label != null and String(board_timer_label.text).strip_edges() == "":
 		board_timer_label.text = "Plan --"
@@ -2437,25 +2443,17 @@ func _queue_active_run_save() -> void:
 	# A reroll rebuild binds five cards in this idle turn. Snapshot serialization
 	# must not run ahead of that first visible result; coalesce it until a draw has
 	# completed, while retaining the pending flag so state changes remain durable.
-	call_deferred("_save_active_run_after_first_draw")
+	var save_timer: Timer = Timer.new()
+	save_timer.one_shot = true
+	save_timer.process_callback = Timer.TIMER_PROCESS_IDLE
+	parent.add_child(save_timer)
+	_active_run_save_timer = save_timer
+	save_timer.timeout.connect(_save_active_run_after_first_draw, CONNECT_ONE_SHOT)
+	save_timer.start(0.0)
 
 func _save_active_run_after_first_draw() -> void:
-	# `frame_post_draw` is not guaranteed while minimized or on a headless driver.
-	# Two process frames still let card binding reach its first player-visible frame,
-	# while bounding persistence latency in every supported runtime.
-	if not is_instance_valid(parent) or parent.is_queued_for_deletion():
-		_active_run_save_pending = false
-		return
-	var tree: SceneTree = parent.get_tree()
-	if tree == null:
-		_active_run_save_pending = false
-		return
-	await tree.process_frame
-	if not is_instance_valid(parent) or parent.is_queued_for_deletion() or parent.get_tree() != tree:
-		_active_run_save_pending = false
-		return
-	await tree.process_frame
-	if not is_instance_valid(parent) or parent.is_queued_for_deletion() or parent.get_tree() != tree:
+	_active_run_save_timer = null
+	if _teardown_done or not is_instance_valid(parent) or parent.is_queued_for_deletion():
 		_active_run_save_pending = false
 		return
 	save_active_run_now()

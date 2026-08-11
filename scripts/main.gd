@@ -21,19 +21,6 @@ const SYSTEM_LAYER_NAME := "SystemMenuLayer"
 const LOSS_OVERLAY_LAYER_NAME := "LossOverlayLayer"
 const SYSTEM_LAYER_INDEX := 220
 const SYSTEM_MENU_BACKDROP_COLOR: Color = Color(0.015, 0.01, 0.012, 0.54)
-const TITLE_INCIDENT_DESKTOP_COPY: String = (
-	"RECOVERY TAG // OLD MILL ROAD\n"
-	+ "BURNED ROADBLOCK // FIRE TRENCH CUT\n"
-	+ "NINE CHAIRS // EIGHT DRAG MARKS\n"
-	+ "ONE WITNESS RETURNED // RESTRAINT MARKS"
-)
-const TITLE_INCIDENT_COMPACT_COPY: String = (
-	"RECOVERY TAG // OLD MILL ROAD\n"
-	+ "BURNED ROADBLOCK // FIRE TRENCH\n"
-	+ "EIGHT DRAG MARKS // ONE WITNESS\n"
-	+ "RESTRAINT MARKS // ROADBLOCK SET"
-)
-
 var _system_layer: CanvasLayer
 var _system_menu_button: Button
 var _system_overlay: Control
@@ -383,17 +370,17 @@ func _build_system_menu() -> void:
 	margin.add_child(_system_stack)
 	var filing_mark: Label = Label.new()
 	filing_mark.name = "FilingMark"
-	filing_mark.text = "FIELD INTERRUPTION // SIGNAL CUT // INPUT HELD"
+	filing_mark.text = ""
 	filing_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	filing_mark.rotation_degrees = -1.0
-	filing_mark.add_theme_font_size_override("font_size", 13)
+	filing_mark.visible = false
 	filing_mark.add_theme_color_override("font_color", Color(0.80, 0.23, 0.19, 0.94))
 	VisualTypeSystem.set_action(filing_mark)
 	_system_stack.add_child(filing_mark)
 
 	var title: Label = Label.new()
 	title.name = "Title"
-	title.text = "SYSTEM HELD // NO SAFE STATE"
+	title.text = "PAUSED"
 	title.custom_minimum_size = Vector2(0.0, 40.0)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -423,13 +410,13 @@ func _build_system_menu() -> void:
 	_apply_system_action_style(_resume_button, "safe")
 	_system_stack.add_child(_resume_button)
 
-	_settings_button = _make_menu_button("SettingsButton", "SETTINGS // LOCAL MACHINE")
+	_settings_button = _make_menu_button("SettingsButton", "SETTINGS")
 	_settings_button.pressed.connect(_open_runtime_settings)
 	_apply_system_action_style(_settings_button, "neutral")
 	_settings_button.set_meta("preserves_active_run", true)
 	_system_stack.add_child(_settings_button)
 
-	_new_run_button = _make_menu_button("NewRunButton", "BURN THIS RUN // NEW BLOOD")
+	_new_run_button = _make_menu_button("NewRunButton", "NEW RUN")
 	_new_run_button.pressed.connect(_on_new_run_menu_pressed)
 	_apply_system_action_style(_new_run_button, "danger")
 	_system_stack.add_child(_new_run_button)
@@ -439,12 +426,12 @@ func _build_system_menu() -> void:
 	_apply_system_action_style(_black_ledger_system_button, "neutral")
 	_system_stack.add_child(_black_ledger_system_button)
 
-	_return_title_button = _make_menu_button("ReturnTitleButton", "RETURN TO TITLE // PRESERVE FILE")
+	_return_title_button = _make_menu_button("ReturnTitleButton", "RETURN TO TITLE")
 	_return_title_button.pressed.connect(request_return_to_title)
 	_apply_system_action_style(_return_title_button, "warning")
 	_system_stack.add_child(_return_title_button)
 
-	_quit_game_button = _make_menu_button("QuitGameButton", "QUIT TO DESKTOP // PRESERVE FILE")
+	_quit_game_button = _make_menu_button("QuitGameButton", "QUIT TO DESKTOP")
 	_quit_game_button.pressed.connect(_on_quit)
 	_apply_system_action_style(_quit_game_button, "danger_muted")
 	_system_stack.add_child(_quit_game_button)
@@ -612,7 +599,6 @@ func _build_title_page() -> void:
 		Rect2(0.046, 0.287, 0.078, 0.002),
 		Color(0.83, 0.69, 0.50, 0.62)
 	)
-	_build_title_incident_docket(_title_page)
 	var center: Control = Control.new()
 	center.name = "Center"
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -667,7 +653,7 @@ func _build_title_page() -> void:
 	entry_affordance.add_child(entry_copy)
 	var entry_order: Label = Label.new()
 	entry_order.name = "EntryOrder"
-	entry_order.text = "CLICK ANYWHERE // OPEN FIELD RECORD"
+	entry_order.text = "CLICK TO CONTINUE"
 	entry_order.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	entry_order.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	entry_order.add_theme_font_size_override("font_size", 18)
@@ -691,45 +677,6 @@ func _build_title_page() -> void:
 	_title_page.gui_input.connect(_on_title_page_gui_input)
 	_layout_title_gateway()
 
-func _build_title_incident_docket(title_page: Control) -> void:
-	if title_page == null:
-		return
-	var docket: PanelContainer = PanelContainer.new()
-	docket.name = "IncidentEvidenceDocket"
-	docket.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	docket.z_index = 2
-	docket.anchor_left = 0.715
-	docket.anchor_top = 0.680
-	docket.anchor_right = 0.955
-	docket.anchor_bottom = 0.825
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.008, 0.007, 0.009, 0.68)
-	style.border_color = Color(0.62, 0.052, 0.064, 0.82)
-	style.border_width_left = 5
-	style.border_width_top = 0
-	style.border_width_right = 0
-	style.border_width_bottom = 1
-	style.content_margin_left = 12.0
-	style.content_margin_top = 8.0
-	style.content_margin_right = 10.0
-	style.content_margin_bottom = 7.0
-	docket.add_theme_stylebox_override("panel", style)
-	title_page.add_child(docket)
-	var incident: Label = Label.new()
-	incident.name = "IncidentEvidence"
-	incident.text = TITLE_INCIDENT_DESKTOP_COPY
-	incident.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	incident.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	incident.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	incident.add_theme_font_size_override("font_size", 14)
-	incident.add_theme_color_override("font_color", Color(0.84, 0.78, 0.68, 0.92))
-	incident.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
-	incident.add_theme_constant_override("outline_size", 2)
-	VisualTypeSystem.set_utility_bold(incident)
-	incident.set_meta("organized_cruelty_evidence", true)
-	incident.set_meta("survivor_consequence_evidence", true)
-	docket.add_child(incident)
-
 func _layout_title_gateway() -> void:
 	if _title_page == null or not is_instance_valid(_title_page):
 		return
@@ -738,29 +685,8 @@ func _layout_title_gateway() -> void:
 	var window: Window = get_window()
 	var physical_size: Vector2 = Vector2(window.size) if window != null else logical_size
 	var large_4k: bool = physical_size.x >= 3000.0 and physical_size.y >= 1600.0
-	var docket: PanelContainer = _title_page.get_node_or_null("IncidentEvidenceDocket") as PanelContainer
-	var incident: Label = docket.get_node_or_null("IncidentEvidence") as Label if docket != null else null
 	var entry_affordance: PanelContainer = _title_page.get_node_or_null("Center/Stack/EntryAffordance") as PanelContainer
 	var entry_order: Label = _title_page.get_node_or_null("Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
-	if docket != null:
-		docket.anchor_left = 0.535 if compact else (0.675 if large_4k else 0.715)
-		docket.anchor_top = 0.655 if compact else (0.655 if large_4k else 0.680)
-		docket.anchor_right = 0.955
-		docket.anchor_bottom = 0.855 if compact else (0.840 if large_4k else 0.825)
-		docket.set_meta("compact_gateway_layout", compact)
-		docket.set_meta("responsive_density", "4k_readable" if large_4k else ("compact" if compact else "desktop"))
-		var docket_style: StyleBoxFlat = docket.get_theme_stylebox("panel") as StyleBoxFlat
-		if docket_style != null:
-			docket_style.content_margin_left = 20.0 if large_4k else 12.0
-			docket_style.content_margin_top = 14.0 if large_4k else 8.0
-			docket_style.content_margin_right = 18.0 if large_4k else 10.0
-			docket_style.content_margin_bottom = 12.0 if large_4k else 7.0
-	if incident != null:
-		incident.text = TITLE_INCIDENT_COMPACT_COPY if compact else TITLE_INCIDENT_DESKTOP_COPY
-		incident.add_theme_font_size_override("font_size", 11 if compact else (20 if large_4k else 14))
-		incident.clip_text = false
-		incident.set_meta("compact_copy", compact)
-		incident.set_meta("responsive_type_role", "4k_incident_evidence" if large_4k else ("compact_incident_evidence" if compact else "desktop_incident_evidence"))
 	if entry_affordance != null:
 		entry_affordance.anchor_left = 0.33 if compact else (0.345 if large_4k else 0.385)
 		entry_affordance.anchor_top = 0.888 if compact else (0.885 if large_4k else 0.895)

@@ -45,15 +45,11 @@ func _run() -> void:
 	var live_system_button: Button = main.get_node_or_null("SystemMenuLayer/SystemMenuButton") as Button
 	_expect(live_system_button != null and live_system_button.text == "SYS // MENU", "live system escape hatch reverted to generic Menu copy")
 	_expect(live_system_button != null and bool(live_system_button.get_meta("authored_system_command", false)), "live system escape hatch lacks authored command styling")
-	var incident_docket: PanelContainer = main.get_node_or_null("TitlePage/IncidentEvidenceDocket") as PanelContainer
-	var incident_evidence: Label = main.get_node_or_null("TitlePage/IncidentEvidenceDocket/IncidentEvidence") as Label
 	var entry_affordance: PanelContainer = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
 	var entry_order: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
-	_expect(incident_docket != null and incident_evidence != null, "title gateway lacks its specific incident evidence docket")
-	_expect(incident_evidence != null and bool(incident_evidence.get_meta("organized_cruelty_evidence", false)), "title gateway does not establish organized cruelty")
-	_expect(incident_evidence != null and bool(incident_evidence.get_meta("survivor_consequence_evidence", false)), "title gateway does not establish survivor consequence")
+	_expect(main.get_node_or_null("TitlePage/IncidentEvidenceDocket") == null, "title gateway should not add decorative incident text")
 	_expect(entry_affordance != null and bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "title gateway entry prompt reverted to a dominant CTA slab")
-	_expect(entry_order != null and entry_order.text == "CLICK ANYWHERE // OPEN FIELD RECORD", "title gateway entry prompt does not advertise the click-anywhere interaction")
+	_expect(entry_order != null and entry_order.text == "CLICK TO CONTINUE", "title gateway entry prompt does not advertise the click interaction")
 	var overlay: Control = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay") as Control
 	if overlay != null:
 		overlay.visible = true
@@ -68,7 +64,7 @@ func _run() -> void:
 	var panel_scars: Label = main.get_node_or_null("SystemMenuLayer/SystemMenuOverlay/Center/Panel/PanelScars") as Label
 	_expect(stack != null, "System Menu stack missing")
 	_expect(title != null, "System Menu title missing")
-	_expect(filing_mark != null and filing_mark.text.contains("FIELD INTERRUPTION"), "System Menu should carry an in-world interruption filing mark")
+	_expect(filing_mark != null and not filing_mark.visible, "System Menu should hide decorative interruption text")
 	_expect(panel_scars != null, "System Menu should carry authored reproduction scars")
 	if stack != null and title != null:
 		_expect(_rect_inside(title.get_global_rect(), stack.get_global_rect().grow(1.0)), "System Menu title escaped stack bounds title=%s stack=%s" % [str(title.get_global_rect()), str(stack.get_global_rect())])

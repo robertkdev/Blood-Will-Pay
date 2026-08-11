@@ -314,7 +314,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	var compact_decision: bool = tight_compact or _uses_narrow_compact_copy()
 	if forced_first_fight:
 		var opening_risk: String = BloodBuckets.format_amount(1, compact_decision)
-		var opening_summary: String = "OPENING RISK // %s // SHOP NEXT" if compact_decision else "OPENING RISK // %s // SHOP UNLOCKS NEXT"
+		var opening_summary: String = "Opening wager: %s" if compact_decision else "Opening wager: %s. Win to unlock the shop."
 		wager_summary.text = opening_summary % opening_risk
 		wager_summary.tooltip_text = BloodBuckets.describe(1) + ". Win the forced opener to unlock wager choice and outcome quotes."
 		wager_summary.set_meta("compact_summary_format", "opening_risk")
@@ -332,10 +332,10 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	var after_win: int = StakesMarket.MAX_SAFE_BLOOD_BUCKETS if after_loss > StakesMarket.MAX_SAFE_BLOOD_BUCKETS - gross_payout else after_loss + gross_payout
 	var risk_prefix: String = ""
 	if not in_combat and wager > 0 and wager >= int(Economy.blood_buckets):
-		risk_prefix = "ALL IN // " if compact_decision else "ALL IN ARMED // "
+		risk_prefix = "All in  •  "
 	if compact_decision:
 		var locked_suffix: String = " LOCKED" if in_combat else ""
-		wager_summary.text = "DECISION // %sRISK %s%s // WIN %d-%d%% // RESERVE W%s / L%s" % [
+		wager_summary.text = "%sWager %s%s  •  Win %d-%d%%  •  After: W%s / L%s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager, true),
 			locked_suffix,
@@ -346,7 +346,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
 	else:
-		wager_summary.text = "DECISION // %sRISK %s%s // EST. WIN %d-%d%% // WIN RESERVE %s // LOSS RESERVE %s" % [
+		wager_summary.text = "%sWager %s%s  •  Win %d-%d%%  •  After: W%s / L%s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager),
 			" LOCKED" if in_combat else "",

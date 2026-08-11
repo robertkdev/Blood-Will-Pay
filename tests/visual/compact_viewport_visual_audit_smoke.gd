@@ -667,8 +667,8 @@ func _expect_planning_landmark_contract(context: String, board_column: Control, 
 	var hostile_band: ColorRect = enemy_area.get_node_or_null("HostileFieldOrderBand") as ColorRect if enemy_area != null else null
 	var survival_band: ColorRect = player_area.get_node_or_null("SurvivalFieldOrderBand") as ColorRect if player_area != null else null
 	var planning_directive: Label = board_column.get_node_or_null("PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
-	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text.contains("HOSTILE LINE"), "%s hostile battlefield landmark is missing" % context)
-	_expect(survival_label != null and survival_label.is_visible_in_tree() and (survival_label.text.contains("SURVIVAL LINE") or survival_label.text.contains("HOLD LINE")), "%s survival battlefield landmark is missing" % context)
+	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text == "ENEMY", "%s enemy battlefield marker is missing" % context)
+	_expect(survival_label != null and survival_label.is_visible_in_tree() and survival_label.text == "YOUR TEAM", "%s player battlefield marker is missing" % context)
 	_expect(hostile_band != null and hostile_band.is_visible_in_tree() and bool(hostile_band.get_meta("planning_landmark", false)), "%s hostile battlefield lane is missing" % context)
 	_expect(survival_band != null and survival_band.is_visible_in_tree() and bool(survival_band.get_meta("planning_landmark", false)), "%s survival battlefield lane is missing" % context)
 	_expect(survival_label != null and bool(survival_label.get_meta("deployment_badge_clearance", false)), "%s survival landmark lacks deployment-badge clearance metadata" % context)
@@ -911,7 +911,7 @@ func _expect_scaled_decision_data(context: String) -> void:
 		_expect_control_inside(resource_strip, "%s blood/level/XP record" % context)
 	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s enlarged layout hid wager outcomes" % context)
 	if wager_summary != null:
-		for required_copy: String in ["DECISION", "WIN", "RESERVE", "W", "L"]:
+		for required_copy: String in ["Wager", "Win", "After:", "W", "L"]:
 			_expect(wager_summary.text.contains(required_copy), "%s wager outcome record omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome record" % context)
 
@@ -1080,7 +1080,7 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
 	if wager_summary != null:
 		_expect(wager_summary.get_theme_font_size("font_size") >= (14 if tight else 18), "%s wager outcome metadata is too small" % context)
-		for required_copy: String in ["DECISION", "RISK", "WIN", "RESERVE", "W", "L"]:
+		for required_copy: String in ["Wager", "Win", "After:", "W", "L"]:
 			_expect(wager_summary.text.contains(required_copy), "%s wager outcome metadata omitted %s" % [context, required_copy])
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
