@@ -16,6 +16,9 @@ var _buy_xp: Button = null
 var _progress_label: Label = null
 var _progression_available: bool = true
 var _enabled: bool = true
+var _reroll_pending: bool = false
+var _reroll_action_text: String = "Reroll"
+var _reroll_action_tooltip: String = ""
 
 func configure(host_container: Container) -> HBoxContainer:
 	_host = host_container
@@ -33,9 +36,9 @@ func _ensure_bar() -> void:
 	# Prefer top placement
 	_host.move_child(_bar, 0)
 	_reroll = Button.new()
-	_reroll.text = "Reroll"
+	_reroll.text = _reroll_action_text
 	_reroll.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_reroll.pressed.connect(func(): emit_signal("reroll_pressed"))
+	_reroll.pressed.connect(_on_reroll_button_pressed)
 	_lock = Button.new()
 	_lock.text = "Lock"
 	_lock.toggle_mode = true
@@ -72,6 +75,14 @@ func teardown() -> void:
 	_buy_xp = null
 	_progress_label = null
 	_enabled = true
+	_reroll_pending = false
+	_reroll_action_text = "Reroll"
+	_reroll_action_tooltip = ""
+
+func _on_reroll_button_pressed() -> void:
+	if _reroll_pending:
+		return
+	reroll_pressed.emit()
 
 func set_locked(locked: bool) -> void:
 	if _lock:
@@ -81,8 +92,9 @@ func set_enabled(enabled: bool) -> void:
 	var en: bool = bool(enabled)
 	_enabled = en
 	if _reroll:
-		_reroll.disabled = not en
-		_reroll.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if en else Control.CURSOR_ARROW
+		var reroll_enabled: bool = en and not _reroll_pending
+		_reroll.disabled = not reroll_enabled
+		_reroll.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if reroll_enabled else Control.CURSOR_ARROW
 	if _lock:
 		_lock.disabled = not en
 		_lock.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if en else Control.CURSOR_ARROW
@@ -102,9 +114,12 @@ func set_progress(level: int, xp: int, xp_to_next: int) -> void:
 		_progress_label.text = "Lvl %d (%d/%d)" % [int(level), cur, need]
 
 func set_action_prices(reroll_price: int, progression_price: int, progression_mode: String, command_rank: int = 0) -> void:
+	_reroll_action_text = "Reroll — %s" % BloodBuckets.format_amount(max(0, int(reroll_price)), true)
+	_reroll_action_tooltip = BloodBuckets.describe(max(0, int(reroll_price)))
 	if _reroll != null:
-		_reroll.text = "Reroll — %s" % BloodBuckets.format_amount(max(0, int(reroll_price)), true)
-		_reroll.tooltip_text = BloodBuckets.describe(max(0, int(reroll_price)))
+		if not _reroll_pending:
+			_reroll.text = _reroll_action_text
+			_reroll.tooltip_text = _reroll_action_tooltip
 	if _buy_xp != null:
 		if String(progression_mode) == "command":
 			_buy_xp.text = "Command Research — %s" % BloodBuckets.format_amount(max(0, int(progression_price)), true)
@@ -125,8 +140,25 @@ func set_progression_available(available: bool, progression_mode: String) -> voi
 		_buy_xp.text = "Research Complete"
 
 func set_reroll_tooltip(text: String) -> void:
+	_reroll_action_tooltip = String(text)
 	if _reroll:
-		_reroll.tooltip_text = String(text)
+		if not _reroll_pending:
+			_reroll.tooltip_text = _reroll_action_tooltip
+
+func set_reroll_pending(pending: bool) -> void:
+	_reroll_pending = bool(pending)
+	if _reroll == null:
+		return
+	_reroll.text = "Rerolling…" if _reroll_pending else _reroll_action_text
+	_reroll.disabled = _reroll_pending or not _enabled
+	_reroll.mouse_default_cursor_shape = Control.CURSOR_ARROW if _reroll.disabled else Control.CURSOR_POINTING_HAND
+	if _reroll_pending:
+		_reroll.tooltip_text = "Refreshing the shop"
+	else:
+		_reroll.tooltip_text = _reroll_action_tooltip
+
+func is_reroll_pending() -> bool:
+	return _reroll_pending
 
 func set_lock_tooltip(text: String) -> void:
 	if _lock:

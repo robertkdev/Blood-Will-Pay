@@ -70,15 +70,40 @@ func _run() -> void:
 	_expect(_tooltip_count() == 1, "shop hover motion should keep a single tooltip")
 
 	var old_card_instance_id: int = card.get_instance_id()
-	var reroll_result: Dictionary = Shop.reroll()
-	_expect(bool(reroll_result.get("ok", false)), "shop reroll should succeed during hover cleanup test")
-	_expect(_tooltip_count() == 0, "shop rebuild should synchronously clear tooltip from old hovered card")
+	var reroll_emissions: int = 0
+	var count_reroll := func(_offers: Array) -> void:
+		reroll_emissions += 1
+	Shop.offers_changed.connect(count_reroll)
+	var buttons: ShopButtons = _presenter.get("_buttons") as ShopButtons
+	var reroll_button: Button = buttons.get("_reroll") as Button if buttons != null else null
+	if reroll_button != null:
+		reroll_button.pressed.emit()
+	else:
+		_presenter.call("_on_reroll")
+	_expect(buttons != null and buttons.is_reroll_pending(), "accepted reroll must publish pending feedback synchronously")
+	_expect(reroll_button != null and reroll_button.disabled and String(reroll_button.text).contains("Rerolling"), "accepted reroll must visibly disable and relabel its button")
+	_expect(reroll_emissions == 0, "accepted reroll must not synchronously rebuild the shop")
+	_expect(_first_shop_card() != null and _first_shop_card().get_instance_id() == old_card_instance_id, "pending feedback must render before replacing shop cards")
+	if reroll_button != null:
+		reroll_button.pressed.emit()
+	else:
+		_presenter.call("_on_reroll")
+	_expect(reroll_emissions == 0, "pending reroll must reject repeat activation")
+	await _settle_frames(1)
+	_expect(reroll_emissions == 0, "reroll mutation must wait through its first feedback frame")
+	await _settle_frames(4)
+	_expect(reroll_emissions == 1, "accepted reroll must eventually rebuild exactly once")
+	_expect(buttons != null and not buttons.is_reroll_pending(), "reroll pending state must clear after rebound")
+	_expect(reroll_button != null and not reroll_button.disabled and not String(reroll_button.text).contains("Rerolling"), "reroll button must recover after rebound")
+	if Shop.offers_changed.is_connected(count_reroll):
+		Shop.offers_changed.disconnect(count_reroll)
+	_expect(_tooltip_count() == 0, "eventual shop rebuild should clear tooltip from old hovered card")
 	var rebound_card: ShopCard = _first_shop_card_excluding(old_card_instance_id)
-	_expect(rebound_card != null, "shop card missing immediately after reroll binding")
+	_expect(rebound_card != null, "shop card missing after deferred reroll binding")
 	if rebound_card != null:
 		_expect(String(rebound_card.get_meta("tooltip_detail_state", "")) == "deferred", "reroll binding must keep replacement-card tooltip detail deferred")
 		_expect(not bool(rebound_card.get("_tooltip_details_built")), "reroll binding must not build replacement-card tooltip detail")
-	await _settle_frames(8)
+	await _settle_frames(4)
 	_expect(_tooltip_count() <= 1, "shop rebuild should never leave stacked old and new tooltips")
 	var rebuilt_tooltip: Control = _first_tooltip()
 	if rebuilt_tooltip != null:
