@@ -70,9 +70,9 @@ func _run() -> void:
 	_expect(_tooltip_count() == 1, "shop hover motion should keep a single tooltip")
 
 	var old_card_instance_id: int = card.get_instance_id()
-	var reroll_emissions: int = 0
+	var reroll_probe := {"emissions": 0}
 	var count_reroll := func(_offers: Array) -> void:
-		reroll_emissions += 1
+		reroll_probe["emissions"] = int(reroll_probe.get("emissions", 0)) + 1
 	Shop.offers_changed.connect(count_reroll)
 	var buttons: ShopButtons = _presenter.get("_buttons") as ShopButtons
 	var reroll_button: Button = buttons.get("_reroll") as Button if buttons != null else null
@@ -82,17 +82,17 @@ func _run() -> void:
 		_presenter.call("_on_reroll")
 	_expect(buttons != null and buttons.is_reroll_pending(), "accepted reroll must publish pending feedback synchronously")
 	_expect(reroll_button != null and reroll_button.disabled and String(reroll_button.text).contains("Rerolling"), "accepted reroll must visibly disable and relabel its button")
-	_expect(reroll_emissions == 0, "accepted reroll must not synchronously rebuild the shop")
+	_expect(int(reroll_probe.get("emissions", 0)) == 0, "accepted reroll must not synchronously rebuild the shop")
 	_expect(_first_shop_card() != null and _first_shop_card().get_instance_id() == old_card_instance_id, "pending feedback must render before replacing shop cards")
 	if reroll_button != null:
 		reroll_button.pressed.emit()
 	else:
 		_presenter.call("_on_reroll")
-	_expect(reroll_emissions == 0, "pending reroll must reject repeat activation")
+	_expect(int(reroll_probe.get("emissions", 0)) == 0, "pending reroll must reject repeat activation")
 	await _settle_frames(1)
-	_expect(reroll_emissions == 0, "reroll mutation must wait through its first feedback frame")
+	_expect(int(reroll_probe.get("emissions", 0)) == 0, "reroll mutation must wait through its first feedback frame")
 	await _settle_frames(4)
-	_expect(reroll_emissions == 1, "accepted reroll must eventually rebuild exactly once")
+	_expect(int(reroll_probe.get("emissions", 0)) == 1, "accepted reroll must eventually rebuild exactly once")
 	_expect(buttons != null and not buttons.is_reroll_pending(), "reroll pending state must clear after rebound")
 	_expect(reroll_button != null and not reroll_button.disabled and not String(reroll_button.text).contains("Rerolling"), "reroll button must recover after rebound")
 	if Shop.offers_changed.is_connected(count_reroll):
