@@ -40,17 +40,13 @@ func _run() -> void:
 		_expect(enter_button != null, "TitlePage EnterButton missing", failures)
 		var continue_prompt: Label = main.get_node_or_null("TitlePage/Center/Stack/ContinuePrompt") as Label
 		_expect(continue_prompt == null, "TitlePage must not restore the generic ContinuePrompt", failures)
-		var gateway_incident: Label = main.get_node_or_null("TitlePage/IncidentEvidenceDocket/IncidentEvidence") as Label
-		_expect(gateway_incident != null, "TitlePage incident evidence missing", failures)
-		if gateway_incident != null:
-			main.call("_layout_title_gateway")
-			_expect(not gateway_incident.text.contains("\nBOUND") and not gateway_incident.text.contains("HANDS BOUND"), "Title incident copy should not orphan BOUND at compact scale", failures)
+		_expect(main.get_node_or_null("TitlePage/IncidentEvidenceDocket") == null, "TitlePage should not add decorative incident text", failures)
 		var entry_affordance: PanelContainer = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
 		var entry_order: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
 		var entry_action: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryAction") as Label
 		_expect(entry_affordance != null and entry_affordance.is_visible_in_tree() and entry_affordance.modulate.a >= 0.90, "TitlePage should expose a visible entry affordance", failures)
 		_expect(entry_affordance != null and _rect_inside(entry_affordance.get_global_rect(), title_page.get_global_rect().grow(1.0)), "TitlePage entry affordance should remain inside the authored composition", failures)
-		_expect(entry_order != null and entry_order.is_visible_in_tree() and entry_order.text.contains("CLICK ANYWHERE") and entry_order.text.contains("FIELD RECORD"), "TitlePage entry affordance should communicate entry through restrained field-record language", failures)
+		_expect(entry_order != null and entry_order.is_visible_in_tree() and entry_order.text == "CLICK TO CONTINUE", "TitlePage entry affordance should use a direct, readable action", failures)
 		_expect(entry_action != null and not entry_action.visible, "TitlePage should not duplicate the restrained entry instruction with a poster-sized action label", failures)
 		_expect(entry_affordance != null and bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "TitlePage entry affordance should publish its restrained CTA contract", failures)
 		var visible_entry_copy: String = "%s %s" % [entry_order.text if entry_order != null else "", entry_action.text if entry_action != null else ""]
@@ -106,19 +102,9 @@ func _run() -> void:
 			_expect(title_label.get_theme_constant("outline_size") <= 2, "GameTitle should avoid a glossy poster-style outline", failures)
 		var subtitle: Label = title_menu.get_node_or_null("Center/VBox/Subtitle") as Label
 		_expect(subtitle != null and subtitle.text == "Their lives. Your odds.", "Title menu should use the new tagline", failures)
-		var title_record_mark: Label = title_menu.get_node_or_null("Center/VBox/TitleRecordMark") as Label
-		_expect(title_record_mark != null and title_record_mark.text == "FIELD RECORD 01 // DEBT OUTSTANDING", "Title rail should bridge into an in-world field record", failures)
-		_expect(title_record_mark != null and title_record_mark.get_theme_font_size("font_size") >= 17, "Title record mark should remain functional-size copy", failures)
-		var consequence_mark: Label = title_menu.get_node_or_null("Center/VBox/WarDebtConsequenceMark") as Label
-		_expect(consequence_mark != null and consequence_mark.text.contains("BWP CASUALTY OFFICE"), "Title rail should name the Blood Will Pay casualty institution", failures)
-		var incident_record: Label = title_menu.get_node_or_null("Center/VBox/IncidentRecord") as Label
-		_expect(incident_record != null and incident_record.visible, "Desktop title rail should expose a specific witnessed incident", failures)
-		if incident_record != null:
-			var incident_copy: String = incident_record.text.to_upper()
-			_expect(incident_copy.contains("MERCY HOUSE") and incident_copy.contains("EAST WARD") and incident_copy.contains("INCIDENT 04"), "Title incident should name one bounded location and record", failures)
-			_expect(incident_copy.contains("DOORS WIRED SHUT") and incident_copy.contains("17 MISSING"), "Title incident should expose organized cruelty and its consequence", failures)
-			_expect(incident_copy.contains("ONE WITNESS") and incident_copy.contains("ASH CELLAR"), "Title incident should retain concrete survivor evidence", failures)
-			_expect(incident_record.get_theme_font_size("font_size") >= 16, "Title incident record should remain functional-size copy", failures)
+		_expect(title_menu.get_node_or_null("Center/VBox/TitleRecordMark") == null, "Title menu should not add decorative record text", failures)
+		_expect(title_menu.get_node_or_null("Center/VBox/WarDebtConsequenceMark") == null, "Title menu should not add decorative consequence text", failures)
+		_expect(title_menu.get_node_or_null("Center/VBox/IncidentRecord") == null, "Title menu should not add decorative incident text", failures)
 		var misregister: Label = title_menu.get_node_or_null("Center/VBox/GameTitle/Misregister") as Label
 		var bone_ghost: Label = title_menu.get_node_or_null("Center/VBox/GameTitle/BoneGhost") as Label
 		var pay_block: ColorRect = title_menu.get_node_or_null("Center/VBox/GameTitle/PayBlock") as ColorRect

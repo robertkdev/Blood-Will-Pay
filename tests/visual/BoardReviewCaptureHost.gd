@@ -949,27 +949,15 @@ func _assert_combat_return_finished_under_result(combat: Control, controller: Va
 
 func _assert_title_gateway_contract(context: String, compact: bool) -> void:
 	var title_page: Control = _main.get_node_or_null("TitlePage") as Control if _main != null else null
-	var docket: PanelContainer = title_page.get_node_or_null("IncidentEvidenceDocket") as PanelContainer if title_page != null else null
-	var incident: Label = docket.get_node_or_null("IncidentEvidence") as Label if docket != null else null
 	var entry_affordance: PanelContainer = title_page.get_node_or_null("Center/Stack/EntryAffordance") as PanelContainer if title_page != null else null
 	_expect(title_page != null and title_page.is_visible_in_tree(), "%s gateway is not visible" % context)
-	_expect(docket != null and docket.is_visible_in_tree(), "%s incident docket is missing" % context)
-	_expect(incident != null and incident.is_visible_in_tree(), "%s incident evidence is missing" % context)
+	_expect(title_page != null and title_page.get_node_or_null("IncidentEvidenceDocket") == null, "%s gateway retained decorative incident text" % context)
 	_expect(entry_affordance != null and entry_affordance.is_visible_in_tree(), "%s entry affordance is missing" % context)
-	if docket == null or incident == null or entry_affordance == null:
+	if entry_affordance == null:
 		return
 	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
-	var docket_rect: Rect2 = docket.get_global_rect()
-	var incident_rect: Rect2 = incident.get_global_rect()
 	var entry_rect: Rect2 = entry_affordance.get_global_rect()
-	_expect(viewport_rect.encloses(docket_rect), "%s incident docket exceeds the logical viewport: %s" % [context, str(docket_rect)])
-	_expect(docket_rect.encloses(incident_rect), "%s incident evidence exceeds its docket: docket=%s evidence=%s" % [context, str(docket_rect), str(incident_rect)])
 	_expect(viewport_rect.encloses(entry_rect), "%s entry affordance exceeds the logical viewport: %s" % [context, str(entry_rect)])
-	_expect(not incident.clip_text, "%s incident evidence enables text clipping" % context)
-	_expect(incident.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART, "%s incident evidence lost authored wrapping" % context)
-	_expect(bool(docket.get_meta("compact_gateway_layout", not compact)) == compact, "%s uses the wrong responsive docket layout" % context)
-	_expect(bool(incident.get_meta("compact_copy", not compact)) == compact, "%s uses the wrong incident copy density" % context)
-	_expect(incident.text.contains("OLD MILL ROAD") and incident.text.contains("RESTRAINT MARKS"), "%s lost its specific atrocity evidence" % context)
 	_expect(bool(entry_affordance.get_meta("restrained_click_anywhere_cue", false)), "%s entry affordance lost its restrained CTA contract" % context)
 
 

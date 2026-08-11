@@ -1006,7 +1006,7 @@ func _ensure_board_status_row() -> void:
 	board_phase_label = board_status_row.get_node_or_null("BoardPhaseLabel") as Label
 	if board_phase_label == null:
 		board_phase_label = _make_board_status_label("BoardPhaseLabel")
-		board_phase_label.text = "/// PLAN"
+		board_phase_label.text = "PLAN"
 		board_status_row.add_child(board_phase_label)
 	board_status_row.move_child(board_phase_label, 0)
 	board_timer_label = board_status_row.get_node_or_null("BoardTimerLabel") as Label
@@ -1077,7 +1077,7 @@ func _update_board_status() -> void:
 				phase_text = "AFTERMATH"
 		if _last_result_title != "" and phase_text == "PLAN":
 			phase_text = "%s / PLAN" % _last_result_title
-		board_phase_label.text = "/// " + phase_text
+		board_phase_label.text = phase_text
 		board_phase_label.tooltip_text = "Current run phase and most recent battle outcome."
 	if board_timer_label != null and String(board_timer_label.text).strip_edges() == "":
 		board_timer_label.text = "Plan --"

@@ -55,17 +55,13 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		_expect(is_equal_approx(window.content_scale_factor, ui_scale), "%dx%d @ %d%% Main should apply the persisted UI scale to its window" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
 	if viewport_size == Vector2i(3840, 2160):
 		var title_page: Control = _main.get_node_or_null("TitlePage") as Control
-		var incident_docket: PanelContainer = _main.get_node_or_null("TitlePage/IncidentEvidenceDocket") as PanelContainer
-		var incident_copy: Label = _main.get_node_or_null("TitlePage/IncidentEvidenceDocket/IncidentEvidence") as Label
 		var entry_affordance: PanelContainer = _main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
 		var entry_order: Label = _main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label
 		_expect(title_page != null and title_page.visible, "3840x2160 title gateway should remain the initial player-facing surface")
-		_expect(incident_docket != null and String(incident_docket.get_meta("responsive_density", "")) == "4k_readable", "3840x2160 incident docket should use its authored 4K density")
-		_expect(incident_copy != null and incident_copy.get_theme_font_size("font_size") >= 20, "3840x2160 incident docket copy should scale above desktop size")
+		_expect(_main.get_node_or_null("TitlePage/IncidentEvidenceDocket") == null, "3840x2160 title gateway should remain free of decorative incident text")
 		_expect(entry_affordance != null and String(entry_affordance.get_meta("responsive_density", "")) == "4k_readable", "3840x2160 click prompt should use its authored 4K density")
 		_expect(entry_order != null and entry_order.get_theme_font_size("font_size") >= 20, "3840x2160 click prompt should scale above desktop size")
-		if title_page != null and incident_docket != null and entry_affordance != null:
-			_expect(incident_docket.size.x >= title_page.size.x * 0.27, "3840x2160 incident docket should not remain disproportionately narrow")
+		if title_page != null and entry_affordance != null:
 			_expect(entry_affordance.size.x >= title_page.size.x * 0.29, "3840x2160 click prompt should not remain disproportionately narrow")
 	var enter_button: Button = _main.get_node_or_null("TitlePage/Center/Stack/EnterButton") as Button
 	if enter_button != null:

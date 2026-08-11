@@ -667,8 +667,8 @@ func _expect_planning_landmark_contract(context: String, board_column: Control, 
 	var hostile_band: ColorRect = enemy_area.get_node_or_null("HostileFieldOrderBand") as ColorRect if enemy_area != null else null
 	var survival_band: ColorRect = player_area.get_node_or_null("SurvivalFieldOrderBand") as ColorRect if player_area != null else null
 	var planning_directive: Label = board_column.get_node_or_null("PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
-	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text.contains("HOSTILE LINE"), "%s hostile battlefield landmark is missing" % context)
-	_expect(survival_label != null and survival_label.is_visible_in_tree() and (survival_label.text.contains("SURVIVAL LINE") or survival_label.text.contains("HOLD LINE")), "%s survival battlefield landmark is missing" % context)
+	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text == "ENEMY", "%s enemy battlefield marker is missing" % context)
+	_expect(survival_label != null and survival_label.is_visible_in_tree() and survival_label.text == "YOUR TEAM", "%s player battlefield marker is missing" % context)
 	_expect(hostile_band != null and hostile_band.is_visible_in_tree() and bool(hostile_band.get_meta("planning_landmark", false)), "%s hostile battlefield lane is missing" % context)
 	_expect(survival_band != null and survival_band.is_visible_in_tree() and bool(survival_band.get_meta("planning_landmark", false)), "%s survival battlefield lane is missing" % context)
 	_expect(survival_label != null and bool(survival_label.get_meta("deployment_badge_clearance", false)), "%s survival landmark lacks deployment-badge clearance metadata" % context)

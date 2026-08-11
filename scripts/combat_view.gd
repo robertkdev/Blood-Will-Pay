@@ -844,18 +844,10 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	label.offset_top = 0.0
 	label.offset_right = 0.0
 	label.offset_bottom = 0.0
-	label.text = (
-		"HOSTILE LINE // BREAK CONTACT"
-		if enemy_side
-		else "SURVIVAL LINE // HOLD / COMMIT"
-	)
-	if tight_compact:
-		label.text = "HOSTILE LINE" if enemy_side else "HOLD LINE"
-	elif compact and not enemy_side:
-		label.text = "HOLD LINE // COMMIT"
+	label.text = "ENEMY" if enemy_side else "YOUR TEAM"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if enemy_side else HORIZONTAL_ALIGNMENT_RIGHT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 13 if maximum_scale_layout else 12 if tight_compact else 15 if compact else 19)
+	label.add_theme_font_size_override("font_size", 12 if maximum_scale_layout else 11 if tight_compact else 13 if compact else 16)
 	label.add_theme_color_override("font_color", Color(1.0, 0.58, 0.47, 0.96) if enemy_side else Color(1.0, 0.90, 0.69, 0.96))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.94))
 	label.add_theme_constant_override("outline_size", 2)
@@ -863,8 +855,7 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	label_plate.bg_color = Color(0.012, 0.010, 0.013, 0.91)
 	label_plate.border_color = Color(0.82, 0.07, 0.09, 0.92) if enemy_side else Color(0.76, 0.62, 0.38, 0.90)
 	label_plate.border_width_left = 4 if enemy_side else 1
-	# A terminal right rule reads like a clipped text delimiter beside the
-	# intentionally shortened maximum-scale "HOLD LINE" label.
+	# Keep the label plate narrow so its team marker never competes with board units.
 	label_plate.border_width_right = 0 if maximum_scale_layout and not enemy_side else 1 if enemy_side else 4
 	label_plate.content_margin_left = 8.0
 	label_plate.content_margin_right = 8.0

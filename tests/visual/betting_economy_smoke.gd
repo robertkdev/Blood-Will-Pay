@@ -258,7 +258,7 @@ func _verify_post_shop_bet_controls() -> void:
 		_expect(armed_style != null and armed_style.texture != null and String(armed_style.texture.resource_path).ends_with("button_wager_selected.png"), "armed all-in control should use the authored selected wager state")
 	if wager_summary != null:
 		var summary_copy: String = String(wager_summary.text)
-		_expect(summary_copy.begins_with("DECISION //"), "wager summary should identify the planning decision: %s" % summary_copy)
+		_expect(summary_copy.contains("Wager") and summary_copy.contains("Win"), "wager summary should state the wager and win estimate: %s" % summary_copy)
 		_expect(summary_copy.contains("ALL IN") and summary_copy.contains("RISK " + BloodBuckets.format_amount(max_bet)), "all-in summary should expose its armed wager: %s" % summary_copy)
 		_expect(summary_copy.contains("EST. WIN ") and summary_copy.contains("-") and summary_copy.contains("WIN RESERVE ") and summary_copy.contains("LOSS RESERVE "), "wager summary should show an estimated range and both reserve outcomes: %s" % summary_copy)
 	var bottom_storage: Control = _main.find_child("BottomStorageArea", true, false) as Control if _main != null else null

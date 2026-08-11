@@ -618,54 +618,12 @@ func _ensure_subtitle() -> void:
 	VisualTypeSystem.set_utility_bold(_subtitle)
 	_subtitle.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.70))
 	_subtitle.add_theme_constant_override("outline_size", 2)
-	var record_mark: Label = center_vbox.get_node_or_null("TitleRecordMark") as Label
-	if record_mark == null:
-		record_mark = Label.new()
-		record_mark.name = "TitleRecordMark"
-		center_vbox.add_child(record_mark)
-		center_vbox.move_child(record_mark, min(2, center_vbox.get_child_count() - 1))
-	record_mark.text = "FIELD RECORD 01 // DEBT OUTSTANDING"
-	record_mark.visible = not short_compact
-	record_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	record_mark.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	record_mark.add_theme_font_size_override("font_size", 17)
-	record_mark.add_theme_color_override("font_color", Color(0.97, 0.48, 0.38, 1.0))
-	VisualTypeSystem.set_utility_bold(record_mark)
-	var consequence_mark: Label = center_vbox.get_node_or_null("WarDebtConsequenceMark") as Label
-	if consequence_mark == null:
-		consequence_mark = Label.new()
-		consequence_mark.name = "WarDebtConsequenceMark"
-		center_vbox.add_child(consequence_mark)
-		center_vbox.move_child(consequence_mark, min(3, center_vbox.get_child_count() - 1))
-	consequence_mark.text = "BWP CASUALTY OFFICE // PAYMENT DUE ON CONTACT"
-	consequence_mark.visible = not short_compact
-	consequence_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	consequence_mark.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	consequence_mark.add_theme_font_size_override("font_size", 16 if compact else 17)
-	consequence_mark.add_theme_color_override("font_color", Color(0.88, 0.80, 0.66, 0.96))
-	VisualTypeSystem.set_utility_bold(consequence_mark)
-	var incident_mark: Label = center_vbox.get_node_or_null("IncidentRecord") as Label
-	if incident_mark == null:
-		incident_mark = Label.new()
-		incident_mark.name = "IncidentRecord"
-		center_vbox.add_child(incident_mark)
-		center_vbox.move_child(incident_mark, min(4, center_vbox.get_child_count() - 1))
-	incident_mark.text = "MERCY HOUSE // EAST WARD // INCIDENT 04\nDOORS WIRED SHUT // 17 MISSING // ONE WITNESS RECOVERED FROM ASH CELLAR"
-	incident_mark.visible = not short_compact
-	incident_mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	incident_mark.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	incident_mark.add_theme_font_size_override("font_size", 15 if compact else 16)
-	incident_mark.add_theme_constant_override("line_spacing", 2)
-	incident_mark.add_theme_color_override("font_color", Color(0.93, 0.53, 0.40, 0.98))
-	incident_mark.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.84))
-	incident_mark.add_theme_constant_override("outline_size", 2)
-	VisualTypeSystem.set_utility_bold(incident_mark)
 	_rule = center_vbox.get_node_or_null("TitleRule") as ColorRect
 	if _rule == null:
 		_rule = ColorRect.new()
 		_rule.name = "TitleRule"
 		center_vbox.add_child(_rule)
-		center_vbox.move_child(_rule, min(5, center_vbox.get_child_count() - 1))
+		center_vbox.move_child(_rule, min(2, center_vbox.get_child_count() - 1))
 	_rule.custom_minimum_size = Vector2(0.0, 3.0)
 	_rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rule.color = Color(0.70, 0.045, 0.070, 0.94)
@@ -687,8 +645,7 @@ func _ensure_action_docket() -> void:
 	if _action_docket.get_index() < target_index:
 		target_index -= 1
 	center_vbox.move_child(_action_docket, max(0, target_index))
-	_action_docket.text = "ACTIVE ORDER // ENTER THE INTAKE"
-	_action_docket.visible = not _is_short_compact_layout()
+	_action_docket.visible = false
 	_action_docket.custom_minimum_size = Vector2(0.0, 30.0)
 	_action_docket.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_action_docket.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
