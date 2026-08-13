@@ -26,12 +26,35 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 76) fail(`Expected curated history with 76 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 136) fail(`Expected curated history with 136 entries, got ${manifest.items.length}.`);
 const phaseTwoUnitIds = new Set(["korath", "veyra", "mara", "pilfer", "nyxa", "creep", "knoll", "quillith", "kett", "luna", "malachor", "sable"]);
 const nonPhaseTwoReviewV1 = manifest.items.filter((item) => item.version === "Review V1" && !phaseTwoUnitIds.has(item.unit));
 if (nonPhaseTwoReviewV1.length !== 39) fail(`Expected 39 non-Phase-Two Review V1 candidates, got ${nonPhaseTwoReviewV1.length}.`);
 if (nonPhaseTwoReviewV1.some((item) => item.current)) fail("Non-Phase-Two Review V1 candidates must not replace existing defaults.");
 if (nonPhaseTwoReviewV1.some((item) => item.status !== "Latest review candidate; no default change")) fail("Every non-Phase-Two Review V1 candidate must state that the default is unchanged.");
+const telegramGenerations = manifest.items.filter((item) => item.kind === "telegram-generation");
+if (telegramGenerations.length !== 60) fail(`Expected 60 Telegram generation-history entries, got ${telegramGenerations.length}.`);
+if (new Set(telegramGenerations.map((item) => item.unit)).size !== 39) fail("Telegram generation history must cover all 39 non-Phase-Two units.");
+if (telegramGenerations.some((item) => phaseTwoUnitIds.has(item.unit))) fail("Phase-Two art must not be mixed into the Telegram non-Phase-Two generation ledger.");
+if (telegramGenerations.some((item) => item.current)) fail("Telegram generation history must never replace an official default.");
+if (telegramGenerations.some((item) => item.source !== "telegram" || !/^Telegram G\d{2}$/.test(item.version))) fail("Telegram generation metadata is incomplete.");
+if (telegramGenerations.some((item) => !Number.isInteger(item.generation) || item.generation < 1)) fail("Telegram generation numbers must be positive integers.");
+if (telegramGenerations.some((item) => Number.isNaN(Date.parse(item.generated_at)))) fail("Telegram generation timestamps must be valid ISO dates.");
+if (telegramGenerations.some((item) => !item.status.endsWith("no default change"))) fail("Telegram generation status must explicitly preserve the default.");
+if (telegramGenerations.some((item) => !item.local_path.startsWith(`history/telegram/${item.unit}/`))) fail("Telegram generation images must use the dedicated bundled history tree.");
+if (new Set(telegramGenerations.map((item) => item.telegram_message_id)).size !== telegramGenerations.length) fail("Telegram message provenance must be unique.");
+if (new Set(telegramGenerations.map((item) => item.content_key)).size !== telegramGenerations.length) fail("Telegram generation content keys must be unique.");
+for (const item of telegramGenerations) {
+	const provenance = item.path.match(/^telegram:message:(\d+):sha256:([0-9a-f]{64})$/);
+	if (!provenance || provenance[1] !== item.telegram_message_id) fail(`Invalid Telegram provenance for ${item.unit} ${item.version}.`);
+	const filePath = path.join(toolRoot, item.local_path);
+	if (!fs.existsSync(filePath) || sha256(filePath) !== provenance[2]) fail(`Telegram source bytes changed for ${item.unit} ${item.version}.`);
+}
+for (const unit of new Set(telegramGenerations.map((item) => item.unit))) {
+	const items = telegramGenerations.filter((item) => item.unit === unit);
+	const expected = items.map((_, index) => `Telegram G${String(index + 1).padStart(2, "0")}`);
+	if (items.map((item) => item.version).join("|") !== expected.join("|")) fail(`Telegram generations for ${unit} are not in chronological order.`);
+}
 const creepHistory = manifest.items.filter((item) => item.unit === "creep");
 if (creepHistory.length !== 4 || creepHistory.map((item) => item.version).join("|") !== "V3|V4|V5|V6") fail("Creep review history must preserve V3 through V6 in chronological order.");
 if (creepHistory.some((item) => item.version === "V6" && item.current)) fail("Creep V6 portrait crop must not replace the default.");
@@ -202,4 +225,4 @@ if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use th
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 if (html.includes("localStorage.setItem")) fail("The durable review file must be the only writable source of truth; browser storage is migration-only.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=76 non-phase2-review-v1=39 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 quillith-reviews=1 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=136 telegram-generations=60 telegram-units=39 non-phase2-review-v1=39 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 quillith-reviews=1 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
