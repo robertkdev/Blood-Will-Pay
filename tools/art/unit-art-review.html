@@ -1024,6 +1024,7 @@
 				<input id="search" class="search" type="search" placeholder="Search units" autocomplete="off">
 				<div class="gameplay-filters" aria-label="Gameplay filters">
 					<label class="filter-control"><span>Role</span><select id="filter-role" aria-label="Filter by role"></select></label>
+					<label class="filter-control"><span>Traits</span><select id="filter-trait" aria-label="Filter by trait"></select></label>
 					<label class="filter-control"><span>Goal</span><select id="filter-goal" aria-label="Filter by goal"></select></label>
 					<label class="filter-control"><span>Approach</span><select id="filter-approach" aria-label="Filter by approach"></select></label>
 					<label class="filter-control"><span>Cost</span><select id="filter-cost" aria-label="Filter by cost"></select></label>
@@ -1473,6 +1474,7 @@
 			set: "all",
 			filter: "all",
 			roleFilter: "all",
+			traitFilter: "all",
 			goalFilter: "all",
 			approachFilter: "all",
 			costFilter: "all",
@@ -1501,6 +1503,7 @@
 			grid: document.getElementById("grid"),
 			search: document.getElementById("search"),
 			roleFilter: document.getElementById("filter-role"),
+			traitFilter: document.getElementById("filter-trait"),
 			goalFilter: document.getElementById("filter-goal"),
 			approachFilter: document.getElementById("filter-approach"),
 			costFilter: document.getElementById("filter-cost"),
@@ -1540,6 +1543,7 @@
 		populateGameplayFilters();
 		[
 			[els.roleFilter, "roleFilter"],
+			[els.traitFilter, "traitFilter"],
 			[els.goalFilter, "goalFilter"],
 			[els.approachFilter, "approachFilter"],
 			[els.costFilter, "costFilter"]
@@ -1834,6 +1838,7 @@
 			const info = Object.values(UNIT_INFO_DATA);
 			const identities = Object.values(UNIT_IDENTITY_DATA);
 			setFilterOptions(els.roleFilter, "All roles", info.map((item) => item.role));
+			setFilterOptions(els.traitFilter, "All traits", info.flatMap((item) => item.traits));
 			setFilterOptions(els.goalFilter, "All goals", identities.map((item) => item.goal));
 			setFilterOptions(els.approachFilter, "All approaches", identities.flatMap((item) => item.approaches));
 			setFilterOptions(els.costFilter, "All costs", info.map((item) => String(item.cost)));
@@ -1997,10 +2002,11 @@
 					(state.filter === "unmarked" && !choice) ||
 					choice === state.filter;
 				const matchesRole = state.roleFilter === "all" || info?.role === state.roleFilter;
+				const matchesTrait = state.traitFilter === "all" || info?.traits?.includes(state.traitFilter);
 				const matchesGoal = state.goalFilter === "all" || identity?.goal === state.goalFilter;
 				const matchesApproach = state.approachFilter === "all" || identity?.approaches?.includes(state.approachFilter);
 				const matchesCost = state.costFilter === "all" || String(info?.cost) === state.costFilter;
-				return matchesQuery && matchesDecision && matchesRole && matchesGoal && matchesApproach && matchesCost;
+				return matchesQuery && matchesDecision && matchesRole && matchesTrait && matchesGoal && matchesApproach && matchesCost;
 			});
 		}
 
@@ -2407,6 +2413,7 @@
 					review_set: "all",
 					filter: "all",
 					role_filter: "all",
+					trait_filter: "all",
 					goal_filter: "all",
 					approach_filter: "all",
 					cost_filter: "all",
@@ -2667,6 +2674,7 @@
 				? ui.filter
 				: "all";
 			state.roleFilter = [...els.roleFilter.options].some((option) => option.value === ui.role_filter) ? ui.role_filter : "all";
+			state.traitFilter = [...els.traitFilter.options].some((option) => option.value === ui.trait_filter) ? ui.trait_filter : "all";
 			state.goalFilter = [...els.goalFilter.options].some((option) => option.value === ui.goal_filter) ? ui.goal_filter : "all";
 			state.approachFilter = [...els.approachFilter.options].some((option) => option.value === ui.approach_filter) ? ui.approach_filter : "all";
 			state.costFilter = [...els.costFilter.options].some((option) => option.value === String(ui.cost_filter)) ? String(ui.cost_filter) : "all";
@@ -2682,6 +2690,7 @@
 			};
 			els.search.value = state.query;
 			els.roleFilter.value = state.roleFilter;
+			els.traitFilter.value = state.traitFilter;
 			els.goalFilter.value = state.goalFilter;
 			els.approachFilter.value = state.approachFilter;
 			els.costFilter.value = state.costFilter;
@@ -2750,6 +2759,7 @@
 					review_set: "all",
 					filter: state.filter,
 					role_filter: state.roleFilter,
+					trait_filter: state.traitFilter,
 					goal_filter: state.goalFilter,
 					approach_filter: state.approachFilter,
 					cost_filter: state.costFilter,
@@ -2956,6 +2966,7 @@
 				review_set_label: setLabel(state.set),
 				gameplay_filters: {
 					role: state.roleFilter,
+					trait: state.traitFilter,
 					goal: state.goalFilter,
 					approach: state.approachFilter,
 					cost: state.costFilter
