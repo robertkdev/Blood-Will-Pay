@@ -65,6 +65,7 @@ var _captured_combat_rect: Rect2 = Rect2()
 var _planning_commit_rect: Rect2 = Rect2()
 var _entry_target_rect: Rect2 = Rect2()
 var _entry_source_rect: Rect2 = Rect2()
+var _return_target_rect: Rect2 = Rect2()
 var _arena_original_z_index: int = 10
 var _arena_original_z_as_relative: bool = true
 var _planning_original_separation: int = 16
@@ -108,6 +109,7 @@ func reset() -> void:
 	_planning_commit_rect = Rect2()
 	_entry_target_rect = Rect2()
 	_entry_source_rect = Rect2()
+	_return_target_rect = Rect2()
 	field_progress_changed.emit(0.0)
 
 func set_encounter_focus(global_point: Vector2) -> void:
@@ -272,10 +274,18 @@ func get_entry_target_rect() -> Rect2:
 func get_planning_commit_rect() -> Rect2:
 	return _planning_commit_rect
 
+func get_return_target_rect() -> Rect2:
+	return _return_target_rect
+
 func _begin_return_after_layout() -> void:
 	if _state != TransitionState.RETURNING or _host == null or _planning_area == null or _arena_container == null:
 		return
-	var target_rect: Rect2 = _planning_commit_rect if _rect_is_valid(_planning_commit_rect) else _planning_grid_visual_rect()
+	# The next-stage board can move when its labels and shop rows rebuild. End
+	# the shared field transform at the freshly registered planning geometry so
+	# hiding the arena cannot expose a late vertical correction.
+	var rebuilt_planning_rect: Rect2 = _planning_grid_visual_rect()
+	var target_rect: Rect2 = rebuilt_planning_rect if _rect_is_valid(rebuilt_planning_rect) else _planning_commit_rect
+	_return_target_rect = target_rect
 	var parent_control: Control = _arena_container.get_parent() as Control
 	if not _reduced_motion and parent_control != null and _captured_combat_rect.size.x > 1.0 and _captured_combat_rect.size.y > 1.0:
 		_arena_container.position = _global_to_parent_position(parent_control, _captured_combat_rect.position)
@@ -288,10 +298,8 @@ func _begin_return_after_layout() -> void:
 		_set_return_progress(1.0)
 	else:
 		_active_tween.tween_method(Callable(self, "_set_return_progress"), 0.0, 1.0, duration)
-	_active_tween.parallel().tween_property(_arena_container, "modulate:a", 0.0, duration)
-	var result_aftermath: Control = _host.get_node_or_null("BattleResultBanner/BattleResultAftermath") as Control
-	if result_aftermath != null:
-		_active_tween.parallel().tween_property(result_aftermath, "modulate:a", 0.18, duration)
+	# Keep the stable arena opaque for the entire reverse spatial transform.
+	# Ownership changes only at the registered planning endpoint.
 	if not _reduced_motion and parent_control != null and target_rect.size.x > 1.0 and target_rect.size.y > 1.0:
 		_active_tween.parallel().tween_property(_arena_container, "position", _global_to_parent_position(parent_control, target_rect.position), duration)
 		_active_tween.parallel().tween_property(_arena_container, "size", target_rect.size, duration)
@@ -400,6 +408,7 @@ func _finish_return() -> void:
 	if _state != TransitionState.RETURNING:
 		return
 	field_progress_changed.emit(0.0)
+	_set_alpha(_arena_container, 0.0)
 	_restore_records(_planning_records)
 	_restore_records(_context_records)
 	_restore_records(_chrome_records)

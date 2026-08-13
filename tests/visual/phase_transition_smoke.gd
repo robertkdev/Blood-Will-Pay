@@ -52,17 +52,18 @@ func _run() -> void:
 	_assert_countdown_focus(combat)
 	var countdown_broadcast: Control = combat.get_node_or_null("CombatBroadcastStrip") as Control
 	_expect(countdown_broadcast != null and countdown_broadcast.visible and countdown_broadcast.modulate.a >= 0.95, "countdown should preserve the compact betting broadcast strip")
-	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 3")
+	_assert_one_arena_visible(combat, "countdown beat 3")
+	_expect(manager.get_engine() != null and not manager.is_engine_running(), "combat engine should be prepared but inactive on countdown beat 3")
 	await _wait_for_countdown_value(combat, "2", 1.0)
 	_capture("02_countdown_2")
 	_assert_joined_field_progress(combat, 8.0, "countdown 2")
-	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 2")
+	_expect(manager.get_engine() != null and not manager.is_engine_running(), "combat engine should remain inactive on countdown beat 2")
 	await _wait_for_countdown_value(combat, "1", 1.0)
 	_capture("03_countdown_1")
 	_assert_joined_field_progress(combat, 1.0, "countdown 1")
 	var countdown_label: Label = combat.get_node_or_null("CombatPhaseTransitionLayer/CountdownValue") as Label
 	_expect(countdown_label != null and countdown_label.scale == Vector2.ONE, "countdown numeral should remain scale-stable")
-	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 1")
+	_expect(manager.get_engine() != null and not manager.is_engine_running(), "combat engine should remain inactive on countdown beat 1")
 	await get_tree().create_timer(0.40).timeout
 	_expect(countdown_label != null and countdown_label.text == "1" and countdown_label.modulate.a >= 0.99, "terminal countdown numeral should hold hard through the cut")
 	_capture("03b_countdown_1_terminal")
@@ -75,6 +76,8 @@ func _run() -> void:
 	var arena_bridge: Variant = controller.get("arena_bridge")
 	var entry_snapshot: Dictionary = arena_bridge.call("get_transition_debug_snapshot") if arena_bridge != null else {}
 	var presentation_ids: Dictionary = _presentation_ids(entry_snapshot)
+	var presentation_sizes: Dictionary = _presentation_sizes(entry_snapshot)
+	_assert_readouts_prepared(entry_snapshot, "camera push start")
 	var arena_start: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	var previous_rect: Rect2 = arena_start.get_global_rect() if arena_start != null else Rect2()
 	var entry_source_rect: Rect2 = transition.call("get_entry_source_rect") as Rect2
@@ -84,32 +87,34 @@ func _run() -> void:
 	_assert_entry_ownership_overlap(entry_snapshot)
 	_assert_entry_targets_in_safe_bounds(entry_snapshot, entry_target_rect)
 	_capture("04a_camera_push_start")
-	# Both surfaces are fully present at the shared source rect. Ownership of unit
-	# renderers has already switched, so there is no planning-to-arena alpha reveal.
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "camera push start")
+	# The stable arena already owns the visible field throughout countdown. The
+	# planning renderers remain hidden, so entry is a spatial transform only.
+	_assert_entry_crossfade_overlap(combat, 0.0, 0.05, 0.95, 1.0, "camera push start")
 	_assert_one_arena_visible(combat, "camera push start")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04b_camera_push_120ms")
 	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "120ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "120ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.0, 0.05, 0.95, 1.0, "120ms camera push")
 	_assert_one_arena_visible(combat, "120ms camera push")
 	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started during the field push")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04c_camera_push_240ms")
+	_expect(_presentation_sizes_close(_presentation_sizes(arena_bridge.call("get_transition_debug_snapshot")), presentation_sizes), "actor scale changed during the camera push")
+	_assert_readouts_prepared(arena_bridge.call("get_transition_debug_snapshot"), "camera push midpoint")
 	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "240ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "240ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.0, 0.05, 0.95, 1.0, "240ms camera push")
 	_assert_one_arena_visible(combat, "240ms camera push")
 	await get_tree().create_timer(0.08).timeout
 	_capture("04d_camera_push_320ms")
 	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "320ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "320ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.0, 0.05, 0.95, 1.0, "320ms camera push")
 	_assert_one_arena_visible(combat, "320ms camera push")
 	var arena_low_point: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	_expect(arena_low_point != null and arena_low_point.modulate.a >= 0.45, "arena did not rise visibly through the camera push")
 	await get_tree().create_timer(0.12).timeout
 	_capture("04e_camera_push_440ms")
 	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "440ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "440ms camera push")
+	_assert_entry_crossfade_overlap(combat, 0.0, 0.05, 0.95, 1.0, "440ms camera push")
 	_assert_one_arena_visible(combat, "440ms camera push")
 	var arena_mid: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	_expect(arena_mid != null and arena_mid.modulate.a >= 0.65, "arena did not decisively take over while planning was still fading")
@@ -140,6 +145,7 @@ func _run() -> void:
 	_expect(overlay != null and not overlay.visible, "countdown layer should be hidden during combat")
 	var combat_snapshot: Dictionary = arena_bridge.call("get_transition_debug_snapshot") if arena_bridge != null else {}
 	_expect(_presentation_ids(combat_snapshot) == presentation_ids, "combat replaced one or more transition presentation actors")
+	_expect(_presentation_sizes_close(_presentation_sizes(combat_snapshot), presentation_sizes), "combat endpoint changed actor scale after ownership handoff")
 	_expect(_planning_unit_views_hidden(controller), "planning unit renderers remained visible behind combat actors")
 	var broadcast_strip: Control = combat.get_node_or_null("CombatBroadcastStrip") as Control
 	_expect(broadcast_strip != null and broadcast_strip.visible and broadcast_strip.modulate.a >= 0.95, "compact combat broadcast strip did not survive the transition")
@@ -152,28 +158,44 @@ func _run() -> void:
 	manager.emit_signal("victory", int(GameState.stage))
 	await _settle_frames(2)
 	var result_banner: PanelContainer = combat.get_node_or_null("BattleResultBanner") as PanelContainer
-	_expect(result_banner != null and result_banner.visible, "result card should remain visible over the return transition")
-	_expect(broadcast_strip != null and not broadcast_strip.visible, "live combat strip should yield to the fixed result card")
-	_capture("06_result_return_start")
+	_expect(result_banner != null and result_banner.visible, "result card should remain visible over the frozen combat field")
+	_expect(broadcast_strip != null and broadcast_strip.visible, "compact combat strip should remain part of the authentic frozen battlefield")
+	var aftermath: Control = combat.get_node_or_null("BattleResultBanner/BattleResultAftermath") as Control
+	_expect(aftermath != null and not aftermath.visible, "result substituted aftermath artwork for the authentic combat field")
+	_expect(String(combat.get_meta("post_combat_transition_state", "")) == "result_held", "result did not enter the explicit held state")
+	var held_snapshot: Dictionary = arena_bridge.call("get_transition_debug_snapshot") if arena_bridge != null else {}
+	_capture("06_result_held")
 	var return_start_rect: Rect2 = arena_low_point.get_global_rect() if arena_low_point != null else Rect2()
-	var return_seen: bool = await _wait_for_transition_state(transition, "returning", 1.0)
-	_expect(return_seen, "combat result did not start the grid return")
-	await _settle_frames(18)
-	_capture("07_result_return_mid")
-	var return_mid_rect: Rect2 = arena_low_point.get_global_rect() if arena_low_point != null else Rect2()
-	_expect(return_mid_rect.size.x > return_start_rect.size.x and return_mid_rect.size.y > return_start_rect.size.y, "result underlay did not restore the zoomed planning field")
-	_expect(result_banner != null and result_banner.visible, "result card lost foreground priority during the reverse camera move")
-	var return_complete: bool = await _wait_for_transition_state(transition, "idle", 1.5)
-	_expect(return_complete, "grid return did not complete behind the result card")
-	_capture("08_result_grid_restored")
-	_expect(result_banner != null and result_banner.visible, "result card should remain visible after the background grid is restored")
-	_expect(GameState.phase == GameState.GamePhase.POST_COMBAT, "planning controls should remain locked until the result closes")
+	await get_tree().create_timer(0.35).timeout
+	_expect(String(transition.call("get_state_name")) == "combat", "result hold started returning before click or timeout")
+	_expect(_presentation_ids(arena_bridge.call("get_transition_debug_snapshot")) == _presentation_ids(held_snapshot), "result hold replaced final combat actors")
+	_expect(arena_low_point != null and arena_low_point.get_global_rect().is_equal_approx(return_start_rect), "result hold moved the final battlefield")
+	var result_card: Control = result_banner.get_node_or_null("Center/BattleResultCard") as Control if result_banner != null else null
+	var held_card_rect: Rect2 = result_card.get_global_rect() if result_card != null else Rect2()
 	controller.set("_result_hold_elapsed", 1.0)
 	controller.call("_skip_result_hold")
+	var acknowledged_button: Button = result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if result_banner != null else null
+	_expect(acknowledged_button != null and acknowledged_button.text == "GRID RETURN IN PROGRESS", "advance did not acknowledge the shared return request")
+	var return_seen: bool = await _wait_for_transition_state(transition, "returning", 1.0)
+	_expect(return_seen, "result advance did not start the grid return")
+	_capture("07_result_return_start")
+	await get_tree().create_timer(0.24).timeout
+	_capture("08_result_return_mid")
+	var return_mid_rect: Rect2 = arena_low_point.get_global_rect() if arena_low_point != null else Rect2()
+	var return_target_rect: Rect2 = transition.call("get_return_target_rect") as Rect2
+	_expect(_rect_between_endpoints(return_mid_rect, return_start_rect, return_target_rect), "result underlay left the registered reverse-transform path")
+	var return_progress: float = float(overlay.get_meta("return_zoom_progress", 0.0)) if overlay != null else 0.0
+	_expect(return_progress > 0.0, "result underlay did not advance along the reverse-transform path")
+	_expect(result_banner != null and result_banner.visible, "result card lost foreground priority during the reverse camera move")
+	_expect(result_card != null and result_card.get_global_rect().position.distance_to(held_card_rect.position) <= 2.0 and result_card.get_global_rect().size.distance_to(held_card_rect.size) <= 2.0, "result card moved while the battlefield returned")
+	_expect(GameState.phase == GameState.GamePhase.POST_COMBAT, "planning controls unlocked during the reverse transform")
+	var return_complete: bool = await _wait_for_transition_state(transition, "idle", 1.5)
+	_expect(return_complete, "grid return did not complete behind the result card")
+	_capture("09_result_grid_restored")
 	var preview_seen: bool = await _wait_for_preview_or_loss(2.0)
 	_expect(preview_seen, "result dismissal did not unlock the restored planning state")
 	await _settle_frames(3)
-	_capture("09_planning_restored")
+	_capture("10_planning_restored")
 	_expect(result_banner != null and not result_banner.visible, "result card should close after the return and skip gates complete")
 	_expect(not combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer").visible, "arena should be hidden after planning restoration")
 	await _capture_crowded_countdown_fixture(combat, controller, manager, transition)
@@ -194,6 +216,36 @@ func _wait_for_countdown_value(combat: Control, value: String, timeout_seconds: 
 	_expect(false, "countdown value %s was not visible" % value)
 	return false
 
+func _presentation_sizes(snapshot: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	var presentations_value: Variant = snapshot.get("unit_presentations", [])
+	if presentations_value is Array:
+		for presentation_value: Variant in presentations_value as Array:
+			if presentation_value is Dictionary:
+				var presentation: Dictionary = presentation_value as Dictionary
+				result[int(presentation.get("presentation_instance_id", 0))] = presentation.get("presentation_size", Vector2.ZERO)
+	return result
+
+func _presentation_sizes_close(actual: Dictionary, expected: Dictionary, tolerance: float = 0.25) -> bool:
+	if actual.size() != expected.size():
+		return false
+	for raw_key: Variant in expected.keys():
+		if not actual.has(raw_key):
+			return false
+		var actual_size: Vector2 = actual.get(raw_key, Vector2.ZERO) as Vector2
+		var expected_size: Vector2 = expected.get(raw_key, Vector2.ZERO) as Vector2
+		if actual_size.distance_to(expected_size) > tolerance:
+			return false
+	return true
+
+func _assert_readouts_prepared(snapshot: Dictionary, label: String) -> void:
+	var presentations_value: Variant = snapshot.get("unit_presentations", [])
+	if presentations_value is Array:
+		for presentation_value: Variant in presentations_value as Array:
+			if presentation_value is Dictionary:
+				var presentation: Dictionary = presentation_value as Dictionary
+				_expect(float(presentation.get("readout_progress", -1.0)) >= 0.99, "%s exposed a late combat readout reveal" % label)
+
 func _wait_for_transition_state(transition: Variant, expected: String, timeout_seconds: float) -> bool:
 	var deadline: int = Time.get_ticks_msec() + int(timeout_seconds * 1000.0)
 	while Time.get_ticks_msec() < deadline:
@@ -212,12 +264,15 @@ func _assert_countdown_is_unframed(combat: Control) -> void:
 
 func _assert_countdown_focus(combat: Control) -> void:
 	var board: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea") as Control
+	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
 	var timer_context: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Control
 	var wager_context: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Control
 	var actions: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as Control
 	var directive: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry") as Control
 	var metrics: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
-	_expect(board != null and board.modulate.a >= 0.95, "countdown should keep the deployment board readable")
+	var field_readable: bool = board != null and board.modulate.a >= 0.95
+	field_readable = field_readable or (arena != null and arena.visible and arena.modulate.a >= 0.95)
+	_expect(field_readable, "countdown should keep the registered battlefield readable")
 	_expect(timer_context != null and timer_context.modulate.a >= 0.35, "countdown should retain board and odds context")
 	_expect(wager_context != null and wager_context.modulate.a >= 0.35, "countdown should retain wager context")
 	_expect(actions != null and (not actions.visible or actions.modulate.a <= 0.10), "countdown should suppress action chrome")

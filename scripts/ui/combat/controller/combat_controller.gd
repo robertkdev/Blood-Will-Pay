@@ -475,6 +475,7 @@ var _post_combat_return_complete: bool = false
 var _post_combat_planning_prepared: bool = false
 var _result_dismiss_requested: bool = false
 var _post_combat_cleanup_steps_ms: Dictionary[String, float] = {}
+var _result_card_hold_rect: Rect2 = Rect2()
 
 const FIRST_DEPLOY_TIMER_EXTENSION: float = 60.0
 
@@ -1581,9 +1582,23 @@ func _queue_battle_start() -> void:
 	_prepare_transition_combat_layout(true)
 	var tree: SceneTree = parent.get_tree() if parent != null else null
 	if tree != null:
-		tree.process_frame.connect(Callable(self, "_start_battle_countdown_after_layout").bind(_battle_start_generation), CONNECT_ONE_SHOT)
+		tree.process_frame.connect(Callable(self, "_prepare_pending_battle_start_before_countdown").bind(_battle_start_generation), CONNECT_ONE_SHOT)
 	else:
-		_start_battle_countdown_after_layout(_battle_start_generation)
+		_prepare_pending_battle_start_before_countdown(_battle_start_generation)
+
+func _prepare_pending_battle_start_before_countdown(generation: int) -> void:
+	if not _battle_start_pending or generation != _battle_start_generation:
+		return
+	if manager == null or not is_instance_valid(manager):
+		_recover_pending_battle_start("combat manager became unavailable")
+		return
+	# Preparation creates the deterministic combat state but does not start its
+	# engine. This lets the stable arena actors, readouts, grid, and landmarks own
+	# every countdown frame instead of replacing the planning grid at beat 1.
+	Trace.step("Calling manager.prepare_stage() before countdown generation=" + str(generation))
+	var prepared: bool = bool(manager.prepare_stage()) if manager.has_method("prepare_stage") else false
+	if not prepared or not manager.has_method("is_stage_prepared") or not bool(manager.is_stage_prepared()):
+		_recover_pending_battle_start("setup returned before battle preparation")
 
 func _start_battle_countdown_after_layout(generation: int) -> void:
 	if not _battle_start_pending or generation != _battle_start_generation or phase_transition == null:
@@ -1622,11 +1637,7 @@ func _on_combat_countdown_finished() -> void:
 	if not _battle_start_pending:
 		return
 	_countdown_finished_for_pending_start = true
-	# Preserve the planning/countdown contract: no combat engine or layout
-	# mutation exists during beats 3, 2, or 1. Once the committed planning rect is
-	# captured, prepare and stage the expensive handoff over bounded frames before
-	# entry begins.
-	call_deferred("_execute_pending_battle_start", _battle_start_generation)
+	_try_begin_prepared_arena_crossfade(_battle_start_generation)
 
 func _execute_pending_battle_start(generation: int) -> void:
 	if not _battle_start_pending or generation != _battle_start_generation:
@@ -1702,18 +1713,31 @@ func _stage_transition_arena(generation: int) -> void:
 			phase_transition.capture_entry_target_rect()
 		var target_rect: Rect2 = phase_transition.get_entry_target_rect() if phase_transition != null else arena_container.get_global_rect()
 		var source_rect: Rect2 = phase_transition.get_planning_commit_rect() if phase_transition != null else planning_area.get_global_rect()
-		arena_bridge.enter_arena(player_views, enemy_views, false, true, target_rect, source_rect)
+		arena_bridge.enter_arena(player_views, enemy_views, true, true, target_rect, source_rect)
 		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
+	_prime_transition_arena_presentation()
 	var tree: SceneTree = parent.get_tree()
 	if tree != null:
 		tree.process_frame.connect(Callable(self, "_mark_transition_preparation_ready").bind(generation), CONNECT_ONE_SHOT)
 	else:
 		_mark_transition_preparation_ready(generation)
 
+func _prime_transition_arena_presentation() -> void:
+	# Landmarks, grid treatment, health UI, and the compact threat frame must be
+	# ready before the camera push. Combat simulation remains gated separately.
+	_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary", true)
+	var focus_painter: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCombatFocusPainter") as Control if parent != null else null
+	if focus_painter != null:
+		focus_painter.visible = true
+	_apply_environmental_pressure_composition(0, _reduced_motion_enabled(), 0.0, 0)
+
 func _mark_transition_preparation_ready(generation: int) -> void:
 	if not _transition_preparation_is_current(generation):
 		return
 	_transition_preparation_ready = true
+	if phase_transition != null and phase_transition.get_state_name() == "idle":
+		_start_battle_countdown_after_layout(generation)
+		return
 	_try_begin_prepared_arena_crossfade(generation)
 
 func _try_begin_prepared_arena_crossfade(generation: int) -> void:
@@ -2782,7 +2806,7 @@ func _on_victory(_stage: int) -> void:
 		_on_log_line("Black Ledger: %s" % victory_detail.replace("\n", " | "))
 	_show_result_banner("VICTORY", victory_detail, Color(0.76, 0.075, 0.11, 1.0), Color(0.98, 0.88, 0.70, 1.0))
 	_auto_loop_running = false
-	_begin_post_combat_return()
+	_hold_post_combat_result()
 	_start_intermission(RESULT_MINIMUM_DWELL_SECONDS)
 
 func _on_defeat(_stage: int) -> void:
@@ -2791,7 +2815,7 @@ func _on_defeat(_stage: int) -> void:
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "defeat"
 	_show_result_banner("DEFEAT", _build_result_economy_detail("defeat"), Color(0.74, 0.20, 0.16, 1.0), Color(1.0, 0.69, 0.60, 1.0))
-	_begin_post_combat_return()
+	_hold_post_combat_result()
 	_start_intermission(RESULT_MINIMUM_DWELL_SECONDS)
 	_auto_loop_running = false
 
@@ -2801,9 +2825,20 @@ func _on_tie(_stage: int) -> void:
 	_end_combat_resolving_feedback()
 	_post_combat_outcome = "tie"
 	_show_result_banner("STALEMATE", _build_result_economy_detail("tie"), Color(0.50, 0.12, 0.10, 1.0), Color(0.92, 0.86, 0.74, 1.0))
-	_begin_post_combat_return()
+	_hold_post_combat_result()
 	_start_intermission(RESULT_MINIMUM_DWELL_SECONDS)
 	_auto_loop_running = false
+
+func _hold_post_combat_result() -> void:
+	_post_combat_return_started = false
+	_post_combat_return_complete = false
+	_post_combat_planning_prepared = false
+	_result_dismiss_requested = false
+	_post_combat_cleanup_steps_ms.clear()
+	if phase_transition != null:
+		phase_transition.capture_combat_rect()
+	if parent != null:
+		parent.set_meta("post_combat_transition_state", "result_held")
 
 func _begin_post_combat_return() -> void:
 	if _post_combat_return_started:
@@ -2811,8 +2846,9 @@ func _begin_post_combat_return() -> void:
 	_post_combat_return_started = true
 	_post_combat_return_complete = false
 	_post_combat_planning_prepared = false
-	_result_dismiss_requested = false
 	_post_combat_cleanup_steps_ms.clear()
+	if parent != null:
+		parent.set_meta("post_combat_transition_state", "returning")
 	if phase_transition != null:
 		phase_transition.capture_combat_rect()
 	var tree: SceneTree = parent.get_tree() if parent != null else null
@@ -2905,6 +2941,8 @@ func get_last_interaction_latency() -> Dictionary[String, Variant]:
 func _schedule_intermission_finished() -> void:
 	if _intermission_finish_scheduled or _intermission_finish_in_progress:
 		return
+	if _result_hold_active and not _result_hold_finishing:
+		_acknowledge_result_return("result_timeout")
 	_intermission_finish_scheduled = true
 	var tree: SceneTree = parent.get_tree() if parent != null else null
 	if tree == null:
@@ -4556,6 +4594,7 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 	if card != null:
 		card.scale = Vector2.ONE
 		card.pivot_offset = card.custom_minimum_size * 0.5
+		_result_card_hold_rect = card.get_global_rect()
 	if not _reduced_motion_enabled() and card != null and parent.get_tree() != null:
 		banner.modulate.a = 0.0
 		var reveal_scale: Vector2 = Vector2(0.84, 1.0)
@@ -4640,6 +4679,8 @@ func refresh_result_banner_layout() -> void:
 	if card == null:
 		return
 	var variant: String = String(card.get_meta("result_variant", "victory")).to_upper()
+	if _result_hold_finishing and _result_card_hold_rect.size.x > 1.0 and _result_card_hold_rect.size.y > 1.0:
+		return
 	_apply_result_card_geometry(card, variant)
 	_refresh_result_aftermath_layout(_result_banner, variant)
 	_protect_persistent_hud_chrome()
@@ -4869,6 +4910,7 @@ func _hide_result_banner() -> void:
 	_result_hold_finishing = false
 	_result_hold_elapsed = 0.0
 	_result_hold_started_usec = 0
+	_result_card_hold_rect = Rect2()
 
 func _set_result_underlay_visibility(restore_phase_visibility: bool) -> void:
 	if parent == null:
@@ -4919,14 +4961,17 @@ func _skip_result_hold() -> void:
 		if _result_hold_finishing or _intermission_finish_scheduled or _intermission_finish_in_progress:
 			_result_repeated_input_count += 1
 		return
+	if intermission != null:
+		intermission.stop()
+	_acknowledge_result_return("result_click")
+	_schedule_intermission_finished()
+
+func _acknowledge_result_return(input_path: String) -> void:
 	var input_accepted_usec: int = Time.get_ticks_usec()
 	_result_hold_finishing = true
 	_result_hold_active = false
-	if intermission != null:
-		intermission.stop()
-	# Keep the result card fixed while the battlefield finishes returning to the
-	# planning grid behind it. A label/button state change acknowledges the skip
-	# immediately without exposing interactive planning controls mid-transition.
+	# Keep the result card fixed while the battlefield returns behind it. The
+	# copy change acknowledges click and timeout through the same operation.
 	var hold_label: Label = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label if _result_banner != null else null
 	var skip_button: Button = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if _result_banner != null else null
 	if hold_label != null:
@@ -4936,7 +4981,7 @@ func _skip_result_hold() -> void:
 		skip_button.text = "GRID RETURN IN PROGRESS"
 	var visible_response_usec: int = Time.get_ticks_usec()
 	_last_result_latency = {
-		"input_path": "result_skip",
+		"input_path": input_path,
 		"input_accepted_usec": input_accepted_usec,
 		"visible_response_usec": visible_response_usec,
 		"input_to_visible_response_ms": float(visible_response_usec - input_accepted_usec) / 1000.0,
@@ -4947,7 +4992,6 @@ func _skip_result_hold() -> void:
 		"settled_ms": -1.0,
 		"repeated_input_count": _result_repeated_input_count,
 	}
-	_schedule_intermission_finished()
 
 func _ensure_result_banner() -> PanelContainer:
 	if parent == null:
@@ -5281,7 +5325,10 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
 	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
 	if aftermath != null:
-		aftermath.visible = true
+		# Results are read over the authentic frozen combat field. The authored
+		# aftermath remains constructed for compatibility, but never substitutes
+		# a second battlefield layer for the final combat composition.
+		aftermath.visible = false
 		aftermath.modulate = Color.WHITE
 		aftermath.set_meta("outcome_variant", title.to_lower())
 		aftermath.set_meta("physical_geometry_signature", "persistent_field_open_escape" if title == "VICTORY" else "persistent_field_suspended_deadlock" if title == "STALEMATE" else "persistent_field_grave_descent")
@@ -5289,7 +5336,8 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 		aftermath.set_meta("grayscale_reading", "open_center" if title == "VICTORY" else "contained_center" if title == "STALEMATE" else "enclosed_perimeter")
 		aftermath.set_meta("flat_rectangle_count", 0)
 		aftermath.set_meta("procedural_outcome_geometry_suppressed", false)
-		aftermath.set_meta("authored_physical_aftermath_visible", true)
+		aftermath.set_meta("authored_physical_aftermath_visible", false)
+		aftermath.set_meta("result_underlay_source", "frozen_live_combat_field")
 	if victory_geometry != null:
 		victory_geometry.visible = title == "VICTORY"
 	if stalemate_geometry != null:

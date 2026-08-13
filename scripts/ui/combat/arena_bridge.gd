@@ -37,6 +37,8 @@ var _entry_source_enemy: Array[Vector2] = []
 var _entry_target_player: Array[Vector2] = []
 var _entry_target_enemy: Array[Vector2] = []
 var _entry_source_views: Array[Dictionary] = []
+var _entry_player_sizes: Array[Vector2] = []
+var _entry_enemy_sizes: Array[Vector2] = []
 var _continuous_entry_active: bool = false
 
 func configure(_arena_container: Control, _arena_units: Control, _planning_area: Control, _arena_background: Control, _player_grid_helper: BoardGrid, _enemy_grid_helper: BoardGrid, _unit_actor_class: Script, _tile_size: int) -> void:
@@ -238,11 +240,12 @@ func apply_field_progress(progress: float) -> void:
     if arena == null or not _continuous_entry_active:
         return
     var field_progress: float = clampf(progress, 0.0, 1.0)
-    var actor_size: Vector2 = Vector2.ONE * lerpf(float(tile_size), float(tile_size) * COMBAT_ACTOR_SIZE_SCALE, field_progress)
     for index: int in range(mini(arena.player_actors.size(), mini(_entry_source_player.size(), _entry_target_player.size()))):
-        _apply_actor_entry(arena.player_actors[index], _entry_source_player[index], _entry_target_player[index], actor_size, field_progress)
+        var player_size: Vector2 = _entry_player_sizes[index] if index < _entry_player_sizes.size() else Vector2.ONE * float(tile_size)
+        _apply_actor_entry(arena.player_actors[index], _entry_source_player[index], _entry_target_player[index], player_size, field_progress)
     for index: int in range(mini(arena.enemy_actors.size(), mini(_entry_source_enemy.size(), _entry_target_enemy.size()))):
-        _apply_actor_entry(arena.enemy_actors[index], _entry_source_enemy[index], _entry_target_enemy[index], actor_size, field_progress)
+        var enemy_size: Vector2 = _entry_enemy_sizes[index] if index < _entry_enemy_sizes.size() else Vector2.ONE * float(tile_size)
+        _apply_actor_entry(arena.enemy_actors[index], _entry_source_enemy[index], _entry_target_enemy[index], enemy_size, field_progress)
     # Ownership changes at the first committed transition frame. The planning
     # unit views and combat actors share the same cell center there, so a second
     # alpha tween only creates ghosted duplicates and a perceived teleport.
@@ -465,16 +468,20 @@ func _capture_continuous_entry(player_views: Array[UnitSlotView], enemy_views: A
     _entry_target_player.clear()
     _entry_target_enemy.clear()
     _entry_source_views.clear()
+    _entry_player_sizes.clear()
+    _entry_enemy_sizes.clear()
     for index: int in range(player_views.size()):
         var player_slot: UnitSlotView = player_views[index]
         var source_position: Vector2 = player_grid_helper.get_center(player_slot.tile_idx) if player_grid_helper != null and player_slot.tile_idx >= 0 else Vector2.ZERO
         _entry_source_player.append(source_position)
         _capture_source_view(player_slot, "player", index)
+        _entry_player_sizes.append(_source_actor_size(player_slot))
     for index: int in range(enemy_views.size()):
         var enemy_slot: UnitSlotView = enemy_views[index]
         var source_position: Vector2 = enemy_grid_helper.get_center(enemy_slot.tile_idx) if enemy_grid_helper != null and enemy_slot.tile_idx >= 0 else Vector2.ZERO
         _entry_source_enemy.append(source_position)
         _capture_source_view(enemy_slot, "enemy", index)
+        _entry_enemy_sizes.append(_source_actor_size(enemy_slot))
     var source_rect: Rect2 = committed_source_rect if committed_source_rect.size.x > 1.0 and committed_source_rect.size.y > 1.0 else _planning_field_rect()
     var target_safe: Rect2 = _safe_bounds_for_rect(target_rect)
     _entry_target_player = _map_shared_formation(_entry_source_player, source_rect, target_safe)
@@ -492,6 +499,13 @@ func _capture_source_view(slot: UnitSlotView, team: String, roster_index: int) -
         "unit_instance_id": slot.unit.get_instance_id() if slot.unit != null else 0,
         "global_center": slot.view.get_global_rect().get_center(),
     })
+
+func _source_actor_size(slot: UnitSlotView) -> Vector2:
+    if slot == null or slot.view == null or not is_instance_valid(slot.view):
+        return Vector2.ONE * float(tile_size)
+    var source_size: Vector2 = slot.view.get_global_rect().size
+    var bounded_side: float = clampf(minf(source_size.x, source_size.y), float(tile_size), float(tile_size) * COMBAT_ACTOR_SIZE_SCALE)
+    return Vector2.ONE * bounded_side
 
 func _map_shared_formation(source_positions: Array[Vector2], source_rect: Rect2, target_rect: Rect2) -> Array[Vector2]:
     var mapped: Array[Vector2] = []
@@ -595,6 +609,8 @@ func _actor_snapshot(actor: UnitActor, team: String) -> Dictionary:
         "global_center": actor.get_global_rect().get_center(),
         "field_anchor": actor.get_meta("committed_field_anchor", Vector2.ZERO),
         "handoff_global_center": actor.get_meta("handoff_global_center", Vector2.INF),
+        "presentation_size": actor.size,
+        "readout_progress": float(actor.get_meta("one_arena_combat_readout_progress", -1.0)),
         "visible": actor.visible and actor.modulate.a > 0.01,
     }
 
@@ -611,6 +627,8 @@ func _clear_continuous_entry() -> void:
     _entry_target_player.clear()
     _entry_target_enemy.clear()
     _entry_source_views.clear()
+    _entry_player_sizes.clear()
+    _entry_enemy_sizes.clear()
     _continuous_entry_active = false
 
 func _ensure_position_signal(manager: CombatManager) -> bool:
