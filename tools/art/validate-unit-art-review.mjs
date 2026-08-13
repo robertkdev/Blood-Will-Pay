@@ -203,7 +203,24 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
 	"history: [...PHASE2_ART, ...HISTORICAL_ART]",
 	"function versionsForUnit(unit)",
-	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()"
+	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()",
+	"&larr;/&rarr; units &middot; &uarr; next version &middot; &darr; previous version",
+	"A use now &middot; S revise &middot; D reject &middot; F undecided",
+	"Enter save &middot; Shift+Enter line break",
+	"els.commentStatus.textContent = \"Unsaved changes\"",
+	"event.target === els.comment",
+	"event.key === \"Enter\"",
+	"!event.shiftKey",
+	"!event.isComposing",
+	"const decisionKeys = {",
+	"a: \"like\"",
+	"s: \"maybe\"",
+	"d: \"cut\"",
+	"f: \"\"",
+	"ArrowLeft: () => movePreview(-1)",
+	"ArrowRight: () => movePreview(1)",
+	"ArrowUp: () => moveVersion(1)",
+	"ArrowDown: () => moveVersion(-1)"
 ].forEach(requireText);
 
 [
