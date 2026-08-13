@@ -26,7 +26,12 @@ const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
-if (manifest.items.length !== 37) fail(`Expected curated history with 37 entries, got ${manifest.items.length}.`);
+if (manifest.items.length !== 76) fail(`Expected curated history with 76 entries, got ${manifest.items.length}.`);
+const phaseTwoUnitIds = new Set(["korath", "veyra", "mara", "pilfer", "nyxa", "creep", "knoll", "quillith", "kett", "luna", "malachor", "sable"]);
+const nonPhaseTwoReviewV1 = manifest.items.filter((item) => item.version === "Review V1" && !phaseTwoUnitIds.has(item.unit));
+if (nonPhaseTwoReviewV1.length !== 39) fail(`Expected 39 non-Phase-Two Review V1 candidates, got ${nonPhaseTwoReviewV1.length}.`);
+if (nonPhaseTwoReviewV1.some((item) => item.current)) fail("Non-Phase-Two Review V1 candidates must not replace existing defaults.");
+if (nonPhaseTwoReviewV1.some((item) => item.status !== "Latest review candidate; no default change")) fail("Every non-Phase-Two Review V1 candidate must state that the default is unchanged.");
 const creepHistory = manifest.items.filter((item) => item.unit === "creep");
 if (creepHistory.length !== 4 || creepHistory.map((item) => item.version).join("|") !== "V3|V4|V5|V6") fail("Creep review history must preserve V3 through V6 in chronological order.");
 if (creepHistory.some((item) => item.version === "V6" && item.current)) fail("Creep V6 portrait crop must not replace the default.");
@@ -197,4 +202,4 @@ if (html.includes("width: min(100%, 1600px)")) fail("Comparison grid must use th
 if (html.includes("dialog[data-mode=\"comparison\"] .review-sidebar")) fail("Comparison mode must keep the review sidebar visible.");
 if (html.includes("localStorage.setItem")) fail("The durable review file must be the only writable source of truth; browser storage is migration-only.");
 
-console.log("UNIT_ART_REVIEW_STATIC: PASS curated=37 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 quillith-reviews=1 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
+console.log("UNIT_ART_REVIEW_STATIC: PASS curated=76 non-phase2-review-v1=39 creep-reviews=4 mara=17 sable-reviews=8 kett-reviews=2 nyxa-reviews=1 pilfer-reviews=1 korath-reviews=2 quillith-reviews=1 hydrated-archives=111 phase2-units=12 canonical=mara pins=5 active-review=1 persistence=file-v1");
