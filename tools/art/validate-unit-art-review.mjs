@@ -7,14 +7,18 @@ const toolRoot = path.resolve(process.argv[2] || ".");
 const projectRoot = path.resolve(process.argv[3] || process.cwd());
 const htmlPath = path.join(toolRoot, "unit-art-review.html");
 const dataPath = path.join(toolRoot, "unit-art-history-data.js");
+const unitInfoPath = path.join(toolRoot, "unit-art-unit-info-data.js");
 const serverPath = path.join(toolRoot, "serve_unit_art_review.py");
 const html = fs.readFileSync(htmlPath, "utf8");
 const dataSource = fs.readFileSync(dataPath, "utf8");
+const unitInfoSource = fs.readFileSync(unitInfoPath, "utf8");
 const serverSource = fs.readFileSync(serverPath, "utf8");
 const context = { window: {} };
 vm.runInNewContext(dataSource, context, { filename: dataPath });
+vm.runInNewContext(unitInfoSource, context, { filename: unitInfoPath });
 
 const manifest = context.window.GAMBLE_BATTLE_UNIT_ART_HISTORY;
+const unitInfoManifest = context.window.UNIT_ART_UNIT_INFO;
 const fail = (message) => { throw new Error(message); };
 const requireText = (value) => {
 	if (!html.includes(value)) fail(`Missing tool behavior: ${value}`);
@@ -23,6 +27,41 @@ const requireServerText = (value) => {
 	if (!serverSource.includes(value)) fail(`Missing persistence server behavior: ${value}`);
 };
 const sha256 = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+const resourceArray = (source, field) => {
+	const raw = source.match(new RegExp(`^${field} = (?:Array\\[String\\]\\()?([^\\n]+?)(?:\\))?$`, "m"))?.[1];
+	return JSON.parse(raw || "[]");
+};
+
+if (unitInfoManifest.source.document_id !== "1OCS4jfjMIiw-2-VQbLPaeDxsmzZMKEAFKb6BHvkMa7I" || unitInfoManifest.source.tab_id !== "t.0" || unitInfoManifest.source.table_number !== 1) {
+	fail("Unit information must retain its authoritative Google Doc table provenance.");
+}
+const unitInfoEntries = Object.entries(unitInfoManifest.units);
+if (unitInfoEntries.length !== 51) fail(`Expected design-chart information for 51 units, got ${unitInfoEntries.length}.`);
+if (Object.keys(unitInfoManifest.identity).length !== 51) fail("Expected RGA identity filters for all 51 playable units.");
+for (const [unitId, info] of unitInfoEntries) {
+	if (!Number.isInteger(info.cost) || info.cost < 1 || info.cost > 5) fail(`Invalid cost for ${unitId}.`);
+	if (!Array.isArray(info.traits) || info.traits.length < 2 || info.traits.some((trait) => !trait)) fail(`Invalid traits for ${unitId}.`);
+	if (!["Assassin", "Brawler", "Mage", "Marksman", "Support", "Tank"].includes(info.role)) fail(`Invalid role for ${unitId}.`);
+	if (![info.ability, info.does, info.rga].every((value) => typeof value === "string" && value.trim())) fail(`Incomplete ability or RGA information for ${unitId}.`);
+	const unitPath = path.join(projectRoot, "data", "units", `${unitId}.tres`);
+	if (!fs.existsSync(unitPath)) fail(`Design-chart unit ${unitId} has no playable unit resource.`);
+	const unitSource = fs.readFileSync(unitPath, "utf8");
+	const cost = Number(unitSource.match(/^cost = (\d+)$/m)?.[1]);
+	const traits = resourceArray(unitSource, "traits");
+	const role = resourceArray(unitSource, "roles")[0];
+	const abilityId = unitSource.match(/^ability_id = "([^"]+)"$/m)?.[1];
+	if (cost !== info.cost || traits.join("|") !== info.traits.join("|") || role !== info.role.toLowerCase()) fail(`Design-chart identity fields drifted for ${unitId}.`);
+	const abilitySource = fs.readFileSync(path.join(projectRoot, "data", "abilities", `${abilityId}.tres`), "utf8");
+	const abilityName = abilitySource.match(/^name = "([^"]+)"$/m)?.[1];
+	if (abilityName !== info.ability) fail(`Design-chart ability name drifted for ${unitId}.`);
+	const identityPath = path.join(projectRoot, "data", "identity", "unit_identities", `${unitId}_identity.tres`);
+	const identitySource = fs.readFileSync(identityPath, "utf8");
+	const goal = identitySource.match(/^primary_goal = "([^"]+)"$/m)?.[1];
+	const approaches = resourceArray(identitySource, "approaches");
+	const filterIdentity = unitInfoManifest.identity[unitId];
+	if (!filterIdentity || filterIdentity.goal !== goal || filterIdentity.approaches.join("|") !== approaches.join("|")) fail(`RGA identity filter data drifted for ${unitId}.`);
+}
+if (html.includes("data-set=\"phase2\"") || html.includes(">Remembered</button>")) fail("Source-set tabs must be replaced by gameplay filters on the main screen.");
 
 if (manifest.aliases.cashmere !== "mara") fail("Legacy Cashmere searches must resolve to canonical Mara.");
 if ("mara" in manifest.aliases) fail("Mara must not be an alias.");
@@ -143,7 +182,6 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 
 [
 	"Blood Will Pay · Unit Concepts",
-	"<button type=\"button\" data-set=\"phase2\">Phase 2</button>",
 	"unit: file === \"cashmere.png\" ? \"mara\"",
 	"{ unit: \"mara\", role: \"Mage\"",
 	"const CANONICAL_CURRENT",
@@ -203,10 +241,23 @@ for (const lunaVersion of ["P2-04", "P2-05", "P2-06"]) {
 	"src: item.local_path ? encodeURI(\"./\" + item.local_path)",
 	"history: [...PHASE2_ART, ...HISTORICAL_ART]",
 	"function versionsForUnit(unit)",
-	"const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(\" \").toLowerCase()",
+	"identity?.approaches?.join(\" \")",
 	"&larr;/&rarr; units &middot; &uarr; next version &middot; &darr; previous version",
 	"A use now &middot; S revise &middot; D reject &middot; F undecided",
 	"Space working concept",
+	"./unit-art-unit-info-data.js?v=20260813-google-doc-unit-info",
+	"<h2>Unit information</h2>",
+	"RGA team job",
+	"renderUnitInformation(item)",
+	"aria-label=\"Gameplay filters\"",
+	"aria-label=\"Filter by role\"",
+	"aria-label=\"Filter by goal\"",
+	"aria-label=\"Filter by approach\"",
+	"aria-label=\"Filter by cost\"",
+	"state.roleFilter",
+	"state.goalFilter",
+	"state.approachFilter",
+	"state.costFilter",
 	"Enter save &middot; Shift+Enter line break",
 	"els.commentStatus.textContent = \"Unsaved changes\"",
 	"event.target === els.comment",

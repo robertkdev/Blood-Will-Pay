@@ -147,6 +147,37 @@
 			color: var(--text);
 		}
 
+		.gameplay-filters {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 6px;
+			align-items: end;
+		}
+
+		.filter-control {
+			display: grid;
+			gap: 2px;
+		}
+
+		.filter-control span {
+			padding-left: 2px;
+			color: var(--muted);
+			font-size: 9px;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
+		.filter-control select {
+			min-height: 34px;
+			max-width: 190px;
+			border: 1px solid var(--line);
+			border-radius: 6px;
+			padding: 6px 26px 6px 8px;
+			background: #12110f;
+			color: var(--text);
+		}
+
 		.segment {
 			display: inline-grid;
 			grid-auto-flow: column;
@@ -640,6 +671,90 @@
 			font-size: 12px;
 		}
 
+		.unit-info-card {
+			display: grid;
+			gap: 12px;
+			padding: 14px;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			background: rgba(255, 255, 255, 0.025);
+		}
+
+		.unit-info-summary {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 8px;
+			align-items: center;
+		}
+
+		.unit-info-cost {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			min-width: 34px;
+			height: 34px;
+			border: 1px solid var(--gold);
+			border-radius: 50%;
+			color: var(--gold);
+			font-family: Georgia, serif;
+			font-size: 18px;
+			font-weight: 700;
+		}
+
+		.unit-info-role {
+			font-family: Georgia, serif;
+			font-size: 16px;
+			font-weight: 700;
+		}
+
+		.unit-info-traits {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 6px;
+		}
+
+		.unit-info-trait {
+			padding: 3px 7px;
+			border: 1px solid var(--line);
+			border-radius: 999px;
+			color: var(--muted);
+			font-size: 11px;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+		}
+
+		.unit-info-block {
+			display: grid;
+			gap: 4px;
+		}
+
+		.unit-info-label {
+			color: var(--gold);
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
+		.unit-info-ability {
+			font-family: Georgia, serif;
+			font-size: 15px;
+			font-weight: 700;
+		}
+
+		.unit-info-copy {
+			margin: 0;
+			color: var(--text);
+			font-size: 13px;
+			line-height: 1.45;
+		}
+
+		.unit-info-source {
+			color: var(--muted);
+			font-size: 10px;
+			line-height: 1.35;
+		}
+
 		.preview-side-hint {
 			position: absolute;
 			top: 50%;
@@ -907,13 +1022,11 @@
 			</div>
 			<div class="controls" aria-label="Review controls">
 				<input id="search" class="search" type="search" placeholder="Search units" autocomplete="off">
-				<div class="segment" aria-label="Review set">
-					<button type="button" data-set="all" class="active">All Units</button>
-					<button type="button" data-set="phase2">Phase 2</button>
-					<button type="button" data-set="history">History</button>
-					<button type="button" data-set="live">Live</button>
-					<button type="button" data-set="candidates">Candidates</button>
-					<button type="button" data-set="remembered">Remembered</button>
+				<div class="gameplay-filters" aria-label="Gameplay filters">
+					<label class="filter-control"><span>Role</span><select id="filter-role" aria-label="Filter by role"></select></label>
+					<label class="filter-control"><span>Goal</span><select id="filter-goal" aria-label="Filter by goal"></select></label>
+					<label class="filter-control"><span>Approach</span><select id="filter-approach" aria-label="Filter by approach"></select></label>
+					<label class="filter-control"><span>Cost</span><select id="filter-cost" aria-label="Filter by cost"></select></label>
 				</div>
 				<div class="segment" aria-label="Filter">
 					<button type="button" data-filter="all" class="active">All</button>
@@ -983,6 +1096,26 @@
 							</div>
 						</div>
 					</section>
+					<section class="sidebar-section" id="unit-information">
+						<h2>Unit information</h2>
+						<div class="unit-info-card">
+							<div class="unit-info-summary">
+								<span id="unit-info-cost" class="unit-info-cost" aria-label="Unit cost">-</span>
+								<span id="unit-info-role" class="unit-info-role"></span>
+							</div>
+							<div id="unit-info-traits" class="unit-info-traits" aria-label="Unit traits"></div>
+							<div class="unit-info-block">
+								<span class="unit-info-label">Ability</span>
+								<span id="unit-info-ability" class="unit-info-ability"></span>
+								<p id="unit-info-does" class="unit-info-copy"></p>
+							</div>
+							<div class="unit-info-block">
+								<span class="unit-info-label">RGA team job</span>
+								<p id="unit-info-rga" class="unit-info-copy"></p>
+							</div>
+							<div class="unit-info-source">Source: Blood Will Pay design chart</div>
+						</div>
+					</section>
 				</aside>
 			</div>
 			<div class="preview-foot">
@@ -1007,6 +1140,7 @@
 	<div id="toast" class="toast" role="status"></div>
 
 	<script src="./unit-art-history-data.js?v=20260813-telegram-generation-history"></script>
+	<script src="./unit-art-unit-info-data.js?v=20260813-google-doc-unit-info"></script>
 	<script>
 		const ASSET_ROOT = "../../assets/units/";
 		const LOCAL_PROJECT_ASSET_ROOT = "../../";
@@ -1028,6 +1162,8 @@
 		const LEGACY_DEFAULTS_KEY = "gamble-battle-unit-art-defaults-v1";
 		const STATE_API_URL = "/api/unit-art-review-state";
 		const STATE_FILE_LABEL = "tools/art/unit-art-review-state.json";
+		const UNIT_INFO_DATA = window.UNIT_ART_UNIT_INFO?.units || {};
+		const UNIT_IDENTITY_DATA = window.UNIT_ART_UNIT_INFO?.identity || {};
 		const STATE_SCHEMA_VERSION = 1;
 		const VALID_DECISIONS = new Set(["like", "maybe", "cut"]);
 		const MAX_PINS = 5;
@@ -1336,6 +1472,10 @@
 		const state = {
 			set: "all",
 			filter: "all",
+			roleFilter: "all",
+			goalFilter: "all",
+			approachFilter: "all",
+			costFilter: "all",
 			query: "",
 			tileSize: 170,
 			decisions: {},
@@ -1360,6 +1500,10 @@
 		const els = {
 			grid: document.getElementById("grid"),
 			search: document.getElementById("search"),
+			roleFilter: document.getElementById("filter-role"),
+			goalFilter: document.getElementById("filter-goal"),
+			approachFilter: document.getElementById("filter-approach"),
+			costFilter: document.getElementById("filter-cost"),
 			visibleCount: document.getElementById("visible-count"),
 			total: document.getElementById("count-total"),
 			like: document.getElementById("count-like"),
@@ -1381,20 +1525,30 @@
 			reviewSidebar: document.querySelector(".review-sidebar"),
 			comment: document.getElementById("preview-comment"),
 			commentStatus: document.getElementById("comment-status"),
+			unitInfo: document.getElementById("unit-information"),
+			unitInfoCost: document.getElementById("unit-info-cost"),
+			unitInfoRole: document.getElementById("unit-info-role"),
+			unitInfoTraits: document.getElementById("unit-info-traits"),
+			unitInfoAbility: document.getElementById("unit-info-ability"),
+			unitInfoDoes: document.getElementById("unit-info-does"),
+			unitInfoRga: document.getElementById("unit-info-rga"),
 			persistenceStatus: document.getElementById("persistence-status"),
 			persistenceRetry: document.getElementById("retry-persistence"),
 			toast: document.getElementById("toast")
 		};
 
-		document.querySelectorAll("[data-set]").forEach((button) => {
-			button.addEventListener("click", () => {
+		populateGameplayFilters();
+		[
+			[els.roleFilter, "roleFilter"],
+			[els.goalFilter, "goalFilter"],
+			[els.approachFilter, "approachFilter"],
+			[els.costFilter, "costFilter"]
+		].forEach(([select, stateKey]) => {
+			select.addEventListener("change", () => {
 				if (!guardPersistenceReady()) {
 					return;
 				}
-				state.set = button.dataset.set;
-				document.querySelectorAll("[data-set]").forEach((candidate) => {
-					candidate.classList.toggle("active", candidate === button);
-				});
+				state[stateKey] = select.value;
 				render();
 				queuePersistenceSave();
 			});
@@ -1636,11 +1790,7 @@
 		}
 
 		function currentItems() {
-			const items = ART_SETS[state.set] || ALL_UNIT_ART;
-			if (state.set !== "all" && state.set !== "phase2") {
-				return items;
-			}
-			return items.map((item) => defaultItemForUnit(item.unit) || item);
+			return ALL_UNIT_ART.map((item) => defaultItemForUnit(item.unit) || item);
 		}
 
 		function allArtItems() {
@@ -1659,6 +1809,34 @@
 
 		function normalizeUnitId(unit) {
 			return unit.replace(/\s+\(\d+\)$/i, "").trim().toLowerCase();
+		}
+
+		function humanizeIdentityValue(value) {
+			const acronyms = { aoe: "AoE", cc: "CC", dps: "DPS", rga: "RGA" };
+			return value.split(".").map((section) => section
+				.split("_")
+				.map((part) => acronyms[part] || part.charAt(0).toUpperCase() + part.slice(1))
+				.join(" "))
+				.join(" · ");
+		}
+
+		function setFilterOptions(select, allLabel, values) {
+			const options = [["all", allLabel], ...[...new Set(values)].sort((a, b) => humanizeIdentityValue(a).localeCompare(humanizeIdentityValue(b))).map((value) => [value, humanizeIdentityValue(value)])];
+			select.replaceChildren(...options.map(([value, label]) => {
+				const option = document.createElement("option");
+				option.value = value;
+				option.textContent = label;
+				return option;
+			}));
+		}
+
+		function populateGameplayFilters() {
+			const info = Object.values(UNIT_INFO_DATA);
+			const identities = Object.values(UNIT_IDENTITY_DATA);
+			setFilterOptions(els.roleFilter, "All roles", info.map((item) => item.role));
+			setFilterOptions(els.goalFilter, "All goals", identities.map((item) => item.goal));
+			setFilterOptions(els.approachFilter, "All approaches", identities.flatMap((item) => item.approaches));
+			setFilterOptions(els.costFilter, "All costs", info.map((item) => String(item.cost)));
 		}
 
 		function uniqueUnits(items) {
@@ -1808,14 +1986,21 @@
 
 		function filteredItems() {
 			return currentItems().filter((item) => {
+				const unitId = normalizeUnitId(item.unit);
+				const info = UNIT_INFO_DATA[unitId];
+				const identity = UNIT_IDENTITY_DATA[unitId];
 				const choice = state.decisions[item.key] || "";
-				const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note].join(" ").toLowerCase();
+				const haystack = [item.id, item.unit, item.sourceUnit, item.role, item.status, item.version, item.kind, item.note, info?.traits?.join(" "), info?.ability, info?.does, info?.rga, identity?.goal, identity?.approaches?.join(" ")].join(" ").toLowerCase();
 				const matchesQuery = !state.query || haystack.includes(state.query);
-				const matchesFilter =
+				const matchesDecision =
 					state.filter === "all" ||
 					(state.filter === "unmarked" && !choice) ||
 					choice === state.filter;
-				return matchesQuery && matchesFilter;
+				const matchesRole = state.roleFilter === "all" || info?.role === state.roleFilter;
+				const matchesGoal = state.goalFilter === "all" || identity?.goal === state.goalFilter;
+				const matchesApproach = state.approachFilter === "all" || identity?.approaches?.includes(state.approachFilter);
+				const matchesCost = state.costFilter === "all" || String(info?.cost) === state.costFilter;
+				return matchesQuery && matchesDecision && matchesRole && matchesGoal && matchesApproach && matchesCost;
 			});
 		}
 
@@ -1841,7 +2026,7 @@
 			els.cut.textContent = String(counts.cut);
 			els.open.textContent = String(counts.open);
 			els.pinned.textContent = state.pins.length + " / " + MAX_PINS;
-			els.visibleCount.textContent = visibleCount + " shown from " + setLabel(state.set);
+			els.visibleCount.textContent = visibleCount + " shown from all units";
 		}
 
 		function getCounts() {
@@ -2089,6 +2274,7 @@
 			els.previewImage.src = item.src;
 			els.previewImage.alt = item.id;
 			renderVersionControls(item);
+			renderUnitInformation(item);
 			const comment = commentForItem(item);
 			els.comment.value = comment;
 			els.commentStatus.textContent = comment ? "Saved in shared review file" : "No note yet";
@@ -2096,6 +2282,27 @@
 				updateComparisonPreview();
 			}
 			updatePreviewChoice();
+		}
+
+		function renderUnitInformation(item) {
+			const unitId = normalizeUnitId(item.unit);
+			const info = UNIT_INFO_DATA[unitId];
+			els.unitInfo.hidden = !info;
+			if (!info) {
+				return;
+			}
+			els.unitInfoCost.textContent = String(info.cost);
+			els.unitInfoCost.setAttribute("aria-label", `Cost ${info.cost}`);
+			els.unitInfoRole.textContent = info.role;
+			els.unitInfoTraits.replaceChildren(...info.traits.map((trait) => {
+				const chip = document.createElement("span");
+				chip.className = "unit-info-trait";
+				chip.textContent = trait;
+				return chip;
+			}));
+			els.unitInfoAbility.textContent = info.ability;
+			els.unitInfoDoes.textContent = info.does;
+			els.unitInfoRga.textContent = info.rga;
 		}
 
 		function renderVersionControls(item) {
@@ -2199,6 +2406,10 @@
 				ui: {
 					review_set: "all",
 					filter: "all",
+					role_filter: "all",
+					goal_filter: "all",
+					approach_filter: "all",
+					cost_filter: "all",
 					query: "",
 					tile_size: 170
 				},
@@ -2451,10 +2662,14 @@
 			ensureExplicitPhase2WorkingConcepts();
 
 			const ui = normalized.ui;
-			state.set = ART_SETS[ui.review_set] ? ui.review_set : "all";
+			state.set = "all";
 			state.filter = ["all", "like", "maybe", "cut", "unmarked"].includes(ui.filter)
 				? ui.filter
 				: "all";
+			state.roleFilter = [...els.roleFilter.options].some((option) => option.value === ui.role_filter) ? ui.role_filter : "all";
+			state.goalFilter = [...els.goalFilter.options].some((option) => option.value === ui.goal_filter) ? ui.goal_filter : "all";
+			state.approachFilter = [...els.approachFilter.options].some((option) => option.value === ui.approach_filter) ? ui.approach_filter : "all";
+			state.costFilter = [...els.costFilter.options].some((option) => option.value === String(ui.cost_filter)) ? String(ui.cost_filter) : "all";
 			state.query = typeof ui.query === "string" ? ui.query : "";
 			state.tileSize = Number.isInteger(ui.tile_size)
 				? Math.max(128, Math.min(260, ui.tile_size))
@@ -2466,9 +2681,10 @@
 				...phase2WorkingVersionKeys()
 			};
 			els.search.value = state.query;
-			document.querySelectorAll("[data-set]").forEach((button) => {
-				button.classList.toggle("active", button.dataset.set === state.set);
-			});
+			els.roleFilter.value = state.roleFilter;
+			els.goalFilter.value = state.goalFilter;
+			els.approachFilter.value = state.approachFilter;
+			els.costFilter.value = state.costFilter;
 			document.querySelectorAll("[data-filter]").forEach((button) => {
 				button.classList.toggle("active", button.dataset.filter === state.filter);
 			});
@@ -2531,8 +2747,12 @@
 				defaults: { ...state.defaults },
 				ui: {
 					...(previous.ui ?? {}),
-					review_set: state.set,
+					review_set: "all",
 					filter: state.filter,
+					role_filter: state.roleFilter,
+					goal_filter: state.goalFilter,
+					approach_filter: state.approachFilter,
+					cost_filter: state.costFilter,
 					query: state.query,
 					tile_size: state.tileSize
 				},
@@ -2734,6 +2954,12 @@
 				project: "blood-will-pay",
 				review_set: state.set,
 				review_set_label: setLabel(state.set),
+				gameplay_filters: {
+					role: state.roleFilter,
+					goal: state.goalFilter,
+					approach: state.approachFilter,
+					cost: state.costFilter
+				},
 				exported_at: new Date().toISOString(),
 				counts,
 				decisions: exportItems().map((item) => ({
