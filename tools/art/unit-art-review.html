@@ -717,9 +717,10 @@
 		}
 
 		.preview-help {
+			grid-column: 1 / -1;
 			color: var(--muted);
 			font-size: 12px;
-			text-align: right;
+			text-align: center;
 		}
 
 		.unit-navigation {
@@ -985,6 +986,7 @@
 				</aside>
 			</div>
 			<div class="preview-foot">
+				<div class="preview-help">&larr;/&rarr; units &middot; &uarr; next version &middot; &darr; previous version &middot; A use now &middot; S revise &middot; D reject &middot; F undecided &middot; Enter save &middot; Shift+Enter line break</div>
 				<div class="unit-navigation">
 					<button id="previous-unit" class="action" type="button">&larr; Previous Unit</button>
 					<div class="preview-status" id="preview-status">Unit 1 / 1</div>
@@ -996,7 +998,6 @@
 					<button class="preview-choice" type="button" data-preview-choice="" data-choice="open">Undecided</button>
 				</div>
 				<div class="unit-navigation next">
-					<div class="preview-help">Arrow keys change units &middot; [ and ] change versions</div>
 					<button id="next-unit" class="action" type="button">Next Unit &rarr;</button>
 				</div>
 			</div>
@@ -1525,7 +1526,7 @@
 		});
 
 		els.comment.addEventListener("input", () => {
-			saveCurrentComment();
+			els.commentStatus.textContent = "Unsaved changes";
 		});
 
 			document.getElementById("save-comment").addEventListener("click", () => {
@@ -1542,32 +1543,52 @@
 		});
 
 		els.preview.addEventListener("keydown", (event) => {
+			if (event.target === els.comment) {
+				if (
+					event.key === "Enter" &&
+					!event.shiftKey &&
+					!event.ctrlKey &&
+					!event.altKey &&
+					!event.metaKey &&
+					!event.isComposing
+				) {
+					event.preventDefault();
+					saveCurrentComment();
+					showToast("Concept note queued for shared save.");
+				}
+				return;
+			}
 			if (event.target.matches("input, textarea, select") || event.target.isContentEditable) {
 				return;
 			}
-			if (event.key === "ArrowLeft") {
-				event.preventDefault();
-				movePreview(-1);
+			if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) {
+				return;
 			}
-			if (event.key === "ArrowRight") {
-				event.preventDefault();
-				movePreview(1);
+			const decisionKeys = {
+				a: "like",
+				s: "maybe",
+				d: "cut",
+				f: ""
+			};
+			const key = event.key.toLowerCase();
+			if (Object.prototype.hasOwnProperty.call(decisionKeys, key)) {
+				if (!event.repeat) {
+					event.preventDefault();
+					voteCurrentPreview(decisionKeys[key]);
+				}
+				return;
 			}
-			if (event.key === "[") {
+			const navigation = {
+				ArrowLeft: () => movePreview(-1),
+				ArrowRight: () => movePreview(1),
+				ArrowUp: () => moveVersion(1),
+				ArrowDown: () => moveVersion(-1),
+				"[": () => moveVersion(-1),
+				"]": () => moveVersion(1)
+			};
+			if (navigation[event.key]) {
 				event.preventDefault();
-				moveVersion(-1);
-			}
-			if (event.key === "]") {
-				event.preventDefault();
-				moveVersion(1);
-			}
-			if (event.key === "ArrowUp") {
-				event.preventDefault();
-				moveVersion(-1);
-			}
-			if (event.key === "ArrowDown") {
-				event.preventDefault();
-				moveVersion(1);
+				navigation[event.key]();
 			}
 		});
 
