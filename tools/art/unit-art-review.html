@@ -943,7 +943,7 @@
 		<main id="grid" class="grid" aria-live="polite"></main>
 	</div>
 
-	<dialog id="preview">
+	<dialog id="preview" tabindex="-1">
 		<div class="preview-shell">
 			<div class="preview-head">
 				<div>
@@ -986,7 +986,7 @@
 				</aside>
 			</div>
 			<div class="preview-foot">
-				<div class="preview-help">&larr;/&rarr; units &middot; &uarr; next version &middot; &darr; previous version &middot; A use now &middot; S revise &middot; D reject &middot; F undecided &middot; Enter save &middot; Shift+Enter line break</div>
+				<div class="preview-help">&larr;/&rarr; units &middot; &uarr; next version &middot; &darr; previous version &middot; A use now &middot; S revise &middot; D reject &middot; F undecided &middot; Space working concept &middot; Enter save &middot; Shift+Enter line break</div>
 				<div class="unit-navigation">
 					<button id="previous-unit" class="action" type="button">&larr; Previous Unit</button>
 					<div class="preview-status" id="preview-status">Unit 1 / 1</div>
@@ -1554,6 +1554,7 @@
 				) {
 					event.preventDefault();
 					saveCurrentComment();
+					els.preview.focus({ preventScroll: true });
 					showToast("Concept note queued for shared save.");
 				}
 				return;
@@ -1575,6 +1576,13 @@
 				if (!event.repeat) {
 					event.preventDefault();
 					voteCurrentPreview(decisionKeys[key]);
+				}
+				return;
+			}
+			if (event.key === " ") {
+				if (!event.repeat) {
+					event.preventDefault();
+					setCurrentAsDefault();
 				}
 				return;
 			}
