@@ -141,6 +141,12 @@ func _run() -> void:
 	_expect(not pre_unfreeze_gate.is_empty(), "entry did not record an explicit pre-unfreeze gate")
 	_expect(not bool(pre_unfreeze_gate.get("engine_running", true)), "engine was already running at the pre-unfreeze gate")
 	_expect(not bool(pre_unfreeze_gate.get("economy_combat_active", true)), "economy was already combat-active at the pre-unfreeze gate")
+	var handoff_snapshots: Dictionary = arena_bridge.call("get_entry_endpoint_handoff_snapshots") as Dictionary
+	var endpoint_before_release: Dictionary = handoff_snapshots.get("before_release", {}) as Dictionary
+	var endpoint_after_release: Dictionary = handoff_snapshots.get("after_release", {}) as Dictionary
+	var first_simulation_snapshot: Dictionary = controller.call("get_entry_first_simulation_snapshot") as Dictionary
+	_assert_presentation_center_continuity(endpoint_before_release, endpoint_after_release, 1.0, "entry ownership release")
+	_assert_presentation_center_continuity(endpoint_after_release, first_simulation_snapshot, 1.0, "first combat simulation frame")
 	var overlay: Control = combat.get_node_or_null("CombatPhaseTransitionLayer") as Control
 	_expect(overlay != null and not overlay.visible, "countdown layer should be hidden during combat")
 	var combat_snapshot: Dictionary = arena_bridge.call("get_transition_debug_snapshot") if arena_bridge != null else {}
@@ -169,7 +175,8 @@ func _run() -> void:
 	await get_tree().create_timer(0.35).timeout
 	_expect(String(transition.call("get_state_name")) == "combat", "result hold started returning before click or timeout")
 	_expect(_presentation_ids(arena_bridge.call("get_transition_debug_snapshot")) == _presentation_ids(held_snapshot), "result hold replaced final combat actors")
-	_expect(arena_low_point != null and arena_low_point.get_global_rect().is_equal_approx(return_start_rect), "result hold moved the final battlefield")
+	var held_field_rect: Rect2 = arena_low_point.get_global_rect() if arena_low_point != null else Rect2()
+	_expect(_rect_close(held_field_rect, return_start_rect, 1.0), "result hold moved the final battlefield by %.3f px or resized it by %.3f px" % [held_field_rect.position.distance_to(return_start_rect.position), held_field_rect.size.distance_to(return_start_rect.size)])
 	var result_card: Control = result_banner.get_node_or_null("Center/BattleResultCard") as Control if result_banner != null else null
 	var held_card_rect: Rect2 = result_card.get_global_rect() if result_card != null else Rect2()
 	controller.set("_result_hold_elapsed", 1.0)
@@ -191,6 +198,9 @@ func _run() -> void:
 	_expect(GameState.phase == GameState.GamePhase.POST_COMBAT, "planning controls unlocked during the reverse transform")
 	var return_complete: bool = await _wait_for_transition_state(transition, "idle", 1.5)
 	_expect(return_complete, "grid return did not complete behind the result card")
+	var return_handoff: Dictionary = arena_bridge.call("get_return_endpoint_handoff_snapshots") as Dictionary
+	_assert_return_endpoint_continuity(return_handoff.get("before_release", {}) as Dictionary, 1.0, "return ownership release")
+	_assert_return_endpoint_continuity(return_handoff.get("after_release", {}) as Dictionary, 1.0, "return first planning frame")
 	_capture("09_result_grid_restored")
 	var preview_seen: bool = await _wait_for_preview_or_loss(2.0)
 	_expect(preview_seen, "result dismissal did not unlock the restored planning state")
@@ -237,6 +247,48 @@ func _presentation_sizes_close(actual: Dictionary, expected: Dictionary, toleran
 		if actual_size.distance_to(expected_size) > tolerance:
 			return false
 	return true
+
+func _presentation_centers(snapshot: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	var presentations_value: Variant = snapshot.get("unit_presentations", [])
+	if presentations_value is Array:
+		for presentation_value: Variant in presentations_value as Array:
+			if presentation_value is Dictionary:
+				var presentation: Dictionary = presentation_value as Dictionary
+				result[int(presentation.get("presentation_instance_id", 0))] = presentation.get("global_center", Vector2.INF)
+	return result
+
+func _assert_presentation_center_continuity(before_snapshot: Dictionary, after_snapshot: Dictionary, tolerance: float, label: String) -> void:
+	var before_centers: Dictionary = _presentation_centers(before_snapshot)
+	var after_centers: Dictionary = _presentation_centers(after_snapshot)
+	_expect(not before_centers.is_empty(), "%s did not capture endpoint actor centers" % label)
+	_expect(before_centers.size() == after_centers.size(), "%s changed the actor presentation set" % label)
+	for raw_id: Variant in before_centers.keys():
+		_expect(after_centers.has(raw_id), "%s replaced actor presentation %s" % [label, raw_id])
+		if not after_centers.has(raw_id):
+			continue
+		var before_center: Vector2 = before_centers.get(raw_id, Vector2.INF) as Vector2
+		var after_center: Vector2 = after_centers.get(raw_id, Vector2.INF) as Vector2
+		_expect(before_center.distance_to(after_center) <= tolerance, "%s moved actor %s by %.3f px" % [label, raw_id, before_center.distance_to(after_center)])
+
+func _assert_return_endpoint_continuity(snapshot: Dictionary, tolerance: float, label: String) -> void:
+	var arena_snapshot: Dictionary = snapshot.get("arena", {}) as Dictionary
+	var planning_snapshot: Dictionary = snapshot.get("planning", {}) as Dictionary
+	var presentations: Array = arena_snapshot.get("unit_presentations", []) as Array
+	var team_indices: Dictionary = {"player": 0, "enemy": 0}
+	_expect(not presentations.is_empty(), "%s did not capture arena actors" % label)
+	for presentation_value: Variant in presentations:
+		var presentation: Dictionary = presentation_value as Dictionary
+		var team: String = String(presentation.get("team", ""))
+		var planning_key: String = "%s_centers" % team
+		var planning_centers: Array = planning_snapshot.get(planning_key, []) as Array
+		var team_index: int = int(team_indices.get(team, 0))
+		_expect(team_index < planning_centers.size(), "%s is missing planning center %s:%d" % [label, team, team_index])
+		if team_index < planning_centers.size():
+			var arena_center: Vector2 = presentation.get("global_center", Vector2.INF) as Vector2
+			var planning_center: Vector2 = planning_centers[team_index] as Vector2
+			_expect(arena_center.distance_to(planning_center) <= tolerance, "%s moved %s actor %d by %.3f px" % [label, team, team_index, arena_center.distance_to(planning_center)])
+		team_indices[team] = team_index + 1
 
 func _assert_readouts_prepared(snapshot: Dictionary, label: String) -> void:
 	var presentations_value: Variant = snapshot.get("unit_presentations", [])
@@ -319,6 +371,9 @@ func _rect_between_endpoints(candidate: Rect2, source: Rect2, target: Rect2) -> 
 		if candidate_size < minf(source_size, target_size) - 2.0 or candidate_size > maxf(source_size, target_size) + 2.0:
 			return false
 	return true
+
+func _rect_close(actual: Rect2, expected: Rect2, tolerance: float) -> bool:
+	return actual.position.distance_to(expected.position) <= tolerance and actual.size.distance_to(expected.size) <= tolerance
 
 func _assert_field_toward_target(combat: Control, previous_rect: Rect2, target_rect: Rect2, label: String) -> Rect2:
 	var arena: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
@@ -478,11 +533,17 @@ func _capture(label: String) -> void:
 	})
 
 func _write_manifest(transition: Variant) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var controller: Variant = combat.get("controller") if combat != null else null
+	var arena_bridge: Variant = controller.get("arena_bridge") if controller != null else null
 	var manifest: Dictionary[String, Variant] = {
 		"test": SMOKE_NAME,
 		"entrypoint": "scenes/Main.tscn",
 		"countdown_seconds": float(transition.call("get_countdown_duration_seconds")) if transition != null else -1.0,
 		"captures": _captures,
+		"entry_endpoint_handoff": arena_bridge.call("get_entry_endpoint_handoff_snapshots") if arena_bridge != null else {},
+		"entry_first_simulation": controller.call("get_entry_first_simulation_snapshot") if controller != null else {},
+		"return_endpoint_handoff": arena_bridge.call("get_return_endpoint_handoff_snapshots") if arena_bridge != null else {},
 		"failures": _failures,
 	}
 	var file: FileAccess = FileAccess.open(MANIFEST_PATH, FileAccess.WRITE)

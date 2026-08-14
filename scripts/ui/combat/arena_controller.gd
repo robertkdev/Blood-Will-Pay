@@ -311,7 +311,7 @@ func sync_arena_with_positions(player_views: Array[UnitSlotView], enemy_views: A
 	_apply_combat_presentation_spacing()
 	reflow_combat_readouts()
 
-func _apply_combat_presentation_spacing() -> void:
+func _apply_combat_presentation_spacing(presentation_bounds_override: Rect2 = Rect2()) -> void:
 	var visible_actors: Array[UnitActor] = []
 	for actor: UnitActor in player_actors:
 		if actor != null and is_instance_valid(actor) and actor.visible:
@@ -319,7 +319,7 @@ func _apply_combat_presentation_spacing() -> void:
 	for actor: UnitActor in enemy_actors:
 		if actor != null and is_instance_valid(actor) and actor.visible:
 			visible_actors.append(actor)
-	var presentation_bounds: Rect2 = _combat_presentation_bounds()
+	var presentation_bounds: Rect2 = presentation_bounds_override if presentation_bounds_override.size.x > 1.0 and presentation_bounds_override.size.y > 1.0 else _combat_presentation_bounds()
 	if visible_actors.size() < 2:
 		for actor: UnitActor in visible_actors:
 			var source_center: Vector2 = actor.get_combat_unspaced_center()
@@ -371,8 +371,8 @@ func _apply_combat_presentation_spacing() -> void:
 		arena_container.set_meta("combat_presentation_bounds", presentation_bounds)
 		arena_container.set_meta("combat_presentation_bounds_contract", "actor_focus_shadow_and_readout_extents_contained")
 
-func refresh_combat_presentation_spacing() -> void:
-	_apply_combat_presentation_spacing()
+func refresh_combat_presentation_spacing(presentation_bounds_override: Rect2 = Rect2()) -> void:
+	_apply_combat_presentation_spacing(presentation_bounds_override)
 	reflow_combat_readouts()
 
 func _combat_spacing_axis(first_actor: UnitActor, second_actor: UnitActor, delta: Vector2, first_index: int, second_index: int) -> Vector2:

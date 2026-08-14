@@ -544,6 +544,12 @@ func set_combat_presentation_offset(offset: Vector2) -> void:
 	set_meta("combat_visual_collision_offset", _combat_presentation_offset)
 	_update_screen_position()
 
+func set_combat_visual_center(center: Vector2) -> void:
+	_base_screen_pos = center - _effect_offset - _combat_presentation_offset
+	_screen_position_initialized = true
+	set_meta("combat_simulation_screen_position", _base_screen_pos)
+	_update_screen_position()
+
 func _ensure_effect_player() -> void:
 	if _effect_player and is_instance_valid(_effect_player):
 		return

@@ -465,6 +465,7 @@ var _arena_prepared_for_transition: bool = false
 var _transition_preparation_generation: int = -1
 var _post_start_presentation_token: int = 0
 var _pre_unfreeze_gate_snapshot: Dictionary[String, Variant] = {}
+var _entry_first_simulation_snapshot: Dictionary[String, Variant] = {}
 var combat_broadcast_strip: PanelContainer = null
 var combat_broadcast_phase: Label = null
 var combat_broadcast_wager: Label = null
@@ -1225,6 +1226,7 @@ func _init_game() -> void:
 	clear_log()
 	_arena_prepared_for_transition = false
 	_pre_unfreeze_gate_snapshot.clear()
+	_entry_first_simulation_snapshot.clear()
 	_post_combat_return_started = false
 	_post_combat_return_complete = false
 	_post_combat_planning_prepared = false
@@ -1774,6 +1776,8 @@ func _on_combat_entry_visual_finished() -> void:
 	}
 	if not manager.has_method("begin_prepared_stage") or not bool(manager.begin_prepared_stage()):
 		_recover_pending_battle_start("prepared battle could not begin")
+		return
+	_entry_first_simulation_snapshot = arena_bridge.get_transition_debug_snapshot().duplicate(true) if arena_bridge != null else {}
 
 func _update_pending_battle_start(delta: float) -> void:
 	if not _battle_start_pending:
@@ -3038,12 +3042,16 @@ func _prepare_post_combat_planning_return() -> void:
 	_update_stage_label()
 	_sync_bottom_combat_visibility(true)
 	sync_tactical_phase_visuals(true)
+	if arena_bridge != null:
+		arena_bridge.begin_continuous_return(player_views, enemy_views)
 	if phase_transition != null:
 		phase_transition.start_return(_reduced_motion_enabled())
 	else:
 		_on_combat_return_visual_finished()
 
 func _on_combat_return_visual_finished() -> void:
+	if arena_bridge != null:
+		arena_bridge.finish_continuous_return(player_views, enemy_views)
 	_post_combat_return_complete = true
 	# Planning layout changes underneath the fixed result card can invalidate its
 	# container geometry for the completion frame. Re-assert the authored card
@@ -3803,6 +3811,9 @@ func _on_transition_field_progress_changed(progress: float) -> void:
 
 func get_pre_unfreeze_gate_snapshot() -> Dictionary[String, Variant]:
 	return _pre_unfreeze_gate_snapshot.duplicate(true)
+
+func get_entry_first_simulation_snapshot() -> Dictionary[String, Variant]:
+	return _entry_first_simulation_snapshot.duplicate(true)
 
 func _committed_confrontation_centroid() -> Vector2:
 	var player_centroid: Vector2 = _team_view_centroid(player_views, player_grid_helper)

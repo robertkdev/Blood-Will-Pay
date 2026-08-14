@@ -36,6 +36,19 @@ var _entry_source_player: Array[Vector2] = []
 var _entry_source_enemy: Array[Vector2] = []
 var _entry_target_player: Array[Vector2] = []
 var _entry_target_enemy: Array[Vector2] = []
+var _entry_presentation_target_player: Array[Vector2] = []
+var _entry_presentation_target_enemy: Array[Vector2] = []
+var _entry_presentation_offset_player: Array[Vector2] = []
+var _entry_presentation_offset_enemy: Array[Vector2] = []
+var _entry_endpoint_before_release: Dictionary[String, Variant] = {}
+var _entry_endpoint_after_release: Dictionary[String, Variant] = {}
+var _continuous_return_active: bool = false
+var _return_source_player: Array[Vector2] = []
+var _return_source_enemy: Array[Vector2] = []
+var _return_target_player: Array[Vector2] = []
+var _return_target_enemy: Array[Vector2] = []
+var _return_endpoint_before_release: Dictionary[String, Variant] = {}
+var _return_endpoint_after_release: Dictionary[String, Variant] = {}
 var _entry_source_views: Array[Dictionary] = []
 var _entry_player_sizes: Array[Vector2] = []
 var _entry_enemy_sizes: Array[Vector2] = []
@@ -136,6 +149,7 @@ func enter_arena(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotV
     arena.configure(arena_container, arena_units, player_grid_helper, enemy_grid_helper, unit_actor_class, tile_size)
     arena.enter_arena(player_views, enemy_views, continuous_entry, _entry_source_player, _entry_source_enemy)
     if continuous_entry:
+        _prepare_continuous_entry_endpoint(target_rect)
         # The actors are born at the committed planning centers. The first
         # presentation frame therefore has no raw-grid placement to correct.
         apply_field_progress(0.0)
@@ -237,15 +251,22 @@ func teardown() -> void:
     _clear_continuous_entry()
 
 func apply_field_progress(progress: float) -> void:
-    if arena == null or not _continuous_entry_active:
+    if arena == null:
+        return
+    if _continuous_return_active:
+        _apply_continuous_return_progress(progress)
+        return
+    if not _continuous_entry_active:
         return
     var field_progress: float = clampf(progress, 0.0, 1.0)
     for index: int in range(mini(arena.player_actors.size(), mini(_entry_source_player.size(), _entry_target_player.size()))):
         var player_size: Vector2 = _entry_player_sizes[index] if index < _entry_player_sizes.size() else Vector2.ONE * float(tile_size)
-        _apply_actor_entry(arena.player_actors[index], _entry_source_player[index], _entry_target_player[index], player_size, field_progress)
+        var player_target: Vector2 = _entry_presentation_target_player[index] if index < _entry_presentation_target_player.size() else _entry_target_player[index]
+        _apply_actor_entry(arena.player_actors[index], _entry_source_player[index], player_target, player_size, field_progress)
     for index: int in range(mini(arena.enemy_actors.size(), mini(_entry_source_enemy.size(), _entry_target_enemy.size()))):
         var enemy_size: Vector2 = _entry_enemy_sizes[index] if index < _entry_enemy_sizes.size() else Vector2.ONE * float(tile_size)
-        _apply_actor_entry(arena.enemy_actors[index], _entry_source_enemy[index], _entry_target_enemy[index], enemy_size, field_progress)
+        var enemy_target: Vector2 = _entry_presentation_target_enemy[index] if index < _entry_presentation_target_enemy.size() else _entry_target_enemy[index]
+        _apply_actor_entry(arena.enemy_actors[index], _entry_source_enemy[index], enemy_target, enemy_size, field_progress)
     # Ownership changes at the first committed transition frame. The planning
     # unit views and combat actors share the same cell center there, so a second
     # alpha tween only creates ghosted duplicates and a perceived teleport.
@@ -267,11 +288,49 @@ func finish_continuous_entry() -> void:
     if arena == null or not _continuous_entry_active:
         return
     apply_field_progress(1.0)
-    # The manager is authoritative for the endpoint, but it must not compete
-    # with the registered field tween while the entry is visible. Release the
-    # guard only after the actors have reached that endpoint.
+    _entry_endpoint_before_release = get_transition_debug_snapshot().duplicate(true)
+    # Swap from interpolated presentation centers to simulation anchors plus
+    # their already-prepared spacing offsets. Both representations resolve to
+    # the same rendered centers, so releasing transition ownership is inert.
+    _commit_continuous_entry_endpoint()
     _continuous_entry_active = false
-    arena.refresh_combat_presentation_spacing()
+    _entry_endpoint_after_release = get_transition_debug_snapshot().duplicate(true)
+
+func get_entry_endpoint_handoff_snapshots() -> Dictionary[String, Variant]:
+    return {
+        "before_release": _entry_endpoint_before_release.duplicate(true),
+        "after_release": _entry_endpoint_after_release.duplicate(true),
+    }
+
+func begin_continuous_return(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
+    if arena == null:
+        return
+    _continuous_return_active = true
+    _return_source_player = _actor_centers(arena.player_actors)
+    _return_source_enemy = _actor_centers(arena.enemy_actors)
+    _return_target_player = _planning_view_centers(player_views, player_grid_helper)
+    _return_target_enemy = _planning_view_centers(enemy_views, enemy_grid_helper)
+    _apply_continuous_return_progress(1.0)
+
+func finish_continuous_return(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> void:
+    if arena == null or not _continuous_return_active:
+        return
+    _apply_continuous_return_progress(0.0)
+    _return_endpoint_before_release = {
+        "arena": get_transition_debug_snapshot().duplicate(true),
+        "planning": _planning_endpoint_snapshot(player_views, enemy_views),
+    }
+    _continuous_return_active = false
+    _return_endpoint_after_release = {
+        "arena": get_transition_debug_snapshot().duplicate(true),
+        "planning": _planning_endpoint_snapshot(player_views, enemy_views),
+    }
+
+func get_return_endpoint_handoff_snapshots() -> Dictionary[String, Variant]:
+    return {
+        "before_release": _return_endpoint_before_release.duplicate(true),
+        "after_release": _return_endpoint_after_release.duplicate(true),
+    }
 
 func get_entry_player_positions() -> Array[Vector2]:
     return _entry_target_player.duplicate()
@@ -301,6 +360,8 @@ func get_transition_debug_snapshot() -> Dictionary[String, Variant]:
         "enemy_source_positions": _entry_source_enemy.duplicate(),
         "player_target_positions": _entry_target_player.duplicate(),
         "enemy_target_positions": _entry_target_enemy.duplicate(),
+        "player_presentation_target_positions": _entry_presentation_target_player.duplicate(),
+        "enemy_presentation_target_positions": _entry_presentation_target_enemy.duplicate(),
         "unit_presentations": presentations,
         "planning_sources": planning_sources,
         "requested_field_rect": arena_container.get_meta("one_arena_requested_field_rect", Rect2()) if arena_container != null else Rect2(),
@@ -467,6 +528,14 @@ func _capture_continuous_entry(player_views: Array[UnitSlotView], enemy_views: A
     _entry_source_enemy.clear()
     _entry_target_player.clear()
     _entry_target_enemy.clear()
+    _entry_presentation_target_player.clear()
+    _entry_presentation_target_enemy.clear()
+    _entry_presentation_offset_player.clear()
+    _entry_presentation_offset_enemy.clear()
+    _entry_endpoint_before_release.clear()
+    _entry_endpoint_after_release.clear()
+    _return_endpoint_before_release.clear()
+    _return_endpoint_after_release.clear()
     _entry_source_views.clear()
     _entry_player_sizes.clear()
     _entry_enemy_sizes.clear()
@@ -487,6 +556,80 @@ func _capture_continuous_entry(player_views: Array[UnitSlotView], enemy_views: A
     _entry_target_player = _map_shared_formation(_entry_source_player, source_rect, target_safe)
     _entry_target_enemy = _map_shared_formation(_entry_source_enemy, source_rect, target_safe)
     _center_mapped_confrontation(target_safe)
+
+func _prepare_continuous_entry_endpoint(target_rect: Rect2) -> void:
+    if arena == null:
+        return
+    for index: int in range(mini(arena.player_actors.size(), _entry_target_player.size())):
+        var player_actor: UnitActor = arena.player_actors[index]
+        var player_size: Vector2 = _entry_player_sizes[index] if index < _entry_player_sizes.size() else Vector2.ONE * float(tile_size)
+        player_actor.set_size_px(player_size)
+        player_actor.set_combat_presentation_offset(Vector2.ZERO)
+        player_actor.set_screen_position(_entry_target_player[index])
+    for index: int in range(mini(arena.enemy_actors.size(), _entry_target_enemy.size())):
+        var enemy_actor: UnitActor = arena.enemy_actors[index]
+        var enemy_size: Vector2 = _entry_enemy_sizes[index] if index < _entry_enemy_sizes.size() else Vector2.ONE * float(tile_size)
+        enemy_actor.set_size_px(enemy_size)
+        enemy_actor.set_combat_presentation_offset(Vector2.ZERO)
+        enemy_actor.set_screen_position(_entry_target_enemy[index])
+    arena.refresh_combat_presentation_spacing(target_rect)
+    _capture_prepared_endpoint(arena.player_actors, _entry_presentation_target_player, _entry_presentation_offset_player)
+    _capture_prepared_endpoint(arena.enemy_actors, _entry_presentation_target_enemy, _entry_presentation_offset_enemy)
+    for actor: UnitActor in arena.player_actors:
+        actor.set_combat_presentation_offset(Vector2.ZERO)
+    for actor: UnitActor in arena.enemy_actors:
+        actor.set_combat_presentation_offset(Vector2.ZERO)
+
+func _capture_prepared_endpoint(actors: Array[UnitActor], centers: Array[Vector2], offsets: Array[Vector2]) -> void:
+    centers.clear()
+    offsets.clear()
+    for actor: UnitActor in actors:
+        centers.append(actor.get_global_rect().get_center())
+        offsets.append(actor.get_meta("combat_visual_collision_offset", Vector2.ZERO) as Vector2)
+
+func _commit_continuous_entry_endpoint() -> void:
+    for index: int in range(mini(arena.player_actors.size(), _entry_target_player.size())):
+        var player_actor: UnitActor = arena.player_actors[index]
+        player_actor.set_screen_position(_entry_target_player[index])
+        player_actor.set_combat_presentation_offset(_entry_presentation_offset_player[index] if index < _entry_presentation_offset_player.size() else Vector2.ZERO)
+    for index: int in range(mini(arena.enemy_actors.size(), _entry_target_enemy.size())):
+        var enemy_actor: UnitActor = arena.enemy_actors[index]
+        enemy_actor.set_screen_position(_entry_target_enemy[index])
+        enemy_actor.set_combat_presentation_offset(_entry_presentation_offset_enemy[index] if index < _entry_presentation_offset_enemy.size() else Vector2.ZERO)
+
+func _apply_continuous_return_progress(progress: float) -> void:
+    var return_progress: float = clampf(progress, 0.0, 1.0)
+    for index: int in range(mini(arena.player_actors.size(), mini(_return_source_player.size(), _return_target_player.size()))):
+        var player_actor: UnitActor = arena.player_actors[index]
+        player_actor.set_combat_presentation_offset(Vector2.ZERO)
+        player_actor.set_combat_visual_center(_return_target_player[index].lerp(_return_source_player[index], return_progress))
+    for index: int in range(mini(arena.enemy_actors.size(), mini(_return_source_enemy.size(), _return_target_enemy.size()))):
+        var enemy_actor: UnitActor = arena.enemy_actors[index]
+        enemy_actor.set_combat_presentation_offset(Vector2.ZERO)
+        enemy_actor.set_combat_visual_center(_return_target_enemy[index].lerp(_return_source_enemy[index], return_progress))
+
+func _actor_centers(actors: Array[UnitActor]) -> Array[Vector2]:
+    var centers: Array[Vector2] = []
+    for actor: UnitActor in actors:
+        centers.append(actor.get_global_rect().get_center())
+    return centers
+
+func _planning_view_centers(views: Array[UnitSlotView], grid: BoardGrid) -> Array[Vector2]:
+    var centers: Array[Vector2] = []
+    for slot: UnitSlotView in views:
+        if slot != null and slot.view != null and is_instance_valid(slot.view):
+            centers.append(slot.view.get_global_rect().get_center())
+        elif slot != null and grid != null and slot.tile_idx >= 0:
+            centers.append(grid.get_center(slot.tile_idx))
+        else:
+            centers.append(Vector2.ZERO)
+    return centers
+
+func _planning_endpoint_snapshot(player_views: Array[UnitSlotView], enemy_views: Array[UnitSlotView]) -> Dictionary[String, Variant]:
+    return {
+        "player_centers": _planning_view_centers(player_views, player_grid_helper),
+        "enemy_centers": _planning_view_centers(enemy_views, enemy_grid_helper),
+    }
 
 func _capture_source_view(slot: UnitSlotView, team: String, roster_index: int) -> void:
     if slot == null or slot.view == null or not is_instance_valid(slot.view):
@@ -626,6 +769,15 @@ func _clear_continuous_entry() -> void:
     _entry_source_enemy.clear()
     _entry_target_player.clear()
     _entry_target_enemy.clear()
+    _entry_presentation_target_player.clear()
+    _entry_presentation_target_enemy.clear()
+    _entry_presentation_offset_player.clear()
+    _entry_presentation_offset_enemy.clear()
+    _continuous_return_active = false
+    _return_source_player.clear()
+    _return_source_enemy.clear()
+    _return_target_player.clear()
+    _return_target_enemy.clear()
     _entry_source_views.clear()
     _entry_player_sizes.clear()
     _entry_enemy_sizes.clear()
