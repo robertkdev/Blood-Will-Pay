@@ -1569,6 +1569,7 @@ func _queue_battle_start() -> void:
 		return
 	_pending_combat_quote_multiplier = _capture_current_encounter_quote_multiplier()
 	_battle_start_pending = true
+	_mark_game_perception_event("gp_start_battle_accepted", "countdown")
 	_battle_start_elapsed = 0.0
 	_battle_start_generation += 1
 	_countdown_finished_for_pending_start = (phase_transition == null)
@@ -3815,6 +3816,11 @@ func get_pre_unfreeze_gate_snapshot() -> Dictionary[String, Variant]:
 func get_entry_first_simulation_snapshot() -> Dictionary[String, Variant]:
 	return _entry_first_simulation_snapshot.duplicate(true)
 
+func _mark_game_perception_event(event_id: String, label: String) -> void:
+	var probe: Node = parent.get_node_or_null("/root/FramePacingProbe") if parent != null else null
+	if probe != null and probe.has_method("mark_event"):
+		probe.call("mark_event", event_id, label)
+
 func _committed_confrontation_centroid() -> Vector2:
 	var player_centroid: Vector2 = _team_view_centroid(player_views, player_grid_helper)
 	var enemy_centroid: Vector2 = _team_view_centroid(enemy_views, enemy_grid_helper)
@@ -4981,6 +4987,7 @@ func _acknowledge_result_return(input_path: String) -> void:
 	var input_accepted_usec: int = Time.get_ticks_usec()
 	_result_hold_finishing = true
 	_result_hold_active = false
+	_mark_game_perception_event("gp_result_advance_accepted", input_path)
 	# Keep the result card fixed while the battlefield returns behind it. The
 	# copy change acknowledges click and timeout through the same operation.
 	var hold_label: Label = _result_banner.get_node_or_null("Center/BattleResultCard/CardMargin/Content/ResultHoldRow/ResultHoldLabel") as Label if _result_banner != null else null
