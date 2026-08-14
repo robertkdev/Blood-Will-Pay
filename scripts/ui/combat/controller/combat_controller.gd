@@ -3817,7 +3817,7 @@ func get_entry_first_simulation_snapshot() -> Dictionary[String, Variant]:
 	return _entry_first_simulation_snapshot.duplicate(true)
 
 func _mark_game_perception_event(event_id: String, label: String) -> void:
-	var probe: Node = parent.get_node_or_null("/root/FramePacingProbe") if parent != null else null
+	var probe: Node = parent.get_node_or_null("/root/GamePerceptionProbe") if parent != null else null
 	if probe != null and probe.has_method("mark_event"):
 		probe.call("mark_event", event_id, label)
 
