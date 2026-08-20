@@ -7,6 +7,13 @@ const UnitIdentity := preload("res://scripts/game/identity/unit_identity.gd")
 @export var id: String = ""
 @export var name: String = ""
 @export var sprite_path: String = ""
+# `sprite_path` remains the board-facing compatibility source.  These optional
+# surfaces permit an approved master to supply reviewed derivatives without
+# forcing every existing unit resource to migrate at once.
+@export var shop_card_art_path: String = ""
+@export var portrait_art_path: String = ""
+@export var ledger_unlock_art_path: String = ""
+@export var menu_info_art_path: String = ""
 @export var ability_id: String = ""
 @export var traits: Array[String] = []
 # Legacy roles by string (kept for backward compatibility)
@@ -38,3 +45,9 @@ func role_names() -> PackedStringArray:
 		if String(s).strip_edges() != "":
 			out.append(RoleLibrary._resolve_role_key(String(s), ""))
 	return out
+
+func shop_card_path() -> String:
+	return shop_card_art_path if not shop_card_art_path.strip_edges().is_empty() else sprite_path
+
+func portrait_path() -> String:
+	return portrait_art_path if not portrait_art_path.strip_edges().is_empty() else sprite_path
