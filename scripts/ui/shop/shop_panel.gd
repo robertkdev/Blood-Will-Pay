@@ -103,7 +103,7 @@ func set_offers(offers: Array) -> void:
                     "price": int(off.price) if int(off.price) > 0 else int(off.cost),
                     "package_level": int(off.package_level),
                     "package_kind": String(off.package_kind),
-                    "image_path": String(off.sprite_path),
+					"image_path": String(off.shop_card_art_path) if not String(off.shop_card_art_path).strip_edges().is_empty() else String(off.sprite_path),
                     "role": _role_text(roles, primary_role),
                     "roles": roles,
                     "traits": traits,
