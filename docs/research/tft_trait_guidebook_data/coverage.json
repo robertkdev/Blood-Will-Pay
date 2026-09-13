@@ -1,0 +1,170 @@
+﻿[
+    {
+        "set_id":  "set1",
+        "set_title":  "Beta Set",
+        "traits":  24,
+        "champions":  57,
+        "source_url":  "https://lolchess.gg/synergies/set1/guide?hl=en"
+    },
+    {
+        "set_id":  "set2",
+        "set_title":  "Rise of the Elements",
+        "traits":  27,
+        "champions":  56,
+        "source_url":  "https://lolchess.gg/synergies/set2/guide?hl=en"
+    },
+    {
+        "set_id":  "set3",
+        "set_title":  "Galaxies",
+        "traits":  23,
+        "champions":  52,
+        "source_url":  "https://lolchess.gg/synergies/set3/guide?hl=en"
+    },
+    {
+        "set_id":  "set3.5",
+        "set_title":  "Galaxies: Return to the Stars",
+        "traits":  24,
+        "champions":  57,
+        "source_url":  "https://lolchess.gg/synergies/set3.5/guide?hl=en"
+    },
+    {
+        "set_id":  "set4",
+        "set_title":  "Fates",
+        "traits":  26,
+        "champions":  58,
+        "source_url":  "https://lolchess.gg/synergies/set4/guide?hl=en"
+    },
+    {
+        "set_id":  "set4.5",
+        "set_title":  "Fates: Festival of Beasts",
+        "traits":  27,
+        "champions":  58,
+        "source_url":  "https://lolchess.gg/synergies/set4.5/guide?hl=en"
+    },
+    {
+        "set_id":  "set5",
+        "set_title":  "Reckoning",
+        "traits":  27,
+        "champions":  58,
+        "source_url":  "https://lolchess.gg/synergies/set5/guide?hl=en"
+    },
+    {
+        "set_id":  "set5.5",
+        "set_title":  "Reckoning: Dawn of Heroes",
+        "traits":  26,
+        "champions":  57,
+        "source_url":  "https://lolchess.gg/synergies/set5.5/guide?hl=en"
+    },
+    {
+        "set_id":  "set6",
+        "set_title":  "Gizmos \u0026 Gadgets",
+        "traits":  28,
+        "champions":  59,
+        "source_url":  "https://lolchess.gg/synergies/set6/guide?hl=en"
+    },
+    {
+        "set_id":  "set6.5",
+        "set_title":  "Gizmos \u0026 Gadgets: Neon Nights",
+        "traits":  28,
+        "champions":  60,
+        "source_url":  "https://lolchess.gg/synergies/set6.5/guide?hl=en"
+    },
+    {
+        "set_id":  "set7",
+        "set_title":  "Dragonlands",
+        "traits":  28,
+        "champions":  58,
+        "source_url":  "https://lolchess.gg/synergies/set7/guide?hl=en"
+    },
+    {
+        "set_id":  "set7.5",
+        "set_title":  "Dragonlands: Uncharted Realms",
+        "traits":  29,
+        "champions":  59,
+        "source_url":  "https://lolchess.gg/synergies/set7.5/guide?hl=en"
+    },
+    {
+        "set_id":  "set8",
+        "set_title":  "Monsters Attack!",
+        "traits":  27,
+        "champions":  59,
+        "source_url":  "https://lolchess.gg/synergies/set8/guide?hl=en"
+    },
+    {
+        "set_id":  "set8.5",
+        "set_title":  "Monsters Attack: Glitched Out!!",
+        "traits":  28,
+        "champions":  59,
+        "source_url":  "https://lolchess.gg/synergies/set8.5/guide?hl=en"
+    },
+    {
+        "set_id":  "set9",
+        "set_title":  "Runeterra Reforged",
+        "traits":  28,
+        "champions":  69,
+        "source_url":  "https://lolchess.gg/synergies/set9/guide?hl=en"
+    },
+    {
+        "set_id":  "set9.5",
+        "set_title":  "Runeterra Reforged: Horizonbound",
+        "traits":  28,
+        "champions":  72,
+        "source_url":  "https://lolchess.gg/synergies/set9.5/guide?hl=en"
+    },
+    {
+        "set_id":  "set10",
+        "set_title":  "Remix Rumble",
+        "traits":  29,
+        "champions":  60,
+        "source_url":  "https://lolchess.gg/synergies/set10/guide?hl=en"
+    },
+    {
+        "set_id":  "set11",
+        "set_title":  "Inkborn Fables",
+        "traits":  26,
+        "champions":  61,
+        "source_url":  "https://lolchess.gg/synergies/set11/guide?hl=en"
+    },
+    {
+        "set_id":  "set12",
+        "set_title":  "Magic n\u0027 Mayhem",
+        "traits":  27,
+        "champions":  60,
+        "source_url":  "https://lolchess.gg/synergies/set12/guide?hl=en"
+    },
+    {
+        "set_id":  "set13",
+        "set_title":  "Into the Arcane",
+        "traits":  29,
+        "champions":  63,
+        "source_url":  "https://lolchess.gg/synergies/set13/guide?hl=en"
+    },
+    {
+        "set_id":  "set14",
+        "set_title":  "Cyber City",
+        "traits":  26,
+        "champions":  60,
+        "source_url":  "https://lolchess.gg/synergies/set14/guide?hl=en"
+    },
+    {
+        "set_id":  "set15",
+        "set_title":  "K.O. Coliseum",
+        "traits":  26,
+        "champions":  65,
+        "source_url":  "https://lolchess.gg/synergies/set15/guide?hl=en"
+    },
+    {
+        "set_id":  "set16",
+        "set_title":  "Lore \u0026 Legends",
+        "traits":  48,
+        "champions":  100,
+        "source_url":  "https://lolchess.gg/synergies/set16/guide?hl=en"
+    },
+    {
+        "set_id":  "set17",
+        "set_title":  "Space Gods",
+        "traits":  35,
+        "champions":  63,
+        "source_url":  "https://lolchess.gg/synergies/set17/guide?hl=en"
+    }
+]
