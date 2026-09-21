@@ -73,6 +73,7 @@ def _rules_digest(rules: dict) -> str:
         f"WAGER QUOTES: {multipliers}",
         f"WAGER RULE: {wager.get('rule', '')} {wager.get('sizing', '')}",
         f"COMPOSITION: {rules.get('composition', {}).get('rule', '')}",
+        f"POWER: {rules.get('power', {}).get('rule', '')} {rules.get('power', {}).get('deployed_payoff', '')}",
         f"PLAYSTYLE: {playstyle.get('identity', '')}",
         f"FLEX: {flex.get('rule', '')} {flex.get('keep_options_open', '')}",
         f"VERTICAL: {vertical.get('rule', '')} {vertical.get('one_piece_away', '')}",
