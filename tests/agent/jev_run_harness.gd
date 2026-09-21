@@ -96,6 +96,10 @@ func _run() -> void:
 	_append_event("run_start", {
 		"mode": _run_mode,
 		"seed": _campaign_seed,
+		# Revision and policy identity travel with the run so a transcript cannot be
+		# mistaken for a different build or a different rule set.
+		"repo_revision": OS.get_environment("JEV_REVISION").strip_edges(),
+		"rules_sha256": OS.get_environment("JEV_RULES_SHA").strip_edges(),
 		"shop_seed_explicit": _seed_explicit,
 		"time_scale": _speed_scale,
 		"real_planning_timer": _use_real_timer,
@@ -277,17 +281,20 @@ func _record_combat_diagnostic(outcome: String) -> void:
 	_append_event("combat_diagnostic", {
 		"outcome": outcome,
 		"engine_outcome": _last_combat_outcome,
+		"fight_index": _battles + 1,
 		"player_damage": int(engine.get("total_damage_player")),
 		"enemy_damage": int(engine.get("total_damage_enemy")),
-		"elapsed_seconds": float(state.elapsed_time) if state != null else -1.0,
+		"elapsed_seconds_at_settlement": float(state.elapsed_time) if state != null else -1.0,
 		"combat_timeout_s": float(engine.get("combat_timeout_s")),
 		"no_progress_timeout_s": float(engine.get("no_progress_timeout_s")),
-		"player_alive": _alive_count(player_team),
-		"enemy_alive": _alive_count(enemy_team),
-		"player_hp_fraction": _health_fraction(player_team),
-		"enemy_hp_fraction": _health_fraction(enemy_team),
-		"player_board": _team_ids(player_team),
-		"enemy_board": _team_ids(enemy_team),
+		# These readings are taken after settlement: the board may already be rebuilt
+		# for the next stage and the units healed. They are labelled as such rather
+		# than presented as the fight's final state; the engine's own "Combat resolved"
+		# log line in combat_log is the authoritative record of the fight.
+		"post_settlement_player_alive": _alive_count(player_team),
+		"post_settlement_enemy_alive": _alive_count(enemy_team),
+		"post_settlement_player_board": _team_ids(player_team),
+		"post_settlement_enemy_board": _team_ids(enemy_team),
 		"buckets_after": int(Economy.blood_buckets),
 		"reserve_before_wager": int(Economy.last_blood_reserve_start),
 		"wager": int(Economy.last_wager_start),
@@ -645,6 +652,23 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	await _decide_wager(label)
 	_ensure_combat_log_connected()
 	_last_combat_outcome = ""
+	# Snapshot everything about the fight BEFORE it starts. After settlement the board
+	# is rebuilt for the next planning beat and the units are healed, so a read taken
+	# afterwards describes the next stage, not the fight that just resolved.
+	_append_event("fight_start", {
+		"fight_index": _battles + 1,
+		"label": label,
+		"board": _board_ids(),
+		"bench": _bench_ids(),
+		"deployed_traits": _trait_snapshot(_board_units()),
+		"wager": int(Economy.current_bet),
+		"buckets": int(Economy.blood_buckets),
+		"stake_unit": int(Economy.stake_unit),
+		"encounter_kind": String(Economy.encounter_quote_kind),
+		"quoted_multiplier": float(Economy.gross_payout_multiplier()),
+		"shown_win_odds": float(Economy.projected_win_probability),
+		"planning_seconds_left": snappedf(_planning_time_left(), 0.01),
+	})
 	await super._press_continue(expect_forced, label)
 
 func _ensure_combat_log_connected() -> void:
@@ -807,7 +831,11 @@ func _plan_state() -> Dictionary:
 		"stake_rank": int(Economy.stake_rank),
 		"recent_fights": _recent_fights.duplicate(true),
 		"stage_retry_count": int(_same_stage_retries.get("%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)], 0)),
-		"traits": _trait_snapshot(_owned_units()),
+		# Traits count unique units, and only the fielded board fights. Reporting the
+		# benched units' traits as if they were active is what let "this offer activates
+		# a trait" be true while the board activated nothing.
+		"traits": _trait_snapshot(_board_units()),
+		"traits_owned": _trait_snapshot(_owned_units()),
 		"planning_time_left": float(controller_node.get("planning_time_left")) if controller_node != null else -1.0,
 		"planning_timer_total": float(controller_node.get("planning_timer_total")) if controller_node != null else -1.0,
 		"time_scale": Engine.time_scale,
@@ -816,7 +844,7 @@ func _plan_state() -> Dictionary:
 	}
 	return state
 
-func _owned_units() -> Array[Unit]:
+func _board_units() -> Array[Unit]:
 	var units: Array[Unit] = []
 	var controller: Variant = _combat_controller()
 	var manager: Variant = controller.get("manager") if controller != null else null
@@ -825,6 +853,10 @@ func _owned_units() -> Array[Unit]:
 			var board_unit: Unit = unit_value as Unit
 			if board_unit != null:
 				units.append(board_unit)
+	return units
+
+func _owned_units() -> Array[Unit]:
+	var units: Array[Unit] = _board_units()
 	for bench_unit: Unit in Roster.compact():
 		if bench_unit != null and not units.has(bench_unit):
 			units.append(bench_unit)
@@ -881,7 +913,7 @@ func _shop_candidates() -> Array[Dictionary]:
 	owned.append_array(_bench_ids())
 	var count_by_trait: Dictionary[String, int] = {}
 	var threshold_by_trait: Dictionary[String, int] = {}
-	for entry: Dictionary in _trait_snapshot(_owned_units()):
+	for entry: Dictionary in _trait_snapshot(_board_units()):
 		var entry_id: String = String(entry.get("id", ""))
 		count_by_trait[entry_id] = int(entry.get("count", 0))
 		threshold_by_trait[entry_id] = int(entry.get("next_threshold", 0))

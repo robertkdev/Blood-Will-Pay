@@ -68,6 +68,10 @@ $env:JEV_RUN_SEED = [string]$Seed
 $env:JEV_STARTER = $Starter
 $env:JEV_SPEED = $Speed.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $env:JEV_REAL_TIMER = if ($HoldPlanningTimer) { "0" } else { "1" }
+$env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
+$env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {
+    (Get-FileHash -LiteralPath $rulesPath -Algorithm SHA256).Hash.ToLowerInvariant()
+} else { "" }
 $env:GODOT_PATH = $GodotPath
 
 $controllerLog = Join-Path $runDirectory "controller.log"
