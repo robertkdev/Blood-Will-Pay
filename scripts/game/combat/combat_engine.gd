@@ -747,9 +747,11 @@ func _emit_outcome(kind: String) -> void:
 	if kind == "":
 		return
 	if kind == "tie":
-		# This game does not draw. TFT resolves a round at its time limit and never
-		# draws, and a mutual wipe is still a round: award it instead of refunding the
-		# wager, which is what made a stage replayable forever for free.
+		# This game does not draw, but the rule is Blood Will Pay's own and must not be
+		# described as a port: Teamfight Tactics escalates a stalemate with overtime
+		# combat modifiers rather than awarding it from a board comparison. A mutual
+		# wipe is still a round: award it instead of refunding the wager, which is what
+		# made a stage replayable forever for free.
 		kind = _mutual_wipe_verdict()
 	if outcome_resolver != null:
 		outcome_resolver.mark_emitted()
