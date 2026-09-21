@@ -79,6 +79,10 @@ var _speed_scale: float = 1.0
 var _use_real_timer: bool = true
 var _seed_explicit: bool = false
 var _last_combat_outcome: String = ""
+## Duration the engine reported when it settled the last fight. Read from the
+## engine's own resolution line because the battle state is already reset by the
+## time the diagnostic runs, which made a post-settlement read report zero.
+var _last_combat_elapsed_s: float = -1.0
 
 func _run() -> void:
 	_read_environment()
@@ -318,7 +322,6 @@ func _record_combat_diagnostic(outcome: String) -> void:
 	var engine: Variant = manager.get_engine()
 	if engine == null:
 		return
-	var state: Variant = engine.get("state")
 	var player_team: Array = manager.get("player_team")
 	var enemy_team: Array = manager.get("enemy_team")
 	_append_event("combat_diagnostic", {
@@ -327,7 +330,9 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		"fight_index": _battles + 1,
 		"player_damage": int(engine.get("total_damage_player")),
 		"enemy_damage": int(engine.get("total_damage_enemy")),
-		"elapsed_seconds_at_settlement": float(state.elapsed_time) if state != null else -1.0,
+		# The engine's own reported duration. Reading state.elapsed_time here reported
+		# zero for every fight, because settlement had already reset the battle state.
+		"engine_reported_elapsed_s": _last_combat_elapsed_s,
 		"combat_timeout_s": float(engine.get("combat_timeout_s")),
 		"no_progress_timeout_s": float(engine.get("no_progress_timeout_s")),
 		# These readings are taken after settlement: the board may already be rebuilt
@@ -709,6 +714,11 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"board": _board_ids(),
 		"bench": _bench_ids(),
 		"deployed_traits": _trait_snapshot(_board_units()),
+		# Both sides, captured before the fight: identity, level, items and tile per
+		# unit, plus the traits each board actually activates.
+		"player_units": _team_units_snapshot(_board_units(), _player_placements()),
+		"enemy_units": _team_units_snapshot(_enemy_units(), _enemy_placements()),
+		"enemy_traits": _trait_snapshot(_enemy_units()),
 		"wager": int(Economy.current_bet),
 		"buckets": int(Economy.blood_buckets),
 		"stake_unit": int(Economy.stake_unit),
@@ -735,6 +745,13 @@ func _on_combat_log_line(text: String) -> void:
 	if text.begins_with("Combat resolved: "):
 		var remainder: String = text.substr("Combat resolved: ".length())
 		_last_combat_outcome = remainder.split(" ")[0].strip_edges()
+		for token: String in remainder.split(" "):
+			if not token.begins_with("elapsed="):
+				continue
+			var raw_value: String = token.trim_prefix("elapsed=").trim_suffix(".").trim_suffix("s")
+			if raw_value.is_valid_float():
+				_last_combat_elapsed_s = float(raw_value)
+			break
 	# Per-hit lines dominate the combat log; keep the lines that explain a
 	# resolution instead of truncating the transcript inside the first fight.
 	var lowered: String = text.to_lower()
@@ -905,6 +922,61 @@ func _board_units() -> Array[Unit]:
 			if board_unit != null:
 				units.append(board_unit)
 	return units
+
+func _enemy_units() -> Array[Unit]:
+	var units: Array[Unit] = []
+	var controller: Variant = _combat_controller()
+	var manager: Variant = controller.get("manager") if controller != null else null
+	if manager != null:
+		for unit_value: Variant in manager.get("enemy_team"):
+			var enemy_unit: Unit = unit_value as Unit
+			if enemy_unit != null:
+				units.append(enemy_unit)
+	return units
+
+func _player_placements() -> Array[int]:
+	var controller: Variant = _combat_controller()
+	var placement: Variant = controller.get("grid_placement") if controller != null else null
+	if placement == null or not placement.has_method("get_player_placements"):
+		return []
+	var out: Array[int] = []
+	for value: Variant in placement.call("get_player_placements"):
+		out.append(int(value))
+	return out
+
+## Enemy tile per unit. The placement layer builds the enemy views, so the tile is
+## read from the view rather than guessed; an unplaced unit reports -1.
+func _enemy_placements() -> Array[int]:
+	var tiles_by_unit: Dictionary = {}
+	var controller: Variant = _combat_controller()
+	var placement: Variant = controller.get("grid_placement") if controller != null else null
+	if placement != null and placement.has_method("get_enemy_views"):
+		for view_value: Variant in placement.call("get_enemy_views"):
+			var slot_view: Variant = view_value
+			if slot_view == null:
+				continue
+			tiles_by_unit[slot_view.get("unit")] = int(slot_view.get("tile_idx"))
+	var out: Array[int] = []
+	for unit: Unit in _enemy_units():
+		out.append(int(tiles_by_unit.get(unit, -1)))
+	return out
+
+## One team's pre-combat state. A fight can only be read after the fact if who was
+## on the board, at what level, holding what, standing where, is recorded before it
+## starts - settlement rebuilds the board and heals the units.
+func _team_units_snapshot(team: Array[Unit], placements: Array[int]) -> Array[Dictionary]:
+	var records: Array[Dictionary] = []
+	for index: int in range(team.size()):
+		var unit: Unit = team[index]
+		if unit == null:
+			continue
+		records.append({
+			"id": _unit_id(unit),
+			"level": int(unit.level),
+			"items": Items.get_equipped(unit) if Items != null else [],
+			"tile": int(placements[index]) if index < placements.size() else -1,
+		})
+	return records
 
 func _owned_units() -> Array[Unit]:
 	var units: Array[Unit] = _board_units()
