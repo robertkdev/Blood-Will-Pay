@@ -840,43 +840,36 @@ func _fallback_timeout_outcome() -> String:
 		return "defeat"
 	var player_alive: int = _alive_count(state.player_team)
 	var enemy_alive: int = _alive_count(state.enemy_team)
-	if enemy_alive <= 0 and player_alive > 0:
-		return "victory"
-	if player_alive <= 0 and enemy_alive > 0:
-		return "defeat"
-	if player_alive <= 0 and enemy_alive <= 0:
-		return _mutual_wipe_verdict()
-	# Both boards still stand: the fight ran out of time rather than resolving, so
-	# award the round the way TFT does at its time limit - more units alive wins, and
-	# equal units is decided by total remaining health. Damage dealt is deliberately
-	# not part of the ladder: hitting a tank should not outrank being healthier.
-	if player_alive != enemy_alive:
-		return "victory" if player_alive > enemy_alive else "defeat"
-	var player_health: float = _health_fraction(state.player_team)
-	var enemy_health: float = _health_fraction(state.enemy_team)
-	if not is_equal_approx(player_health, enemy_health):
-		return "victory" if player_health > enemy_health else "defeat"
-	# Perfectly symmetrical boards (a mirror fight) can match on every measure.
-	# Fall back to the seeded roll so the result stays deterministic per seed and
-	# still decisive.
-	return "victory" if rng == null or rng.randf() < 0.5 else "defeat"
+	# The fight ran out of time rather than resolving, so award it on the shared
+	# ladder: units alive, then total remaining health. The ladder is a pure function
+	# so its cases are testable without fighting a battle.
+	var verdict: String = OutcomeLadder.decide(
+		player_alive,
+		enemy_alive,
+		_remaining_health(state.player_team),
+		_remaining_health(state.enemy_team)
+	)
+	if verdict != "":
+		return verdict
+	# A mutual wipe or an exact tie on both measures: the seeded roll keeps the round
+	# decisive and reproducible per seed.
+	return _mutual_wipe_verdict()
 
 func _mutual_wipe_verdict() -> String:
 	# Both boards are destroyed, so there is no surviving-unit or health comparison
 	# left to make. The seeded roll keeps the verdict decisive and reproducible.
 	return "victory" if rng == null or rng.randf() < 0.5 else "defeat"
 
-func _health_fraction(team: Array) -> float:
-	var current: float = 0.0
-	var maximum: float = 0.0
+func _remaining_health(team: Array) -> int:
+	# Absolute remaining health across the team. Dead units contribute nothing, so
+	# this is the total the ladder compares - not a fraction of the roster, which can
+	# rank two sides the opposite way round from the health they actually hold.
+	var total: int = 0
 	for unit: Unit in team:
 		if unit == null:
 			continue
-		current += max(0.0, float(unit.hp))
-		maximum += max(0.0, float(unit.max_hp))
-	if maximum <= 0.0:
-		return 0.0
-	return current / maximum
+		total += max(0, int(unit.hp))
+	return total
 
 func _alive_count(units: Array[Unit]) -> int:
 	var count: int = 0
