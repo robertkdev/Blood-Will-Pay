@@ -649,10 +649,17 @@ static func _desired_size_for_target(target: int, kind: String) -> int:
 		return clampi(4 + int(floor(float(max(0, rating - 520)) / 260.0)), 4, MAX_BOARD_UNITS)
 	if rating <= 120:
 		return 1
-	if rating <= 230:
+	if rating <= 190:
 		return 2
-	if rating < 360:
+	if rating <= 260:
 		return 3
+	if rating < 360:
+		# Chapter 2-3 normal stages sit in this band. A three-unit board here buys
+		# difficulty with unit levels, and levels beat breadth in the fight itself:
+		# a six-unit level-1 flex board was measured at 41% predicted odds against
+		# one. Four units at the same rating keeps the number and makes the fight a
+		# team fight rather than a squashing.
+		return 4
 	return clampi(4 + int(floor(float(max(0, rating - 360)) / 260.0)), 4, MAX_BOARD_UNITS)
 
 static func _level_cap_for(chapter: int, kind: String) -> int:

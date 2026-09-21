@@ -76,6 +76,14 @@ XP is worth buying when it unlocks room for a benched body, when the board is fu
 and the bench is not, or when the shop cannot improve the board and the reserve can
 afford it.
 
+**5a. Level your units — it is the biggest middle-game lever.** Measured against
+chapter 2 stage 3, the same six-unit board sits at roughly **40% win odds with every
+unit at level 1**, **61% at level 2**, and **79% at level 3**; a level-2 unit is worth
+about 1.75 level-1 units of the same identity. Breadth of level-1 bodies is enough
+for chapter 1 and stops being enough as chapter 2 opens, so a duplicate that
+completes a third copy outranks another new one-cost body whenever the bench or the
+reserve can take it.
+
 **6. Chapter contracts are optional.** Take one only when the price stays inside
 the reserve and the reward matches the chapter plan; otherwise pass.
 

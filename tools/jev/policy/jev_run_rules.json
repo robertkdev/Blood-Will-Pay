@@ -52,7 +52,9 @@
     }
   },
   "level": {
-    "rule": "Buy XP when the level-up raises board capacity, when the board is full but the bench is not, or when the shop cannot offer anything that improves the board and the reserve can pay for the level. Otherwise bank the buckets."
+    "rule": "Buy XP when the level-up raises board capacity, when the board is full but the bench is not, or when the shop cannot offer anything that improves the board and the reserve can pay for the level. Otherwise bank the buckets.",
+    "unit_levels": "Unit level is the biggest power lever in the middle of a run: measured against chapter 2 stage 3, the same six-unit board sits at about 40% win odds with every unit at level 1, about 61% with every unit at level 2, and about 79% at level 3. A level-2 unit is worth roughly 1.75 level-1 units of the same identity. Combining three copies is therefore not a side quest - by chapter 2 it is the difference between a losing and a winning board.",
+    "combine_priority": "Take a duplicate that completes a third copy whenever the board already has room for it or the reserve can hold. Breadth of level-1 bodies stops being enough as soon as chapter 2 opens; if the shop is offering a third copy and the bench can take it, that beats another new one-cost body."
   },
   "contracts": {
     "rule": "A chapter contract is optional. Take one only when its price stays inside the reserve and its reward matches the plan for this chapter; otherwise pass and keep the buckets for bodies and levels."

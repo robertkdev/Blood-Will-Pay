@@ -77,7 +77,7 @@ def _rules_digest(rules: dict) -> str:
         f"FLEX: {flex.get('rule', '')} {flex.get('keep_options_open', '')}",
         f"VERTICAL: {vertical.get('rule', '')} {vertical.get('one_piece_away', '')}",
         f"FORCE: {force.get('rule', '')} {force.get('when_not_to_force', '')}",
-        f"LEVEL: {rules.get('level', {}).get('rule', '')}",
+        f"LEVEL: {rules.get('level', {}).get('rule', '')} {rules.get('level', {}).get('unit_levels', '')} {rules.get('level', {}).get('combine_priority', '')}",
         f"CONTRACTS: {rules.get('contracts', {}).get('rule', '')}",
         f"STALL: {rules.get('stall', {}).get('rule', '')}",
         f"CLOCK: {rules.get('stall', {}).get('clock_rule', '')}",

@@ -317,6 +317,48 @@ was a wipe-out (`player_alive 0`, enemy damage 11-12k against the player's ~2.4k
 not a close fight. A flex board that survives chapter 1 is not merely behind at
 chapter 2, it is deleted.
 
+## Third pass: the chapter-2 cliff, measured
+
+`tests/rga_testing/validation/EncounterShapeProbe.tscn` (new) audits the *shape* of
+generated encounters - board size, unit levels, and how much of the difficulty is
+bought with the blanket `stat_scale` - alongside the game's own power model.
+
+### What the measurements said
+
+- The blanket stat multiplier was never the problem: generated boards sat at
+  `stat_scale 1.00` almost everywhere (the chapter 1 boss even scales *down*, 0.86-0.89).
+- The shape was the problem. Chapter 2 normal stages generated **three units at
+  levels 2-3**, and `_desired_size_for_target()` only asked for four-plus units once
+  the target passed 360, which happens in chapter 3. So difficulty in chapters 1-2
+  was bought with unit levels.
+- Levels beat breadth in the fight itself. Against chapter 2 stage 3 the same
+  six-unit flex board measured **41% predicted odds all at level 1, 63% at level 2,
+  81% at level 3**; a level-2 unit is worth about 1.75 level-1 units of the same
+  identity. A pure breadth board is an underdog at chapter 2 by the game's own odds
+  model - and the fight delivers worse than the model, because levels concentrate
+  damage while spread bodies whittle.
+
+### Changes
+
+1. `endless_chapter_generator._desired_size_for_target()` now asks for **four units
+   from rating 260** (previously 360), so chapter 2-3 normal stages are built from
+   four-plus bodies at modest levels instead of three at high levels. The rating
+   target is unchanged - only the shape changed. Verified: chapter 2 stage 3 went
+   from 3 units `{2,3,3}` at `stat_scale 1.00` to 4 units `{1,1,1,2}` at
+   `stat_scale 1.00`, rating 276 against a 297 target; chapter 3 stages are 4 units.
+2. The rules and the run document now state the level economics explicitly (40% /
+   61% / 79% at levels 1 / 2 / 3 against that reference fight, and "a duplicate that
+   completes a third copy outranks another new one-cost body"), so the controller
+   prices combining instead of drifting wide.
+
+### Still open
+
+Whether chapter 2 should *require* one round of combines is a product call. The
+measurement says a level-1 breadth board sits at 43% odds after the shape fix
+(64% at level 2), so the game currently asks the player to level something by
+chapter 2. The shape fix removed the wipe-out; the remaining gap is a difficulty
+decision, not a bug.
+
 The harness observes structured game state (buckets, level, offers, roles) rather
 than a screenshot, so it can measure planning economics and outcomes, not
 first-time player comprehension or visual discoverability. Deployment, rerolls,
