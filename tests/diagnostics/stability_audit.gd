@@ -37,6 +37,7 @@ func _run() -> void:
 			"tests/rga_testing/validation/ActiveRunResumeProbe.tscn",
 			"tests/rga_testing/validation/FreshProcessResumeWriter.tscn",
 			"tests/rga_testing/validation/FreshProcessResumeReader.tscn",
+			"tests/rga_testing/validation/RetryRecoveryPersistenceProbe.tscn",
 		],
 	}
 	await _finish()
