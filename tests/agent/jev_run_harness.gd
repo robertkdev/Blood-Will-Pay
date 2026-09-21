@@ -906,11 +906,80 @@ func _offer_traits(slot: int) -> Array[String]:
 		output.append(String(raw_trait))
 	return output
 
+func _offer_package_level(slot: int) -> int:
+	if Shop == null or Shop.state == null:
+		return 1
+	if slot < 0 or slot >= Shop.state.offers.size():
+		return 1
+	var offer: ShopOffer = Shop.state.offers[slot] as ShopOffer
+	if offer == null:
+		return 1
+	return max(1, int(offer.package_level))
+
+## Copies already owned at the level this offer would arrive at. CombineService groups
+## three-of-a-kind by identity *and* level, so identity alone overstates progress.
+func _owned_at_offer_level(unit_id: String, level: int) -> int:
+	var count: int = 0
+	for unit: Unit in _owned_units():
+		if _unit_id(unit) == unit_id and int(unit.level) == level:
+			count += 1
+	return count
+
+## Pure facts about one shop offer.
+##
+## Extracted so the rules that feed Jev's shop decisions can be pinned by fixtures
+## rather than only exercised inside a live campaign. The inline version this
+## replaced reported a benched-only identity as "already fielded" (it keyed off
+## board-plus-bench ownership while the trait snapshot only counts deployed units)
+## and computed combine progress from identity alone.
+static func summarize_offer_facts(
+	offer_traits: Array[String],
+	package_level: int,
+	board_copies: int,
+	bench_copies: int,
+	owned_at_offer_level: int,
+	board_count_by_trait: Dictionary,
+	next_threshold_by_trait: Dictionary,
+	board_has_room: bool
+) -> Dictionary:
+	var traits_after_deploy: Array[String] = []
+	var activates_after_deploy: Array[String] = []
+	if board_copies <= 0:
+		for trait_id: String in offer_traits:
+			traits_after_deploy.append(trait_id)
+			var current_count: int = int(board_count_by_trait.get(trait_id, 0))
+			var next_threshold: int = int(next_threshold_by_trait.get(trait_id, 0))
+			if next_threshold > 0 and current_count < next_threshold and current_count + 1 >= next_threshold:
+				activates_after_deploy.append(trait_id)
+	var copies_after_purchase: int = owned_at_offer_level + 1
+	var combine_needed: int = (3 - (copies_after_purchase % 3)) % 3
+	return {
+		"already_deployed": board_copies > 0,
+		"board_copies": board_copies,
+		"bench_copies": bench_copies,
+		"copies_owned": board_copies + bench_copies,
+		"package_level": max(1, int(package_level)),
+		"owned_at_offer_level": owned_at_offer_level,
+		"copies_after_purchase": copies_after_purchase,
+		"combines_on_purchase": combine_needed == 0,
+		"combine_needed": combine_needed,
+		"traits": offer_traits,
+		"adds_traits": traits_after_deploy,
+		"activates_traits": activates_after_deploy,
+		"traits_after_deploy": traits_after_deploy,
+		"activates_after_deploy": activates_after_deploy,
+		# A purchase lands on the bench, so any trait gain is a claim about a later
+		# deployment, not about this purchase.
+		"trait_gain_requires_deploy": board_copies <= 0,
+		"deploy_requires_replacement": board_copies <= 0 and not board_has_room,
+	}
+
 func _shop_candidates() -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []
 	var summaries: Array[Dictionary] = _offer_summaries()
-	var owned: Array[String] = _board_ids()
-	owned.append_array(_bench_ids())
+	var board_ids: Array[String] = _board_ids()
+	var bench_ids: Array[String] = _bench_ids()
+	var board_has_room: bool = board_ids.size() < _roster_max_team_size()
 	var count_by_trait: Dictionary[String, int] = {}
 	var threshold_by_trait: Dictionary[String, int] = {}
 	for entry: Dictionary in _trait_snapshot(_board_units()):
@@ -934,24 +1003,38 @@ func _shop_candidates() -> Array[Dictionary]:
 			})
 			continue
 		var slot_index: int = int(summary.get("slot", -1))
-		var copies: int = owned.count(unit_id)
-		var offer_traits: Array[String] = _offer_traits(slot_index)
-		var adds_traits: Array[String] = []
-		var activates_traits: Array[String] = []
-		if copies <= 0:
-			# Traits count unique units, so only a unit you do not already field can
-			# move a trait count.
-			for trait_id: String in offer_traits:
-				adds_traits.append(trait_id)
-				var current_count: int = int(count_by_trait.get(trait_id, 0))
-				var next_threshold: int = int(threshold_by_trait.get(trait_id, 0))
-				if next_threshold > 0 and current_count < next_threshold and current_count + 1 >= next_threshold:
-					activates_traits.append(trait_id)
-		var combine_needed: int = 0
-		if copies > 0:
-			combine_needed = 3 - (copies % 3)
-			if combine_needed == 3:
-				combine_needed = 0
+		var offer_level: int = _offer_package_level(slot_index)
+		var facts: Dictionary = summarize_offer_facts(
+			_offer_traits(slot_index),
+			offer_level,
+			board_ids.count(unit_id),
+			bench_ids.count(unit_id),
+			_owned_at_offer_level(unit_id, offer_level),
+			count_by_trait,
+			threshold_by_trait,
+			board_has_room
+		)
+		var copies: int = int(facts.get("copies_owned", 0))
+		var combine_needed: int = int(facts.get("combine_needed", 0))
+		var adds_traits: Array = facts.get("adds_traits", []) as Array
+		var activates_traits: Array = facts.get("activates_traits", []) as Array
+		# Only two or more same-level copies are actually on the road to a combine;
+		# a first copy is a body, not combine progress.
+		var combine_relevant: bool = int(facts.get("copies_after_purchase", 0)) >= 2
+		var combine_text: String = "no combine progress yet"
+		if bool(facts.get("combines_on_purchase", false)):
+			combine_text = "this purchase completes a three-of-a-kind at level %d" % offer_level
+		elif combine_relevant:
+			combine_text = "%d more at level %d for the next combine" % [combine_needed, offer_level]
+		var trait_text: String = "Adds no trait count."
+		if bool(facts.get("already_deployed", false)):
+			trait_text = "Adds no trait count (already deployed)."
+		elif not adds_traits.is_empty():
+			trait_text = "Would add traits %s once deployed" % ", ".join(adds_traits)
+			trait_text += " (needs a swap: the board is full)." if bool(facts.get("deploy_requires_replacement", false)) else "."
+		var activation_text: String = ""
+		if not activates_traits.is_empty():
+			activation_text = " Similarly activates %s once deployed." % ", ".join(activates_traits)
 		candidates.append({
 			"id": "offer_%d" % int(summary.get("slot", -1)),
 			"label": "%s (cost %d, %s%s)" % [
@@ -960,13 +1043,14 @@ func _shop_candidates() -> Array[Dictionary]:
 				String(summary.get("primary_role", "unit")),
 				", owns %d copies" % copies if copies > 0 else "",
 			],
-			"effect": "Buy %s for %d buckets; %d copies owned, %s. %s %s Leaves %d buckets." % [
+			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s Leaves %d buckets." % [
 				unit_id,
+				offer_level,
 				cost,
 				copies,
-				"%d more for the next combine" % combine_needed if combine_needed > 0 else "no combine progress",
-				("Adds traits %s." % ", ".join(adds_traits)) if not adds_traits.is_empty() else "Adds no trait count (already fielded).",
-				("Activates %s." % ", ".join(activates_traits)) if not activates_traits.is_empty() else "",
+				combine_text,
+				trait_text,
+				activation_text,
 				int(Economy.gold) - cost,
 			],
 			"affordable": true,
@@ -976,9 +1060,18 @@ func _shop_candidates() -> Array[Dictionary]:
 			"primary_role": String(summary.get("primary_role", "")),
 			"copies_owned": copies,
 			"combine_needed": combine_needed,
-			"traits": offer_traits,
+			"combines_on_purchase": bool(facts.get("combines_on_purchase", false)),
+			"combine_relevant": combine_relevant,
+			"package_level": offer_level,
+			"owned_at_offer_level": int(facts.get("owned_at_offer_level", 0)),
+			"board_copies": int(facts.get("board_copies", 0)),
+			"bench_copies": int(facts.get("bench_copies", 0)),
+			"already_deployed": bool(facts.get("already_deployed", false)),
+			"traits": facts.get("traits", []),
 			"adds_traits": adds_traits,
 			"activates_traits": activates_traits,
+			"trait_gain_requires_deploy": bool(facts.get("trait_gain_requires_deploy", false)),
+			"deploy_requires_replacement": bool(facts.get("deploy_requires_replacement", false)),
 			"buckets_after": int(Economy.gold) - cost,
 		})
 	var pass_candidate: Dictionary = {
