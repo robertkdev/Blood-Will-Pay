@@ -46,7 +46,11 @@ func _run() -> void:
 			player_level,
 			player_power,
 		])
-	print("EncounterShapeComparisonProbe: PASS pairs=%d" % PAIRS.size())
+	# Diagnostic only. This probe prints the generated shape, rating, power and
+	# modelled odds for two size ladders on one seed; it asserts nothing, so it cannot
+	# say which shape plays better and must not report PASS. Reading it as a pass is
+	# how the reverted breadth ladder was once described as proved to remove the cliff.
+	print("EncounterShapeComparisonProbe: DIAGNOSTIC pairs=%d (no behavioural assertions; reports generated shape and modelled power only)" % PAIRS.size())
 	await get_tree().create_timer(SHUTDOWN_GRACE_SECONDS).timeout
 	get_tree().quit(0)
 

@@ -6,6 +6,22 @@ the real `scenes/Main.tscn` runtime on the current `main` checkout
 records what was built, the rules Jev played by, what happened, and what the run
 says about the game.
 
+> **Corrections applied after the third pass.** Parts of this report described work
+> that was later reverted or measured to be unsupported. Where that happened the
+> original text is corrected in place and the reason is stated, rather than left
+> standing:
+>
+> - The chapter-2 breadth ladder described as a change is **not shipped**. Commit
+>   `10010944` made it opt-in after a paired comparison showed it did not lower the
+>   requirement, and the shipped ladder was restored. Anything below that reads as
+>   "the shape fix removed the cliff" is superseded.
+> - This report's reserve-target finding asserted a 75-stake-unit planning target
+>   taken from a simulation sweep. That sweep is not a measurement of this build's
+>   income, and nothing in the game asks for 75 units. The claim is withdrawn.
+> - The level-versus-breadth percentages quoted here have no checked-in artifact
+>   behind them and have not been re-verified on the current build.
+> - A loss in one run is recorded here as an outcome, not as a defect.
+
 ## What plays the game
 
 | Piece | Path | Role |
@@ -189,16 +205,21 @@ player-visible result often comes from a heuristic rather than from combat. Chec
 the damage-to-health ratio at this band; either shorten the durable phase or let
 damage outpace sustain so fights close.
 
-### 4. The documented reserve target is unreachable in a real chapter 1 (medium)
+### 4. Peak bankroll in a real chapter 1 (observation, not a defect)
 
-The shop policy in `analysis/endless_economy/decision_quality_results.json` only
-passes its gates at a 75-unit reserve. A real chapter 1 run peaks at 6 buckets
-(`peak_bankroll = 6` in all four runs, `stake_unit = 1`). Either the sweep's
-"unit" is not a bucket, or the shipped income curve is an order of magnitude below
-the model the shop gates were tuned against.
+Withdrawn as a finding. It previously read that the shop policy in
+`analysis/endless_economy/decision_quality_results.json` "only passes its gates at a
+75-unit reserve", and that a real chapter 1 run reaching 6 buckets meant either a
+denomination mismatch or an income curve an order of magnitude short.
 
-Suggested change: reconcile the sweep's denomination with the live economy and
-re-run `decision_quality_model.py` against a real bankroll curve.
+That sweep models reserve *targets* inside a simulation. It is not a measurement of
+this build's income, and no shipped rule asks a player to hold 75 units. Comparing a
+live run against it was a comparison against a number the game never sets. What the
+run actually shows is recorded here as an observation: a real chapter 1 run peaked at
+6 buckets with `stake_unit = 1`.
+
+Suggested change: drop the target from the policy and the analyzer (done), and set a
+reserve target only from a measured live income curve.
 
 ### 5. Early prices remove the economic tension the gates assume (medium)
 
@@ -312,10 +333,11 @@ fight, and 3 of 11 fights ran to the 45-second cap and were decided by the tie-b
 ladder rather than by a kill - so the longest part of the loop is sometimes a fight
 that does not resolve.
 
-**Chapter 2 falls off a cliff rather than ramping.** Every loss that ended the run
-was a wipe-out (`player_alive 0`, enemy damage 11-12k against the player's ~2.4k),
-not a close fight. A flex board that survives chapter 1 is not merely behind at
-chapter 2, it is deleted.
+**Chapter 2 losses in this sample were wipe-outs, not close fights.** In the four
+runs behind this report, every loss that ended the run was a wipe-out
+(`player_alive 0`, enemy damage 11-12k against the player's ~2.4k). Four runs is a
+small sample, and a lost run is an outcome rather than proof of a defect; recorded
+here as the observation it is.
 
 ## Third pass: the chapter-2 cliff, measured
 
@@ -340,24 +362,43 @@ bought with the blanket `stat_scale` - alongside the game's own power model.
 
 ### Changes
 
-1. `endless_chapter_generator._desired_size_for_target()` now asks for **four units
-   from rating 260** (previously 360), so chapter 2-3 normal stages are built from
-   four-plus bodies at modest levels instead of three at high levels. The rating
-   target is unchanged - only the shape changed. Verified: chapter 2 stage 3 went
-   from 3 units `{2,3,3}` at `stat_scale 1.00` to 4 units `{1,1,1,2}` at
-   `stat_scale 1.00`, rating 276 against a 297 target; chapter 3 stages are 4 units.
-2. The rules and the run document now state the level economics explicitly (40% /
-   61% / 79% at levels 1 / 2 / 3 against that reference fight, and "a duplicate that
-   completes a third copy outranks another new one-cost body"), so the controller
-   prices combining instead of drifting wide.
+1. **Reverted, not shipped.** `endless_chapter_generator._desired_size_for_target()`
+   was changed to ask for **four units from rating 260** (previously 360) so
+   chapter 2-3 normal stages would be built from four-plus bodies at modest levels
+   instead of three at high levels. The generated shapes did change as intended:
+   chapter 2 stage 3 went from 3 units `{2,3,3}` at `stat_scale 1.00` to 4 units
+   `{1,1,1,2}` at `stat_scale 1.00`, rating 276 against a 297 target.
+
+   What it did **not** do is lower the requirement. `EncounterShapeComparisonProbe`
+   generated both ladders on the same seed against the same affordable board and
+   measured the breadth ladder *raising* generated power slightly (302 to 321, 301 to
+   319) while leaving chapter 2 stage 2 untouched, so commit `10010944` made the
+   ladder opt-in and restored the shipped one. The probe is kept as diagnostic
+   evidence; it prints generated shape and modelled power and asserts nothing, so it
+   cannot say which shape plays better, and it no longer prints `PASS`.
+2. **Superseded.** The rules and the run document were updated to state level
+   economics explicitly, including the line "a duplicate that completes a third copy
+   outranks another new one-cost body". That framing is gone. The policy now names a
+   second copy, a third copy, a stronger unit, an item, an extra slot and a trait
+   breakpoint as competing ways to add power, and records that a purchase lands on
+   the bench so it changes nothing until it is deployed.
 
 ### Still open
 
-Whether chapter 2 should *require* one round of combines is a product call. The
-measurement says a level-1 breadth board sits at 43% odds after the shape fix
-(64% at level 2), so the game currently asks the player to level something by
-chapter 2. The shape fix removed the wipe-out; the remaining gap is a difficulty
-decision, not a bug.
+Whether chapter 2 should *require* one round of combines is a product call. The 43%
+and 64% figures quoted here have no checked-in artifact behind them on the current
+build, and the shape change above was reverted, so it removed nothing: **no
+wipe-out fix is shipped.** What is established instead:
+
+- Most fights are decided by the 45-second clock rather than by a kill: 83 of 146
+  across nine recorded runs, and 4 of 5 in a run at shipped speed with the real
+  timer.
+- The 12-second no-progress watchdog never fired once in any of those runs, so this
+  is not a stalled-fight problem. Boards simply stop being able to finish each other.
+- TFT-style overtime escalation resolves those fights (26 clock-decided standoffs to
+  2 on the frozen set) but changes who wins, and at the tuning that resolves them the
+  player-facing win odds mis-calibrate by 28.8% against a 15% gate. It is built, off,
+  and blocked on the odds estimator.
 
 The harness observes structured game state (buckets, level, offers, roles) rather
 than a screenshot, so it can measure planning economics and outcomes, not

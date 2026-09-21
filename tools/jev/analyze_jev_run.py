@@ -17,7 +17,6 @@ import json
 from pathlib import Path
 import statistics
 
-RESERVE_TARGET_STAKE_UNITS = 75.0
 LOW_CONFIDENCE = 0.70
 
 
@@ -682,16 +681,23 @@ def _findings(
             stake_unit = max(1, int(state["stake_unit"]))
     if isinstance(peak, (int, float)):
         findings.append({
-            "id": "reserve-target-ratio",
+            "id": "peak-bankroll",
             "severity": "info",
-            "title": "Bankroll against the documented reserve target",
+            "title": "Peak bankroll for this run",
             "evidence": {
                 "peak_bankroll": peak,
-                "reserve_target_units": RESERVE_TARGET_STAKE_UNITS,
                 "stake_unit": stake_unit,
-                "peak_in_units": round(float(peak) / stake_unit, 2),
+                "peak_in_stake_units": round(float(peak) / stake_unit, 2),
             },
-            "recommendation": "The decision-quality sweep assumes a 75-unit reserve; if a real run never reaches it, the sweep's assumption and the shipped economy disagree.",
+            # This used to compare the peak against a 75-stake-unit target taken from
+            # analysis/endless_economy. That sweep models reserve *targets* inside a
+            # simulation; it is not a measurement of this build's income, and using it
+            # as a live target produced a finding that said the shipped economy was an
+            # order of magnitude short of a number nothing in the game asks for.
+            "recommendation": (
+                "Observation only. Set a reserve target from a measured live income curve, not from the "
+                "simulation sweep, before treating any gap here as an economy defect."
+            ),
         })
     shops = int(experience.get("shops_observed", 0) or 0)
     if shops >= 6:
