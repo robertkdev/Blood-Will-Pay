@@ -456,6 +456,23 @@ var _encounter_escalations_seen: int = 0
 # also removed every cost from failing, so a stage the player could not beat simply
 # repeated forever.
 var _early_retry_transfusions_used: Dictionary[String, bool] = {}
+
+## Persistence hooks for the once-per-stage transfusion record. Without these the
+## record lives only in memory, so saving and resuming an active run reset it and the
+## player could collect the bailout again on the same stage.
+func snapshot_retry_recovery() -> Array[String]:
+	var keys: Array[String] = []
+	for stage_key: String in _early_retry_transfusions_used.keys():
+		keys.append(stage_key)
+	keys.sort()
+	return keys
+
+func restore_retry_recovery(keys: Array) -> void:
+	_early_retry_transfusions_used.clear()
+	for raw_key: Variant in keys:
+		var stage_key: String = String(raw_key).strip_edges()
+		if stage_key != "":
+			_early_retry_transfusions_used[stage_key] = true
 var _tactical_phase_visual_state: int = -1
 var _combat_pressure_elapsed: float = 0.0
 var _environmental_pressure_phase: int = -1
