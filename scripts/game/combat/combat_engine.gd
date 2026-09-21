@@ -746,6 +746,11 @@ func _evaluate_outcome() -> bool:
 func _emit_outcome(kind: String) -> void:
 	if kind == "":
 		return
+	if kind == "tie":
+		# This game does not draw. TFT resolves a round at its time limit and never
+		# draws, and a mutual wipe is still a round: award it instead of refunding the
+		# wager, which is what made a stage replayable forever for free.
+		kind = _mutual_wipe_verdict()
 	if outcome_resolver != null:
 		outcome_resolver.mark_emitted()
 	emit_signal("log_line", _resolution_diagnostic_text(kind))
@@ -840,15 +845,13 @@ func _fallback_timeout_outcome() -> String:
 	if player_alive <= 0 and enemy_alive > 0:
 		return "defeat"
 	if player_alive <= 0 and enemy_alive <= 0:
-		# A genuine mutual wipe is the only draw a forced result may return.
-		return "tie"
+		return _mutual_wipe_verdict()
 	# Both boards still stand: the fight ran out of time rather than resolving, so
-	# award the round to the side that did more work instead of handing back a free
-	# draw. A draw here refunds the whole wager and lets the stage repeat forever.
+	# award the round the way TFT does at its time limit - more units alive wins, and
+	# equal units is decided by total remaining health. Damage dealt is deliberately
+	# not part of the ladder: hitting a tank should not outrank being healthier.
 	if player_alive != enemy_alive:
 		return "victory" if player_alive > enemy_alive else "defeat"
-	if total_damage_player != total_damage_enemy:
-		return "victory" if total_damage_player > total_damage_enemy else "defeat"
 	var player_health: float = _health_fraction(state.player_team)
 	var enemy_health: float = _health_fraction(state.enemy_team)
 	if not is_equal_approx(player_health, enemy_health):
@@ -856,6 +859,11 @@ func _fallback_timeout_outcome() -> String:
 	# Perfectly symmetrical boards (a mirror fight) can match on every measure.
 	# Fall back to the seeded roll so the result stays deterministic per seed and
 	# still decisive.
+	return "victory" if rng == null or rng.randf() < 0.5 else "defeat"
+
+func _mutual_wipe_verdict() -> String:
+	# Both boards are destroyed, so there is no surviving-unit or health comparison
+	# left to make. The seeded roll keeps the verdict decisive and reproducible.
 	return "victory" if rng == null or rng.randf() < 0.5 else "defeat"
 
 func _health_fraction(team: Array) -> float:
