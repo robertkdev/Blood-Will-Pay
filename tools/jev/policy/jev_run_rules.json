@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "policy_id": "bwp-best-odds-v1",
+  "title": "Blood Will Pay: best-odds planning rules for a Jev-controlled run",
+  "goal": "Win the current stage, keep the run alive, and grow enough power to beat the next stage. Every decision is made from the state shown on screen.",
+  "lane_targets": {
+    "campaign": "Reach the campaign target chapter and round with the run still alive."
+  },
+  "reserve": {
+    "planning_reserve_stake_units": 75,
+    "minimum_reserve_buckets": 2,
+    "retry_floor_buckets": 3,
+    "rule": "Keep a planning reserve before the next shop. The minimum legal wager is one bucket, so holding exactly one bucket before a fight forces an all-in and a loss ends the run: end every planning phase with at least two buckets, or three in the early chapters. A purchase that breaks that floor is only right when it is the purchase that wins the stage about to start."
+  },
+  "decision_quality_gates": {
+    "economically_implausible_pass_rate_min": 0.30,
+    "full_shop_buyout_rate_max": 0.10,
+    "selective_score_lift_over_buy_all_min": 1.0,
+    "premium_wager_reduction_min": 0.08,
+    "rule": "Buying every affordable offer is the losing baseline. Pass on offers that do not add power for the plan, and let a premium purchase pull the next wager down instead of betting the same amount with less reserve."
+  },
+  "wager": {
+    "quote_multipliers": {
+      "CREEPS": 1.5,
+      "NORMAL": 2.0,
+      "MIRROR": 2.0,
+      "ELITE": 2.5,
+      "EVENT": 2.5,
+      "BOSS": 3.0
+    },
+    "rule": "The payout quote is fixed by encounter kind, so win probability is the only thing that decides whether a wager is worth taking. Win odds at or below 1 / multiplier are negative expected value: bet the minimum. Win odds clearly above it justify a larger wager, but never wager so much that a loss ends the run or leaves the next shop unaffordable.",
+    "sizing": "Scale the wager with how far the shown win odds beat the break-even line, and hold back the retry floor plus the next shop's expected cost."
+  },
+  "composition": {
+    "frontline_target": 2,
+    "support_max": 1,
+    "rule": "Two bodies that can hold the front before adding ranged or spell damage; more than one pure support wastes a slot. A duplicate that completes a third copy is worth more than a new body when the board is already at capacity."
+  },
+  "level": {
+    "rule": "Buy XP when the level-up raises board capacity, when the board is full but the bench is not, or when the shop cannot offer anything that improves the board and the reserve can pay for the level. Otherwise bank the buckets."
+  },
+  "contracts": {
+    "rule": "A chapter contract is optional. Take one only when its price stays inside the reserve and its reward matches the plan for this chapter; otherwise pass and keep the buckets for bodies and levels."
+  },
+  "stall": {
+    "rule": "Never start a fight with the same board that already failed. A draw returns the whole wager and a loss on a non-final stage keeps the run alive, so the stage is still there and the board must change before trying again. Change means: buy a duplicate toward a combine, take an upgrade, buy the level that raises capacity, or take a contract that changes the fight.",
+    "tie_rule": "A draw refunds the escrowed wager, so a draw costs planning time rather than bankroll. That is exactly why repeating a drawn board is the worst habit: it burns stages without moving the run."
+  },
+  "shown_odds": {
+    "rule": "The preview win-odds range is informational and does not price the wager. Treat it as a rough preparation signal: well above the break-even line means the board is ready, near or below it means buy power before starting."
+  }
+}
