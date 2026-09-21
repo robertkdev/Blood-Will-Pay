@@ -28,6 +28,13 @@ const DEFAULT_CREEP_REWARDS: Dictionary = {
 }
 
 const CREEP_IDS: Array[String] = ["beegle", "drubble", "drueling", "faeling"]
+## Normal-stage size ladder selector. "shipped" is the original ladder; "breadth" is an
+## experiment that asks for larger, lower-level boards. A paired comparison on one seed
+## (EncounterShapeComparisonProbe) showed breadth does NOT reduce the power the player
+## needs - the generator still solves to its rating target and the larger board overshot
+## it slightly (chapter 2 stage 3: power 302.5 -> 321.0, player odds 40% -> 37%) - so the
+## experiment stays opt-in until the requirement itself is decided.
+static var size_ladder_mode: String = "shipped"
 const RUNWAY_OPENER_CREEP_ID: String = "beegle"
 const RUNWAY_OPENER_STATS: Dictionary = {
 	"max_hp": 120,
@@ -647,6 +654,17 @@ static func _desired_size_for_target(target: int, kind: String) -> int:
 		if rating < 520:
 			return 4
 		return clampi(4 + int(floor(float(max(0, rating - 520)) / 260.0)), 4, MAX_BOARD_UNITS)
+	# A/B switch for the normal-stage size ladder. "current" is shipped; "previous"
+	# reproduces the ladder before chapter-2 breadth was introduced, so the two shapes
+	# can be compared against the same player board on the same seed.
+	if size_ladder_mode != "breadth":
+		if rating <= 120:
+			return 1
+		if rating <= 230:
+			return 2
+		if rating < 360:
+			return 3
+		return clampi(4 + int(floor(float(max(0, rating - 360)) / 260.0)), 4, MAX_BOARD_UNITS)
 	if rating <= 120:
 		return 1
 	if rating <= 190:
