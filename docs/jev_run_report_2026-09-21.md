@@ -429,6 +429,73 @@ its output or printing its completion line **both with and without this change**
 (verified by stashing the combat edit and re-running), so it is a pre-existing
 checkout condition rather than a regression from this work.
 
+## Why the clock decides most fights
+
+This is the finding the rest of the report kept circling, measured rather than
+inferred. **The damage a board deals in forty-five seconds is smaller than the health
+the other board is holding.**
+
+From `data/identity/primary_role_profiles/*.tres`, a board of one of each role holds
+**7,420 HP** and deals a combined **106.4 basic-attack DPS** against comparable armor:
+
+| Role | HP | AD | Atk speed | DPS vs own armor | Self time-to-kill |
+| --- | --- | --- | --- | --- | --- |
+| Assassin | 980 | 40.6 | 0.70 | 21.9 | 44.8s |
+| Brawler | 1,400 | 56.0 | 0.70 | 24.5 | 57.1s |
+| Mage | 1,050 | 31.5 | 0.70 | 16.3 | 64.3s |
+| Marksman | 1,190 | 48.3 | 0.70 | 23.3 | 51.0s |
+| Support | 1,190 | 14.0 | 0.70 | 6.8 | 176.1s |
+| Tank | 1,610 | 35.0 | 0.70 | 13.6 | 118.3s |
+
+Every one of those self time-to-kill figures is at or above the 45-second clock, and
+the durable roles are two to four times past it. The same-role cases matter most:
+**a mirror fight is a board against itself**, so by construction it cannot be won by a
+wipe inside the clock.
+
+Real fights match the arithmetic. In the shipped-speed run the chapter 1 boss resolved
+three times, and after the full 45 seconds **both boards still had all four units
+alive** with the player having dealt 2,000-2,300 damage. Against 7,420 HP that is
+roughly 42% attack uptime once movement, range and target switching are accounted
+for, which puts the practical time-to-wipe near 165 seconds - about **3.7 times the
+clock**.
+
+That also explains the watchdog reading. The 12-second no-progress timeout requires no
+damage *and* no meaningful movement; damage lands continuously, so it never fires.
+Nothing is stalled. The boards simply cannot out-damage each other's health pool.
+
+### What was tried and rejected
+
+Held constant across all of these: the calibration probe's 144 dated matchups and the
+frozen 26-fight standoff set.
+
+| Change | Clock-decided fights | Shown-odds calibration |
+| --- | --- | --- |
+| none (shipped, 45s clock) | 12 of 144, 26 of 26 | PASS, worst bucket gap 12.4% |
+| overtime, start 30s, +200% | 11 of 144, 14 of 26 | PASS, gaps unchanged |
+| overtime, start 24s, +300% | 0 of 144, 2 of 26 | FAIL, 28.8% bucket gap |
+| clock raised to the documented 105s | 9 of 144 outran the sim's own 60s limit | FAIL, 28.8% bucket gap |
+
+Overtime makes fights resolve but changes who wins faster than the estimator can
+follow. Raising the clock does not resolve them either: at 105 seconds, nine fights
+had still not finished when the probe's own 60-second wall timeout stopped them, and
+calibration got worse. Neither is the lever.
+
+### The decision this needs
+
+The damage-to-health ratio is the lever, and moving it is a balance change across all
+six role profiles that also requires recalibrating the shown win odds, because the
+odds are what the wagering loop is priced on. Concretely, one of:
+
+- raise `attack_damage` and/or ability output so a same-size board wipes inside
+  roughly 20-30 seconds, leaving the 45-second clock as a backstop;
+- cut `max_hp` by a comparable factor, which is the same ratio from the other side;
+- or set an explicit target fight length first, then tune to it.
+
+No target exists anywhere in the current design document or the repo, so this is a
+product call rather than a bug to fix silently. Whichever lever is chosen, the
+`team_odds_calibration_probe` bucket gaps are the acceptance check: they must stay
+inside the 15% gate.
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would
