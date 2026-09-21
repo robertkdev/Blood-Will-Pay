@@ -172,19 +172,30 @@ def _experience(events: list[dict], observations: list[dict], decisions: list[di
     # The shipped countdown restarts at the top of every planning beat, so round
     # start/end readings cancel out. Measure the beat from the per-decision readings
     # instead: how far the timer fell across the decisions of one beat.
-    beat_readings: dict[tuple, list[float]] = {}
+    # Split the planning readings into beats. Keying by (chapter, stage) alone merges
+    # repeat attempts at the same stage and mixes their countdowns together; a beat
+    # also ends when the shipped countdown restarts, which shows up as a jump back up.
+    planning_runs: list[list[float]] = []
+    current_run: list[float] = []
+    current_key: tuple | None = None
+    previous_value: float = -1.0
     for observation in observations:
         state = observation.get("state", {})
         value = state.get("planning_time_left")
         if not isinstance(value, (int, float)) or float(value) <= 0.0:
             continue
         key = (state.get("chapter"), state.get("stage_in_chapter"))
-        beat_readings.setdefault(key, []).append(float(value))
-    planning_used = [
-        max(values) - min(values)
-        for values in beat_readings.values()
-        if len(values) >= 2
-    ]
+        restart: bool = previous_value >= 0.0 and float(value) > previous_value + 1.0
+        if key != current_key or restart:
+            if len(current_run) >= 2:
+                planning_runs.append(current_run)
+            current_run = []
+            current_key = key
+        current_run.append(float(value))
+        previous_value = float(value)
+    if len(current_run) >= 2:
+        planning_runs.append(current_run)
+    planning_used = [max(values) - min(values) for values in planning_runs]
     planning_allowance = None
     for observation in observations:
         total = observation.get("state", {}).get("planning_timer_total")
@@ -262,6 +273,18 @@ def _audit(summary: dict, events: list[dict], observations: list[dict]) -> dict:
     rounds = payloads("round")
 
     shop_decisions = len(purchases) + len(passes)
+    # A shop is a planning beat, not a purchase attempt: one shop can hold several buy
+    # decisions. Kept separate so "shops" and "decisions" cannot be confused.
+    shop_beats = {
+        (event.get("chapter"), event.get("stage_in_chapter"))
+        for event in events
+        if event.get("kind") in ("shop_purchase", "shop_pass")
+    }
+    purchase_beats = {
+        (event.get("chapter"), event.get("stage_in_chapter"))
+        for event in events
+        if event.get("kind") == "shop_purchase"
+    }
     negative_ev_wagers = []
     ruin_risk_wagers = []
     for wager in wagers:
@@ -312,6 +335,8 @@ def _audit(summary: dict, events: list[dict], observations: list[dict]) -> dict:
         if event.get("kind") == "same_stage_retry"
     ]
     return {
+        "shops": len(shop_beats),
+        "beats_with_no_purchase": len(shop_beats - purchase_beats),
         "shop_decisions": shop_decisions,
         "purchases": len(purchases),
         "passes": len(passes),
