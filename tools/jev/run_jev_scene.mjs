@@ -164,7 +164,7 @@ async function main() {
   writeFileSync(args.log, '');
 
   const passthrough = {};
-  for (const key of ['JEV_RUN_DIR', 'JEV_MODE', 'JEV_RUN_SEED', 'JEV_STARTER']) {
+  for (const key of ['JEV_RUN_DIR', 'JEV_MODE', 'JEV_RUN_SEED', 'JEV_STARTER', 'JEV_SPEED', 'JEV_REAL_TIMER', 'JEV_ENCOUNTER_CASE']) {
     if (process.env[key]) passthrough[key] = process.env[key];
   }
   const client = new McpClient(args.server, { GODOT_PATH: args.godotPath, ...passthrough });

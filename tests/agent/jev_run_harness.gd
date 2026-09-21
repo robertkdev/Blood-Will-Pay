@@ -38,6 +38,7 @@ const COMBAT_LOG_KEYWORDS: Array[String] = [
 	"boss phase",
 	"escalat",
 	"reinforcement",
+	"sudden death",
 ]
 # Assertions inherited from the fixed-policy two-stage smoke. They describe what that
 # scripted policy does, not what the game requires: a combining player legitimately
