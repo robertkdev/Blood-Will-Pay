@@ -49,6 +49,28 @@ more, but never enough that a loss ends the run or empties the next shop.
 One support at most. When the board is at capacity, a duplicate that completes a
 third copy is worth more than another new body.
 
+**4a. Play flex by default.** This is a gambling game with strategy, so the default
+plan is to take what the shop gives you: the offer that fills the role the board is
+missing, or that adds a trait count you already hold. Prefer offers whose traits
+overlap what you own. Traits count *unique* units, so a second copy of a unit you
+already field adds no trait count — it is only worth buying when it completes a
+combine. Keeping two or three partial plans alive is the point; the next shop stays
+useful because you did not over-commit.
+
+**4b. A gifted vertical is a good thing.** When the board already stacks one trait
+(three or more units) or sits one piece below the next threshold, take the piece
+that finishes it. Activating a tier is the strongest single purchase on the board,
+and taking it while the shop keeps offering it is the position paying off, not a
+gamble. That purchase may spend into the reserve, but never below the two-bucket
+floor.
+
+**4c. Forcing is the gamble.** Rerolling or buying units that only fit a plan you do
+not own is a paid coin flip: the reroll costs buckets, the shop may not deliver, and
+the board you field while chasing is worse than the flex pick you passed. Force only
+when the reserve covers two or three rerolls, when the flex offer in front of you is
+genuinely weak, or when you are already one piece from the payoff. Never pass a flex
+pick you would take in an open shop to reroll for a plan you do not own.
+
 **5. Buy level when it converts to capacity.** Level-ups raise board capacity, so
 XP is worth buying when it unlocks room for a benched body, when the board is full
 and the bench is not, or when the shop cannot improve the board and the reserve can

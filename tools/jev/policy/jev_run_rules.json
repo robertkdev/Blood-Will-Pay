@@ -36,6 +36,21 @@
     "support_max": 1,
     "rule": "Two bodies that can hold the front before adding ranged or spell damage; more than one pure support wastes a slot. A duplicate that completes a third copy is worth more than a new body when the board is already at capacity."
   },
+  "playstyle": {
+    "identity": "This is a gambling game with strategy. Play flex first: take what the shop gives you, keep several later shops useful, and let the game hand you a direction. A vertical is a gift when it arrives, and forcing one is a paid gamble.",
+    "flex": {
+      "rule": "Default plan. Buy the offer that fills the role the board is missing, or that adds a trait count you already hold, and prefer the offer whose traits overlap what you own. Traits count unique units, so a second copy of a unit you already field adds no trait count: it is only worth it when it completes a combine.",
+      "keep_options_open": "Do not commit the board to one trait early. Two or three units that share traits with what you already own are worth more than a single piece of a plan you cannot complete, and they keep the next shop's flex picks live."
+    },
+    "vertical": {
+      "rule": "When your board already stacks one trait (three or more units sharing it) or sits one piece below the next threshold shown in the state, take the piece that finishes it. Activating a tier is the strongest single purchase available, and taking it while the shop keeps offering it is not a gamble - it is the position paying off.",
+      "one_piece_away": "A purchase that activates a trait tier beats a generic flex body even when it spends into the reserve, but never below the two-bucket floor."
+    },
+    "force": {
+      "rule": "Forcing is a gamble. Rerolling or buying units that only fit a plan you do not own is a paid coin flip: the reroll costs buckets, the shop may not deliver, and the board you field while chasing is weaker than the flex pick you passed. Force only when the reserve can pay for two or three rerolls, when the flex pick in front of you is genuinely weak, or when you are already one piece from the payoff.",
+      "when_not_to_force": "Never pass a flex pick you would take in an open shop in order to reroll for a plan you do not own. That is the losing version of the gamble."
+    }
+  },
   "level": {
     "rule": "Buy XP when the level-up raises board capacity, when the board is full but the bench is not, or when the shop cannot offer anything that improves the board and the reserve can pay for the level. Otherwise bank the buckets."
   },

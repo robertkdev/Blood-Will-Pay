@@ -118,6 +118,103 @@ def _combat_resolutions(events: list[dict]) -> dict:
     }
 
 
+def _experience(events: list[dict], observations: list[dict], decisions: list[dict]) -> dict:
+    """What the run says about the game as an experience for an average player.
+
+    Three questions: did the planning beat offer real choices, could a vertical
+    actually be assembled from what the shop handed over, and how long did a round
+    of play take at the shipped speed.
+    """
+    decisions_by_index = {int(record.get("index", -1)): record for record in decisions}
+    shop_observations = [item for item in observations if item.get("kind") == "shop_buy"]
+
+    shop_rows: list[dict] = []
+    for observation in shop_observations:
+        state = observation.get("state", {})
+        owned_traits = {str(entry.get("id", "")) for entry in (state.get("traits") or [])}
+        offers = [
+            candidate
+            for candidate in observation.get("candidates", [])
+            if str(candidate.get("id", "")).startswith("offer_") and candidate.get("affordable") is not False
+        ]
+        flex = [
+            candidate
+            for candidate in offers
+            if owned_traits.intersection(str(trait) for trait in (candidate.get("adds_traits") or []))
+        ]
+        vertical = [candidate for candidate in offers if candidate.get("activates_traits")]
+        record = decisions_by_index.get(int(observation.get("index", -1)))
+        top_probability = None
+        live_options = None
+        if record and isinstance(record.get("answer"), dict):
+            probabilities = record["answer"].get("probabilities") or {}
+            values = sorted((float(value) for value in probabilities.values()), reverse=True)
+            if values:
+                top_probability = round(values[0], 3)
+                live_options = sum(1 for value in values if value >= 0.15)
+        shop_rows.append({
+            "index": observation.get("index"),
+            "chapter": state.get("chapter"),
+            "round": state.get("stage_in_chapter"),
+            "affordable_offers": len(offers),
+            "flex_offers": len(flex),
+            "vertical_offers": len(vertical),
+            "took_vertical": bool(
+                record and any(str(candidate.get("id")) == str(record.get("choice_id")) for candidate in vertical)
+            ),
+            "chosen": str(record.get("choice_id")) if record else None,
+            "top_probability": top_probability,
+            "live_options": live_options,
+        })
+
+    rounds = [event.get("payload", {}) for event in events if event.get("kind") == "round_timing"]
+    wall = [float(item["wall_seconds"]) for item in rounds if isinstance(item.get("wall_seconds"), (int, float))]
+    # The shipped countdown restarts at the top of every planning beat, so round
+    # start/end readings cancel out. Measure the beat from the per-decision readings
+    # instead: how far the timer fell across the decisions of one beat.
+    beat_readings: dict[tuple, list[float]] = {}
+    for observation in observations:
+        state = observation.get("state", {})
+        value = state.get("planning_time_left")
+        if not isinstance(value, (int, float)) or float(value) <= 0.0:
+            continue
+        key = (state.get("chapter"), state.get("stage_in_chapter"))
+        beat_readings.setdefault(key, []).append(float(value))
+    planning_used = [
+        max(values) - min(values)
+        for values in beat_readings.values()
+        if len(values) >= 2
+    ]
+    planning_allowance = None
+    for observation in observations:
+        total = observation.get("state", {}).get("planning_timer_total")
+        if isinstance(total, (int, float)) and float(total) > 0:
+            planning_allowance = float(total)
+            break
+    decisions_per_round = [int(item["decisions"]) for item in rounds if isinstance(item.get("decisions"), int)]
+
+    live_counts = [row["live_options"] for row in shop_rows if isinstance(row["live_options"], int)]
+    shops_with_vertical = sum(1 for row in shop_rows if row["vertical_offers"] > 0)
+    shops_with_two_flex = sum(1 for row in shop_rows if row["flex_offers"] >= 2)
+    shops_with_one_offer = sum(1 for row in shop_rows if row["affordable_offers"] <= 1)
+    return {
+        "shops_observed": len(shop_rows),
+        "shops_with_a_tier_completing_offer": shops_with_vertical,
+        "shops_with_two_or_more_flex_offers": shops_with_two_flex,
+        "shops_with_at_most_one_affordable_offer": shops_with_one_offer,
+        "median_live_options": _percentile([float(value) for value in live_counts], 0.5) if live_counts else None,
+        "mean_live_options": round(statistics.fmean(live_counts), 2) if live_counts else None,
+        "round_wall_seconds_median": _percentile(wall, 0.5),
+        "round_wall_seconds_p95": _percentile(wall, 0.95),
+        "planning_seconds_used_median": _percentile(planning_used, 0.5),
+        "planning_seconds_used_max": max(planning_used) if planning_used else None,
+        "planning_allowance_seconds": planning_allowance,
+        "decisions_per_round_median": _percentile([float(value) for value in decisions_per_round], 0.5) if decisions_per_round else None,
+        "rounds": rounds,
+        "shops": shop_rows,
+    }
+
+
 def _decision_latency(decisions: list[dict]) -> dict:
     api_values = [float(record["api_ms"]) for record in decisions if isinstance(record.get("api_ms"), (int, float))]
     response_values = []
@@ -310,6 +407,7 @@ def _findings(
     observations: list[dict],
     engine_errors: list[str],
     combat: dict,
+    experience: dict,
 ) -> list[dict]:
     findings: list[dict] = []
     terminal = str(summary.get("terminal", "unknown"))
@@ -499,10 +597,69 @@ def _findings(
             },
             "recommendation": "The decision-quality sweep assumes a 75-unit reserve; if a real run never reaches it, the sweep's assumption and the shipped economy disagree.",
         })
+    shops = int(experience.get("shops_observed", 0) or 0)
+    if shops >= 6:
+        vertical_shops = int(experience.get("shops_with_a_tier_completing_offer", 0) or 0)
+        if vertical_shops / shops < 0.25:
+            findings.append({
+                "id": "vertical-fantasy-unreachable",
+                "severity": "medium",
+                "title": "The shop rarely hands over the piece that finishes a trait",
+                "evidence": {
+                    "shops_observed": shops,
+                    "shops_with_a_tier_completing_offer": vertical_shops,
+                    "shops_with_two_or_more_flex_offers": experience.get("shops_with_two_or_more_flex_offers"),
+                },
+                "recommendation": "If a vertical is meant to be a reward the game hands you, the shop has to produce tier-completing pieces at this band; otherwise the payoff is unreachable for an average player.",
+            })
+        else:
+            findings.append({
+                "id": "vertical-reachable",
+                "severity": "info",
+                "title": "The shop offered a trait-completing piece in most planning beats",
+                "evidence": {
+                    "shops_observed": shops,
+                    "shops_with_a_tier_completing_offer": vertical_shops,
+                },
+                "recommendation": "Keep this rate: it is what makes the vertical payoff discoverable.",
+            })
+        live = experience.get("median_live_options")
+        if isinstance(live, (int, float)) and live < 2:
+            findings.append({
+                "id": "thin-choices",
+                "severity": "medium",
+                "title": "Planning decisions rarely had two live options",
+                "evidence": {
+                    "median_live_options": live,
+                    "mean_live_options": experience.get("mean_live_options"),
+                    "shops_with_at_most_one_affordable_offer": experience.get("shops_with_at_most_one_affordable_offer"),
+                },
+                "recommendation": "An average player needs at least two defensible picks per shop for the decision to feel like a decision; check offer spread and prices at this band.",
+            })
+        if isinstance(experience.get("planning_seconds_used_median"), (int, float)):
+            findings.append({
+                "id": "planning-beat-budget",
+                "severity": "info",
+                "title": "How much of the planning beat the decisions actually used",
+                "evidence": {
+                    "planning_seconds_used_median": experience.get("planning_seconds_used_median"),
+                    "round_wall_seconds_median": experience.get("round_wall_seconds_median"),
+                    "decisions_per_round_median": experience.get("decisions_per_round_median"),
+                },
+                "recommendation": "Compare this against the shipped countdown: a beat that gives far more time than the choice needs reads as waiting, and one that gives less reads as a scramble.",
+            })
     return findings
 
 
-def _render(summary: dict, latency: dict, audit: dict, calibration: dict, findings: list[dict], run_dir: Path) -> str:
+def _render(
+    summary: dict,
+    latency: dict,
+    audit: dict,
+    calibration: dict,
+    findings: list[dict],
+    run_dir: Path,
+    experience: dict | None = None,
+) -> str:
     lines = [
         "# Jev run report",
         "",
@@ -562,6 +719,31 @@ def _render(summary: dict, latency: dict, audit: dict, calibration: dict, findin
             )
     else:
         lines.append("- Not enough pre-fight odds samples were recorded.")
+    if experience:
+        lines.extend(["", "## Experience for an average player", ""])
+        lines.append(
+            "- Shops observed: %s  with a trait-completing offer: %s  with two or more flex offers: %s  with at most one affordable offer: %s"
+            % (
+                experience.get("shops_observed"),
+                experience.get("shops_with_a_tier_completing_offer"),
+                experience.get("shops_with_two_or_more_flex_offers"),
+                experience.get("shops_with_at_most_one_affordable_offer"),
+            )
+        )
+        lines.append(
+            "- Live options per shop (top-pick probability >= 0.15): median %s, mean %s"
+            % (experience.get("median_live_options"), experience.get("mean_live_options"))
+        )
+        lines.append(
+            "- Round wall time: median %ss, p95 %ss  |  decisions per round: median %s  |  planning countdown used by the decisions: median %ss of a %ss beat"
+            % (
+                experience.get("round_wall_seconds_median"),
+                experience.get("round_wall_seconds_p95"),
+                experience.get("decisions_per_round_median"),
+                experience.get("planning_seconds_used_median"),
+                experience.get("planning_allowance_seconds"),
+            )
+        )
     lines.extend(["", "## Findings", ""])
     for finding in findings:
         lines.append(f"### [{finding['severity']}] {finding['title']}")
@@ -581,11 +763,12 @@ def main(argv: list[str] | None = None) -> int:
     events = _load_jsonl(run_dir / "run_events.jsonl")
     observations = _observations(run_dir)
     combat = _combat_resolutions(events)
+    experience = _experience(events, observations, decisions)
     latency = _decision_latency(decisions)
     audit = _audit(summary, events, observations)
     calibration = _calibration(events)
     engine_errors = _engine_errors(run_dir)
-    findings = _findings(summary, latency, audit, calibration, observations, engine_errors, combat)
+    findings = _findings(summary, latency, audit, calibration, observations, engine_errors, combat, experience)
     result = {
         "run_dir": str(run_dir),
         "summary": {
@@ -607,12 +790,13 @@ def main(argv: list[str] | None = None) -> int:
         "calibration": {key: value for key, value in calibration.items() if key != "pairs"},
         "engine_errors": engine_errors,
         "combat": combat,
+        "experience": experience,
         "findings": findings,
     }
     out_dir = Path(args.out).resolve() if args.out else run_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "findings.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-    (out_dir / "report.md").write_text(_render(summary, latency, audit, calibration, findings, run_dir), encoding="utf-8")
+    (out_dir / "report.md").write_text(_render(summary, latency, audit, calibration, findings, run_dir, experience), encoding="utf-8")
     print(json.dumps({
         "terminal": summary.get("terminal"),
         "decisions": latency.get("decisions"),

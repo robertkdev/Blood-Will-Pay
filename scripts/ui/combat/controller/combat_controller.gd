@@ -451,6 +451,11 @@ var _active_run_save_pending: bool = false
 var _active_run_save_timer: Timer = null
 var _active_run_restore_in_progress: bool = false
 var _encounter_escalations_seen: int = 0
+# Stages that already used their one early-run retry transfusion. The transfusion
+# exists so a bad opening cannot soft-lock a new player, but an unbounded version
+# also removed every cost from failing, so a stage the player could not beat simply
+# repeated forever.
+var _early_retry_transfusions_used: Dictionary[String, bool] = {}
 var _tactical_phase_visual_state: int = -1
 var _combat_pressure_elapsed: float = 0.0
 var _environmental_pressure_phase: int = -1
@@ -3206,12 +3211,21 @@ func _apply_early_run_retry_recovery(win: bool) -> void:
 	if int(GameState.chapter) > EARLY_RETRY_RECOVERY_MAX_CHAPTER:
 		return
 	if int(GameState.chapter) == 1 and int(GameState.stage_in_chapter) == 1:
+		# A new run always restarts at chapter 1 stage 1, so this is the clear point
+		# for the once-per-stage transfusion record.
+		_early_retry_transfusions_used.clear()
+		return
+	# One transfusion per stage: the second defeat on the same stage is charged in
+	# full, so retrying is a real second chance instead of an endless free one.
+	var stage_key: String = "%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)]
+	if _early_retry_transfusions_used.has(stage_key):
 		return
 	var missing_buckets: int = max(0, EARLY_RETRY_RECOVERY_MIN_BUCKETS - int(Economy.blood_buckets))
 	if missing_buckets <= 0:
 		return
+	_early_retry_transfusions_used[stage_key] = true
 	Economy.add_blood_buckets(missing_buckets, false, "recovery")
-	_on_log_line("Early retry transfusion: %s." % BloodBuckets.format_delta(missing_buckets))
+	_on_log_line("Early retry transfusion (once per stage): %s." % BloodBuckets.format_delta(missing_buckets))
 
 func _start_auto_loop() -> void:
 	if not auto_combat:

@@ -3,7 +3,9 @@ param(
     [ValidateSet("campaign")]
     [string] $Lane = "campaign",
 
-    [int] $Seed = 4401,
+    # -1 keeps the shipped random shop rolls; pass a seed only when a run must be
+    # comparable with another run.
+    [int] $Seed = -1,
 
     [string] $Starter = "bonko",
 
@@ -17,6 +19,13 @@ param(
     [string] $ArtifactRoot = "E:\CodexStorage\task-artifacts\gamble-battle-jev-run-20260921",
 
     [string] $GodotPath = "",
+
+    # 1.0 is the shipped game speed. Higher values are for fast sweeps only.
+    [ValidateRange(0.25, 16.0)]
+    [double] $Speed = 1.0,
+
+    # Fast-sweep only: hold the planning beat open instead of the shipped countdown.
+    [switch] $HoldPlanningTimer,
 
     [ValidateRange(1, 240)]
     [int] $TimeoutMinutes = 45,
@@ -57,6 +66,8 @@ $env:JEV_RUN_DIR = $runDirectory
 $env:JEV_MODE = $Mode
 $env:JEV_RUN_SEED = [string]$Seed
 $env:JEV_STARTER = $Starter
+$env:JEV_SPEED = $Speed.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+$env:JEV_REAL_TIMER = if ($HoldPlanningTimer) { "0" } else { "1" }
 $env:GODOT_PATH = $GodotPath
 
 $controllerLog = Join-Path $runDirectory "controller.log"
@@ -65,7 +76,8 @@ $runLog = Join-Path $runDirectory "godot.log"
 $controllerProcess = $null
 
 Write-Host "Run directory: $runDirectory"
-Write-Host "Mode: $Mode  Lane: $Lane  Seed: $Seed  Starter: $Starter"
+Write-Host ("Mode: {0}  Lane: {1}  Seed: {2}  Starter: {3}  Speed: {4}x  RealPlanningTimer: {5}" -f `
+    $Mode, $Lane, ($(if ($Seed -lt 0) { "random" } else { [string]$Seed })), $Starter, $Speed, (-not $HoldPlanningTimer))
 
 try {
     if ($Mode -eq "jev" -and -not $NoController) {
@@ -124,6 +136,8 @@ $result = [ordered]@{
     run_directory = $runDirectory
     mode = $Mode
     seed = $Seed
+    speed = $Speed
+    real_planning_timer = (-not $HoldPlanningTimer)
     starter = $Starter
     scene = $Scene
     godot_log = $runLog

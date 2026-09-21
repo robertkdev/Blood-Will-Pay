@@ -53,6 +53,10 @@ var _same_stage_retries: Dictionary[String, int] = {}
 var _recent_fights: Array[Dictionary] = []
 var _reserve_floor_buckets: int = DEFAULT_RESERVE_FLOOR_BUCKETS
 var _combat_log_lines: int = 0
+var _speed_scale: float = 1.0
+var _use_real_timer: bool = true
+var _seed_explicit: bool = false
+var _last_combat_outcome: String = ""
 
 func _run() -> void:
 	_read_environment()
@@ -64,25 +68,35 @@ func _run() -> void:
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
-	Engine.time_scale = 8.0
+	Engine.time_scale = _speed_scale
 	if Shop != null and not Shop.is_connected("error", Callable(self, "_on_shop_error")):
 		Shop.error.connect(_on_shop_error)
-	_set_shop_seed(_campaign_seed)
+	if _seed_explicit:
+		_set_shop_seed(_campaign_seed)
 	_prepare_run_dir()
-	print("%s: boot mode=%s seed=%d target=chapter %d round %d" % [
+	print("%s: boot mode=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
 		JEV_HARNESS_NAME,
 		_run_mode,
-		_campaign_seed,
+		str(_campaign_seed) if _seed_explicit else "random",
+		_speed_scale,
+		str(_use_real_timer),
 		CAMPAIGN_TARGET_CHAPTER,
 		CAMPAIGN_TARGET_ROUND,
 	])
 	_append_event("run_start", {
 		"mode": _run_mode,
 		"seed": _campaign_seed,
+		"shop_seed_explicit": _seed_explicit,
+		"time_scale": _speed_scale,
+		"real_planning_timer": _use_real_timer,
 		"target_chapter": CAMPAIGN_TARGET_CHAPTER,
 		"target_round": CAMPAIGN_TARGET_ROUND,
 		"engine_time_scale": Engine.time_scale,
 		"entrypoint": "scenes/Main.tscn",
+		"player_facing_entrypoint": true,
+		"input_path": "engine_parsed_mouse_events",
+		"handler_fallback": false,
+		"drag_lifecycle_fallback": false,
 	})
 
 	_start_main_scene()
@@ -127,9 +141,22 @@ func _run() -> void:
 	_battles = 1
 
 	while _battles < CAMPAIGN_MAX_BATTLES and not _campaign_target_reached():
+		var round_wall_start: float = Time.get_unix_time_from_system()
+		var decisions_before_round: int = _decision_index
+		var planning_before_round: float = _planning_time_left()
 		var round_result: Dictionary = await _play_two_stage_round()
 		_rounds.append(round_result)
 		_append_event("round", round_result)
+		_append_event("round_timing", {
+			"chapter": int(round_result.get("chapter_before", -1)),
+			"round": int(round_result.get("round_before", -1)),
+			"wall_seconds": snappedf(Time.get_unix_time_from_system() - round_wall_start, 0.01),
+			"decisions": _decision_index - decisions_before_round,
+			"planning_seconds_at_start": snappedf(planning_before_round, 0.01),
+			"planning_seconds_at_end": snappedf(_planning_time_left(), 0.01),
+			"fight_result": String(round_result.get("fight_result", "")),
+			"advanced": bool(round_result.get("advanced", false)),
+		})
 		_recent_fights.append({
 			"chapter": int(round_result.get("chapter_before", -1)),
 			"round": int(round_result.get("round_before", -1)),
@@ -194,9 +221,8 @@ func _campaign_target_reached() -> bool:
 func _second_fight_result(resolved: bool) -> String:
 	# The inherited classifier falls back to "shop" whenever the phase returns to
 	# PREVIEW, which makes a drawn or lost fight look like a completed stage and
-	# turns the campaign loop into a retry treadmill. Classify from the live
-	# settlement instead: an advanced stage is a win, a restored reserve is a tie,
-	# and anything else is a loss.
+	# turns the campaign loop into a retry treadmill. Classify from the settlement:
+	# an advanced stage is a win, and otherwise the engine's own verdict decides.
 	if not resolved:
 		return "timeout"
 	var outcome: String = ""
@@ -204,7 +230,18 @@ func _second_fight_result(resolved: bool) -> String:
 		outcome = "loss"
 	elif _stage_advanced_from_round():
 		outcome = "shop"
+	elif _last_combat_outcome != "":
+		match _last_combat_outcome:
+			"tie":
+				outcome = "tie"
+			"defeat":
+				outcome = "loss"
+			"victory":
+				outcome = "shop"
+			_:
+				outcome = _last_combat_outcome
 	else:
+		# No engine verdict captured: fall back to the reserve read.
 		var reserve_start: int = int(Economy.last_blood_reserve_start)
 		if reserve_start > 0 and int(Economy.blood_buckets) >= reserve_start:
 			outcome = "tie"
@@ -229,6 +266,7 @@ func _record_combat_diagnostic(outcome: String) -> void:
 	var enemy_team: Array = manager.get("enemy_team")
 	_append_event("combat_diagnostic", {
 		"outcome": outcome,
+		"engine_outcome": _last_combat_outcome,
 		"player_damage": int(engine.get("total_damage_player")),
 		"enemy_damage": int(engine.get("total_damage_enemy")),
 		"elapsed_seconds": float(state.elapsed_time) if state != null else -1.0,
@@ -240,6 +278,10 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		"enemy_hp_fraction": _health_fraction(enemy_team),
 		"player_board": _team_ids(player_team),
 		"enemy_board": _team_ids(enemy_team),
+		"buckets_after": int(Economy.blood_buckets),
+		"reserve_before_wager": int(Economy.last_blood_reserve_start),
+		"wager": int(Economy.last_wager_start),
+		"combat_active": bool(Economy.combat_active),
 	})
 
 func _alive_count(team: Array) -> int:
@@ -285,12 +327,33 @@ func _read_environment() -> void:
 	if mode_value == "heuristic":
 		_run_mode = "heuristic"
 	var seed_value: String = OS.get_environment("JEV_RUN_SEED").strip_edges()
-	if seed_value.is_valid_int():
+	if seed_value.is_valid_int() and seed_value.to_int() >= 0:
+		_seed_explicit = true
 		_campaign_seed = seed_value.to_int()
+	else:
+		# No seed: the shipped random shop rolls stay in place. Report -1 so the
+		# transcript cannot be mistaken for a reproducible seeded run.
+		_campaign_seed = -1
+	var speed_value: String = OS.get_environment("JEV_SPEED").strip_edges()
+	if speed_value.is_valid_float() and speed_value.to_float() > 0.0:
+		_speed_scale = clampf(speed_value.to_float(), 0.25, 16.0)
+	var timer_value: String = OS.get_environment("JEV_REAL_TIMER").strip_edges().to_lower()
+	if timer_value in ["0", "false", "held", "off"]:
+		# Fast-sweep only: hold the planning beat open instead of the shipped
+		# countdown. Every report that uses this must say so.
+		_use_real_timer = false
 	var starter_value: String = OS.get_environment("JEV_STARTER").strip_edges().to_lower()
 	if not starter_value.is_empty():
 		_starter_id = starter_value
 	_reserve_floor_buckets = _load_reserve_floor()
+
+func _set_planning_timer_safe() -> void:
+	# The shipped planning beat is a live 120-second countdown that auto-starts the
+	# fight when it expires: that countdown is part of what "playable" means, so by
+	# default the run leaves it alone. Only the fast-sweep mode holds it open.
+	if _use_real_timer:
+		return
+	super._set_planning_timer_safe()
 
 func _load_reserve_floor() -> int:
 	# The floor lives in the policy file so the rules and the guard cannot drift.
@@ -312,6 +375,20 @@ func _prepare_run_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(_run_dir)
 	if not DirAccess.dir_exists_absolute(_run_dir):
 		push_error("%s: run directory is not writable: %s" % [JEV_HARNESS_NAME, _run_dir])
+
+func _use_synthetic_input() -> bool:
+	# Drive the game through real mouse events parsed by the engine, not by calling
+	# button handlers. A click has to survive hit-testing, focus, disabled state and
+	# mouse filters the way a player's click does.
+	return true
+
+func _allow_button_signal_fallback() -> bool:
+	# A click that misses the real control must fail loudly. The silent pressed-signal
+	# fallback would turn a mis-aimed click into a passed test.
+	return false
+
+func _allow_drag_lifecycle_fallback() -> bool:
+	return false
 
 func _flow_smoke_name() -> String:
 	return JEV_HARNESS_NAME
@@ -549,6 +626,7 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	await _resolve_pending_contract_market()
 	await _decide_wager(label)
 	_ensure_combat_log_connected()
+	_last_combat_outcome = ""
 	await super._press_continue(expect_forced, label)
 
 func _ensure_combat_log_connected() -> void:
@@ -560,8 +638,13 @@ func _ensure_combat_log_connected() -> void:
 		return
 	if manager.has_signal("log_line") and not manager.is_connected("log_line", Callable(self, "_on_combat_log_line")):
 		manager.log_line.connect(_on_combat_log_line)
-
 func _on_combat_log_line(text: String) -> void:
+	# The engine announces every settlement through this line. It is the authority
+	# for the outcome: a defeat can leave the bankroll untouched (the early retry
+	# transfusion), so a bankroll-only read used to report a loss as a draw.
+	if text.begins_with("Combat resolved: "):
+		var remainder: String = text.substr("Combat resolved: ".length())
+		_last_combat_outcome = remainder.split(" ")[0].strip_edges()
 	# Per-hit lines dominate the combat log; keep the lines that explain a
 	# resolution instead of truncating the transcript inside the first fight.
 	var lowered: String = text.to_lower()
@@ -683,6 +766,7 @@ func _plan_state() -> Dictionary:
 	var encounter_kind: String = String(Economy.encounter_quote_kind)
 	var board: Array[String] = _board_ids()
 	var bench: Array[String] = _bench_ids()
+	var controller_node: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
 	var state: Dictionary = {
 		"chapter": int(GameState.chapter),
 		"stage_in_chapter": int(GameState.stage_in_chapter),
@@ -705,15 +789,84 @@ func _plan_state() -> Dictionary:
 		"stake_rank": int(Economy.stake_rank),
 		"recent_fights": _recent_fights.duplicate(true),
 		"stage_retry_count": int(_same_stage_retries.get("%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)], 0)),
+		"traits": _trait_snapshot(_owned_units()),
+		"planning_time_left": float(controller_node.get("planning_time_left")) if controller_node != null else -1.0,
+		"planning_timer_total": float(controller_node.get("planning_timer_total")) if controller_node != null else -1.0,
+		"time_scale": Engine.time_scale,
+		"shop_seed_explicit": _seed_explicit,
 		"campaign": {"mode": _run_mode, "seed": _campaign_seed, "target_chapter": CAMPAIGN_TARGET_CHAPTER, "target_round": CAMPAIGN_TARGET_ROUND},
 	}
 	return state
+
+func _owned_units() -> Array[Unit]:
+	var units: Array[Unit] = []
+	var controller: Variant = _combat_controller()
+	var manager: Variant = controller.get("manager") if controller != null else null
+	if manager != null:
+		for unit_value: Variant in manager.get("player_team"):
+			var board_unit: Unit = unit_value as Unit
+			if board_unit != null:
+				units.append(board_unit)
+	for bench_unit: Unit in Roster.compact():
+		if bench_unit != null and not units.has(bench_unit):
+			units.append(bench_unit)
+	return units
+
+func _trait_snapshot(units: Array[Unit]) -> Array[Dictionary]:
+	# Traits count unique units, so a second copy of a unit you already field is an
+	# upgrade play, not a trait play. Report counts, the next threshold, and whether
+	# a tier is already live so flex and vertical decisions are made on facts.
+	var compiled: Dictionary = TraitCompiler.compile(units)
+	var counts: Dictionary = compiled.get("counts", {})
+	var tiers: Dictionary = compiled.get("tiers", {})
+	var thresholds: Dictionary = compiled.get("thresholds", {})
+	var snapshot: Array[Dictionary] = []
+	for trait_key: Variant in counts.keys():
+		var trait_id: String = String(trait_key)
+		var count: int = int(counts[trait_id])
+		var ladder: Array = thresholds.get(trait_id, [2, 4, 6, 8])
+		var next_threshold: int = 0
+		for raw_threshold: Variant in ladder:
+			if int(raw_threshold) > count:
+				next_threshold = int(raw_threshold)
+				break
+		snapshot.append({
+			"id": trait_id,
+			"count": count,
+			"tier": int(tiers.get(trait_id, 0)),
+			"active": int(tiers.get(trait_id, 0)) > 0,
+			"next_threshold": next_threshold,
+			"needed": max(0, next_threshold - count) if next_threshold > 0 else 0,
+		})
+	snapshot.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return int(left.get("count", 0)) > int(right.get("count", 0))
+	)
+	return snapshot
+
+func _offer_traits(slot: int) -> Array[String]:
+	var output: Array[String] = []
+	if Shop == null or Shop.state == null:
+		return output
+	if slot < 0 or slot >= Shop.state.offers.size():
+		return output
+	var offer: ShopOffer = Shop.state.offers[slot] as ShopOffer
+	if offer == null:
+		return output
+	for raw_trait: Variant in offer.traits:
+		output.append(String(raw_trait))
+	return output
 
 func _shop_candidates() -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []
 	var summaries: Array[Dictionary] = _offer_summaries()
 	var owned: Array[String] = _board_ids()
 	owned.append_array(_bench_ids())
+	var count_by_trait: Dictionary[String, int] = {}
+	var threshold_by_trait: Dictionary[String, int] = {}
+	for entry: Dictionary in _trait_snapshot(_owned_units()):
+		var entry_id: String = String(entry.get("id", ""))
+		count_by_trait[entry_id] = int(entry.get("count", 0))
+		threshold_by_trait[entry_id] = int(entry.get("next_threshold", 0))
 	for summary: Dictionary in summaries:
 		var unit_id: String = String(summary.get("id", ""))
 		var cost: int = int(summary.get("cost", 0))
@@ -730,7 +883,20 @@ func _shop_candidates() -> Array[Dictionary]:
 				"cost": cost,
 			})
 			continue
+		var slot_index: int = int(summary.get("slot", -1))
 		var copies: int = owned.count(unit_id)
+		var offer_traits: Array[String] = _offer_traits(slot_index)
+		var adds_traits: Array[String] = []
+		var activates_traits: Array[String] = []
+		if copies <= 0:
+			# Traits count unique units, so only a unit you do not already field can
+			# move a trait count.
+			for trait_id: String in offer_traits:
+				adds_traits.append(trait_id)
+				var current_count: int = int(count_by_trait.get(trait_id, 0))
+				var next_threshold: int = int(threshold_by_trait.get(trait_id, 0))
+				if next_threshold > 0 and current_count < next_threshold and current_count + 1 >= next_threshold:
+					activates_traits.append(trait_id)
 		var combine_needed: int = 0
 		if copies > 0:
 			combine_needed = 3 - (copies % 3)
@@ -744,11 +910,13 @@ func _shop_candidates() -> Array[Dictionary]:
 				String(summary.get("primary_role", "unit")),
 				", owns %d copies" % copies if copies > 0 else "",
 			],
-			"effect": "Buy %s for %d buckets; %d copies owned, %s. Leaves %d buckets." % [
+			"effect": "Buy %s for %d buckets; %d copies owned, %s. %s %s Leaves %d buckets." % [
 				unit_id,
 				cost,
 				copies,
 				"%d more for the next combine" % combine_needed if combine_needed > 0 else "no combine progress",
+				("Adds traits %s." % ", ".join(adds_traits)) if not adds_traits.is_empty() else "Adds no trait count (already fielded).",
+				("Activates %s." % ", ".join(activates_traits)) if not activates_traits.is_empty() else "",
 				int(Economy.gold) - cost,
 			],
 			"affordable": true,
@@ -758,6 +926,9 @@ func _shop_candidates() -> Array[Dictionary]:
 			"primary_role": String(summary.get("primary_role", "")),
 			"copies_owned": copies,
 			"combine_needed": combine_needed,
+			"traits": offer_traits,
+			"adds_traits": adds_traits,
+			"activates_traits": activates_traits,
 			"buckets_after": int(Economy.gold) - cost,
 		})
 	var pass_candidate: Dictionary = {
@@ -772,7 +943,7 @@ func _shop_candidates() -> Array[Dictionary]:
 		candidates.append({
 			"id": "reroll",
 			"label": "Reroll the shop for %d buckets." % reroll_price,
-			"effect": "Replace every current offer with a new roll. Leaves %d buckets." % (int(Economy.gold) - reroll_price),
+			"effect": "Replace every current offer with a new roll. This is the gamble: it pays only when the new roll beats the flex pick in front of you. Leaves %d buckets." % (int(Economy.gold) - reroll_price),
 			"affordable": true,
 			"cost": reroll_price,
 		})

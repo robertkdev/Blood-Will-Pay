@@ -24,6 +24,33 @@ heuristic run can be compared on the same seed. Combat is not player-controlled
 (`CombatController.auto_combat` defaults to true), so these planning decisions are
 the whole of play.
 
+## Playing the real game, not a model of it
+
+The rig drives the shipped build, and the transcript says so. Every run records its
+own fidelity in `run_start`:
+
+| Fidelity fact | Value |
+| --- | --- |
+| Entrypoint | `scenes/Main.tscn` (`player_facing_entrypoint: true`) |
+| Input path | `engine_parsed_mouse_events` - clicks are `InputEventMouseButton` events pushed through `Input.parse_input_event` and `Input.flush_buffered_events`, so hit-testing, focus, disabled state, mouse filters and drag lifecycle all run |
+| Handler fallback | `false` - the base harness can fall back to emitting a button's `pressed` signal directly; that fallback is disabled here, so a click that misses the control fails loudly instead of passing |
+| Drag lifecycle fallback | `false` - drags must survive the real mouse sequence |
+| Combat speed | `time_scale 1.0` (shipped) |
+| Planning beat | `real_planning_timer: true` - the shipped 120-second countdown runs, and it auto-starts the fight if it expires |
+| Shop rolls | unseeded by default (`shop_seed_explicit: false`); pass `-Seed` only to make two runs comparable |
+
+Systems exercised are the real ones: the `Shop`, `Economy`, `Roster` and `Items`
+autoloads, the real chapter/stage progression, the real `CombatManager` and
+`CombatEngine` (its own log lines are what the transcript records), the real mirror
+snapshot and the real chapter-contract market.
+
+What still is not the shipped player experience: deployment, fielding order and item
+equipping are executed by the harness's rule-based helpers rather than by Jev, and
+the run reads structured state (buckets, offers, traits) instead of pixels, so it
+measures economics, decisions and pacing - not first-time visual comprehension. A
+116-second planning beat is now part of the recorded evidence, which is a real
+pacing signal the earlier fast runs could not produce.
+
 ## Rules Jev played by
 
 1. Keep a planning reserve; never spend to zero before a fight.
@@ -199,6 +226,96 @@ Five pre-fight samples: predicted mean 0.596, observed 0.600, gap 0.004, Brier
 grow, not evidence of calibration.
 
 ## Evidence limits
+
+## Second pass: real-game fidelity, the retry loop, and flex play
+
+### Fidelity: the rig now drives the shipped game
+
+The first pass called button handlers directly whenever a synthetic click missed,
+which meant the game logic was real but the input path was not. Fixed:
+
+| Change | Why |
+| --- | --- |
+| Clicks are `InputEventMouseButton` events pushed through `Input.parse_input_event` + `Input.flush_buffered_events` | hit-testing, focus, disabled state, mouse filters and drag lifecycle all run |
+| `_allow_button_signal_fallback()` and `_allow_drag_lifecycle_fallback()` now return `false` | a click that misses the control fails loudly instead of passing silently |
+| `Engine.time_scale = 1.0` by default (`-Speed` only for sweeps) | shipped combat speed; `Engine.time_scale` also scales the planning countdown |
+| The shipped 120-second planning timer runs (`JEV_REAL_TIMER`, `-HoldPlanningTimer` only for sweeps) | the live beat that auto-starts the fight at zero is part of what "playable" means |
+| Shop rolls are unseeded unless `-Seed` is passed | the shipped market is random; a seed is a comparison tool, not the default |
+| Outcomes come from the engine's own `Combat resolved:` line | a defeat can leave the bankroll untouched, so a bankroll-only read reported losses as draws |
+
+Every run writes these facts into `run_start`, so a transcript states its own
+fidelity.
+
+### The loop had a second cause: an unbounded early retry transfusion
+
+`EARLY_RETRY_RECOVERY_MIN_BUCKETS = 6` with `EARLY_RETRY_RECOVERY_MAX_CHAPTER = 2`
+meant any defeat in chapters 1-2 topped the bankroll back to six buckets. Failing
+cost nothing, so a stage the player could not beat repeated forever - the same
+player-visible symptom as the draw, from a different cause.
+
+Evidence, before the fix: chapter 1 stage 5 defeats recorded
+`reserve_before_wager 2`, `wager 1`, `buckets_after 6` four times in a row.
+
+Fixed in `scripts/ui/combat/controller/combat_controller.gd`: the transfusion is
+now granted once per stage (`_early_retry_transfusions_used`, cleared when a new run
+passes through chapter 1 stage 1). Evidence after the fix: the first defeat at
+chapter 1 stage 5 still refunds to 6 buckets, and the retries then cost the wager -
+`reserve 6 -> 5`, `5 -> 4`, `4 -> 3`.
+
+### Strategy: flex first, vertical as the gift, forcing as the gamble
+
+The observation now carries the player's trait counts, each trait's next activation
+threshold, and, per offer, whether the purchase would *add* a trait count or
+*activate* a tier. Traits count unique units, so a duplicate is reported as an
+upgrade play rather than a trait play. The rules (`tools/jev/policy/jev_run_rules.json`
+and `docs/agent-workflows/jev-run-rules.md`) were rewritten around the requested
+design:
+
+- **Flex is the default**: take what the shop gives you, fill the missing role, add a
+  trait count you already hold, keep several later shops useful.
+- **A gifted vertical is a good thing**: when the board is stacked on a trait or one
+  piece below the next threshold, take the piece that finishes it - that purchase may
+  spend into the reserve, but never below the two-bucket floor.
+- **Forcing is the paid gamble**: rerolling or buying for a plan you do not own is a
+  coin flip that must be paid from the reserve, and is wrong when a flex pick you
+  would take in an open shop is already in front of you.
+
+### The real-speed run
+
+`runs/jev-campaign-seed-1-20260921-124809`: Jev, shipped speed, live 120-second
+beat, random shop, Bonko. Terminal **loss at chapter 2 round 3 with 0 buckets**,
+10 battles, 0 technical failures, 0 engine errors.
+
+| Measure | Value |
+| --- | --- |
+| Decisions | 32 (API median 153 ms, observation-to-decision median 210 ms) |
+| Planning countdown used by the decisions | median 5.3 s of a 120 s beat (max 12.5 s) |
+| Round wall time | median 63 s, p95 69 s |
+| Shop decisions | 17, median 3 live options (>=15% probability) |
+| Shops offering a tier-completing piece | 8 of 17 - and Jev took the vertical in all 8 |
+| Shops with two or more flex offers | 7 of 17 |
+| Shops with one or zero affordable offers | 5 of 17 |
+| Fight resolutions | 11, zero draws, 3 decided by the clock, 8 by a wipe |
+
+### What that says for an average player
+
+**The gamble works.** The run is losable, decisive (no draws), and the vertical
+payoff is reachable and taken: the shop handed a tier-completing piece in half the
+planning beats and the player took every one. With the transfusion bounded, a stage
+bails you out once and then charges you, which is what makes forcing a real risk.
+
+**The pacing is lopsided.** The planning beat allows 120 seconds and the actual
+decisions consume about 5. For a fast player that is mostly waiting next to a
+countdown that will eventually auto-start the fight; for a slow player it is a real
+deadline. Meanwhile a round takes about 63 seconds of wall time, most of it the
+fight, and 3 of 11 fights ran to the 45-second cap and were decided by the tie-break
+ladder rather than by a kill - so the longest part of the loop is sometimes a fight
+that does not resolve.
+
+**Chapter 2 falls off a cliff rather than ramping.** Every loss that ended the run
+was a wipe-out (`player_alive 0`, enemy damage 11-12k against the player's ~2.4k),
+not a close fight. A flex board that survives chapter 1 is not merely behind at
+chapter 2, it is deleted.
 
 The harness observes structured game state (buckets, level, offers, roles) rather
 than a screenshot, so it can measure planning economics and outcomes, not

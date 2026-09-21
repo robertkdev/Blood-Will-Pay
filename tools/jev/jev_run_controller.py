@@ -59,6 +59,10 @@ def _configuration() -> tuple[str, str]:
 def _rules_digest(rules: dict) -> str:
     reserve = rules.get("reserve", {})
     wager = rules.get("wager", {})
+    playstyle = rules.get("playstyle", {})
+    flex = playstyle.get("flex", {})
+    vertical = playstyle.get("vertical", {})
+    force = playstyle.get("force", {})
     multipliers = ", ".join(
         f"{kind} {value}x" for kind, value in sorted(wager.get("quote_multipliers", {}).items())
     )
@@ -69,6 +73,10 @@ def _rules_digest(rules: dict) -> str:
         f"WAGER QUOTES: {multipliers}",
         f"WAGER RULE: {wager.get('rule', '')} {wager.get('sizing', '')}",
         f"COMPOSITION: {rules.get('composition', {}).get('rule', '')}",
+        f"PLAYSTYLE: {playstyle.get('identity', '')}",
+        f"FLEX: {flex.get('rule', '')} {flex.get('keep_options_open', '')}",
+        f"VERTICAL: {vertical.get('rule', '')} {vertical.get('one_piece_away', '')}",
+        f"FORCE: {force.get('rule', '')} {force.get('when_not_to_force', '')}",
         f"LEVEL: {rules.get('level', {}).get('rule', '')}",
         f"CONTRACTS: {rules.get('contracts', {}).get('rule', '')}",
         f"STALL: {rules.get('stall', {}).get('rule', '')}",
@@ -143,12 +151,41 @@ def _state_digest(kind: str, observation: dict) -> str:
         )
     if rendered_offers:
         parts.append("SHOP OFFERS: " + "; ".join(rendered_offers))
+    traits = state.get("traits") or []
+    if traits:
+        rendered_traits = []
+        for entry in traits:
+            suffix = ""
+            if entry.get("active"):
+                suffix = " (active)"
+            elif entry.get("next_threshold"):
+                suffix = " (next tier at %s)" % entry.get("next_threshold")
+            rendered_traits.append("%s x%s%s" % (entry.get("id"), entry.get("count"), suffix))
+        parts.append("YOUR TRAITS: " + "; ".join(rendered_traits))
+    parts.append(
+        "FIDELITY: time_scale=%s planning_timer_total=%s planning_time_left=%s shop_seed_explicit=%s"
+        % (
+            state.get("time_scale"),
+            state.get("planning_timer_total"),
+            state.get("planning_time_left"),
+            state.get("shop_seed_explicit"),
+        )
+    )
     if observation.get("contract_buttons"):
         parts.append("CONTRACT OPTIONS: " + "; ".join(str(item) for item in observation["contract_buttons"]))
     return "\n".join(parts)[:STATE_DIGEST_LIMIT]
 
 
 def _kind_preamble(kind: str) -> str:
+    if kind == "shop_buy":
+        return (
+            "This is a shop decision. Work the priority order: first, does an offer fill the role the "
+            "board is missing or add a trait count you already hold? Second, does an offer finish a "
+            "vertical you are already stacked on or one piece below its next threshold - that is the "
+            "gift, take it. Third, a reroll or a unit that only fits a plan you do not own is the "
+            "gamble: it must be paid for out of the reserve, and it is wrong when a flex pick you "
+            "would take in an open shop is already in front of you."
+        )
     if kind == "reserve_override":
         return (
             "This is a reserve-floor confirmation. The rules set a floor for the buckets held "
