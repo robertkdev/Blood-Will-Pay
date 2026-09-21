@@ -42,6 +42,8 @@ built-in policy with no model in the loop.
 
 | Run | Starter | Terminal | Final stage | Battles | Peak bankroll | Decisions |
 | --- | --- | --- | --- | ---: | ---: | ---: |
+| `jev-campaign-seed4401-20260921-093554` (after the fixes) | bonko | target reached | chapter 2 round 4 | 12 | 6 | 40 |
+| `heuristic-campaign-seed4401-20260921-093053` (after the fixes) | bonko | target reached | chapter 2 round 4 | 10 | 7 | - |
 | `jev-campaign-seed4401-20260921-082105` (final Jev run) | brute (Jev's choice) | stage stall | chapter 2 round 2 | 9 | 6 | 41 |
 | `jev-campaign-seed4401-20260921-075736` | brute | loss | chapter 1 round 5 | 5 | 6 | 15 |
 | `heuristic-campaign-seed4401-20260921-080256` | brute | loss | chapter 1 round 5 | 7 | 6 | - |
@@ -51,6 +53,52 @@ built-in policy with no model in the loop.
 
 Raw runs, observations, decisions, and generated reports:
 `E:\CodexStorage\task-artifacts\gamble-battle-jev-run-20260921\runs\`.
+
+## Fixes in this change
+
+**1. Forced results are now decisive (`scripts/game/combat/combat_engine.gd`).** Two
+things were wrong on the timeout path. `_combat_timeout_outcome()` scored the fight
+with the damage totals cached at the end of the previous frame, so a stale cache
+could compare equal while the live fight did not. And `_fallback_timeout_outcome()`
+returned `tie` whenever both boards were still standing, which refunds the whole
+wager and lets the stage repeat forever. The totals are now refreshed before the
+decision, and a fight that runs the clock is awarded by surviving units, then
+damage dealt, then remaining health, with the seeded roll only for a perfectly
+symmetrical board. A draw is now only possible on a genuine mutual wipe.
+
+Evidence: the same stage that drew four times in a row now resolves. Across the
+after-fix Jev run, 12 fights resolved with **zero draws**, 9 of them on the clock
+(`E:\CodexStorage\task-artifacts\gamble-battle-jev-run-20260921\runs\jev-campaign-seed4401-20260921-093554`).
+
+Regression: `tests/rga_testing/validation/StalemateResolutionProbe.tscn` drives two
+durable boards into the timeout path and requires a decisive verdict -
+`StalemateResolutionProbe: PASS cases=2 forced=2`.
+
+**2. The planning reserve floor is two buckets (`scripts/game/shop/affordability.gd`).**
+`PLANNING_RESERVE_FLOOR` was `1` while its own comment promised "enough health to
+survive one ordinary 1-bet loss" - one bucket does not survive a one-bucket loss.
+Since the minimum wager is one bucket, a floor of one turned the next fight into an
+all-in. The floor is now `2`.
+
+Evidence: the after-fix Jev run recorded zero spends to the floor and zero all-in
+wagers, against two runs that died on a forced last-bucket wager
+(`reserve_before = 1, applied = 1`).
+
+**3. The loss screen no longer resumes a freed coroutine (`scripts/ui/loss_screen.gd`).**
+`call_deferred` plus an internal `await` resumed after the screen was freed and
+logged `Resumed function '_reassert_loss_scoreboard_typography()' after await, but
+class instance is gone`. The layout pass is now scheduled as a one-shot
+`process_frame` connection, which Godot drops automatically when the receiver is
+freed; the method itself no longer awaits.
+
+**4. Harness and strategy.** The harness now records the engine's own resolution
+lines (so a forced result is explainable), captures the enemy board and damage per
+fight, offers rerolls as a Jev decision, and reports combine progress and the
+reserve each offer leaves. The rules gained a reserve floor of two buckets, a
+focused reserve-floor question (a repeatedly missed conditional gets its own
+question instead of another general line), a rule against replaying a failed
+board, and the clock rule below. Jev's after-fix run used two rerolls and passed on
+6 of 18 shop decisions.
 
 Jev's controller behaviour on the final run: 41 decisions across starter, shop,
 level, wager, contract, and one reserve-floor confirmation; API latency median
@@ -64,7 +112,7 @@ wagers.
 
 ## Findings
 
-### 1. A stage can draw forever, so the planning beat never ends (high)
+### 1. A stage could draw forever, so the planning beat never ended (high, fixed)
 
 The engine's no-progress and combat timeouts resolve through
 `_fallback_timeout_outcome()`, which returns `tie` when both teams are alive with
@@ -79,12 +127,9 @@ the run at that point (`stage_stall`) because a rule-following player had no
 remaining move that changed the outcome. The superseded run looped chapter 2 round
 3 the same way with an unchanged board.
 
-Suggested change: escalate the encounter on a draw, count draws against a bounded
-retry budget, or make the timeout fallback unreachable with a sudden-death damage
-ramp, so "draw forever" is not a stable state. This is the exact player experience
-that started this investigation: the planning phase appears to repeat without end.
+Fixed by making the forced result decisive, as described above.
 
-### 2. At one bucket the only legal wager is all-in, and that ends runs (high)
+### 2. At one bucket the only legal wager is all-in, and that ended runs (high, fixed)
 
 The wager slider's minimum is one bucket, so a player holding one bucket must risk
 it. Both tank-starter runs arrived at the chapter 1 mirror with two buckets, spent
@@ -96,17 +141,26 @@ an earlier Jev run; `spend-to-floor` findings on a cost-1 purchase and a 4-bucke
 level purchase; terminal `loss` with `buckets = 0`. In the final run the same rule
 with a two-bucket floor plus the focused confirmation removed every all-in wager.
 
-Suggested change: let a zero wager be selectable, price the level purchase against
-the chapter's income, or grant a floor of more than one bucket at a retry.
+Fixed by raising the planning reserve floor to two buckets, so the shop refuses the
+spend that would strand the player at one bucket. Letting a zero wager be selectable
+remains an option the design owner may prefer; the floor fix needs no new control.
 
-### 3. The loss screen resumes a coroutine after its node is gone (medium)
+### 3. The loss screen resumed a coroutine after its node was gone (medium, fixed)
 
 `err| ERROR: Resumed function '_reassert_loss_scoreboard_typography()' after
 await, but class instance is gone. At script: res://scripts/ui/loss_screen.gd:896`
 appeared three times across the two runs that reached the loss overlay.
 
-Suggested change: guard the awaited callback against a freed instance or bind the
-pending timer to the node's lifetime.
+Fixed by scheduling the layout pass as a one-shot frame connection.
+
+### 3b. Most fights are decided by the clock (medium, open)
+
+In the after-fix run 9 of 12 fights reached the 45-second cap and were awarded by
+the tie-break ladder rather than by a wipe, and the same is true of the control
+run. The boards at chapter 1-2 cannot kill each other inside the clock, so the
+player-visible result often comes from a heuristic rather than from combat. Check
+the damage-to-health ratio at this band; either shorten the durable phase or let
+damage outpace sustain so fights close.
 
 ### 4. The documented reserve target is unreachable in a real chapter 1 (medium)
 
@@ -154,6 +208,26 @@ being judged. Runs used `Engine.time_scale = 8.0` for combat only; each decision
 is made from the live planning state, and Jev's turn-around was measured
 separately. One seed and two policies is enough to expose the stall and the
 one-bucket trap, not enough to score overall balance.
+
+## Validation of the fixes
+
+| Check | Result |
+| --- | --- |
+| `tests/rga_testing/validation/StalemateResolutionProbe.tscn` | `PASS cases=2 forced=2` - durable boards forced the timeout path and both results were decisive |
+| `tests/rga_testing/validation/ReserveFloorContractProbe.tscn` | `PASS floor=2` - planning and in-combat floor arithmetic |
+| Heuristic campaign, seed 4401, Bonko | target reached, chapter 2 round 4, 10 battles, 0 technical failures |
+| Jev campaign, seed 4401, Bonko | target reached, chapter 2 round 4, 12 battles, 0 technical failures, 12 resolutions and 0 draws |
+
+Two limitations are worth naming. `tests/visual/EconomyTieAffordabilitySmoke.tscn`
+and `tests/visual/ShopCorrectnessAuditSmoke.tscn` were updated to the two-bucket
+contract, but neither can be observed through the MCP runner used here: a scene that
+prints and quits inside the same frame loses that output when stdout is a pipe
+(`tests/diagnostics/MinimalQuit.tscn`, untouched, loses its `PASS` line the same
+way), so `ReserveFloorContractProbe` carries the observable assertions instead.
+And `tests/rga_testing/RGATesting.tscn` exits after about 47 seconds without writing
+its output or printing its completion line **both with and without this change**
+(verified by stashing the combat edit and re-running), so it is a pre-existing
+checkout condition rather than a regression from this work.
 
 ## Runtime notes
 

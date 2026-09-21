@@ -83,6 +83,41 @@ def _engine_errors(run_dir: Path) -> list[str]:
     return list(seen.keys())
 
 
+def _combat_resolutions(events: list[dict]) -> dict:
+    """Read the engine's own resolution lines out of the captured combat log."""
+    resolutions: list[dict] = []
+    forced = 0
+    for event in events:
+        if event.get("kind") != "combat_log":
+            continue
+        line = str(event.get("payload", {}).get("line", ""))
+        if not line:
+            continue
+        if line.startswith(("Combat timeout", "Combat no-progress timeout")):
+            forced += 1
+            continue
+        if not line.startswith("Combat resolved:"):
+            continue
+        parsed: dict = {"chapter": event.get("chapter"), "stage_in_chapter": event.get("stage_in_chapter"), "line": line}
+        for token in line.split():
+            if "=" not in token:
+                continue
+            key, _, value = token.partition("=")
+            cleaned = value.rstrip(".")
+            try:
+                parsed[key] = float(cleaned) if "." in cleaned else int(cleaned)
+            except ValueError:
+                continue
+        resolutions.append(parsed)
+    drawn = [item for item in resolutions if str(item.get("line", "")).startswith("Combat resolved: tie")]
+    return {
+        "resolutions": resolutions,
+        "forced_results": forced,
+        "decisive_results": len(resolutions) - len(drawn),
+        "draws": drawn,
+    }
+
+
 def _decision_latency(decisions: list[dict]) -> dict:
     api_values = [float(record["api_ms"]) for record in decisions if isinstance(record.get("api_ms"), (int, float))]
     response_values = []
@@ -274,6 +309,7 @@ def _findings(
     calibration: dict,
     observations: list[dict],
     engine_errors: list[str],
+    combat: dict,
 ) -> list[dict]:
     findings: list[dict] = []
     terminal = str(summary.get("terminal", "unknown"))
@@ -363,6 +399,43 @@ def _findings(
             "evidence": audit["same_stage_retries"],
             "recommendation": "A draw refunds the whole wager, so replaying the same stage costs nothing and can loop forever. Escalate the encounter or count draws against a retry budget.",
         })
+    if combat.get("draws"):
+        findings.append({
+            "id": "drawn-stages",
+            "severity": "high",
+            "title": "A stage resolved as a draw",
+            "evidence": combat["draws"][:4],
+            "recommendation": "A draw returns the whole wager and blocks progress. The forced-result rule should award the round instead of returning a draw whenever both boards are still standing.",
+        })
+    elif combat.get("resolutions"):
+        findings.append({
+            "id": "resolutions-decisive",
+            "severity": "info",
+            "title": "Every resolved fight was decisive",
+            "evidence": {
+                "resolutions": len(combat["resolutions"]),
+                "forced_results": combat.get("forced_results"),
+                "decisive_results": combat.get("decisive_results"),
+            },
+            "recommendation": "Keep the forced-result rule: a fight that runs the clock must award a winner.",
+        })
+    if combat.get("resolutions"):
+        clock_resolved = [
+            item for item in combat["resolutions"]
+            if isinstance(item.get("elapsed"), (int, float)) and float(item["elapsed"]) >= 40.0
+        ]
+        if len(clock_resolved) >= max(2, len(combat["resolutions"]) // 2):
+            findings.append({
+                "id": "clock-decides-most-fights",
+                "severity": "medium",
+                "title": "Most fights are decided by the clock",
+                "evidence": {
+                    "clock_resolved": len(clock_resolved),
+                    "total": len(combat["resolutions"]),
+                    "examples": clock_resolved[:3],
+                },
+                "recommendation": "Boards at this chapter cannot kill each other inside 45 seconds, so the result comes from the tie-break ladder rather than combat. Check the damage-to-health ratio at this band.",
+            })
     if calibration.get("samples", 0) >= 8:
         evidence = {
             "samples": calibration["samples"],
@@ -507,11 +580,12 @@ def main(argv: list[str] | None = None) -> int:
     decisions = _load_jsonl(run_dir / "decisions.jsonl")
     events = _load_jsonl(run_dir / "run_events.jsonl")
     observations = _observations(run_dir)
+    combat = _combat_resolutions(events)
     latency = _decision_latency(decisions)
     audit = _audit(summary, events, observations)
     calibration = _calibration(events)
     engine_errors = _engine_errors(run_dir)
-    findings = _findings(summary, latency, audit, calibration, observations, engine_errors)
+    findings = _findings(summary, latency, audit, calibration, observations, engine_errors, combat)
     result = {
         "run_dir": str(run_dir),
         "summary": {
@@ -532,6 +606,7 @@ def main(argv: list[str] | None = None) -> int:
         "audit": audit,
         "calibration": {key: value for key, value in calibration.items() if key != "pairs"},
         "engine_errors": engine_errors,
+        "combat": combat,
         "findings": findings,
     }
     out_dir = Path(args.out).resolve() if args.out else run_dir

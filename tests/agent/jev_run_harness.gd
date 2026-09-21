@@ -27,7 +27,18 @@ const CAMPAIGN_TARGET_CHAPTER: int = 2
 const CAMPAIGN_TARGET_ROUND: int = 4
 const CAMPAIGN_MAX_BATTLES: int = 30
 const MAX_SAME_STAGE_RETRIES: int = 3
+const MAX_REROLLS_PER_SHOP: int = 3
 const WAGER_PRESET_SHARES: Array[float] = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+const COMBAT_LOG_KEYWORDS: Array[String] = [
+	"timeout",
+	"stalemate",
+	"tie",
+	"victory",
+	"defeat",
+	"boss phase",
+	"escalat",
+	"reinforcement",
+]
 
 var _run_dir: String = DEFAULT_RUN_DIR
 var _run_mode: String = "jev"
@@ -41,6 +52,7 @@ var _decision_kinds: Dictionary[String, int] = {}
 var _same_stage_retries: Dictionary[String, int] = {}
 var _recent_fights: Array[Dictionary] = []
 var _reserve_floor_buckets: int = DEFAULT_RESERVE_FLOOR_BUCKETS
+var _combat_log_lines: int = 0
 
 func _run() -> void:
 	_read_environment()
@@ -83,6 +95,7 @@ func _run() -> void:
 		_abort_run("CombatView did not open after starter selection")
 		return
 	_set_planning_timer_safe()
+	_ensure_combat_log_connected()
 	var opener_result: String = ""
 	var opener_attempts: int = 0
 	while opener_attempts < MAX_SAME_STAGE_RETRIES:
@@ -186,14 +199,76 @@ func _second_fight_result(resolved: bool) -> String:
 	# and anything else is a loss.
 	if not resolved:
 		return "timeout"
+	var outcome: String = ""
 	if get_tree().root.get_node_or_null("LossOverlayLayer") != null:
-		return "loss"
-	if _stage_advanced_from_round():
-		return "shop"
-	var reserve_start: int = int(Economy.last_blood_reserve_start)
-	if reserve_start > 0 and int(Economy.blood_buckets) >= reserve_start:
-		return "tie"
-	return "loss"
+		outcome = "loss"
+	elif _stage_advanced_from_round():
+		outcome = "shop"
+	else:
+		var reserve_start: int = int(Economy.last_blood_reserve_start)
+		if reserve_start > 0 and int(Economy.blood_buckets) >= reserve_start:
+			outcome = "tie"
+		else:
+			outcome = "loss"
+	_record_combat_diagnostic(outcome)
+	return outcome
+
+func _record_combat_diagnostic(outcome: String) -> void:
+	# A drawn stage is the hardest outcome to read from the outside: the fight
+	# resolves without advancing and without costing anything. Record the engine's
+	# own numbers so the reason is visible in the transcript.
+	var controller: Variant = _combat_controller()
+	var manager: Variant = controller.get("manager") if controller != null else null
+	if manager == null:
+		return
+	var engine: Variant = manager.get_engine()
+	if engine == null:
+		return
+	var state: Variant = engine.get("state")
+	var player_team: Array = manager.get("player_team")
+	var enemy_team: Array = manager.get("enemy_team")
+	_append_event("combat_diagnostic", {
+		"outcome": outcome,
+		"player_damage": int(engine.get("total_damage_player")),
+		"enemy_damage": int(engine.get("total_damage_enemy")),
+		"elapsed_seconds": float(state.elapsed_time) if state != null else -1.0,
+		"combat_timeout_s": float(engine.get("combat_timeout_s")),
+		"no_progress_timeout_s": float(engine.get("no_progress_timeout_s")),
+		"player_alive": _alive_count(player_team),
+		"enemy_alive": _alive_count(enemy_team),
+		"player_hp_fraction": _health_fraction(player_team),
+		"enemy_hp_fraction": _health_fraction(enemy_team),
+		"player_board": _team_ids(player_team),
+		"enemy_board": _team_ids(enemy_team),
+	})
+
+func _alive_count(team: Array) -> int:
+	var count: int = 0
+	for unit_value: Variant in team:
+		var unit: Unit = unit_value as Unit
+		if unit != null and unit.is_alive():
+			count += 1
+	return count
+
+func _health_fraction(team: Array) -> float:
+	var current: float = 0.0
+	var maximum: float = 0.0
+	for unit_value: Variant in team:
+		var unit: Unit = unit_value as Unit
+		if unit == null:
+			continue
+		current += max(0.0, float(unit.hp))
+		maximum += max(0.0, float(unit.max_hp))
+	if maximum <= 0.0:
+		return 0.0
+	return current / maximum
+
+func _team_ids(team: Array) -> Array[String]:
+	var output: Array[String] = []
+	for unit_value: Variant in team:
+		var unit: Unit = unit_value as Unit
+		output.append(_unit_id(unit))
+	return output
 
 func _stage_advanced_from_round() -> bool:
 	if int(GameState.chapter) > _transition_chapter_before:
@@ -302,55 +377,89 @@ func _decide_starter() -> void:
 func _buy_best_two_stage_offer(buy_index: int) -> String:
 	if _run_mode != "jev":
 		return await super._buy_best_two_stage_offer(buy_index)
-	var candidates: Array[Dictionary] = _shop_candidates()
-	if candidates.is_empty():
-		return ""
-	var state: Dictionary = _plan_state()
-	state["buy_index"] = buy_index
-	var decision: Dictionary = await _ask_decision("shop_buy", state, candidates)
-	var chosen: String = String(decision.get("choice_id", ""))
-	if chosen == "pass":
-		_append_event("shop_pass", {"buy_index": buy_index, "review_flags": decision.get("review_flags", [])})
-		return ""
-	for candidate: Dictionary in candidates:
-		if String(candidate.get("id", "")) != chosen:
-			continue
-		var slot: int = int(candidate.get("slot", -1))
-		var unit_id: String = String(candidate.get("unit_id", ""))
-		var cost: int = int(candidate.get("cost", 0))
-		var reserve_after: int = int(Economy.gold) - cost
-		if reserve_after < _reserve_floor_buckets:
-			# The policy asks for a reserve floor and the model still buys through
-			# it, so this state gets its own focused question instead of another
-			# line in the general rules.
-			var confirmed: bool = await _confirm_reserve_break(
-				"buy %s for %d buckets" % [unit_id, cost],
-				reserve_after,
-			)
-			if not confirmed:
-				_append_event("reserve_guard_pass", {
-					"kind": "shop_buy",
-					"unit_id": unit_id,
-					"cost": cost,
-					"reserve_after": reserve_after,
-					"floor": _reserve_floor_buckets,
-				})
+	for reroll_attempt: int in range(MAX_REROLLS_PER_SHOP):
+		var candidates: Array[Dictionary] = _shop_candidates()
+		if candidates.is_empty():
+			return ""
+		var state: Dictionary = _plan_state()
+		state["buy_index"] = buy_index
+		state["rerolls_this_shop"] = reroll_attempt
+		var decision: Dictionary = await _ask_decision("shop_buy", state, candidates)
+		var chosen: String = String(decision.get("choice_id", ""))
+		if chosen == "pass":
+			_append_event("shop_pass", {"buy_index": buy_index, "review_flags": decision.get("review_flags", [])})
+			return ""
+		if chosen == "reroll":
+			if not await _click_reroll():
+				_append_event("reroll_failed", {"buy_index": buy_index, "attempt": reroll_attempt})
 				return ""
-		var gold_before: int = int(Economy.gold)
-		var clicked: bool = await _click_shop_slot(slot)
-		await _settle_frames(3)
-		_append_event("shop_purchase", {
-			"buy_index": buy_index,
-			"slot": slot,
-			"unit_id": unit_id,
-			"cost": int(candidate.get("cost", 0)),
-			"gold_before": gold_before,
-			"gold_after": int(Economy.gold),
-			"clicked": clicked,
-		})
-		return unit_id if clicked else ""
-	_append_event("decision_rejected", {"kind": "shop_buy", "choice_id": chosen, "reason": "not_an_offer_candidate"})
+			await _settle_frames(4)
+			continue
+		for candidate: Dictionary in candidates:
+			if String(candidate.get("id", "")) != chosen:
+				continue
+			var slot: int = int(candidate.get("slot", -1))
+			var unit_id: String = String(candidate.get("unit_id", ""))
+			var cost: int = int(candidate.get("cost", 0))
+			var reserve_after: int = int(Economy.gold) - cost
+			if reserve_after < _reserve_floor_buckets:
+				# The policy asks for a reserve floor and the model still buys through
+				# it, so this state gets its own focused question instead of another
+				# line in the general rules.
+				var confirmed: bool = await _confirm_reserve_break(
+					"buy %s for %d buckets" % [unit_id, cost],
+					reserve_after,
+				)
+				if not confirmed:
+					_append_event("reserve_guard_pass", {
+						"kind": "shop_buy",
+						"unit_id": unit_id,
+						"cost": cost,
+						"reserve_after": reserve_after,
+						"floor": _reserve_floor_buckets,
+					})
+					return ""
+			var gold_before: int = int(Economy.gold)
+			var clicked: bool = await _click_shop_slot(slot)
+			await _settle_frames(3)
+			_append_event("shop_purchase", {
+				"buy_index": buy_index,
+				"slot": slot,
+				"unit_id": unit_id,
+				"cost": cost,
+				"gold_before": gold_before,
+				"gold_after": int(Economy.gold),
+				"clicked": clicked,
+			})
+			return unit_id if clicked else ""
+		_append_event("decision_rejected", {"kind": "shop_buy", "choice_id": chosen, "reason": "not_an_offer_candidate"})
+		return ""
+	_append_event("reroll_budget_exhausted", {"buy_index": buy_index, "rerolls": MAX_REROLLS_PER_SHOP})
 	return ""
+
+func _reroll_button() -> Button:
+	if _main == null:
+		return null
+	for node: Node in _main.find_children("*", "Button", true, false):
+		var button: Button = node as Button
+		if button != null and button.text.strip_edges().begins_with("Reroll"):
+			return button
+	return null
+
+func _click_reroll() -> bool:
+	var button: Button = _reroll_button()
+	if button == null or button.disabled:
+		return false
+	var gold_before: int = int(Economy.gold)
+	var clicked: bool = await _click_button(button, "Jev reroll")
+	await _settle_frames(4)
+	_append_event("reroll", {
+		"gold_before": gold_before,
+		"gold_after": int(Economy.gold),
+		"clicked": clicked,
+		"offers": _offer_summaries(),
+	})
+	return clicked
 
 func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	if _run_mode != "jev":
@@ -439,7 +548,34 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	# start-battle click path.
 	await _resolve_pending_contract_market()
 	await _decide_wager(label)
+	_ensure_combat_log_connected()
 	await super._press_continue(expect_forced, label)
+
+func _ensure_combat_log_connected() -> void:
+	# The engine explains a forced result (timeout, stalled board) through
+	# log_line only. Capture it so a drawn stage can be explained after the fact.
+	var controller: Variant = _combat_controller()
+	var manager: Variant = controller.get("manager") if controller != null else null
+	if manager == null:
+		return
+	if manager.has_signal("log_line") and not manager.is_connected("log_line", Callable(self, "_on_combat_log_line")):
+		manager.log_line.connect(_on_combat_log_line)
+
+func _on_combat_log_line(text: String) -> void:
+	# Per-hit lines dominate the combat log; keep the lines that explain a
+	# resolution instead of truncating the transcript inside the first fight.
+	var lowered: String = text.to_lower()
+	var interesting: bool = false
+	for keyword: String in COMBAT_LOG_KEYWORDS:
+		if lowered.contains(keyword):
+			interesting = true
+			break
+	if not interesting:
+		return
+	if _combat_log_lines >= 200:
+		return
+	_combat_log_lines += 1
+	_append_event("combat_log", {"line": text})
 
 func _decide_wager(label: String) -> void:
 	if _run_mode != "jev":
@@ -595,6 +731,11 @@ func _shop_candidates() -> Array[Dictionary]:
 			})
 			continue
 		var copies: int = owned.count(unit_id)
+		var combine_needed: int = 0
+		if copies > 0:
+			combine_needed = 3 - (copies % 3)
+			if combine_needed == 3:
+				combine_needed = 0
 		candidates.append({
 			"id": "offer_%d" % int(summary.get("slot", -1)),
 			"label": "%s (cost %d, %s%s)" % [
@@ -603,13 +744,20 @@ func _shop_candidates() -> Array[Dictionary]:
 				String(summary.get("primary_role", "unit")),
 				", owns %d copies" % copies if copies > 0 else "",
 			],
-			"effect": "Buy %s for %d buckets; %d copies owned, level-up at three." % [unit_id, cost, copies],
+			"effect": "Buy %s for %d buckets; %d copies owned, %s. Leaves %d buckets." % [
+				unit_id,
+				cost,
+				copies,
+				"%d more for the next combine" % combine_needed if combine_needed > 0 else "no combine progress",
+				int(Economy.gold) - cost,
+			],
 			"affordable": true,
 			"slot": int(summary.get("slot", -1)),
 			"unit_id": unit_id,
 			"cost": cost,
 			"primary_role": String(summary.get("primary_role", "")),
 			"copies_owned": copies,
+			"combine_needed": combine_needed,
 			"buckets_after": int(Economy.gold) - cost,
 		})
 	var pass_candidate: Dictionary = {
@@ -619,6 +767,15 @@ func _shop_candidates() -> Array[Dictionary]:
 		"affordable": true,
 	}
 	candidates.append(pass_candidate)
+	var reroll_price: int = int(Economy.reroll_price())
+	if reroll_price > 0 and int(Economy.gold) - reroll_price >= _reserve_floor_buckets:
+		candidates.append({
+			"id": "reroll",
+			"label": "Reroll the shop for %d buckets." % reroll_price,
+			"effect": "Replace every current offer with a new roll. Leaves %d buckets." % (int(Economy.gold) - reroll_price),
+			"affordable": true,
+			"cost": reroll_price,
+		})
 	return candidates
 
 func _wager_candidates(reserve: int) -> Array[Dictionary]:

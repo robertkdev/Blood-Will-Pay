@@ -43,8 +43,8 @@
     "rule": "A chapter contract is optional. Take one only when its price stays inside the reserve and its reward matches the plan for this chapter; otherwise pass and keep the buckets for bodies and levels."
   },
   "stall": {
-    "rule": "Never start a fight with the same board that already failed. A draw returns the whole wager and a loss on a non-final stage keeps the run alive, so the stage is still there and the board must change before trying again. Change means: buy a duplicate toward a combine, take an upgrade, buy the level that raises capacity, or take a contract that changes the fight.",
-    "tie_rule": "A draw refunds the escrowed wager, so a draw costs planning time rather than bankroll. That is exactly why repeating a drawn board is the worst habit: it burns stages without moving the run."
+    "rule": "Never start a fight with the same board that already failed. A loss on a non-final stage keeps the run alive on the same stage, so the board must change before trying again. Change means: buy a duplicate toward a combine, take an upgrade, buy the level that raises capacity, buy a reroll that finds a better offer, or take a contract that changes the fight.",
+    "clock_rule": "The fight has a 45-second cap. If neither board is wiped the result is awarded by surviving units, then damage dealt, then remaining health, so a board that cannot kill loses the clock. Keep at least one damage role in the lineup and upgrade it; an all-tank board is a losing clock even when it never dies."
   },
   "shown_odds": {
     "rule": "The preview win-odds range is informational and does not price the wager. Treat it as a rough preparation signal: well above the break-even line means the board is ready, near or below it means buy power before starting."

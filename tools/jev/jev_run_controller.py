@@ -71,7 +71,8 @@ def _rules_digest(rules: dict) -> str:
         f"COMPOSITION: {rules.get('composition', {}).get('rule', '')}",
         f"LEVEL: {rules.get('level', {}).get('rule', '')}",
         f"CONTRACTS: {rules.get('contracts', {}).get('rule', '')}",
-        f"STALL: {rules.get('stall', {}).get('rule', '')} {rules.get('stall', {}).get('tie_rule', '')}",
+        f"STALL: {rules.get('stall', {}).get('rule', '')}",
+        f"CLOCK: {rules.get('stall', {}).get('clock_rule', '')}",
         f"SHOWN ODDS: {rules.get('shown_odds', {}).get('rule', '')}",
     ]
     return "\n".join(line for line in lines if line.split(": ", 1)[-1])[:RULE_DIGEST_LIMIT]

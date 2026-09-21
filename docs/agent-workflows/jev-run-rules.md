@@ -61,13 +61,18 @@ the reserve and the reward matches the chapter plan; otherwise pass.
 price the wager, but it is still the honest summary of how prepared the board is.
 Well above the break-even line means start; near or below means buy power first.
 
-**8. Never replay the board that already failed.** A draw settles by returning the
-whole wager, and a loss on a non-final stage keeps the run alive on the same stage.
-Both leave the same fight in front of you, so the board has to change before you
-try again: buy the duplicate that completes a combine, take the level that raises
-capacity, or take the contract that changes the encounter. Re-entering the fight
-with an unchanged board burns stages without moving the run, which is how a
-healthy-looking 6-unit board at chapter 2 round 3 can loop forever.
+**8. Never replay the board that already failed.** A loss on a non-final stage
+keeps the run alive on the same stage, so the board has to change before you try
+again: buy the duplicate that completes a combine, take the level that raises
+capacity, reroll a shop that offers nothing useful, or take the contract that
+changes the encounter. Re-entering the fight with an unchanged board burns
+bankroll without moving the run.
+
+**9. Build a board that can close the fight.** The fight is capped at 45 seconds.
+If neither board is wiped the round is awarded by surviving units, then damage
+dealt, then remaining health. A durable lineup that cannot kill therefore loses
+the clock, which is why at least one damage role has to be in the lineup and
+upgraded; tanks buy the time, they do not win it.
 
 ## Running it
 

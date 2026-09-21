@@ -748,6 +748,7 @@ func _emit_outcome(kind: String) -> void:
 		return
 	if outcome_resolver != null:
 		outcome_resolver.mark_emitted()
+	emit_signal("log_line", _resolution_diagnostic_text(kind))
 	# Mark inactive and revert any lingering stat buffs BEFORE notifying listeners,
 	# so planning UI and intermission handlers see base stats.
 	state.battle_active = false
@@ -762,6 +763,18 @@ func _emit_outcome(kind: String) -> void:
 		_:
 			# Fallback: default to defeat if unknown outcome
 			emit_signal("defeat", stage)
+
+func _resolution_diagnostic_text(kind: String) -> String:
+	if state == null:
+		return "Combat resolved: %s (no state)." % kind
+	return "Combat resolved: %s elapsed=%.1fs player_damage=%d enemy_damage=%d player_alive=%d enemy_alive=%d." % [
+		kind,
+		float(state.elapsed_time),
+		int(total_damage_player),
+		int(total_damage_enemy),
+		_alive_count(state.player_team),
+		_alive_count(state.enemy_team),
+	]
 
 func _emit_stats_snapshot() -> void:
 	emit_signal("stats_updated", player_ref, BattleState.first_alive(state.enemy_team))
@@ -792,13 +805,30 @@ func _mark_combat_progress() -> void:
 func _combat_timeout_outcome() -> String:
 	if state == null or not state.battle_active:
 		return ""
-	if combat_timeout_s > 0.0 and float(state.elapsed_time) >= combat_timeout_s:
-		emit_signal("log_line", "Combat timeout: forcing result from current board state.")
+	var combat_due: bool = combat_timeout_s > 0.0 and float(state.elapsed_time) >= combat_timeout_s
+	var progress_due: bool = no_progress_timeout_s > 0.0 and float(state.elapsed_time) - _last_progress_time >= no_progress_timeout_s
+	if not combat_due and not progress_due:
+		return ""
+	# Totals are cached at the end of each processed frame, so refresh them before
+	# scoring a forced result: a stale cache can compare equal when the live fight
+	# does not, which is how a timeout resolved into a free draw.
+	_update_totals_cache()
+	if combat_due:
+		emit_signal("log_line", "Combat timeout: forcing result from current board state. %s" % _timeout_diagnostic_text())
 		return _fallback_timeout_outcome()
-	if no_progress_timeout_s > 0.0 and float(state.elapsed_time) - _last_progress_time >= no_progress_timeout_s:
-		emit_signal("log_line", "Combat no-progress timeout: forcing result from current board state.")
-		return _fallback_timeout_outcome()
-	return ""
+	emit_signal("log_line", "Combat no-progress timeout: forcing result from current board state. %s" % _timeout_diagnostic_text())
+	return _fallback_timeout_outcome()
+
+func _timeout_diagnostic_text() -> String:
+	var player_alive: int = _alive_count(state.player_team)
+	var enemy_alive: int = _alive_count(state.enemy_team)
+	return "elapsed=%.1fs player_damage=%d enemy_damage=%d player_alive=%d enemy_alive=%d" % [
+		float(state.elapsed_time),
+		int(total_damage_player),
+		int(total_damage_enemy),
+		player_alive,
+		enemy_alive,
+	]
 
 func _fallback_timeout_outcome() -> String:
 	if state == null:
@@ -809,11 +839,36 @@ func _fallback_timeout_outcome() -> String:
 		return "victory"
 	if player_alive <= 0 and enemy_alive > 0:
 		return "defeat"
-	if total_damage_player > total_damage_enemy:
-		return "victory"
-	if total_damage_enemy > total_damage_player:
-		return "defeat"
-	return "tie"
+	if player_alive <= 0 and enemy_alive <= 0:
+		# A genuine mutual wipe is the only draw a forced result may return.
+		return "tie"
+	# Both boards still stand: the fight ran out of time rather than resolving, so
+	# award the round to the side that did more work instead of handing back a free
+	# draw. A draw here refunds the whole wager and lets the stage repeat forever.
+	if player_alive != enemy_alive:
+		return "victory" if player_alive > enemy_alive else "defeat"
+	if total_damage_player != total_damage_enemy:
+		return "victory" if total_damage_player > total_damage_enemy else "defeat"
+	var player_health: float = _health_fraction(state.player_team)
+	var enemy_health: float = _health_fraction(state.enemy_team)
+	if not is_equal_approx(player_health, enemy_health):
+		return "victory" if player_health > enemy_health else "defeat"
+	# Perfectly symmetrical boards (a mirror fight) can match on every measure.
+	# Fall back to the seeded roll so the result stays deterministic per seed and
+	# still decisive.
+	return "victory" if rng == null or rng.randf() < 0.5 else "defeat"
+
+func _health_fraction(team: Array) -> float:
+	var current: float = 0.0
+	var maximum: float = 0.0
+	for unit: Unit in team:
+		if unit == null:
+			continue
+		current += max(0.0, float(unit.hp))
+		maximum += max(0.0, float(unit.max_hp))
+	if maximum <= 0.0:
+		return 0.0
+	return current / maximum
 
 func _alive_count(units: Array[Unit]) -> int:
 	var count: int = 0

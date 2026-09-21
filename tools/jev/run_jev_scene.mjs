@@ -10,7 +10,7 @@
 //   node tools/jev/run_jev_scene.mjs --project <projectDir> --scene <scene> --log <file>
 
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 function parseArgs(argv) {
@@ -20,6 +20,7 @@ function parseArgs(argv) {
     log: '',
     server: 'C:/Users/Flipm/Documents/godot-mcp/build/index.js',
     godotPath: process.env.GODOT_PATH || '',
+    completeMarker: 'JEV_RUN_COMPLETE',
     timeoutSeconds: 2700,
     pollMilliseconds: 2000,
     startGraceSeconds: 300,
@@ -34,6 +35,7 @@ function parseArgs(argv) {
       case '--server': args.server = next; index += 1; break;
       case '--godot-path': args.godotPath = next; index += 1; break;
       case '--timeout-seconds': args.timeoutSeconds = Number(next); index += 1; break;
+      case '--complete-marker': args.completeMarker = next; index += 1; break;
       case '--poll-milliseconds': args.pollMilliseconds = Number(next); index += 1; break;
       case '--start-grace-seconds': args.startGraceSeconds = Number(next); index += 1; break;
       default:
@@ -187,7 +189,13 @@ async function main() {
       try {
         payload = await client.callTool('get_debug_output', {});
       } catch (error) {
+        // The game can exit on its own (probe scenes quit themselves). A clean
+        // exit after real output is a finished run, not a supervision failure.
         summary.status = sawStart ? 'process_ended' : 'never_started';
+        if (sawStart) {
+          const seen = readFileSync(args.log, 'utf8');
+          if (seen.includes(args.completeMarker)) summary.status = 'complete';
+        }
         summary.detail = String(error.message ?? error);
         break;
       }
@@ -203,7 +211,7 @@ async function main() {
         appendFileSync(args.log, newErrors.map((line) => `err| ${line}`).join('\n') + '\n');
       }
       const joined = [...output, ...errors].join('\n');
-      if (joined.includes('JEV_RUN_COMPLETE')) {
+      if (joined.includes(args.completeMarker)) {
         summary.status = 'complete';
         break;
       }
@@ -211,7 +219,7 @@ async function main() {
         summary.status = 'debugger_break';
         break;
       }
-      if (joined.includes('JevRunHarness')) sawStart = true;
+      if (output.length > 0 || errors.length > 0) sawStart = true;
       if (!sawStart && Date.now() > startDeadline) {
         summary.status = 'harness_never_started';
         break;
