@@ -60,6 +60,18 @@ var _rounds: Array[Dictionary] = []
 var _events: Array[Dictionary] = []
 var _decision_kinds: Dictionary[String, int] = {}
 var _same_stage_retries: Dictionary[String, int] = {}
+## Planning-beat and shop-revision identity.
+##
+## Keying shop telemetry on (chapter, stage) merges repeat attempts at the same
+## stage into a single beat, and counting every purchase decision as a shop counts
+## decisions as if they were visits. Neither can be inferred reliably downstream:
+## a beat also ends when the countdown restarts without the stage changing. Both
+## identifiers are emitted explicitly instead.
+##
+## A beat is one shop visit. A revision is one distinct shop contents state: the
+## initial roll, then each reroll or purchase that changes what is on the shelf.
+var _planning_beat_id: int = 0
+var _shop_revision_id: int = 0
 var _recent_fights: Array[Dictionary] = []
 var _reserve_floor_buckets: int = DEFAULT_RESERVE_FLOOR_BUCKETS
 var _combat_log_lines: int = 0
@@ -124,6 +136,7 @@ func _run() -> void:
 		return
 	_set_planning_timer_safe()
 	_ensure_combat_log_connected()
+	_begin_planning_beat()
 	var opener_result: String = ""
 	var opener_attempts: int = 0
 	while opener_attempts < MAX_SAME_STAGE_RETRIES:
@@ -231,6 +244,36 @@ func _campaign_target_reached() -> bool:
 	if int(GameState.chapter) > CAMPAIGN_TARGET_CHAPTER:
 		return true
 	return int(GameState.chapter) == CAMPAIGN_TARGET_CHAPTER and int(GameState.stage_in_chapter) >= CAMPAIGN_TARGET_ROUND
+
+## One shop visit. Called at the top of every round and before the opening
+## planning phase, so a replayed stage is its own beat instead of being folded
+## into the stage key it shares with the attempt that failed.
+func _begin_planning_beat() -> void:
+	_planning_beat_id += 1
+	_shop_revision_id += 1
+
+## The shelf changed: a reroll replaced it, or a purchase consumed an offer.
+func _bump_shop_revision() -> void:
+	_shop_revision_id += 1
+
+## Offers still on the shelf. Distinguishes the initial presentation of a shop
+## from the depleted state a decision can also be asked in.
+##
+## A purchased slot is replaced by a blank placeholder rather than removed, so the
+## count has to key on the offer's identity; counting non-null entries reports a
+## sold-out shelf as full.
+func _shop_offers_remaining() -> int:
+	if Shop == null or Shop.state == null:
+		return 0
+	var remaining: int = 0
+	for offer: ShopOffer in Shop.state.offers:
+		if offer != null and String(offer.id).strip_edges() != "":
+			remaining += 1
+	return remaining
+
+func _play_two_stage_round() -> Dictionary:
+	_begin_planning_beat()
+	return await super._play_two_stage_round()
 
 func _second_fight_result(resolved: bool) -> String:
 	# The inherited classifier falls back to "shop" whenever the phase returns to
@@ -524,6 +567,9 @@ func _buy_best_two_stage_offer(buy_index: int) -> String:
 			var gold_before: int = int(Economy.gold)
 			var clicked: bool = await _click_shop_slot(slot)
 			await _settle_frames(3)
+			if clicked:
+				# The shelf is narrower now, so the next decision sees a new revision.
+				_bump_shop_revision()
 			_append_event("shop_purchase", {
 				"buy_index": buy_index,
 				"slot": slot,
@@ -555,6 +601,8 @@ func _click_reroll() -> bool:
 	var gold_before: int = int(Economy.gold)
 	var clicked: bool = await _click_button(button, "Jev reroll")
 	await _settle_frames(4)
+	if clicked:
+		_bump_shop_revision()
 	_append_event("reroll", {
 		"gold_before": gold_before,
 		"gold_after": int(Economy.gold),
@@ -830,6 +878,9 @@ func _plan_state() -> Dictionary:
 		"stake_unit": int(Economy.stake_unit),
 		"stake_rank": int(Economy.stake_rank),
 		"recent_fights": _recent_fights.duplicate(true),
+		"planning_beat_id": _planning_beat_id,
+		"shop_revision_id": _shop_revision_id,
+		"shop_offers_remaining": _shop_offers_remaining(),
 		"stage_retry_count": int(_same_stage_retries.get("%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)], 0)),
 		# Traits count unique units, and only the fielded board fights. Reporting the
 		# benched units' traits as if they were active is what let "this offer activates
@@ -1186,6 +1237,8 @@ func _append_event(kind: String, payload: Dictionary) -> void:
 		"kind": kind,
 		"chapter": int(GameState.chapter),
 		"stage_in_chapter": int(GameState.stage_in_chapter),
+		"planning_beat_id": _planning_beat_id,
+		"shop_revision_id": _shop_revision_id,
 		"buckets": int(Economy.blood_buckets),
 		"payload": payload,
 	}

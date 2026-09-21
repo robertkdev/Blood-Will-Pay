@@ -156,6 +156,10 @@ def _experience(events: list[dict], observations: list[dict], decisions: list[di
             "index": observation.get("index"),
             "chapter": state.get("chapter"),
             "round": state.get("stage_in_chapter"),
+            "planning_beat_id": state.get("planning_beat_id"),
+            "shop_revision_id": state.get("shop_revision_id"),
+            "buy_index": state.get("buy_index"),
+            "offers_remaining": state.get("shop_offers_remaining"),
             "affordable_offers": len(offers),
             "flex_offers": len(flex),
             "vertical_offers": len(vertical),
@@ -166,6 +170,29 @@ def _experience(events: list[dict], observations: list[dict], decisions: list[di
             "top_probability": top_probability,
             "live_options": live_options,
         })
+
+    # A planning beat is one shop visit, and one visit can ask several purchase
+    # decisions as the shelf narrows. Availability is a property of the first
+    # presentation of a beat: averaging across the depleted states that follow
+    # purchases reports the shelf as emptier than the player ever found it.
+    # The beat id comes from the harness; the (chapter, stage) fallback only
+    # applies to transcripts recorded before that field existed, and it cannot
+    # tell a replayed stage apart from the attempt that failed.
+    def _beat_key(row: dict) -> tuple:
+        beat = row.get("planning_beat_id")
+        if isinstance(beat, int):
+            return ("beat", beat)
+        return ("stage", row.get("chapter"), row.get("round"))
+
+    first_row_by_beat: dict[tuple, dict] = {}
+    for row in shop_rows:
+        key = _beat_key(row)
+        current = first_row_by_beat.get(key)
+        if current is None or int(row.get("index") or 0) < int(current.get("index") or 0):
+            first_row_by_beat[key] = row
+    presentation_indexes = {int(row.get("index") or 0) for row in first_row_by_beat.values()}
+    presentation_rows = [row for row in shop_rows if int(row.get("index") or 0) in presentation_indexes]
+    depleted_rows = [row for row in shop_rows if int(row.get("index") or 0) not in presentation_indexes]
 
     rounds = [event.get("payload", {}) for event in events if event.get("kind") == "round_timing"]
     wall = [float(item["wall_seconds"]) for item in rounds if isinstance(item.get("wall_seconds"), (int, float))]
@@ -205,15 +232,27 @@ def _experience(events: list[dict], observations: list[dict], decisions: list[di
     decisions_per_round = [int(item["decisions"]) for item in rounds if isinstance(item.get("decisions"), int)]
 
     live_counts = [row["live_options"] for row in shop_rows if isinstance(row["live_options"], int)]
-    shops_with_vertical = sum(1 for row in shop_rows if row["vertical_offers"] > 0)
-    shops_with_two_flex = sum(1 for row in shop_rows if row["flex_offers"] >= 2)
-    shops_with_one_offer = sum(1 for row in shop_rows if row["affordable_offers"] <= 1)
+    presentation_live_counts = [
+        row["live_options"] for row in presentation_rows if isinstance(row["live_options"], int)
+    ]
+    shops_with_vertical = sum(1 for row in presentation_rows if row["vertical_offers"] > 0)
+    shops_with_two_flex = sum(1 for row in presentation_rows if row["flex_offers"] >= 2)
+    shops_with_one_offer = sum(1 for row in presentation_rows if row["affordable_offers"] <= 1)
     return {
-        "shops_observed": len(shop_rows),
+        # Beats, not decisions: one visit is one shop even when it asks three
+        # purchase questions, and a replayed stage is a second visit.
+        "shops_observed": len(first_row_by_beat),
+        "shop_decisions_observed": len(shop_rows),
+        "depleted_shop_decisions": len(depleted_rows),
         "shops_with_a_tier_completing_offer": shops_with_vertical,
         "shops_with_two_or_more_flex_offers": shops_with_two_flex,
         "shops_with_at_most_one_affordable_offer": shops_with_one_offer,
         "median_live_options": _percentile([float(value) for value in live_counts], 0.5) if live_counts else None,
+        "median_live_options_at_presentation": (
+            _percentile([float(value) for value in presentation_live_counts], 0.5)
+            if presentation_live_counts
+            else None
+        ),
         "mean_live_options": round(statistics.fmean(live_counts), 2) if live_counts else None,
         "round_wall_seconds_median": _percentile(wall, 0.5),
         "round_wall_seconds_p95": _percentile(wall, 0.95),
@@ -275,13 +314,21 @@ def _audit(summary: dict, events: list[dict], observations: list[dict]) -> dict:
     shop_decisions = len(purchases) + len(passes)
     # A shop is a planning beat, not a purchase attempt: one shop can hold several buy
     # decisions. Kept separate so "shops" and "decisions" cannot be confused.
+    # The beat id is explicit; (chapter, stage) is only a fallback for transcripts
+    # recorded before it existed, and it merges a replayed stage into one beat.
+    def _event_beat(event: dict) -> tuple:
+        beat = event.get("planning_beat_id")
+        if isinstance(beat, int):
+            return ("beat", beat)
+        return ("stage", event.get("chapter"), event.get("stage_in_chapter"))
+
     shop_beats = {
-        (event.get("chapter"), event.get("stage_in_chapter"))
+        _event_beat(event)
         for event in events
         if event.get("kind") in ("shop_purchase", "shop_pass")
     }
     purchase_beats = {
-        (event.get("chapter"), event.get("stage_in_chapter"))
+        _event_beat(event)
         for event in events
         if event.get("kind") == "shop_purchase"
     }
@@ -304,9 +351,17 @@ def _audit(summary: dict, events: list[dict], observations: list[dict]) -> dict:
 
     affordable_counts = []
     zero_affordable_shops = 0
+    presentation_beats: set = set()
     for observation in observations:
         if observation.get("kind") != "shop_buy":
             continue
+        state = observation.get("state", {})
+        beat = state.get("planning_beat_id")
+        key = ("beat", beat) if isinstance(beat, int) else ("stage", state.get("chapter"), state.get("stage_in_chapter"), observation.get("index"))
+        if key in presentation_beats:
+            continue
+        # Only the first presentation of a beat says what the shelf offered.
+        presentation_beats.add(key)
         candidates = observation.get("candidates", [])
         affordable = [item for item in candidates if item.get("affordable") is not False and item.get("id") != "pass"]
         affordable_counts.append(len(affordable))
@@ -336,6 +391,7 @@ def _audit(summary: dict, events: list[dict], observations: list[dict]) -> dict:
     ]
     return {
         "shops": len(shop_beats),
+        "shop_presentations": len(presentation_beats),
         "beats_with_no_purchase": len(shop_beats - purchase_beats),
         "shop_decisions": shop_decisions,
         "purchases": len(purchases),
@@ -457,8 +513,8 @@ def _findings(
         rounds = summary.get("rounds") or []
         findings.append({
             "id": "run-ended-in-loss",
-            "severity": "medium",
-            "title": "A rule-following player still lost the run",
+            "severity": "info",
+            "title": "The run ended in a loss",
             "evidence": {
                 "chapter": summary.get("final_chapter"),
                 "stage_in_chapter": summary.get("final_stage_in_chapter"),
@@ -466,7 +522,7 @@ def _findings(
                 "peak_bankroll": summary.get("peak_bankroll"),
                 "final_board": rounds[-1].get("board_after") if rounds else None,
             },
-            "recommendation": "Compare the losing board against the encounter budget for that chapter and stage; a prepared board losing there is a difficulty or information problem.",
+            "recommendation": "One loss is an outcome, not a verdict. Compare the losing board against the encounter budget for that chapter and stage, and treat it as a difficulty or information problem only if prepared boards lose there repeatedly.",
         })
     if audit["negative_expected_value_wagers"]:
         findings.append({
@@ -515,12 +571,27 @@ def _findings(
             "recommendation": "A spend that leaves one bucket forces the minimum wager to be all-in. Check the level price against the income at that chapter, or let a zero wager be selectable.",
         })
     if audit["same_stage_retries"]:
+        # A replayed stage is what the transcript shows. Why it replayed is in the
+        # recorded fight result: a loss was charged in full, and only a draw refunds
+        # the wager. Blaming a free refund for a stage the run lost on is wrong.
+        retry_results = sorted({
+            str(item.get("fight_result", "")) for item in audit["same_stage_retries"]
+        } - {""})
         findings.append({
             "id": "stage-replayed",
             "severity": "high",
             "title": "The run had to replay a stage it could not resolve",
-            "evidence": audit["same_stage_retries"],
-            "recommendation": "A draw refunds the whole wager, so replaying the same stage costs nothing and can loop forever. Escalate the encounter or count draws against a retry budget.",
+            "evidence": {
+                "retries": audit["same_stage_retries"],
+                "fight_results": retry_results,
+            },
+            "recommendation": (
+                "The recorded results for these replays were %s. A loss is charged in full, so this stage was "
+                "paid for each attempt; only a draw refunds the wager. Check whether the board could convert the "
+                "stage at all before treating the repeats as a free loop." % ", ".join(retry_results)
+                if retry_results
+                else "Read the fight result for each replay before attributing the repeat to a refunded draw."
+            ),
         })
     if combat.get("draws"):
         findings.append({
@@ -638,13 +709,22 @@ def _findings(
                 "recommendation": "If a vertical is meant to be a reward the game hands you, the shop has to produce tier-completing pieces at this band; otherwise the payoff is unreachable for an average player.",
             })
         else:
+            share = vertical_shops / shops
             findings.append({
                 "id": "vertical-reachable",
                 "severity": "info",
-                "title": "The shop offered a trait-completing piece in most planning beats",
+                # State the measurement. The gate for this branch is 25%, so "most"
+                # was a claim the number never supported.
+                "title": "The shop offered a trait-completing piece in %d of %d planning beats (%.0f%%)" % (
+                    vertical_shops,
+                    shops,
+                    share * 100.0,
+                ),
                 "evidence": {
                     "shops_observed": shops,
                     "shops_with_a_tier_completing_offer": vertical_shops,
+                    "share_of_planning_beats": round(share, 3),
+                    "branch_threshold": 0.25,
                 },
                 "recommendation": "Keep this rate: it is what makes the vertical payoff discoverable.",
             })
