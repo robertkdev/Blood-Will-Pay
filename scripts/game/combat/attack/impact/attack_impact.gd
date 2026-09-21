@@ -3,6 +3,7 @@ class_name AttackImpact
 
 const Health := preload("res://scripts/game/stats/health.gd")
 const BuffTags := preload("res://scripts/game/abilities/buff_tags.gd")
+const Overtime := preload("res://scripts/game/combat/overtime.gd")
 
 var state: BattleState
 var rng: RandomNumberGenerator
@@ -13,6 +14,15 @@ var dmgcalc: DamageCalculator
 var shields: ShieldService
 var redirect: AbsorbRedirector
 var lifesteal: LifestealService
+
+## Overtime escalation has to reach every damage source or it silently favours the
+## builds whose damage happens to route through one entry point. Both entry points
+## below scale by this, and the trait/item amp diagnostics keep reporting only the
+## trait or item that caused them.
+func _overtime_multiplier() -> float:
+	if state == null:
+		return 1.0
+	return Overtime.damage_multiplier(float(state.elapsed_time))
 
 func configure(_state: BattleState, _rng: RandomNumberGenerator, _hooks, _shield_service: ShieldService) -> void:
 	state = _state
@@ -126,6 +136,7 @@ func apply_hit(source_team: String, source_index: int, src: Unit, tgt_team: Stri
 				result.amp_output_kind = String(amp_meta.get("kind", "damage_amp"))
 				result.amp_source_team = String(amp_meta.get("source_team", source_team))
 				result.amp_source_index = int(amp_meta.get("source_index", source_index))
+	total = max(0.0, total * _overtime_multiplier())
 	var dealt_pre: float = max(0.0, total)
 	var dealt_pre_i: int = int(max(0.0, round(dealt_pre)))
 
@@ -221,6 +232,13 @@ func apply_ability_hit(source_team: String, source_index: int, src: Unit, tgt_te
 			magic_base = half
 		_:
 			true_base = max(0.0, float(amount))
+
+	# Overtime scales the incoming components before mitigation so the recorded
+	# component breakdown and the post-mitigation total stay consistent.
+	var overtime_multiplier: float = _overtime_multiplier()
+	phys_base *= overtime_multiplier
+	magic_base *= overtime_multiplier
+	true_base *= overtime_multiplier
 
 	# Total after mitigation (percent armor/MR then percent DR)
 	var total: float = dmgcalc.from_components(phys_base, magic_base, true_base, src, tgt)
