@@ -51,8 +51,8 @@
       "one_piece_away": "A trait breakpoint is a strong purchase, not an automatic one. Check that it survives the swap, and keep the two-bucket floor."
     },
     "force": {
-      "rule": "Forcing is the plan. When the shop does not offer a piece of the trait you are chasing, reroll to find one. Spend up to two rerolls per planning beat on the chase, and stop when that budget is spent even if nothing arrived.",
-      "when_not_to_force": "Reroll only when the shop offers nothing belonging to your chased trait. Never reroll past the two-per-beat budget, and never leave fewer than two buckets."
+      "rule": "Forcing is the plan. Reroll to find a piece of the trait you are chasing even when the shop already offers something usable. Spend up to two rerolls per planning beat on the chase, and stop when that budget is spent even if nothing arrived.",
+      "when_not_to_force": "Reroll whenever a reroll is affordable, regardless of whether the current offers are usable. Never reroll past the two-per-beat budget, and never leave fewer than two buckets."
     }
   },
   "level": {

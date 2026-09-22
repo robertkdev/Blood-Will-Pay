@@ -522,46 +522,64 @@ fast sweep, with the real planning timer; both arms on the same harness build an
 same neutral candidate list, differing only in the `playstyle.flex` and
 `playstyle.force` text (`tools/jev/policy/variants/force_first.json`).
 
+Two forcing variants were played, because the first one turned out never to force:
+`commit` rerolls only when the shop offers nothing for the chased trait, and
+`force-always` rerolls whenever a reroll is affordable, usable offers or not.
+
 | Arm | Seed | Terminal | Battles | Ended at | Buys | Passes | Rerolls |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | flex | 4401 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
 | flex | 7717 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
 | flex | 90210 | loss | 10 | 2:2 | 11 | 5 | 0 |
-| commit-to-trait | 4401 | loss | 11 | 2:3 | 12 | 5 | 0 |
-| commit-to-trait | 7717 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
-| commit-to-trait | 90210 | loss | 5 | 1:4 | 2 | 3 | 0 |
+| commit | 4401 | loss | 11 | 2:3 | 12 | 5 | 0 |
+| commit | 7717 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
+| commit | 90210 | loss | 5 | 1:4 | 2 | 3 | 0 |
+| force-always | 4401 | loss | 8 | 2:2 | 9 | 3 | 1 |
+| force-always | 7717 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
+| force-always | 90210 | loss | 5 | 1:4 | 2 | 3 | 0 |
 
-**Result: null.** Both arms reached chapter 2 in exactly one of three seeds. The
-single-run difference that prompted the comparison - the variant reaching 2:3 while
-flex stalled at 1:4 on seed 4401, with 11 battles against 6 - did not replicate on
-7717 (both arms identical at 1:4) or 90210 (where flex went *further*, 2:2 against
-1:4). A one-run lead at n=1 per arm was noise.
+| Arm | Reached chapter 2 | Rerolls | Battles |
+| --- | --- | --- | --- |
+| flex | 1 of 3 | 0 | 6, 6, 10 |
+| commit | 1 of 3 | 0 | 11, 6, 5 |
+| force-always | 1 of 3 | 1 | 8, 6, 5 |
 
-### Forcing was available and never warranted
+**Result: null, and the seed dominates the stance.** Every arm reached chapter 2 in
+exactly one of three seeds. The single-run difference that prompted the comparison -
+the variant reaching 2:3 while flex stalled at 1:4 on seed 4401 - did not replicate;
+on 7717 and 90210 the arms are identical or flex goes further.
 
-Zero rerolls appear in all six runs, including the arm instructed to chase. That is
-not a blocked option: an affordable reroll was on the table in **15 of 50 shop
-decisions** (30%), whenever the reserve could pay for it and still hold the floor.
+The more useful reading is in the per-seed rows. On seed 7717 all three arms produced
+the *same* run (stage stall at 1:4, six battles, three buys, one pass). On 90210 the
+two committing arms were identical to each other and flex differed. Only on 4401 did
+all three diverge. With five offers per shop at chapter 1-2 prices, the affordable
+purchase is usually the same one under any of these stances, so the encounter seed
+decides far more than the policy does.
 
-The chase rule in the variant is conditional - reroll only when the shop offers
-nothing belonging to the chased trait - and with five offers per shop and a
-tier-completing piece appearing in about half of all planning beats, that condition
-was rarely met. Which is itself the finding: at chapter 1-2 prices, with this shop
-width, **forcing is rarely compelled.** Flex is not merely the safe default, it is
-usually the available one. That supports the design intent as written; it does not
-yet show forcing being punished, because a condition that never fires cannot be
-punished.
+### Forcing happens, and costs nothing measurable
 
-To test the other half of the intent - that a paid chase is a real gamble - the
-variant has to force on beats where a usable offer exists, not only where none does.
-That is a different experiment and has not been run.
+The first variant never forced at all. The chase rule was conditional on the shop
+offering nothing usable, and with a tier-completing piece appearing in about half of
+all beats that condition almost never held - zero rerolls across six runs.
+
+`force-always` removes the condition, and it works: seed 4401 rerolled once, the first
+forced reroll in this whole investigation. It changed nothing measurable. That run
+ended at 2:2 with eight battles, where the conditional variant reached 2:3 with
+eleven; both reached chapter 2. On the other two seeds it behaved identically to the
+conditional variant.
+
+So at chapter 1-2 prices: flex is the reliable play, forcing is rarely *compelled*,
+and when it is exercised it is neither punished nor rewarded at this sample. The
+design intent says a paid chase should be a gamble; nothing here contradicts that, but
+one forced reroll in nine runs cannot confirm it either.
 
 ### Caveat on this sample
 
-Three seeds per arm is small, and the clock still decides fights in every one of
-these runs (1 to 5 clock-decided fights out of 6 to 12). Strategy differences are
-being measured through an outcome layer that is itself unresolved, so treat the null
-as "no effect detectable at this sample" rather than "no effect".
+Three seeds across three arms is nine runs, and the clock still decides fights in
+every one of them (1 to 5 clock-decided fights out of 6 to 12). Strategy differences
+are being measured through an outcome layer that is itself unresolved, so treat this
+null as "no effect detectable at this sample" rather than "no effect". The runs are
+also a fast sweep at `time_scale = 8.0`, not shipped speed.
 
 ## Runtime notes
 
