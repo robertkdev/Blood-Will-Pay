@@ -1724,6 +1724,8 @@ func _stage_transition_arena(generation: int) -> void:
 		var source_rect: Rect2 = phase_transition.get_planning_commit_rect() if phase_transition != null else planning_area.get_global_rect()
 		arena_bridge.enter_arena(player_views, enemy_views, false, true, target_rect, source_rect)
 		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
+	if phase_transition != null:
+		phase_transition.prepare_entry_presentation()
 	var tree: SceneTree = parent.get_tree()
 	if tree != null:
 		tree.process_frame.connect(Callable(self, "_mark_transition_preparation_ready").bind(generation), CONNECT_ONE_SHOT)
@@ -3778,6 +3780,7 @@ func _prepare_transition_combat_layout(preserve_countdown_context: bool = false)
 		arena_container.set_meta("use_full_combat_bounds", true)
 		_apply_environmental_pressure_composition(0, _reduced_motion_enabled(), 0.0, 0)
 		_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary", true)
+		phase_transition.prepare_entry_presentation()
 		return
 	for path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",

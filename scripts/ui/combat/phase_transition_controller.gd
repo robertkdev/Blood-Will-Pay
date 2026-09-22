@@ -324,17 +324,29 @@ func capture_entry_target_rect() -> void:
 		_arena_container.set_meta("field_camera_source", _camera_focus)
 		_arena_container.set_meta("field_camera_target", _camera_target)
 
+func prepare_entry_presentation() -> void:
+	if _arena_container == null or _state != TransitionState.COUNTDOWN:
+		return
+	for child: Node in _arena_container.get_children():
+		if not child is Control or child.name == "ArenaUnits" or child.name == "GothicArenaSurface":
+			continue
+		var control: Control = child as Control
+		var already_captured: bool = false
+		for record: Dictionary in _surface_records:
+			if _record_control(record) == control:
+				already_captured = true
+				break
+		if not already_captured:
+			_surface_records.append({"node_ref": weakref(control), "alpha": control.modulate.a})
+		_set_alpha(control, 0.0)
+
 func start_entry_crossfade() -> void:
 	if _host == null or _state != TransitionState.COUNTDOWN:
 		return
 	_kill_tween()
+	prepare_entry_presentation()
 	_state = TransitionState.ENTRY_CROSSFADE
 	_capture_records(_planning_records, _planning_grid_controls())
-	var surface_controls: Array[Control] = []
-	for child: Node in _arena_container.get_children():
-		if child is Control and child.name != "ArenaUnits" and child.name != "GothicArenaSurface":
-			surface_controls.append(child as Control)
-	_capture_records(_surface_records, surface_controls)
 	if _countdown_label != null:
 		_countdown_label.visible = false
 	if _overlay != null:

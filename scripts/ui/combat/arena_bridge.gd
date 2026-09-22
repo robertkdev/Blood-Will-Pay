@@ -419,7 +419,10 @@ func configure_engine_arena(manager: CombatManager, _player_views: Array[UnitSlo
         return
     _ensure_position_signal(manager)
     Trace.step("ArenaBridge.configure_engine_arena: begin")
-    _sync_container_to_planning_rect()
+    # Prepare logical combat bounds without presenting the final camera pose.
+    # The phase transition owns the visual container throughout the push-in.
+    if not _continuous_entry_active:
+        _sync_container_to_planning_rect()
     var ts: float = float(tile_size)
     # Initial positions from current tile centers
     var ppos: Array[Vector2] = []

@@ -31,6 +31,7 @@ func _run() -> void:
 	var planning: Control = combat.get("planning_area") as Control
 	var planning_rect: Rect2 = planning.get_global_rect()
 	var floor_surface: Control = combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as Control
+	var planning_floor_rect: Rect2 = floor_surface.get_global_rect()
 	var source_floor_inverse: Transform2D = floor_surface.get_global_transform_with_canvas().affine_inverse()
 	var stage_heading: Control = combat.get_node("MarginContainer/VBoxContainer/StageLabel") as Control
 	var heading_visible: bool = stage_heading.visible
@@ -39,7 +40,27 @@ func _run() -> void:
 	_expect(planning.get_global_rect().position.distance_to(planning_rect.position) < 1.0, "entry moved the planning board before the field transition")
 	_expect(planning.get_global_rect().size.distance_to(planning_rect.size) < 1.0, "entry reflowed the planning layout")
 	_expect(manager.get_engine() == null, "simulation was prepared during countdown")
-	_expect(await _wait_for_combat_active(5.0), "entry did not reach combat")
+	var entry_deadline: int = Time.get_ticks_msec() + 5000
+	var inspected_preparation: bool = false
+	while Time.get_ticks_msec() < entry_deadline:
+		# Inspect each presented preparation frame, including the interval between
+		# engine setup and entry. Endpoint checks cannot catch a one-frame flash.
+		if DisplayServer.get_name() == "headless":
+			await get_tree().process_frame
+		else:
+			await RenderingServer.frame_post_draw
+		if String(transition.call("get_state_name")) == "countdown":
+			var current_floor_rect: Rect2 = floor_surface.get_global_rect()
+			_expect(current_floor_rect.position.distance_to(planning_floor_rect.position) <= 1.0 and current_floor_rect.size.distance_to(planning_floor_rect.size) <= 1.0, "preparation flashed a different floor pose before the zoom")
+			if bool(controller.get("_arena_prepared_for_transition")):
+				inspected_preparation = true
+				for node_name: String in ["CombatThreatBoundary", "CombatExchangeFocus"]:
+					var readout: Control = floor_surface.get_parent().get_node_or_null(node_name) as Control
+					_expect(readout == null or not readout.is_visible_in_tree() or readout.modulate.a <= 0.01, "combat readout flashed before the zoom: %s" % node_name)
+		elif String(transition.call("get_state_name")) == "combat":
+			break
+	_expect(inspected_preparation, "entry skipped the preparation-frame witness")
+	_expect(String(transition.call("get_state_name")) == "combat", "entry did not reach combat")
 	var gate: Dictionary = controller.call("get_pre_unfreeze_gate_snapshot") as Dictionary
 	var before: Dictionary = gate.get("last_entry", {}) as Dictionary
 	var after: Dictionary = gate.get("released_entry", {}) as Dictionary
