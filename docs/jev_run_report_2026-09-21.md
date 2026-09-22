@@ -702,6 +702,58 @@ What this does establish is the thing strategy work needed: a reproducible, same
 opponent that Jev currently loses to, with a measured gap to close rather than an
 aggregate win rate to argue about.
 
+## Second policy iteration: buying up, tested and reverted
+
+Reading the baseline's actual code rather than guessing at its behaviour turned up a
+concrete difference. Its purchase scoring is
+`cost * 80 + role_score - 35 if duplicate - 30 if second support`, so it **buys the
+most expensive affordable unit**, weighted by the role the board lacks.
+
+That is not an arbitrary preference. `scripts/game/units/unit_scaler.gd` multiplies
+`max_hp`, `attack_damage`, `armor`, `magic_resist` and the rest by **1.5 per cost
+step**, so a cost-3 body carries **2.25x** a cost-1's health and damage. The shipped
+policy said to buy "the cheapest real power on the shelf", which is the opposite of
+what the stats say.
+
+So the policy was changed to say cost is power and to prefer the strongest body you
+can afford. Measured over the same six seeds:
+
+| Seed | Previous policy | Buying up |
+| --- | --- | --- |
+| 4401 | 2:2, 12 battles | 1:4, 6 battles |
+| 7717 | 2:2, 9 battles | 2:3, 11 battles |
+| 90210 | 1:4, 5 battles | 1:4, 6 battles |
+| 11111 | 2:3, 10 battles | 1:4, 6 battles |
+| 22222 | 1:4, 6 battles | 2:3, 13 battles |
+| 33333 | 1:4, 6 battles | 1:4, 6 battles |
+
+| Arm | Reached chapter 2 |
+| --- | --- |
+| previous policy | **3 of 6** |
+| buying up | 2 of 6 |
+
+**The rule is factually right and it measured worse.** So it was reverted: the shipped
+policy is back to the wording with the better record. Two seeds improved sharply and
+two got sharply worse, which is what a six-seed sample looks like when the effect is
+smaller than the variance - three-versus-two is one seed flipping, and neither number
+settles anything.
+
+The honest summary is that stating a true fact in the policy did not make Jev play
+better, and the reason is not known. It may be that "prefer the strongest body"
+competes with the role and trait rules and the model resolves that badly; it may be
+noise. Either way, shipping a change that measured worse on the declared set would
+have been the wrong call, so it is not shipped.
+
+### A harness defect this surfaced
+
+One of those six runs ended in a technical failure, not a result: a synthetic mouse
+event missed a shop slot that was rendered, enabled and `mouse_filter 0`. The
+inherited click path records that as a failure immediately, which makes the whole run
+unusable. `_click_shop_slot` now retries a bounded three times and keeps only the
+final attempt's failure, so one dropped event cannot invalidate a run while a slot
+that genuinely cannot be clicked still fails loudly. Re-running seed 33333 with the
+retry in place completed cleanly, and the run in the table above is that re-run.
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would

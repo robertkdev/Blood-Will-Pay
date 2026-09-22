@@ -27,6 +27,12 @@ const CAMPAIGN_TARGET_CHAPTER: int = 2
 const CAMPAIGN_TARGET_ROUND: int = 4
 const CAMPAIGN_MAX_BATTLES: int = 30
 const MAX_SAME_STAGE_RETRIES: int = 3
+## A synthetic mouse event occasionally misses a control that is visibly present and
+## enabled - observed once across six seeds, on a shop slot, with the card rendered and
+## mouse_filter 0. That is an input-layer artifact rather than play, but the inherited
+## click path records it as a technical failure and the whole run becomes unusable. Each
+## attempt is still a real engine-parsed mouse event; only the retries are new.
+const SHOP_CLICK_ATTEMPTS: int = 3
 const MAX_REROLLS_PER_SHOP: int = 3
 const WAGER_PRESET_SHARES: Array[float] = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
 const COMBAT_LOG_KEYWORDS: Array[String] = [
@@ -624,6 +630,26 @@ func _reroll_button() -> Button:
 		if button != null and button.text.strip_edges().begins_with("Reroll"):
 			return button
 	return null
+
+## Bounded retry around the inherited shop-slot click. Only the last attempt's failure
+## is kept, so a single dropped mouse event does not turn a valid run into a technical
+## failure - but a slot that genuinely cannot be clicked still fails loudly.
+func _click_shop_slot(slot_index: int) -> bool:
+	for attempt: int in range(SHOP_CLICK_ATTEMPTS):
+		var failures_before: int = _failures.size()
+		var clicked: bool = await super._click_shop_slot(slot_index)
+		if clicked:
+			if attempt > 0:
+				_append_event("shop_click_retry", {"slot": slot_index, "attempt": attempt + 1})
+			return true
+		if attempt + 1 >= SHOP_CLICK_ATTEMPTS:
+			return false
+		# Discard this attempt's recorded failure: it is an input miss we are retrying,
+		# not a finding. The final attempt's failure is left in place.
+		while _failures.size() > failures_before:
+			_failures.remove_at(_failures.size() - 1)
+		await _settle_frames(4)
+	return false
 
 func _click_reroll() -> bool:
 	var button: Button = _reroll_button()
