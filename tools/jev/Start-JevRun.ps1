@@ -12,6 +12,10 @@ param(
     [ValidateSet("jev", "heuristic")]
     [string] $Mode = "jev",
 
+    # Rule set to play. Defaults to the shipped policy; pass a variant under
+    # policy\variants\ to compare a different stance on identical seeds.
+    [string] $Rules = "",
+
     [string] $Scene = "tests/agent/JevRunHarness.tscn",
 
     [string] $ProjectPath = "",
@@ -45,7 +49,15 @@ if (-not (Test-Path -LiteralPath $GodotPath -PathType Leaf)) {
     throw "Pinned Godot console binary not found: $GodotPath"
 }
 
-$rulesPath = Join-Path $PSScriptRoot "policy\jev_run_rules.json"
+$rulesPath = if ([string]::IsNullOrWhiteSpace($Rules)) {
+    Join-Path $PSScriptRoot "policy\jev_run_rules.json"
+} else {
+    $candidate = Join-Path $PSScriptRoot "policy\$Rules"
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+        throw "Policy variant not found: $candidate"
+    }
+    (Resolve-Path -LiteralPath $candidate).Path
+}
 $runnerPath = Join-Path $PSScriptRoot "run_jev_scene.mjs"
 $controllerPath = Join-Path $PSScriptRoot "jev_run_controller.py"
 $controllerPython = Join-Path $env:USERPROFILE ".codex\playtest-judgment\.venv\Scripts\python.exe"

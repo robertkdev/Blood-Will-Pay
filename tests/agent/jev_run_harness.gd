@@ -1209,7 +1209,11 @@ func _shop_candidates() -> Array[Dictionary]:
 		candidates.append({
 			"id": "reroll",
 			"label": "Reroll the shop for %d buckets." % reroll_price,
-			"effect": "Replace every current offer with a new roll. This is the gamble: it pays only when the new roll beats the flex pick in front of you. Leaves %d buckets." % (int(Economy.gold) - reroll_price),
+			# Neutral on purpose. This used to read "This is the gamble: it pays only
+			# when the new roll beats the flex pick in front of you", which pre-judged
+			# the action inside the candidate itself. Every policy variant then produced
+			# identical decisions, so the stance being compared never reached the model.
+			"effect": "Replace every current offer with a new roll. Costs %d buckets and leaves %d. What arrives is not known in advance." % [reroll_price, int(Economy.gold) - reroll_price],
 			"affordable": true,
 			"cost": reroll_price,
 		})
