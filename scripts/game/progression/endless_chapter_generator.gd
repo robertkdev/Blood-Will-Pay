@@ -22,7 +22,14 @@ const TRAIT_COUNT_PRESSURE := 2.0
 
 const DEFAULT_CREEP_REWARDS: Dictionary = {
 	"pool_path": "res://data/creeps/reward_pools/default.tres",
-	"rolls_per_kill": 1,
+	# Each chapter has exactly one creep stage and the reward fires roughly once per
+	# creep stage (measured with the reward debug log), so one roll per kill yields
+	# about 0.58 components per chapter. The pacing target is eight completed items -
+	# sixteen components - by chapter 10, so ten creep stages need about 1.6
+	# components each. The pool's per-roll distribution is fixed by the design
+	# document; the roll count is the rate knob the document leaves open. Three rolls
+	# per trigger lands at ~17.5 components by chapter 10.
+	"rolls_per_kill": 3,
 	"only_creeps": true,
 	"source_team": "player",
 }

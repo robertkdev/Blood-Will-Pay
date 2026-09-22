@@ -77,7 +77,10 @@ static var _entries: Dictionary = {
 
 const DEFAULT_CREEP_REWARDS: Dictionary = {
 	"pool_path": "res://data/creeps/reward_pools/default.tres",
-	"rolls_per_kill": 1,
+	# Kept in step with EndlessChapterGenerator: one creep stage per chapter at one
+	# roll per kill cannot supply the item curve the design targets. See the note
+	# there for the arithmetic.
+	"rolls_per_kill": 3,
 	"only_creeps": true,
 	"source_team": "player",
 }

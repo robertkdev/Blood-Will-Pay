@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("campaign")]
+    # campaign stops at the chapter-2 round-4 target; deep keeps playing so the
+    # power curve (capacity, combines, trait ladders, bankroll) is observable.
+    [ValidateSet("campaign", "deep")]
     [string] $Lane = "campaign",
 
     # -1 keeps the shipped random shop rolls; pass a seed only when a run must be
@@ -79,6 +81,7 @@ $env:JEV_MODE = $Mode
 $env:JEV_RUN_SEED = [string]$Seed
 $env:JEV_STARTER = $Starter
 $env:JEV_SPEED = $Speed.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+$env:JEV_LANE = $Lane
 $env:JEV_REAL_TIMER = if ($HoldPlanningTimer) { "0" } else { "1" }
 $env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
 $env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {
@@ -175,3 +178,6 @@ if (Test-Path -LiteralPath $controllerSummaryPath) {
     $result["controller_errors"] = $controllerSummary.errors
 }
 $result | ConvertTo-Json -Depth 5
+# Also written to the run directory so a batch driver does not have to parse the
+# combined stdout of the node runner and this script.
+$result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runDirectory "run_result.json") -Encoding UTF8

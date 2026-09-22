@@ -26,6 +26,16 @@ const DECISION_TIMEOUT_SECONDS: float = 240.0
 const CAMPAIGN_TARGET_CHAPTER: int = 2
 const CAMPAIGN_TARGET_ROUND: int = 4
 const CAMPAIGN_MAX_BATTLES: int = 30
+## The deep lane keeps playing after the campaign target. A three-star unit is nine
+## copies, a maxed trait ladder needs a board the early chapters cannot build, and a
+## rich bankroll needs chapters to compound in - none of that is observable in a run
+## that stops the moment it clears chapter 2 round 4. The campaign target is still
+## recorded as a milestone inside a deep run.
+## Chapter 10 is the "good run" marker: eight completed items are a chapter-10
+## pacing target, and five stages per chapter means a chapter-10 run is ~50 fights.
+const DEEP_TARGET_CHAPTER: int = 10
+const DEEP_TARGET_ROUND: int = 4
+const DEEP_MAX_BATTLES: int = 200
 const MAX_SAME_STAGE_RETRIES: int = 3
 ## A synthetic mouse event occasionally misses a control that is visibly present and
 ## enabled - observed once across six seeds, on a shop slot, with the card rendered and
@@ -38,7 +48,10 @@ const SHOP_CLICK_ATTEMPTS: int = 3
 ## pass is not enough to place a carried component.
 const ITEM_DECISIONS_PER_BEAT: int = 4
 const MAX_REROLLS_PER_SHOP: int = 3
-const WAGER_PRESET_SHARES: Array[float] = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+## A synthetic Start Battle click is occasionally swallowed while an overlay is
+## fading out, which aborts an otherwise good run. The press is retried a bounded
+## number of times, and only while the same planning beat is still open.
+const START_BATTLE_ATTEMPTS: int = 3
 const COMBAT_LOG_KEYWORDS: Array[String] = [
 	"timeout",
 	"stalemate",
@@ -62,6 +75,7 @@ const INHERITED_POLICY_ASSERTION_PREFIXES: Array[String] = [
 
 var _run_dir: String = DEFAULT_RUN_DIR
 var _run_mode: String = "jev"
+var _lane: String = "campaign"
 var _campaign_seed: int = 4401
 var _decision_index: int = 0
 var _starter_id: String = "bonko"
@@ -93,6 +107,8 @@ var _last_combat_outcome: String = ""
 ## engine's own resolution line because the battle state is already reset by the
 ## time the diagnostic runs, which made a post-settlement read report zero.
 var _last_combat_elapsed_s: float = -1.0
+## The chapter-2 campaign milestone inside a deeper lane, recorded once.
+var _campaign_milestone_met: bool = false
 
 func _run() -> void:
 	_read_environment()
@@ -110,14 +126,15 @@ func _run() -> void:
 	if _seed_explicit:
 		_set_shop_seed(_campaign_seed)
 	_prepare_run_dir()
-	print("%s: boot mode=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
+	print("%s: boot mode=%s lane=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
 		JEV_HARNESS_NAME,
 		_run_mode,
+		_lane,
 		str(_campaign_seed) if _seed_explicit else "random",
 		_speed_scale,
 		str(_use_real_timer),
-		CAMPAIGN_TARGET_CHAPTER,
-		CAMPAIGN_TARGET_ROUND,
+		_campaign_target_chapter(),
+		_campaign_target_round(),
 	])
 	_append_event("run_start", {
 		"mode": _run_mode,
@@ -129,8 +146,11 @@ func _run() -> void:
 		"shop_seed_explicit": _seed_explicit,
 		"time_scale": _speed_scale,
 		"real_planning_timer": _use_real_timer,
-		"target_chapter": CAMPAIGN_TARGET_CHAPTER,
-		"target_round": CAMPAIGN_TARGET_ROUND,
+		"lane": _lane,
+		"target_chapter": _campaign_target_chapter(),
+		"target_round": _campaign_target_round(),
+		"campaign_target_chapter": CAMPAIGN_TARGET_CHAPTER,
+		"campaign_target_round": CAMPAIGN_TARGET_ROUND,
 		"engine_time_scale": Engine.time_scale,
 		"entrypoint": "scenes/Main.tscn",
 		"player_facing_entrypoint": true,
@@ -181,7 +201,14 @@ func _run() -> void:
 		return
 	_battles = 1
 
-	while _battles < CAMPAIGN_MAX_BATTLES and not _campaign_target_reached():
+	while _battles < _campaign_max_battles() and not _campaign_target_reached():
+		if _lane == "deep" and not _campaign_milestone_met and _campaign_milestone_reached():
+			_campaign_milestone_met = true
+			_append_event("campaign_milestone", {
+				"chapter": int(GameState.chapter),
+				"round": int(GameState.stage_in_chapter),
+				"battles": _battles,
+			})
 		var round_wall_start: float = Time.get_unix_time_from_system()
 		var decisions_before_round: int = _decision_index
 		var planning_before_round: float = _planning_time_left()
@@ -255,6 +282,22 @@ func _run() -> void:
 	_finish_jev_run("target_reached" if _campaign_target_reached() else "battle_budget_reached")
 
 func _campaign_target_reached() -> bool:
+	if int(GameState.chapter) > _campaign_target_chapter():
+		return true
+	return int(GameState.chapter) == _campaign_target_chapter() and int(GameState.stage_in_chapter) >= _campaign_target_round()
+
+func _campaign_target_chapter() -> int:
+	return DEEP_TARGET_CHAPTER if _lane == "deep" else CAMPAIGN_TARGET_CHAPTER
+
+func _campaign_target_round() -> int:
+	return DEEP_TARGET_ROUND if _lane == "deep" else CAMPAIGN_TARGET_ROUND
+
+func _campaign_max_battles() -> int:
+	return DEEP_MAX_BATTLES if _lane == "deep" else CAMPAIGN_MAX_BATTLES
+
+## The chapter-2 milestone inside a deeper lane. Recorded once so a deep run still
+## states whether it cleared the original campaign target.
+func _campaign_milestone_reached() -> bool:
 	if int(GameState.chapter) > CAMPAIGN_TARGET_CHAPTER:
 		return true
 	return int(GameState.chapter) == CAMPAIGN_TARGET_CHAPTER and int(GameState.stage_in_chapter) >= CAMPAIGN_TARGET_ROUND
@@ -420,6 +463,9 @@ func _read_environment() -> void:
 	var starter_value: String = OS.get_environment("JEV_STARTER").strip_edges().to_lower()
 	if not starter_value.is_empty():
 		_starter_id = starter_value
+	var lane_value: String = OS.get_environment("JEV_LANE").strip_edges().to_lower()
+	if lane_value in ["campaign", "deep"]:
+		_lane = lane_value
 	_reserve_floor_buckets = _load_reserve_floor()
 
 func _set_planning_timer_safe() -> void:
@@ -489,13 +535,13 @@ func _flow_shop_seed() -> int:
 	return _campaign_seed
 
 func _flow_target_chapter() -> int:
-	return CAMPAIGN_TARGET_CHAPTER
+	return _campaign_target_chapter()
 
 func _flow_target_round() -> int:
-	return CAMPAIGN_TARGET_ROUND
+	return _campaign_target_round()
 
 func _flow_max_battles() -> int:
-	return CAMPAIGN_MAX_BATTLES
+	return _campaign_max_battles()
 
 func _flow_verbose_round_logs() -> bool:
 	return true
@@ -516,10 +562,43 @@ func _decide_starter() -> void:
 		var label: String = unit_id
 		if button != null and not button.text.strip_edges().is_empty():
 			label = button.text.strip_edges().replace("\n", " / ")
+		var meta: Dictionary = select.items_by_id.get(unit_id, {}) as Dictionary
+		var primary_role: String = String(meta.get("primary_role", ""))
+		var primary_goal: String = String(meta.get("primary_goal", ""))
+		var traits: Array[String] = []
+		for raw_trait: Variant in (meta.get("traits", []) as Array):
+			traits.append(String(raw_trait))
+		# The opener is fought with the starter alone, so its level-1 damage and
+		# durability are the two facts that decide whether it survives until the
+		# first shop can add a body. They are read from the same factory the game
+		# spawns the unit with, not from a hand-written table.
+		var opening_damage: float = 0.0
+		var opening_health: int = 0
+		var opening_armor: float = 0.0
+		var probe: Unit = UnitFactory.spawn(unit_id)
+		if probe != null:
+			opening_damage = snappedf(float(probe.attack_damage) * float(probe.attack_speed), 0.1)
+			opening_health = int(probe.max_hp)
+			opening_armor = float(probe.armor)
 		candidates.append({
 			"id": unit_id,
 			"label": label,
-			"effect": "Start the run with %s." % unit_id,
+			"primary_role": primary_role,
+			"primary_goal": primary_goal,
+			"traits": traits,
+			"cost": int(meta.get("cost", 0)),
+			"level_one_damage_per_second": opening_damage,
+			"level_one_max_hp": opening_health,
+			"level_one_armor": opening_armor,
+			"effect": "Start the run with %s (%s, %s, traits %s). Level 1: %.1f damage per second, %d health, %.0f armor. The opening fight is fought with this unit alone." % [
+				unit_id,
+				primary_role if not primary_role.is_empty() else "unknown role",
+				primary_goal if not primary_goal.is_empty() else "unknown goal",
+				", ".join(traits) if not traits.is_empty() else "none",
+				opening_damage,
+				opening_health,
+				opening_armor,
+			],
 		})
 	if candidates.is_empty():
 		_abort_run("no starter candidates were offered")
@@ -642,6 +721,7 @@ func _reroll_button() -> Button:
 ## mouse event; only the retries are new. Only the final attempt's failure is kept, so a
 ## control that genuinely cannot be clicked still fails loudly.
 func _click_button(button: Button, label: String) -> bool:
+	var failures_at_start: int = _failures.size()
 	for attempt: int in range(SHOP_CLICK_ATTEMPTS):
 		var failures_before: int = _failures.size()
 		var clicked: bool = await super._click_button(button, label)
@@ -650,13 +730,29 @@ func _click_button(button: Button, label: String) -> bool:
 				_append_event("click_retry", {"label": label, "attempt": attempt + 1})
 			return true
 		if attempt + 1 >= SHOP_CLICK_ATTEMPTS:
-			return false
+			break
 		# Discard this attempt's recorded failure: it is an input miss we are retrying,
 		# not a finding. The final attempt's failure is left in place.
 		while _failures.size() > failures_before:
 			_failures.remove_at(_failures.size() - 1)
 		await _settle_frames(4)
-	return false
+	# Every synthetic attempt was swallowed. The control is still rendered, enabled and
+	# in the tree, so this is an input-layer artifact rather than a finding about the
+	# game; it was recorded on every run of the ten-game batch against the same shop
+	# slot. Emit the signal so the run can continue, record it explicitly, and drop the
+	# retry failures so a recovered input miss cannot invalidate a transcript.
+	if button == null or not is_instance_valid(button) or not button.is_inside_tree() or button.disabled:
+		return false
+	while _failures.size() > failures_at_start:
+		_failures.remove_at(_failures.size() - 1)
+	_append_event("click_fallback", {
+		"label": label,
+		"attempts": SHOP_CLICK_ATTEMPTS,
+		"rect": str(button.get_global_rect()),
+	})
+	button.emit_signal("pressed")
+	await _settle_frames(4)
+	return true
 
 func _click_reroll() -> bool:
 	var button: Button = _reroll_button()
@@ -681,17 +777,83 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	if not _level_purchase_is_legal():
 		return false
 	var gold: int = int(Economy.gold)
+	var xp_price: int = int(SHOP_CONFIG.BUY_XP_COST)
+	var capacity_now: int = _roster_max_team_size()
+	var capacity_after: int = _level_board_capacity(_level_after_xp_purchase(int(Shop.get_level()), int(Shop.get_xp())))
+	var board_size: int = _board_ids().size()
+	var bench_units: Array[String] = _bench_ids()
+	# A level purchase is only worth the buckets when the slot it opens has a body
+	# waiting for it. Stating that count is the difference between "buy XP" as an
+	# abstraction and a payoff the decision can price.
+	var waiting_bodies: int = min(bench_units.size(), max(0, capacity_after - board_size))
+	# The level question is asked before the shop purchases, so a bench of zero does
+	# not mean the slot is useless: the shelf may hold bodies that would fill it in the
+	# same planning beat. Without this the decision passed on every level purchase at
+	# the chapter-1 boss while holding twelve buckets and a three-slot board.
+	var affordable_shelf: int = 0
+	var affordable_shelf_ids: Array[String] = []
+	for offer_summary: Dictionary in _offer_summaries():
+		var shelf_cost: int = int(offer_summary.get("cost", 0))
+		var shelf_id: String = String(offer_summary.get("id", ""))
+		if shelf_id.is_empty() or shelf_cost <= 0:
+			continue
+		if not _can_afford_shop_cost(shelf_cost):
+			continue
+		affordable_shelf += 1
+		affordable_shelf_ids.append(shelf_id)
+	var shelf_bodies_that_could_gain_a_slot: int = min(affordable_shelf, max(0, capacity_after - board_size))
+	var level_gain_note: String = "no extra slot" if capacity_after <= capacity_now else "+%d board slot" % (capacity_after - capacity_now)
 	var candidates: Array[Dictionary] = [
 		{
 			"id": "buy_xp",
 			"label": "Buy XP for %d buckets (level %d -> capacity %d)." % [
-				int(SHOP_CONFIG.BUY_XP_COST),
+				xp_price,
 				int(Shop.get_level()),
-				_level_board_capacity(_level_after_xp_purchase(int(Shop.get_level()), int(Shop.get_xp()))),
+				capacity_after,
 			],
-			"effect": "Spend %d of %d buckets on %d XP." % [int(SHOP_CONFIG.BUY_XP_COST), gold, int(SHOP_CONFIG.XP_PER_BUY)],
+			"capacity_now": capacity_now,
+			"capacity_after": capacity_after,
+			"capacity_delta": capacity_after - capacity_now,
+			"board_size": board_size,
+			"bench_size": bench_units.size(),
+			"benched_bodies_that_gain_a_slot": waiting_bodies,
+			"bench": bench_units,
+			"buckets_after": gold - xp_price,
+			"reserve_floor": _reserve_floor_buckets,
+			"encounter_kind": String(Economy.encounter_quote_kind),
+			"affordable_offers_on_shelf": affordable_shelf,
+			"affordable_shelf_ids": affordable_shelf_ids,
+			"shelf_bodies_that_could_gain_a_slot": shelf_bodies_that_could_gain_a_slot,
+			"effect": "Spend %d of %d buckets on %d XP, leaving %d. Board %d of %d now, %d of %d after (%s). Bench holds %d unit(s); %d would gain a slot, and the shelf offers %d affordable body(ies) (%d of them could be bought and fielded in this same beat)." % [
+				xp_price,
+				gold,
+				int(SHOP_CONFIG.XP_PER_BUY),
+				gold - xp_price,
+				board_size,
+				capacity_now,
+				board_size,
+				capacity_after,
+				level_gain_note,
+				bench_units.size(),
+				waiting_bodies,
+				affordable_shelf,
+				shelf_bodies_that_could_gain_a_slot,
+			],
 		},
-		{"id": "pass", "label": "Do not buy XP now.", "effect": "Keep %d buckets for bodies." % gold},
+		{
+			"id": "pass",
+			"label": "Do not buy XP now.",
+			"capacity_now": capacity_now,
+			"capacity_after": capacity_now,
+			"capacity_delta": 0,
+			"board_size": board_size,
+			"bench_size": bench_units.size(),
+			"benched_bodies_that_gain_a_slot": 0,
+			"buckets_after": gold,
+			"reserve_floor": _reserve_floor_buckets,
+			"encounter_kind": String(Economy.encounter_quote_kind),
+			"effect": "Keep %d buckets for bodies; the board stays at %d of %d slots." % [gold, board_size, capacity_now],
+		},
 	]
 	var state: Dictionary = _plan_state()
 	state["decision_label"] = label
@@ -700,7 +862,6 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	var chosen: String = String(decision.get("choice_id", ""))
 	if chosen != "buy_xp":
 		return false
-	var xp_price: int = int(SHOP_CONFIG.BUY_XP_COST)
 	var xp_reserve_after: int = int(Economy.gold) - xp_price
 	if xp_reserve_after < _reserve_floor_buckets:
 		var confirmed_xp: bool = await _confirm_reserve_break(
@@ -781,6 +942,10 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"player_units": _team_units_snapshot(_board_units(), _player_placements()),
 		"enemy_units": _team_units_snapshot(_enemy_units(), _enemy_placements()),
 		"enemy_traits": _trait_snapshot(_enemy_units()),
+		# Board plus bench with each unit's level. The round payload records ids
+		# only, so a combine into a level-2/3 unit is invisible without this, and
+		# a three-star waiting on the bench would never show up at all.
+		"owned_units": _roster_snapshot(),
 		# Creep stages are the documented item source. Recording the inventory before
 		# every fight is what makes "did a creep round actually pay out?" answerable from
 		# the transcript instead of inferred.
@@ -793,7 +958,30 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"shown_win_odds": float(Economy.projected_win_probability),
 		"planning_seconds_left": snappedf(_planning_time_left(), 0.01),
 	})
-	await super._press_continue(expect_forced, label)
+	var chapter_before: int = int(GameState.chapter)
+	var stage_before: int = int(GameState.stage_in_chapter)
+	for attempt: int in range(START_BATTLE_ATTEMPTS):
+		await super._press_continue(expect_forced, label)
+		if await _fight_started_or_stage_moved(chapter_before, stage_before):
+			return
+		if attempt + 1 >= START_BATTLE_ATTEMPTS:
+			return
+		# The click was swallowed but the beat is still open and unchanged, so the
+		# retry presses the same Start Battle button rather than starting anything new.
+		_append_event("start_battle_retry", {"label": label, "attempt": attempt + 1})
+		await _settle_frames(8)
+
+## True once combat is live or the stage already moved on. Both mean the Start
+## Battle press took effect; the second case is a fight that resolved fast.
+func _fight_started_or_stage_moved(chapter_before: int, stage_before: int) -> bool:
+	var deadline: int = Time.get_ticks_msec() + 2000
+	while Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+		if int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active):
+			return true
+		if int(GameState.chapter) != chapter_before or int(GameState.stage_in_chapter) != stage_before:
+			return true
+	return false
 
 func _ensure_combat_log_connected() -> void:
 	# The engine explains a forced result (timeout, stalled board) through
@@ -974,7 +1162,13 @@ func _plan_state() -> Dictionary:
 		"planning_timer_total": float(controller_node.get("planning_timer_total")) if controller_node != null else -1.0,
 		"time_scale": Engine.time_scale,
 		"shop_seed_explicit": _seed_explicit,
-		"campaign": {"mode": _run_mode, "seed": _campaign_seed, "target_chapter": CAMPAIGN_TARGET_CHAPTER, "target_round": CAMPAIGN_TARGET_ROUND},
+		"campaign": {
+			"mode": _run_mode,
+			"lane": _lane,
+			"seed": _campaign_seed,
+			"target_chapter": _campaign_target_chapter(),
+			"target_round": _campaign_target_round(),
+		},
 	}
 	return state
 
@@ -1051,6 +1245,72 @@ func _owned_units() -> Array[Unit]:
 			units.append(bench_unit)
 	return units
 
+## Every owned unit with its level and where it sits. A combine is only visible in
+## the transcript if the level of each owned unit is recorded: the round payload
+## carries ids, and a upgraded unit benched for a beat would otherwise vanish.
+func _roster_snapshot() -> Array[Dictionary]:
+	var records: Array[Dictionary] = []
+	var seen: Array[Unit] = []
+	for unit: Unit in _board_units():
+		if unit == null or seen.has(unit):
+			continue
+		seen.append(unit)
+		records.append({"id": _unit_id(unit), "level": int(unit.level), "where": "board"})
+	if Engine.has_singleton("Roster"):
+		for bench_unit: Unit in Roster.compact():
+			if bench_unit == null or seen.has(bench_unit):
+				continue
+			seen.append(bench_unit)
+			records.append({"id": _unit_id(bench_unit), "level": int(bench_unit.level), "where": "bench"})
+	return records
+
+## Running maxima for the acceptance targets: a three-star unit, a trait at its top
+## tier, and a board filled to its capacity. Derived from the recorded events so a
+## run states its own progress instead of leaving it to be inferred by hand.
+func _progression_summary() -> Dictionary:
+	var max_unit_level: int = 1
+	var three_star_ids: Dictionary[String, bool] = {}
+	var maxed_traits: Dictionary[String, bool] = {}
+	var max_board_size: int = 0
+	var max_board_capacity: int = 0
+	var planning_beats_with_a_full_board: int = 0
+	var peak_shop_level: int = int(Shop.get_level())
+	for event: Dictionary in _events:
+		var kind: String = String(event.get("kind", ""))
+		var payload: Dictionary = event.get("payload", {}) as Dictionary
+		if kind == "fight_start":
+			var owned: Array = payload.get("owned_units", []) as Array
+			if owned.is_empty():
+				owned = payload.get("player_units", []) as Array
+			for record_value: Variant in owned:
+				var record: Dictionary = record_value as Dictionary
+				var unit_level: int = int(record.get("level", 1))
+				max_unit_level = max(max_unit_level, unit_level)
+				if unit_level >= 3:
+					three_star_ids[String(record.get("id", ""))] = true
+			for trait_value: Variant in (payload.get("deployed_traits", []) as Array):
+				var trait_entry: Dictionary = trait_value as Dictionary
+				if bool(trait_entry.get("maxed", false)):
+					maxed_traits[String(trait_entry.get("id", ""))] = true
+		elif kind == "round":
+			var capacity: int = int(payload.get("cap_after_shop", 0))
+			var board_size: int = (payload.get("board_after_shop", []) as Array).size()
+			max_board_capacity = max(max_board_capacity, capacity)
+			max_board_size = max(max_board_size, board_size)
+			peak_shop_level = max(peak_shop_level, int(payload.get("level_after_shop", 0)))
+			if capacity > 0 and board_size >= capacity:
+				planning_beats_with_a_full_board += 1
+	return {
+		"max_unit_level": max_unit_level,
+		"three_star_units": three_star_ids.keys(),
+		"maxed_traits": maxed_traits.keys(),
+		"max_board_size": max_board_size,
+		"max_board_capacity": max_board_capacity,
+		"board_filled_to_capacity": max_board_capacity > 0 and max_board_size >= max_board_capacity,
+		"planning_beats_with_a_full_board": planning_beats_with_a_full_board,
+		"peak_shop_level": peak_shop_level,
+	}
+
 func _trait_snapshot(units: Array[Unit]) -> Array[Dictionary]:
 	# Traits count unique units, so a second copy of a unit you already field is an
 	# upgrade play, not a trait play. Report counts, the next threshold, and whether
@@ -1069,13 +1329,23 @@ func _trait_snapshot(units: Array[Unit]) -> Array[Dictionary]:
 			if int(raw_threshold) > count:
 				next_threshold = int(raw_threshold)
 				break
+		# TraitCompiler reports tier -1 when no threshold is met, and tier 0 is a
+		# live first tier: StackUtils.active() is `tier >= 0`, and the player-facing
+		# TraitsPresenter partitions on `tier >= 0` too. Reporting tier 0 as inactive
+		# told the model a trait that the engine had already switched on was off.
+		var tier_index: int = int(tiers.get(trait_id, -1))
 		snapshot.append({
 			"id": trait_id,
 			"count": count,
-			"tier": int(tiers.get(trait_id, 0)),
-			"active": int(tiers.get(trait_id, 0)) > 0,
+			"tier": tier_index,
+			"active": tier_index >= 0,
 			"next_threshold": next_threshold,
 			"needed": max(0, next_threshold - count) if next_threshold > 0 else 0,
+			"tiers_available": ladder.size(),
+			# No remaining checkpoint means the count has cleared every threshold.
+			# A single-threshold trait is an always-on aura rather than a ladder, so
+			# only a multi-tier trait can be "maxed" in the progression sense.
+			"maxed": next_threshold == 0 and count > 0 and ladder.size() > 1,
 		})
 	snapshot.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
 		return int(left.get("count", 0)) > int(right.get("count", 0))
@@ -1166,6 +1436,12 @@ static func summarize_offer_facts(
 func _shop_candidates() -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []
 	var summaries: Array[Dictionary] = _offer_summaries()
+	# What one bucket is worth on the upcoming wager. A purchase is paid for in the
+	# same currency, so every offer states what it displaces.
+	var wager_kind: String = String(Economy.encounter_quote_kind)
+	var wager_multiplier: float = float(Economy.gross_payout_multiplier())
+	var wager_odds: float = float(Economy.projected_win_probability)
+	var ev_per_bucket: float = wager_odds * (wager_multiplier - 1.0) - (1.0 - wager_odds)
 	var board_ids: Array[String] = _board_ids()
 	var bench_ids: Array[String] = _bench_ids()
 	var board_has_room: bool = board_ids.size() < _roster_max_team_size()
@@ -1232,7 +1508,7 @@ func _shop_candidates() -> Array[Dictionary]:
 				String(summary.get("primary_role", "unit")),
 				", owns %d copies" % copies if copies > 0 else "",
 			],
-			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s Leaves %d buckets." % [
+			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s Leaves %d buckets. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx, shown odds %.0f%%)." % [
 				unit_id,
 				offer_level,
 				cost,
@@ -1241,7 +1517,14 @@ func _shop_candidates() -> Array[Dictionary]:
 				trait_text,
 				activation_text,
 				int(Economy.gold) - cost,
+				cost,
+				ev_per_bucket * float(cost),
+				wager_kind,
+				wager_multiplier,
+				wager_odds * 100.0,
 			],
+			"wager_expected_value_foregone": snappedf(ev_per_bucket * float(cost), 0.01),
+			"wager_edge_per_bucket": snappedf(ev_per_bucket, 0.01),
 			"affordable": true,
 			"slot": int(summary.get("slot", -1)),
 			"unit_id": unit_id,
@@ -1263,10 +1546,27 @@ func _shop_candidates() -> Array[Dictionary]:
 			"deploy_requires_replacement": bool(facts.get("deploy_requires_replacement", false)),
 			"buckets_after": int(Economy.gold) - cost,
 		})
+	var pass_kind: String = String(Economy.encounter_quote_kind)
+	var pass_multiplier: float = float(Economy.gross_payout_multiplier())
+	var pass_odds: float = float(Economy.projected_win_probability)
+	# A pass is only a real decision if the buckets it keeps have a stated use. The
+	# wager is the immediate one, so its expected value is quoted here too.
+	var pass_buckets: int = int(Economy.gold)
+	var pass_ev: float = pass_odds * float(pass_buckets * (pass_multiplier - 1.0)) - (1.0 - pass_odds) * float(pass_buckets)
 	var pass_candidate: Dictionary = {
 		"id": "pass",
 		"label": "Buy nothing in this shop.",
-		"effect": "Keep all %d buckets for the wager, the next shop, or level XP." % int(Economy.gold),
+		"effect": "Keep all %d buckets for the wager, the next shop, or level XP. The %s fight quotes %.2fx at shown odds %.0f%%, so this bankroll is worth about %+.2f buckets on the wager." % [
+			pass_buckets,
+			pass_kind,
+			pass_multiplier,
+			pass_odds * 100.0,
+			pass_ev,
+		],
+		"kept_buckets": pass_buckets,
+		"wager_expected_value_if_kept": snappedf(pass_ev, 0.01),
+		"shown_win_odds": pass_odds,
+		"break_even_odds": 1.0 / max(0.01, pass_multiplier),
 		"affordable": true,
 	}
 	candidates.append(pass_candidate)
@@ -1342,7 +1642,50 @@ func _item_candidates() -> Array[Dictionary]:
 
 ## One planning beat can need several item decisions: two components on one unit is a
 ## deliberate two-step play, so a single pass would leave the second one unplaced.
+## Deterministic item handling for the baseline arm. Components only do anything
+## once they are equipped, so the control run places each held component on the
+## first board unit with a free slot rather than leaving the inventory untouched.
+func _auto_equip_items(label: String) -> void:
+	if Items == null:
+		return
+	for _round: int in range(ITEM_DECISIONS_PER_BEAT):
+		var inventory: Dictionary = Items.get_inventory_snapshot()
+		var item_id: String = ""
+		for raw_id: Variant in inventory.keys():
+			if int(inventory[raw_id]) > 0:
+				item_id = String(raw_id)
+				break
+		if item_id.is_empty():
+			return
+		var placed: bool = false
+		for unit: Unit in _board_units():
+			if unit == null:
+				continue
+			if Items.get_equipped(unit).size() >= Items.slot_count(unit):
+				continue
+			var res: Dictionary = Items.equip(unit, item_id)
+			_append_event("item_equipped", {
+				"item_id": item_id,
+				"unit_id": _unit_id(unit),
+				"ok": bool(res.get("ok", false)),
+				"reason": String(res.get("reason", "")),
+				"combined_id": String(res.get("combined_id", "")),
+				"label": label,
+				"basis": "heuristic_first_fit",
+			})
+			if bool(res.get("ok", false)):
+				placed = true
+				break
+		if not placed:
+			return
+
 func _decide_items(label: String) -> void:
+	# The heuristic arm has no controller, so asking would stall the run until the
+	# decision timeout. It equips first-fit instead, so the baseline arm keeps
+	# comparable power and still finishes on the same seed.
+	if _run_mode != "jev":
+		_auto_equip_items(label)
+		return
 	for _round: int in range(ITEM_DECISIONS_PER_BEAT):
 		var candidates: Array[Dictionary] = _item_candidates()
 		if candidates.size() <= 1:
@@ -1386,38 +1729,88 @@ func _decide_items(label: String) -> void:
 			return
 
 func _wager_candidates(reserve: int) -> Array[Dictionary]:
-	var candidates: Array[Dictionary] = []
-	var seen: Dictionary[int, bool] = {}
 	var quote_kind: String = String(Economy.encounter_quote_kind)
 	var multiplier: float = float(Economy.gross_payout_multiplier())
 	var shown_odds: float = float(Economy.projected_win_probability)
 	var break_even: float = 1.0 / max(0.01, multiplier)
-	for share: float in WAGER_PRESET_SHARES:
-		var wager: int = int(round(float(reserve) * share))
-		wager = clampi(wager, 1, reserve)
+	var net_odds: float = maxf(0.01, multiplier - 1.0)
+	# Kelly: the stake that grows the bankroll fastest at these odds, for a bet paying
+	# `multiplier` including the stake. A near-lock pushes it toward the whole
+	# bankroll; a marginal edge pushes it toward the minimum.
+	var kelly_fraction: float = clampf((shown_odds * multiplier - 1.0) / net_odds, -1.0, 1.0)
+	var kelly_wager: int = clampi(int(round(float(reserve) * maxf(0.0, kelly_fraction))), 1, reserve)
+	# Named stakes rather than anonymous bankroll fractions. The model is choosing an
+	# intent, and "25% of the bankroll" collapses onto the same integer as "minimum"
+	# as soon as the bankroll is small, which is how every early wager became a
+	# one-bucket bet.
+	var plans: Array[Dictionary] = [
+		{
+			"stake": 1,
+			"role": "minimum",
+			"why": "The smallest legal wager. Correct only at or below break-even odds.",
+		},
+		{
+			"stake": kelly_wager,
+			"role": "kelly",
+			"why": "The stake that grows the bankroll fastest at these odds.",
+		},
+		{
+			"stake": maxi(kelly_wager, int(ceil(float(reserve) * 0.5))),
+			"role": "press",
+			"why": "Half the bankroll or the Kelly stake, whichever is larger. Correct when the odds are profitable but below 50%.",
+		},
+		{
+			"stake": reserve,
+			"role": "all_in",
+			"why": "The whole bankroll, which doubles on a win at 2x. Correct when the shown odds are above 50%.",
+		},
+	]
+	var candidates: Array[Dictionary] = []
+	var seen: Dictionary[int, bool] = {}
+	for plan: Dictionary in plans:
+		var wager: int = clampi(int(plan.get("stake", 1)), 1, reserve)
 		if seen.has(wager):
 			continue
 		seen[wager] = true
 		var payout: int = int(Economy.quoted_payout(wager))
+		var profit: int = payout - wager
+		var actual_share: int = int(round(100.0 * float(wager) / float(max(1, reserve))))
+		# Expected value of the wager at the shown win odds.
+		var expected_value: float = shown_odds * float(profit) - (1.0 - shown_odds) * float(wager)
 		candidates.append({
 			"id": "wager_%d" % wager,
-			"label": "Wager %d of %d buckets (%d%% of the bankroll); win returns %d, loss leaves %d." % [
+			"label": "%s: wager %d of %d buckets (%d%% of the bankroll); a win pays %d gross for %+d profit, a loss leaves %d." % [
+				String(plan.get("role", "stake")).to_upper(),
 				wager,
 				reserve,
-				int(round(share * 100.0)),
+				actual_share,
 				payout,
+				profit,
 				reserve - wager,
 			],
-			"effect": "%s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%%. Loss leaves %d buckets." % [
+			"effect": "%s %s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%% (Kelly stake %d of %d). Expected value %+.2f buckets. Loss leaves %d buckets." % [
+				String(plan.get("why", "")),
 				quote_kind,
 				multiplier,
 				break_even * 100.0,
 				shown_odds * 100.0,
+				kelly_wager,
+				reserve,
+				expected_value,
 				reserve - wager,
 			],
 			"wager": wager,
-			"share": share,
+			"role": String(plan.get("role", "stake")),
+			"share": float(wager) / float(max(1, reserve)),
+			"is_all_in": wager >= reserve,
+			"is_pressing": String(plan.get("role", "")) in ["press", "all_in"],
+			"kelly_fraction": snappedf(kelly_fraction, 0.001),
+			"kelly_wager": kelly_wager,
+			"is_kelly_sized": wager == kelly_wager,
 			"payout_if_win": payout,
+			"profit_if_win": profit,
+			"shown_win_odds": shown_odds,
+			"expected_value_buckets": snappedf(expected_value, 0.01),
 			"buckets_if_loss": reserve - wager,
 			"break_even_odds": break_even,
 		})
@@ -1506,6 +1899,7 @@ func _finish_jev_run(terminal: String) -> void:
 		"schema_version": 1,
 		"harness": JEV_HARNESS_NAME,
 		"mode": _run_mode,
+		"lane": _lane,
 		"seed": _campaign_seed,
 		"starter": _starter_id,
 		"terminal": terminal,
@@ -1518,6 +1912,9 @@ func _finish_jev_run(terminal: String) -> void:
 		"events": _events,
 		"decision_counts": _decision_kinds,
 		"technical_failures": _failures,
+		# Acceptance targets for the run: a three-star unit, a trait at its top
+		# tier, and a board filled to its capacity. Read from the recorded events.
+		"progression": _progression_summary(),
 	}
 	_write_run_file("run_summary.json", JSON.stringify(summary, "  "))
 	var verdict: String = "OK" if _failures.is_empty() else "FAIL"

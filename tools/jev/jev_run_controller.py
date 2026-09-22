@@ -71,6 +71,7 @@ def _rules_digest(rules: dict) -> str:
     )
     lines = [
         f"GOAL: {rules.get('goal', '')}",
+        f"STARTER: {rules.get('starter', {}).get('rule', '')} {rules.get('starter', {}).get('first_shop', '')}",
         f"RESERVE: {reserve.get('rule', '')}",
         f"DECISION QUALITY: {rules.get('decision_quality_gates', {}).get('rule', '')}",
         f"WAGER QUOTES: {multipliers}",
