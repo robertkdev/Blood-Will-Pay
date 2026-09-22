@@ -463,10 +463,12 @@ That also explains the watchdog reading. The 12-second no-progress timeout requi
 damage *and* no meaningful movement; damage lands continuously, so it never fires.
 Nothing is stalled. The boards simply cannot out-damage each other's health pool.
 
-### What was tried and rejected
+### What was tried
 
-Held constant across all of these: the calibration probe's 144 dated matchups and the
-frozen 26-fight standoff set.
+Measured against the calibration probe's 144 dated matchups, with the frozen 26-fight
+standoff set as a second reading. **Every experiment below was reverted.** The shipped
+build is unchanged: the calibration fingerprint is
+`24efe26953c85f40c84d243cce55e999c64dcd692f2e023d1a27b15fa6118b7c` before and after.
 
 | Change | Clock-decided fights | Shown-odds calibration |
 | --- | --- | --- |
@@ -474,27 +476,40 @@ frozen 26-fight standoff set.
 | overtime, start 30s, +200% | 11 of 144, 14 of 26 | PASS, gaps unchanged |
 | overtime, start 24s, +300% | 0 of 144, 2 of 26 | FAIL, 28.8% bucket gap |
 | clock raised to the documented 105s | 9 of 144 outran the sim's own 60s limit | FAIL, 28.8% bucket gap |
+| `attack_damage` x2.5 on all six roles | **12 of 144 - no change at all** | FAIL, bucket population collapsed to 4 |
+| `max_hp` halved on all six roles | **1 of 144** | FAIL, 25.2% bucket gap |
 
-Overtime makes fights resolve but changes who wins faster than the estimator can
-follow. Raising the clock does not resolve them either: at 105 seconds, nine fights
-had still not finished when the probe's own 60-second wall timeout stopped them, and
-calibration got worse. Neither is the lever.
+Three things follow, and the first is the surprising one:
+
+1. **Basic-attack damage is not the lever.** Raising it by two and a half times left
+   the clock-decided count at exactly 12. The estimator noticed (its bucket
+   populations shifted sharply) while the fights did not.
+2. **Health is the lever.** Halving it took clock-decided fights from 12 to 1.
+   Whatever keeps those boards standing is the size of their health pool relative to
+   the damage that reaches it.
+3. **Any change that makes fights resolve breaks the shown odds, and always in the
+   same direction.** Overtime at the steep tuning, a longer clock, and halved health
+   each drop clock-decided fights and each push the mid-band estimate out by 25-29%
+   against a 15% gate, with near-even boards losing far more often than advertised.
+   The estimator is calibrated against fights that mostly do not resolve; make them
+   resolve and it is wrong.
 
 ### The decision this needs
 
-The damage-to-health ratio is the lever, and moving it is a balance change across all
-six role profiles that also requires recalibrating the shown win odds, because the
-odds are what the wagering loop is priced on. Concretely, one of:
+Two calls, and they are coupled:
 
-- raise `attack_damage` and/or ability output so a same-size board wipes inside
-  roughly 20-30 seconds, leaving the 45-second clock as a backstop;
-- cut `max_hp` by a comparable factor, which is the same ratio from the other side;
-- or set an explicit target fight length first, then tune to it.
+1. **Set a target fight length.** Nothing in the design document or the repo states
+   how long a fight should last. The clock is 45 seconds and a wipe currently needs
+   roughly 70 seconds of full uptime, far more with realistic uptime. Any health or
+   damage change is unanchored until that number exists.
+2. **Recalibrate the shown win odds against resolved fights.** This is not optional
+   cleanup: every lever that makes fights resolve moves the mid-band estimate by
+   25-29% against a 15% gate, and those odds are what the whole wagering loop is
+   priced on. Shipping a rebalance without it replaces "the clock decides" with "the
+   odds lie", which is worse in a game built on wagering.
 
-No target exists anywhere in the current design document or the repo, so this is a
-product call rather than a bug to fix silently. Whichever lever is chosen, the
-`team_odds_calibration_probe` bucket gaps are the acceptance check: they must stay
-inside the 15% gate.
+`team_odds_calibration_probe` is the acceptance check for both, and its 15% bucket
+gate is the number to hold.
 
 ## Runtime notes
 
