@@ -288,6 +288,8 @@ func reset_planning_timer(seconds: float = -1.0) -> void:
 
 
 func _update_planning_timer(delta: float) -> void:
+	if controller != null and controller.phase_transition != null and controller.phase_transition.is_transition_active():
+		return
 	var gp: Variant = _get_gs()
 	if gp == null:
 		return
