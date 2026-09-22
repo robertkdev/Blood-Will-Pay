@@ -592,6 +592,36 @@ are being measured through an outcome layer that is itself unresolved, so treat 
 null as "no effect detectable at this sample" rather than "no effect". The runs are
 also a fast sweep at `time_scale = 8.0`, not shipped speed.
 
+## Jev is behind the scripted baseline
+
+The rig has always been able to replay a seed with the built-in rule-based policy as a
+control, but that arm recorded no shop telemetry at all - it returned before any event
+was written - so no comparison against it could actually be read. With that fixed
+(`062f63b2`), the same three seeds now compare:
+
+| Arm | Reached chapter 2 | Battles | Buys | Passes |
+| --- | --- | --- | --- | --- |
+| Jev, flex | 1 of 3 | 6, 6, 10 | 3, 3, 11 | 1, 1, 5 |
+| Jev, commit | 1 of 3 | 11, 6, 5 | 12, 3, 2 | 5, 1, 3 |
+| Jev, force | 1 of 3 | 8, 6, 5 | 9, 3, 2 | 3, 1, 3 |
+| **scripted baseline** | **2 of 3** | 6, 11, 12 | 3, 6, 8 | 5, 8, 9 |
+
+**The built-in policy reaches chapter 2 on two of three seeds; no Jev arm manages more
+than one.** On seed 7717 the scripted policy reaches 2:2 with twelve battles while all
+three Jev arms stall at 1:4 with six; on 90210 it reaches 2:2 with the longest run of
+the set. Only on 4401 do the arms converge.
+
+This is the first direct evidence about whether Jev's strategy is any good, and the
+answer at this sample is no - it is losing to a deterministic script on the same
+seeds. What the script does differently is pass more: 22 passes across the three seeds
+against Jev flex's 7, while buying comparable amounts. That lines up with the policy's
+own claim that buying every affordable offer is the losing baseline, and suggests Jev
+is taking offers the script declines.
+
+Three seeds is not enough to call this settled, and the clock still decides fights in
+every run here. But it is a better starting point for improving the policy than any
+aggregate win rate: there is now a specific, reproducible opponent to beat.
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would
