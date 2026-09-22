@@ -237,7 +237,7 @@ func _pick_opening_helper_id(helper_ids: Array[String]) -> String:
 func _offer_for_id(unit_id: String) -> ShopOffer:
 	if _catalog == null or not _catalog.has_id(unit_id):
 		return null
-	return ShopOffer.new(
+	var offer: ShopOffer = ShopOffer.new(
 		unit_id,
 		_catalog.get_name(unit_id),
 		_catalog.get_cost(unit_id),
@@ -250,3 +250,5 @@ func _offer_for_id(unit_id: String) -> ShopOffer:
 		_catalog.get_identity_path(unit_id),
 		_catalog.get_alt_goals(unit_id)
 	)
+	offer.shop_card_art_path = _catalog.get_shop_card_art_path(unit_id)
+	return offer

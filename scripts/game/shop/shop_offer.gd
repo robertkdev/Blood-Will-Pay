@@ -13,6 +13,7 @@ var package_level: int = 1
 var package_multiplier: int = 1
 var package_kind: String = "standard"
 var sprite_path: String = ""
+var shop_card_art_path: String = ""
 var roles: Array[String] = []
 var traits: Array[String] = []
 var primary_role: String = ""

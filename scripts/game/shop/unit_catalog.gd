@@ -47,6 +47,7 @@ func refresh() -> void:
 		var id := ""
 		var name := ""
 		var sprite_path := ""
+		var shop_card_art_path: String = ""
 		var cost := 0
 		var roles: Array = []
 		var traits: Array = []
@@ -56,6 +57,7 @@ func refresh() -> void:
 			id = String(p.id)
 			name = String(p.name)
 			sprite_path = String(p.sprite_path)
+			shop_card_art_path = p.shop_card_path()
 			cost = int(p.cost)
 			roles = _duplicate_string_array(p.roles)
 			traits = _duplicate_string_array(p.traits)
@@ -76,6 +78,7 @@ func refresh() -> void:
 		_meta_by_id[id] = {
 			"name": name,
 			"sprite_path": sprite_path,
+			"shop_card_art_path": shop_card_art_path,
 			"cost": cost,
 			"roles": roles,
 			"traits": traits,
@@ -155,6 +158,9 @@ func get_name(id: String) -> String:
 
 func get_sprite_path(id: String) -> String:
 	return String(get_unit_meta(id).get("sprite_path", ""))
+
+func get_shop_card_art_path(id: String) -> String:
+	return String(get_unit_meta(id).get("shop_card_art_path", get_sprite_path(id)))
 
 func get_cost(id: String) -> int:
 	return int(get_unit_meta(id).get("cost", 0))
