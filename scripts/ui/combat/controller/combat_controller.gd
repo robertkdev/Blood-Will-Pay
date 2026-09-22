@@ -2490,6 +2490,10 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	Trace.step("CombatView._on_battle_started: begin")
 	var locked_quote_multiplier: float = _pending_combat_quote_multiplier
 	_complete_pending_battle_start()
+	if not _arena_prepared_for_transition and phase_transition != null:
+		# A direct/custom battle can replace a pending countdown. Release that
+		# camera's layout/input ownership before arranging its live arena.
+		phase_transition.reset()
 	if continue_button != null:
 		continue_button.text = BATTLE_LOCKED_TEXT
 	_encounter_escalations_seen = 0
