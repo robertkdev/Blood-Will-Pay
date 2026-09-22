@@ -39,6 +39,18 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def _summary_for(run_dir: Path) -> dict:
+    """The run's own summary, falling back to the per-round checkpoint.
+
+    A long run that exits without reaching its end path still leaves a checkpoint,
+    which is the difference between reading chapter 8 and reading nothing.
+    """
+    summary = _load_json(run_dir / "run_summary.json")
+    if summary:
+        return summary
+    return _load_json(run_dir / "run_checkpoint.json")
+
+
 def _load_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
@@ -620,6 +632,9 @@ def _fight_records(events: list[dict]) -> list[dict]:
                 "enemy_board": _board_label(payload.get("enemy_units") or []),
                 "player_count": len(payload.get("player_units") or []),
                 "enemy_count": len(payload.get("enemy_units") or []),
+                "player_power": payload.get("player_power"),
+                "enemy_power": payload.get("enemy_power"),
+                "target_rating": payload.get("target_rating"),
                 "deployed_traits": [
                     "%s%d" % (entry.get("id"), int(entry.get("count", 0) or 0))
                     for entry in (payload.get("deployed_traits") or [])
@@ -1318,7 +1333,11 @@ def _run_dirs_from_batch(path: Path) -> list[Path]:
     if (path / "run_summary.json").exists():
         return [path]
     return sorted(
-        (child for child in path.iterdir() if (child / "run_summary.json").exists()),
+        (
+            child
+            for child in path.iterdir()
+            if (child / "run_summary.json").exists() or (child / "run_checkpoint.json").exists()
+        ),
         key=lambda item: item.name,
     )
 
@@ -1332,7 +1351,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
     all_fights: list[dict] = []
     runs: list[dict] = []
     for run_dir in run_dirs:
-        summary = _load_json(run_dir / "run_summary.json")
+        summary = _summary_for(run_dir)
         events = _load_jsonl(run_dir / "run_events.jsonl")
         if not summary and not events:
             continue
@@ -1359,6 +1378,52 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
             "max_global_stage": items.get("max_global_stage"),
         })
     prediction = _prediction_quality(all_fights)
+    # The difficulty ramp against the player's actual power, per global stage. This
+    # is the curve to read before changing any per-chapter constant.
+    by_stage: dict[int, dict] = {}
+    for row in all_fights:
+        stage = int(row.get("global_stage") or 0)
+        if stage <= 0:
+            continue
+        entry = by_stage.setdefault(stage, {
+            "global_stage": stage,
+            "fights": 0,
+            "player_power": 0.0,
+            "enemy_power": 0.0,
+            "target_rating": 0.0,
+            "wins": 0,
+            "odds": 0.0,
+            "power_samples": 0,
+            "odds_samples": 0,
+        })
+        entry["fights"] += 1
+        if row.get("won"):
+            entry["wins"] += 1
+        if isinstance(row.get("player_power"), (int, float)) and isinstance(row.get("enemy_power"), (int, float)):
+            entry["player_power"] += float(row["player_power"])
+            entry["enemy_power"] += float(row["enemy_power"])
+            entry["power_samples"] += 1
+        if isinstance(row.get("target_rating"), (int, float)):
+            entry["target_rating"] += float(row["target_rating"])
+        if isinstance(row.get("shown_win_odds"), (int, float)):
+            entry["odds"] += float(row["shown_win_odds"])
+            entry["odds_samples"] += 1
+    power_curve = []
+    for stage in sorted(by_stage):
+        entry = by_stage[stage]
+        samples = max(1, entry["power_samples"])
+        power_curve.append({
+            "global_stage": stage,
+            "fights": entry["fights"],
+            "win_rate": round(entry["wins"] / max(1, entry["fights"]), 3),
+            "mean_player_power": round(entry["player_power"] / samples, 1),
+            "mean_enemy_power": round(entry["enemy_power"] / samples, 1),
+            "mean_power_ratio": round(
+                (entry["player_power"] / samples) / max(0.01, entry["enemy_power"] / samples), 3
+            ),
+            "mean_target_rating": round(entry["target_rating"] / max(1, entry["fights"]), 1),
+            "mean_shown_odds": round(entry["odds"] / max(1, entry["odds_samples"]), 3),
+        })
     # The acceptance targets, counted across the sample.
     runs_reaching_chapter_10 = sum(1 for row in runs if int(row.get("final_chapter") or 0) >= 10)
     runs_with_three_star = sum(1 for row in runs if row.get("three_star_units"))
@@ -1373,6 +1438,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
         "runs": runs,
         "fights": all_fights,
         "prediction": prediction,
+        "power_curve": power_curve,
         "acceptance": {
             "runs": len(runs),
             "reached_chapter_10": runs_reaching_chapter_10,
@@ -1430,6 +1496,26 @@ def _render_batch(batch: dict) -> str:
         )
     )
     lines.append("- Terminals: %s  |  highest peak bankroll: %s" % (acceptance.get("terminals"), acceptance.get("peak_bankroll_max")))
+    if batch.get("power_curve"):
+        lines.extend(["", "## Difficulty ramp versus player power, by global stage", ""])
+        lines.append("| stage | fights | win rate | player power | enemy power | ratio | target rating | mean shown odds |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+        for row in batch["power_curve"]:
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (
+                    row.get("global_stage"),
+                    row.get("fights"),
+                    row.get("win_rate"),
+                    row.get("mean_player_power"),
+                    row.get("mean_enemy_power"),
+                    row.get("mean_power_ratio"),
+                    row.get("mean_target_rating"),
+                    row.get("mean_shown_odds"),
+                )
+            )
+        lines.append("")
+        lines.append("- A ratio below 1.0 at a stage means the player board was, on average, the weaker one on the model's own rating.")
     lines.extend(["", "## Prediction quality across the sample", ""])
     if prediction.get("samples"):
         lines.append(
@@ -1493,7 +1579,7 @@ def main(argv: list[str] | None = None) -> int:
         }, indent=2))
         return 0
     run_dir = Path(args.run_dir).resolve()
-    summary = _load_json(run_dir / "run_summary.json")
+    summary = _summary_for(run_dir)
     decisions = _load_jsonl(run_dir / "decisions.jsonl")
     events = _load_jsonl(run_dir / "run_events.jsonl")
     observations = _observations(run_dir)

@@ -240,6 +240,7 @@ func _run() -> void:
 			return
 		if bool(round_result.get("advanced", false)):
 			_battles += 1
+			_checkpoint_run()
 			continue
 		if _can_retry_after_same_stage(round_result):
 			var stage_key: String = "%d:%d" % [
@@ -269,6 +270,7 @@ func _run() -> void:
 				_finish_jev_run("stage_stall")
 				return
 			_battles += 1
+			_checkpoint_run()
 			continue
 		if String(round_result.get("fight_result", "")) == "loss":
 			_append_event("run_end", {"reason": "loss", "chapter": int(GameState.chapter), "round": int(GameState.stage_in_chapter)})
@@ -942,6 +944,12 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"player_units": _team_units_snapshot(_board_units(), _player_placements()),
 		"enemy_units": _team_units_snapshot(_enemy_units(), _enemy_placements()),
 		"enemy_traits": _trait_snapshot(_enemy_units()),
+		# Both teams' model ratings, plus the stage's target rating. The preview odds
+		# are a function of the first two, so recording them is what makes "the ramp
+		# outran the board" a measurement instead of an inference from the boards.
+		"player_power": snappedf(CombatPowerModel.team_power(_board_units()), 0.01),
+		"enemy_power": snappedf(CombatPowerModel.team_power(_enemy_units()), 0.01),
+		"target_rating": _stage_target_rating(),
 		# Board plus bench with each unit's level. The round payload records ids
 		# only, so a combine into a level-2/3 unit is invisible without this, and
 		# a three-star waiting on the bench would never show up at all.
@@ -1642,6 +1650,16 @@ func _item_candidates() -> Array[Dictionary]:
 
 ## One planning beat can need several item decisions: two components on one unit is a
 ## deliberate two-step play, so a single pass would leave the second one unplaced.
+## The stage's design target rating. Read from the already-generated spec for the
+## stage being fought; the procedural chapter is cached by the time a fight starts.
+func _stage_target_rating() -> int:
+	if RosterCatalog == null:
+		return -1
+	var spec: Variant = RosterCatalog.get_spec(int(GameState.chapter), int(GameState.stage_in_chapter))
+	if not spec is Dictionary:
+		return -1
+	return int(spec.get("target_rating", -1))
+
 ## Deterministic item handling for the baseline arm. Components only do anything
 ## once they are equipped, so the control run places each held component on the
 ## first board unit with a free slot rather than leaving the inventory untouched.
@@ -1895,27 +1913,7 @@ func _abort_run(reason: String) -> void:
 func _finish_jev_run(terminal: String) -> void:
 	Engine.time_scale = 1.0
 	UnitFactory.suppress_validation_warnings = _previous_suppress_validation_warnings
-	var summary: Dictionary = {
-		"schema_version": 1,
-		"harness": JEV_HARNESS_NAME,
-		"mode": _run_mode,
-		"lane": _lane,
-		"seed": _campaign_seed,
-		"starter": _starter_id,
-		"terminal": terminal,
-		"final_chapter": int(GameState.chapter),
-		"final_stage_in_chapter": int(GameState.stage_in_chapter),
-		"battles": _battles,
-		"peak_bankroll": int(Economy.peak_bankroll),
-		"buckets": int(Economy.blood_buckets),
-		"rounds": _rounds,
-		"events": _events,
-		"decision_counts": _decision_kinds,
-		"technical_failures": _failures,
-		# Acceptance targets for the run: a three-star unit, a trait at its top
-		# tier, and a board filled to its capacity. Read from the recorded events.
-		"progression": _progression_summary(),
-	}
+	var summary: Dictionary = _run_summary(terminal)
 	_write_run_file("run_summary.json", JSON.stringify(summary, "  "))
 	var verdict: String = "OK" if _failures.is_empty() else "FAIL"
 	print("%s: %s terminal=%s chapter=%d round=%d battles=%d peak=%d buckets=%d decisions=%s" % [
@@ -1936,3 +1934,36 @@ func _finish_jev_run(terminal: String) -> void:
 	_cleanup_runtime()
 	var exit_code: int = 0 if _failures.is_empty() else 1
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, CLEANUP_DRAIN_FRAMES), CONNECT_ONE_SHOT)
+
+## The full run record. Written once per round as a checkpoint and again when the run
+## ends, so a long run that dies for any reason still leaves its data behind - the
+## deepest runs are the expensive ones, and they were the ones being lost.
+func _run_summary(terminal: String) -> Dictionary:
+	return {
+		"schema_version": 1,
+		"harness": JEV_HARNESS_NAME,
+		"mode": _run_mode,
+		"lane": _lane,
+		"seed": _campaign_seed,
+		"starter": _starter_id,
+		"terminal": terminal,
+		"final_chapter": int(GameState.chapter),
+		"final_stage_in_chapter": int(GameState.stage_in_chapter),
+		"battles": _battles,
+		"peak_bankroll": int(Economy.peak_bankroll),
+		"buckets": int(Economy.blood_buckets),
+		"rounds": _rounds,
+		"events": _events,
+		"decision_counts": _decision_kinds,
+		"technical_failures": _failures,
+		# Acceptance targets for the run: a three-star unit, a trait at its top
+		# tier, and a board filled to its capacity. Read from the recorded events.
+		"progression": _progression_summary(),
+	}
+
+## Cheap insurance for a long run. The full record is a few hundred KB, so writing it
+## once per round is not free, but losing a nine-minute chapter-8 run to a silent exit
+## costs far more.
+func _checkpoint_run() -> void:
+	var summary: Dictionary = _run_summary("in_progress")
+	_write_run_file("run_checkpoint.json", JSON.stringify(summary, "  "))
