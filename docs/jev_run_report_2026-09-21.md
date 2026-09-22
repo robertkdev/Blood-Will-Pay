@@ -809,6 +809,43 @@ more rolls per kill, more creeps per creep stage, or more creep stages per chapt
 That is a product call, and the document does not settle it - it fixes the
 probabilities per roll, not how many rolls a chapter grants.
 
+## The mirror stage punishes getting stronger
+
+A player who plays this reported the tactic of taking a deliberately un-upgraded board
+into the boss round, minimum bet, so that the mirror round is easier. The code says
+they are right, and that the mechanic is backwards.
+
+In `scripts/combat_manager.gd`, `prepare_stage` does this:
+
+    var spec: Dictionary = RosterCatalog.get_spec(ch, sic)
+    if String(spec.get(StageTypes.KEY_KIND, StageTypes.KIND_NORMAL)) == StageTypes.KIND_BOSS:
+        MirrorBoardStore.capture_boss_board(ch, _state.player_team)
+
+and `MirrorRule.on_pre_spawn` sets `mirror_source = "boss_entry_board"`, builds the
+mirror from `MirrorBoardStore.snapshot_ids(ch)`, and applies that snapshot to the
+mirror units.
+
+So the mirror opponent is **the board you were fielding when the boss stage was
+prepared**. Buying a stronger unit before the boss puts it on the other side of the
+next fight. The rational play is to sandbag before the boss and then beat your own
+weakened board - which is what the player worked out from playing.
+
+Two consequences worth separating:
+
+1. **The incentive is inverted.** The stage immediately after the boss is the one
+   stage where being weaker is strictly better, and the game gives no sign of it.
+2. **A same-board mirror cannot be won by a wipe.** This is the same-board case from
+   the time-to-kill table above, against the same 45-second clock, so it lands on the
+   terminal ladder by construction. The mirror is a structural contributor to the
+   clock-decided rate, not just a victim of it.
+
+The design document says the mirror round "uses the player's team as its conceptual
+opponent source", which is true but does not say *when* that team is sampled - and the
+answer is the one moment where sampling it creates a perverse incentive. Fixing this
+is a design decision with at least three shapes: sample the board at the start of the
+chapter rather than at boss entry, give the mirror a fixed generated opponent, or drop
+the mirror stage. Each changes what the stage is for, so it is a product call.
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would
