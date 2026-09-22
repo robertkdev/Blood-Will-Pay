@@ -754,6 +754,61 @@ final attempt's failure, so one dropped event cannot invalidate a run while a sl
 that genuinely cannot be clicked still fails loudly. Re-running seed 33333 with the
 retry in place completed cleanly, and the run in the table above is that re-run.
 
+## Player report: "creep rounds are broken, no items after the start"
+
+The player who actually plays this reported that creep rounds stop paying out items
+and called it an error. Checked in order.
+
+**Creep stages exist in every chapter, and they do pay.** `EndlessChapterGenerator.get_spec`
+routes `CREEP_STAGE` to `_make_creep_spec` for any chapter, and that spec carries
+`DEFAULT_CREEP_REWARDS`. Measured on a real `Main.tscn` run by recording the item
+inventory before every fight:
+
+| fight | stage | kind | inventory before the fight |
+| --- | --- | --- | --- |
+| 1 | ch1:1 | CREEPS | `[]` |
+| 2 | ch1:2 | NORMAL | `[orb]` |
+| 7 | ch2:1 | CREEPS | `[orb]` |
+| 8 | ch2:2 | NORMAL | `[orb, wand]` |
+
+Both creep stages paid. The flat claim does not reproduce on this build.
+
+**But there was a real defect in the same pool, and it is the opposite one.** In
+`data/creeps/reward_pools/default.tres` the entries array referenced only
+`drop_component`:
+
+    entries = Array[...]([SubResource("7")])
+
+`gold_pool_pick` and `reroll_pool_pick` were defined with weights 25 and 5 and never
+referenced, and there was no `nothing` entry. `CreepRewardRuntime._pick_entry`
+normalises over *the entries actually present*, so the only wired entry was picked
+100% of the time: **every creep kill dropped a component, and gold and rerolls could
+never drop at all.** The design document specifies 58.33% component, 16.67% nothing,
+12.5 / 6.25 / 2.08% gold, 3.33 / 0.83% rerolls.
+
+The pool now implements the document. `EconomyBalanceEvidenceProbe` samples 20,000
+reward terminals and every terminal lands inside its six-sigma tolerance:
+
+| terminal | configured | observed |
+| --- | --- | --- |
+| one component | 0.5833 | 0.5889 |
+| +1 / +2 / +3 buckets | 0.1250 / 0.0625 / 0.0208 | 0.1240 / 0.0601 / 0.0223 |
+| +1 / +2 rerolls | 0.0334 / 0.0083 | 0.0334 / 0.0086 |
+| nothing | 0.1667 | 0.1630 |
+
+**This makes components rarer, not more common** - from one guaranteed component per
+creep kill down to 58.33%, in exchange for gold and rerolls that previously could not
+appear. So it fixes a broken pool but it is not the fix the player was asking for.
+
+Their complaint points at a different lever. There is **one creep stage per chapter**
+of five stages, and it contains one creep, with `rolls_per_kill: 1`. That is roughly
+**0.58 component rolls per chapter** - about one component every eight or nine fights,
+which is what "no items after the start" describes from the player's side. Making
+items arrive often enough to "slam items on the correct units" is a rate decision:
+more rolls per kill, more creeps per creep stage, or more creep stages per chapter.
+That is a product call, and the document does not settle it - it fixes the
+probabilities per roll, not how many rolls a chapter grants.
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would

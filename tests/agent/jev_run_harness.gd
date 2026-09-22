@@ -771,6 +771,10 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"player_units": _team_units_snapshot(_board_units(), _player_placements()),
 		"enemy_units": _team_units_snapshot(_enemy_units(), _enemy_placements()),
 		"enemy_traits": _trait_snapshot(_enemy_units()),
+		# Creep stages are the documented item source. Recording the inventory before
+		# every fight is what makes "did a creep round actually pay out?" answerable from
+		# the transcript instead of inferred.
+		"inventory": Items.get_inventory_snapshot() if Items != null else {},
 		"wager": int(Economy.current_bet),
 		"buckets": int(Economy.blood_buckets),
 		"stake_unit": int(Economy.stake_unit),
