@@ -8,7 +8,7 @@ OFFER = (ROOT / "scripts/game/shop/shop_offer.gd").read_text(encoding="utf-8")
 PANEL = (ROOT / "scripts/ui/shop/shop_panel.gd").read_text(encoding="utf-8")
 
 
-def test_unit_art_has_optional_surface_derivatives_with_legacy_fallbacks():
+def test_unit_art_declares_optional_surface_derivatives_and_fallback_helpers():
     for field in [
         "shop_card_art_path",
         "portrait_art_path",
@@ -21,7 +21,7 @@ def test_unit_art_has_optional_surface_derivatives_with_legacy_fallbacks():
     assert "else sprite_path" in PROFILE
 
 
-def test_shop_uses_a_reviewed_card_derivative_when_one_is_declared():
+def test_shop_source_wiring_includes_declared_card_derivative_path():
     assert '"shop_card_art_path": shop_card_art_path' in CATALOG
     assert "func get_shop_card_art_path" in CATALOG
     assert "var shop_card_art_path: String" in OFFER

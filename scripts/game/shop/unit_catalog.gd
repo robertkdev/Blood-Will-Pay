@@ -47,7 +47,7 @@ func refresh() -> void:
 		var id := ""
 		var name := ""
 		var sprite_path := ""
-		var shop_card_art_path := ""
+		var shop_card_art_path: String = ""
 		var cost := 0
 		var roles: Array = []
 		var traits: Array = []
