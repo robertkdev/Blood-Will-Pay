@@ -526,7 +526,33 @@ func _decide_starter() -> void:
 
 func _buy_best_two_stage_offer(buy_index: int) -> String:
 	if _run_mode != "jev":
-		return await super._buy_best_two_stage_offer(buy_index)
+		# The heuristic arm used to return here without recording anything, so its
+		# transcript carried no shop events at all and the analyzer reported zero
+		# purchases for the baseline it was being compared against. Record what the
+		# inherited policy actually did - the id it bought and the gold it spent, both
+		# measured around the call - and label the basis so a policy action is never
+		# mistaken for a Jev decision executed by the harness.
+		var policy_gold_before: int = int(Economy.gold)
+		var policy_bought: String = await super._buy_best_two_stage_offer(buy_index)
+		var policy_gold_after: int = int(Economy.gold)
+		if policy_bought == "":
+			_append_event("shop_pass", {
+				"buy_index": buy_index,
+				"basis": "inherited_policy",
+				"gold_before": policy_gold_before,
+				"gold_after": policy_gold_after,
+			})
+			return ""
+		_bump_shop_revision()
+		_append_event("shop_purchase", {
+			"buy_index": buy_index,
+			"unit_id": policy_bought,
+			"cost": max(0, policy_gold_before - policy_gold_after),
+			"gold_before": policy_gold_before,
+			"gold_after": policy_gold_after,
+			"basis": "inherited_policy",
+		})
+		return policy_bought
 	for reroll_attempt: int in range(MAX_REROLLS_PER_SHOP):
 		var candidates: Array[Dictionary] = _shop_candidates()
 		if candidates.is_empty():
