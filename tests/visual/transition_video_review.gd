@@ -59,7 +59,7 @@ func _process(delta: float) -> void:
 			var token: String = String(request.get("token", ""))
 			if not token.is_empty() and token != _sync_token_seen:
 				_sync_token_seen = token
-				_probe.call("mark_visual_sync", token, 8)
+				_probe.call("mark_visual_sync", token, 4)
 				var ack: FileAccess = FileAccess.open(_output_dir.path_join("sync-ack.json"), FileAccess.WRITE)
 				ack.store_string(JSON.stringify({"queued": true, "ticks_usec": Time.get_ticks_usec()}))
 				ack.close()
