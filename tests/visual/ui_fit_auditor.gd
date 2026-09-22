@@ -57,6 +57,12 @@ static func _audit_parent_bounds(control: Control, context: String, failures: Ar
 		enforce_vertical = scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED
 	var parent_rect: Rect2 = parent_control.get_global_rect()
 	var child_rect: Rect2 = control.get_global_rect()
+	if control is TextureRect and control.name == "GothicArenaSurface" and bool(parent_control.get_meta("shared_field_camera", false)):
+		# The camera crops one uniformly scaled floor. Audit coverage of its
+		# clipped viewport; requiring the source image to fit would distort it.
+		if not parent_control.clip_contents or not child_rect.grow(EDGE_TOLERANCE).encloses(parent_rect):
+			failures.append("%s %s does not cover its clipped field viewport: floor=%s viewport=%s" % [_path(control), context, str(child_rect), str(parent_rect)])
+		return
 	if enforce_horizontal and (child_rect.position.x < parent_rect.position.x - EDGE_TOLERANCE or child_rect.end.x > parent_rect.end.x + EDGE_TOLERANCE):
 		failures.append("%s %s exceeds parent %s horizontally: child=%s parent=%s" % [_path(control), context, _path(parent_control), str(child_rect), str(parent_rect)])
 	if enforce_vertical and (child_rect.position.y < parent_rect.position.y - EDGE_TOLERANCE or child_rect.end.y > parent_rect.end.y + EDGE_TOLERANCE):

@@ -61,6 +61,8 @@ func _run() -> void:
 	var start_result: Dictionary[String, Variant] = _manager.start_custom_battle(PLAYER_IDS, ENEMY_IDS, options)
 	_expect(bool(start_result.get("ok", false)), "direct custom battle failed: %s" % String(start_result.get("reason", "unknown")))
 	await _settle_frames(12)
+	var transition: PhaseTransitionController = _view.get("controller").get("phase_transition") as PhaseTransitionController
+	_expect(transition != null and not transition.is_layout_locked(), "direct battle should release an interrupted countdown's layout ownership")
 	_assert_direct_combat_centroid()
 	_assert_broadcast_health_contract("desktop")
 

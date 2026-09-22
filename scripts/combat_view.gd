@@ -288,6 +288,8 @@ func reset_planning_timer(seconds: float = -1.0) -> void:
 
 
 func _update_planning_timer(delta: float) -> void:
+	if controller != null and controller.phase_transition != null and controller.phase_transition.is_transition_active():
+		return
 	var gp: Variant = _get_gs()
 	if gp == null:
 		return
@@ -394,6 +396,8 @@ func _apply_visual_theme() -> void:
 
 func _apply_visual_theme_deferred() -> void:
 	GothicUITheme.apply(self)
+	if controller != null and controller.phase_transition != null:
+		controller.phase_transition.refresh_field_material()
 	_apply_responsive_layout()
 
 func _apply_responsive_layout() -> void:
@@ -534,6 +538,8 @@ func _apply_responsive_layout() -> void:
 	_update_external_backplates()
 	call_deferred("_update_external_backplates")
 	call_deferred("_finalize_responsive_layout")
+	if controller != null and controller.phase_transition != null:
+		controller.phase_transition.refresh_return_opacity()
 
 func _finalize_responsive_layout() -> void:
 	if not is_inside_tree():

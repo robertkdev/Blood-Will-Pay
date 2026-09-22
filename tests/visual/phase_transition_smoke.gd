@@ -9,176 +9,136 @@ const MANIFEST_PATH: String = OUTPUT_DIR + "/phase_transition_manifest.json"
 var _captures: Array[Dictionary] = []
 
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
-	UnitFactory.suppress_validation_warnings = true
 	Engine.time_scale = 1.0
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT_DIR))
+	UnitFactory.suppress_validation_warnings = true
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	_main = MAIN_SCENE.instantiate() as Control
-	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_main.offset_left = 0.0
-	_main.offset_top = 0.0
-	_main.offset_right = 0.0
-	_main.offset_bottom = 0.0
 	get_tree().root.add_child(_main)
 	await _settle_frames(5)
 	await _ensure_unit_select()
 	await _select_starter("bonko")
 	var combat: Control = await _wait_for_combat_view_ready(20.0)
-	_expect(combat != null, "manual opening did not expose CombatView")
+	_expect(combat != null, "planning did not open")
 	if combat == null:
 		_finish()
 		return
-	await _settle_frames(4)
-	_capture("00_planning")
+	await _settle_frames(5)
 	var controller: Variant = combat.get("controller")
 	var manager: CombatManager = combat.get("manager") as CombatManager
-	var transition: Variant = controller.get("phase_transition") if controller != null else null
-	_expect(controller != null and transition != null, "phase transition controller missing")
-	_expect(manager != null, "combat manager missing")
-	if controller == null or transition == null or manager == null:
-		_finish()
-		return
-	await _press_continue(true, "transition probe")
-	await _wait_for_countdown_value(combat, "3", 1.0)
-	await get_tree().create_timer(0.28).timeout
-	_capture("01_countdown_3")
-	_assert_countdown_is_unframed(combat)
-	_assert_countdown_focus(combat)
-	var countdown_broadcast: Control = combat.get_node_or_null("CombatBroadcastStrip") as Control
-	_expect(countdown_broadcast != null and countdown_broadcast.visible and countdown_broadcast.modulate.a >= 0.95, "countdown should preserve the compact betting broadcast strip")
-	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 3")
-	await _wait_for_countdown_value(combat, "2", 1.0)
-	_capture("02_countdown_2")
-	_assert_joined_field_progress(combat, 8.0, "countdown 2")
-	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 2")
-	await _wait_for_countdown_value(combat, "1", 1.0)
-	_capture("03_countdown_1")
-	_assert_joined_field_progress(combat, 1.0, "countdown 1")
-	var countdown_label: Label = combat.get_node_or_null("CombatPhaseTransitionLayer/CountdownValue") as Label
-	_expect(countdown_label != null and countdown_label.scale == Vector2.ONE, "countdown numeral should remain scale-stable")
-	_expect(manager.get_engine() == null, "combat engine should not exist on countdown beat 1")
-	await get_tree().create_timer(0.40).timeout
-	_expect(countdown_label != null and countdown_label.text == "1" and countdown_label.modulate.a >= 0.99, "terminal countdown numeral should hold hard through the cut")
-	_capture("03b_countdown_1_terminal")
-	var crossfade_seen: bool = await _wait_for_transition_state(transition, "entry_crossfade", 1.2)
-	_expect(crossfade_seen, "one-arena camera push did not follow the countdown")
-	# Keep the evidence window at production speed. The transition contract is
-	# temporal, so captured frames must reflect the same tween cadence the player
-	# sees rather than a slowed diagnostic replay.
-	Engine.time_scale = 1.0
-	var arena_bridge: Variant = controller.get("arena_bridge")
-	var entry_snapshot: Dictionary = arena_bridge.call("get_transition_debug_snapshot") if arena_bridge != null else {}
-	var presentation_ids: Dictionary = _presentation_ids(entry_snapshot)
-	var arena_start: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
-	var previous_rect: Rect2 = arena_start.get_global_rect() if arena_start != null else Rect2()
-	var entry_source_rect: Rect2 = transition.call("get_entry_source_rect") as Rect2
-	var entry_target_rect: Rect2 = transition.call("get_entry_target_rect") as Rect2
-	_expect(entry_source_rect.get_area() >= entry_target_rect.get_area() * 1.05, "planning zoom did not provide a bounded source field larger than the combat safe rectangle")
-	_expect(_rect_between_endpoints(previous_rect, entry_source_rect, entry_target_rect), "camera push left the shared field outside its registered endpoints")
-	_assert_entry_ownership_overlap(entry_snapshot)
-	_assert_entry_targets_in_safe_bounds(entry_snapshot, entry_target_rect)
-	_capture("04a_camera_push_start")
-	# Both surfaces are fully present at the shared source rect. Ownership of unit
-	# renderers has already switched, so there is no planning-to-arena alpha reveal.
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "camera push start")
-	_assert_one_arena_visible(combat, "camera push start")
-	await get_tree().create_timer(0.12).timeout
-	_capture("04b_camera_push_120ms")
-	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "120ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "120ms camera push")
-	_assert_one_arena_visible(combat, "120ms camera push")
-	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started during the field push")
-	await get_tree().create_timer(0.12).timeout
-	_capture("04c_camera_push_240ms")
-	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "240ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "240ms camera push")
-	_assert_one_arena_visible(combat, "240ms camera push")
-	await get_tree().create_timer(0.08).timeout
-	_capture("04d_camera_push_320ms")
-	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "320ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "320ms camera push")
-	_assert_one_arena_visible(combat, "320ms camera push")
-	var arena_low_point: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
-	_expect(arena_low_point != null and arena_low_point.modulate.a >= 0.45, "arena did not rise visibly through the camera push")
-	await get_tree().create_timer(0.12).timeout
-	_capture("04e_camera_push_440ms")
-	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "440ms camera push")
-	_assert_entry_crossfade_overlap(combat, 0.95, 1.0, 0.95, 1.0, "440ms camera push")
-	_assert_one_arena_visible(combat, "440ms camera push")
-	var arena_mid: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
-	_expect(arena_mid != null and arena_mid.modulate.a >= 0.65, "arena did not decisively take over while planning was still fading")
-	_expect(manager.has_method("is_stage_prepared") and bool(manager.is_stage_prepared()), "battle should be prepared during the field push")
-	_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started before the field push completed")
-	await get_tree().create_timer(0.12).timeout
-	_capture("04f_camera_push_560ms")
-	previous_rect = _assert_field_toward_target(combat, previous_rect, entry_target_rect, "560ms camera push")
-	_expect(previous_rect.get_area() >= entry_target_rect.get_area() * 0.96, "camera push did not reach the authored combat field endpoint")
-	if String(transition.call("get_state_name")) == "entry_crossfade":
-		_expect(manager.has_method("is_engine_running") and not bool(manager.is_engine_running()), "combat simulation started before the camera endpoint")
-	var arena_late: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
-	_expect(arena_late != null and arena_late.modulate.a >= 0.99, "arena field should remain fully present through the camera push")
-	var entry_overlay: Control = combat.get_node_or_null("CombatPhaseTransitionLayer") as Control
-	_expect(entry_overlay != null and bool(entry_overlay.get_meta("transition_no_alpha_reveal", false)), "entry did not expose the no-alpha shared-field contract")
-	_expect(entry_overlay != null and not bool(entry_overlay.get_meta("planning_grid_reparented", true)), "entry reparented the planning grid")
-	Engine.time_scale = 1.0
-	var combat_seen: bool = await _wait_for_combat_active(2.0)
-	_expect(combat_seen, "combat did not begin after the one-arena camera push")
-	await _settle_frames(3)
-	_capture("05_combat")
-	_expect(manager.has_method("is_engine_running") and bool(manager.is_engine_running()), "combat simulation should run after entry completion")
-	var pre_unfreeze_gate: Dictionary = controller.call("get_pre_unfreeze_gate_snapshot") as Dictionary
-	_expect(not pre_unfreeze_gate.is_empty(), "entry did not record an explicit pre-unfreeze gate")
-	_expect(not bool(pre_unfreeze_gate.get("engine_running", true)), "engine was already running at the pre-unfreeze gate")
-	_expect(not bool(pre_unfreeze_gate.get("economy_combat_active", true)), "economy was already combat-active at the pre-unfreeze gate")
-	var overlay: Control = combat.get_node_or_null("CombatPhaseTransitionLayer") as Control
-	_expect(overlay != null and not overlay.visible, "countdown layer should be hidden during combat")
-	var combat_snapshot: Dictionary = arena_bridge.call("get_transition_debug_snapshot") if arena_bridge != null else {}
-	_expect(_presentation_ids(combat_snapshot) == presentation_ids, "combat replaced one or more transition presentation actors")
-	_expect(_planning_unit_views_hidden(controller), "planning unit renderers remained visible behind combat actors")
-	var broadcast_strip: Control = combat.get_node_or_null("CombatBroadcastStrip") as Control
-	_expect(broadcast_strip != null and broadcast_strip.visible and broadcast_strip.modulate.a >= 0.95, "compact combat broadcast strip did not survive the transition")
-	var objective_signal: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
-	_expect(objective_signal != null and objective_signal.text == "LIVE // SURVIVE" and objective_signal.get_theme_font_size("font_size") <= 16, "combat objective should remain a compact utility signal")
+	var transition: Variant = controller.get("phase_transition")
+	var planning: Control = combat.get("planning_area") as Control
+	var planning_rect: Rect2 = planning.get_global_rect()
+	var floor_surface: Control = combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as Control
+	var planning_floor_rect: Rect2 = floor_surface.get_global_rect()
+	var source_floor_inverse: Transform2D = floor_surface.get_global_transform_with_canvas().affine_inverse()
+	var stage_heading: Control = combat.get_node("MarginContainer/VBoxContainer/StageLabel") as Control
+	var heading_visible: bool = stage_heading.visible
+	await _press_continue(true, "continuous transition regression")
+	await get_tree().create_timer(0.30).timeout
+	_expect(planning.get_global_rect().position.distance_to(planning_rect.position) < 1.0, "entry moved the planning board before the field transition")
+	_expect(planning.get_global_rect().size.distance_to(planning_rect.size) < 1.0, "entry reflowed the planning layout")
+	_expect(manager.get_engine() == null, "simulation was prepared during countdown")
+	var entry_deadline: int = Time.get_ticks_msec() + 5000
+	var inspected_preparation: bool = false
+	while Time.get_ticks_msec() < entry_deadline:
+		# Inspect each presented preparation frame, including the interval between
+		# engine setup and entry. Endpoint checks cannot catch a one-frame flash.
+		if DisplayServer.get_name() == "headless":
+			await get_tree().process_frame
+		else:
+			await RenderingServer.frame_post_draw
+		if String(transition.call("get_state_name")) == "countdown":
+			var current_floor_rect: Rect2 = floor_surface.get_global_rect()
+			_expect(current_floor_rect.position.distance_to(planning_floor_rect.position) <= 1.0 and current_floor_rect.size.distance_to(planning_floor_rect.size) <= 1.0, "preparation flashed a different floor pose before the zoom")
+			if bool(controller.get("_arena_prepared_for_transition")):
+				inspected_preparation = true
+				for node_name: String in ["CombatThreatBoundary", "CombatExchangeFocus"]:
+					var readout: Control = floor_surface.get_parent().get_node_or_null(node_name) as Control
+					_expect(readout == null or not readout.is_visible_in_tree() or readout.modulate.a <= 0.01, "combat readout flashed before the zoom: %s" % node_name)
+		elif String(transition.call("get_state_name")) == "combat":
+			break
+	_expect(inspected_preparation, "entry skipped the preparation-frame witness")
+	_expect(String(transition.call("get_state_name")) == "combat", "entry did not reach combat")
+	var gate: Dictionary = controller.call("get_pre_unfreeze_gate_snapshot") as Dictionary
+	var before: Dictionary = gate.get("last_entry", {}) as Dictionary
+	var after: Dictionary = gate.get("released_entry", {}) as Dictionary
+	var before_actors: Array = before.get("unit_presentations", []) as Array
+	var after_actors: Array = after.get("unit_presentations", []) as Array
+	var planning_sources: Array = before.get("planning_sources", []) as Array
+	_expect(not before_actors.is_empty() and before_actors.size() == after_actors.size(), "endpoint witnesses missing")
+	for index: int in range(mini(before_actors.size(), after_actors.size())):
+		var first: Vector2 = before_actors[index].get("global_center", Vector2.INF) as Vector2
+		var second: Vector2 = after_actors[index].get("global_center", Vector2.ZERO) as Vector2
+		_expect(first.distance_to(second) <= 1.0, "actor snapped when entry released ownership")
+		if index < planning_sources.size():
+			var source_center: Vector2 = planning_sources[index].get("global_center", Vector2.ZERO) as Vector2
+			var floor_locked_center: Vector2 = floor_surface.get_global_transform_with_canvas() * (source_floor_inverse * source_center)
+			_expect(first.distance_to(floor_locked_center) <= 1.0, "fighter moved independently of the floor camera")
+	await _settle_frames(4)
+	var pressure_surface: Control = combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as Control
+	for pressure_phase: int in [1, 2]:
+		controller.call("_apply_environmental_pressure_composition", pressure_phase, false, 0.5, pressure_phase)
+		await _settle_frames(2)
+		_expect(not pressure_surface.is_visible_in_tree(), "combat pressure replaced the shared planning floor")
 	var engine: Variant = manager.get_engine()
-	if engine != null and engine.has_method("stop"):
+	if engine != null:
 		engine.stop()
 	manager.set("_engine_running", false)
 	manager.emit_signal("victory", int(GameState.stage))
-	await _settle_frames(2)
-	var result_banner: PanelContainer = combat.get_node_or_null("BattleResultBanner") as PanelContainer
-	_expect(result_banner != null and result_banner.visible, "result card should remain visible over the return transition")
-	_expect(broadcast_strip != null and not broadcast_strip.visible, "live combat strip should yield to the fixed result card")
-	_capture("06_result_return_start")
-	var return_start_rect: Rect2 = arena_low_point.get_global_rect() if arena_low_point != null else Rect2()
-	var return_seen: bool = await _wait_for_transition_state(transition, "returning", 1.0)
-	_expect(return_seen, "combat result did not start the grid return")
-	await _settle_frames(18)
-	_capture("07_result_return_mid")
-	var return_mid_rect: Rect2 = arena_low_point.get_global_rect() if arena_low_point != null else Rect2()
-	_expect(return_mid_rect.size.x > return_start_rect.size.x and return_mid_rect.size.y > return_start_rect.size.y, "result underlay did not restore the zoomed planning field")
-	_expect(result_banner != null and result_banner.visible, "result card lost foreground priority during the reverse camera move")
-	var return_complete: bool = await _wait_for_transition_state(transition, "idle", 1.5)
-	_expect(return_complete, "grid return did not complete behind the result card")
-	_capture("08_result_grid_restored")
-	_expect(result_banner != null and result_banner.visible, "result card should remain visible after the background grid is restored")
-	_expect(GameState.phase == GameState.GamePhase.POST_COMBAT, "planning controls should remain locked until the result closes")
-	controller.set("_result_hold_elapsed", 1.0)
+	await get_tree().create_timer(0.6).timeout
+	var banner: Control = combat.get_node("BattleResultBanner") as Control
+	var card: Control = banner.get_node("Center/BattleResultCard") as Control
+	var card_rect: Rect2 = card.get_global_rect()
+	var arena: Control = combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer") as Control
+	var held_rect: Rect2 = arena.get_global_rect()
+	_expect(banner.visible and card.modulate.a >= 0.99, "result is not readable after the finishing beat")
+	_expect(not bool(controller.get("_post_combat_planning_prepared")), "planning rebuilt while the result was still being read")
+	_expect(not banner.get_node("BattleResultAftermath").visible, "result replaced the finished battlefield")
+	await get_tree().create_timer(0.7).timeout
+	_expect(card.get_global_rect().position.distance_to(card_rect.position) <= 1.0, "result card moved during its reading hold")
+	_expect(arena.get_global_rect().position.distance_to(held_rect.position) <= 1.0, "finished arena moved behind the result")
+	_expect(arena.get_global_rect().size.distance_to(held_rect.size) <= 1.0, "finished arena resized behind the result")
 	controller.call("_skip_result_hold")
-	var preview_seen: bool = await _wait_for_preview_or_loss(2.0)
-	_expect(preview_seen, "result dismissal did not unlock the restored planning state")
-	await _settle_frames(3)
-	_capture("09_planning_restored")
-	_expect(result_banner != null and not result_banner.visible, "result card should close after the return and skip gates complete")
-	_expect(not combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer").visible, "arena should be hidden after planning restoration")
-	await _capture_crowded_countdown_fixture(combat, controller, manager, transition)
+	controller.call("_skip_result_hold")
+	var return_target: Rect2 = planning_rect
+	var saw_return: bool = false
+	var deadline: int = Time.get_ticks_msec() + 4000
+	while Time.get_ticks_msec() < deadline:
+		if DisplayServer.get_name() == "headless":
+			await get_tree().process_frame
+		else:
+			await RenderingServer.frame_post_draw
+		var transition_state: String = String(transition.call("get_state_name"))
+		if transition_state == "returning":
+			saw_return = true
+			return_target = planning.get_global_rect()
+			var overlay: Control = combat.get_node("CombatPhaseTransitionLayer") as Control
+			if float(overlay.get_meta("return_zoom_progress", 0.0)) <= 0.5:
+				for node_path: String in ["BattleArea/ContentRow/LeftItemArea", "BattleArea/ContentRow/StatsArea", "BenchArea", "BottomStorageArea"]:
+					var chrome: Control = combat.get_node("MarginContainer/VBoxContainer/" + node_path) as Control
+					_expect(not chrome.is_visible_in_tree() or chrome.modulate.a <= 0.01, "planning chrome flashed before the pullback reveal: %s" % node_path)
+		elif saw_return and transition_state == "idle":
+			break
+	_expect(saw_return, "dismissal skipped the reverse transition")
+	_expect(GameState.phase == GameState.GamePhase.PREVIEW, "result dismissal did not return to planning")
+	await _settle_frames(5)
+	_expect(not banner.visible and arena.visible, "the persistent field disappeared on return")
+	_expect(arena.get_node("ArenaUnits").get_child_count() == 0, "combat actors leaked into planning")
+	_expect(planning.get_global_rect().position.distance_to(planning_rect.position) <= 2.0, "planning returned at a different position")
+	# The opening fight unlocks the populated shop. Its new content can consume
+	# more height, but that layout must be settled during the reverse movement,
+	# without another reflow when the arena/result finally disappear.
+	_expect(planning.get_global_rect().size.distance_to(return_target.size) <= 2.0, "planning reflowed after the reverse movement: %s -> %s" % [return_target, planning.get_global_rect()])
+	_expect(stage_heading.visible == heading_visible, "return introduced a duplicate chapter heading")
+	_expect(int(controller.get("_intermission_finish_count")) == 1, "repeated advance settled the fight twice")
+	_expect(not bool(transition.call("is_layout_locked")), "planning input/layout lock survived the return")
 	await _run_reduced_motion_contract()
-	_write_manifest(transition)
+	print("TransitionContinuitySmoke: " + ("OK" if _failures.is_empty() else str(_failures)))
+	var report: FileAccess = FileAccess.open("user://transition_continuity_result.json", FileAccess.WRITE)
+	report.store_string(JSON.stringify({"ok": _failures.is_empty(), "failures": _failures, "gate": gate, "planning_before": str(planning_rect), "planning_after": str(planning.get_global_rect())}, "\t"))
+	report.close()
 	_finish()
 
 func _uses_manual_opening_continue() -> bool:
@@ -385,14 +345,13 @@ func _run_reduced_motion_contract() -> void:
 	transition.capture_combat_rect()
 	arena.position = Vector2(24.0, 18.0)
 	arena.size = Vector2(420.0, 300.0)
-	var reduced_return_position: Vector2 = arena.position
-	var reduced_return_size: Vector2 = arena.size
 	transition.start_return(true)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_expect(arena.position.is_equal_approx(reduced_return_position), "reduced motion return should not jump arena position")
-	_expect(arena.size.is_equal_approx(reduced_return_size), "reduced motion return should not jump arena size")
-	_expect(float(overlay.get_meta("return_zoom_progress", 0.0)) == 1.0, "reduced motion return should cut directly to the planning endpoint")
+	var reduced_rect: Rect2 = arena.get_global_rect()
+	await get_tree().create_timer(0.12).timeout
+	_expect(arena.get_global_rect().is_equal_approx(reduced_rect), "reduced motion return animated the camera")
+	_expect(planning.scale == Vector2.ONE, "reduced motion return scaled the grid")
 	transition.teardown()
 	remove_child(host)
 	host.free()

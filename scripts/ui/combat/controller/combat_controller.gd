@@ -1231,8 +1231,12 @@ func _apply_grid_dimensions(tile: int) -> void:
 		bottom_area.custom_minimum_size.y = player_top_pad + float(grid_h) + player_bottom_pad
 
 func process(_delta: float) -> void:
-	if arena_container and arena_container.visible and not _post_combat_return_started and (phase_transition == null or not phase_transition.is_transition_active()):
+	if phase_transition != null:
+		phase_transition.sync_combat_field()
+	if arena_container and arena_container.visible and GameState.phase == GameState.GamePhase.COMBAT and not _post_combat_return_started and (phase_transition == null or not phase_transition.is_transition_active()):
 		_sync_arena_units()
+	if phase_transition != null:
+		phase_transition.sync_planning_field()
 	_sync_bottom_combat_visibility()
 	sync_tactical_phase_visuals()
 	_update_environmental_pressure(_delta)
@@ -1596,11 +1600,8 @@ func _queue_battle_start() -> void:
 	if phase_transition == null:
 		call_deferred("_execute_pending_battle_start", _battle_start_generation)
 		return
-	# Commit the combat composition before the visible countdown. The board gets
-	# its larger combat-focused width once, then the transition only animates the
-	# registered field; hiding side rails after beat 1 was the source of the
-	# left/right camera correction in the previous handoff.
-	_prepare_transition_combat_layout(true)
+	# Keep the planning composition intact until the transition owns its visual
+	# state. Removing container children here reflowed the board on the click.
 	var tree: SceneTree = parent.get_tree() if parent != null else null
 	if tree != null:
 		tree.process_frame.connect(Callable(self, "_start_battle_countdown_after_layout").bind(_battle_start_generation), CONNECT_ONE_SHOT)
@@ -1612,10 +1613,7 @@ func _start_battle_countdown_after_layout(generation: int) -> void:
 		return
 	phase_transition.set_encounter_focus(_committed_confrontation_centroid())
 	phase_transition.start_countdown(_reduced_motion_enabled())
-	# A phase-visual sync can run between the preflight layout commit and the
-	# countdown callback. Re-assert the already-committed chrome state here,
-	# before any transition frame is presented.
-	_prepare_transition_combat_layout(true)
+	# The compact strip replaces the fading planning controls without reflow.
 	_sync_combat_broadcast_strip(true)
 
 func _sync_encounter_quote_kind(economy_node: Node = null) -> void:
@@ -1726,6 +1724,8 @@ func _stage_transition_arena(generation: int) -> void:
 		var source_rect: Rect2 = phase_transition.get_planning_commit_rect() if phase_transition != null else planning_area.get_global_rect()
 		arena_bridge.enter_arena(player_views, enemy_views, false, true, target_rect, source_rect)
 		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
+	if phase_transition != null:
+		phase_transition.prepare_entry_presentation()
 	var tree: SceneTree = parent.get_tree()
 	if tree != null:
 		tree.process_frame.connect(Callable(self, "_mark_transition_preparation_ready").bind(generation), CONNECT_ONE_SHOT)
@@ -1762,9 +1762,12 @@ func _begin_prepared_arena_crossfade(generation: int = -1) -> void:
 func _on_combat_entry_visual_finished() -> void:
 	if not _battle_start_pending or manager == null:
 		return
+	var last_entry: Dictionary = arena_bridge.get_transition_debug_snapshot() if arena_bridge != null else {}
 	if arena_bridge != null:
 		arena_bridge.finish_continuous_entry()
 	_pre_unfreeze_gate_snapshot = {
+		"last_entry": last_entry,
+		"released_entry": arena_bridge.get_transition_debug_snapshot() if arena_bridge != null else {},
 		"captured_at_usec": Time.get_ticks_usec(),
 		"engine_running": bool(manager.is_engine_running()) if manager.has_method("is_engine_running") else false,
 		"economy_combat_active": bool(Economy.combat_active) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else false,
@@ -2489,6 +2492,10 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 	Trace.step("CombatView._on_battle_started: begin")
 	var locked_quote_multiplier: float = _pending_combat_quote_multiplier
 	_complete_pending_battle_start()
+	if not _arena_prepared_for_transition and phase_transition != null:
+		# A direct/custom battle can replace a pending countdown. Release that
+		# camera's layout/input ownership before arranging its live arena.
+		phase_transition.reset()
 	if continue_button != null:
 		continue_button.text = BATTLE_LOCKED_TEXT
 	_encounter_escalations_seen = 0
@@ -2515,9 +2522,7 @@ func _on_battle_started(_stage: int, _enemy: Unit) -> void:
 		grid_placement.rebuild_player_views(manager.player_team, false)
 		player_views = grid_placement.get_player_views()
 	Trace.step("CombatView._on_battle_started: enter arena")
-	if _arena_prepared_for_transition:
-		arena_bridge.configure_engine_arena(manager, player_views, enemy_views)
-	else:
+	if not _arena_prepared_for_transition:
 		_enter_combat_arena()
 	_arena_prepared_for_transition = false
 	if phase_transition != null:
@@ -2837,11 +2842,12 @@ func _begin_post_combat_return() -> void:
 	_post_combat_cleanup_steps_ms.clear()
 	if phase_transition != null:
 		phase_transition.capture_combat_rect()
-	var tree: SceneTree = parent.get_tree() if parent != null else null
-	if tree != null:
-		tree.process_frame.connect(Callable(self, "_prepare_post_combat_planning_return"), CONNECT_ONE_SHOT)
-	else:
-		_prepare_post_combat_planning_return()
+	var focus: Control = arena_container.get_node_or_null("ArenaCombatFocusPainter") as Control if arena_container != null else null
+	if focus != null:
+		var settle_tween: Tween = parent.create_tween()
+		settle_tween.tween_property(focus, "modulate:a", 0.18, 0.25)
+	# Hold the actual finished fight. Cleanup and the reverse camera movement
+	# begin only when the existing advance/auto-advance action dismisses it.
 
 func _build_result_economy_detail(outcome: String, bounty_result: Dictionary = {}) -> String:
 	var economy: Node = _autoload_node("Economy")
@@ -2970,9 +2976,11 @@ func _on_intermission_finished() -> void:
 		_finalize_post_combat_return()
 
 func _prepare_post_combat_planning_return() -> void:
-	if _post_combat_planning_prepared or not _post_combat_return_started:
+	if _post_combat_planning_prepared or not _post_combat_return_started or not _result_dismiss_requested:
 		return
 	_post_combat_planning_prepared = true
+	arena_bridge.capture_return_actors()
+	_hide_result_banner()
 	var cleanup_step_usec: int = Time.get_ticks_usec()
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		GameState.set_phase(GameState.GamePhase.POST_COMBAT)
@@ -3019,6 +3027,14 @@ func _prepare_post_combat_planning_return() -> void:
 				Shop.add_free_rerolls(1)
 				Shop.reroll()
 	_post_combat_cleanup_steps_ms["shop_refresh"] = float(Time.get_ticks_usec() - cleanup_step_usec) / 1000.0
+	# Resolve the real next planning layout while it is still covered. The
+	# transition overlay keeps input locked until the reverse camera completes.
+	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
+		GameState.set_phase(GameState.GamePhase.PREVIEW)
+	if phase_transition != null:
+		phase_transition.prepare_return_layout()
+	if parent.has_method("_apply_responsive_layout"):
+		parent.call("_apply_responsive_layout")
 	_update_stage_label()
 	_sync_bottom_combat_visibility(true)
 	sync_tactical_phase_visuals(true)
@@ -3718,6 +3734,8 @@ func _sync_arena_units() -> void:
 
 func _exit_combat_arena() -> void:
 	arena_bridge.exit_arena()
+	if phase_transition != null:
+		phase_transition.sync_planning_field()
 
 func _configure_engine_arena() -> void:
 	if not manager:
@@ -3755,6 +3773,15 @@ func _sync_bottom_combat_visibility(force: bool = false) -> void:
 	_set_root_control_visible("GothicShopCommandPlate", planning_visible)
 
 func _prepare_transition_combat_layout(preserve_countdown_context: bool = false) -> void:
+	if phase_transition != null and phase_transition.is_layout_locked():
+		# The arena can occupy the viewport without removing planning containers
+		# from their layout. They keep their geometry behind the moving field.
+		arena_container.set_meta("combat_target_rect", phase_transition.get_combat_viewport_rect())
+		arena_container.set_meta("use_full_combat_bounds", true)
+		_apply_environmental_pressure_composition(0, _reduced_motion_enabled(), 0.0, 0)
+		_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary", true)
+		phase_transition.prepare_entry_presentation()
+		return
 	for path: String in [
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
@@ -3791,7 +3818,12 @@ func _prepare_transition_combat_layout(preserve_countdown_context: bool = false)
 
 func _on_transition_field_progress_changed(progress: float) -> void:
 	if arena_bridge != null:
-		arena_bridge.apply_field_progress(progress)
+		if phase_transition != null and phase_transition.is_returning():
+			arena_bridge.apply_return_progress(progress)
+		else:
+			arena_bridge.apply_field_progress(progress)
+	if phase_transition != null and phase_transition.get_state_name() == "entry_crossfade":
+		_update_combat_focus_frame(arena_container, 0, _reduced_motion_enabled())
 	_sync_combat_broadcast_strip(true)
 
 func get_pre_unfreeze_gate_snapshot() -> Dictionary[String, Variant]:
@@ -3887,7 +3919,7 @@ func _sync_combat_broadcast_strip(force: bool = false) -> void:
 	var in_combat: bool = false
 	if Engine.has_singleton("GameState") or parent.has_node("/root/GameState"):
 		in_combat = int(GameState.phase) == int(GameState.GamePhase.COMBAT)
-	var should_show: bool = _battle_start_pending or in_combat
+	var should_show: bool = (_battle_start_pending or in_combat) and not _post_combat_return_started
 	if force or combat_broadcast_strip.visible != should_show:
 		combat_broadcast_strip.visible = should_show
 	if not should_show:
@@ -3953,7 +3985,7 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 	_update_tactical_shell_layout(in_combat)
 	var focus_painter: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCombatFocusPainter") as Control
 	if focus_painter != null:
-		focus_painter.visible = in_combat
+		focus_painter.visible = in_combat and not bool(arena_container.get_meta("shared_field_camera", false))
 	if in_combat:
 		_update_environmental_pressure(0.0)
 	_enforce_reduced_motion_composition_lock()
@@ -3961,6 +3993,8 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 
 func _update_tactical_shell_layout(in_combat: bool) -> void:
 	if parent == null:
+		return
+	if phase_transition != null and phase_transition.is_layout_locked():
 		return
 	var battle_area: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	if battle_area != null:
@@ -3974,10 +4008,10 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 			battle_area.custom_minimum_size.y = float(battle_area.get_meta("planning_minimum_height", 604.0))
 			battle_area.remove_meta("planning_minimum_height")
 	if stage_label != null:
-		stage_label.visible = not in_combat
+		stage_label.visible = not in_combat and not bool(parent.get_meta("compact_layout", false))
 	var planning_timer: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Control
 	if planning_timer != null:
-		planning_timer.visible = not in_combat
+		planning_timer.visible = false
 	if arena_container != null:
 		arena_container.set_meta("use_full_combat_bounds", in_combat)
 	var arena_objective: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
@@ -4006,6 +4040,8 @@ func _configure_compact_objective_signal(objective: Label) -> void:
 
 func _update_environmental_pressure(delta: float) -> void:
 	if parent == null or _tactical_phase_visual_state != 1:
+		return
+	if _post_combat_return_started:
 		return
 	_combat_pressure_elapsed += maxf(0.0, delta)
 	var reduced_motion: bool = _reduced_motion_enabled()
@@ -4067,6 +4103,9 @@ func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_mot
 		return
 	var focus_painter: Control = arena.get_node_or_null("ArenaCombatFocusPainter") as Control
 	if focus_painter == null:
+		return
+	if bool(arena.get_meta("shared_field_camera", false)):
+		focus_painter.visible = false
 		return
 	var bounds: Rect2 = Rect2()
 	var found_actor: bool = false
@@ -4179,7 +4218,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		# The breach is already authored for phase zero; exposing its parent at the
 		# instant combat starts makes the field feel invaded instead of briefly
 		# reverting to an empty tactical grid.
-		aftermath.visible = true
+		aftermath.visible = not bool(arena.get_meta("shared_field_camera", false))
 		aftermath.modulate = Color(1.0, 1.0, 1.0, 0.82 if effective_phase == 0 and not reduced_motion else 1.0)
 	if onset != null:
 		onset.visible = true
@@ -4204,7 +4243,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		pressure_painter.call("configure", effective_phase, reduced_motion, casualty_pressure, casualty_event_index)
 	var focus_painter: Control = arena.get_node_or_null("ArenaCombatFocusPainter") as Control
 	if focus_painter != null:
-		focus_painter.visible = true
+		focus_painter.visible = not bool(arena.get_meta("shared_field_camera", false))
 		if focus_painter.has_method("configure"):
 			focus_painter.call("configure", effective_phase, reduced_motion)
 	var arena_surface: TextureRect = arena.get_node_or_null("GothicArenaSurface") as TextureRect
@@ -4217,7 +4256,9 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var pressure_surface: TextureRect = arena.get_node_or_null("GothicArenaPressureSurface") as TextureRect
 	if pressure_surface != null:
 		pressure_surface.texture = GothicUIAssets.battlefield_reduced_motion_texture() if reduced_motion else GothicUIAssets.battlefield_midfight_texture()
-		pressure_surface.visible = reduced_motion or effective_phase >= 1
+		# This full-field raster changes the ground itself. A shared camera must
+		# keep the planning floor throughout the fight and its reverse movement.
+		pressure_surface.visible = not bool(arena.get_meta("shared_field_camera", false)) and (reduced_motion or effective_phase >= 1)
 		pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.86 if reduced_motion else 0.90 if effective_phase == 1 else 1.0)
 		pressure_surface.set_meta("active_material_phase", "reduced_motion_static" if reduced_motion else phase_name)
 		pressure_surface.set_meta("landmark_aligned_with_base", true)
@@ -4345,6 +4386,8 @@ func _set_control_visible(path: String, visible_state: bool) -> void:
 		return
 	var control: Control = parent.get_node_or_null(path) as Control
 	if control != null:
+		if phase_transition != null and phase_transition.owns_layout(control):
+			return
 		control.visible = visible_state
 
 func _set_root_control_visible(node_name: String, visible_state: bool) -> void:
@@ -4352,6 +4395,8 @@ func _set_root_control_visible(node_name: String, visible_state: bool) -> void:
 		return
 	var control: Control = parent.get_node_or_null(node_name) as Control
 	if control != null:
+		if phase_transition != null and phase_transition.owns_layout(control):
+			return
 		control.visible = visible_state
 
 func _ensure_phase_transition_bridge() -> Control:
@@ -4588,22 +4633,15 @@ func _show_result_banner(title: String, detail: String, accent_color: Color, tit
 		card.scale = Vector2.ONE
 		card.pivot_offset = card.custom_minimum_size * 0.5
 	if not _reduced_motion_enabled() and card != null and parent.get_tree() != null:
-		banner.modulate.a = 0.0
-		var reveal_scale: Vector2 = Vector2(0.84, 1.0)
-		var reveal_profile: String = "survival_record_opens"
-		if title == "STALEMATE":
-			reveal_scale = Vector2(0.96, 0.84)
-			reveal_profile = "suspended_record_drops"
-		elif title == "DEFEAT":
-			reveal_scale = Vector2(1.0, 0.78)
-			reveal_profile = "consequence_record_collapses"
-		card.scale = reveal_scale
-		card.set_meta("motion_profile", reveal_profile)
-		var reveal_tween: Tween = parent.get_tree().create_tween()
-		reveal_tween.set_parallel(true)
-		reveal_tween.tween_property(banner, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		reveal_tween.tween_property(card, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		# Give the finishing hit a beat, then reveal an already-laid-out card.
+		# Its position and scale remain fixed throughout the reading interval.
+		card.modulate.a = 0.0
+		card.set_meta("motion_profile", "finished_field_fixed_record")
+		var reveal_tween: Tween = parent.create_tween()
+		reveal_tween.tween_interval(0.25)
+		reveal_tween.tween_property(card, "modulate:a", 1.0, 0.18)
 	elif card != null:
+		card.modulate.a = 1.0
 		card.set_meta("motion_profile", "reduced_motion_static")
 
 func _configure_result_outcome(
@@ -4745,15 +4783,15 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 		_result_banner.offset_top = top_reservation
 		var center: CenterContainer = _result_banner.get_node_or_null("Center") as CenterContainer
 		if center != null:
-			center.anchor_left = 0.0 if compact_layout else 0.14 if title == "VICTORY" else 0.18 if title == "STALEMATE" else 0.36
-			center.anchor_right = 1.0 if compact_layout else 0.86 if title == "VICTORY" else 0.82 if title == "STALEMATE" else 0.96
+			center.anchor_left = 0.0
+			center.anchor_right = 1.0
 			center.anchor_top = 0.0
 			center.anchor_bottom = 1.0
 			center.offset_left = 0.0
 			center.offset_right = 0.0
-			center.offset_top = 0.0 if compact_layout else -34.0
-			center.offset_bottom = 0.0 if compact_layout else -34.0
-			center.set_meta("outcome_composition", "wide_escape_left" if title == "VICTORY" else "suspended_center" if title == "STALEMATE" else "grave_descent_right")
+			center.offset_top = 0.0
+			center.offset_bottom = 0.0
+			center.set_meta("outcome_composition", "fixed_center_over_finished_fight")
 
 func _result_uses_compact_layout(viewport_size: Vector2) -> bool:
 	var ui_scale: float = float(UserSettingsScript.get_ui_scale())
@@ -5312,7 +5350,9 @@ func _configure_result_aftermath(banner: PanelContainer, title: String, accent_c
 	var viewport_size: Vector2 = parent.get_viewport_rect().size if parent != null else Vector2(1920.0, 1080.0)
 	var compact_layout: bool = _result_uses_compact_layout(viewport_size)
 	if aftermath != null:
-		aftermath.visible = true
+		# The live arena is the aftermath. An opaque replacement discarded the
+		# finishing moment and concealed the reverse transition underneath it.
+		aftermath.visible = false
 		aftermath.modulate = Color.WHITE
 		aftermath.set_meta("outcome_variant", title.to_lower())
 		aftermath.set_meta("physical_geometry_signature", "persistent_field_open_escape" if title == "VICTORY" else "persistent_field_suspended_deadlock" if title == "STALEMATE" else "persistent_field_grave_descent")
