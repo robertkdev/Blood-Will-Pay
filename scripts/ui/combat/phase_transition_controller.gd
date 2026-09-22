@@ -98,7 +98,7 @@ func sync_planning_field() -> void:
 	var content: Control = _host.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow") as Control
 	if content != null:
 		content.z_index = 20
-	for path: String in ["TopArea/GothicPlanningTopSurface", "BottomArea/GothicPlanningBottomSurface"]:
+	for path: String in ["TopArea/GothicPlanningTopSurface", "BottomArea/GothicPlanningBottomSurface", "TopArea/PlanningWarFieldTopPainter", "BottomArea/PlanningWarFieldBottomPainter"]:
 		var old_surface: Control = _planning_area.get_node_or_null(path) as Control
 		if old_surface != null:
 			old_surface.visible = false
@@ -109,6 +109,7 @@ func sync_planning_field() -> void:
 				(child as Control).modulate.a = 1.0
 	_set_field_rect(rect)
 	_arena_container.visible = true
+	_arena_container.set_meta("shared_field_camera", true)
 	_arena_container.modulate.a = 1.0
 	var surface: TextureRect = _arena_container.get_node_or_null("GothicArenaSurface") as TextureRect
 	if surface == null or surface.texture == null:
@@ -269,14 +270,6 @@ func start_countdown(reduced_motion: bool) -> void:
 	_active_tween.tween_method(Callable(self, "_set_countdown_progress"), 0.0, 1.0, COUNTDOWN_DURATION_SECONDS)
 	if not _reduced_motion:
 		_active_tween.parallel().tween_property(_planning_area, "scale", Vector2.ONE * ENTRY_ZOOM_SCALE, COUNTDOWN_DURATION_SECONDS)
-	for record: Dictionary in _context_records:
-		var control: Control = _record_control(record)
-		if control != null:
-			_active_tween.parallel().tween_property(control, "modulate:a", CONTEXT_ENTRY_ALPHA, CONTEXT_FADE_SECONDS)
-	for record: Dictionary in _chrome_records:
-		var control: Control = _record_control(record)
-		if control != null:
-			_active_tween.parallel().tween_property(control, "modulate:a", CHROME_ENTRY_ALPHA, CHROME_FADE_SECONDS)
 	_active_tween.tween_callback(Callable(self, "_finish_countdown"))
 
 func capture_entry_target_rect() -> void:
@@ -472,6 +465,10 @@ func _set_entry_progress(progress: float) -> void:
 	_set_floor_transform(origin, _floor_scale * zoom)
 	_set_planning_camera(eased_progress)
 	field_progress_changed.emit(eased_progress)
+	for record: Dictionary in _context_records + _chrome_records:
+		var control: Control = _record_control(record)
+		if control != null:
+			_set_alpha(control, float(record.get("alpha", 1.0)) * (1.0 - smoothstep(0.0, 0.5, eased_progress)))
 	# The floor never fades. Only the grid and the combat readouts change opacity.
 	for record: Dictionary in _surface_records:
 		var surface: Control = _record_control(record)

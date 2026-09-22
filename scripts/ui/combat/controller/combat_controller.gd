@@ -3977,7 +3977,7 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 	_update_tactical_shell_layout(in_combat)
 	var focus_painter: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaCombatFocusPainter") as Control
 	if focus_painter != null:
-		focus_painter.visible = in_combat
+		focus_painter.visible = in_combat and not bool(arena_container.get_meta("shared_field_camera", false))
 	if in_combat:
 		_update_environmental_pressure(0.0)
 	_enforce_reduced_motion_composition_lock()
@@ -4096,6 +4096,9 @@ func _update_combat_focus_frame(arena: Control, pressure_phase: int, reduced_mot
 	var focus_painter: Control = arena.get_node_or_null("ArenaCombatFocusPainter") as Control
 	if focus_painter == null:
 		return
+	if bool(arena.get_meta("shared_field_camera", false)):
+		focus_painter.visible = false
+		return
 	var bounds: Rect2 = Rect2()
 	var found_actor: bool = false
 	var player_actors: Array[Control] = []
@@ -4207,7 +4210,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		# The breach is already authored for phase zero; exposing its parent at the
 		# instant combat starts makes the field feel invaded instead of briefly
 		# reverting to an empty tactical grid.
-		aftermath.visible = true
+		aftermath.visible = not bool(arena.get_meta("shared_field_camera", false))
 		aftermath.modulate = Color(1.0, 1.0, 1.0, 0.82 if effective_phase == 0 and not reduced_motion else 1.0)
 	if onset != null:
 		onset.visible = true
@@ -4232,7 +4235,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		pressure_painter.call("configure", effective_phase, reduced_motion, casualty_pressure, casualty_event_index)
 	var focus_painter: Control = arena.get_node_or_null("ArenaCombatFocusPainter") as Control
 	if focus_painter != null:
-		focus_painter.visible = true
+		focus_painter.visible = not bool(arena.get_meta("shared_field_camera", false))
 		if focus_painter.has_method("configure"):
 			focus_painter.call("configure", effective_phase, reduced_motion)
 	var arena_surface: TextureRect = arena.get_node_or_null("GothicArenaSurface") as TextureRect
