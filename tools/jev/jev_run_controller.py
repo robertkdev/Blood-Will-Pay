@@ -75,7 +75,7 @@ def _rules_digest(rules: dict) -> str:
         f"COMPOSITION: {rules.get('composition', {}).get('rule', '')}",
         f"POWER: {rules.get('power', {}).get('rule', '')} {rules.get('power', {}).get('deployed_payoff', '')}",
         f"PLAYSTYLE: {playstyle.get('identity', '')}",
-        f"FLEX: {flex.get('rule', '')} {flex.get('keep_options_open', '')}",
+        f"FLEX: {flex.get('rule', '')} {flex.get('keep_options_open', '')} {flex.get('pass_rule', '')}",
         f"VERTICAL: {vertical.get('rule', '')} {vertical.get('one_piece_away', '')}",
         f"FORCE: {force.get('rule', '')} {force.get('when_not_to_force', '')}",
         f"LEVEL: {rules.get('level', {}).get('rule', '')} {rules.get('level', {}).get('unit_levels', '')} {rules.get('level', {}).get('combine_priority', '')}",

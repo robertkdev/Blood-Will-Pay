@@ -622,6 +622,44 @@ Three seeds is not enough to call this settled, and the clock still decides figh
 every run here. But it is a better starting point for improving the policy than any
 aggregate win rate: there is now a specific, reproducible opponent to beat.
 
+## First policy iteration: a pass rule, and what it did and did not change
+
+The baseline's most obvious difference was that it passed far more, so the shipped
+policy gained an explicit pass rule: *"Pass when the offer neither fills a missing
+role, nor advances a trait you hold, nor is a same-level duplicate you are two copies
+into. A defensive pass is a real move."* The digest had to be trimmed to fit
+afterwards - see the budget note below.
+
+| Arm | Reached chapter 2 | Battles | Buys | Passes | Pass rate |
+| --- | --- | --- | --- | --- | --- |
+| flex, before | 1 of 3 | 6, 6, 10 | 17 | 7 | 0.29 |
+| flex, with the pass rule | 2 of 3 | 12, 9, 5 | 24 | 11 | 0.31 |
+| scripted baseline | 2 of 3 | 6, 11, 12 | 17 | 22 | 0.56 |
+
+**The headline improved and the mechanism did not.** Jev moved from one seed reaching
+chapter 2 to two, matching the scripted baseline on the same seeds - and one seed
+regressed, 90210 going from 2:2 to 1:4.
+
+But the stated reason was wrong. The pass *rate* barely moved: 0.29 before, 0.31
+after, against the baseline's 0.56. Jev did not become more selective. It bought
+absolutely more (24 against 17) because it survived longer and therefore visited more
+shops, and it passed more for the same reason. **Comparing raw buy and pass counts
+across runs of different length is the same mistake as counting purchase decisions as
+shops** - the totals scale with the number of beats, so the rate is the honest
+measure and the totals are not.
+
+So the improvement is real in the headline and unexplained in the mechanism. At n=3
+with one regression it could be noise, and a policy-text change moves every prompt at
+once, so this cannot be attributed to the pass rule specifically. It needs more seeds
+before it means anything.
+
+One thing the iteration did prove: the digest budget check works. Adding the rule took
+the digest to 5,223 characters against a 5,200 limit, which would have silently cut
+the shown-odds rule off the end of every prompt. The check caught it, the policy was
+trimmed to 5,123, and the test now evaluates the controller's own f-strings rather
+than a hand-built approximation - two earlier versions of it under-counted and passed
+while the real digest was being truncated.
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would

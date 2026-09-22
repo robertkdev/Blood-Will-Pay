@@ -84,54 +84,75 @@ class PowerLanguageTest(unittest.TestCase):
 
 
 class DigestCoverageTest(unittest.TestCase):
+    def _controller_digest(self) -> tuple[str, int, int]:
+        """Rebuild the digest the controller actually sends.
+
+        Evaluating the controller's own f-strings rather than re-deriving the text is
+        deliberate. Two earlier versions of this check reconstructed the digest by
+        hand and both under-counted - one ignored the "LABEL: " prefixes, the next
+        ignored a whole field - so each passed while the real digest was being
+        truncated. Returns (digest, limit, untruncated_length).
+        """
+        controller_source = (Path(__file__).with_name("jev_run_controller.py")).read_text(encoding="utf-8")
+        limit = int(re.search(r"RULE_DIGEST_LIMIT = (\d+)", controller_source).group(1))
+        body = controller_source.split("def _rules_digest", 1)[1].split("\n    return", 1)[0]
+        expressions = re.findall(r'f"(.+?)",\s*$', body, re.M)
+        self.assertGreaterEqual(len(expressions), 15, "could not parse the digest f-strings")
+        rules = policy()
+        wager = rules.get("wager", {})
+        playstyle = rules.get("playstyle", {})
+        scope = {
+            "rules": rules,
+            "reserve": rules.get("reserve", {}),
+            "wager": wager,
+            "playstyle": playstyle,
+            "flex": playstyle.get("flex", {}),
+            "vertical": playstyle.get("vertical", {}),
+            "force": playstyle.get("force", {}),
+            "multipliers": ", ".join(
+                f"{kind} {value}x" for kind, value in sorted(wager.get("quote_multipliers", {}).items())
+            ),
+        }
+        for expression in expressions:
+            self.assertNotIn('"', expression, "digest f-strings must not contain double quotes")
+        # Evaluate each captured body as the f-string it is in the controller.
+        lines = [eval('f"' + expression + '"', scope) for expression in expressions]  # noqa: S307 - our own source
+        kept = [line for line in lines if line.split(": ", 1)[-1]]
+        untruncated = "\n".join(kept)
+        return untruncated[:limit], limit, len(untruncated)
+
     def test_the_authored_policy_fits_the_prompt_digest_budget(self) -> None:
         # The digest is truncated to a fixed length, so a policy that grows past the
         # budget silently loses its tail - the last rules stop reaching the model
-        # without anything failing. Rebuild the flattened text the controller sends
-        # and check it still fits.
-        controller_source = (Path(__file__).with_name("jev_run_controller.py")).read_text(encoding="utf-8")
-        limit = int(re.search(r"RULE_DIGEST_LIMIT = (\d+)", controller_source).group(1))
-        digest_body = controller_source.split("def _rules_digest", 1)[1].split("\n\n    return", 1)[0]
-        # The digest prefixes every section with "LABEL: ", and an approximation that
-        # ignores those prefixes under-reports the total - which is exactly how an
-        # earlier version of this check passed while the real digest was truncated.
-        labels = re.findall(r'f"([A-Z][A-Z ]*):', digest_body)
-        self.assertGreaterEqual(len(labels), 15, "the digest should still emit every authored section")
-        overhead = sum(len(label) + 2 for label in labels) + max(0, len(labels) - 1)
-
-        rules = policy()
-        playstyle = rules["playstyle"]
-        parts = [
-            rules["goal"],
-            rules["reserve"]["rule"],
-            rules["decision_quality_gates"]["rule"],
-            rules["wager"]["rule"],
-            rules["wager"]["sizing"],
-            rules["composition"]["rule"],
-            rules["power"]["rule"],
-            rules["power"]["deployed_payoff"],
-            playstyle["identity"],
-            playstyle["flex"]["rule"],
-            playstyle["flex"]["keep_options_open"],
-            playstyle["vertical"]["rule"],
-            playstyle["vertical"]["one_piece_away"],
-            playstyle["force"]["rule"],
-            playstyle["force"]["when_not_to_force"],
-            rules["level"]["rule"],
-            rules["level"]["unit_levels"],
-            rules["level"]["combine_priority"],
-            rules["contracts"]["rule"],
-            rules["stall"]["rule"],
-            rules["stall"]["clock_rule"],
-            rules["shown_odds"]["rule"],
-        ]
-        flattened = "\n".join(parts) + "\n" + f"WAGER QUOTES: {', '.join(sorted(rules['wager']['quote_multipliers']))}"
-        total = len(flattened) + overhead
+        # without anything failing.
+        digest, limit, untruncated = self._controller_digest()
         self.assertLessEqual(
-            total,
+            untruncated,
             limit,
-            f"authored rules plus {len(labels)} section labels reach {total} characters but the digest keeps only {limit}",
+            f"authored rules reach {untruncated} characters but the digest keeps only {limit}; the tail is dropped",
         )
+        self.assertEqual(len(digest), untruncated)
+
+    def test_every_authored_policy_field_reaches_the_prompt(self) -> None:
+        # A field that no digest line reads is authored but never shown to the model.
+        digest, _, _ = self._controller_digest()
+        rules = policy()
+        for section, field in (
+            ("power", "rule"),
+            ("power", "deployed_payoff"),
+            ("playstyle", "identity"),
+            ("level", "unit_levels"),
+            ("level", "combine_priority"),
+            ("composition", "rule"),
+            ("stall", "rule"),
+            ("stall", "clock_rule"),
+            ("shown_odds", "rule"),
+        ):
+            value = str(rules[section][field])
+            self.assertIn(value, digest, f"{section}.{field} is authored but never reaches the prompt")
+        for field in ("rule", "keep_options_open", "pass_rule"):
+            value = str(rules["playstyle"]["flex"][field])
+            self.assertIn(value, digest, f"playstyle.flex.{field} is authored but never reaches the prompt")
 
     def test_the_new_power_section_is_read_by_the_digest(self) -> None:
         controller_source = (Path(__file__).with_name("jev_run_controller.py")).read_text(encoding="utf-8")

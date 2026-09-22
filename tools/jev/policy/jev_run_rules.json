@@ -43,7 +43,8 @@
     "identity": "This is a gambling game with strategy. Play flex first: take what the shop gives you, keep later shops useful, and let the game hand you a direction. A vertical is a gift when it arrives; forcing one is a paid gamble.",
     "flex": {
       "rule": "Default plan. Buy the offer that fills the role the board is missing, adds a trait count you already hold, or is the cheapest real power on the shelf; prefer offers whose traits overlap what you own. Traits count unique units, so a second copy of a deployed unit adds no trait count.",
-      "keep_options_open": "Do not commit the board to one trait early. Two or three units sharing traits with what you own beat one piece of a plan you cannot complete."
+      "keep_options_open": "Do not commit the board to one trait early. Two or three units sharing traits with what you own beat one piece of a plan you cannot complete.",
+      "pass_rule": "Pass when the offer neither fills a missing role, nor advances a trait you hold, nor is a same-level duplicate you are two copies into. A defensive pass is a real move."
     },
     "vertical": {
       "rule": "When the board stacks a trait or sits one piece below the next threshold, the piece that finishes it is a good buy - provided the tier actually activates on the board you will field. Only deployed units count, so on a full board the swap costs the replaced unit's own trait count.",
@@ -56,7 +57,7 @@
   },
   "level": {
     "rule": "Buy XP when the level-up raises capacity, when the board is full but the bench is not, or when the shop cannot improve the board and the reserve can pay.",
-    "unit_levels": "Unit level is the biggest middle-game power lever: a level-2 copy is worth well more than a level-1 of the same identity, and three same-level copies convert into one stronger unit. (An earlier calibration's 40% / 61% / 79% odds at levels 1 / 2 / 3 have not been re-verified on this build.)",
+    "unit_levels": "Unit level is the biggest middle-game power lever: a level-2 copy is worth well more than a level-1 of the same identity, and three same-level copies convert into one stronger unit. (An earlier 40% / 61% / 79% odds calibration has not been re-verified on this build.)",
     "combine_priority": "Take a duplicate that completes a third copy at a level you already hold when the board has room - but a stronger unit, an item, an extra slot, or a trait breakpoint can supply the same power sooner. A combine is one option, not the required path into chapter 2."
   },
   "contracts": {
