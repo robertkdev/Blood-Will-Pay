@@ -33,6 +33,10 @@ const MAX_SAME_STAGE_RETRIES: int = 3
 ## click path records it as a technical failure and the whole run becomes unusable. Each
 ## attempt is still a real engine-parsed mouse event; only the retries are new.
 const SHOP_CLICK_ATTEMPTS: int = 3
+## Equip decisions asked per planning beat. Two components on one unit combine
+## automatically, so placing a component can be a two-step commitment and a single
+## pass is not enough to place a carried component.
+const ITEM_DECISIONS_PER_BEAT: int = 4
 const MAX_REROLLS_PER_SHOP: int = 3
 const WAGER_PRESET_SHARES: Array[float] = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
 const COMBAT_LOG_KEYWORDS: Array[String] = [
@@ -631,16 +635,19 @@ func _reroll_button() -> Button:
 			return button
 	return null
 
-## Bounded retry around the inherited shop-slot click. Only the last attempt's failure
-## is kept, so a single dropped mouse event does not turn a valid run into a technical
-## failure - but a slot that genuinely cannot be clicked still fails loudly.
-func _click_shop_slot(slot_index: int) -> bool:
+## Bounded retry around every inherited button click. Synthetic mouse events
+## intermittently miss controls that are visibly present, enabled and mouse_filter 0 -
+## seen on a shop slot and then on the unit-select start button, where the miss aborted
+## the whole run before the first fight. Each attempt is still a real engine-parsed
+## mouse event; only the retries are new. Only the final attempt's failure is kept, so a
+## control that genuinely cannot be clicked still fails loudly.
+func _click_button(button: Button, label: String) -> bool:
 	for attempt: int in range(SHOP_CLICK_ATTEMPTS):
 		var failures_before: int = _failures.size()
-		var clicked: bool = await super._click_shop_slot(slot_index)
+		var clicked: bool = await super._click_button(button, label)
 		if clicked:
 			if attempt > 0:
-				_append_event("shop_click_retry", {"slot": slot_index, "attempt": attempt + 1})
+				_append_event("click_retry", {"label": label, "attempt": attempt + 1})
 			return true
 		if attempt + 1 >= SHOP_CLICK_ATTEMPTS:
 			return false
@@ -754,6 +761,9 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	# chosen against the real post-contract reserve, then hand off to the shared
 	# start-battle click path.
 	await _resolve_pending_contract_market()
+	# Items before the wager: a component that completes an item changes the board the
+	# wager is being placed on, so the risk decision has to see the equipped board.
+	await _decide_items(label)
 	await _decide_wager(label)
 	_ensure_combat_log_connected()
 	_last_combat_outcome = ""
@@ -1274,6 +1284,106 @@ func _shop_candidates() -> Array[Dictionary]:
 			"cost": reroll_price,
 		})
 	return candidates
+
+## Item assignment, decided by Jev rather than by a helper.
+##
+## Items matter more than the policy's silence suggests: a component's value depends on
+## which unit receives it, and `Items.equip` auto-combines two components that land on
+## the same unit. That makes "which unit gets this component" the whole decision, and it
+## is a decision the player makes, so it belongs here.
+func _item_candidates() -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	if Items == null:
+		return candidates
+	var inventory: Dictionary = Items.get_inventory_snapshot()
+	var board: Array[Unit] = _board_units()
+	if board.is_empty():
+		return candidates
+	for raw_id: Variant in inventory.keys():
+		var item_id: String = String(raw_id).strip_edges()
+		if item_id == "" or item_id == "remover" or int(inventory[raw_id]) <= 0:
+			continue
+		var def: Variant = ItemCatalog.get_def(item_id)
+		var item_name: String = item_id
+		var item_kind: String = "unknown"
+		var item_tags: String = ""
+		var item_mods: String = ""
+		if def != null:
+			item_name = String(def.get("name")) if String(def.get("name")) != "" else item_id
+			item_kind = String(def.get("type"))
+			item_tags = ", ".join(def.get("tags"))
+			item_mods = JSON.stringify(def.get("stat_mods"))
+		for unit: Unit in board:
+			if Items.get_equipped(unit).size() >= Items.slot_count(unit):
+				continue
+			var unit_id: String = _unit_id(unit)
+			candidates.append({
+				"id": "equip_%s_on_%s" % [item_id, unit_id],
+				"label": "Equip %s to %s (level %d, %s)." % [item_name, unit_id, int(unit.level), String(unit.get("primary_role")) if unit.get("primary_role") != null else "unit"],
+				"effect": "Put %s (%s%s%s) on %s, which currently holds %s. Two components on one unit combine automatically." % [
+					item_name,
+					item_kind,
+					", tags: " + item_tags if item_tags != "" else "",
+					", mods: " + item_mods if item_mods != "{}" else "",
+					unit_id,
+					", ".join(Items.get_equipped(unit)) if not Items.get_equipped(unit).is_empty() else "nothing",
+				],
+				"item_id": item_id,
+				"unit_id": unit_id,
+			})
+	if candidates.is_empty():
+		return candidates
+	candidates.append({
+		"id": "hold_items",
+		"label": "Hold every item for now.",
+		"effect": "Keep the components unassigned until a better unit is on the board.",
+	})
+	return candidates
+
+## One planning beat can need several item decisions: two components on one unit is a
+## deliberate two-step play, so a single pass would leave the second one unplaced.
+func _decide_items(label: String) -> void:
+	for _round: int in range(ITEM_DECISIONS_PER_BEAT):
+		var candidates: Array[Dictionary] = _item_candidates()
+		if candidates.size() <= 1:
+			return
+		var state: Dictionary = _plan_state()
+		var equipped: Array[Dictionary] = []
+		for unit: Unit in _board_units():
+			equipped.append({
+				"unit_id": _unit_id(unit),
+				"level": int(unit.level),
+				"items": Items.get_equipped(unit),
+			})
+		state["equipped"] = equipped
+		state["items_held"] = Items.get_inventory_snapshot()
+		var decision: Dictionary = await _ask_decision("item_equip", state, candidates)
+		var chosen: String = String(decision.get("choice_id", ""))
+		if chosen == "hold_items" or chosen == "":
+			return
+		var placed: bool = false
+		for candidate: Dictionary in candidates:
+			if String(candidate.get("id", "")) != chosen:
+				continue
+			var target_id: String = String(candidate.get("unit_id", ""))
+			for unit: Unit in _board_units():
+				if _unit_id(unit) != target_id:
+					continue
+				var res: Dictionary = Items.equip(unit, String(candidate.get("item_id", "")))
+				_append_event("item_equipped", {
+					"item_id": String(candidate.get("item_id", "")),
+					"unit_id": target_id,
+					"ok": bool(res.get("ok", false)),
+					"reason": String(res.get("reason", "")),
+					"combined_id": String(res.get("combined_id", "")),
+					"label": label,
+				})
+				placed = true
+				break
+			break
+		if not placed:
+			_append_event("decision_rejected", {"kind": "item_equip", "choice_id": chosen, "reason": "not_an_item_candidate"})
+			return
 
 func _wager_candidates(reserve: int) -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []

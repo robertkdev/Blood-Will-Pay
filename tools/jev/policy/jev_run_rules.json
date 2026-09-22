@@ -22,6 +22,10 @@
     "rule": "Power arrives in several shapes and none is always best: a second copy at your level, a third copy at that level, a stronger or higher-level unit, an item, another board slot from a level purchase, or a trait breakpoint a new body completes. Price them against each other and take the one that most improves the board you will field.",
     "deployed_payoff": "Only the deployed board fights. A purchase lands on the bench, so it changes nothing until deployed, and deploying onto a full board replaces a unit already there. Judge the offer by the board you would field after that swap."
   },
+  "items": {
+    "rule": "Assign every held component to a unit before the fight; a component in the inventory does nothing. Match the item to the unit it helps: an item tagged for a role belongs on that role, and the unit actually carrying the fight is worth more than a body sitting at the back. Two components on one unit combine automatically, so putting a pair that belong together on the same unit is worth more than spreading them across two.",
+    "hold_only_when": "Hold a component only when nothing on the board can use it yet and a better unit is plausibly arriving."
+  },
   "wager": {
     "quote_multipliers": {
       "CREEPS": 1.5,

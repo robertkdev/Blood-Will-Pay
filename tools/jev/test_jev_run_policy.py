@@ -140,6 +140,8 @@ class DigestCoverageTest(unittest.TestCase):
         for section, field in (
             ("power", "rule"),
             ("power", "deployed_payoff"),
+            ("items", "rule"),
+            ("items", "hold_only_when"),
             ("playstyle", "identity"),
             ("level", "unit_levels"),
             ("level", "combine_priority"),

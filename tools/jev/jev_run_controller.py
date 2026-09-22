@@ -23,7 +23,10 @@ from playtest_judgment.backends import load_env_file
 from typesafe_sdk import Choice, TypeSafeClient
 
 ENDPOINT = "https://api.typesafe.ai"
-RULE_DIGEST_LIMIT = 5200
+# Raised from 5200 when item assignment became a Jev decision. The digest is still
+# truncated by this number, and test_jev_run_policy asserts the authored rules fit
+# inside it, so the budget stays a real constraint rather than a comment.
+RULE_DIGEST_LIMIT = 6600
 STATE_DIGEST_LIMIT = 4200
 
 
@@ -74,6 +77,7 @@ def _rules_digest(rules: dict) -> str:
         f"WAGER RULE: {wager.get('rule', '')} {wager.get('sizing', '')}",
         f"COMPOSITION: {rules.get('composition', {}).get('rule', '')}",
         f"POWER: {rules.get('power', {}).get('rule', '')} {rules.get('power', {}).get('deployed_payoff', '')}",
+        f"ITEMS: {rules.get('items', {}).get('rule', '')} {rules.get('items', {}).get('hold_only_when', '')}",
         f"PLAYSTYLE: {playstyle.get('identity', '')}",
         f"FLEX: {flex.get('rule', '')} {flex.get('keep_options_open', '')} {flex.get('pass_rule', '')}",
         f"VERTICAL: {vertical.get('rule', '')} {vertical.get('one_piece_away', '')}",
