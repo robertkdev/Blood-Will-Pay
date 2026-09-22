@@ -134,6 +134,30 @@ func sync_planning_field() -> void:
 	_set_floor_transform(_floor_origin, _floor_scale)
 	surface.modulate = Color(1.24, 1.12, 1.04, 1.0)
 
+func get_combat_viewport_rect() -> Rect2:
+	var viewport_rect: Rect2 = _host.get_viewport_rect()
+	return Rect2(viewport_rect.position + Vector2(10.0, 92.0), viewport_rect.size - Vector2(20.0, 110.0))
+
+func sync_combat_field() -> void:
+	if _state != TransitionState.COMBAT or not _rect_is_valid(_entry_target_rect):
+		return
+	var target_rect: Rect2 = get_combat_viewport_rect()
+	if target_rect.position.distance_to(_entry_target_rect.position) <= 0.5 and target_rect.size.distance_to(_entry_target_rect.size) <= 0.5:
+		return
+	var previous_rect: Rect2 = _arena_container.get_global_rect()
+	if not _rect_is_valid(target_rect) or not _rect_is_valid(previous_rect):
+		return
+	var surface: TextureRect = _arena_container.get_node_or_null("GothicArenaSurface") as TextureRect
+	var floor_origin: Vector2 = surface.global_position if surface != null else Vector2.ZERO
+	var floor_scale: float = surface.scale.x if surface != null else 1.0
+	# A resized viewport keeps the same crop center and a uniform floor scale.
+	# The arena bridge remaps live fighters into these new bounds afterward.
+	var resize_zoom: float = maxf(target_rect.size.x / previous_rect.size.x, target_rect.size.y / previous_rect.size.y)
+	_set_field_rect(target_rect)
+	_set_floor_transform(target_rect.get_center() + (floor_origin - previous_rect.get_center()) * resize_zoom, floor_scale * resize_zoom)
+	_arena_container.set_meta("combat_target_rect", target_rect)
+	capture_entry_target_rect()
+
 func _set_field_rect(rect: Rect2) -> void:
 	_arena_container.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
 	var parent_control: Control = _arena_container.get_parent() as Control

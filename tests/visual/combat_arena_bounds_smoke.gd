@@ -97,7 +97,7 @@ func _run() -> void:
 		"planning_rect": combat_board_rect,
 		"engine_bounds": engine_bounds,
 	}
-	_expect(_rect_close(arena_rect, battle_area.get_global_rect(), 3.0), "arena container should expand to the live full battle field arena=%s field=%s" % [str(arena_rect), str(battle_area.get_global_rect())])
+	_expect(arena_rect.size.x >= viewport_rect.size.x * 0.95 and arena_rect.size.y >= viewport_rect.size.y * 0.85, "combat camera should fill the viewport around the persistent HUD")
 	_expect(arena_rect.size.y >= battle_rect_before.size.y, "combat field should not shrink below the planning shell's battle-area height")
 	_expect(not stats_area.visible or stats_area.modulate.a <= 0.20, "team metrics should recede while the full combat field is active")
 	_expect(_rect_inside(arena_rect, viewport_rect.grow(3.0)), "combat arena should remain inside the viewport arena=%s viewport=%s" % [str(arena_rect), str(viewport_rect)])
@@ -124,6 +124,9 @@ func _run() -> void:
 	var compact_viewport_rect: Rect2 = _view.get_viewport().get_visible_rect()
 	_expect(Vector2i(compact_viewport_rect.size) == COMPACT_VIEWPORT_SIZE, "combat viewport should resize to 1280x720, got=%s" % str(compact_viewport_rect.size))
 	_expect(_rect_inside(compact_arena_rect, compact_viewport_rect.grow(3.0)), "compact combat arena should remain inside the viewport")
+	_expect(compact_arena_rect.size.x >= compact_viewport_rect.size.x * 0.95, "resized combat camera should still fill the viewport width")
+	var floor_surface: Control = arena_container.get_node_or_null("GothicArenaSurface") as Control
+	_expect(floor_surface != null and floor_surface.get_global_rect().grow(1.0).encloses(compact_arena_rect), "resized camera floor should cover the full clipped field")
 	_expect(_rect_inside(compact_engine_bounds, compact_arena_rect.grow(3.0)), "compact engine bounds should stay inside the live arena")
 	_expect(compact_engine_bounds.position.x >= compact_arena_rect.position.x + 51.0, "compact engine bounds should reserve the actor footprint on the left")
 	_expect(compact_engine_bounds.position.y >= compact_arena_rect.position.y + 65.0, "compact engine bounds should reserve health-bar space above actors")
@@ -205,7 +208,9 @@ func _assert_direct_battle_return_geometry() -> void:
 	await get_tree().create_timer(0.40).timeout
 	var return_mid_rect: Rect2 = arena.get_global_rect()
 	_expect(return_mid_rect.size.x < return_start_rect.size.x and return_mid_rect.size.y < return_start_rect.size.y, "direct battle return did not reverse the arena geometry")
-	await get_tree().create_timer(0.50).timeout
+	var return_deadline: int = Time.get_ticks_msec() + 1500
+	while transition.get_state_name() != "idle" and Time.get_ticks_msec() < return_deadline:
+		await get_tree().process_frame
 	await _settle_frames(2)
 	_expect(transition.get_state_name() == "idle", "direct battle return did not finish")
 	_expect(_rect_close(arena.get_global_rect(), planning_rect, 2.0), "direct battle return missed its committed planning geometry")

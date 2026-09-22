@@ -1231,6 +1231,8 @@ func _apply_grid_dimensions(tile: int) -> void:
 		bottom_area.custom_minimum_size.y = player_top_pad + float(grid_h) + player_bottom_pad
 
 func process(_delta: float) -> void:
+	if phase_transition != null:
+		phase_transition.sync_combat_field()
 	if arena_container and arena_container.visible and GameState.phase == GameState.GamePhase.COMBAT and not _post_combat_return_started and (phase_transition == null or not phase_transition.is_transition_active()):
 		_sync_arena_units()
 	if phase_transition != null:
@@ -3768,8 +3770,7 @@ func _prepare_transition_combat_layout(preserve_countdown_context: bool = false)
 	if phase_transition != null and phase_transition.is_layout_locked():
 		# The arena can occupy the viewport without removing planning containers
 		# from their layout. They keep their geometry behind the moving field.
-		var viewport_rect: Rect2 = parent.get_global_rect()
-		arena_container.set_meta("combat_target_rect", Rect2(viewport_rect.position + Vector2(10.0, 92.0), viewport_rect.size - Vector2(20.0, 110.0)))
+		arena_container.set_meta("combat_target_rect", phase_transition.get_combat_viewport_rect())
 		arena_container.set_meta("use_full_combat_bounds", true)
 		_apply_environmental_pressure_composition(0, _reduced_motion_enabled(), 0.0, 0)
 		_set_control_visible("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary", true)
