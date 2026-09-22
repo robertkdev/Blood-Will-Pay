@@ -24,7 +24,9 @@ func _ready() -> void:
 	_output_dir = String(config.get("output_dir", ""))
 	DirAccess.make_dir_recursive_absolute(_output_dir)
 	var probe_script: GDScript = GDScript.new()
-	probe_script.source_code = FileAccess.get_file_as_string(String(config.get("probe_path", "")))
+	# The external probe supports less strict projects; suppress only its
+	# Variant inference warning when loading it under this project's policy.
+	probe_script.source_code = "@warning_ignore_start(\"inference_on_variant\")\n" + FileAccess.get_file_as_string(String(config.get("probe_path", "")))
 	if probe_script.reload() != OK:
 		get_tree().quit(1)
 		return
