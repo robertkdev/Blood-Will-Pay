@@ -660,6 +660,48 @@ trimmed to 5,123, and the test now evaluates the controller's own f-strings rath
 than a hand-built approximation - two earlier versions of it under-counted and passed
 while the real digest was being truncated.
 
+## Six seeds: Jev is behind the scripted baseline, and it is not marginal
+
+The three-seed result above was too small to trust, so the declared set was extended
+to six seeds - 4401, 7717, 90210, 11111, 22222, 33333 - with the current policy
+against the scripted baseline on each.
+
+| Seed | Jev (current policy) | Scripted baseline |
+| --- | --- | --- |
+| 4401 | loss, 2:2, 12 battles, pass rate 0.28 | stage stall, 1:4, 6 battles, 0.62 |
+| 7717 | loss, 2:2, 9 battles, 0.31 | loss, 2:2, 11 battles, 0.57 |
+| 90210 | loss, 1:4, 5 battles, 0.50 | loss, 2:2, 12 battles, 0.53 |
+| 11111 | stage stall, **2:3**, 10 battles, 0.20 | stage stall, 2:2, 10 battles, 0.53 |
+| 22222 | stage stall, 1:4, 6 battles, 0.50 | **target reached**, 2:4, 9 battles, 0.42 |
+| 33333 | stage stall, 1:4, 6 battles, 0.25 | **target reached**, 2:4, 10 battles, 0.54 |
+
+| Arm | Reached chapter 2 | Reached the campaign target | Mean pass rate |
+| --- | --- | --- | --- |
+| Jev, current policy | 3 of 6 | 0 of 6 | 0.34 |
+| scripted baseline | **5 of 6** | **2 of 6** | 0.54 |
+
+The baseline reaches chapter 2 on five seeds to Jev's three, and it is the only arm
+that has ever reached the campaign target in this investigation. Jev's one better
+result - 11111, where it got a stage further - does not offset that.
+
+### The obvious explanation is a difference, not yet a cause
+
+The baseline passes on 54% of its shop decisions and Jev on 34%, and the arm that
+passes more is the arm that goes further. That is a real difference between the arms
+and it matches the policy's own claim that buying every affordable offer is the losing
+baseline.
+
+It does not hold *within* Jev, though, and that is worth stating before anyone tunes
+against it. Jev's best run (11111, reaching 2:3) had its **lowest** pass rate at 0.20,
+and one of its worst (90210, out at 1:4) had 0.50. Across six seeds the pass rate and
+the outcome do not move together inside the arm. So "pass more" is where the two arms
+differ, not a demonstrated lever - and the pass rule added above did not move the rate
+anyway (0.29 to 0.31).
+
+What this does establish is the thing strategy work needed: a reproducible, same-seed
+opponent that Jev currently loses to, with a measured gap to close rather than an
+aggregate win rate to argue about.
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would
