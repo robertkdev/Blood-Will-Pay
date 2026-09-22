@@ -60,7 +60,7 @@ func _ready() -> void:
 	if _pending_populate or _tracker != null:
 		_pending_populate = false
 		_populate()
-	call_deferred("_reassert_loss_scoreboard_typography")
+	_schedule_loss_scoreboard_typography_reassert()
 
 func _exit_tree() -> void:
 	teardown()
@@ -890,10 +890,21 @@ func _sync_layout() -> void:
 	if _pressure_layer != null:
 		_pressure_layer.set_meta("compact_fragment_suppression", tight_compact)
 		_pressure_layer.set_meta("loss_pressure_density", 0.16 if tight_compact else 0.34)
-	call_deferred("_reassert_loss_scoreboard_typography")
+	_schedule_loss_scoreboard_typography_reassert()
+
+func _schedule_loss_scoreboard_typography_reassert() -> void:
+	# A deferred await on this node resumes even after the screen is freed
+	# (quitting from the loss overlay, starting a new game), which logs "Resumed
+	# function ... after await, but class instance is gone". A one-shot frame
+	# signal is dropped automatically when the receiver is freed, so the layout
+	# pass stays a plain call.
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	if not tree.process_frame.is_connected(_reassert_loss_scoreboard_typography):
+		tree.process_frame.connect(_reassert_loss_scoreboard_typography, CONNECT_ONE_SHOT)
 
 func _reassert_loss_scoreboard_typography() -> void:
-	await get_tree().process_frame
 	if scoreboard_holder == null or not is_instance_valid(scoreboard_holder):
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size

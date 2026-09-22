@@ -475,7 +475,8 @@ func _floor_evidence(failures: Array[String]) -> Dictionary[String, Variant]:
 	var affordability_rows: Array[Variant] = []
 	var affordability_cases: Array[Variant] = [
 		{"case_id": "planning_floor_denial", "gold": 1, "bet": 1, "cost": 1, "in_combat": false, "spent": 0, "expected_ok": false, "expected_reason": "RESERVE_FLOOR"},
-		{"case_id": "planning_above_floor", "gold": 2, "bet": 1, "cost": 1, "in_combat": false, "spent": 0, "expected_ok": true, "expected_reason": "OK"},
+		{"case_id": "planning_one_bucket_reserve_denial", "gold": 2, "bet": 1, "cost": 1, "in_combat": false, "spent": 0, "expected_ok": false, "expected_reason": "RESERVE_FLOOR"},
+		{"case_id": "planning_above_floor", "gold": 3, "bet": 1, "cost": 1, "in_combat": false, "spent": 0, "expected_ok": true, "expected_reason": "OK"},
 		{"case_id": "combat_credit_boundary", "gold": 0, "bet": 1, "cost": 1, "in_combat": true, "spent": 0, "expected_ok": true, "expected_reason": "OK"},
 		{"case_id": "combat_credit_exceeded", "gold": 0, "bet": 1, "cost": 2, "in_combat": true, "spent": 0, "expected_ok": false, "expected_reason": "CREDIT_LIMIT"},
 	]

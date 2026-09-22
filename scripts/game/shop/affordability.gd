@@ -8,7 +8,10 @@ const REASON_OK := "OK"
 const REASON_RESERVE_FLOOR := "RESERVE_FLOOR"   # Out of combat: must keep the planning reserve
 const REASON_CREDIT_LIMIT := "CREDIT_LIMIT"     # In combat: would exceed combat credit and kill you even on win
 const REASON_INSUFFICIENT := "INSUFFICIENT_GOLD"
-const PLANNING_RESERVE_FLOOR := 1
+# Planning must leave enough behind to survive one ordinary loss. The minimum
+# wager is one bucket, so a floor of one turns the next fight into an all-in and
+# a single loss ends the run; two is the smallest survivable reserve.
+const PLANNING_RESERVE_FLOOR := 2
 
 static func can_afford(gold: int, bet: int, cost: int, in_combat: bool, spent_so_far: int = 0) -> Dictionary:
 	var c: int = max(0, int(cost))

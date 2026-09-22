@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/outcome_ladder_probe.gd" id="1_outcome_ladder"]
+
+[node name="OutcomeLadderProbe" type="Node"]
+script = ExtResource("1_outcome_ladder")

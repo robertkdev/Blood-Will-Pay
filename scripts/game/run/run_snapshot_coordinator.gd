@@ -53,6 +53,7 @@ static func capture(controller: Variant) -> Dictionary:
 		"roster_catalog": RosterCatalog.snapshot_runtime(),
 		"mirror_boards": MirrorBoardStore.snapshot_runtime(),
 		"planning_time_left": float(controller.parent.get("planning_time_left")) if controller.parent != null else 0.0,
+		"retry_recovery_used": controller.call("snapshot_retry_recovery") if controller != null and controller.has_method("snapshot_retry_recovery") else [],
 	}
 
 static func restore(controller: Variant, snapshot: Dictionary) -> Dictionary:
@@ -84,6 +85,11 @@ static func restore(controller: Variant, snapshot: Dictionary) -> Dictionary:
 	var mirror_value: Variant = snapshot.get("mirror_boards", {})
 	if mirror_value is Dictionary:
 		MirrorBoardStore.restore_runtime(mirror_value as Dictionary)
+	# Restore the once-per-stage retry bailout record so a resumed run cannot collect
+	# a second transfusion on a stage it already used one on.
+	if controller.has_method("restore_retry_recovery"):
+		var retry_value: Variant = snapshot.get("retry_recovery_used", [])
+		controller.call("restore_retry_recovery", retry_value if retry_value is Array else [])
 	var game_state_data: Dictionary = snapshot.get("game_state", {}) as Dictionary
 	game_state_node.call(
 		"set_chapter_and_stage",

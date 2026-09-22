@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/rga_testing/validation/reserve_floor_contract_probe.gd" id="1_reserve_floor"]
+
+[node name="ReserveFloorContractProbe" type="Node"]
+script = ExtResource("1_reserve_floor")

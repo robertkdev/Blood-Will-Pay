@@ -1,0 +1,77 @@
+{
+  "schema_version": 2,
+  "policy_id": "bwp-best-odds-v2",
+  "title": "Blood Will Pay: best-odds planning rules for a Jev-controlled run",
+  "goal": "Win the current stage, keep the run alive, and grow enough power to beat the next stage. Every decision uses the state on screen.",
+  "lane_targets": {
+    "campaign": "Reach the campaign target chapter and round with the run still alive."
+  },
+  "reserve": {
+    "minimum_reserve_buckets": 2,
+    "retry_floor_buckets": 3,
+    "rule": "Keep a planning reserve. The minimum wager is one bucket, so ending a planning phase with one bucket forces an all-in and a loss ends the run: hold at least two buckets, or three in the early chapters. Break that floor only when the purchase wins the stage about to start."
+  },
+  "decision_quality_gates": {
+    "economically_implausible_pass_rate_min": 0.30,
+    "full_shop_buyout_rate_max": 0.10,
+    "selective_score_lift_over_buy_all_min": 1.0,
+    "premium_wager_reduction_min": 0.08,
+    "rule": "Buying every affordable offer is the losing baseline. Pass on offers that do not add power for the plan, and let a premium purchase pull the next wager down."
+  },
+  "power": {
+    "rule": "Power arrives in several shapes and none is always best: a second copy at your level, a third copy at that level, a stronger or higher-level unit, an item, another board slot from a level purchase, or a trait breakpoint a new body completes. Price them against each other and take the one that most improves the board you will field.",
+    "deployed_payoff": "Only the deployed board fights. A purchase lands on the bench, so it changes nothing until deployed, and deploying onto a full board replaces a unit already there. Judge the offer by the board you would field after that swap."
+  },
+  "items": {
+    "rule": "Assign every held component to a unit before the fight; a component in the inventory does nothing. Match the item to the unit it helps: an item tagged for a role belongs on that role, and the unit actually carrying the fight is worth more than a body sitting at the back. Two components on one unit combine automatically, so putting a pair that belong together on the same unit is worth more than spreading them across two.",
+    "hold_only_when": "Hold a component only when nothing on the board can use it yet and a better unit is plausibly arriving."
+  },
+  "wager": {
+    "quote_multipliers": {
+      "CREEPS": 1.5,
+      "NORMAL": 2.0,
+      "MIRROR": 2.0,
+      "ELITE": 2.5,
+      "EVENT": 2.5,
+      "BOSS": 3.0
+    },
+    "rule": "The payout quote is fixed by encounter kind, so win probability alone decides the wager. Odds at or below 1 / multiplier are negative expected value: bet the minimum. Clearly above it, bet more - never so much that a loss ends the run or empties the next shop.",
+    "sizing": "Scale the wager with how far the shown win odds beat the break-even line, and hold back the retry floor plus the next shop's expected cost."
+  },
+  "composition": {
+    "frontline_target": 2,
+    "support_max": 1,
+    "rule": "Two bodies that can hold the front before adding ranged or spell damage; more than one pure support wastes a slot. A new body and a duplicate can both add power, and a third same-level copy often beats both - but only at a level you can reach."
+  },
+  "playstyle": {
+    "identity": "This is a gambling game with strategy. Play flex first: take what the shop gives you, keep later shops useful, and let the game hand you a direction. A vertical is a gift when it arrives; forcing one is a paid gamble.",
+    "flex": {
+      "rule": "Default plan. Buy the offer that fills the role the board is missing, adds a trait count you already hold, or is the cheapest real power on the shelf; prefer offers whose traits overlap what you own. Traits count unique units, so a second copy of a deployed unit adds no trait count.",
+      "keep_options_open": "Do not commit the board to one trait early. Two or three units sharing traits with what you own beat one piece of a plan you cannot complete.",
+      "pass_rule": "Pass when the offer neither fills a missing role, nor advances a trait you hold, nor is a same-level duplicate you are two copies into. A defensive pass is a real move."
+    },
+    "vertical": {
+      "rule": "When the board stacks a trait or sits one piece below the next threshold, the piece that finishes it is a good buy - provided the tier actually activates on the board you will field. Only deployed units count, so on a full board the swap costs the replaced unit's own trait count.",
+      "one_piece_away": "A trait breakpoint is a strong purchase, not an automatic one. Check that it survives the swap, and keep the two-bucket floor."
+    },
+    "force": {
+      "rule": "Forcing is a gamble: the shop may not deliver, and the board you field while chasing is weaker than the flex pick you passed. A paid chase needs a budget set before it starts - decide how many rerolls the plan is worth, and stop when it is spent.",
+      "when_not_to_force": "Never pass a flex pick you would take in an open shop to reroll for a plan you do not own, and never reroll past the budget you set."
+    }
+  },
+  "level": {
+    "rule": "Buy XP when the level-up raises capacity, when the board is full but the bench is not, or when the shop cannot improve the board and the reserve can pay.",
+    "unit_levels": "Unit level is the biggest middle-game power lever: a level-2 copy is worth well more than a level-1 of the same identity, and three same-level copies convert into one stronger unit. (An earlier 40% / 61% / 79% odds calibration has not been re-verified on this build.)",
+    "combine_priority": "Take a duplicate that completes a third copy at a level you already hold when the board has room - but a stronger unit, an item, an extra slot, or a trait breakpoint can supply the same power sooner. A combine is one option, not the required path into chapter 2."
+  },
+  "contracts": {
+    "rule": "A chapter contract is optional. Take one only when its price stays inside the reserve and its reward matches the chapter plan; otherwise pass."
+  },
+  "stall": {
+    "rule": "Never start a fight with the same board that already failed. A loss on a non-final stage keeps the run alive on that stage, so the board must change first: a duplicate, an upgrade, the level that raises capacity, a reroll, or a contract.",
+    "clock_rule": "A clocked-out fight is awarded by surviving units first, then by total remaining health. Damage dealt is not part of that ladder. Cut the enemy's survivors if you can; otherwise hold more total health than they do, and note a durable board that never dies can still win the clock on health."
+  },
+  "shown_odds": {
+    "rule": "The preview win-odds range does not price the wager. Treat it as a readiness signal: well above break-even means the board is ready, near or below means buy power first."
+  }
+}

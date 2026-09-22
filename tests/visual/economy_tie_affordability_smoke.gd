@@ -14,8 +14,13 @@ func _run() -> void:
 	_finish()
 
 func _check_planning_affordability() -> void:
-	var allowed: Dictionary = ShopAffordability.can_afford(2, 1, 1, false)
-	_expect(bool(allowed.get("ok", false)), "2 gold should afford a 1-cost planning purchase")
+	# The planning floor is two buckets: one to wager and one to survive a loss.
+	# A spend that would leave a single bucket turns the next fight into an all-in.
+	var allowed: Dictionary = ShopAffordability.can_afford(3, 1, 1, false)
+	_expect(bool(allowed.get("ok", false)), "3 gold should afford a 1-cost planning purchase")
+	var survivable_floor: Dictionary = ShopAffordability.can_afford(2, 1, 1, false)
+	_expect(not bool(survivable_floor.get("ok", true)), "2 gold should not afford a 1-cost planning purchase")
+	_expect(String(survivable_floor.get("reason", "")) == ShopAffordability.REASON_RESERVE_FLOOR, "a spend that leaves one bucket should be blocked by the reserve floor")
 	var denied: Dictionary = ShopAffordability.can_afford(1, 1, 1, false)
 	_expect(not bool(denied.get("ok", true)), "1 gold should not afford a 1-cost planning purchase")
 	_expect(String(denied.get("reason", "")) == ShopAffordability.REASON_RESERVE_FLOOR, "last-health spend should be blocked by reserve floor")

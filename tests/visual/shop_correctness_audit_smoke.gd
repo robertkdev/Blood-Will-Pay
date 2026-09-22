@@ -110,11 +110,13 @@ func _assert_opening_choice_quality(catalog: UnitCatalog, roller: ShopRoller, rn
 				_expect(false, "%s seed %d should expose at least two distinct opening choices when two eligible cost-1 units exist" % [starter_id, seed])
 
 func _assert_affordability_reserves_wager() -> void:
-	var denied: Dictionary = ShopAffordabilityScript.can_afford(4, 1, 4, false, 0)
-	var allowed: Dictionary = ShopAffordabilityScript.can_afford(5, 1, 4, false, 0)
-	_expect(not bool(denied.get("ok", false)), "4g should not permit a 4g purchase while reserving 1g")
-	_expect(int(denied.get("need_more", 0)) == 1, "4g reserve-floor denial should report one gold needed")
-	_expect(bool(allowed.get("ok", false)), "5g should permit a 4g purchase while reserving 1g")
+	# The planning floor is two buckets so a loss cannot leave the player betting
+	# their last bucket on the next fight.
+	var denied: Dictionary = ShopAffordabilityScript.can_afford(5, 1, 4, false, 0)
+	var allowed: Dictionary = ShopAffordabilityScript.can_afford(6, 1, 4, false, 0)
+	_expect(not bool(denied.get("ok", false)), "5g should not permit a 4g purchase while reserving 2g")
+	_expect(int(denied.get("need_more", 0)) == 1, "5g reserve-floor denial should report one gold needed")
+	_expect(bool(allowed.get("ok", false)), "6g should permit a 4g purchase while reserving 2g")
 
 func _assert_lock_reroll_and_bench_full(catalog: UnitCatalog, roller: ShopRoller) -> void:
 	var transactions: ShopTransactions = ShopTransactionsScript.new()
