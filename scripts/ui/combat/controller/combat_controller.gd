@@ -4248,7 +4248,9 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	var pressure_surface: TextureRect = arena.get_node_or_null("GothicArenaPressureSurface") as TextureRect
 	if pressure_surface != null:
 		pressure_surface.texture = GothicUIAssets.battlefield_reduced_motion_texture() if reduced_motion else GothicUIAssets.battlefield_midfight_texture()
-		pressure_surface.visible = reduced_motion or effective_phase >= 1
+		# This full-field raster changes the ground itself. A shared camera must
+		# keep the planning floor throughout the fight and its reverse movement.
+		pressure_surface.visible = not bool(arena.get_meta("shared_field_camera", false)) and (reduced_motion or effective_phase >= 1)
 		pressure_surface.modulate = Color(1.0, 1.0, 1.0, 0.86 if reduced_motion else 0.90 if effective_phase == 1 else 1.0)
 		pressure_surface.set_meta("active_material_phase", "reduced_motion_static" if reduced_motion else phase_name)
 		pressure_surface.set_meta("landmark_aligned_with_base", true)

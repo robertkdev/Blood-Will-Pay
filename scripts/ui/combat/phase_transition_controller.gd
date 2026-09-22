@@ -96,7 +96,7 @@ func refresh_field_material() -> void:
 		var old_surface: Control = _planning_area.get_node_or_null(path) as Control
 		if old_surface != null:
 			old_surface.visible = false
-	for node_name: String in ["ArenaCombatFocusPainter", "ArenaWarAftermath"]:
+	for node_name: String in ["ArenaCombatFocusPainter", "ArenaWarAftermath", "GothicArenaPressureSurface"]:
 		var decoration: Control = _arena_container.get_node_or_null(node_name) as Control
 		if decoration != null:
 			decoration.visible = false

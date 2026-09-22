@@ -56,6 +56,11 @@ func _run() -> void:
 			var floor_locked_center: Vector2 = floor_surface.get_global_transform_with_canvas() * (source_floor_inverse * source_center)
 			_expect(first.distance_to(floor_locked_center) <= 1.0, "fighter moved independently of the floor camera")
 	await _settle_frames(4)
+	var pressure_surface: Control = combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaPressureSurface") as Control
+	for pressure_phase: int in [1, 2]:
+		controller.call("_apply_environmental_pressure_composition", pressure_phase, false, 0.5, pressure_phase)
+		await _settle_frames(2)
+		_expect(not pressure_surface.is_visible_in_tree(), "combat pressure replaced the shared planning floor")
 	var engine: Variant = manager.get_engine()
 	if engine != null:
 		engine.stop()
