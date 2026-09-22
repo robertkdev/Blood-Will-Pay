@@ -484,6 +484,17 @@ Three things follow, and the first is the surprising one:
 1. **Basic-attack damage is not the lever.** Raising it by two and a half times left
    the clock-decided count at exactly 12. The estimator noticed (its bucket
    populations shifted sharply) while the fights did not.
+
+   Ability damage explains the asymmetry and is worth stating plainly, because it is
+   not a defect. Abilities compute as `DAMAGE_BASE[level] + AD_RATIO * attack_damage`,
+   so they partly follow attack damage already; but the ones that scale from
+   `spell_power` do not, and `spell_power` is `0.0` in every role profile. The Google
+   design doc specifies exactly that - *"Unless overridden by the role profile: move
+   speed 120, spell power 0, critical damage 1.5x"* - so a flat magic caster is
+   documented behaviour and spell power is meant to arrive through items, not through
+   role profiles. Raising `attack_damage` therefore did nothing for the magic half of
+   the roster. Brute is the other extreme: `brute_slam` deals no damage at all, it is
+   a knockup.
 2. **Health is the lever.** Halving it took clock-decided fights from 12 to 1.
    Whatever keeps those boards standing is the size of their health pool relative to
    the damage that reaches it.
