@@ -87,7 +87,25 @@ var _return_floor_origin: Vector2 = Vector2.ZERO
 var _return_floor_scale: float = 1.0
 var _return_rect: Rect2 = Rect2()
 
+func refresh_field_material() -> void:
+	if _arena_container == null or _planning_area == null:
+		return
+	# Shop/stats refreshes reapply the visual theme. Reassert camera ownership
+	# immediately so those refreshes cannot restore a second floor or exposure.
+	for path: String in ["TopArea/GothicPlanningTopSurface", "BottomArea/GothicPlanningBottomSurface", "TopArea/PlanningWarFieldTopPainter", "BottomArea/PlanningWarFieldBottomPainter"]:
+		var old_surface: Control = _planning_area.get_node_or_null(path) as Control
+		if old_surface != null:
+			old_surface.visible = false
+	for node_name: String in ["ArenaCombatFocusPainter", "ArenaWarAftermath"]:
+		var decoration: Control = _arena_container.get_node_or_null(node_name) as Control
+		if decoration != null:
+			decoration.visible = false
+	var floor_surface: Control = _arena_container.get_node_or_null("GothicArenaSurface") as Control
+	if floor_surface != null:
+		floor_surface.modulate = Color(1.24, 1.12, 1.04, 1.0)
+
 func sync_planning_field() -> void:
+	refresh_field_material()
 	if _state != TransitionState.IDLE or _arena_container == null:
 		return
 	var rect: Rect2 = _planning_grid_visual_rect()
@@ -98,10 +116,6 @@ func sync_planning_field() -> void:
 	var content: Control = _host.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow") as Control
 	if content != null:
 		content.z_index = 20
-	for path: String in ["TopArea/GothicPlanningTopSurface", "BottomArea/GothicPlanningBottomSurface", "TopArea/PlanningWarFieldTopPainter", "BottomArea/PlanningWarFieldBottomPainter"]:
-		var old_surface: Control = _planning_area.get_node_or_null(path) as Control
-		if old_surface != null:
-			old_surface.visible = false
 	for child: Node in _arena_container.get_children():
 		if child is Control:
 			(child as Control).visible = child.name == "GothicArenaSurface" or child.name == "ArenaUnits"

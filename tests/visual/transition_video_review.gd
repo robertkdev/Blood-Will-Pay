@@ -27,6 +27,7 @@ func _ready() -> void:
 	# The external probe supports less strict projects; suppress only its
 	# Variant inference warning when loading it under this project's policy.
 	probe_script.source_code = "@warning_ignore_start(\"inference_on_variant\")\n" + FileAccess.get_file_as_string(String(config.get("probe_path", "")))
+	probe_script.source_code = probe_script.source_code.replace('var camera_name := _camera.get_path() if is_instance_valid(_camera) else ""', 'var camera_name: String = str(_camera.get_path()) if is_instance_valid(_camera) else ""')
 	if probe_script.reload() != OK:
 		get_tree().quit(1)
 		return

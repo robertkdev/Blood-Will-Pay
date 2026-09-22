@@ -396,6 +396,8 @@ func _apply_visual_theme() -> void:
 
 func _apply_visual_theme_deferred() -> void:
 	GothicUITheme.apply(self)
+	if controller != null and controller.phase_transition != null:
+		controller.phase_transition.refresh_field_material()
 	_apply_responsive_layout()
 
 func _apply_responsive_layout() -> void:
