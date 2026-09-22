@@ -86,6 +86,7 @@ var _floor_scale: float = 1.0
 var _return_floor_origin: Vector2 = Vector2.ZERO
 var _return_floor_scale: float = 1.0
 var _return_rect: Rect2 = Rect2()
+var _return_progress: float = 0.0
 
 func refresh_field_material() -> void:
 	if _arena_container == null or _planning_area == null:
@@ -405,6 +406,7 @@ func start_return(reduced_motion: bool) -> void:
 	_kill_tween()
 	_reduced_motion = reduced_motion
 	_state = TransitionState.RETURNING
+	_return_progress = 0.0
 	if _overlay != null:
 		_overlay.visible = true
 		_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -531,6 +533,7 @@ func _set_entry_progress(progress: float) -> void:
 
 func _set_return_progress(progress: float) -> void:
 	var amount: float = clampf(progress, 0.0, 1.0)
+	_return_progress = amount
 	var camera_amount: float = 1.0 if _reduced_motion else amount
 	_set_field_rect(Rect2(_captured_combat_rect.position.lerp(_return_rect.position, camera_amount), _captured_combat_rect.size.lerp(_return_rect.size, camera_amount)))
 	_set_floor_transform(_floor_origin.lerp(_return_floor_origin, camera_amount), lerpf(_floor_scale, _return_floor_scale, camera_amount))
@@ -538,6 +541,14 @@ func _set_return_progress(progress: float) -> void:
 	if _overlay != null:
 		_overlay.set_meta("return_zoom_progress", amount)
 	field_progress_changed.emit(1.0 - amount)
+	refresh_return_opacity()
+
+func refresh_return_opacity() -> void:
+	if _state != TransitionState.RETURNING:
+		return
+	# Deferred theme/layout refreshes also write alpha. Keep the reveal at its
+	# current progress, including the frame before the reverse tween starts.
+	var amount: float = _return_progress
 	for record: Dictionary in _planning_records:
 		var grid: Control = _record_control(record)
 		if grid != null:

@@ -538,6 +538,8 @@ func _apply_responsive_layout() -> void:
 	_update_external_backplates()
 	call_deferred("_update_external_backplates")
 	call_deferred("_finalize_responsive_layout")
+	if controller != null and controller.phase_transition != null:
+		controller.phase_transition.refresh_return_opacity()
 
 func _finalize_responsive_layout() -> void:
 	if not is_inside_tree():

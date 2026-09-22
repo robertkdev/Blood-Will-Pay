@@ -106,13 +106,21 @@ func _run() -> void:
 	var saw_return: bool = false
 	var deadline: int = Time.get_ticks_msec() + 4000
 	while Time.get_ticks_msec() < deadline:
+		if DisplayServer.get_name() == "headless":
+			await get_tree().process_frame
+		else:
+			await RenderingServer.frame_post_draw
 		var transition_state: String = String(transition.call("get_state_name"))
 		if transition_state == "returning":
 			saw_return = true
 			return_target = planning.get_global_rect()
+			var overlay: Control = combat.get_node("CombatPhaseTransitionLayer") as Control
+			if float(overlay.get_meta("return_zoom_progress", 0.0)) <= 0.5:
+				for node_path: String in ["BattleArea/ContentRow/LeftItemArea", "BattleArea/ContentRow/StatsArea", "BenchArea", "BottomStorageArea"]:
+					var chrome: Control = combat.get_node("MarginContainer/VBoxContainer/" + node_path) as Control
+					_expect(not chrome.is_visible_in_tree() or chrome.modulate.a <= 0.01, "planning chrome flashed before the pullback reveal: %s" % node_path)
 		elif saw_return and transition_state == "idle":
 			break
-		await get_tree().process_frame
 	_expect(saw_return, "dismissal skipped the reverse transition")
 	_expect(GameState.phase == GameState.GamePhase.PREVIEW, "result dismissal did not return to planning")
 	await _settle_frames(5)
