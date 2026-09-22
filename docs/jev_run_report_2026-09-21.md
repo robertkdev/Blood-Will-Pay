@@ -511,6 +511,58 @@ Two calls, and they are coupled:
 `team_odds_calibration_probe` is the acceptance check for both, and its 15% bucket
 gate is the number to hold.
 
+## Declared seed set: flex versus committing to a trait
+
+The design intent is that flex play is the default, a gifted vertical is a good
+thing, and forcing is a gamble. That is testable, so it was tested on a declared seed
+set rather than on one convenient run.
+
+**Setup.** Seeds 4401, 7717 and 90210; starter Bonko; `Engine.time_scale = 8.0` for a
+fast sweep, with the real planning timer; both arms on the same harness build and the
+same neutral candidate list, differing only in the `playstyle.flex` and
+`playstyle.force` text (`tools/jev/policy/variants/force_first.json`).
+
+| Arm | Seed | Terminal | Battles | Ended at | Buys | Passes | Rerolls |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| flex | 4401 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
+| flex | 7717 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
+| flex | 90210 | loss | 10 | 2:2 | 11 | 5 | 0 |
+| commit-to-trait | 4401 | loss | 11 | 2:3 | 12 | 5 | 0 |
+| commit-to-trait | 7717 | stage_stall | 6 | 1:4 | 3 | 1 | 0 |
+| commit-to-trait | 90210 | loss | 5 | 1:4 | 2 | 3 | 0 |
+
+**Result: null.** Both arms reached chapter 2 in exactly one of three seeds. The
+single-run difference that prompted the comparison - the variant reaching 2:3 while
+flex stalled at 1:4 on seed 4401, with 11 battles against 6 - did not replicate on
+7717 (both arms identical at 1:4) or 90210 (where flex went *further*, 2:2 against
+1:4). A one-run lead at n=1 per arm was noise.
+
+### Forcing was available and never warranted
+
+Zero rerolls appear in all six runs, including the arm instructed to chase. That is
+not a blocked option: an affordable reroll was on the table in **15 of 50 shop
+decisions** (30%), whenever the reserve could pay for it and still hold the floor.
+
+The chase rule in the variant is conditional - reroll only when the shop offers
+nothing belonging to the chased trait - and with five offers per shop and a
+tier-completing piece appearing in about half of all planning beats, that condition
+was rarely met. Which is itself the finding: at chapter 1-2 prices, with this shop
+width, **forcing is rarely compelled.** Flex is not merely the safe default, it is
+usually the available one. That supports the design intent as written; it does not
+yet show forcing being punished, because a condition that never fires cannot be
+punished.
+
+To test the other half of the intent - that a paid chase is a real gamble - the
+variant has to force on beats where a usable offer exists, not only where none does.
+That is a different experiment and has not been run.
+
+### Caveat on this sample
+
+Three seeds per arm is small, and the clock still decides fights in every one of
+these runs (1 to 5 clock-decided fights out of 6 to 12). Strategy differences are
+being measured through an outcome layer that is itself unresolved, so treat the null
+as "no effect detectable at this sample" rather than "no effect".
+
 ## Runtime notes
 
 - This checkout needed the repository's own CI import gate before it would
