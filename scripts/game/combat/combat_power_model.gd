@@ -77,7 +77,11 @@ static func team_power_for_ids(ids: Array[String], levels: Dictionary = {}, stat
 		if absf(float(stat_scale) - 1.0) >= 0.001:
 			rules["stat_scale"] = float(stat_scale)
 		var spec: Dictionary = StageTypes.make_spec(ids, StageTypes.KIND_NORMAL, rules)
-		StageRuleRunner.post_spawn(units, spec, 1, 1)
+		# Scoring must be a pure function of the ids, levels and scale that make up the
+		# cache key. With live contract / Red Ink multipliers applied here, the cached
+		# rating depended on when the combination was first scored, and the generator's
+		# budget fitting silently absorbed difficulty it was supposed to keep.
+		StageRuleRunner.post_spawn(units, spec, 1, 1, false)
 	var base_power: float = 0.0
 	for unit: Unit in units:
 		base_power += unit_power(unit)
