@@ -541,19 +541,63 @@ func _set_planning_timer_safe() -> void:
 
 func _load_reserve_floor() -> int:
 	# The floor lives in the policy file so the rules and the guard cannot drift.
-	var raw_text: String = FileAccess.get_file_as_string(JEV_RULES_PATH) if FileAccess.file_exists(JEV_RULES_PATH) else ""
-	var trimmed: String = raw_text.strip_edges()
-	if trimmed.length() < 2 or not trimmed.begins_with("{"):
-		return DEFAULT_RESERVE_FLOOR_BUCKETS
-	var parsed: Variant = JSON.parse_string(trimmed)
-	if not parsed is Dictionary:
-		return DEFAULT_RESERVE_FLOOR_BUCKETS
-	var reserve: Variant = (parsed as Dictionary).get("reserve", {})
+	var parsed: Dictionary = _policy_document()
+	var reserve: Variant = parsed.get("reserve", {})
 	if reserve is Dictionary:
 		var floor_value: Variant = (reserve as Dictionary).get("minimum_reserve_buckets", DEFAULT_RESERVE_FLOOR_BUCKETS)
 		if floor_value is float or floor_value is int:
 			return max(1, int(floor_value))
 	return DEFAULT_RESERVE_FLOOR_BUCKETS
+
+## The authored policy document, or an empty dictionary when it cannot be read.
+func _policy_document() -> Dictionary:
+	var raw_text: String = FileAccess.get_file_as_string(JEV_RULES_PATH) if FileAccess.file_exists(JEV_RULES_PATH) else ""
+	var trimmed: String = raw_text.strip_edges()
+	if trimmed.length() < 2 or not trimmed.begins_with("{"):
+		return {}
+	var parsed: Variant = JSON.parse_string(trimmed)
+	return parsed if parsed is Dictionary else {}
+
+## Win rate to size a first-attempt stake from, at the odds on screen.
+##
+## The displayed estimate is pessimistic - it reads 0.4 on normal stages the rig wins
+## 0.73 of and 0.4 on bosses it wins 0.40 of - so staking the shown number leaves the
+## profitable bands under-bet. The measured band rate in the policy file is shrunk
+## toward the shown odds by `prior_strength` pseudo-observations, so a band built on
+## three fights cannot size a stake on its own. Unknown kinds and bands fall back to
+## the shown odds, which is the conservative answer.
+func _measured_first_attempt_win_rate(quote_kind: String, shown_odds: float) -> float:
+	var measured: Variant = _policy_document().get("wager", {})
+	if not measured is Dictionary:
+		return shown_odds
+	var section: Variant = (measured as Dictionary).get("measured_first_attempt", {})
+	if not section is Dictionary:
+		return shown_odds
+	var bands: Variant = (section as Dictionary).get("bands", {})
+	if not bands is Dictionary:
+		return shown_odds
+	var rows: Variant = (bands as Dictionary).get(quote_kind, [])
+	if not rows is Array or (rows as Array).is_empty():
+		return shown_odds
+	var prior: float = maxf(0.0, float((section as Dictionary).get("prior_strength", 0)))
+	var found: Dictionary = {}
+	var found_band: float = -1.0
+	for row: Variant in (rows as Array):
+		if not row is Dictionary:
+			continue
+		var band: float = float((row as Dictionary).get("shown", -1.0))
+		if band < 0.0:
+			continue
+		if shown_odds + 0.0001 >= band and band > found_band:
+			found = row as Dictionary
+			found_band = band
+	if found_band < 0.0:
+		return shown_odds
+	var samples: float = maxf(0.0, float(found.get("samples", 0)))
+	var observed: float = clampf(float(found.get("observed", shown_odds)), 0.0, 1.0)
+	if samples + prior <= 0.0:
+		return shown_odds
+	return clampf((samples * observed + prior * shown_odds) / (samples + prior), 0.01, 0.99)
 
 func _prepare_run_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(_run_dir)
@@ -1203,6 +1247,17 @@ func _stage_attempt() -> int:
 
 func _apply_wager(wager: int, label: String, reserve: int, auto_applied: bool, stage_attempt: int = 1) -> void:
 	Economy.set_bet(wager)
+	# The rate the stake was sized from travels with the wager, so a transcript can
+	# tell "bet small on the displayed number" apart from "bet small on the measured
+	# band rate" without re-deriving the table.
+	var quote_kind: String = String(Economy.encounter_quote_kind)
+	var shown_odds: float = float(Economy.projected_win_probability)
+	var stake_odds: float = shown_odds
+	var stake_basis: String = "shown odds"
+	if int(stage_attempt) < 2:
+		stake_odds = _measured_first_attempt_win_rate(quote_kind, shown_odds)
+		if absf(stake_odds - shown_odds) >= 0.001:
+			stake_basis = "measured band rate"
 	_append_event("wager_set", {
 		"label": label,
 		"stage_attempt": stage_attempt,
@@ -1211,9 +1266,12 @@ func _apply_wager(wager: int, label: String, reserve: int, auto_applied: bool, s
 		"auto_applied": auto_applied,
 		"reserve_before": reserve,
 		"reserve_if_loss": reserve - int(Economy.current_bet),
-		"quote_kind": String(Economy.encounter_quote_kind),
+		"quote_kind": quote_kind,
 		"quoted_multiplier": float(Economy.gross_payout_multiplier()),
-		"shown_win_odds": float(Economy.projected_win_probability),
+		"shown_win_odds": shown_odds,
+		"stake_odds": snappedf(stake_odds, 0.001),
+		"stake_basis": stake_basis,
+		"measured_edge": snappedf(stake_odds * float(Economy.gross_payout_multiplier()) - 1.0, 0.001),
 		"break_even_odds": 1.0 / max(0.01, float(Economy.gross_payout_multiplier())),
 		"stake_unit": int(Economy.stake_unit),
 	})
@@ -2300,10 +2358,21 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 	var net_odds: float = maxf(0.01, multiplier - 1.0)
 	var retry: bool = int(stage_attempt) >= 2
 	var retry_cap: int = maxi(1, int(round(float(reserve) * RETRY_STAKE_CAP)))
+	# What the stake is sized from. A first attempt uses the measured band rate from
+	# the policy file, because the displayed estimate is pessimistic in bands that
+	# are profitable; a retry keeps the displayed number, since the retry record says
+	# the displayed number is if anything too generous there.
+	var stake_odds: float = shown_odds
+	var stake_basis: String = "shown odds"
+	if not retry:
+		stake_odds = _measured_first_attempt_win_rate(quote_kind, shown_odds)
+		if absf(stake_odds - shown_odds) >= 0.001:
+			stake_basis = "measured band rate"
+	var measured_edge: float = stake_odds * multiplier - 1.0
 	# Kelly: the stake that grows the bankroll fastest at these odds, for a bet paying
 	# `multiplier` including the stake. A near-lock pushes it toward the whole
 	# bankroll; a marginal edge pushes it toward the minimum.
-	var kelly_fraction: float = clampf((shown_odds * multiplier - 1.0) / net_odds, -1.0, 1.0)
+	var kelly_fraction: float = clampf(measured_edge / net_odds, -1.0, 1.0)
 	var kelly_wager: int = clampi(int(round(float(reserve) * maxf(0.0, kelly_fraction))), 1, reserve)
 	# Named stakes rather than anonymous bankroll fractions. The model is choosing an
 	# intent, and "25% of the bankroll" collapses onto the same integer as "minimum"
@@ -2313,22 +2382,22 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 		{
 			"stake": 1,
 			"role": "minimum",
-			"why": "The smallest legal wager. Correct only at or below break-even odds.",
+			"why": "The smallest legal wager. Correct only when the measured edge is negative.",
 		},
 		{
 			"stake": kelly_wager,
 			"role": "kelly",
-			"why": "The stake that grows the bankroll fastest at these odds.",
+			"why": "The stake that grows the bankroll fastest at the measured rate. Correct while the measured edge is under half a bucket per bucket staked.",
 		},
 		{
 			"stake": maxi(kelly_wager, int(ceil(float(reserve) * 0.5))),
 			"role": "press",
-			"why": "Half the bankroll or the Kelly stake, whichever is larger. Correct when the odds are profitable but below 50%.",
+			"why": "Half the bankroll or the Kelly stake, whichever is larger. Correct when the measured edge is real but the stake has to leave a reserve.",
 		},
 		{
 			"stake": reserve,
 			"role": "all_in",
-			"why": "The whole bankroll, which doubles on a win at 2x. Correct when the shown odds are above 50%.",
+			"why": "The whole bankroll. Correct when the measured edge is at least half a bucket per bucket staked, which is where the doubling makes a run rich.",
 		},
 	]
 	var candidates: Array[Dictionary] = []
@@ -2346,8 +2415,10 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 		var payout: int = int(Economy.quoted_payout(wager))
 		var profit: int = payout - wager
 		var actual_share: int = int(round(100.0 * float(wager) / float(max(1, reserve))))
-		# Expected value of the wager at the shown win odds.
-		var expected_value: float = shown_odds * float(profit) - (1.0 - shown_odds) * float(wager)
+		# Expected value of the wager at the rate the stake was sized from, so a
+		# candidate that looks marginal on the screen cannot be quoted as marginal
+		# when the recorded band rate says it is profitable.
+		var expected_value: float = stake_odds * float(profit) - (1.0 - stake_odds) * float(wager)
 		var retry_note: String = ""
 		if retry:
 			retry_note = " ATTEMPT %d AT THIS STAGE: the stake is capped at %d of %d buckets. This exact generated enemy has already beaten this board once, and the recorded retries returned about -0.8 expected buckets per bucket staked in this odds band while first attempts in the same band returned +0.15. The loss already taken is information the odds on screen cannot price." % [
@@ -2366,12 +2437,15 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 				profit,
 				reserve - wager,
 			],
-			"effect": "%s %s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%% (Kelly stake %d of %d). Expected value %+.2f buckets. Loss leaves %d buckets.%s" % [
+			"effect": "%s %s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%%, %s %.0f%% (edge %+.2f buckets per bucket staked; Kelly stake %d of %d). Expected value %+.2f buckets. Loss leaves %d buckets.%s" % [
 				String(plan.get("why", "")),
 				quote_kind,
 				multiplier,
 				break_even * 100.0,
 				shown_odds * 100.0,
+				stake_basis,
+				stake_odds * 100.0,
+				measured_edge,
 				kelly_wager,
 				reserve,
 				expected_value,
@@ -2380,6 +2454,9 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 			],
 			"wager": wager,
 			"role": role,
+			"stake_odds": snappedf(stake_odds, 0.001),
+			"stake_basis": stake_basis,
+			"measured_edge": snappedf(measured_edge, 0.001),
 			"stage_attempt": int(stage_attempt),
 			"retry": retry,
 			"retry_capped": capped,

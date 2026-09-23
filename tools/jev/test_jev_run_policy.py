@@ -162,5 +162,58 @@ class DigestCoverageTest(unittest.TestCase):
         self.assertIn("power", digest_body)
 
 
+HARNESS_PATH = REPO_ROOT / "tests" / "agent" / "jev_run_harness.gd"
+
+
+class MeasuredWagerRateTest(unittest.TestCase):
+    """The measured band rates are data the stake is sized from, so they need guarding.
+
+    A table that silently loses a band, or that the harness stops reading, reverts
+    every wager to the displayed number without failing anything else.
+    """
+
+    def _bands(self) -> dict:
+        return policy()["wager"]["measured_first_attempt"]["bands"]
+
+    def test_every_quote_kind_has_bands(self) -> None:
+        # The generated chapter layout only produces these four kinds. ELITE and EVENT
+        # have quotes but no recorded fights, so the harness falls back to the shown
+        # odds there; that fallback is the conservative answer, not a gap to paper over
+        # with invented numbers.
+        bands = self._bands()
+        for kind in ("CREEPS", "NORMAL", "BOSS", "MIRROR"):
+            self.assertIn(kind, bands, f"{kind} quotes have no measured band rate")
+        self.assertTrue(set(bands) <= set(policy()["wager"]["quote_multipliers"]))
+
+    def test_bands_declare_their_evidence(self) -> None:
+        for kind, rows in self._bands().items():
+            self.assertTrue(rows, f"{kind} has an empty band list")
+            for row in rows:
+                self.assertIn("shown", row, f"{kind} band is missing the shown odds")
+                self.assertIn("observed", row, f"{kind} band is missing the observed rate")
+                self.assertGreater(int(row["samples"]), 0, f"{kind} band claims no fights")
+                self.assertGreaterEqual(float(row["observed"]), 0.0)
+                self.assertLessEqual(float(row["observed"]), 1.0)
+            showns = [float(row["shown"]) for row in rows]
+            self.assertEqual(showns, sorted(showns), f"{kind} bands are not ordered by shown odds")
+
+    def test_declared_sample_total_matches_the_bands(self) -> None:
+        section = policy()["wager"]["measured_first_attempt"]
+        total = sum(int(row["samples"]) for rows in self._bands().values() for row in rows)
+        self.assertEqual(total, int(section["samples"]), "declared sample count does not match the bands")
+
+    def test_the_harness_reads_the_measured_table(self) -> None:
+        harness = HARNESS_PATH.read_text(encoding="utf-8")
+        self.assertIn("measured_first_attempt", harness, "the harness never reads the measured table")
+        self.assertIn("_measured_first_attempt_win_rate", harness)
+        # The stake maths must use the measured rate, not the displayed one.
+        self.assertIn("measured_edge", harness, "the stake is not sized from a measured edge")
+
+    def test_sizing_rule_names_the_measured_rate(self) -> None:
+        sizing = policy()["wager"]["sizing"]
+        self.assertIn("measured", sizing)
+        self.assertIn("ALL_IN", sizing)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

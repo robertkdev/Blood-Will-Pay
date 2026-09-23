@@ -40,7 +40,38 @@
       "BOSS": 3.0
     },
     "rule": "The quote is fixed by encounter kind, so the shown win odds alone set the size. At or below 1 / multiplier the bet loses money: take MINIMUM.",
-    "sizing": "You only all-in when you expect to win. Above 50% shown odds take ALL_IN - an all-in win doubles the bankroll, and that doubling is how a run gets rich. At or below 50% the board is the problem, not the stake: buy the bodies and the slots that raise the odds, then take PRESS or MINIMUM.",
+    "sizing": "Size off the measured band rate the candidates quote, not the odds on screen; the screen reads low in the bands that pay. ALL_IN when the measured edge is at least half a bucket per bucket staked; the Kelly stake when smaller; MINIMUM only when negative. An all-in 3x win is the run-making double.",
+    "measured_first_attempt": {
+      "rule": "Observed win rate of the FIRST attempt at a stage, bucketed by encounter kind and the odds on screen at the time, from 1073 recorded first attempts. Each band is shrunk toward the shown odds with a prior of 20 pseudo-observations, so a band built on three fights cannot drive a stake by itself. Retries are excluded on purpose: they are capped separately because a repeat of a stage the run already lost behaves nothing like a first look.",
+      "samples": 1073,
+      "prior_strength": 20,
+      "bands": {
+        "BOSS": [
+          {"shown": 0.2, "observed": 0.615, "samples": 13},
+          {"shown": 0.3, "observed": 0.6, "samples": 75},
+          {"shown": 0.4, "observed": 0.396, "samples": 96},
+          {"shown": 0.5, "observed": 0.681, "samples": 72},
+          {"shown": 0.6, "observed": 1.0, "samples": 18}
+        ],
+        "CREEPS": [
+          {"shown": 1.0, "observed": 1.0, "samples": 174}
+        ],
+        "MIRROR": [
+          {"shown": 0.4, "observed": 0.333, "samples": 3},
+          {"shown": 0.5, "observed": 0.556, "samples": 126},
+          {"shown": 0.6, "observed": 0.937, "samples": 79}
+        ],
+        "NORMAL": [
+          {"shown": 0.3, "observed": 0.571, "samples": 14},
+          {"shown": 0.4, "observed": 0.734, "samples": 64},
+          {"shown": 0.5, "observed": 0.845, "samples": 103},
+          {"shown": 0.6, "observed": 1.0, "samples": 59},
+          {"shown": 0.7, "observed": 1.0, "samples": 33},
+          {"shown": 0.8, "observed": 1.0, "samples": 69},
+          {"shown": 0.9, "observed": 1.0, "samples": 75}
+        ]
+      }
+    },
     "retry_rule": "A repeat attempt at a stage this run has already lost is capped at a quarter of the bankroll, and the cap is not negotiable against the shown odds. The enemy board is generated once per stage and does not change between attempts, so a loss already taken there is evidence the on-screen odds cannot see. Recorded retries returned roughly -0.8 expected buckets per bucket staked in the quoted-forty-percent band while first attempts in the same band returned about +0.15, and the rig was staking close to half the bankroll on them. Stake the cap, keep the reserve, and let the rebuilt board win the stage on a later attempt instead of betting the run on a rematch."
   },
   "composition": {
