@@ -54,6 +54,10 @@ const RETRY_STAKE_CAP: float = 0.25
 ## Most units one planning beat will pull out of the front rank. A placement the
 ## engine refuses must not turn the beat into a drag loop.
 const REPOSITION_ROLE_FIX_LIMIT: int = 3
+## Consecutive unanswered decisions that mean the controller is gone rather than
+## briefly unavailable. One hiccup falls back to the safe default; this many in a row
+## ends the run, because every later decision would cost a full timeout first.
+const CONTROLLER_LOST_AFTER_TIMEOUTS: int = 3
 ## A synthetic Start Battle click is occasionally swallowed while an overlay is
 ## fading out, which aborts an otherwise good run. The press is retried a bounded
 ## number of times, and only while the same planning beat is still open.
@@ -89,6 +93,9 @@ var _battles: int = 0
 var _rounds: Array[Dictionary] = []
 var _events: Array[Dictionary] = []
 var _decision_kinds: Dictionary[String, int] = {}
+## Unanswered decisions in a row. Reset by any answered decision; see
+## CONTROLLER_LOST_AFTER_TIMEOUTS for why the count matters.
+var _consecutive_decision_timeouts: int = 0
 var _same_stage_retries: Dictionary[String, int] = {}
 ## Planning-beat and shop-revision identity.
 ##
@@ -2557,6 +2564,7 @@ func _ask_decision(kind: String, state: Dictionary, candidates: Array[Dictionary
 				var decision: Dictionary = parsed as Dictionary
 				if int(decision.get("index", -1)) == _decision_index:
 					_decision_kinds[kind] = int(_decision_kinds.get(kind, 0)) + 1
+					_consecutive_decision_timeouts = 0
 					return decision
 		await get_tree().create_timer(DECISION_POLL_SECONDS, true, false, true).timeout
 	# The controller did not answer. Every caller treats an empty decision as its safe
@@ -2568,6 +2576,7 @@ func _ask_decision(kind: String, state: Dictionary, candidates: Array[Dictionary
 		"kind": kind,
 		"timeout_seconds": int(DECISION_TIMEOUT_SECONDS),
 		"fallback": "safe_default",
+		"consecutive": _consecutive_decision_timeouts + 1,
 	})
 	print("%s: decision %d (%s) unanswered after %ds; continuing on the safe default" % [
 		JEV_HARNESS_NAME,
@@ -2575,6 +2584,25 @@ func _ask_decision(kind: String, state: Dictionary, candidates: Array[Dictionary
 		kind,
 		int(DECISION_TIMEOUT_SECONDS),
 	])
+	# One unanswered decision is an upstream hiccup and the safe default keeps the run
+	# alive; a controller that has died is a different thing. Every later decision then
+	# costs the full timeout, so a dead controller turned one run into hours of wall
+	# clock on safe defaults - and the transcript would still be labelled a Jev run.
+	# End it as its own terminal so the batch and the analysis can tell the difference.
+	_consecutive_decision_timeouts += 1
+	if _consecutive_decision_timeouts >= CONTROLLER_LOST_AFTER_TIMEOUTS:
+		_append_event("run_end", {
+			"reason": "controller_lost",
+			"consecutive_timeouts": _consecutive_decision_timeouts,
+			"chapter": int(GameState.chapter),
+			"round": int(GameState.stage_in_chapter),
+		})
+		print("%s: %d consecutive unanswered decisions; ending the run as controller_lost" % [
+			JEV_HARNESS_NAME,
+			_consecutive_decision_timeouts,
+		])
+		_finish_jev_run("controller_lost")
+		return {}
 	return {}
 
 func _write_run_file(file_name: String, text: String) -> void:
@@ -2693,6 +2721,10 @@ func _run_outcome_record(terminal: String) -> Dictionary:
 			cause = "stage_stall_after_%d_attempts" % attempts
 		"technical_failure":
 			cause = "harness_fault"
+		"controller_lost":
+			# The decision source stopped answering, so the run is a harness outage
+			# rather than a game result and must not be read as one.
+			cause = "harness_controller_lost"
 		"aborted":
 			cause = "harness_abort"
 		"target_reached":
@@ -2708,7 +2740,11 @@ func _run_outcome_record(terminal: String) -> Dictionary:
 	# Every note below is about a run that ENDED badly, so they are gated on failure:
 	# a successful run also finishes holding buckets and would otherwise be tallied as
 	# a case of the same waste.
-	if failed:
+	# A harness outage is not a game loss either: a run cut off when the controller died
+	# still holds buckets and can still be mid-stage, and counting those as design
+	# signals would put harness noise into the loss tally.
+	var game_result: bool = terminal in ["loss", "opener_loss", "opener_stall", "stage_stall"]
+	if failed and game_result:
 		if capacity > 0 and board_size < capacity:
 			notes.append("board_fielded_%d_of_%d_slots" % [board_size, capacity])
 		if buckets > 0:
