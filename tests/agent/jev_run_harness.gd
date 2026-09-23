@@ -1790,7 +1790,18 @@ func _shop_candidates() -> Array[Dictionary]:
 	var wager_kind: String = String(Economy.encounter_quote_kind)
 	var wager_multiplier: float = float(Economy.gross_payout_multiplier())
 	var wager_odds: float = float(Economy.projected_win_probability)
-	var ev_per_bucket: float = wager_odds * (wager_multiplier - 1.0) - (1.0 - wager_odds)
+	# The same rate the stake is sized from: the measured band rate on a first attempt,
+	# the displayed number on a retry. Spending and betting draw on one currency, so both
+	# decisions have to price the alternative the same way - pricing a purchase against
+	# the pessimistic display while the stake is sized from the measured rate made
+	# buying look cheaper than it is.
+	var wager_rate: float = wager_odds
+	var wager_rate_basis: String = "shown odds"
+	if _stage_attempt() < 2:
+		wager_rate = _measured_first_attempt_win_rate(wager_kind, wager_odds)
+		if absf(wager_rate - wager_odds) >= 0.001:
+			wager_rate_basis = "measured band rate"
+	var ev_per_bucket: float = wager_rate * (wager_multiplier - 1.0) - (1.0 - wager_rate)
 	var vertical: Dictionary = _vertical_summary()
 	var vertical_target_id: String = String(vertical.get("target_id", ""))
 	var board_ids: Array[String] = _board_ids()
@@ -1874,7 +1885,7 @@ func _shop_candidates() -> Array[Dictionary]:
 				String(summary.get("primary_role", "unit")),
 				", owns %d copies" % copies if copies > 0 else "",
 			],
-			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s%s Leaves %d buckets. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx, shown odds %.0f%%)." % [
+			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s%s Leaves %d buckets. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx at %s %.0f%%)." % [
 				unit_id,
 				offer_level,
 				cost,
@@ -1888,11 +1899,13 @@ func _shop_candidates() -> Array[Dictionary]:
 				ev_per_bucket * float(cost),
 				wager_kind,
 				wager_multiplier,
-				wager_odds * 100.0,
+				wager_rate_basis,
+				wager_rate * 100.0,
 			],
 			"is_vertical_target": is_vertical,
 			"wager_expected_value_foregone": snappedf(ev_per_bucket * float(cost), 0.01),
 			"wager_edge_per_bucket": snappedf(ev_per_bucket, 0.01),
+			"wager_rate_basis": wager_rate_basis,
 			"affordable": true,
 			"slot": int(summary.get("slot", -1)),
 			"unit_id": unit_id,
@@ -1966,14 +1979,29 @@ func _shop_candidates() -> Array[Dictionary]:
 			# when the new roll beats the flex pick in front of you", which pre-judged
 			# the action inside the candidate itself. Every policy variant then produced
 			# identical decisions, so the stance being compared never reached the model.
-			"effect": "Replace every current offer with a new roll. Costs %d buckets (%s) and leaves %d.%s What arrives is not known in advance." % [
+			# Priced like a purchase, because it is the same currency. A reroll was the
+			# only spend decision that never stated what the wager would have paid: over
+			# 1802 recorded planning beats the rig rerolled in 347 of them and bought
+			# nothing in 43% of those, which is 3018 buckets - more than a third of all
+			# shop spending - spent on shelves it then declined.
+			"effect": "Replace every current offer with a new roll. Costs %d buckets (%s) and leaves %d.%s What arrives is not known in advance. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx at %s %.0f%%), and 43%% of the reroll beats on record bought nothing from the new shelf." % [
 				reroll_price,
 				reroll_cost_text,
 				reroll_bankroll - reroll_price,
 				progress_text,
+				reroll_price,
+				ev_per_bucket * float(reroll_price),
+				wager_kind,
+				wager_multiplier,
+				wager_rate_basis,
+				wager_rate * 100.0,
 			],
 			"affordable": true,
 			"cost": reroll_price,
+			"wager_expected_value_foregone": snappedf(ev_per_bucket * float(reroll_price), 0.01),
+			"wager_edge_per_bucket": snappedf(ev_per_bucket, 0.01),
+			"wager_rate_basis": wager_rate_basis,
+			"reroll_beats_that_bought_nothing": 0.43,
 			"combined_cost_text": reroll_cost_text,
 			"combine_progress": progress,
 		})

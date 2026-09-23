@@ -20,7 +20,7 @@
     "full_shop_buyout_rate_max": 0.10,
     "selective_score_lift_over_buy_all_min": 1.0,
     "premium_wager_reduction_min": 0.08,
-    "rule": "Buying every affordable offer is the losing baseline. Pass on offers that do not add power for the plan, and price every purchase against the wager those same buckets could carry."
+    "rule": "Buying every affordable offer is the losing baseline. Pass on offers that do not add power for the plan, and price every purchase against the wager those same buckets could carry. A reroll is a purchase too: it is paid in the same buckets, and 43% of the reroll beats on record bought nothing from the shelf they bought. Do not reroll a shop you would not buy from with the buckets left."
   },
   "power": {
     "rule": "Power arrives in several shapes and none is always best: a second copy at your level, a third copy at that level, a stronger or higher-level unit, an item, another board slot from a level purchase, or a trait breakpoint a new body completes. Price them against each other and take the best board.",

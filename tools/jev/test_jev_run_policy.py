@@ -100,6 +100,24 @@ class PowerLanguageTest(unittest.TestCase):
         self.assertIn("shelf_is_the_reason", harness)
         self.assertIn("slot_payoff", harness)
 
+    def test_reroll_is_priced_against_the_wager(self) -> None:
+        # A reroll is paid in the same buckets as the bet, and it was the only spend
+        # decision that never said what those buckets would have paid: 43% of reroll
+        # beats on record bought nothing from the shelf they bought.
+        rule = policy()["decision_quality_gates"]["rule"]
+        self.assertIn("reroll", rule)
+        self.assertIn("43%", rule)
+        harness = HARNESS_PATH.read_text(encoding="utf-8")
+        reroll_block = harness.split('"id": "reroll"', 1)[1]
+        self.assertIn("wager_expected_value_foregone", reroll_block)
+        self.assertIn("wager_rate_basis", reroll_block)
+        self.assertIn("reroll_beats_that_bought_nothing", reroll_block)
+
+    def test_the_wager_rate_basis_matches_the_stake_sizing(self) -> None:
+        harness = HARNESS_PATH.read_text(encoding="utf-8")
+        self.assertIn("_measured_first_attempt_win_rate(wager_kind, wager_odds)", harness)
+        self.assertIn("wager_rate_basis", harness)
+
 
 class DigestCoverageTest(unittest.TestCase):
     def _controller_digest(self) -> tuple[str, int, int]:

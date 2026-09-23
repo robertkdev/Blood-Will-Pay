@@ -28,9 +28,10 @@ ENDPOINT = "https://api.typesafe.ai"
 # inside it, so the budget stays a real constraint rather than a comment.
 ## Raised from 6600 when the wager sizing rule had to state the Kelly relationship
 ## explicitly: the old "all-in above 50% shown odds" line was wrong for every 3x
-## quote, and the replacement is longer. The guard exists so authored rules are never
-## silently dropped from the prompt, not to cap the policy at a fixed length.
-RULE_DIGEST_LIMIT = 6800
+## quote, and the replacement is longer. Raised again for the reroll pricing rule. The
+## guard exists so authored rules are never silently dropped from the prompt, not to cap
+## the policy at a length set before the rule existed.
+RULE_DIGEST_LIMIT = 7100
 STATE_DIGEST_LIMIT = 4200
 ## A transient upstream failure must not end a long run. One internal server error
 ## aborted a 47-battle run that was one stage from its target, so a failing call is
