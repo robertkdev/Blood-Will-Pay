@@ -555,9 +555,14 @@ func _field_preferred_units(field_ids: Array[String], bench_out_ids: Array[Strin
 		var current_cap: int = _roster_max_team_size()
 		if current_cap >= 0 and _board_ids().size() >= current_cap:
 			var bench_out_id: String = _next_board_swap_id(field_ids, bench_out_ids)
-			_expect(bench_out_id != "", "%s needs a board unit to bench before fielding %s" % [label, field_id])
 			if bench_out_id == "":
-				return swaps
+				# No board unit is worth trading away for this one. Skipping is the
+				# right answer, not a failure: an override may decline a swap that
+				# would bench an invested unit to field a weaker copy of the same id.
+				continue
+			if not _swap_is_worthwhile(bench_out_id, field_id):
+				continue
+			_on_board_swap(bench_out_id, field_id, label)
 			var benched: bool = await _drag_board_unit_id_to_bench(bench_out_id, "%s bench out %s" % [label, bench_out_id])
 			_expect(benched, "%s failed to bench %s before fielding %s" % [label, bench_out_id, field_id])
 			if not benched:
@@ -620,6 +625,17 @@ func _mirror_bench_out_id(candidate_id: String) -> String:
 	if bench_out_id == "":
 		return ""
 	return bench_out_id
+
+## Whether a swap is worth making at all. Base allows every swap the chooser returned;
+## the Jev rig refuses to trade an invested board unit for a less invested body.
+func _swap_is_worthwhile(_bench_out_id: String, _field_id: String) -> bool:
+	return true
+
+## Called before a board unit is benched so a fielding swap can be fielded for its
+## own identity. Base is a no-op; the Jev rig records it so a trade-down is visible in
+## the transcript rather than only in a player's memory of watching it happen.
+func _on_board_swap(_bench_out_id: String, _field_id: String, _label: String) -> void:
+	pass
 
 func _next_board_swap_id(field_ids: Array[String], bench_out_ids: Array[String]) -> String:
 	var board: Array[String] = _board_ids()

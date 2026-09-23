@@ -135,7 +135,10 @@ static func _force_items(unit: Unit, items: Array[String]) -> void:
 	var items_node: Variant = _items_singleton()
 	if items_node == null or not items_node.has_method("force_set_equipped"):
 		return
-	items_node.call("force_set_equipped", unit, items)
+	# A snapshot restore must keep duplicates: a boss-entry unit holding two Guards was
+	# mirrored with one, while its copied stats still matched, so the mirror lost a
+	# Guard trigger without the rating showing it.
+	items_node.call("force_set_equipped", unit, items, true)
 
 static func _items_singleton() -> Variant:
 	var loop: MainLoop = Engine.get_main_loop()

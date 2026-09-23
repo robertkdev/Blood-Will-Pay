@@ -668,6 +668,21 @@ def _fight_records(events: list[dict]) -> list[dict]:
                     if _tier_of(entry) < 0
                 ],
             }
+        elif kind == "combat_log" and pending is not None:
+            line = str(payload.get("line", ""))
+            if line.startswith("Combat resolved: "):
+                fields: dict[str, int] = {}
+                for token in line[len("Combat resolved: "):].split(" "):
+                    if "=" not in token:
+                        continue
+                    key, _, value = token.partition("=")
+                    cleaned = value.rstrip(".")
+                    try:
+                        fields[key] = int(float(cleaned))
+                    except ValueError:
+                        continue
+                pending["_resolution_fields"] = fields
+                pending["resolution_line"] = line
         elif kind == "combat_diagnostic" and pending is not None:
             timeout_s = float(payload.get("combat_timeout_s", 0.0) or 0.0)
             elapsed = float(payload.get("engine_reported_elapsed_s", 0.0) or 0.0)
@@ -678,8 +693,21 @@ def _fight_records(events: list[dict]) -> list[dict]:
             pending["elapsed_s"] = elapsed
             # A fight that used the whole clock was decided by the tie-break ladder.
             pending["clock_decided"] = bool(timeout_s > 0.0 and elapsed >= timeout_s - 0.3)
-            pending["player_alive_after"] = payload.get("post_settlement_player_alive")
-            pending["enemy_alive_after"] = payload.get("post_settlement_enemy_alive")
+            # The post_settlement_* fields are read after settlement has rebuilt the
+            # board for the next stage, so they are NOT the fight's survivors - a
+            # one-unit enemy showed as "2 alive" after a player victory. The engine's
+            # own "Combat resolved:" line is the only trustworthy record of who was
+            # left standing, so it is preferred and the post-settlement values are
+            # kept apart under their own names.
+            pending["post_settlement_player_alive"] = payload.get("post_settlement_player_alive")
+            pending["post_settlement_enemy_alive"] = payload.get("post_settlement_enemy_alive")
+            resolved = pending.pop("_resolution_fields", None) or {}
+            pending["player_alive_after"] = resolved.get("player_alive")
+            pending["enemy_alive_after"] = resolved.get("enemy_alive")
+            if pending["player_alive_after"] is None:
+                pending["player_alive_after"] = payload.get("post_settlement_player_alive")
+            if pending["enemy_alive_after"] is None:
+                pending["enemy_alive_after"] = payload.get("post_settlement_enemy_alive")
             result = str(pending.get("result", ""))
             pending["won"] = True if result == "shop" else (False if result == "loss" else None)
             records.append(pending)

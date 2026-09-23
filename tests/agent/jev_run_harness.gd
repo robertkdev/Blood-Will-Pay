@@ -1420,12 +1420,15 @@ func _roster_snapshot() -> Array[Dictionary]:
 			continue
 		seen.append(unit)
 		records.append({"id": _unit_id(unit), "level": int(unit.level), "where": "board"})
-	if Engine.has_singleton("Roster"):
-		for bench_unit: Unit in Roster.compact():
-			if bench_unit == null or seen.has(bench_unit):
-				continue
-			seen.append(bench_unit)
-			records.append({"id": _unit_id(bench_unit), "level": int(bench_unit.level), "where": "bench"})
+	# Direct reference rather than Engine.has_singleton: a script autoload is not an
+	# engine singleton, so that guard was always false and the bench half of this
+	# snapshot was silently empty - a combined unit sitting on the bench could not be
+	# seen at all.
+	for bench_unit: Unit in Roster.compact():
+		if bench_unit == null or seen.has(bench_unit):
+			continue
+		seen.append(bench_unit)
+		records.append({"id": _unit_id(bench_unit), "level": int(bench_unit.level), "where": "bench"})
 	return records
 
 ## Running maxima for the acceptance targets: a three-star unit, a trait at its top
@@ -1922,7 +1925,108 @@ func _stage_target_rating() -> int:
 	var spec: Variant = RosterCatalog.get_spec(int(GameState.chapter), int(GameState.stage_in_chapter))
 	if not spec is Dictionary:
 		return -1
-	return int(spec.get("target_rating", -1))
+	# StageTypes.make_spec only emits ids/kind/rules, so the target lives under rules.
+	# Reading the top level returned -1 for every stage of every run.
+	var rules: Variant = spec.get("rules", {})
+	if rules is Dictionary:
+		return int((rules as Dictionary).get("target_rating", -1))
+	return -1
+
+## Never trade a board unit away for a less invested body.
+##
+## The same defect as the id-collision trade-down, one step wider: the fielding plan
+## is built from id strings, so it cannot see that the "grint" it wants to bench is a
+## three-star holding an item and the "berebell" replacing it is a fresh level 1. A
+## replacement has to be at least as invested as the unit leaving, which still allows
+## upgrades and like-for-like role swaps while refusing to throw away levels or items.
+func _swap_is_worthwhile(bench_out_id: String, field_id: String) -> bool:
+	var out_unit: Unit = _board_unit_with_id(bench_out_id)
+	var in_unit: Unit = _bench_unit_with_id(field_id)
+	if out_unit == null or in_unit == null:
+		return true
+	return _investment(in_unit) >= _investment(out_unit)
+
+## Record every board swap with the levels and item counts on both sides, so a
+## trade-down (benching an invested unit to field a weaker copy) is visible as data
+## instead of something only a player watching the screen would notice.
+func _on_board_swap(bench_out_id: String, field_id: String, label: String) -> void:
+	var out_unit: Unit = _board_unit_with_id(bench_out_id)
+	var in_unit: Unit = _bench_unit_with_id(field_id)
+	_append_event("board_swap", {
+		"label": label,
+		"bench_ids": _bench_ids(),
+		"out_id": bench_out_id,
+		"out_level": int(out_unit.level) if out_unit != null else -1,
+		"out_items": Items.get_equipped(out_unit).size() if (out_unit != null and Items != null) else 0,
+		"in_id": field_id,
+		"in_level": int(in_unit.level) if in_unit != null else -1,
+		"in_items": Items.get_equipped(in_unit).size() if (in_unit != null and Items != null) else 0,
+		"trade_down": out_unit != null and in_unit != null and _investment(in_unit) < _investment(out_unit),
+	})
+
+## Which board unit to trade away when a bench unit is being fielded.
+##
+## The inherited chooser works on id strings, so it cannot tell a level-3 Bonko
+## holding three items from a freshly bought level-1 Bonko - both are "bonko". It
+## benched the invested one and fielded the fresh copy, repeatedly: the run slammed
+## three items onto a Bonko, watched it get benched for a level-1 copy, lost, bought
+## another, and did it again. Investment is never worth trading down, so an
+## invested board unit is not a swap candidate while a weaker same-id copy waits on
+## the bench, and the weakest board unit is preferred otherwise.
+func _next_board_swap_id(field_ids: Array[String], bench_out_ids: Array[String]) -> String:
+	var board: Array[String] = _board_ids()
+	var desired_counts: Dictionary = _id_counts(field_ids)
+	var seen_counts: Dictionary = {}
+	for unit_id: String in bench_out_ids:
+		if not board.has(unit_id):
+			continue
+		seen_counts[unit_id] = int(seen_counts.get(unit_id, 0)) + 1
+		if int(seen_counts.get(unit_id, 0)) > int(desired_counts.get(unit_id, 0)):
+			return unit_id
+	var worst_id: String = ""
+	var worst_score: int = 1 << 30
+	for board_id: String in board:
+		var board_unit: Unit = _board_unit_with_id(board_id)
+		if board_unit == null:
+			continue
+		var bench_copy: Unit = _bench_unit_with_id(board_id)
+		if bench_copy != null and _investment(bench_copy) <= _investment(board_unit):
+			# Trading this copy down for a weaker one of the same identity is never
+			# worth it; leave it alone.
+			continue
+		# A unit the fielding plan does not want is the natural swap; otherwise take
+		# the least invested body.
+		var score: int = _investment(board_unit)
+		if not field_ids.has(board_id):
+			score -= 1000
+		if score < worst_score:
+			worst_score = score
+			worst_id = board_id
+	return worst_id
+
+## Rough value of a unit: level first, then how many items it carries.
+func _investment(unit: Unit) -> int:
+	if unit == null:
+		return 0
+	var item_count: int = 0
+	if Items != null:
+		item_count = Items.get_equipped(unit).size()
+	return maxi(1, int(unit.level)) * 100 + item_count
+
+func _board_unit_with_id(unit_id: String) -> Unit:
+	for unit: Unit in _board_units():
+		if unit != null and _unit_id(unit) == unit_id:
+			return unit
+	return null
+
+func _bench_unit_with_id(unit_id: String) -> Unit:
+	# No Engine.has_singleton guard: a script autoload is not an engine singleton, so
+	# that check is always false and this lookup silently returned null every time,
+	# which is why a swap guard could not see the unit it was trading away.
+	for unit: Unit in Roster.compact():
+		if unit != null and _unit_id(unit) == unit_id:
+			return unit
+	return null
 
 ## Deploy by role instead of by first empty tile.
 ##
