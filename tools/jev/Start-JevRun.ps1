@@ -38,6 +38,12 @@ param(
     # Fast-sweep only: hold the planning beat open instead of the shipped countdown.
     [switch] $HoldPlanningTimer,
 
+    # Ledger depth for this arm. -1 leaves the live account alone; 0 is a clean
+    # profile and a positive value rebuilds the account at that many lifetime Omens
+    # in its own profile file. Two arms on the same seeds are how campaign growth is
+    # measured; see _seed_account_omens_if_requested in the harness.
+    [int] $LedgerOmens = -1,
+
     [ValidateRange(1, 240)]
     [int] $TimeoutMinutes = 45,
 
@@ -88,6 +94,11 @@ $env:JEV_STARTER = $Starter
 $env:JEV_SPEED = $Speed.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $env:JEV_LANE = $Lane
 $env:JEV_REAL_TIMER = if ($HoldPlanningTimer) { "0" } else { "1" }
+if ($LedgerOmens -ge 0) {
+    $env:JEV_LEDGER_OMENS = [string]$LedgerOmens
+} else {
+    Remove-Item Env:\JEV_LEDGER_OMENS -ErrorAction SilentlyContinue
+}
 $env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
 $env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {
     (Get-FileHash -LiteralPath $rulesPath -Algorithm SHA256).Hash.ToLowerInvariant()

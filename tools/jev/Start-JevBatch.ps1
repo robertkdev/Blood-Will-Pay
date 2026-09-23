@@ -19,6 +19,11 @@ param(
     [ValidateRange(1, 240)]
     [int] $TimeoutMinutes = 45,
 
+    # Ledger depth for this arm. -1 leaves the live account alone; 0 is a clean
+    # profile and a positive value rebuilds the account at that many lifetime Omens.
+    # Run the same seeds twice with different depths to measure campaign growth.
+    [int] $LedgerOmens = -1,
+
     [string] $Rules = ""
 )
 
@@ -34,7 +39,8 @@ $analyzer = Join-Path $scriptRoot "analyze_jev_run.py"
 $single = Join-Path $scriptRoot "Start-JevRun.ps1"
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$batchDirectory = Join-Path $ArtifactRoot ("batches\{0}-{1}-{2}" -f $Mode, $Lane, $stamp)
+$ledgerLabel = if ($LedgerOmens -lt 0) { "live" } else { "ledger$LedgerOmens" }
+$batchDirectory = Join-Path $ArtifactRoot ("batches\{0}-{1}-{2}-{3}" -f $Mode, $Lane, $stamp, $ledgerLabel)
 New-Item -ItemType Directory -Force -Path $batchDirectory | Out-Null
 $batchDirectory = (Resolve-Path -LiteralPath $batchDirectory).Path
 
@@ -52,6 +58,9 @@ foreach ($seed in $Seeds) {
     }
     if (-not [string]::IsNullOrWhiteSpace($Rules)) {
         $arguments["Rules"] = $Rules
+    }
+    if ($LedgerOmens -ge 0) {
+        $arguments["LedgerOmens"] = $LedgerOmens
     }
     $payload = & $single @arguments | Out-String
     $result = $null
@@ -90,6 +99,7 @@ foreach ($seed in $Seeds) {
         seed = $seed
         mode = $result.mode
         lane = $Lane
+        ledger_omens = $LedgerOmens
         terminal = $result.terminal
         chapter = $result.final_chapter
         round = $result.final_stage_in_chapter
@@ -113,6 +123,7 @@ $lines = @(
     ("# Jev batch: {0} / {1}" -f $Mode, $Lane),
     "",
     ("Seeds: {0}" -f ($Seeds -join ", ")),
+    ("Ledger depth: {0} (-1 means the live account)" -f $LedgerOmens),
     "",
     ($rows | ConvertTo-Csv -NoTypeInformation | Out-String),
     $table

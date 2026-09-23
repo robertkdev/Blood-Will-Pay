@@ -20,6 +20,7 @@ extends "res://tests/pacing/competent_policy_pacing_harness.gd"
 const JEV_HARNESS_NAME: String = "JevRunHarness"
 const DEFAULT_RUN_DIR: String = "user://jev_run"
 const JEV_RULES_PATH: String = "res://tools/jev/policy/jev_run_rules.json"
+const AccountProfileStoreScript: GDScript = preload("res://scripts/game/account/account_profile_store.gd")
 const DEFAULT_RESERVE_FLOOR_BUCKETS: int = 2
 const DECISION_POLL_SECONDS: float = 0.05
 const DECISION_TIMEOUT_SECONDS: float = 240.0
@@ -87,6 +88,13 @@ var _run_dir: String = DEFAULT_RUN_DIR
 var _run_mode: String = "jev"
 var _lane: String = "campaign"
 var _campaign_seed: int = 4401
+## Set when JEV_LEDGER_OMENS asks for a controlled account depth; see
+## _seed_account_omens_if_requested.
+var _seeded_account_profile_path: String = ""
+var _seeded_account_journal_path: String = ""
+var _seeded_account_omens: int = 0
+var _seeded_account_rank: int = 1
+var _seeded_account_saved: bool = false
 var _decision_index: int = 0
 var _starter_id: String = "bonko"
 var _battles: int = 0
@@ -187,6 +195,7 @@ func _run() -> void:
 	_prepare_run_dir()
 	# The Ledger is spent between runs, so this has to happen before the run freezes its
 	# loadout. See _prepare_campaign_loadout for what the account was doing before this.
+	_seed_account_omens_if_requested()
 	_prepare_campaign_loadout()
 	print("%s: boot mode=%s lane=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
 		JEV_HARNESS_NAME,
@@ -222,6 +231,7 @@ func _run() -> void:
 	})
 
 	_start_main_scene()
+	_apply_seeded_account_paths()
 	await _settle_frames(10)
 	await _ensure_unit_select()
 	await _decide_starter()
@@ -615,16 +625,68 @@ func _measured_first_attempt_win_rate(quote_kind: String, shown_odds: float) -> 
 
 ## What the Ledger should buy, in the order that changes a run soonest.
 ##
-## Only two Edicts change a fight: Debtor's Mercy adds a starting blood bucket, which the
-## doubling ladder compounds from the very first wager, and House Courtesy makes the first
-## paid reroll free. Iron Memory is next because it buys the third Edict slot, and the rest
-## are Omen income - income is what pays for later runs, so it is bought but equipped last.
+## Three Edicts change a fight: Debtor's Mercy adds starting blood buckets, which the
+## doubling ladder compounds from the very first wager; Wide Table adds board bodies, the
+## quantity that separated winners from losers at the first boss; and House Courtesy makes
+## the first paid reroll free. Iron Memory is next because it buys the third Edict slot, and
+## the rest are Omen income - income is what pays for later runs, so it is equipped last.
 const CAMPAIGN_EDICT_PURCHASE_ORDER: Array[String] = [
-	"debtors_mercy", "house_courtesy", "iron_memory", "widows_thread", "foremans_seal", "third_margin",
+	"debtors_mercy", "house_courtesy", "wide_table", "iron_memory", "widows_thread", "foremans_seal", "third_margin",
 ]
 const CAMPAIGN_EDICT_EQUIP_ORDER: Array[String] = [
-	"debtors_mercy", "house_courtesy", "widows_thread", "foremans_seal", "third_margin",
+	"debtors_mercy", "wide_table", "house_courtesy", "widows_thread", "foremans_seal", "third_margin",
 ]
+
+## Spend the Ledger between runs.
+##
+## Rebuild the account at a chosen Ledger depth, so one batch can compare a fresh
+## profile against a grown one on the same seeds. That comparison is the only way to
+## test the incremental promise - play, lose, and come back further - because a batch
+## that inherits the live account has already spent every Edict before the first run.
+## JEV_LEDGER_OMENS=0 is a clean account; JEV_LEDGER_OMENS=5331 is the rank-66 account
+## the recorded batches have been farming.
+##
+## The arm runs against its own profile file, so a fresh arm cannot wipe the live
+## account's accumulated Omens. Unset leaves the live profile in place. The file is
+## written here and the path is handed to Main by _apply_seeded_account_paths once the
+## main scene exists, so the run freezes its loadout against the seeded account.
+func _seed_account_omens_if_requested() -> void:
+	var raw: String = OS.get_environment("JEV_LEDGER_OMENS").strip_edges()
+	if raw.is_empty() or not raw.is_valid_int():
+		return
+	var omens: int = max(0, raw.to_int())
+	_seeded_account_rank = int(LivingLedgerCatalog.rank_progress(omens).get("rank", 1))
+	_seeded_account_omens = omens
+	_seeded_account_profile_path = "user://jev_account_ledger%d.json" % omens
+	_seeded_account_journal_path = "user://jev_journal_ledger%d.json" % omens
+	var rebuilt: Dictionary = AccountProfileStoreScript.default_profile()
+	rebuilt["lifetime_omens"] = omens
+	rebuilt["omens_balance"] = omens
+	var saved: Dictionary = AccountProfileStoreScript.save_profile(rebuilt, _seeded_account_profile_path)
+	_seeded_account_saved = bool(saved.get("ok", false))
+
+## Point Main and Economy at the seeded account. Runs immediately after the main scene
+## is instantiated and before any starter is chosen, which is the window in which the
+## run settles its Ledger loadout.
+func _apply_seeded_account_paths() -> void:
+	if _seeded_account_profile_path == "":
+		return
+	if _main != null and _main.has_method("set_account_progression_paths"):
+		_main.call("set_account_progression_paths", _seeded_account_profile_path, _seeded_account_journal_path)
+	if Economy != null and Economy.has_method("reset_run"):
+		# Economy caches the loadout and opening reserve in reset_run, and the autoload
+		# booted against the live profile before the harness could redirect it.
+		Economy.call("reset_run")
+	print("%s: seeded account to %d lifetime Omens (rank %d, profile=%s, saved=%s)" % [
+		JEV_HARNESS_NAME, _seeded_account_omens, _seeded_account_rank,
+		_seeded_account_profile_path, str(_seeded_account_saved),
+	])
+	_append_event("campaign_seed", {
+		"lifetime_omens": _seeded_account_omens,
+		"rank": _seeded_account_rank,
+		"profile_path": _seeded_account_profile_path,
+		"saved": _seeded_account_saved,
+	})
 
 ## Spend the Ledger between runs.
 ##
@@ -635,16 +697,19 @@ const CAMPAIGN_EDICT_EQUIP_ORDER: Array[String] = [
 ## ever have shown campaign growth. This buys what is affordable in the order above,
 ## equips what fits, and records both so a run's loadout is readable in its transcript.
 func _prepare_campaign_loadout() -> void:
-	var before: Dictionary = AccountProgression.profile()
+	# Resolved once so the spend/equip pass and the run's own loadout read the same
+	# account: the default live profile, or the isolated one a Ledger-depth arm seeded.
+	var path: String = _resolved_account_profile_path()
+	var before: Dictionary = AccountProgression.profile(path)
 	var omens_before: int = int(before.get("omens_balance", 0))
 	var purchased: Array[String] = []
 	for edict_id: String in CAMPAIGN_EDICT_PURCHASE_ORDER:
-		if _string_list(AccountProgression.profile().get("unlocked_edict_ids", [])).has(edict_id):
+		if _string_list(AccountProgression.profile(path).get("unlocked_edict_ids", [])).has(edict_id):
 			continue
-		var purchase: Dictionary = AccountProgression.purchase_edict(edict_id)
+		var purchase: Dictionary = AccountProgression.purchase_edict(edict_id, path)
 		if bool(purchase.get("ok", false)):
 			purchased.append(edict_id)
-	var after_purchase: Dictionary = AccountProgression.profile()
+	var after_purchase: Dictionary = AccountProgression.profile(path)
 	var slots: int = AccountProgression.max_edict_slots(after_purchase)
 	var unlocked: Array[String] = _string_list(after_purchase.get("unlocked_edict_ids", []))
 	var already: Array[String] = _string_list(after_purchase.get("equipped_edict_ids", []))
@@ -657,10 +722,10 @@ func _prepare_campaign_loadout() -> void:
 		if already.has(edict_id):
 			equipped.append(edict_id)
 			continue
-		var toggled: Dictionary = AccountProgression.toggle_edict(edict_id)
+		var toggled: Dictionary = AccountProgression.toggle_edict(edict_id, path)
 		if bool(toggled.get("ok", false)):
 			equipped.append(edict_id)
-	var after: Dictionary = AccountProgression.profile()
+	var after: Dictionary = AccountProgression.profile(path)
 	_append_event("campaign_prep", {
 		"omens_before": omens_before,
 		"omens_after": int(after.get("omens_balance", 0)),
@@ -669,7 +734,8 @@ func _prepare_campaign_loadout() -> void:
 		"equipped": equipped,
 		"edict_slots": slots,
 		"unlocked_edict_ids": _string_list(after.get("unlocked_edict_ids", [])),
-		"starting_blood_bucket_bonus": AccountProgression.starting_blood_bucket_bonus(),
+		"starting_blood_bucket_bonus": AccountProgression.starting_blood_bucket_bonus(path),
+		"board_capacity_bonus": AccountProgression.board_capacity_bonus(path),
 		"red_ink_tier": int(after.get("selected_red_ink", 0)),
 	})
 	print("%s: ledger prep omens %d -> %d, bought %s, equipped %s" % [
@@ -679,6 +745,19 @@ func _prepare_campaign_loadout() -> void:
 		str(purchased),
 		str(equipped),
 	])
+
+## The account this run reads. A Ledger-depth arm points Main at its own profile file;
+## every other run uses the live account.
+func _resolved_account_profile_path() -> String:
+	if _seeded_account_profile_path != "":
+		return _seeded_account_profile_path
+	if _main == null:
+		return AccountProfileStoreScript.DEFAULT_PATH
+	var value: Variant = _main.get("account_profile_path")
+	if value == null:
+		return AccountProfileStoreScript.DEFAULT_PATH
+	var path: String = String(value).strip_edges()
+	return path if path != "" else AccountProfileStoreScript.DEFAULT_PATH
 
 func _string_list(value: Variant) -> Array[String]:
 	var out: Array[String] = []
