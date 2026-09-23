@@ -1158,10 +1158,14 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 	if planning_directive != null:
 		planning_directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
 		planning_directive.add_theme_font_size_override("font_size", 16 if tight_compact else 20)
-		planning_directive.offset_left = -246.0 if tight_compact else -286.0
-		planning_directive.offset_right = 246.0 if tight_compact else 286.0
-		planning_directive.offset_top = 0.0 if tight_compact else 12.0
-		planning_directive.offset_bottom = 34.0 if tight_compact else 54.0
+		# Anchored on the commit boundary (the seam between the two boards). Anchoring
+		# it at the top of the planning area drew it over the enemy deployment grid.
+		planning_directive.anchor_top = 0.5
+		planning_directive.anchor_bottom = 0.5
+		planning_directive.offset_left = -180.0 if tight_compact else -230.0
+		planning_directive.offset_right = 180.0 if tight_compact else 230.0
+		planning_directive.offset_top = -15.0
+		planning_directive.offset_bottom = 15.0
 		planning_directive.visible = not maximum_scale_layout
 		planning_directive.z_index = 110
 		planning_directive.z_as_relative = false

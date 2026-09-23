@@ -1565,12 +1565,16 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 		geometry.add_child(directive)
 	directive.anchor_left = 0.5
 	directive.anchor_right = 0.5
-	directive.anchor_top = 0.0
-	directive.anchor_bottom = 0.0
-	directive.offset_left = -286.0
-	directive.offset_right = 286.0
-	directive.offset_top = 12.0
-	directive.offset_bottom = 54.0
+	# Sit on the commit boundary rather than at the top of the planning area. The
+	# planning area's top band is the enemy deployment grid, so the banner used to be
+	# painted straight across the enemy unit cards; the red commit rule it labels is
+	# already the seam between the two boards at 0.5.
+	directive.anchor_top = 0.5
+	directive.anchor_bottom = 0.5
+	directive.offset_left = -230.0
+	directive.offset_right = 230.0
+	directive.offset_top = -17.0
+	directive.offset_bottom = 17.0
 	directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
 	directive.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	directive.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

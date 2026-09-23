@@ -114,6 +114,12 @@ var _campaign_milestone_met: bool = false
 ## so the transcript records the frames rather than only the outcome.
 var _fight_frame_ms: Array[float] = []
 var _previous_frame_process: bool = false
+## Optional planning-beat screenshots. A UI report ("this banner covers the enemy
+## grid") needs a real rendered frame to confirm against, and the run is already
+## driving the real 1920x1080 scene. Off unless JEV_CAPTURE_PLANNING is set, and
+## bounded per run so a sweep cannot fill a disk.
+var _capture_planning: bool = false
+var _capture_budget: int = 3
 
 func _process(delta: float) -> void:
 	if int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active):
@@ -503,6 +509,10 @@ func _read_environment() -> void:
 	var lane_value: String = OS.get_environment("JEV_LANE").strip_edges().to_lower()
 	if lane_value in ["campaign", "deep"]:
 		_lane = lane_value
+	_capture_planning = OS.get_environment("JEV_CAPTURE_PLANNING").strip_edges() == "1"
+	var capture_budget_value: String = OS.get_environment("JEV_CAPTURE_BUDGET").strip_edges()
+	if capture_budget_value.is_valid_int():
+		_capture_budget = max(0, capture_budget_value.to_int())
 	_reserve_floor_buckets = _load_reserve_floor()
 
 func _set_planning_timer_safe() -> void:
@@ -1023,6 +1033,7 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	})
 	var chapter_before: int = int(GameState.chapter)
 	var stage_before: int = int(GameState.stage_in_chapter)
+	await _maybe_capture_planning(label)
 	for attempt: int in range(START_BATTLE_ATTEMPTS):
 		await super._press_continue(expect_forced, label)
 		if await _fight_started_or_stage_moved(chapter_before, stage_before):
@@ -1033,6 +1044,35 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		# retry presses the same Start Battle button rather than starting anything new.
 		_append_event("start_battle_retry", {"label": label, "attempt": attempt + 1})
 		await _settle_frames(8)
+
+## Save a frame of the live planning beat so a UI layout report can be checked
+## against the real render instead of a description. Bounded per run.
+func _maybe_capture_planning(label: String) -> void:
+	if not _capture_planning or _capture_budget <= 0:
+		return
+	_capture_budget -= 1
+	await RenderingServer.frame_post_draw
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture == null:
+		return
+	var image: Image = texture.get_image()
+	if image == null:
+		return
+	var file_name: String = "planning_ch%d_r%d_%d.png" % [
+		int(GameState.chapter),
+		int(GameState.stage_in_chapter),
+		_capture_budget,
+	]
+	var error: int = image.save_png(_run_dir.path_join(file_name))
+	_append_event("planning_capture", {
+		"file": file_name,
+		"label": label,
+		"ok": error == OK,
+		"board": _board_ids(),
+		"board_capacity": _roster_max_team_size(),
+		"enemy_count": _enemy_units().size(),
+		"viewport": str(get_viewport().get_visible_rect().size),
+	})
 
 ## True once combat is live or the stage already moved on. Both mean the Start
 ## Battle press took effect; the second case is a fight that resolved fast.
@@ -1496,6 +1536,27 @@ static func summarize_offer_facts(
 		"deploy_requires_replacement": board_copies <= 0 and not board_has_room,
 	}
 
+## Whether the rendered card for a slot is actually buyable right now. Resolved from
+## the grid the same way the click path resolves it, so the candidate list and the
+## click cannot disagree about which offers are live.
+func _shop_slot_is_purchasable(slot_index: int, unit_id: String) -> bool:
+	if slot_index < 0:
+		return false
+	var combat: Node = _main.get_node_or_null("CombatView") if _main != null else null
+	if combat == null:
+		return false
+	var grid: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
+	if grid == null:
+		return false
+	for child: Node in grid.get_children():
+		var card: ShopCard = child as ShopCard
+		if card == null or int(card.slot_index) != slot_index:
+			continue
+		if card.disabled:
+			return false
+		return unit_id == "" or String(card.offer_id) == unit_id
+	return false
+
 func _shop_candidates() -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []
 	var summaries: Array[Dictionary] = _offer_summaries()
@@ -1518,6 +1579,11 @@ func _shop_candidates() -> Array[Dictionary]:
 		var unit_id: String = String(summary.get("id", ""))
 		var cost: int = int(summary.get("cost", 0))
 		if unit_id == "" or cost <= 0:
+			continue
+		# The shelf can still list an offer whose card has already been sold or
+		# disabled. Offering it would have the model choose something it cannot buy,
+		# and the click path then records "slot N is disabled" against the run.
+		if not _shop_slot_is_purchasable(int(summary.get("slot", -1)), unit_id):
 			continue
 		if not _can_afford_shop_cost(cost):
 			candidates.append({
