@@ -137,13 +137,19 @@ recorded results follow it exactly:
 | 0 (tied) | 72 | **24%** |
 | +1 to +8 | 335 | 100% |
 
-Any nonzero margin is decisive, which is the rule working. The tie is not: 72 fights went
-to equal survivors, and the player lost three of every four. The second criterion is
-*absolute* remaining health, and the generated enemy is a small board of stat-inflated
-units - four bodies at the chapter two boss against the player's six - so at equal
-survivor counts it holds more health and takes the award. A scale-free second criterion
-(remaining health per surviving unit, or each survivor's own health fraction) would make
-that close to even.
+Any nonzero margin is decisive, which is the rule working. The tie is not even: 72 fights
+went to equal survivors, and the player lost three of every four. The second criterion is
+remaining health, and the generated enemy is a small board of stat-inflated units - four
+bodies at the chapter two boss against the player's six - so at equal survivor counts it
+simply has more health left.
+
+That last point rules out the obvious fix. Rewriting the second criterion to be scale-free
+does not help: health per surviving unit still favours the beefier board (four survivors at
+200 health beat four at 100), and health as a fraction of each team's own maximum still
+favours it (800 of 3200 against 400 of 2400). Every health-based comparison rewards the
+shape the generator chose. The asymmetry is in the *board shape*, not in the ladder: a boss
+board of four fat units against a player board of six flat ones wins the clock whenever the
+fight is close, and the fight is close because the board was fitted to be a near-peer.
 
 At the chapter two boss specifically: 87 of 128 attempts ran to the clock, the survivor
 margin was spread 24 negative / 22 tied / 41 positive, and the stage's overall 45% is
@@ -176,6 +182,24 @@ refitted to be a near-peer, the player's build barely moves the win rate, the ga
 out as coin flips, and the run distribution is "die in chapter 1-2, or occasionally go
 deep" rather than a build-driven progression. It is also why re-pricing one boss changed
 almost nothing.
+
+The two properties compound. A board fitted to the target with as few bodies as the size
+ladder allows is narrow and heavy, so it wins the clock tie-break; and because it is fitted
+at all, it is always close enough to the player for that tie-break to decide the stage.
+
+The design levers this points at, with the trade-offs already measured in the code:
+
+- **Make the boss board scale in breadth with its target.** `_desired_size_for_target`
+  returns 4 for every boss below rating 520 and only widens above that, but the player's
+  boss board is 6-7 bodies by chapter 2-3. A wider boss board would carry less health per
+  unit and stop winning clock ties by shape. The code already carries the breadth ladder
+  for normal stages and an earlier paired comparison that found it overshot the target
+  slightly (power 302.5 -> 321.0, player odds 40% -> 37%), so this trades one imbalance for
+  another unless the target is fitted after the shape is chosen.
+- **Fit the shape first, then the rating.** Everything above follows from fitting the
+  board to a number. Choosing a per-stage board shape first - how many bodies, at what
+  level - and then letting the stat fit close the gap would give the win rate something to
+  track, which is what a build-driven progression needs.
 
 ## Standing limits on this kind of measurement
 
