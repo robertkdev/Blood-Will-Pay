@@ -109,6 +109,38 @@ var _last_combat_outcome: String = ""
 var _last_combat_elapsed_s: float = -1.0
 ## The chapter-2 campaign milestone inside a deeper lane, recorded once.
 var _campaign_milestone_met: bool = false
+## Real frame times while a fight is on screen. The board grows to nine units a side
+## in the deep lane, and the player-visible complaint at that size is frame pacing,
+## so the transcript records the frames rather than only the outcome.
+var _fight_frame_ms: Array[float] = []
+var _previous_frame_process: bool = false
+
+func _process(delta: float) -> void:
+	if int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active):
+		_fight_frame_ms.append(maxf(0.0, float(delta)) * 1000.0)
+		_previous_frame_process = true
+	elif _previous_frame_process:
+		# The fight just ended; leave the buffer for the diagnostic that follows.
+		_previous_frame_process = false
+
+## Percentiles of the frames recorded since the last reset.
+func _take_fight_frame_stats() -> Dictionary:
+	if _fight_frame_ms.is_empty():
+		return {}
+	var ordered: Array[float] = _fight_frame_ms.duplicate()
+	_fight_frame_ms.clear()
+	ordered.sort()
+	var total: float = 0.0
+	for value: float in ordered:
+		total += value
+	var count: int = ordered.size()
+	return {
+		"frames": count,
+		"mean_ms": snappedf(total / float(count), 0.01),
+		"p50_ms": snappedf(ordered[int(floor(float(count - 1) * 0.50))], 0.01),
+		"p95_ms": snappedf(ordered[int(ceil(float(count - 1) * 0.95))], 0.01),
+		"max_ms": snappedf(ordered[count - 1], 0.01),
+	}
 
 func _run() -> void:
 	_read_environment()
@@ -402,6 +434,9 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		"reserve_before_wager": int(Economy.last_blood_reserve_start),
 		"wager": int(Economy.last_wager_start),
 		"combat_active": bool(Economy.combat_active),
+		# Frame pacing for the fight that just ended, at the board size it ran with.
+		"frame_ms": _take_fight_frame_stats(),
+		"board_size": player_team.size() + enemy_team.size(),
 	})
 
 func _alive_count(team: Array) -> int:
@@ -544,6 +579,20 @@ func _flow_target_round() -> int:
 
 func _flow_max_battles() -> int:
 	return _campaign_max_battles()
+
+## The inherited fixture caps a shop at two purchases, and at one in chapter 1 rounds
+## 1-4, so a scripted pacing test stays deterministic. That cap - not the economy -
+## is what stopped the rig from ever accumulating the nine copies a three-star needs:
+## a Jev run reached a 12,751-bucket bankroll and could still only buy two cards per
+## beat. A player with money buys the shelf.
+func _max_natural_buys_for_round(_chapter_before: int, _round_before: int) -> int:
+	return int(SHOP_CONFIG.SLOT_COUNT)
+
+## The gate exists to protect a scripted script's chapter-1 boss purchase. With the
+## shop now open to the whole shelf, the reserve floor in the affordability rules is
+## the thing that protects the bankroll, so this stays out of the way.
+func _should_reserve_gold_for_round_four_gate(_chapter_before: int, _round_before: int) -> bool:
+	return false
 
 func _flow_verbose_round_logs() -> bool:
 	return true
@@ -964,6 +1013,12 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"encounter_kind": String(Economy.encounter_quote_kind),
 		"quoted_multiplier": float(Economy.gross_payout_multiplier()),
 		"shown_win_odds": float(Economy.projected_win_probability),
+		# The number the decision actually acted on is Economy.projected_win_probability,
+		# which the combat view refreshes on its own signals. That refresh can lag the
+		# final board - items are equipped after deployment - so the odds are also
+		# recomputed here from the teams that are about to fight. Comparing the two in
+		# the transcript separates "the display is stale" from "the model is wrong".
+		"live_win_odds": _live_win_odds(),
 		"planning_seconds_left": snappedf(_planning_time_left(), 0.01),
 	})
 	var chapter_before: int = int(GameState.chapter)
@@ -1650,6 +1705,23 @@ func _item_candidates() -> Array[Dictionary]:
 
 ## One planning beat can need several item decisions: two components on one unit is a
 ## deliberate two-step play, so a single pass would leave the second one unplaced.
+## The same estimate the HUD shows, recomputed from the teams that are about to
+## fight. Uses the game's own estimator so the two numbers are directly comparable.
+func _live_win_odds() -> float:
+	var player_team: Array[Unit] = _board_units()
+	var enemy_team: Array[Unit] = _enemy_units()
+	if player_team.is_empty() or enemy_team.is_empty():
+		return -1.0
+	var boss_factor: float = 1.0
+	if RosterUtils.is_boss_stage(int(GameState.stage_in_chapter)):
+		boss_factor = TeamOddsEstimator.BOSS_ESCALATION_PREVIEW_FACTOR
+	var percent: int = TeamOddsEstimator.estimate_from_ratings(
+		TeamOddsEstimator.team_rating(player_team),
+		TeamOddsEstimator.team_rating(enemy_team),
+		boss_factor,
+	)
+	return snappedf(float(percent) / 100.0, 0.001)
+
 ## The stage's design target rating. Read from the already-generated spec for the
 ## stage being fought; the procedural chapter is cached by the time a fight starts.
 func _stage_target_rating() -> int:

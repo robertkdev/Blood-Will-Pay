@@ -23,6 +23,9 @@ function parseArgs(argv) {
     completeMarker: 'JEV_RUN_COMPLETE',
     timeoutSeconds: 2700,
     pollMilliseconds: 2000,
+    // A dropped debug poll is retried before the run is treated as over.
+    pollRetries: 6,
+    pollRetryMilliseconds: 2500,
     startGraceSeconds: 300,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -37,6 +40,8 @@ function parseArgs(argv) {
       case '--timeout-seconds': args.timeoutSeconds = Number(next); index += 1; break;
       case '--complete-marker': args.completeMarker = next; index += 1; break;
       case '--poll-milliseconds': args.pollMilliseconds = Number(next); index += 1; break;
+      case '--poll-retries': args.pollRetries = Number(next); index += 1; break;
+      case '--poll-retry-milliseconds': args.pollRetryMilliseconds = Number(next); index += 1; break;
       case '--start-grace-seconds': args.startGraceSeconds = Number(next); index += 1; break;
       default:
         if (token.startsWith('--')) throw new Error(`Unknown argument: ${token}`);
@@ -189,15 +194,37 @@ async function main() {
       try {
         payload = await client.callTool('get_debug_output', {});
       } catch (error) {
-        // The game can exit on its own (probe scenes quit themselves). A clean
-        // exit after real output is a finished run, not a supervision failure.
-        summary.status = sawStart ? 'process_ended' : 'never_started';
-        if (sawStart) {
-          const seen = readFileSync(args.log, 'utf8');
-          if (seen.includes(args.completeMarker)) summary.status = 'complete';
+        // A single failed poll is not proof the run ended. The debug channel drops
+        // while the game is still playing when a second Godot instance holds the
+        // same project, and treating that as terminal kills a run mid-flight - which
+        // is how the deepest runs were lost. Retry before believing it.
+        if (readFileSync(args.log, 'utf8').includes(args.completeMarker)) {
+          summary.status = 'complete';
+          summary.detail = String(error.message ?? error);
+          break;
         }
-        summary.detail = String(error.message ?? error);
-        break;
+        let recovered = false;
+        for (let retry = 0; retry < args.pollRetries; retry += 1) {
+          await sleep(args.pollRetryMilliseconds);
+          try {
+            payload = await client.callTool('get_debug_output', {});
+            recovered = true;
+            appendFileSync(args.log, `runner| debug poll recovered after ${retry + 1} retries\n`);
+            break;
+          } catch {
+            // keep retrying; the run may still be alive
+          }
+        }
+        if (!recovered) {
+          // The game can also exit on its own (probe scenes quit themselves). A
+          // clean exit after real output is a finished run, not a supervision
+          // failure.
+          summary.status = sawStart ? 'process_ended' : 'never_started';
+          const seen = readFileSync(args.log, 'utf8');
+          if (sawStart && seen.includes(args.completeMarker)) summary.status = 'complete';
+          summary.detail = String(error.message ?? error);
+          break;
+        }
       }
       const { output, errors } = extractLines(payload);
       const newOutput = output.slice(writtenOutput);

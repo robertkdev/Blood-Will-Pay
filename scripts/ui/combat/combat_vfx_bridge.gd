@@ -36,6 +36,15 @@ var _recent: Dictionary[String, float] = {}
 var _overlay_parent: Control = null
 var _pressure_banner: PanelContainer = null
 var _pressure_label: Label = null
+## Last parent rect this overlay stretched itself into. Re-writing the anchors every
+## frame invalidates the parent's layout for no reason; the size only changes when
+## the arena is resized. The arena is also re-read on a timer so a resize that does
+## not emit a signal is still picked up.
+var _last_parent_size: Vector2 = Vector2(-1.0, -1.0)
+var _rect_poll_seconds: float = RectPollSeconds
+var _telegraph_draw_has_content: bool = false
+
+const RectPollSeconds: float = 0.25
 
 func _ready() -> void:
 	name = "CombatVfxBridge"
@@ -127,6 +136,10 @@ func _fill_parent_rect() -> void:
 		parent_control = get_parent() as Control
 	if parent_control == null:
 		return
+	var parent_size: Vector2 = parent_control.size
+	if parent_size == _last_parent_size:
+		return
+	_last_parent_size = parent_size
 	anchor_left = 0.0
 	anchor_top = 0.0
 	anchor_right = 1.0
@@ -139,15 +152,44 @@ func _fill_parent_rect() -> void:
 
 func _process(delta: float) -> void:
 	_clock += max(0.0, float(delta))
-	_fill_parent_rect()
+	_rect_poll_seconds -= max(0.0, float(delta))
+	if _rect_poll_seconds <= 0.0:
+		_rect_poll_seconds = RectPollSeconds
+		_fill_parent_rect()
+	# Whether anything was on screen at the start of this frame. The final effect to
+	# expire has to repaint once, or its last drawn frame would stay on the canvas.
+	var had_effects: bool = not _bursts.is_empty() or not _lines.is_empty()
 	if not _bursts.is_empty():
 		_update_effect_list(_bursts, delta)
 	if not _lines.is_empty():
 		_update_effect_list(_lines, delta)
-	if manager != null or not _bursts.is_empty() or not _lines.is_empty():
+	# Redraw only when something on this overlay can actually change. The previous
+	# condition redrew the whole canvas every frame for the entire fight, which is
+	# what made max-team-size fights choppy: a full-overlay repaint at 60fps whether
+	# or not a single effect or telegraph was on screen.
+	_telegraph_draw_has_content = _has_ready_telegraph()
+	if had_effects or not _bursts.is_empty() or not _lines.is_empty() or _telegraph_draw_has_content:
 		queue_redraw()
 
+## Cheap pre-check for the telegraph layer. The full candidate list allocates a
+## dictionary per ready unit and sorts it, so it is only built when at least one
+## unit is actually at ready mana.
+func _has_ready_telegraph() -> bool:
+	if manager == null:
+		return false
+	for team: String in ["player", "enemy"]:
+		var units: Array = manager.player_team if team == "player" else manager.enemy_team
+		for unit_value: Variant in units:
+			var unit: Unit = unit_value as Unit
+			if unit == null or not unit.is_alive() or unit.ability_id.is_empty() or unit.mana_max <= 0:
+				continue
+			if clamp(float(unit.mana) / float(unit.mana_max), 0.0, 1.0) >= READY_MANA_THRESHOLD:
+				return true
+	return false
+
 func _draw() -> void:
+	if not _telegraph_draw_has_content and _lines.is_empty() and _bursts.is_empty():
+		return
 	_draw_ready_telegraphs()
 	for line: Dictionary[String, Variant] in _lines:
 		_draw_effect_line(line)

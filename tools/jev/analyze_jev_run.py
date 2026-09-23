@@ -619,6 +619,7 @@ def _fight_records(events: list[dict]) -> list[dict]:
                 "encounter_kind": payload.get("encounter_kind"),
                 "quoted_multiplier": payload.get("quoted_multiplier"),
                 "shown_win_odds": payload.get("shown_win_odds"),
+                "live_win_odds": payload.get("live_win_odds"),
                 "break_even_odds": (
                     1.0 / float(payload["quoted_multiplier"])
                     if isinstance(payload.get("quoted_multiplier"), (int, float))
@@ -704,6 +705,23 @@ def _prediction_quality(records: list[dict]) -> dict:
     # Favourite rule: does the "odds above 50%" call actually win more often than not?
     favourites = [row for row in decided if float(row["shown_win_odds"]) > 0.5]
     favourite_wins = sum(1 for row in favourites if row["won"])
+    # Display staleness: how far the number the player acted on sat below the odds
+    # recomputed from the board that actually fought.
+    stale = [
+        row
+        for row in decided
+        if isinstance(row.get("live_win_odds"), (int, float)) and float(row["live_win_odds"]) > 0
+    ]
+    staleness = None
+    if stale:
+        staleness = {
+            "samples": len(stale),
+            "mean_shown": round(sum(float(row["shown_win_odds"]) for row in stale) / len(stale), 4),
+            "mean_live": round(sum(float(row["live_win_odds"]) for row in stale) / len(stale), 4),
+            "mean_gap": round(
+                sum(float(row["live_win_odds"]) - float(row["shown_win_odds"]) for row in stale) / len(stale), 4
+            ),
+        }
     return {
         "samples": len(decided),
         "ties": ties,
@@ -716,6 +734,7 @@ def _prediction_quality(records: list[dict]) -> dict:
         "favourite_calls": len(favourites),
         "favourite_call_win_rate": round(favourite_wins / len(favourites), 4) if favourites else None,
         "clock_decided": sum(1 for row in decided if row.get("clock_decided")),
+        "display_staleness": staleness,
     }
 
 

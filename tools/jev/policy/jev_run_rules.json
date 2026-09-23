@@ -52,14 +52,14 @@
     "flex": {
       "rule": "Default plan. Buy the offer that fills the role the board is missing, adds a trait count you already hold, or is the cheapest real power on the shelf; prefer offers whose traits overlap what you own. Traits count unique units, so a second copy of a deployed unit adds no trait count.",
       "keep_options_open": "Do not commit the board to one trait early. Two or three units sharing traits with what you own beat one piece of a plan you cannot complete.",
-      "pass_rule": "Pass when the offer neither fills a missing role, nor advances a trait you hold, nor is a same-level duplicate you are two copies into. A defensive pass is a real move."
+      "pass_rule": "Pass when the offer neither fills a missing role, nor advances a trait you hold, nor is another copy of your chosen vertical. A defensive pass is a real move."
     },
     "vertical": {
       "rule": "When the board stacks a trait or sits one piece below the next threshold, the finishing piece is a good buy - if the tier activates on the deployed board you will field. On a full board the swap costs the replaced unit's trait count.",
       "one_piece_away": "A trait breakpoint is a strong purchase, not an automatic one. Check that it survives the swap, and keep the two-bucket floor."
     },
     "force": {
-      "rule": "Forcing is a gamble: the shop may not deliver and the board you field while chasing can be weaker than the flex pick you passed. Once the bankroll is large the chase is cheap, and a committed vertical is how a run reaches a three-star: nine copies of one identity. Pick the identity you hold most, reroll toward it, and buy every copy.",
+      "rule": "Forcing is a gamble, but a committed vertical is the only way a run reaches a three-star: nine copies of one identity. Once the bankroll can afford it, pick the identity you hold the most copies of, reroll toward it, and buy every copy you see - not just the one that completes a combine. Two copies is progress, not a wasted buy.",
       "when_not_to_force": "Never pass a flex pick you would take in an open shop to reroll for a plan you do not own, and never reroll past the budget you set."
     }
   },
