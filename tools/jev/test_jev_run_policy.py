@@ -95,7 +95,10 @@ class PowerLanguageTest(unittest.TestCase):
         harness = HARNESS_PATH.read_text(encoding="utf-8")
         self.assertIn("shelf_high_cost_odds_now", harness)
         self.assertIn("shelf_high_cost_odds_after", harness)
-        self.assertIn("Shelf quality", harness)
+        # The shelf is quoted as the reason only when the slot argument is spent; on
+        # every level question it over-sold early XP and cost a batch 25 battles.
+        self.assertIn("shelf_is_the_reason", harness)
+        self.assertIn("slot_payoff", harness)
 
 
 class DigestCoverageTest(unittest.TestCase):

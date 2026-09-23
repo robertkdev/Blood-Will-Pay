@@ -934,6 +934,17 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	var shelf_after: Dictionary = ShopOdds.get_cost_probabilities(int(Shop.get_level()) + 1)
 	var high_cost_now: float = _high_cost_share(shelf_now)
 	var high_cost_after: float = _high_cost_share(shelf_after)
+	# The shelf is only offered as a reason when the slot argument is spent. Advertised
+	# on every level question it made early XP look better than it is, and a batch paid
+	# for it: 130 battles against 155 with the same wager policy and a peak of 13
+	# against 169, because the early level-ups drained the bankroll the ladder needs.
+	var slot_payoff: bool = capacity_after > capacity_now
+	var shelf_note: String = ""
+	if not slot_payoff:
+		shelf_note = " Shelf quality is the reason here: a cost-3 or better unit is %.0f%% of rolls now and %.0f%% after this level." % [
+			high_cost_now * 100.0,
+			high_cost_after * 100.0,
+		]
 	var candidates: Array[Dictionary] = [
 		{
 			"id": "buy_xp",
@@ -945,6 +956,7 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 			"capacity_now": capacity_now,
 			"capacity_after": capacity_after,
 			"capacity_delta": capacity_after - capacity_now,
+			"shelf_is_the_reason": not slot_payoff,
 			"shelf_high_cost_odds_now": snappedf(high_cost_now, 0.001),
 			"shelf_high_cost_odds_after": snappedf(high_cost_after, 0.001),
 			"board_size": board_size,
@@ -957,7 +969,7 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 			"affordable_offers_on_shelf": affordable_shelf,
 			"affordable_shelf_ids": affordable_shelf_ids,
 			"shelf_bodies_that_could_gain_a_slot": shelf_bodies_that_could_gain_a_slot,
-			"effect": "Spend %d of %d buckets on %d XP, leaving %d. Board %d of %d now, %d of %d after (%s). Bench holds %d unit(s); %d would gain a slot, and the shelf offers %d affordable body(ies) (%d of them could be bought and fielded in this same beat). Shelf quality: a cost-3 or better unit is %.0f%% of rolls now and %.0f%% after this level." % [
+			"effect": "Spend %d of %d buckets on %d XP, leaving %d. Board %d of %d now, %d of %d after (%s). Bench holds %d unit(s); %d would gain a slot, and the shelf offers %d affordable body(ies) (%d of them could be bought and fielded in this same beat).%s" % [
 				xp_price,
 				gold,
 				int(SHOP_CONFIG.XP_PER_BUY),
@@ -971,8 +983,7 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 				waiting_bodies,
 				affordable_shelf,
 				shelf_bodies_that_could_gain_a_slot,
-				high_cost_now * 100.0,
-				high_cost_after * 100.0,
+				shelf_note,
 			],
 		},
 		{
