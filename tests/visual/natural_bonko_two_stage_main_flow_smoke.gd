@@ -723,11 +723,18 @@ func _drag_board_unit_id_to_bench(unit_id: String, label: String) -> bool:
 		return true
 	var fallback_view: UnitView = _find_unit_view_by_id(player_grid, unit_id)
 	if fallback_view != null and is_instance_valid(fallback_view):
-		var router: MoveRouter = controller.move_router as MoveRouter
+		# Called through Variant on purpose: a strict `as MoveRouter` cast here can fail
+		# silently and skip the fallback entirely, which looks identical to the game
+		# refusing the move. The deployment path in the Jev harness already documents that
+		# trap for its own grid helper. A silent skip also costs the diagnosis, because the
+		# route status line that would name the reason never prints.
+		var router: Variant = controller.move_router
 		if router != null and router.has_method("route_board_to_bench"):
-			var route_ok: bool = router.route_board_to_bench(fallback_view, target_tile)
-			print("%s: %s fallback board_to_bench route_ok=%s status=%s" % [_flow_smoke_name(), label, str(route_ok), JSON.stringify(router.last_route_status)])
+			var route_ok: bool = bool(router.call("route_board_to_bench", fallback_view, target_tile))
+			print("%s: %s fallback board_to_bench route_ok=%s status=%s" % [_flow_smoke_name(), label, str(route_ok), JSON.stringify(router.get("last_route_status"))])
 			await _settle_frames(6)
+		else:
+			print("%s: %s fallback board_to_bench unavailable (router=%s)" % [_flow_smoke_name(), label, str(router)])
 	return moved_unit != null and Roster.compact().has(moved_unit) and not controller.manager.player_team.has(moved_unit)
 
 func _find_unit_view_by_id(root: Node, unit_id: String) -> UnitView:

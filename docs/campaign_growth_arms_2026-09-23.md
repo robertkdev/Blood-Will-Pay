@@ -83,3 +83,71 @@ capacity, not board quality, is now the binding constraint on the wide-board pla
   way the design intends.
 - Scale the Ledger further per rank. Rank 67 is the depth the whole project was farmed to;
   the ladder is worth climbing to 99 only if the payout keeps growing with it.
+
+---
+
+# Re-run after the seed, generator and sweep fixes - 2026-09-23 (later)
+
+Same two arms, a fresh seed block (21011-21020), and every fix from this session in place:
+the procedural seed lock, the whole-team level tuning, the planning window, the controller
+retry, the item identity fix, and the simulator lifecycle. This is the first arm reading where
+the two runs of a seed faced the same enemies.
+
+## Paired result
+
+| seed | fresh | grown |
+| --- | --- | --- |
+| 21011 | ch2, peak 21 | ch2, peak 67 |
+| 21012 | ch2, peak 13 | ch3, peak 1,032 |
+| 21013 | ch1, peak 9 | ch3, peak 131 |
+| 21014 | ch1, peak 7 | ch3, peak 53 |
+| 21015 | ch5, peak 140 | ch2, peak 14 |
+| 21016 | ch7, peak 1,022 | ch6, peak 642 |
+| 21017 | ch7, peak 122 | ch2, peak 11 |
+| 21018 | ch1, peak 7 | ch2, peak 93 |
+| 21019 | ch2, peak 12 | ch3, peak 357 |
+| 21020 | ch2, peak 27 | ch5, peak 3,028 |
+
+| | fresh | grown |
+| --- | ---: | ---: |
+| mean chapter | 3.00 | 3.10 |
+| median chapter | 2.0 | 3.0 |
+| mean peak bankroll | 138 | **543** |
+| best peak bankroll | 1,022 | **3,028** |
+| reached chapter 5+ | 3 | 2 |
+| reached chapter 7+ | 2 | 0 |
+| technical failures | 1 | 0 |
+
+Grown went deeper on 6 seeds, fresh on 3, one tie. The honest reading is that **the Ledger
+buys money, not depth**: peak bankroll is four times higher and the best run is three times
+richer, while mean depth is unchanged. The compounding ladder works - 3 starting buckets
+becomes 3,028 - and depth is still decided by the gate stages rather than by the bankroll.
+That is the same self-normalising-difficulty finding, now measured with the confounds removed.
+
+## Boss curve with everything in place
+
+First attempts, this batch only. Chapter cells under four fights are dropped.
+
+| arm | ch1 boss | ch2 boss | ch3 boss |
+| --- | ---: | ---: | ---: |
+| fresh | 60.0% (n=10) | 100% (n=5) | - |
+| grown | 80.0% (n=10) | 88.9% (n=9) | 83.3% (n=6) |
+
+The chapter-2 spike is gone: it used to be the hardest fight in the game at 49.3% and it is
+now the easiest early boss. Chapter 1 is the remaining problem in the other direction - it is
+the *hardest* early boss for a fresh account at 60%, so the first boss still gates runs that
+the design says should be cruising into chapter 2.
+
+## Criteria with everything in place
+
+| criterion | result |
+| --- | --- |
+| three-star at least one unit | 10 of 20 |
+| max out at least one trait | **20 of 20** |
+| fully build out a board | 18 of 20 |
+| complete 8 items | reached once (9 completed in the richest run) |
+| reach chapter 10 | **0 of 20** (best: chapter 7) |
+
+The trait criterion is now universal and the three-star rate is up. The depth criterion is
+not met: chapter 7 is the deepest the rig has ever reached, and chapter 10 has still never
+been seen.
