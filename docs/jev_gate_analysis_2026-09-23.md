@@ -92,6 +92,37 @@ Two directions worth measuring next, in preference order:
    that stage, from two creep stages), and shop level (the rig reaches level 2-3 by then,
    where cost-3 is a 5% roll and cost-4 is impossible).
 
+## Experiment run and reverted: the first procedural boss at 0.75
+
+The first recommendation above was tried and did not hold up. `target_rating_for` scaled
+the chapter two boss target to 0.75, taking it from 350 to 262, with the chapter one
+runway boss and every chapter from three up untouched and the generation probe still
+passing at 0.120 relative error against a 0.17 gate.
+
+Result, measured on the stage itself rather than on run depth:
+
+| | runs in era | attempts at that boss | won |
+| --- | --- | --- | --- |
+| target 350 | 179 | 103 | 44.7% |
+| target 262 | 25 | 14 | 57.1% (95% CI 31-83%) |
+
+The intervals overlap, so this is not a demonstrated improvement, and it is well short of
+the ~74% the target-251 and target-297 bands predicted for the same boards. The reason is
+the finding above: that stage's win rate is close to flat in board-over-target ratio, so
+moving the ratio from 0.69 to 1.01 barely moves the outcome. Lowering the target makes the
+stage easier on paper and almost not at all in play.
+
+The constant was reverted in `6fb20467`. Two lessons worth keeping:
+
+1. A stage whose outcome does not track the build cannot be fixed by re-pricing the
+   build. The lever has to be something the fight actually responds to, and at this stage
+   that is not yet identified - abilities, targeting and the boss escalation phases are
+   the remaining candidates.
+2. Resolving a twelve-point shift at this stage would take a few hundred attempts per
+   arm, not the twenty-five runs spent here. This stage is too rare to test at the scale
+   the other findings in this document were tested at (100+ fights each), which is why
+   the recommendation was recorded as a hypothesis and not as a fix in the first place.
+
 ## Standing limits on this kind of measurement
 
 Live fights cannot be replayed. `CombatEngine.process(delta)` takes the render frame's
