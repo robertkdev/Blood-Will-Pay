@@ -108,6 +108,14 @@ static func set_procedural_seed(seed: int) -> void:
 static func set_endless_seed(seed: int) -> void:
 	set_procedural_seed(seed)
 
+## The seed this run's generated boards were built from.
+##
+## Exposed so a fight can be made reproducible against the same run seed that built the
+## board it is fought on. Returns 0 when nothing has pinned one yet, which callers
+## should read as "leave the fight random".
+static func get_procedural_seed() -> int:
+	return int(_procedural_seed)
+
 static func snapshot_runtime() -> Dictionary:
 	_ensure_procedural_seed()
 	_ensure_procedural_state()

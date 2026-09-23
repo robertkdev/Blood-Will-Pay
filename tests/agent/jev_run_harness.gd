@@ -234,6 +234,7 @@ func _run() -> void:
 	var opener_attempts: int = 0
 	while opener_attempts < MAX_SAME_STAGE_RETRIES:
 		opener_attempts += 1
+		_apply_battle_seed(int(GameState.chapter), int(GameState.stage_in_chapter), opener_attempts)
 		await _start_opening_fight_if_waiting()
 		opener_result = await _wait_for_first_result(_flow_first_fight_timeout())
 		_append_event("opener_result", {
@@ -271,6 +272,8 @@ func _run() -> void:
 		var round_wall_start: float = Time.get_unix_time_from_system()
 		var decisions_before_round: int = _decision_index
 		var planning_before_round: float = _planning_time_left()
+		# Before the beat opens the next stage, so the fight it prepares carries the seed.
+		_apply_battle_seed(int(GameState.chapter), int(GameState.stage_in_chapter), _stage_attempt())
 		var round_result: Dictionary = await _play_two_stage_round()
 		_rounds.append(round_result)
 		_append_event("round", round_result)
@@ -622,6 +625,34 @@ func _seed_procedural_roster(seed: int) -> void:
 	# Called statically: RosterCatalog is a static-only class here, so has_method() on it
 	# is a parser error, not a guard.
 	RosterCatalog.set_procedural_seed(seed)
+
+## Give the fight about to start a seed a replay can reproduce.
+##
+## The live battle path never seeded the engine, so CombatEngine.start() randomised its
+## own stream, and the creep reward rolls draw from that same stream - two runs with
+## identical decisions dropped different components (an orb and nothing) and were fed
+## different enemies. The seed is derived from the run seed, the stage and the ATTEMPT:
+## per stage alone would make a retry an exact replay of the loss before it, which would
+## turn every stall into a guaranteed stall.
+func _apply_battle_seed(chapter: int, stage_in_chapter: int, attempt: int) -> void:
+	if not _seed_explicit or RosterCatalog == null:
+		return
+	var spec: Variant = RosterCatalog.get_spec(maxi(1, chapter), maxi(1, stage_in_chapter))
+	if not spec is Dictionary:
+		return
+	var rules: Variant = (spec as Dictionary).get("rules", {})
+	if not rules is Dictionary:
+		return
+	var key: String = "%d:%d:%d:%d" % [_campaign_seed, chapter, stage_in_chapter, maxi(1, attempt)]
+	var battle_seed: int = int(abs(key.hash()))
+	(rules as Dictionary)["battle_seed"] = battle_seed
+	_append_event("battle_seed", {
+		"chapter": chapter,
+		"stage_in_chapter": stage_in_chapter,
+		"attempt": maxi(1, attempt),
+		"seed": battle_seed,
+		"basis": "run_seed:chapter:stage:attempt",
+	})
 
 func _prepare_run_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(_run_dir)

@@ -64,6 +64,8 @@ var _pending_movement_debug_frames: int = 0
 var _trait_runtime: TraitRuntime = null
 var _stage_prepared: bool = false
 var _engine_running: bool = false
+## Prepares so far in this run. Feeds the derived battle seed so a retry is a new fight.
+var _battle_seed_counter: int = 0
 var _prepared_spec: Dictionary = {}
 var _prepared_chapter: int = 1
 var _prepared_stage_in_chapter: int = 1
@@ -471,6 +473,26 @@ func prepare_stage() -> bool:
 
 	Trace.step("CM.prepare_stage: create engine")
 	_engine = load("res://scripts/game/combat/combat_engine.gd").new()
+	# A seeded run has to reach the fight. This path never called set_seed, so
+	# CombatEngine.start() randomised its own stream - and the creep reward rolls draw
+	# from that same stream, which is why two runs of one seed dropped different
+	# components and saw different enemies. A caller that wants a reproducible fight
+	# puts battle_seed in the spec rules (the Jev harness does, per attempt); play that
+	# does not supply one keeps the random stream it has always had.
+	var seed_rules: Variant = spec.get(StageTypes.KEY_RULES, {})
+	if seed_rules is Dictionary and (seed_rules as Dictionary).has("battle_seed"):
+		_engine.set_seed(int((seed_rules as Dictionary).get("battle_seed", 0)))
+	else:
+		# Otherwise derive one from the run seed that built this board. The stage counter
+		# increments on every prepare, so a retry is a different fight rather than an
+		# exact replay of the loss before it, while a seeded run reproduces end to end -
+		# including the opening fight, which is prepared before a caller can inject
+		# anything. With no run seed pinned the value is 0 and the stream stays random.
+		var run_seed: int = RosterCatalog.get_procedural_seed() if RosterCatalog != null else 0
+		if run_seed != 0:
+			_battle_seed_counter += 1
+			var key: String = "%d:%d:%d:%d" % [run_seed, ch, sic, _battle_seed_counter]
+			_engine.set_seed(int(abs(key.hash())))
 	# Rules: allow provider to tweak state/engine prior to configure
 	StageRuleRunner.pre_engine_config(_state, _engine, spec, ch, sic)
 	Trace.step("CM.prepare_stage: configure engine")
