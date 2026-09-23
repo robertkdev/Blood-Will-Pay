@@ -2279,7 +2279,22 @@ func _ask_decision(kind: String, state: Dictionary, candidates: Array[Dictionary
 					_decision_kinds[kind] = int(_decision_kinds.get(kind, 0)) + 1
 					return decision
 		await get_tree().create_timer(DECISION_POLL_SECONDS, true, false, true).timeout
-	_abort_run("Jev decision %d (%s) was not answered within %d seconds" % [_decision_index, kind, int(DECISION_TIMEOUT_SECONDS)])
+	# The controller did not answer. Every caller treats an empty decision as its safe
+	# default (pass, minimum wager, hold, back out), so the run continues and the
+	# transcript records exactly where it fell back. Aborting here threw away a
+	# 47-battle run that was one stage from its target because of one upstream 5xx.
+	_append_event("decision_timeout", {
+		"index": _decision_index,
+		"kind": kind,
+		"timeout_seconds": int(DECISION_TIMEOUT_SECONDS),
+		"fallback": "safe_default",
+	})
+	print("%s: decision %d (%s) unanswered after %ds; continuing on the safe default" % [
+		JEV_HARNESS_NAME,
+		_decision_index,
+		kind,
+		int(DECISION_TIMEOUT_SECONDS),
+	])
 	return {}
 
 func _write_run_file(file_name: String, text: String) -> void:

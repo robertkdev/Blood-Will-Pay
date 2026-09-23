@@ -28,6 +28,11 @@ ENDPOINT = "https://api.typesafe.ai"
 # inside it, so the budget stays a real constraint rather than a comment.
 RULE_DIGEST_LIMIT = 6600
 STATE_DIGEST_LIMIT = 4200
+## A transient upstream failure must not end a long run. One internal server error
+## aborted a 47-battle run that was one stage from its target, so a failing call is
+## retried with linear backoff before the controller gives up.
+API_RETRIES = 4
+API_RETRY_BACKOFF_S = 3.0
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -372,18 +377,47 @@ def main(argv: list[str] | None = None) -> int:
                     model=model,
                 )
             except Exception as exc:
-                errors += 1
-                record = {
-                    "index": index,
-                    "kind": kind,
-                    "status": "error",
-                    "error": type(exc).__name__,
-                    "api_ms": round((time.time() - api_started) * 1000.0, 1),
-                }
-                _append_jsonl(transcript, record)
-                summary["stopped"] = "api_error"
-                summary["last_error"] = record
-                break
+                # A transient upstream 5xx must not end a run: one TypeSafeInternalServerError
+                # aborted a 47-battle run that was one stage from its target. Retry with
+                # backoff, and only report an error if the service keeps failing.
+                last_error: Exception = exc
+                recovered = False
+                for attempt in range(API_RETRIES):
+                    time.sleep(API_RETRY_BACKOFF_S * (attempt + 1))
+                    try:
+                        api_started = time.time()
+                        response = client.judge(
+                            questions={"action": question},
+                            model=model,
+                        )
+                        recovered = True
+                        _append_jsonl(
+                            transcript,
+                            {
+                                "index": index,
+                                "kind": kind,
+                                "status": "retried",
+                                "error": type(exc).__name__,
+                                "attempt": attempt + 1,
+                                "api_ms": round((time.time() - api_started) * 1000.0, 1),
+                            },
+                        )
+                        break
+                    except Exception as retry_exc:
+                        last_error = retry_exc
+                if not recovered:
+                    errors += 1
+                    record = {
+                        "index": index,
+                        "kind": kind,
+                        "status": "error",
+                        "error": type(last_error).__name__,
+                        "api_ms": round((time.time() - api_started) * 1000.0, 1),
+                    }
+                    _append_jsonl(transcript, record)
+                    summary["stopped"] = "api_error"
+                    summary["last_error"] = record
+                    break
             api_ms = round((time.time() - api_started) * 1000.0, 1)
             answer = response.answers.get("action")
             if answer is None:
