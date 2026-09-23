@@ -53,12 +53,25 @@ const DEFAULT_BOARD_CAPACITY := 3                 # New runs start with three us
 const MAX_BOARD_CAPACITY: int = 16                # Physical/readability ceiling; contracts cannot exceed it
 const POST_OPENING_MIN_TEAM_SIZE := DEFAULT_BOARD_CAPACITY
 const POST_OPENING_TEAM_SIZE_BONUS := 0           # Board slots now come from DEFAULT_BOARD_CAPACITY + player levels
+# Board capacity in the chapters where the curve was inverted.
+#
+# Difficulty is meant to rise with the chapter, and it did not: over every recorded Jev
+# run the chapter one boss was won 45.0% of 431 attempts and the chapter two boss 33.5%
+# of 245 - the two hardest fights in the game - against 62.3% at chapter three and 68.4%
+# at chapter four. At the chapter one boss the measured difference between winning and
+# losing was a single body: winners fielded four (median power 126) and losers three
+# (median 97), and the capacity there was three unless the player had already bought XP.
+#
+# Capacity is the right lever for this because it moves the player's side of the rating
+# while the generator keeps fitting the enemy to the stage's fixed target - unlike a
+# target change, which the fitting absorbs. The early floors are one body higher, and the
+# level-two floor moves with them so levelling still buys a slot rather than becoming free.
 const EARLY_RUN_CAP_FLOOR_STAGE := 3              # By the second shop, bought bench units should be deployable
-const EARLY_RUN_CAP_FLOOR_TEAM_SIZE := 3
+const EARLY_RUN_CAP_FLOOR_TEAM_SIZE := 4
 const EARLY_LEVEL_TWO_CAP_FLOOR_STAGE := 3        # By the second shop, Buy XP should create a real board-slot payoff
-const EARLY_LEVEL_TWO_CAP_FLOOR_TEAM_SIZE := 4
+const EARLY_LEVEL_TWO_CAP_FLOOR_TEAM_SIZE := 5
 const CHAPTER_TWO_CAP_FLOOR_STAGE := 7            # Chapter 2 round 2 should let roster depth break retry loops
-const CHAPTER_TWO_CAP_FLOOR_TEAM_SIZE := 6
+const CHAPTER_TWO_CAP_FLOOR_TEAM_SIZE := 7
 const CHAPTER_THREE_CAP_FLOOR_STAGE := 12         # Chapter 3 should let accumulated bench depth matter before normal fights
 const CHAPTER_THREE_CAP_FLOOR_TEAM_SIZE := 7
 const CHAPTER_FOUR_CAP_FLOOR_STAGE := 17          # Late chapters should not strand a full bench at the same board cap
