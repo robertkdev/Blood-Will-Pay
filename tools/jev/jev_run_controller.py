@@ -367,6 +367,16 @@ def _replay_main(args) -> int:
     in the current candidate list is substituted with the safe default and the
     substitution is written to the transcript, so a replay that silently diverged from
     its reference can be told apart from one that did not.
+
+    Two things still stop a replay from being a replication, both measured with this
+    tool: the procedural roster was never seeded by the rig (now wired in the harness,
+    which was necessary and not sufficient), and the live battle path never seeds the
+    engine - combat_manager.gd creates the engine and configures it without calling
+    set_seed, so CombatEngine.start() randomises the stream. The creep reward rolls draw
+    from that same engine RNG, which is why two runs with identical decisions dropped
+    different components (an orb in one, nothing in the other). Seeding the engine per
+    attempt would close it, but seed it per ATTEMPT and not per stage: a stage-seeded
+    fight would make a retry an exact replay of the loss that preceded it.
     """
     run_dir = Path(args.run_dir).resolve()
     replay_dir = Path(args.replay_from).resolve()
