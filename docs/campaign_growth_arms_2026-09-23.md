@@ -151,3 +151,62 @@ the design says should be cruising into chapter 2.
 The trait criterion is now universal and the three-star rate is up. The depth criterion is
 not met: chapter 7 is the deepest the rig has ever reached, and chapter 10 has still never
 been seen.
+
+---
+
+# All-in bar A/B: a half against three quarters - 2026-09-23 (later still)
+
+The replay above said a Kelly-share bar of a half should raise the peak bankroll by a third
+and the p90 threefold on identical fights. This is the live check: both arms grown, rank 67,
+the same eight seeds, only the policy's all-in bar differing. The three-quarter bar is kept
+as `tools/jev/policy/variants/wager_cautious_075.json`.
+
+| seed | all-in at a half | all-in at three quarters |
+| --- | --- | --- |
+| 21011 | ch2, peak 24 | ch2, peak 67 |
+| 21012 | ch2, peak 87 | ch3, peak 962 |
+| 21013 | ch1, peak 16 | ch3, peak 30 |
+| 21014 | ch3, peak 1,109 | ch4, peak 3,405 |
+| 21015 | ch2, peak 16 | ch2, peak 14 |
+| 21016 | ch6, peak **42,126** (aborted) | ch4, peak 21 |
+| 21017 | ch2, peak 24 | ch3, peak 290 |
+| 21018 | ch1, peak 14 | ch3, peak 13 |
+
+| | a half | three quarters |
+| --- | ---: | ---: |
+| mean chapter | 2.38 | 3.00 |
+| median peak bankroll | 55.5 | 48.5 |
+| best peak bankroll | **42,126** | 3,405 |
+| runs ending in chapter 1-2 | 4 of 8 | 2 of 8 |
+
+## What the live check says, honestly
+
+The bankroll claim holds and then some: the half bar produced **42,126 buckets**, twelve times
+the best run this project has ever recorded before it (3,028), with a 12,377-bucket wager on
+a chapter-6 boss. The gambling shape the objective asks for is now present - super rich,
+way overpowered, and early losses in the same batch.
+
+The depth claim does **not** hold. Mean chapter reached is 2.38 against 3.00, and the half
+bar ended four of eight runs in the first two chapters against two of eight. With eight seeds
+per arm and a standard deviation near 1.4 chapters, that difference is about one standard
+error and is not significant on its own - but it is the wrong sign, and it is consistent with
+the finding this whole review keeps returning to: more money does not buy depth, because depth
+is decided by gate stages.
+
+So the bar stays at a half, for the reason the objective gives rather than for depth: the
+distribution now spans "loses early" through "gets super rich", and the three-quarter bar's
+distribution did not. The intermediate bar of 0.65 - the replay shows it captures about half
+the peak gain with a third of the bankroll-loss risk - remains the option if the early
+losses turn out to be too many.
+
+## A harness defect that cost the richest run of the session
+
+The 42,126-bucket run was aborted at chapter 6 round 4, not lost. The planning window was
+healthy this time (960 -> 727 seconds), so the sweep fix held; the recorded failures are
+three `continue button disabled` assertions and then `Start Battle did not enter combat`,
+immediately after a `click_fallback` that needed three synthetic-mouse attempts to register
+a shop click. The board was 9 of 9, the bankroll 39,326, and the button disabled.
+
+That points at synthetic input or the fielding pass leaving the UI unable to accept Start
+Battle, not at the game refusing a legal action. The fielding fallback is now reachable and
+self-reporting, which should name the cause next time it happens.
