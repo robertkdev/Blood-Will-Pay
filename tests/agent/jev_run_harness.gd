@@ -51,6 +51,9 @@ const MAX_REROLLS_PER_SHOP: int = 3
 ## Cap on the wager stake when the planning beat is a repeat of a stage this run has
 ## already lost. See _wager_candidates for the measured retry record behind it.
 const RETRY_STAKE_CAP: float = 0.25
+## Most units one planning beat will pull out of the front rank. A placement the
+## engine refuses must not turn the beat into a drag loop.
+const REPOSITION_ROLE_FIX_LIMIT: int = 3
 ## A synthetic Start Battle click is occasionally swallowed while an overlay is
 ## fading out, which aborts an otherwise good run. The press is retried a bounded
 ## number of times, and only while the same planning beat is still open.
@@ -996,6 +999,10 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	# chosen against the real post-contract reserve, then hand off to the shared
 	# start-battle click path.
 	await _resolve_pending_contract_market()
+	# Repair the ranks before anything is priced against the board. A purchased unit
+	# is already on the board by the time the fielding pass looks at it, and the game
+	# puts it in the first free tile - which is the rank that meets the enemy.
+	await _pull_backline_out_of_the_front_rank(label)
 	# Items before the wager: a component that completes an item changes the board the
 	# wager is being placed on, so the risk decision has to see the equipped board.
 	await _decide_items(label)
@@ -2118,6 +2125,76 @@ func _preferred_board_tile(controller: Variant, unit_id: String) -> int:
 			if index < tile_count and not bool(helper.call("is_occupied", index)):
 				return index
 	return -1
+
+## Move backline units out of the rank that meets the enemy.
+##
+## The role preference in _preferred_board_tile only runs on the drag path, and a
+## bought unit is already on the board before that path is reached: the game places it
+## in the first free tile, which is the rank that faces the enemy. Recorded
+## placements showed a support standing in tile 2 beside the frontline while a free
+## back-row tile went unused, and across the archive only the runs that fielded nine
+## units put most of their backline behind the front rank at all.
+##
+## This runs before the wager so the board being priced is the board that fights, and
+## it moves at most REPOSITION_ROLE_FIX_LIMIT units per beat so a placement the engine
+## refuses cannot turn the planning beat into a drag loop.
+func _pull_backline_out_of_the_front_rank(label: String) -> int:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	if combat == null:
+		return 0
+	var controller: Variant = combat.get("controller")
+	if controller == null or controller.player_grid_helper == null:
+		return 0
+	var helper: Variant = controller.player_grid_helper
+	if not helper.has_method("size") or not helper.has_method("is_occupied") or not helper.has_method("get_center"):
+		return 0
+	var player_grid: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid") as GridContainer
+	if player_grid == null:
+		return 0
+	var tile_count: int = int(helper.call("size"))
+	var rows: int = maxi(1, int(tile_count / BOARD_COLUMNS))
+	if rows < 2:
+		return 0
+	var placements: Array[int] = _player_placements()
+	var board: Array[Unit] = _board_units()
+	var moved: int = 0
+	for index: int in range(board.size()):
+		if moved >= REPOSITION_ROLE_FIX_LIMIT:
+			break
+		var unit: Unit = board[index]
+		if unit == null:
+			continue
+		if FRONTLINE_ROLES.has(_unit_role(_unit_id(unit))):
+			continue
+		var tile: int = int(placements[index]) if index < placements.size() else -1
+		if tile < 0 or int(tile / BOARD_COLUMNS) != 0:
+			continue
+		var target: int = -1
+		for row: int in range(rows - 1, 0, -1):
+			for column: int in range(BOARD_COLUMNS):
+				var candidate: int = row * BOARD_COLUMNS + column
+				if candidate < tile_count and not bool(helper.call("is_occupied", candidate)):
+					target = candidate
+					break
+			if target >= 0:
+				break
+		if target < 0:
+			break
+		var view: UnitView = _find_unit_view_by_id(player_grid, _unit_id(unit))
+		if view == null:
+			continue
+		var center: Vector2 = helper.call("get_center", target)
+		var dragged: bool = await _drag_control_to(view, center, "%s pull %s back" % [label, _unit_id(unit)])
+		await _settle_frames(4)
+		if dragged:
+			moved += 1
+			_append_event("reposition_role_fix", {
+				"unit_id": _unit_id(unit),
+				"from_tile": tile,
+				"to_tile": target,
+				"label": label,
+			})
+	return moved
 
 ## Deterministic item handling for the baseline arm. Components only do anything
 ## once they are equipped, so the control run places each held component on the
