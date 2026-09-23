@@ -924,6 +924,16 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 		affordable_shelf_ids.append(shelf_id)
 	var shelf_bodies_that_could_gain_a_slot: int = min(affordable_shelf, max(0, capacity_after - board_size))
 	var level_gain_note: String = "no extra slot" if capacity_after <= capacity_now else "+%d board slot" % (capacity_after - capacity_now)
+	# The other half of what a level buys. Board capacity also comes from chapter
+	# floors, so once the board is full at the stage's cap the slot argument for XP
+	# disappears and the level decision used to pass forever. The shelf is what is
+	# left: the level sets the cost distribution, and a level-3 shelf has a 5% chance
+	# of a cost-3 unit and none above that. A run reached chapter six on a level-3
+	# shelf, held 151 buckets it never spent, and lost with a damage ratio of 0.33.
+	var shelf_now: Dictionary = ShopOdds.get_cost_probabilities(int(Shop.get_level()))
+	var shelf_after: Dictionary = ShopOdds.get_cost_probabilities(int(Shop.get_level()) + 1)
+	var high_cost_now: float = _high_cost_share(shelf_now)
+	var high_cost_after: float = _high_cost_share(shelf_after)
 	var candidates: Array[Dictionary] = [
 		{
 			"id": "buy_xp",
@@ -935,6 +945,8 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 			"capacity_now": capacity_now,
 			"capacity_after": capacity_after,
 			"capacity_delta": capacity_after - capacity_now,
+			"shelf_high_cost_odds_now": snappedf(high_cost_now, 0.001),
+			"shelf_high_cost_odds_after": snappedf(high_cost_after, 0.001),
 			"board_size": board_size,
 			"bench_size": bench_units.size(),
 			"benched_bodies_that_gain_a_slot": waiting_bodies,
@@ -945,7 +957,7 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 			"affordable_offers_on_shelf": affordable_shelf,
 			"affordable_shelf_ids": affordable_shelf_ids,
 			"shelf_bodies_that_could_gain_a_slot": shelf_bodies_that_could_gain_a_slot,
-			"effect": "Spend %d of %d buckets on %d XP, leaving %d. Board %d of %d now, %d of %d after (%s). Bench holds %d unit(s); %d would gain a slot, and the shelf offers %d affordable body(ies) (%d of them could be bought and fielded in this same beat)." % [
+			"effect": "Spend %d of %d buckets on %d XP, leaving %d. Board %d of %d now, %d of %d after (%s). Bench holds %d unit(s); %d would gain a slot, and the shelf offers %d affordable body(ies) (%d of them could be bought and fielded in this same beat). Shelf quality: a cost-3 or better unit is %.0f%% of rolls now and %.0f%% after this level." % [
 				xp_price,
 				gold,
 				int(SHOP_CONFIG.XP_PER_BUY),
@@ -959,6 +971,8 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 				waiting_bodies,
 				affordable_shelf,
 				shelf_bodies_that_could_gain_a_slot,
+				high_cost_now * 100.0,
+				high_cost_after * 100.0,
 			],
 		},
 		{
@@ -1037,6 +1051,19 @@ func _level_purchase_is_legal() -> bool:
 	if int(Shop.get_level()) >= int(SHOP_CONFIG.MAX_LEVEL):
 		return false
 	return int(Economy.gold) >= int(SHOP_CONFIG.BUY_XP_COST)
+
+## Share of shop rolls that are cost 3 or better, at the given cost distribution.
+##
+## Cost 3 and up is where the middle-game bodies live: the level-3 distribution is
+## 65% / 30% / 5% across costs 1-3 with nothing above, while level 8 puts a little
+## over a quarter of rolls on costs 4-5. Quoted to the level decision so "level for
+## the shelf" is a number instead of a hunch.
+func _high_cost_share(probabilities: Dictionary) -> float:
+	var share: float = 0.0
+	for cost: Variant in probabilities.keys():
+		if int(cost) >= 3:
+			share += float(probabilities[cost])
+	return clampf(share, 0.0, 1.0)
 
 func _press_continue(expect_forced: bool, label: String) -> void:
 	# Resolve the chapter contract before asking about the wager so the wager is

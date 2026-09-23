@@ -98,7 +98,7 @@
     }
   },
   "level": {
-    "rule": "Buy XP when the level-up raises capacity and the slot has a use - a benched body, or shelf_bodies_that_could_gain_a_slot that can be bought and fielded in the same beat - and the board already holds upgrades. Hold off while you are sitting on several 1-cost pairs with no upgrades: the lower shop level has the best 1-cost odds and those upgrades come first. Capacity is still the ceiling on everything else.",
+    "rule": "Buy XP for a slot when the level-up raises capacity and the slot has a use - a benched body, or shelf_bodies_that_could_gain_a_slot that can be bought and fielded in the same beat. Once capacity is capped by the chapter floor the reason to level is the shelf: the level sets the cost distribution, and the candidate quotes how much of the shop is cost-3 or better before and after. Hold off only while several 1-cost pairs with no upgrades are still the best value.",
     "unit_levels": "Unit level is the biggest middle-game power lever: a level-2 copy is worth well more than a level-1 of the same identity, and three same-level copies convert into one stronger unit. (An earlier 40% / 61% / 79% odds calibration has not been re-verified on this build.)",
     "combine_priority": "Take a duplicate that completes a third copy at a level you already hold when the board has room - but a stronger unit, an item, an extra slot, or a trait breakpoint can supply the same power sooner. A combine is one option, not the required path into chapter 2."
   },

@@ -82,6 +82,21 @@ class PowerLanguageTest(unittest.TestCase):
         unit_levels = policy()["level"]["unit_levels"]
         self.assertIn("not been re-verified on this build", unit_levels)
 
+    def test_level_rule_names_the_shelf_as_a_reason(self) -> None:
+        # The slot is the only reason the rule used to give. Board capacity also comes
+        # from chapter floors, so on a full board the level question passed every time
+        # and a run reached chapter six on a level-3 shelf.
+        rule = policy()["level"]["rule"]
+        self.assertIn("capacity is capped", rule)
+        self.assertIn("shelf", rule)
+        self.assertIn("cost distribution", rule)
+
+    def test_level_candidate_quotes_shelf_quality(self) -> None:
+        harness = HARNESS_PATH.read_text(encoding="utf-8")
+        self.assertIn("shelf_high_cost_odds_now", harness)
+        self.assertIn("shelf_high_cost_odds_after", harness)
+        self.assertIn("Shelf quality", harness)
+
 
 class DigestCoverageTest(unittest.TestCase):
     def _controller_digest(self) -> tuple[str, int, int]:
