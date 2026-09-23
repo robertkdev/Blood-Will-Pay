@@ -2387,17 +2387,17 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 		{
 			"stake": kelly_wager,
 			"role": "kelly",
-			"why": "The stake that grows the bankroll fastest at the measured rate. Correct while the measured edge is under half a bucket per bucket staked.",
+			"why": "The stake that grows the bankroll fastest at the measured rate. Correct when the measured edge is positive and the run can carry the full Kelly swing.",
 		},
 		{
-			"stake": maxi(kelly_wager, int(ceil(float(reserve) * 0.5))),
-			"role": "press",
-			"why": "Half the bankroll or the Kelly stake, whichever is larger. Correct when the measured edge is real but the stake has to leave a reserve.",
+			"stake": maxi(1, int(round(float(reserve) * kelly_fraction * 0.5))),
+			"role": "half_kelly",
+			"why": "Half the growth-optimal stake, which gives up a quarter of the growth rate for half the swing. Correct when the measured edge is clear but the run cannot afford the full Kelly drawdown.",
 		},
 		{
 			"stake": reserve,
 			"role": "all_in",
-			"why": "The whole bankroll. Correct when the measured edge is at least half a bucket per bucket staked, which is where the doubling makes a run rich.",
+			"why": "The whole bankroll. Correct only where the Kelly share is at least three quarters, which is the near-lock bands the record wins essentially always; at a thinner edge it is over-betting and the record shows it ending runs.",
 		},
 	]
 	var candidates: Array[Dictionary] = []
@@ -2462,7 +2462,7 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 			"retry_capped": capped,
 			"share": float(wager) / float(max(1, reserve)),
 			"is_all_in": wager >= reserve,
-			"is_pressing": role in ["press", "all_in"],
+			"is_pressing": role in ["half_kelly", "kelly", "press", "all_in"],
 			"kelly_fraction": snappedf(kelly_fraction, 0.001),
 			"kelly_wager": kelly_wager,
 			"is_kelly_sized": wager == kelly_wager,

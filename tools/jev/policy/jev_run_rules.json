@@ -40,7 +40,7 @@
       "BOSS": 3.0
     },
     "rule": "The quote is fixed by encounter kind, so the shown win odds alone set the size. At or below 1 / multiplier the bet loses money: take MINIMUM.",
-    "sizing": "Size off the measured band rate the candidates quote, not the odds on screen; the screen reads low in the bands that pay. ALL_IN when the measured edge is at least half a bucket per bucket staked; the Kelly stake when smaller; MINIMUM only when negative. An all-in 3x win is the run-making double.",
+    "sizing": "Stake the Kelly candidate at the measured band rate the candidates quote, not the odds on screen: that is the growth-optimal share and it is usually well under the whole bankroll. ALL_IN only where the Kelly share is at least three quarters, which is the near-lock bands the record wins essentially always. A 3x band at a measured rate in the 0.5s has a Kelly share near a third, and all-in there ends runs.",
     "measured_first_attempt": {
       "rule": "Observed win rate of the FIRST attempt at a stage, bucketed by encounter kind and the odds on screen at the time, from 1073 recorded first attempts. Each band is shrunk toward the shown odds with a prior of 20 pseudo-observations, so a band built on three fights cannot drive a stake by itself. Retries are excluded on purpose: they are capped separately because a repeat of a stage the run already lost behaves nothing like a first look.",
       "samples": 1073,

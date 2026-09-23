@@ -26,7 +26,11 @@ ENDPOINT = "https://api.typesafe.ai"
 # Raised from 5200 when item assignment became a Jev decision. The digest is still
 # truncated by this number, and test_jev_run_policy asserts the authored rules fit
 # inside it, so the budget stays a real constraint rather than a comment.
-RULE_DIGEST_LIMIT = 6600
+## Raised from 6600 when the wager sizing rule had to state the Kelly relationship
+## explicitly: the old "all-in above 50% shown odds" line was wrong for every 3x
+## quote, and the replacement is longer. The guard exists so authored rules are never
+## silently dropped from the prompt, not to cap the policy at a fixed length.
+RULE_DIGEST_LIMIT = 6800
 STATE_DIGEST_LIMIT = 4200
 ## A transient upstream failure must not end a long run. One internal server error
 ## aborted a 47-battle run that was one stage from its target, so a failing call is
