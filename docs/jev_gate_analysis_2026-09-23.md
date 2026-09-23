@@ -201,6 +201,41 @@ The design levers this points at, with the trade-offs already measured in the co
   level - and then letting the stat fit close the gap would give the win rate something to
   track, which is what a build-driven progression needs.
 
+## A retraction: the mirror formation finding was a chapter confound
+
+Earlier work in this loop concluded that a mirror stage punishes a role-split formation,
+because the engine lays the clone out compactly and the compact side won: 75.0% of 204
+mirror first attempts with every unit in the front rank, against 68.3% with one pulled
+back and 66.7% with two. The role repair was therefore skipped on mirrors (1750aeb4).
+
+That reading does not survive controlling for the stage. Restricted to mirror fights with
+at least six bodies - big enough for a back rank to exist at all - and split by chapter:
+
+| chapter | front-rank only | one or more pulled back |
+| --- | --- | --- |
+| 2 | 7/29 = 24% | 18/31 = 58% |
+| 3 | 4/7 = 57% | 11/23 = 48% |
+| 4 | 0/1 | 10/15 = 67% |
+
+Inside chapter 2, where the sample is largest, the sign is the opposite of the pooled
+figure. The pooled "front rank wins" was mostly the shallow runs: small boards cannot
+reach a back rank whatever the policy does, so "front-rank only" was standing in for
+"early chapter", and early chapters are free.
+
+Two further confounds sit underneath even this split. Whether a board has any backline
+units at all is a property of its *composition*, not of its placement, so "front-rank
+only" also means "no support or mage on the board". And the era comparison that first
+suggested the exemption (74.2% before any repair, 63.3% with the repair everywhere, 54.5%
+with it skipped on mirrors) spans three different code bases and very different run
+depths.
+
+The exemption is reverted in `a3095fc4`. The honest position is that the effect of
+formation on a mirror is *not measured*: the observational data cannot separate placement
+from chapter and composition, and the live engine cannot be replayed to hold everything
+else fixed (see the limits above). The role repair itself stays, because it is the
+requested behaviour and matches the game's own role semantics - not because this data
+proves it wins fights.
+
 ## Standing limits on this kind of measurement
 
 Live fights cannot be replayed. `CombatEngine.process(delta)` takes the render frame's
