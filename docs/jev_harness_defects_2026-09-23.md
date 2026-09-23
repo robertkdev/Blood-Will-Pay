@@ -46,17 +46,39 @@ Verified on the failing case: seed 21009 at rank 67 went from a chapter-6 abort 
 technical failures to a legitimate `stage_stall` at chapter 5 round 5 with zero technical
 failures, 29 battles and a 1,118-bucket peak.
 
-## 3. The rig offers item equips to units with no free slot (open)
+## 3. The rig equipped the wrong copy of a unit (fixed)
 
-The item decision can select a unit whose three item slots are full. The game blocks the
-equip, the rig selects it again, and the component stays in the inventory.
+The item decision generated a candidate per unit id, but a board can hold two copies of
+one unit: 305 of 438 recorded fight snapshots do. The saturated copy was correctly skipped
+when candidates were built, and then the equip was applied to the **first** board unit with
+that id - which was often the saturated one. The game refused it with `no_slot`, the
+component stayed in the inventory, and the run paid a decision for it.
 
-Evidence: 204 `[Items] equip blocked: no_slot` lines across 8 of 254 recorded runs, all
-of them `no_slot`. One run logged the same blocked equip on the same unit repeatedly.
+Evidence: 204 `[Items] equip blocked: no_slot` lines across 8 of 254 recorded runs, and a
+board with two Bonkos is the ordinary case, not the exception.
 
-Effect: a wasted decision and an unequipped component, in the runs where the board is
-strongest and the item most matters. Not yet fixed - the fix belongs in the equip
-candidate list, which should not offer a saturated unit.
+Fix: candidates carry the unit instance key as well as the id, the id is unique per copy,
+the second copy is labelled `id#2` so the choice is legible, and the equip resolves on the
+instance that was priced.
+
+Verified live on the seed that produced the most refusals (seed 21002, previously 48):
+`equip blocked` count **0**, and 6 of 6 `item_equipped` events landed with `ok: true`.
+
+## 3b. Fielding a preferred unit can fail to bench its replacement (open)
+
+Found while verifying the item fix, on the live run above. `_field_preferred_units` decided
+to bench `knoll` for `grint` at chapter 3 round 4, and the drag to the bench failed three
+times in a row, which the harness records as three technical failures. The run then stalled
+on that same stage.
+
+Evidence: `chapter 3 round 4 natural fielding failed to bench knoll before fielding grint`
+three times, and no `fallback board_to_bench route_ok=` line, so the failure is before or
+inside the route fallback rather than a refusal from the game. The board at that point held
+two Bonkos and the bench held two Grints and a Knoll, so id-keyed view lookup is the first
+thing to check.
+
+This is in the shared base harness (`natural_bonko_two_stage_main_flow_smoke.gd`), so it
+affects every smoke test that fields units, not only the Jev rig.
 
 ## 4. The wager rule is more cautious than the evidence (open)
 

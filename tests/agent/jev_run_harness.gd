@@ -2286,6 +2286,13 @@ func _item_candidates() -> Array[Dictionary]:
 	var board: Array[Unit] = _board_units()
 	if board.is_empty():
 		return candidates
+	# A board can hold two copies of one unit - 305 of 438 recorded fight snapshots do -
+	# and a candidate keyed on the unit id alone names the wrong copy when it is applied:
+	# the saturated copy was matched first, the game refused the equip with `no_slot`, and
+	# the component stayed in the inventory. 204 such refusals are on record. Key each
+	# candidate on the unit instance, and give the second copy of an id a distinct label
+	# so the choice is legible to the player as well.
+	var ordinal_by_id: Dictionary = {}
 	for raw_id: Variant in inventory.keys():
 		var item_id: String = String(raw_id).strip_edges()
 		if item_id == "" or item_id == "remover" or int(inventory[raw_id]) <= 0:
@@ -2304,19 +2311,24 @@ func _item_candidates() -> Array[Dictionary]:
 			if Items.get_equipped(unit).size() >= Items.slot_count(unit):
 				continue
 			var unit_id: String = _unit_id(unit)
+			var ordinal: int = int(ordinal_by_id.get(unit_id, 0)) + 1
+			ordinal_by_id[unit_id] = ordinal
+			var unit_label: String = unit_id if ordinal == 1 else "%s#%d" % [unit_id, ordinal]
+			var unit_key: String = str(unit.get_instance_id())
 			candidates.append({
-				"id": "equip_%s_on_%s" % [item_id, unit_id],
-				"label": "Equip %s to %s (level %d, %s)." % [item_name, unit_id, int(unit.level), String(unit.get("primary_role")) if unit.get("primary_role") != null else "unit"],
+				"id": "equip_%s_on_%s_%s" % [item_id, unit_id, unit_key],
+				"label": "Equip %s to %s (level %d, %s)." % [item_name, unit_label, int(unit.level), String(unit.get("primary_role")) if unit.get("primary_role") != null else "unit"],
 				"effect": "Put %s (%s%s%s) on %s, which currently holds %s. Two components on one unit combine automatically." % [
 					item_name,
 					item_kind,
 					", tags: " + item_tags if item_tags != "" else "",
 					", mods: " + item_mods if item_mods != "{}" else "",
-					unit_id,
+					unit_label,
 					", ".join(Items.get_equipped(unit)) if not Items.get_equipped(unit).is_empty() else "nothing",
 				],
 				"item_id": item_id,
 				"unit_id": unit_id,
+				"unit_key": unit_key,
 			})
 	if candidates.is_empty():
 		return candidates
@@ -2634,13 +2646,19 @@ func _decide_items(label: String) -> void:
 			if String(candidate.get("id", "")) != chosen:
 				continue
 			var target_id: String = String(candidate.get("unit_id", ""))
+			var target_key: String = String(candidate.get("unit_key", ""))
 			for unit: Unit in _board_units():
 				if _unit_id(unit) != target_id:
+					continue
+				# Two copies of one unit are two different units: apply the equip to the
+				# instance the candidate was priced on, not to the first copy of that id.
+				if target_key != "" and str(unit.get_instance_id()) != target_key:
 					continue
 				var res: Dictionary = Items.equip(unit, String(candidate.get("item_id", "")))
 				_append_event("item_equipped", {
 					"item_id": String(candidate.get("item_id", "")),
 					"unit_id": target_id,
+					"unit_key": target_key,
 					"ok": bool(res.get("ok", false)),
 					"reason": String(res.get("reason", "")),
 					"combined_id": String(res.get("combined_id", "")),

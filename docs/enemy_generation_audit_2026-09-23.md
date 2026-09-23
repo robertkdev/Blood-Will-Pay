@@ -54,9 +54,9 @@ Fix: every candidate is scored by rescoring the whole team with the promotion ap
 Measured effect on the generator's own gate: mean absolute rating error falls from 69.75 to
 **54.85**, maximum relative error 0.119 against the 0.17 gate.
 
-## 4. The boss calibration probe tests a boss that never escalates (open)
+## 4. The boss calibration probe tested a boss that never escalated (fixed)
 
-This one invalidates evidence rather than gameplay, and it is the highest-value item left.
+This one invalidated evidence rather than gameplay, and it was the highest-value item left.
 
 Bosses carry two escalation phases (`BossRule.default_escalation_config`: a health-threshold
 phase that revives two units and multiplies health and offence, then a second at a lower
@@ -80,3 +80,37 @@ observed outcomes by 20 points while the probe's miss is 1.4.
 Fix direction: make the simulator run the full stage-rule lifecycle for the enemy spec before
 `engine.configure`, then assert a non-empty phase list and a fired-phase event in the probe,
 and recalibrate. Expect boss difficulty to move once the probe measures the real fight.
+
+### Fixed and re-measured
+
+`LockstepSimulator` now runs the same order `CombatManager` does: `pre_spawn` -> spawn ->
+`post_spawn`, then `pre_engine_config` -> `configure` -> `start` -> `on_battle_start`. The
+ordering is load-bearing: `configure_encounter_escalation` stores the config while
+`engine.state` is still null, and `engine.configure()` is what applies it to the runtime with
+the real state. The simulator also exposes `enemy_escalation_configured_phases`,
+`enemy_escalation_enabled` and `enemy_escalation_fired_phases` in its result, and the probe
+asserts that every boss sample had phases configured and that at least one sample fired one.
+
+Evidence after the fix, `BossStageCalibrationProbe`: PASS, 108 samples,
+**escalation configured 108/108, fired in 84**, predicted 61.0%, observed 64.8%, gap 3.8%,
+Brier 0.090.
+
+The difficulty moved exactly where escalation should move it. Preparation tiers:
+
+| tier | before (no escalation) | after (real escalation) |
+| --- | ---: | ---: |
+| underprepared | 33.3% | **16.7%** |
+| prepared | 63.9% | 77.8% |
+| strong | 77.8% | **100.0%** |
+
+The underprepared tier now loses five of six, which is what two escalation phases that heal,
+multiply health and offence, and return dead units should do to a board that cannot close.
+The strong tier sweeping is a design signal worth its own look: a board that bursts the boss
+below the first threshold still has to survive two revives.
+
+Both gates that consume the simulator still pass: `TeamOddsTimeoutReplayProbe` (13 historical
+tuples, 0 current timeouts) and `TeamOddsCalibrationProbe` (144 samples, 0.0% gap, Brier
+0.103, worst bucket 12.4%). `RGATesting` passes with 0 failed rows.
+
+Live confirmation that this is the encounter the game actually runs: a recorded fight logs
+`[BOSS PHASE 1] THE HOUSE DOUBLES DOWN - 1 reinforcement(s) return`.
