@@ -319,6 +319,14 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 	return StageTypes.make_spec(ids, kind, rules)
 
 static func _select_unit_ids(catalog: Array[Dictionary], theme: Dictionary, desired_size: int, chapter: int, stage_index: int, target: int, seed: int, kind: String, state: Dictionary) -> Array[String]:
+	# This picks by rating from the whole catalog, so a generated board can field cost-4
+	# and cost-5 units long before the player's shop level can offer them: at the chapter
+	# two boss, 61 of 117 recorded fights had a cost-4 enemy unit against a player whose
+	# shop was capped at cost 3, and the player's own board was 82% cost-1. Tested as a
+	# cause of that stage being a coin flip, and it is not one - those fights were won
+	# 46% of the time and the fights without a capstone were won 46% of the time. Across
+	# every stage from target 130 up the split is 76% against 78%. So do not gate the
+	# enemy's cost tier expecting the wall to move; the wall is somewhere else.
 	var selected: Array[String] = []
 	var front_id: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, target, seed, kind, "front")
 	if front_id != "":
