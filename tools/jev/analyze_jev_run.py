@@ -1698,6 +1698,70 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
             "mean_target_rating": round(entry["target_rating"] / max(1, entry["fights"]), 1),
             "mean_shown_odds": round(entry["odds"] / max(1, entry["odds_samples"]), 3),
         })
+    # Difficulty should rise with the chapter, so the boss win rate should not rise.
+    # This is the gate for "bosses are not harder early than late": a chapter whose boss
+    # is won more often than the previous chapter's is a curve inversion, and a chapter
+    # with too few boss fights to carry a rate is reported but cannot pass judgement.
+    chapter_rows: dict[int, dict] = {}
+    for row in all_fights:
+        chapter = int(row.get("chapter") or 0)
+        if chapter <= 0:
+            continue
+        entry = chapter_rows.setdefault(chapter, {
+            "fights": 0,
+            "wins": 0,
+            "boss_fights": 0,
+            "boss_wins": 0,
+            "clock": 0,
+            "ratio_sum": 0.0,
+            "ratio_samples": 0,
+            "target_sum": 0.0,
+            "target_samples": 0,
+        })
+        entry["fights"] += 1
+        if row.get("won"):
+            entry["wins"] += 1
+        if row.get("clock_decided"):
+            entry["clock"] += 1
+        if str(row.get("encounter_kind")) == "BOSS":
+            entry["boss_fights"] += 1
+            if row.get("won"):
+                entry["boss_wins"] += 1
+        player_power = row.get("player_power")
+        enemy_power = row.get("enemy_power")
+        if isinstance(player_power, (int, float)) and isinstance(enemy_power, (int, float)) and float(enemy_power) > 0:
+            entry["ratio_sum"] += float(player_power) / float(enemy_power)
+            entry["ratio_samples"] += 1
+        if isinstance(row.get("target_rating"), (int, float)):
+            entry["target_sum"] += float(row["target_rating"])
+            entry["target_samples"] += 1
+    # Five boss fights is the floor for a rate worth reading; below that the row is
+    # reported with a null rate rather than being silently dropped.
+    chapter_difficulty: list[dict] = []
+    for chapter in sorted(chapter_rows):
+        entry = chapter_rows[chapter]
+        boss_fights = entry["boss_fights"]
+        chapter_difficulty.append({
+            "chapter": chapter,
+            "fights": entry["fights"],
+            "win_rate": round(entry["wins"] / max(1, entry["fights"]), 3),
+            "boss_fights": boss_fights,
+            "boss_win_rate": round(entry["boss_wins"] / boss_fights, 3) if boss_fights >= 5 else None,
+            "mean_power_ratio": round(entry["ratio_sum"] / max(1, entry["ratio_samples"]), 3),
+            "mean_target_rating": round(entry["target_sum"] / max(1, entry["target_samples"]), 1),
+            "clock_decided_share": round(entry["clock"] / max(1, entry["fights"]), 3),
+        })
+    inversions: list[dict] = []
+    rated = [row for row in chapter_difficulty if row["boss_win_rate"] is not None]
+    for before, after in zip(rated, rated[1:]):
+        if after["boss_win_rate"] > before["boss_win_rate"] + 0.05:
+            inversions.append({
+                "easier_chapter": after["chapter"],
+                "easier_boss_win_rate": after["boss_win_rate"],
+                "harder_chapter": before["chapter"],
+                "harder_boss_win_rate": before["boss_win_rate"],
+            })
+
     # The acceptance targets, counted across the sample.
     runs_reaching_chapter_10 = sum(1 for row in runs if int(row.get("final_chapter") or 0) >= 10)
     runs_with_three_star = sum(1 for row in runs if row.get("three_star_units"))
@@ -1714,6 +1778,8 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
         "fights": all_fights,
         "prediction": prediction,
         "power_curve": power_curve,
+        "chapter_difficulty": chapter_difficulty,
+        "chapter_difficulty_inversions": inversions,
         "trait_effectiveness": trait_effectiveness,
         "failure_summary": failure_summary,
         "acceptance": {
@@ -1803,6 +1869,42 @@ def _render_batch(batch: dict) -> str:
             )
         lines.append("")
         lines.append("- A ratio below 1.0 at a stage means the player board was, on average, the weaker one on the model's own rating.")
+    if batch.get("chapter_difficulty"):
+        lines.extend(["", "## Boss difficulty by chapter (the curve gate)", ""])
+        lines.append("Difficulty should rise with the chapter, so the boss win rate should not rise. Five boss fights is the floor for a rate worth reading.")
+        lines.append("")
+        lines.append("| chapter | fights | win rate | boss fights | boss win rate | power ratio | target | clock-decided |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+        for row in batch["chapter_difficulty"]:
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (
+                    row.get("chapter"),
+                    row.get("fights"),
+                    row.get("win_rate"),
+                    row.get("boss_fights"),
+                    row.get("boss_win_rate") if row.get("boss_win_rate") is not None else "-",
+                    row.get("mean_power_ratio"),
+                    row.get("mean_target_rating"),
+                    row.get("clock_decided_share"),
+                )
+            )
+        inversions = batch.get("chapter_difficulty_inversions") or []
+        if inversions:
+            lines.append("")
+            for row in inversions:
+                lines.append(
+                    "- Curve inversion: chapter %s is easier than chapter %s (%s against %s)."
+                    % (
+                        row.get("easier_chapter"),
+                        row.get("harder_chapter"),
+                        row.get("easier_boss_win_rate"),
+                        row.get("harder_boss_win_rate"),
+                    )
+                )
+        else:
+            lines.append("")
+            lines.append("- No inversion detected in the chapters with enough boss fights.")
     trait_effectiveness = batch.get("trait_effectiveness") or {}
     if trait_effectiveness.get("rows"):
         lines.extend(["", "## Trait effectiveness (observational)", ""])
