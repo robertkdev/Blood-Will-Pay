@@ -20,7 +20,6 @@ extends "res://tests/pacing/competent_policy_pacing_harness.gd"
 const JEV_HARNESS_NAME: String = "JevRunHarness"
 const DEFAULT_RUN_DIR: String = "user://jev_run"
 const JEV_RULES_PATH: String = "res://tools/jev/policy/jev_run_rules.json"
-const AccountProfileStoreScript: GDScript = preload("res://scripts/game/account/account_profile_store.gd")
 const DEFAULT_RESERVE_FLOOR_BUCKETS: int = 2
 const DECISION_POLL_SECONDS: float = 0.05
 const DECISION_TIMEOUT_SECONDS: float = 240.0
@@ -37,6 +36,8 @@ const CAMPAIGN_MAX_BATTLES: int = 30
 const DEEP_TARGET_CHAPTER: int = 10
 const DEEP_TARGET_ROUND: int = 4
 const DEEP_MAX_BATTLES: int = 200
+## The shipped planning countdown in game seconds; see _scale_planning_window_for_sweep.
+const SHIPPED_PLANNING_WINDOW_S: float = 120.0
 const MAX_SAME_STAGE_RETRIES: int = 3
 ## A synthetic mouse event occasionally misses a control that is visibly present and
 ## enabled - observed once across six seeds, on a shop slot, with the card rendered and
@@ -560,8 +561,41 @@ func _set_planning_timer_safe() -> void:
 	# fight when it expires: that countdown is part of what "playable" means, so by
 	# default the run leaves it alone. Only the fast-sweep mode holds it open.
 	if _use_real_timer:
+		_scale_planning_window_for_sweep()
 		return
 	super._set_planning_timer_safe()
+
+## Give the rig the same wall-clock planning budget a player gets.
+##
+## The countdown advances on the engine's scaled delta, so running the sweep at 8x also
+## burns the planning window eight times faster in wall-clock terms. A shop the rig needs
+## a dozen Jev round-trips to work then runs out of time, the beat closes before Start
+## Battle is pressed, and the harness aborts the run. That is how the richest run in the
+## record died - chapter 6 round 4, 24,491 buckets, 16 decisions in the final shop, and
+## `start_not_entered` - and it biases every depth measurement against exactly the deep,
+## decision-heavy runs the design is trying to produce. Scaling the window by the sweep
+## factor keeps the rig's wall-clock budget equal to a player's while the fights still
+## resolve at speed.
+func _scale_planning_window_for_sweep() -> void:
+	if _speed_scale <= 1.0:
+		return
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	if combat == null:
+		return
+	var previous_total: float = float(combat.get("planning_timer_total"))
+	if previous_total <= 0.0:
+		previous_total = SHIPPED_PLANNING_WINDOW_S
+	var target: float = SHIPPED_PLANNING_WINDOW_S * _speed_scale
+	# A fresh planning beat resets the window to the shipped total, so lift anything
+	# still at or below it. A window already at the sweep budget is left alone: this
+	# runs once per beat, and scaling the scaled value compounds it (120 -> 960 ->
+	# 7680 -> ...), which is a window no fight can ever close.
+	if previous_total >= target:
+		return
+	combat.set("planning_timer_total", target)
+	var left: float = float(combat.get("planning_time_left"))
+	if left > 0.0 and left <= previous_total:
+		combat.set("planning_time_left", left * (target / previous_total))
 
 func _load_reserve_floor() -> int:
 	# The floor lives in the policy file so the rules and the guard cannot drift.
