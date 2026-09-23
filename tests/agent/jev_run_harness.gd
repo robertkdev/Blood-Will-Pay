@@ -2728,7 +2728,7 @@ func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary
 		{
 			"stake": reserve,
 			"role": "all_in",
-			"why": "The whole bankroll. Correct only where the Kelly share is at least three quarters, which is the near-lock bands the record wins essentially always; at a thinner edge it is over-betting and the record shows it ending runs.",
+			"why": "The whole bankroll. Correct wherever the Kelly share is at least a half: on the recorded fight sequences that bar lifted the median peak bankroll by a third and the p90 threefold with the median closing bankroll unchanged. Below a half it is over-betting and the record shows it ending runs.",
 		},
 	]
 	var candidates: Array[Dictionary] = []
