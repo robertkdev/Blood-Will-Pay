@@ -12,7 +12,7 @@
     "rule": "The reserve floor exists so a loss cannot end a run, not so buckets can sit idle. The minimum wager is one bucket, so never *spend* in the shop down to one bucket unless that purchase wins the stage about to start. The wager is the other half of the bankroll and is not covered by this floor."
   },
   "starter": {
-    "rule": "The opening fight is fought with the starter alone and the first shop only opens after it, so pick the opener that kills. Each candidate carries its level-one damage per second, health and armor: prefer a real damage dealer or a frontline body with real attack; a pure absorb tank that deals almost no damage is the weakest opener. Traits only matter once a body exists.",
+    "rule": "The opening fight is fought with the starter alone and the first shop opens only after it, so pick the opener that kills. Each candidate carries its level-one damage, health and armor: prefer a real damage dealer or a frontline body with real attack; a pure absorb tank with almost no damage is the weakest opener.",
     "first_shop": "Buy a second body before any XP."
   },
   "decision_quality_gates": {
@@ -27,8 +27,8 @@
     "deployed_payoff": "Only the deployed board fights, so judge an offer by the board you would field after the swap. A bench buy is not dead value though: three same-level copies combine across board and bench automatically, and the next slot you open fields the result. When the shown odds are at or below 50% the board cannot carry a bet, so a body, a level that opens a slot, or a duplicate that combines is worth the buckets; when the odds are well above 50% the wager pays better than the shelf."
   },
   "items": {
-    "rule": "Assign every held component to a unit before the fight; a component in the inventory does nothing. Match it by role, and value the unit actually carrying the fight over a body at the back. Two components on one unit combine automatically, so pairing them on one unit beats spreading them.",
-    "hold_only_when": "Hold a component only when nothing on the board can use it."
+    "rule": "Assign every held component before the fight; a component in the inventory does nothing. Slam for the unit you have upgraded, not the board you want: an item on a 1-star 1-cost rarely decides anything, and the unit actually carrying the fight is worth more than a body at the back. Two components on one unit combine automatically, so pairing them beats spreading them.",
+    "hold_only_when": "Hold a component when nothing on the board can use it, and hold it rather than slamming it onto a 1-star 1-cost."
   },
   "wager": {
     "quote_multipliers": {
@@ -50,7 +50,7 @@
   "playstyle": {
     "identity": "This is a gambling game with strategy. Play flex first: take what the shop gives you, keep later shops useful, and let the game hand you a direction. A vertical is a gift when it arrives; forcing one is a paid gamble.",
     "flex": {
-      "rule": "Default plan. Buy the offer that fills the role the board is missing, adds a trait count you already hold, or is the cheapest real power on the shelf; prefer offers whose traits overlap what you own. Traits count unique units, so a second copy of a deployed unit adds no trait count.",
+      "rule": "Default plan: pairs first. Any pair beats a weak single, and a 1-cost pair is the most reliable early unit, so take the offer that completes a pair you already hold before one that merely fills a role or adds a trait count - but traits count unique units, so a second copy of a deployed unit adds no trait count on its own.",
       "keep_options_open": "Do not commit the board to one trait early. Two or three units sharing traits with what you own beat one piece of a plan you cannot complete.",
       "pass_rule": "Pass when the offer neither fills a missing role, nor advances a trait you hold, nor is another copy of your chosen vertical. A defensive pass is a real move."
     },
@@ -59,12 +59,12 @@
       "one_piece_away": "A trait breakpoint is a strong purchase, not an automatic one: check that it survives the swap."
     },
     "force": {
-      "rule": "Forcing is a gamble, but a committed vertical is the only way a run reaches a three-star: nine copies of one identity. Once the bankroll can afford it, pick the identity you hold the most copies of, buy every copy you see - not just the one that completes a combine - and reroll the shelf whenever a combine is one or two copies away and the reroll costs a rounding error next to the bankroll. Two copies is progress, not a wasted buy.",
+      "rule": "Forcing is a gamble, but a committed vertical is the only way a run reaches a three-star: nine copies of one identity. The state names your commitment as VERTICAL. Once the bankroll can afford it, buy every copy of that identity you see - not just the one that completes a combine - and reroll the shelf whenever it is one or two copies short and the roll costs a rounding error next to the bankroll. Two copies is progress, not a wasted buy.",
       "when_not_to_force": "Never pass a flex pick you would take in an open shop to reroll for a plan you do not own."
     }
   },
   "level": {
-    "rule": "Buy XP when the level-up raises capacity and the slot has a use: a benched body, or shelf_bodies_that_could_gain_a_slot - bodies that can be bought and fielded in the same beat. The chapter's boss round on a full board is the clearest case, and buying the level plus the body together is one plan, not two. Capacity is the ceiling on everything else: a board that never grows cannot combine, cannot field a third copy, and cannot stack a trait.",
+    "rule": "Buy XP when the level-up raises capacity and the slot has a use - a benched body, or shelf_bodies_that_could_gain_a_slot that can be bought and fielded in the same beat - and the board already holds upgrades. Hold off while you are sitting on several 1-cost pairs with no upgrades: the lower shop level has the best 1-cost odds and those upgrades come first. Capacity is still the ceiling on everything else.",
     "unit_levels": "Unit level is the biggest middle-game power lever: a level-2 copy is worth well more than a level-1 of the same identity, and three same-level copies convert into one stronger unit. (An earlier 40% / 61% / 79% odds calibration has not been re-verified on this build.)",
     "combine_priority": "Take a duplicate that completes a third copy at a level you already hold when the board has room - but a stronger unit, an item, an extra slot, or a trait breakpoint can supply the same power sooner. A combine is one option, not the required path into chapter 2."
   },
@@ -73,7 +73,7 @@
   },
   "stall": {
     "rule": "Never start a fight with the same board that already failed. A loss on a non-final stage keeps the run alive on that stage, so the board must change first: a duplicate, an upgrade, the level that raises capacity, a reroll, or a contract.",
-    "clock_rule": "A clocked-out fight is awarded by surviving units first, then by total remaining health. Damage dealt is not part of that ladder. Cut the enemy's survivors if you can; otherwise hold more total health than they do, and note a durable board that never dies can still win the clock on health."
+    "clock_rule": "A clocked-out fight is awarded by surviving units first, then by total remaining health. Damage dealt is not part of that ladder: cut the enemy's survivors if you can, otherwise hold more total health than they do."
   },
   "shown_odds": {
     "rule": "The preview win-odds range does not price the wager. Treat it as a readiness signal: well above break-even means the board is ready, near or below means buy power first."

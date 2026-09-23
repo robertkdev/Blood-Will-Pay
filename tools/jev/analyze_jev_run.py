@@ -597,6 +597,19 @@ def _board_label(units: list[dict]) -> str:
     return " ".join(parts) if parts else "-"
 
 
+def _tier_of(entry: dict) -> int:
+    """Trait tier with the missing value kept distinct from tier 0.
+
+    TraitCompiler reports -1 for "no threshold met" and 0 for the first live tier,
+    so `entry.get("tier") or -1` collapses a live first tier into "inactive". That
+    bug made every single-threshold trait read as permanently off.
+    """
+    value = entry.get("tier")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return -1
+    return int(value)
+
+
 def _fight_records(events: list[dict]) -> list[dict]:
     """One row per fight, pairing the pre-fight prediction and boards with the result.
 
@@ -640,7 +653,19 @@ def _fight_records(events: list[dict]) -> list[dict]:
                 "deployed_traits": [
                     "%s%d" % (entry.get("id"), int(entry.get("count", 0) or 0))
                     for entry in (payload.get("deployed_traits") or [])
-                    if int(entry.get("tier", -1) or -1) >= 0
+                    if _tier_of(entry) >= 0
+                ],
+                # Split by whether the tier is actually live, so a trait can be scored
+                # against the fights where it was only collected, not active.
+                "active_traits": [
+                    str(entry.get("id"))
+                    for entry in (payload.get("deployed_traits") or [])
+                    if _tier_of(entry) >= 0
+                ],
+                "inactive_traits": [
+                    str(entry.get("id"))
+                    for entry in (payload.get("deployed_traits") or [])
+                    if _tier_of(entry) < 0
                 ],
             }
         elif kind == "combat_diagnostic" and pending is not None:
@@ -1408,6 +1433,47 @@ def _run_dirs_from_batch(path: Path) -> list[Path]:
     )
 
 
+def _trait_effectiveness(fights: list[dict]) -> dict:
+    """Win rate with a trait active against the win rate without it.
+
+    Observational, not causal: a run that is winning survives long enough to stack
+    traits, so every number here is confounded by run length. It is still the
+    cheapest way to notice a trait that looks dead, and it is reported with its
+    sample size so nobody reads a five-fight bucket as a verdict.
+    """
+    active: dict[str, list[int]] = {}
+    inactive: dict[str, list[int]] = {}
+    for fight in fights:
+        if fight.get("won") is None:
+            continue
+        won = 1 if fight.get("won") else 0
+        for entry in fight.get("active_traits") or []:
+            bucket = active.setdefault(str(entry), [0, 0])
+            bucket[0] += 1
+            bucket[1] += won
+        for entry in fight.get("inactive_traits") or []:
+            bucket = inactive.setdefault(str(entry), [0, 0])
+            bucket[0] += 1
+            bucket[1] += won
+    rows = []
+    for trait_id in sorted(set(active) | set(inactive)):
+        a_n, a_w = active.get(trait_id, [0, 0])
+        i_n, i_w = inactive.get(trait_id, [0, 0])
+        rows.append({
+            "trait": trait_id,
+            "active_fights": a_n,
+            "active_win_rate": round(a_w / a_n, 3) if a_n else None,
+            "inactive_fights": i_n,
+            "inactive_win_rate": round(i_w / i_n, 3) if i_n else None,
+            "delta": round((a_w / a_n) - (i_w / i_n), 3) if a_n and i_n else None,
+        })
+    rows.sort(key=lambda row: (row["delta"] is None, row["delta"] if row["delta"] is not None else 0.0))
+    return {
+        "note": "observational; run length confounds every row",
+        "rows": rows,
+    }
+
+
 def _batch_analysis(run_dirs: list[Path]) -> dict:
     """Aggregate the prediction check and the acceptance targets across runs.
 
@@ -1471,6 +1537,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
         "notes": dict(sorted(failure_notes.items(), key=lambda item: -item[1])),
     }
     prediction = _prediction_quality(all_fights)
+    trait_effectiveness = _trait_effectiveness(all_fights)
     # The difficulty ramp against the player's actual power, per global stage. This
     # is the curve to read before changing any per-chapter constant.
     by_stage: dict[int, dict] = {}
@@ -1532,6 +1599,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
         "fights": all_fights,
         "prediction": prediction,
         "power_curve": power_curve,
+        "trait_effectiveness": trait_effectiveness,
         "failure_summary": failure_summary,
         "acceptance": {
             "runs": len(runs),
@@ -1618,6 +1686,25 @@ def _render_batch(batch: dict) -> str:
             )
         lines.append("")
         lines.append("- A ratio below 1.0 at a stage means the player board was, on average, the weaker one on the model's own rating.")
+    trait_effectiveness = batch.get("trait_effectiveness") or {}
+    if trait_effectiveness.get("rows"):
+        lines.extend(["", "## Trait effectiveness (observational)", ""])
+        lines.append("- %s" % trait_effectiveness.get("note"))
+        lines.append("")
+        lines.append("| trait | active fights | active win% | inactive fights | inactive win% | delta |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
+        for row in trait_effectiveness["rows"]:
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s |"
+                % (
+                    row.get("trait"),
+                    row.get("active_fights"),
+                    row.get("active_win_rate"),
+                    row.get("inactive_fights"),
+                    row.get("inactive_win_rate"),
+                    row.get("delta"),
+                )
+            )
     lines.extend(["", "## Prediction quality across the sample", ""])
     if prediction.get("samples"):
         lines.append(

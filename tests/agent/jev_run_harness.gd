@@ -1286,6 +1286,9 @@ func _plan_state() -> Dictionary:
 		# a trait" be true while the board activated nothing.
 		"traits": _trait_snapshot(_board_units()),
 		"traits_owned": _trait_snapshot(_owned_units()),
+		# Which unit the run is actually committed to, and how close it is to a
+		# three-star, so every decision can price an offer against the plan.
+		"vertical": _vertical_summary(),
 		"planning_time_left": float(controller_node.get("planning_time_left")) if controller_node != null else -1.0,
 		"planning_timer_total": float(controller_node.get("planning_timer_total")) if controller_node != null else -1.0,
 		"time_scale": Engine.time_scale,
@@ -1365,6 +1368,39 @@ func _team_units_snapshot(team: Array[Unit], placements: Array[int]) -> Array[Di
 			"tile": int(placements[index]) if index < placements.size() else -1,
 		})
 	return records
+
+## The player's own revealed commitment: the identity they hold the most copies of,
+## measured in level-1 equivalents because a combine consumes three of them, so a
+## three-star is nine. Reported as a fact so the model does not have to re-derive
+## which unit it is committed to in every shop - left to re-decide, it spread eight
+## purchases across five identities and never finished a single combine.
+func _vertical_summary() -> Dictionary:
+	var equivalents: Dictionary[String, int] = {}
+	for unit: Unit in _owned_units():
+		if unit == null:
+			continue
+		var unit_id: String = _unit_id(unit)
+		if unit_id.is_empty():
+			continue
+		var value: int = 1
+		for _step: int in range(maxi(0, int(unit.level) - 1)):
+			value *= 3
+		equivalents[unit_id] = int(equivalents.get(unit_id, 0)) + value
+	var target_id: String = ""
+	var best: int = 0
+	for candidate_id: String in equivalents.keys():
+		var count: int = int(equivalents[candidate_id])
+		if count > best or (count == best and target_id != "" and candidate_id < target_id):
+			best = count
+			target_id = candidate_id
+	if target_id.is_empty():
+		return {}
+	return {
+		"target_id": target_id,
+		"level1_equivalents": best,
+		"copies_to_three_star": maxi(0, 9 - best),
+		"progress_percent": int(round(100.0 * float(mini(best, 9)) / 9.0)),
+	}
 
 func _owned_units() -> Array[Unit]:
 	var units: Array[Unit] = _board_units()
@@ -1591,6 +1627,8 @@ func _shop_candidates() -> Array[Dictionary]:
 	var wager_multiplier: float = float(Economy.gross_payout_multiplier())
 	var wager_odds: float = float(Economy.projected_win_probability)
 	var ev_per_bucket: float = wager_odds * (wager_multiplier - 1.0) - (1.0 - wager_odds)
+	var vertical: Dictionary = _vertical_summary()
+	var vertical_target_id: String = String(vertical.get("target_id", ""))
 	var board_ids: Array[String] = _board_ids()
 	var bench_ids: Array[String] = _bench_ids()
 	var board_has_room: bool = board_ids.size() < _roster_max_team_size()
@@ -1654,6 +1692,16 @@ func _shop_candidates() -> Array[Dictionary]:
 		var activation_text: String = ""
 		if not activates_traits.is_empty():
 			activation_text = " Similarly activates %s once deployed." % ", ".join(activates_traits)
+		# Whether this offer advances the run's own committed vertical, and where that
+		# leaves the three-star.
+		var is_vertical: bool = vertical_target_id != "" and unit_id == vertical_target_id
+		var vertical_text: String = ""
+		if is_vertical:
+			var have: int = int(vertical.get("level1_equivalents", 0))
+			vertical_text = " This is your committed vertical (%s): %d of 9 level-1 copies toward a three-star." % [
+				vertical_target_id,
+				have + (1 if offer_level <= 1 else 3),
+			]
 		candidates.append({
 			"id": "offer_%d" % int(summary.get("slot", -1)),
 			"label": "%s (cost %d, %s%s)" % [
@@ -1662,7 +1710,7 @@ func _shop_candidates() -> Array[Dictionary]:
 				String(summary.get("primary_role", "unit")),
 				", owns %d copies" % copies if copies > 0 else "",
 			],
-			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s Leaves %d buckets. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx, shown odds %.0f%%)." % [
+			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s%s Leaves %d buckets. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx, shown odds %.0f%%)." % [
 				unit_id,
 				offer_level,
 				cost,
@@ -1670,6 +1718,7 @@ func _shop_candidates() -> Array[Dictionary]:
 				combine_text,
 				trait_text,
 				activation_text,
+				vertical_text,
 				int(Economy.gold) - cost,
 				cost,
 				ev_per_bucket * float(cost),
@@ -1677,6 +1726,7 @@ func _shop_candidates() -> Array[Dictionary]:
 				wager_multiplier,
 				wager_odds * 100.0,
 			],
+			"is_vertical_target": is_vertical,
 			"wager_expected_value_foregone": snappedf(ev_per_bucket * float(cost), 0.01),
 			"wager_edge_per_bucket": snappedf(ev_per_bucket, 0.01),
 			"affordable": true,
@@ -1873,6 +1923,46 @@ func _stage_target_rating() -> int:
 	if not spec is Dictionary:
 		return -1
 	return int(spec.get("target_rating", -1))
+
+## Deploy by role instead of by first empty tile.
+##
+## The player board is 8 columns x 3 rows and index 0 is the top row, which is the
+## rank that faces the enemy. Filling the first empty tile therefore put every early
+## unit in the front rank: a run was observed holding mage at tile 2, support at 3,
+## marksman at 5/6 and tank at 4 - all in row 0, so the backline was tanking. Front
+## roles take the front rank first; everyone else starts in the back rank.
+const BOARD_COLUMNS: int = 8
+const FRONTLINE_ROLES: Array[String] = ["tank", "brawler", "assassin"]
+
+func _preferred_board_tile(controller: Variant, unit_id: String) -> int:
+	if controller == null or controller.player_grid_helper == null:
+		return -1
+	# Called through Variant on purpose: a strict `as BoardGrid` cast here silently
+	# failed and the deployment fell back to the first empty tile, which is what put
+	# the backline in the front rank.
+	var helper: Variant = controller.player_grid_helper
+	if not helper.has_method("size") or not helper.has_method("is_occupied"):
+		return -1
+	var tile_count: int = int(helper.call("size"))
+	if tile_count <= 0:
+		return -1
+	var rows: int = maxi(1, int(tile_count / BOARD_COLUMNS))
+	var frontline: bool = FRONTLINE_ROLES.has(_unit_role(unit_id))
+	# Front roles fill row 0 outward; back roles fill the last row outward. Both fall
+	# back through the remaining rows so a large board still deploys.
+	var row_order: Array[int] = []
+	if frontline:
+		for row: int in range(rows):
+			row_order.append(row)
+	else:
+		for row: int in range(rows - 1, -1, -1):
+			row_order.append(row)
+	for row: int in row_order:
+		for column: int in range(BOARD_COLUMNS):
+			var index: int = row * BOARD_COLUMNS + column
+			if index < tile_count and not bool(helper.call("is_occupied", index)):
+				return index
+	return -1
 
 ## Deterministic item handling for the baseline arm. Components only do anything
 ## once they are equipped, so the control run places each held component on the

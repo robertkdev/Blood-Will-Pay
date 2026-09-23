@@ -129,6 +129,19 @@ def _state_digest(kind: str, observation: dict) -> str:
         parts.append("BOARD: " + ", ".join(str(unit) for unit in state["board"]))
     if state.get("bench"):
         parts.append("BENCH: " + ", ".join(str(unit) for unit in state["bench"]))
+    vertical = state.get("vertical") or {}
+    if vertical:
+        # Stated once per decision so the model does not have to re-derive its own
+        # commitment from the board and bench every shop.
+        parts.append(
+            "VERTICAL: committed to %s, %s of 9 level-1 copies toward a three-star (%s%%), %s more needed"
+            % (
+                vertical.get("target_id"),
+                vertical.get("level1_equivalents"),
+                vertical.get("progress_percent"),
+                vertical.get("copies_to_three_star"),
+            )
+        )
     if state.get("recent_fights"):
         rendered_fights = [
             "chapter %s round %s %s%s"

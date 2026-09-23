@@ -642,6 +642,12 @@ func _id_counts(unit_ids: Array[String]) -> Dictionary:
 		counts[unit_id] = int(counts.get(unit_id, 0)) + 1
 	return counts
 
+## Which board tile a unit should be deployed into. The default is the first empty
+## tile, which is index order and therefore the front row first; the Jev rig overrides
+## this to place by role so backliners are not dropped into the front rank.
+func _preferred_board_tile(controller: Variant, _unit_id: String) -> int:
+	return _first_empty_board_tile(controller)
+
 func _drag_bench_unit_id_to_board(unit_id: String, label: String) -> bool:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
 	if combat == null:
@@ -656,6 +662,9 @@ func _drag_bench_unit_id_to_board(unit_id: String, label: String) -> bool:
 	if unit_view == null:
 		return false
 	var target_tile: int = _first_empty_board_tile(controller)
+	var preferred: int = _preferred_board_tile(controller, unit_id)
+	if preferred >= 0:
+		target_tile = preferred
 	if target_tile < 0:
 		return false
 	var moved_unit: Unit = unit_view.unit as Unit
