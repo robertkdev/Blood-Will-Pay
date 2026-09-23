@@ -185,6 +185,9 @@ func _run() -> void:
 		_set_shop_seed(_campaign_seed)
 		_seed_procedural_roster(_campaign_seed)
 	_prepare_run_dir()
+	# The Ledger is spent between runs, so this has to happen before the run freezes its
+	# loadout. See _prepare_campaign_loadout for what the account was doing before this.
+	_prepare_campaign_loadout()
 	print("%s: boot mode=%s lane=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
 		JEV_HARNESS_NAME,
 		_run_mode,
@@ -609,6 +612,83 @@ func _measured_first_attempt_win_rate(quote_kind: String, shown_odds: float) -> 
 	if samples + prior <= 0.0:
 		return shown_odds
 	return clampf((samples * observed + prior * shown_odds) / (samples + prior), 0.01, 0.99)
+
+## What the Ledger should buy, in the order that changes a run soonest.
+##
+## Only two Edicts change a fight: Debtor's Mercy adds a starting blood bucket, which the
+## doubling ladder compounds from the very first wager, and House Courtesy makes the first
+## paid reroll free. Iron Memory is next because it buys the third Edict slot, and the rest
+## are Omen income - income is what pays for later runs, so it is bought but equipped last.
+const CAMPAIGN_EDICT_PURCHASE_ORDER: Array[String] = [
+	"debtors_mercy", "house_courtesy", "iron_memory", "widows_thread", "foremans_seal", "third_margin",
+]
+const CAMPAIGN_EDICT_EQUIP_ORDER: Array[String] = [
+	"debtors_mercy", "house_courtesy", "widows_thread", "foremans_seal", "third_margin",
+]
+
+## Spend the Ledger between runs.
+##
+## The account earns an Omen for every unique victory and had never spent one: after all
+## the recorded runs the profile held 5,331 lifetime Omens at Ledger rank 66, with every
+## Edict gate open, zero Edicts unlocked and zero equipped. The permanent layer the game
+## is built on - play, lose, come back stronger - was inert for the rig, so no batch could
+## ever have shown campaign growth. This buys what is affordable in the order above,
+## equips what fits, and records both so a run's loadout is readable in its transcript.
+func _prepare_campaign_loadout() -> void:
+	var before: Dictionary = AccountProgression.profile()
+	var omens_before: int = int(before.get("omens_balance", 0))
+	var purchased: Array[String] = []
+	for edict_id: String in CAMPAIGN_EDICT_PURCHASE_ORDER:
+		if _string_list(AccountProgression.profile().get("unlocked_edict_ids", [])).has(edict_id):
+			continue
+		var purchase: Dictionary = AccountProgression.purchase_edict(edict_id)
+		if bool(purchase.get("ok", false)):
+			purchased.append(edict_id)
+	var after_purchase: Dictionary = AccountProgression.profile()
+	var slots: int = AccountProgression.max_edict_slots(after_purchase)
+	var unlocked: Array[String] = _string_list(after_purchase.get("unlocked_edict_ids", []))
+	var already: Array[String] = _string_list(after_purchase.get("equipped_edict_ids", []))
+	var equipped: Array[String] = []
+	for edict_id: String in CAMPAIGN_EDICT_EQUIP_ORDER:
+		if equipped.size() >= slots:
+			break
+		if not unlocked.has(edict_id):
+			continue
+		if already.has(edict_id):
+			equipped.append(edict_id)
+			continue
+		var toggled: Dictionary = AccountProgression.toggle_edict(edict_id)
+		if bool(toggled.get("ok", false)):
+			equipped.append(edict_id)
+	var after: Dictionary = AccountProgression.profile()
+	_append_event("campaign_prep", {
+		"omens_before": omens_before,
+		"omens_after": int(after.get("omens_balance", 0)),
+		"lifetime_omens": int(after.get("lifetime_omens", 0)),
+		"purchased": purchased,
+		"equipped": equipped,
+		"edict_slots": slots,
+		"unlocked_edict_ids": _string_list(after.get("unlocked_edict_ids", [])),
+		"starting_blood_bucket_bonus": AccountProgression.starting_blood_bucket_bonus(),
+		"red_ink_tier": int(after.get("selected_red_ink", 0)),
+	})
+	print("%s: ledger prep omens %d -> %d, bought %s, equipped %s" % [
+		JEV_HARNESS_NAME,
+		omens_before,
+		int(after.get("omens_balance", 0)),
+		str(purchased),
+		str(equipped),
+	])
+
+func _string_list(value: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if value is Array:
+		for entry: Variant in (value as Array):
+			out.append(String(entry))
+	elif value is PackedStringArray:
+		for entry: String in (value as PackedStringArray):
+			out.append(entry)
+	return out
 
 ## Pin the procedural roster to the run seed, the way the visual smokes and the RGA
 ## probes already do. The rig was seeding only the shop, so the seeded-run contract was
