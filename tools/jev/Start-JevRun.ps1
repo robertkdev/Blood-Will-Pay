@@ -26,6 +26,11 @@ param(
 
     [string] $GodotPath = "",
 
+    # Replay a recorded run's decisions instead of asking the model. The rig's choices
+    # are held fixed so a game-side or rules-side change can be measured against the
+    # same play; see jev_run_controller.py --replay-from.
+    [string] $ReplayFrom = "",
+
     # 1.0 is the shipped game speed. Higher values are for fast sweeps only.
     [ValidateRange(0.25, 16.0)]
     [double] $Speed = 1.0,
@@ -105,6 +110,9 @@ try {
             "--run-dir", $runDirectory,
             "--rules", $rulesPath
         )
+        if (-not [string]::IsNullOrWhiteSpace($ReplayFrom)) {
+            $controllerArguments += @("--replay-from", $ReplayFrom)
+        }
         $controllerProcess = Start-Process -FilePath $controllerPython `
             -ArgumentList $controllerArguments `
             -RedirectStandardOutput $controllerLog `

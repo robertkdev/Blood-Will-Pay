@@ -183,6 +183,7 @@ func _run() -> void:
 		Shop.error.connect(_on_shop_error)
 	if _seed_explicit:
 		_set_shop_seed(_campaign_seed)
+		_seed_procedural_roster(_campaign_seed)
 	_prepare_run_dir()
 	print("%s: boot mode=%s lane=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
 		JEV_HARNESS_NAME,
@@ -605,6 +606,22 @@ func _measured_first_attempt_win_rate(quote_kind: String, shown_odds: float) -> 
 	if samples + prior <= 0.0:
 		return shown_odds
 	return clampf((samples * observed + prior * shown_odds) / (samples + prior), 0.01, 0.99)
+
+## Pin the procedural roster to the run seed, the way the visual smokes and the RGA
+## probes already do. The rig was seeding only the shop, so the seeded-run contract was
+## half-wired.
+##
+## This is necessary but NOT sufficient: after wiring it, two runs of seed 55555 still
+## generated different enemies for the same stage (luna in one, bo in the other), and a
+## replay of one run's recorded decisions still diverged there while the opener, the
+## shop offers and the purchases matched exactly. So at least one more source of
+## run-to-run variation exists in enemy generation or in the reward rolls - the first
+## divergence in the replayed pair was an item drop (an orb in one run, nothing in the
+## other). Until that is found, same-seed runs are samples and not replicates.
+func _seed_procedural_roster(seed: int) -> void:
+	# Called statically: RosterCatalog is a static-only class here, so has_method() on it
+	# is a parser error, not a guard.
+	RosterCatalog.set_procedural_seed(seed)
 
 func _prepare_run_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(_run_dir)

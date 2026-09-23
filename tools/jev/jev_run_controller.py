@@ -49,6 +49,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--decision-timeout-seconds", type=float, default=180.0)
     parser.add_argument("--max-decisions", type=int, default=400)
     parser.add_argument("--api-timeout", type=float, default=60.0)
+    # Replay a recorded run instead of asking the model. Jev's decisions are sampled,
+    # so the same seed does not reproduce: one seed went chapter nine and then chapter
+    # one on effectively identical code, which makes a run-to-run comparison unable to
+    # attribute a change to the change. Replaying a recorded decision sequence holds the
+    # rig's choices fixed so a game-side or rules-side change can be measured against
+    # the same play.
+    parser.add_argument("--replay-from", default="")
     return parser.parse_args(argv)
 
 
@@ -303,6 +310,143 @@ def _write_decision(run_dir: Path, index: int, choice_id: str, payload: dict) ->
     temporary.replace(path)
 
 
+## Choices that mean "do not spend, do not risk" in the kinds the rig asks about. Used
+## only when a replayed choice cannot be honoured, so a substitution never escalates.
+SAFE_CHOICE_PREFERENCE = ("pass", "hold_items", "back_out", "confirm", "pass_items")
+
+
+def _recorded_choices_by_kind(replay_dir: Path) -> dict[str, list[dict]]:
+    """The reference run's decisions, grouped by kind in the order it answered them.
+
+    Matching on the absolute decision index is not enough: the harness asks a
+    different NUMBER of questions per planning beat depending on what the rig chose
+    (a purchase consumes an offer and the shop keeps asking), so the indices drift
+    apart as soon as one answer differs. Asking for "the third shop_buy decision"
+    instead of "decision 7" keeps a replay on the same track through that drift.
+    """
+    grouped: dict[str, list[dict]] = {}
+    if not replay_dir.exists():
+        return grouped
+    for path in sorted(replay_dir.glob("decision_*.json")):
+        try:
+            parsed = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        kind = str(parsed.get("kind", ""))
+        if not kind:
+            continue
+        grouped.setdefault(kind, []).append(parsed)
+    return grouped
+
+
+def _safe_choice_id(kind: str, choosable: list[dict]) -> str:
+    ids = [str(candidate.get("id", "")) for candidate in choosable]
+    for preferred in SAFE_CHOICE_PREFERENCE:
+        if preferred in ids:
+            return preferred
+    if kind == "wager":
+        stakes = sorted(
+            (int(candidate_id.split("_", 1)[1]), candidate_id)
+            for candidate_id in ids
+            if candidate_id.startswith("wager_") and candidate_id.split("_", 1)[1].isdigit()
+        )
+        if stakes:
+            return stakes[0][1]
+    return ids[0] if ids else ""
+
+
+def _replay_main(args) -> int:
+    """Answer each observation with the choice recorded by another run.
+
+    The rig's decisions are sampled, so the same seed does not reproduce: one seed went
+    chapter nine and then chapter one on effectively identical code. Replaying a
+    recorded sequence holds the rig's choices fixed, which is what makes a game-side or
+    rules-side change measurable against the same play. A choice that no longer exists
+    in the current candidate list is substituted with the safe default and the
+    substitution is written to the transcript, so a replay that silently diverged from
+    its reference can be told apart from one that did not.
+    """
+    run_dir = Path(args.run_dir).resolve()
+    replay_dir = Path(args.replay_from).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    transcript = run_dir / "decisions.jsonl"
+    answered: set[int] = set()
+    decisions = 0
+    substitutions = 0
+    missing = 0
+    started = time.time()
+    recorded_by_kind: dict[str, list[dict]] = _recorded_choices_by_kind(replay_dir)
+    seen_by_kind: dict[str, int] = {}
+    summary: dict = {
+        "controller": "jev_run_controller",
+        "mode": "replay",
+        "run_dir": str(run_dir),
+        "replay_from": str(replay_dir),
+        "reference_decisions": sum(len(rows) for rows in recorded_by_kind.values()),
+        "started_at_epoch": started,
+    }
+    print(f"replay controller attached: replaying {replay_dir} into {run_dir}")
+    while decisions < args.max_decisions:
+        found = _next_observation(run_dir, answered)
+        if found is None:
+            if (run_dir / "run_summary.json").exists() or (run_dir / "STOP").exists():
+                break
+            time.sleep(args.poll_seconds)
+            continue
+        _path, observation = found
+        index = int(observation.get("index", -1))
+        kind = str(observation.get("kind", "unknown"))
+        choosable, _unaffordable = _split_candidates(observation)
+        valid_ids = {str(candidate.get("id", "")) for candidate in choosable}
+        occurrence = seen_by_kind.get(kind, 0)
+        seen_by_kind[kind] = occurrence + 1
+        rows = recorded_by_kind.get(kind, [])
+        recorded = rows[occurrence] if occurrence < len(rows) else {}
+        recorded_id = str(recorded.get("choice_id", ""))
+        choice_id = recorded_id
+        basis = "replayed"
+        if choice_id not in valid_ids:
+            choice_id = _safe_choice_id(kind, choosable)
+            basis = "replayed_substituted" if recorded_id else "replay_missing"
+            substitutions += 1
+            if not recorded_id:
+                missing += 1
+        _write_decision(
+            run_dir,
+            index,
+            choice_id,
+            {
+                "kind": kind,
+                "model": "replay",
+                "basis": basis,
+                "recorded_choice_id": recorded_id,
+                "substituted": basis != "replayed",
+            },
+        )
+        _append_jsonl(
+            transcript,
+            {
+                "index": index,
+                "kind": kind,
+                "status": basis,
+                "choice_id": choice_id,
+                "recorded_choice_id": recorded_id,
+                "replay_from": str(replay_dir),
+            },
+        )
+        answered.add(index)
+        decisions += 1
+    summary["decisions"] = decisions
+    summary["substitutions"] = substitutions
+    summary["missing_reference_decisions"] = missing
+    summary["seconds"] = round(time.time() - started, 2)
+    (run_dir / "controller_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(json.dumps(summary))
+    return 0
+
+
 def _next_observation(run_dir: Path, answered: set[int]) -> tuple[Path, dict] | None:
     for path in sorted(run_dir.glob("observation_*.json")):
         try:
@@ -332,6 +476,8 @@ def _split_candidates(observation: dict) -> tuple[list[dict], list[dict]]:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    if args.replay_from:
+        return _replay_main(args)
     run_dir = Path(args.run_dir).resolve()
     rules_path = Path(args.rules).resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -374,7 +520,7 @@ def main(argv: list[str] | None = None) -> int:
                 _write_decision(run_dir, index, str(choosable[0]["id"]) if choosable else "", {
                     "kind": kind,
                     "model": "not_called",
-                    "reason": "single_candidate_auto_applied",
+                "reason": "single_candidate_auto_applied",
                 })
                 answered.add(index)
                 last_progress = time.time()
