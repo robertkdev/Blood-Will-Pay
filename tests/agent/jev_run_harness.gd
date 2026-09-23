@@ -2318,15 +2318,6 @@ func _preferred_board_tile(controller: Variant, unit_id: String) -> int:
 ## it moves at most REPOSITION_ROLE_FIX_LIMIT units per beat so a placement the engine
 ## refuses cannot turn the planning beat into a drag loop.
 func _pull_backline_out_of_the_front_rank(label: String) -> int:
-	# A mirror stage fields a clone of this board, so deviating from the formation the
-	# clone uses is a disadvantage, and the mirror is the chapter gate. Measured inside
-	# one code era over 204 mirror first attempts: every backliner in the front rank won
-	# 75.0%, one pulled back 68.3%, two pulled back 66.7%. Generated stages want the
-	# opposite - none / one / two pulled back won 75.9% / 79.7% / 86.1% over 905 first
-	# attempts - so the repair runs everywhere except the mirror.
-	if String(Economy.encounter_quote_kind) == "MIRROR":
-		_append_event("reposition_role_fix_skipped", {"reason": "mirror_matches_the_clone", "label": label})
-		return 0
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
 	if combat == null:
 		return 0
