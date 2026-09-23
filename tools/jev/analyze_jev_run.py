@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 import re
 import statistics
+from typing import Callable
 
 LOW_CONFIDENCE = 0.70
 
@@ -785,6 +786,48 @@ def _prediction_quality(records: list[dict]) -> dict:
                 sum(float(row["live_win_odds"]) - float(row["shown_win_odds"]) for row in stale) / len(stale), 4
             ),
         }
+
+    # Where the estimate stops describing the fight.
+    #
+    # The estimator compares summed team power, so it barely moves when one side
+    # simply has more bodies on the field. Measured against the recorded results it
+    # is wrong in exactly that spot: the side with one extra body wins about 95% of
+    # the time while the shown odds stay near a coin flip, and a one-body deficit
+    # loses about as heavily. Grouping the decided fights this way is what turns
+    # "the middle bands are off" into "buy a body or do not take the bet", and it is
+    # the first thing to read before retuning the odds curve.
+    def _group(key_for: Callable[[dict], str | None]) -> dict[str, dict]:
+        grouped: dict[str, dict] = {}
+        for row in decided:
+            key = key_for(row)
+            if key is None:
+                continue
+            group = grouped.setdefault(key, {"samples": 0, "predicted": 0.0, "wins": 0})
+            group["samples"] += 1
+            group["predicted"] += float(row["shown_win_odds"])
+            group["wins"] += 1 if row["won"] else 0
+        for group in grouped.values():
+            group["predicted"] = round(group["predicted"] / group["samples"], 4)
+            group["observed"] = round(group["wins"] / group["samples"], 4)
+            group["gap"] = round(group["observed"] - group["predicted"], 4)
+        return dict(
+            sorted(
+                grouped.items(),
+                key=lambda item: (int(item[0]),) if item[0].lstrip("+-").isdigit() else (0, item[0]),
+            )
+        )
+
+    def _size_key(row: dict) -> str | None:
+        player_count = row.get("player_count")
+        enemy_count = row.get("enemy_count")
+        if not isinstance(player_count, int) or not isinstance(enemy_count, int):
+            return None
+        # Clamped so the buckets stay populated once boards reach the late cap.
+        delta = max(-5, min(5, player_count - enemy_count))
+        return "%+d" % delta
+
+    size_advantage = _group(_size_key)
+    clock_split = _group(lambda row: "clock_decided" if row.get("clock_decided") else "live")
     return {
         "samples": len(decided),
         "ties": ties,
@@ -798,6 +841,8 @@ def _prediction_quality(records: list[dict]) -> dict:
         "favourite_call_win_rate": round(favourite_wins / len(favourites), 4) if favourites else None,
         "clock_decided": sum(1 for row in decided if row.get("clock_decided")),
         "display_staleness": staleness,
+        "size_advantage": size_advantage,
+        "clock_split": clock_split,
     }
 
 
@@ -1369,6 +1414,19 @@ def _render(
                     (prediction.get("favourite_call_win_rate") or 0.0) * 100.0,
                 )
             )
+        for label, band in (
+            ("Body advantage (player units minus enemy units)", "size_advantage"),
+            ("How the fight was resolved", "clock_split"),
+        ):
+            groups = prediction.get(band) or {}
+            if not groups:
+                continue
+            lines.append("- %s (key: n, predicted, observed, gap):" % label)
+            for key, group in groups.items():
+                lines.append(
+                    "  - %s: n=%s predicted=%s observed=%s gap=%+0.3f"
+                    % (key, group.get("samples"), group.get("predicted"), group.get("observed"), group.get("gap") or 0.0)
+                )
     if experience:
         lines.extend(["", "## Experience for an average player", ""])
         lines.append(
@@ -1783,6 +1841,25 @@ def _render_batch(batch: dict) -> str:
                 % (prediction.get("favourite_calls"), prediction.get("favourite_call_win_rate"))
             )
         lines.append("- Clock-decided fights in the sample: %s" % prediction.get("clock_decided"))
+        # Two cuts that explain most of the residual error: how many bodies each side
+        # fielded, and whether the fight ended on the clock instead of on damage.
+        for title, band, key_label in (
+            ("Body advantage (player units minus enemy units)", "size_advantage", "delta"),
+            ("Resolution", "clock_split", "result"),
+        ):
+            groups = prediction.get(band) or {}
+            if not groups:
+                continue
+            lines.append("")
+            lines.append("**%s**" % title)
+            lines.append("")
+            lines.append("| %s | n | predicted | observed | gap |" % key_label)
+            lines.append("| --- | --- | --- | --- | --- |")
+            for key, group in groups.items():
+                lines.append(
+                    "| %s | %s | %s | %s | %+0.3f |"
+                    % (key, group.get("samples"), group.get("predicted"), group.get("observed"), group.get("gap") or 0.0)
+                )
     else:
         lines.append("- No decided fights were found in the collected runs.")
     return "\n".join(lines)
