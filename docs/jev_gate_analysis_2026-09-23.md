@@ -115,13 +115,67 @@ stage easier on paper and almost not at all in play.
 The constant was reverted in `6fb20467`. Two lessons worth keeping:
 
 1. A stage whose outcome does not track the build cannot be fixed by re-pricing the
-   build. The lever has to be something the fight actually responds to, and at this stage
-   that is not yet identified - abilities, targeting and the boss escalation phases are
-   the remaining candidates.
+   build. The lever is identified further down: the fight is awarded on the clock, and
+   the generator refits every stage into a near-peer, so the stat budget never gets to
+   be the difference.
 2. Resolving a twelve-point shift at this stage would take a few hundred attempts per
    arm, not the twenty-five runs spent here. This stage is too rare to test at the scale
    the other findings in this document were tested at (100+ fights each), which is why
    the recommendation was recorded as a hypothesis and not as a fix in the first place.
+
+## The mechanism: the clock decides almost half of the post-chapter-one fights
+
+First attempts at stages of target 130 or higher: 979 fights, of which **478 (49%) ran to
+the 45-second cap** and were awarded by `OutcomeLadder` instead of by the fight.
+
+The ladder compares survivors, then absolute remaining health, then a seeded roll. The
+recorded results follow it exactly:
+
+| survivor margin (player - enemy) | n | won |
+| --- | --- | --- |
+| -4 to -1 | 71 | 0% |
+| 0 (tied) | 72 | **24%** |
+| +1 to +8 | 335 | 100% |
+
+Any nonzero margin is decisive, which is the rule working. The tie is not: 72 fights went
+to equal survivors, and the player lost three of every four. The second criterion is
+*absolute* remaining health, and the generated enemy is a small board of stat-inflated
+units - four bodies at the chapter two boss against the player's six - so at equal
+survivor counts it holds more health and takes the award. A scale-free second criterion
+(remaining health per surviving unit, or each survivor's own health fraction) would make
+that close to even.
+
+At the chapter two boss specifically: 87 of 128 attempts ran to the clock, the survivor
+margin was spread 24 negative / 22 tied / 41 positive, and the stage's overall 45% is
+that spread. The stage is not being lost on the stat budget; it is a survivor race
+settled on a near-tie.
+
+## The deeper pattern: difficulty is self-normalising
+
+The generator fits every board to the stage's target rating. That means the opponent is
+always built as a near-peer of the target, whatever the target is - and the recorded fights
+show it:
+
+| target | n | damage share p25 / p50 / p75 | won |
+| --- | --- | --- | --- |
+| 251 | 113 | 0.44 / 0.56 / 0.70 | 73% |
+| 297 | 103 | 0.43 / 0.56 / 0.70 | 73% |
+| 350 | 128 | 0.44 / 0.52 / 0.61 | 45% |
+| 369 | 35 | 0.57 / 0.66 / 0.78 | 94% |
+| 435 | 62 | 0.45 / 0.55 / 0.60 | 66% |
+| 519 | 33 | 0.45 / 0.57 / 0.65 | 70% |
+| 604 | 21 | 0.48 / 0.50 / 0.62 | 62% |
+
+Damage share sits near one half at every target, and 38% of all fights are decided inside
+a 40-60% share. Adjacent stages a fifth apart in target can differ wildly in outcome -
+350 wins 45% and 369 wins 94% - which is a property of the board that was generated, not
+of the number in the target.
+
+This is the cleanest explanation of everything measured above: because every stage is
+refitted to be a near-peer, the player's build barely moves the win rate, the gates come
+out as coin flips, and the run distribution is "die in chapter 1-2, or occasionally go
+deep" rather than a build-driven progression. It is also why re-pricing one boss changed
+almost nothing.
 
 ## Standing limits on this kind of measurement
 
