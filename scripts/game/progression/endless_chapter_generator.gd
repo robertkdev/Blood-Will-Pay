@@ -14,6 +14,20 @@ const MAX_BOARD_UNITS := 9
 const CHAPTER_RATING_STEP := 32.0
 const CHAPTER_BAND_SIZE := 5.0
 const CHAPTER_BAND_RATING_STEP := 55.0
+## Boss budgets ramp with the player's board instead of jumping straight to the
+## authored plateau at the second chapter.
+##
+## Measured across the recorded Jev runs, the player's board power at the boss
+## stage climbs 102 -> 249 -> 339 -> 430 -> 557 over chapters 1-5, i.e. 2.4x and
+## then 1.36x and 1.27x. The flat 2.65 multiplier produced enemy budgets of
+## 87 -> 322 -> 435 -> 520 -> 613 over the same chapters: 3.7x at the chapter
+## 1 -> 2 step, where the player only delivers 2.4x. That step is the hardest
+## fight in the game - chapter 2's boss was won 49.3% of 69 first attempts
+## against chapter 1's 59.6% of 99 and chapter 3's 78.1% of 32, which is the
+## difficulty inversion the design asks not to have. The ramp holds the enemy to
+## the player's own growth, then rejoins the authored 2.65 once the curve has
+## caught up; chapter 5 onward is unchanged.
+const BOSS_MULTIPLIER_RAMP: Array[float] = [1.00, 1.80, 2.20, 2.45, 2.65]
 const DEFAULT_TRAIT_THRESHOLDS: Array[int] = [2, 4, 6, 8]
 const TRAIT_BASE_PRESSURE := 0.06
 const TRAIT_TIER_PRESSURE_STEP := 0.04
@@ -141,12 +155,12 @@ static func target_rating_for(chapter: int, stage_index: int) -> int:
 		ProgressionConfig.SECOND_RGA_STAGE:
 			multiplier = 2.25
 		ProgressionConfig.BOSS_STAGE:
-			multiplier = 2.65
-			if procedural_index == 1:
-				# The preview quote accounts for the live boss escalation phases.
-				# Keep the raw opening target at the level-1 runway baseline so a
-				# four-unit prepared board sees a fair, escalation-adjusted quote.
-				multiplier = 1.00
+			# Ramps to the authored 2.65 plateau instead of starting there: see
+			# BOSS_MULTIPLIER_RAMP. The first entry keeps the raw opening target at
+			# the level-1 runway baseline so the preview quote, which already
+			# accounts for the live boss escalation phases, is not double-counted.
+			var boss_ramp_index: int = clampi(procedural_index - 1, 0, BOSS_MULTIPLIER_RAMP.size() - 1)
+			multiplier = BOSS_MULTIPLIER_RAMP[boss_ramp_index]
 		ProgressionConfig.MIRROR_STAGE:
 			multiplier = 2.65
 		_:
