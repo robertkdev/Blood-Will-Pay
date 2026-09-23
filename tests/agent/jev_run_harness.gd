@@ -1289,6 +1289,8 @@ func _plan_state() -> Dictionary:
 		# Which unit the run is actually committed to, and how close it is to a
 		# three-star, so every decision can price an offer against the plan.
 		"vertical": _vertical_summary(),
+		# The cheapest trait ladder to finish, so a run has a reason to stack one.
+		"trait_goal": _trait_goal_summary(),
 		"planning_time_left": float(controller_node.get("planning_time_left")) if controller_node != null else -1.0,
 		"planning_timer_total": float(controller_node.get("planning_timer_total")) if controller_node != null else -1.0,
 		"time_scale": Engine.time_scale,
@@ -1368,6 +1370,33 @@ func _team_units_snapshot(team: Array[Unit], placements: Array[int]) -> Array[Di
 			"tile": int(placements[index]) if index < placements.size() else -1,
 		})
 	return records
+
+## The trait closest to being maxed, and how many more unique bodies it needs.
+##
+## Traits count unique units, so maxing one is a board-composition goal, not a
+## duplicate goal: the cheapest top tier among the traits already held is the one to
+## chase. Reported as a fact because nothing in the run had a reason to stack a trait,
+## which is why no run has ever maxed one.
+func _trait_goal_summary() -> Dictionary:
+	var best: Dictionary = {}
+	for entry: Dictionary in _trait_snapshot(_owned_units()):
+		var top: int = int(entry.get("top_threshold", 0))
+		if top < 2:
+			# A single-rung trait is an always-on aura, not a ladder to climb.
+			continue
+		var count: int = int(entry.get("count", 0))
+		var needed: int = maxi(0, top - count)
+		if needed <= 0:
+			continue
+		if best.is_empty() or needed < int(best.get("more_needed", 9999)):
+			best = {
+				"trait_id": String(entry.get("id", "")),
+				"owned_unique": count,
+				"top_threshold": top,
+				"more_needed": needed,
+				"already_maxed": int(entry.get("next_threshold", 1)) == 0,
+			}
+	return best
 
 ## The player's own revealed commitment: the identity they hold the most copies of,
 ## measured in level-1 equivalents because a combine consumes three of them, so a
@@ -1507,12 +1536,19 @@ func _trait_snapshot(units: Array[Unit]) -> Array[Dictionary]:
 			"tier": tier_index,
 			"active": tier_index >= 0,
 			"next_threshold": next_threshold,
+			# The last rung on this trait's ladder. Needed to price "how many more
+			# unique bodies to MAX it", which is a different question from the next
+			# tier and is the one the acceptance target asks.
+			"top_threshold": int(ladder[ladder.size() - 1]) if ladder.size() > 0 else 0,
 			"needed": max(0, next_threshold - count) if next_threshold > 0 else 0,
 			"tiers_available": ladder.size(),
-			# No remaining checkpoint means the count has cleared every threshold.
-			# A single-threshold trait is an always-on aura rather than a ladder, so
-			# only a multi-tier trait can be "maxed" in the progression sense.
-			"maxed": next_threshold == 0 and count > 0 and ladder.size() > 1,
+			# No remaining checkpoint means the count has cleared every threshold, which
+			# is what the game itself calls a maxed trait - Cartel at 2/2 shows as maxed
+			# in the UI. `maxed_ladder` is the harder reading, restricted to traits that
+			# actually have more than one tier; both are reported so a single-threshold
+			# aura cannot be mistaken for a stacked build.
+			"maxed": next_threshold == 0 and count > 0,
+			"maxed_ladder": next_threshold == 0 and count > 0 and ladder.size() > 1,
 		})
 	snapshot.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
 		return int(left.get("count", 0)) > int(right.get("count", 0))

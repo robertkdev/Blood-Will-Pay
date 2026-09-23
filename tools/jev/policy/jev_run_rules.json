@@ -23,7 +23,7 @@
     "rule": "Buying every affordable offer is the losing baseline. Pass on offers that do not add power for the plan, and price every purchase against the wager those same buckets could carry."
   },
   "power": {
-    "rule": "Power arrives in several shapes and none is always best: a second copy at your level, a third copy at that level, a stronger or higher-level unit, an item, another board slot from a level purchase, or a trait breakpoint a new body completes. Price them against each other and take the one that most improves the board you will field.",
+    "rule": "Power arrives in several shapes and none is always best: a second copy at your level, a third copy at that level, a stronger or higher-level unit, an item, another board slot from a level purchase, or a trait breakpoint a new body completes. Price them against each other and take the best board.",
     "deployed_payoff": "Only the deployed board fights, so judge an offer by the board you would field after the swap. A bench buy is not dead value though: three same-level copies combine across board and bench automatically, and the next slot you open fields the result. When the shown odds are at or below 50% the board cannot carry a bet, so a body, a level that opens a slot, or a duplicate that combines is worth the buckets; when the odds are well above 50% the wager pays better than the shelf."
   },
   "items": {
@@ -50,13 +50,15 @@
   "playstyle": {
     "identity": "This is a gambling game with strategy. Play flex first: take what the shop gives you, keep later shops useful, and let the game hand you a direction. A vertical is a gift when it arrives; forcing one is a paid gamble.",
     "flex": {
-      "rule": "Default plan: pairs first. Any pair beats a weak single, and a 1-cost pair is the most reliable early unit, so take the offer that completes a pair you already hold before one that merely fills a role or adds a trait count - but traits count unique units, so a second copy of a deployed unit adds no trait count on its own.",
+      "rule": "Default plan: pairs first. Any pair beats a weak single and a 1-cost pair is the most reliable early unit, so take the offer that completes a pair you hold before one that fills a role or adds a trait count - traits count unique units, so a duplicate of a deployed unit adds no count.",
       "keep_options_open": "Do not commit the board to one trait early. Two or three units sharing traits with what you own beat one piece of a plan you cannot complete.",
       "pass_rule": "Pass when the offer neither fills a missing role, nor advances a trait you hold, nor is another copy of your chosen vertical. A defensive pass is a real move."
     },
     "vertical": {
       "rule": "When the board stacks a trait or sits one piece below the next threshold, the finishing piece is a good buy - if the tier activates on the deployed board you will field. On a full board the swap costs the replaced unit's trait count.",
       "one_piece_away": "A trait breakpoint is a strong purchase, not an automatic one: check that it survives the swap."
+      ,
+      "goal": "Maxing the TRAIT GOAL is a composition goal: traits count unique units, so take a new identity sharing it over a duplicate."
     },
     "force": {
       "rule": "Forcing is a gamble, but a committed vertical is the only way a run reaches a three-star: nine copies of one identity. The state names your commitment as VERTICAL. Once the bankroll can afford it, buy every copy of that identity you see - not just the one that completes a combine - and reroll the shelf whenever it is one or two copies short and the roll costs a rounding error next to the bankroll. Two copies is progress, not a wasted buy.",

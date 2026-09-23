@@ -460,6 +460,7 @@ def _progression(summary: dict, events: list[dict]) -> dict:
     levels_by_unit: dict[str, int] = {}
     three_star: set[str] = set()
     maxed_traits: set[str] = set()
+    maxed_ladders: set[str] = set()
     highest_tier: dict[str, int] = {}
     max_board_size = 0
     max_board_capacity = 0
@@ -490,9 +491,16 @@ def _progression(summary: dict, events: list[dict]) -> dict:
                 # which have no ladder to max.
                 next_threshold = int(trait.get("next_threshold", 1) or 0)
                 tiers_available = int(trait.get("tiers_available", 0) or 0)
-                ladder_maxed = next_threshold == 0 and int(trait.get("count", 0) or 0) > 0 and tiers_available > 1
-                if bool(trait.get("maxed")) or ladder_maxed:
+                # `maxed` is the game's own reading (every tier on that trait is live,
+                # including a single-tier aura like Cartel 2/2). `maxed_ladders` is the
+                # stricter multi-tier reading.
+                trait_count = int(trait.get("count", 0) or 0)
+                if bool(trait.get("maxed")) or (next_threshold == 0 and trait_count > 0):
                     maxed_traits.add(trait_id)
+                if bool(trait.get("maxed_ladder")) or (
+                    next_threshold == 0 and trait_count > 0 and tiers_available > 1
+                ):
+                    maxed_ladders.add(trait_id)
         elif kind == "round":
             capacity = int(payload.get("cap_after_shop", 0) or 0)
             board_size = len(payload.get("board_after_shop") or [])
@@ -517,6 +525,7 @@ def _progression(summary: dict, events: list[dict]) -> dict:
         "max_unit_level": max_unit_level,
         "three_star_units": sorted(three_star),
         "maxed_traits": sorted(maxed_traits),
+        "maxed_ladders": sorted(maxed_ladders),
         "highest_trait_tier": dict(sorted(highest_tier.items())),
         "max_board_size": max_board_size,
         "max_board_capacity": max_board_capacity,
@@ -1531,6 +1540,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
             "technical_failures": len(summary.get("technical_failures") or []),
             "three_star_units": progression.get("three_star_units"),
             "maxed_traits": progression.get("maxed_traits"),
+            "maxed_ladders": progression.get("maxed_ladders"),
             "max_unit_level": progression.get("max_unit_level"),
             "board": "%s/%s" % (progression.get("max_board_size"), progression.get("max_board_capacity")),
             "items_completed": items.get("items_completed"),
@@ -1616,6 +1626,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
     runs_reaching_chapter_10 = sum(1 for row in runs if int(row.get("final_chapter") or 0) >= 10)
     runs_with_three_star = sum(1 for row in runs if row.get("three_star_units"))
     runs_with_maxed_trait = sum(1 for row in runs if row.get("maxed_traits"))
+    runs_with_maxed_ladder = sum(1 for row in runs if row.get("maxed_ladders"))
     runs_with_full_board = sum(
         1
         for row in runs
@@ -1634,6 +1645,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
             "reached_chapter_10": runs_reaching_chapter_10,
             "three_star_a_unit": runs_with_three_star,
             "maxed_a_trait": runs_with_maxed_trait,
+            "maxed_a_multi_tier_trait": runs_with_maxed_ladder,
             "filled_a_board": runs_with_full_board,
             "eight_items": runs_with_eight_items,
             "peak_bankroll_max": max((int(row.get("peak_bankroll") or 0) for row in runs), default=0),
@@ -1675,12 +1687,13 @@ def _render_batch(batch: dict) -> str:
         )
     lines.extend(["", "## Acceptance targets", ""])
     lines.append(
-        "- Runs: %s  |  reached chapter 10: %s  |  three-starred a unit: %s  |  maxed a trait: %s  |  filled a board: %s  |  8+ items: %s"
+        "- Runs: %s  |  reached chapter 10: %s  |  three-starred a unit: %s  |  maxed a trait: %s (multi-tier: %s)  |  filled a board: %s  |  8+ items: %s"
         % (
             acceptance.get("runs"),
             acceptance.get("reached_chapter_10"),
             acceptance.get("three_star_a_unit"),
             acceptance.get("maxed_a_trait"),
+            acceptance.get("maxed_a_multi_tier_trait"),
             acceptance.get("filled_a_board"),
             acceptance.get("eight_items"),
         )

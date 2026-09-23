@@ -86,7 +86,7 @@ def _rules_digest(rules: dict) -> str:
         f"ITEMS: {rules.get('items', {}).get('rule', '')} {rules.get('items', {}).get('hold_only_when', '')}",
         f"PLAYSTYLE: {playstyle.get('identity', '')}",
         f"FLEX: {flex.get('rule', '')} {flex.get('keep_options_open', '')} {flex.get('pass_rule', '')}",
-        f"VERTICAL: {vertical.get('rule', '')} {vertical.get('one_piece_away', '')}",
+        f"VERTICAL: {vertical.get('rule', '')} {vertical.get('one_piece_away', '')} {vertical.get('goal', '')}",
         f"FORCE: {force.get('rule', '')} {force.get('when_not_to_force', '')}",
         f"LEVEL: {rules.get('level', {}).get('rule', '')} {rules.get('level', {}).get('unit_levels', '')} {rules.get('level', {}).get('combine_priority', '')}",
         f"CONTRACTS: {rules.get('contracts', {}).get('rule', '')}",
@@ -145,6 +145,17 @@ def _state_digest(kind: str, observation: dict) -> str:
                 vertical.get("level1_equivalents"),
                 vertical.get("progress_percent"),
                 vertical.get("copies_to_three_star"),
+            )
+        )
+    trait_goal = state.get("trait_goal") or {}
+    if trait_goal:
+        parts.append(
+            "TRAIT GOAL: %s needs %s more unique unit(s) to reach its top tier at %s (have %s)"
+            % (
+                trait_goal.get("trait_id"),
+                trait_goal.get("more_needed"),
+                trait_goal.get("top_threshold"),
+                trait_goal.get("owned_unique"),
             )
         )
     if state.get("recent_fights"):
