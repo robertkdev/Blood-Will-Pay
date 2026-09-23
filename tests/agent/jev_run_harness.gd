@@ -48,6 +48,9 @@ const SHOP_CLICK_ATTEMPTS: int = 3
 ## pass is not enough to place a carried component.
 const ITEM_DECISIONS_PER_BEAT: int = 4
 const MAX_REROLLS_PER_SHOP: int = 3
+## Cap on the wager stake when the planning beat is a repeat of a stage this run has
+## already lost. See _wager_candidates for the measured retry record behind it.
+const RETRY_STAKE_CAP: float = 0.25
 ## A synthetic Start Battle click is occasionally swallowed while an overlay is
 ## fading out, which aborts an otherwise good run. The press is retried a bounded
 ## number of times, and only while the same planning beat is still open.
@@ -1160,30 +1163,42 @@ func _decide_wager(label: String) -> void:
 	var reserve: int = int(Economy.blood_buckets)
 	if reserve <= 0:
 		return
-	var candidates: Array[Dictionary] = _wager_candidates(reserve)
+	var stage_attempt: int = _stage_attempt()
+	var candidates: Array[Dictionary] = _wager_candidates(reserve, stage_attempt)
 	if candidates.is_empty():
 		return
 	if candidates.size() == 1:
 		# One legal wager is not a decision, but it still has to be applied: the
 		# economy remembers the previous preferred wager, and leaving it stale can
 		# stake buckets the planner never chose.
-		_apply_wager(int(candidates[0].get("wager", 1)), label, reserve, true)
+		_apply_wager(int(candidates[0].get("wager", 1)), label, reserve, true, stage_attempt)
 		return
 	var state: Dictionary = _plan_state()
 	state["decision_label"] = label
+	state["stage_attempt"] = stage_attempt
 	var decision: Dictionary = await _ask_decision("wager", state, candidates)
 	var chosen: String = String(decision.get("choice_id", ""))
 	for candidate: Dictionary in candidates:
 		if String(candidate.get("id", "")) != chosen:
 			continue
-		_apply_wager(int(candidate.get("wager", 0)), label, reserve, false)
+		_apply_wager(int(candidate.get("wager", 0)), label, reserve, false, stage_attempt)
 		return
 	_append_event("decision_rejected", {"kind": "wager", "choice_id": chosen, "reason": "not_a_wager_candidate"})
 
-func _apply_wager(wager: int, label: String, reserve: int, auto_applied: bool) -> void:
+## Which attempt at the current stage this planning beat is.
+##
+## A loss does not advance the stage, so the chapter/stage pair still names the fight
+## about to start and the retry tally for that pair is the number of losses already
+## taken there.
+func _stage_attempt() -> int:
+	var stage_key: String = "%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)]
+	return int(_same_stage_retries.get(stage_key, 0)) + 1
+
+func _apply_wager(wager: int, label: String, reserve: int, auto_applied: bool, stage_attempt: int = 1) -> void:
 	Economy.set_bet(wager)
 	_append_event("wager_set", {
 		"label": label,
+		"stage_attempt": stage_attempt,
 		"requested": wager,
 		"applied": int(Economy.current_bet),
 		"auto_applied": auto_applied,
@@ -2190,12 +2205,24 @@ func _decide_items(label: String) -> void:
 			_append_event("decision_rejected", {"kind": "item_equip", "choice_id": chosen, "reason": "not_an_item_candidate"})
 			return
 
-func _wager_candidates(reserve: int) -> Array[Dictionary]:
+## Stake options for the wager about to be placed.
+##
+## ``stage_attempt`` is the attempt number at the current stage. A repeat of a stage
+## the run has already lost is not the same bet as the first look at it, and the
+## recorded results say the shown odds do not know the difference: across 559 retry
+## fights the quoted-40% band returned -0.81 expected buckets per bucket staked while
+## the first attempts in the same band returned +0.15, and the rig was staking about
+## 46% of its bankroll on the retries. The generated enemy does not change between
+## attempts, so the loss already taken is real information the power model cannot see.
+## Retries are therefore capped instead of being priced like a fresh read.
+func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary]:
 	var quote_kind: String = String(Economy.encounter_quote_kind)
 	var multiplier: float = float(Economy.gross_payout_multiplier())
 	var shown_odds: float = float(Economy.projected_win_probability)
 	var break_even: float = 1.0 / max(0.01, multiplier)
 	var net_odds: float = maxf(0.01, multiplier - 1.0)
+	var retry: bool = int(stage_attempt) >= 2
+	var retry_cap: int = maxi(1, int(round(float(reserve) * RETRY_STAKE_CAP)))
 	# Kelly: the stake that grows the bankroll fastest at these odds, for a bet paying
 	# `multiplier` including the stake. A near-lock pushes it toward the whole
 	# bankroll; a marginal edge pushes it toward the minimum.
@@ -2230,19 +2257,31 @@ func _wager_candidates(reserve: int) -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []
 	var seen: Dictionary[int, bool] = {}
 	for plan: Dictionary in plans:
-		var wager: int = clampi(int(plan.get("stake", 1)), 1, reserve)
+		var role: String = String(plan.get("role", "stake"))
+		var planned_stake: int = clampi(int(plan.get("stake", 1)), 1, reserve)
+		var wager: int = planned_stake
+		if retry:
+			wager = mini(wager, retry_cap)
 		if seen.has(wager):
 			continue
 		seen[wager] = true
+		var capped: bool = retry and planned_stake > wager
 		var payout: int = int(Economy.quoted_payout(wager))
 		var profit: int = payout - wager
 		var actual_share: int = int(round(100.0 * float(wager) / float(max(1, reserve))))
 		# Expected value of the wager at the shown win odds.
 		var expected_value: float = shown_odds * float(profit) - (1.0 - shown_odds) * float(wager)
+		var retry_note: String = ""
+		if retry:
+			retry_note = " ATTEMPT %d AT THIS STAGE: the stake is capped at %d of %d buckets. This exact generated enemy has already beaten this board once, and the recorded retries returned about -0.8 expected buckets per bucket staked in this odds band while first attempts in the same band returned +0.15. The loss already taken is information the odds on screen cannot price." % [
+				int(stage_attempt),
+				retry_cap,
+				reserve,
+			]
 		candidates.append({
 			"id": "wager_%d" % wager,
 			"label": "%s: wager %d of %d buckets (%d%% of the bankroll); a win pays %d gross for %+d profit, a loss leaves %d." % [
-				String(plan.get("role", "stake")).to_upper(),
+				"RETRY-CAPPED" if capped else role.to_upper(),
 				wager,
 				reserve,
 				actual_share,
@@ -2250,7 +2289,7 @@ func _wager_candidates(reserve: int) -> Array[Dictionary]:
 				profit,
 				reserve - wager,
 			],
-			"effect": "%s %s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%% (Kelly stake %d of %d). Expected value %+.2f buckets. Loss leaves %d buckets." % [
+			"effect": "%s %s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%% (Kelly stake %d of %d). Expected value %+.2f buckets. Loss leaves %d buckets.%s" % [
 				String(plan.get("why", "")),
 				quote_kind,
 				multiplier,
@@ -2260,12 +2299,16 @@ func _wager_candidates(reserve: int) -> Array[Dictionary]:
 				reserve,
 				expected_value,
 				reserve - wager,
+				retry_note,
 			],
 			"wager": wager,
-			"role": String(plan.get("role", "stake")),
+			"role": role,
+			"stage_attempt": int(stage_attempt),
+			"retry": retry,
+			"retry_capped": capped,
 			"share": float(wager) / float(max(1, reserve)),
 			"is_all_in": wager >= reserve,
-			"is_pressing": String(plan.get("role", "")) in ["press", "all_in"],
+			"is_pressing": role in ["press", "all_in"],
 			"kelly_fraction": snappedf(kelly_fraction, 0.001),
 			"kelly_wager": kelly_wager,
 			"is_kelly_sized": wager == kelly_wager,

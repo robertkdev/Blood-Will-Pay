@@ -720,6 +720,15 @@ def _fight_records(events: list[dict]) -> list[dict]:
                 pending["enemy_alive_after"] = payload.get("post_settlement_enemy_alive")
             result = str(pending.get("result", ""))
             pending["won"] = True if result == "shop" else (False if result == "loss" else None)
+            # A loss does not advance the stage, so two consecutive records at the same
+            # global stage are the same fight played again. The wager policy treats a
+            # repeat attempt differently from a first look, so the record has to carry
+            # which one it was.
+            previous = records[-1] if records else None
+            if previous is not None and previous.get("global_stage") == pending.get("global_stage"):
+                pending["stage_attempt"] = int(previous.get("stage_attempt", 1) or 1) + 1
+            else:
+                pending["stage_attempt"] = 1
             records.append(pending)
             pending = None
     return records
@@ -828,6 +837,13 @@ def _prediction_quality(records: list[dict]) -> dict:
 
     size_advantage = _group(_size_key)
     clock_split = _group(lambda row: "clock_decided" if row.get("clock_decided") else "live")
+    # First look versus rematch. The enemy board is generated once per stage, so a
+    # repeat attempt is the same fight against a board that already won once.
+    attempt_split = _group(
+        lambda row: (
+            "first_attempt" if int(row.get("stage_attempt") or 1) <= 1 else "same_stage_retry"
+        )
+    )
     return {
         "samples": len(decided),
         "ties": ties,
@@ -843,6 +859,7 @@ def _prediction_quality(records: list[dict]) -> dict:
         "display_staleness": staleness,
         "size_advantage": size_advantage,
         "clock_split": clock_split,
+        "attempt_split": attempt_split,
     }
 
 
@@ -1417,6 +1434,7 @@ def _render(
         for label, band in (
             ("Body advantage (player units minus enemy units)", "size_advantage"),
             ("How the fight was resolved", "clock_split"),
+            ("First look versus same-stage retry", "attempt_split"),
         ):
             groups = prediction.get(band) or {}
             if not groups:
@@ -1846,6 +1864,7 @@ def _render_batch(batch: dict) -> str:
         for title, band, key_label in (
             ("Body advantage (player units minus enemy units)", "size_advantage", "delta"),
             ("Resolution", "clock_split", "result"),
+            ("First look versus same-stage retry", "attempt_split", "attempt"),
         ):
             groups = prediction.get(band) or {}
             if not groups:

@@ -40,7 +40,8 @@
       "BOSS": 3.0
     },
     "rule": "The quote is fixed by encounter kind, so the shown win odds alone set the size. At or below 1 / multiplier the bet loses money: take MINIMUM.",
-    "sizing": "You only all-in when you expect to win. Above 50% shown odds take ALL_IN - an all-in win doubles the bankroll, and that doubling is how a run gets rich. At or below 50% the board is the problem, not the stake: buy the bodies and the slots that raise the odds, then take PRESS or MINIMUM."
+    "sizing": "You only all-in when you expect to win. Above 50% shown odds take ALL_IN - an all-in win doubles the bankroll, and that doubling is how a run gets rich. At or below 50% the board is the problem, not the stake: buy the bodies and the slots that raise the odds, then take PRESS or MINIMUM.",
+    "retry_rule": "A repeat attempt at a stage this run has already lost is capped at a quarter of the bankroll, and the cap is not negotiable against the shown odds. The enemy board is generated once per stage and does not change between attempts, so a loss already taken there is evidence the on-screen odds cannot see. Recorded retries returned roughly -0.8 expected buckets per bucket staked in the quoted-forty-percent band while first attempts in the same band returned about +0.15, and the rig was staking close to half the bankroll on them. Stake the cap, keep the reserve, and let the rebuilt board win the stage on a later attempt instead of betting the run on a rematch."
   },
   "composition": {
     "frontline_target": 2,
