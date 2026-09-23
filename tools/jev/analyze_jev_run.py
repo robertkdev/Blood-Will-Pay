@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import statistics
 
 LOW_CONFIDENCE = 0.70
@@ -1331,6 +1332,52 @@ def _render(
                 experience.get("planning_allowance_seconds"),
             )
         )
+    outcome = (summary.get("outcome") or {})
+    if outcome:
+        lines.extend(["", "## Why the run stopped", ""])
+        lines.append(
+            "- Terminal `%s` (failed: %s)  cause: `%s`"
+            % (outcome.get("terminal"), outcome.get("failed"), outcome.get("cause"))
+        )
+        lines.append(
+            "- Died at chapter %s round %s (global stage %s) on a %s fight, stage attempt %s"
+            % (
+                outcome.get("chapter"),
+                outcome.get("round"),
+                outcome.get("global_stage"),
+                outcome.get("encounter_kind"),
+                int(outcome.get("stage_attempts") or 0) + 1,
+            )
+        )
+        lines.append(
+            "- Shown odds %s against break-even %s at a %sx quote; wagered %s of the bankroll, ended with %s buckets"
+            % (
+                outcome.get("shown_win_odds"),
+                outcome.get("break_even_odds"),
+                outcome.get("quoted_multiplier"),
+                outcome.get("wager"),
+                outcome.get("buckets_at_end"),
+            )
+        )
+        lines.append(
+            "- Board %s of %s slots (full: %s)  |  clock decided: %s  |  alive after: %s vs %s  |  damage %s/%s"
+            % (
+                outcome.get("board_size"),
+                outcome.get("board_capacity"),
+                outcome.get("board_full"),
+                outcome.get("clock_decided"),
+                outcome.get("player_alive_after"),
+                outcome.get("enemy_alive_after"),
+                outcome.get("player_damage"),
+                outcome.get("enemy_damage"),
+            )
+        )
+        if outcome.get("notes"):
+            lines.append("- Notes: %s" % json.dumps(outcome.get("notes")))
+        if outcome.get("player_board"):
+            lines.append("- Final player board: %s" % outcome.get("player_board"))
+        if outcome.get("enemy_board"):
+            lines.append("- Final enemy board: %s" % outcome.get("enemy_board"))
     lines.extend(["", "## Findings", ""])
     for finding in findings:
         lines.append(f"### [{finding['severity']}] {finding['title']}")
@@ -1395,7 +1442,34 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
             "items_completed": items.get("items_completed"),
             "components_equipped": items.get("components_equipped"),
             "max_global_stage": items.get("max_global_stage"),
+            "outcome": summary.get("outcome") or {},
         })
+    # Where and why runs actually end. This is the failure population, kept separate
+    # from the per-run detail so "runs die at the boss with a slot open" is visible
+    # across the sample without reading ten reports.
+    failure_causes: dict[str, int] = {}
+    failure_stages: dict[str, int] = {}
+    failure_kinds: dict[str, int] = {}
+    failure_notes: dict[str, int] = {}
+    failures = [row["outcome"] for row in runs if (row.get("outcome") or {}).get("failed")]
+    for outcome in failures:
+        cause = str(outcome.get("cause", "unknown"))
+        failure_causes[cause] = failure_causes.get(cause, 0) + 1
+        stage_key = "ch%s:%s" % (outcome.get("chapter"), outcome.get("round"))
+        failure_stages[stage_key] = failure_stages.get(stage_key, 0) + 1
+        kind = str(outcome.get("encounter_kind", "unknown"))
+        failure_kinds[kind] = failure_kinds.get(kind, 0) + 1
+        for note in outcome.get("notes") or []:
+            # Bucket the numeric parts so the tallies stay comparable.
+            key = re.sub(r"\d+", "N", str(note))
+            failure_notes[key] = failure_notes.get(key, 0) + 1
+    failure_summary = {
+        "runs_failed": len(failures),
+        "causes": dict(sorted(failure_causes.items(), key=lambda item: -item[1])),
+        "by_stage": dict(sorted(failure_stages.items(), key=lambda item: -item[1])),
+        "by_encounter_kind": dict(sorted(failure_kinds.items(), key=lambda item: -item[1])),
+        "notes": dict(sorted(failure_notes.items(), key=lambda item: -item[1])),
+    }
     prediction = _prediction_quality(all_fights)
     # The difficulty ramp against the player's actual power, per global stage. This
     # is the curve to read before changing any per-chapter constant.
@@ -1458,6 +1532,7 @@ def _batch_analysis(run_dirs: list[Path]) -> dict:
         "fights": all_fights,
         "prediction": prediction,
         "power_curve": power_curve,
+        "failure_summary": failure_summary,
         "acceptance": {
             "runs": len(runs),
             "reached_chapter_10": runs_reaching_chapter_10,
@@ -1515,6 +1590,14 @@ def _render_batch(batch: dict) -> str:
         )
     )
     lines.append("- Terminals: %s  |  highest peak bankroll: %s" % (acceptance.get("terminals"), acceptance.get("peak_bankroll_max")))
+    failure_summary = batch.get("failure_summary") or {}
+    if failure_summary.get("runs_failed"):
+        lines.extend(["", "## Why runs ended", ""])
+        lines.append("- Runs that failed: %s of %s" % (failure_summary.get("runs_failed"), acceptance.get("runs")))
+        lines.append("- Causes: %s" % json.dumps(failure_summary.get("causes")))
+        lines.append("- By stage: %s" % json.dumps(failure_summary.get("by_stage")))
+        lines.append("- By encounter kind: %s" % json.dumps(failure_summary.get("by_encounter_kind")))
+        lines.append("- Recurring notes: %s" % json.dumps(failure_summary.get("notes")))
     if batch.get("power_curve"):
         lines.extend(["", "## Difficulty ramp versus player power, by global stage", ""])
         lines.append("| stage | fights | win rate | player power | enemy power | ratio | target rating | mean shown odds |")

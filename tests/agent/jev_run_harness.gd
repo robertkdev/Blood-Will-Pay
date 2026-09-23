@@ -120,6 +120,13 @@ var _previous_frame_process: bool = false
 ## bounded per run so a sweep cannot fill a disk.
 var _capture_planning: bool = false
 var _capture_budget: int = 3
+## The fight that ended the run, kept so the failure record can say what actually
+## happened rather than only that the run stopped.
+var _last_combat_diagnostic: Dictionary = {}
+## The engine's own settlement line for the most recent fight, and its parsed fields.
+## The board is rebuilt during settlement, so only this line records the survivors.
+var _last_resolution_line: String = ""
+var _last_resolution_fields: Dictionary = {}
 
 func _process(delta: float) -> void:
 	if int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active):
@@ -417,7 +424,7 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		return
 	var player_team: Array = manager.get("player_team")
 	var enemy_team: Array = manager.get("enemy_team")
-	_append_event("combat_diagnostic", {
+	var payload: Dictionary = {
 		"outcome": outcome,
 		"engine_outcome": _last_combat_outcome,
 		"fight_index": _battles + 1,
@@ -443,7 +450,10 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		# Frame pacing for the fight that just ended, at the board size it ran with.
 		"frame_ms": _take_fight_frame_stats(),
 		"board_size": player_team.size() + enemy_team.size(),
-	})
+	}
+	# Kept so the failure record can describe the fight that ended the run.
+	_last_combat_diagnostic = payload
+	_append_event("combat_diagnostic", payload)
 
 func _alive_count(team: Array) -> int:
 	var count: int = 0
@@ -1100,6 +1110,21 @@ func _on_combat_log_line(text: String) -> void:
 	# for the outcome: a defeat can leave the bankroll untouched (the early retry
 	# transfusion), so a bankroll-only read used to report a loss as a draw.
 	if text.begins_with("Combat resolved: "):
+		# Keep the engine's own settlement line. It is the only record of the fight's
+		# real survivor counts: the board is rebuilt during settlement, so reading the
+		# teams afterwards describes the next stage.
+		_last_resolution_line = text
+		var fields: Dictionary = {}
+		for field_token: String in text.substr("Combat resolved: ".length()).split(" "):
+			if "=" not in field_token:
+				continue
+			var key: String = field_token.split("=")[0]
+			var value_text: String = field_token.split("=")[1].trim_suffix(".")
+			if value_text.is_valid_int():
+				fields[key] = value_text.to_int()
+			elif value_text.is_valid_float():
+				fields[key] = value_text.to_float()
+		_last_resolution_fields = fields
 		var remainder: String = text.substr("Combat resolved: ".length())
 		_last_combat_outcome = remainder.split(" ")[0].strip_edges()
 		for token: String in remainder.split(" "):
@@ -1701,6 +1726,25 @@ func _shop_candidates() -> Array[Dictionary]:
 	candidates.append(pass_candidate)
 	var reroll_price: int = int(Economy.reroll_price())
 	if reroll_price > 0 and int(Economy.gold) - reroll_price >= _reserve_floor_buckets:
+		# A reroll is only a real gamble when the model can see what it is chasing and
+		# what the roll costs relative to the bankroll. A run with a 14,436-bucket
+		# bankroll rerolled once in thirty-five fights and finished one copy short of
+		# two separate three-stars.
+		var progress: Dictionary = _best_combine_progress()
+		var reroll_bankroll: int = int(Economy.gold)
+		var reroll_cost_text: String = (
+			"a rounding error against the bankroll"
+			if reroll_bankroll >= reroll_price * 50
+			else "%.1f%% of the bankroll" % (100.0 * float(reroll_price) / float(max(1, reroll_bankroll)))
+		)
+		var progress_text: String = " No three-of-a-kind is in progress."
+		if not progress.is_empty():
+			progress_text = " Closest combine: %s at level %d, %d of 3 held - %d more completes it." % [
+				String(progress.get("id", "")),
+				int(progress.get("level", 1)),
+				int(progress.get("have", 0)),
+				int(progress.get("need", 0)),
+			]
 		candidates.append({
 			"id": "reroll",
 			"label": "Reroll the shop for %d buckets." % reroll_price,
@@ -1708,11 +1752,43 @@ func _shop_candidates() -> Array[Dictionary]:
 			# when the new roll beats the flex pick in front of you", which pre-judged
 			# the action inside the candidate itself. Every policy variant then produced
 			# identical decisions, so the stance being compared never reached the model.
-			"effect": "Replace every current offer with a new roll. Costs %d buckets and leaves %d. What arrives is not known in advance." % [reroll_price, int(Economy.gold) - reroll_price],
+			"effect": "Replace every current offer with a new roll. Costs %d buckets (%s) and leaves %d.%s What arrives is not known in advance." % [
+				reroll_price,
+				reroll_cost_text,
+				reroll_bankroll - reroll_price,
+				progress_text,
+			],
 			"affordable": true,
 			"cost": reroll_price,
+			"combined_cost_text": reroll_cost_text,
+			"combine_progress": progress,
 		})
 	return candidates
+
+## The three-of-a-kind closest to completing, across everything owned. Grouped by
+## identity AND level because that is how CombineService groups them.
+func _best_combine_progress() -> Dictionary:
+	var groups: Dictionary[String, int] = {}
+	for unit: Unit in _owned_units():
+		if unit == null:
+			continue
+		var key: String = "%s#%d" % [_unit_id(unit), int(unit.level)]
+		groups[key] = int(groups.get(key, 0)) + 1
+	var best: Dictionary = {}
+	for key: String in groups.keys():
+		var count: int = int(groups[key])
+		if count < 2:
+			continue
+		if count <= int(best.get("have", 0)):
+			continue
+		var parts: PackedStringArray = key.split("#")
+		best = {
+			"id": String(parts[0]),
+			"level": int(parts[1]) if parts.size() > 1 else 1,
+			"have": count,
+			"need": maxi(0, 3 - count),
+		}
+	return best
 
 ## Item assignment, decided by Jev rather than by a helper.
 ##
@@ -2051,7 +2127,11 @@ func _abort_run(reason: String) -> void:
 func _finish_jev_run(terminal: String) -> void:
 	Engine.time_scale = 1.0
 	UnitFactory.suppress_validation_warnings = _previous_suppress_validation_warnings
-	var summary: Dictionary = _run_summary(terminal)
+	# Computed once so the event and the summary cannot disagree about why the run
+	# stopped.
+	var outcome_record: Dictionary = _run_outcome_record(terminal)
+	_append_event("run_outcome", outcome_record)
+	var summary: Dictionary = _run_summary(terminal, outcome_record)
 	_write_run_file("run_summary.json", JSON.stringify(summary, "  "))
 	var verdict: String = "OK" if _failures.is_empty() else "FAIL"
 	print("%s: %s terminal=%s chapter=%d round=%d battles=%d peak=%d buckets=%d decisions=%s" % [
@@ -2073,10 +2153,125 @@ func _finish_jev_run(terminal: String) -> void:
 	var exit_code: int = 0 if _failures.is_empty() else 1
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, CLEANUP_DRAIN_FRAMES), CONNECT_ONE_SHOT)
 
+## Why the run stopped, in the terms the design can act on.
+##
+## A terminal like "loss" says nothing about whether the board was outnumbered on
+## the clock, wiped outright, or beaten after spending nothing. This record ties the
+## ending to the fight that caused it: the encounter, the odds against the quote, the
+## wager, both boards, whether the clock decided it, and whether the run died with
+## board slots or buckets still in hand.
+func _run_outcome_record(terminal: String) -> Dictionary:
+	var diagnostic: Dictionary = _last_combat_diagnostic
+	var player_team: Array = diagnostic.get("post_settlement_player_board", [])
+	var board_size: int = _board_ids().size()
+	var capacity: int = _roster_max_team_size()
+	var buckets: int = int(Economy.blood_buckets)
+	var elapsed: float = float(diagnostic.get("engine_reported_elapsed_s", 0.0))
+	var timeout_s: float = float(diagnostic.get("combat_timeout_s", 0.0))
+	var clock_decided: bool = timeout_s > 0.0 and elapsed >= timeout_s - 0.3
+	# Prefer the engine's own settlement line: post-settlement team reads describe the
+	# board that was rebuilt for the next stage, not the fight that just ended.
+	var player_alive: int = int(_last_resolution_fields.get("player_alive", diagnostic.get("post_settlement_player_alive", -1)))
+	var enemy_alive: int = int(_last_resolution_fields.get("enemy_alive", diagnostic.get("post_settlement_enemy_alive", -1)))
+	var player_damage: int = int(_last_resolution_fields.get("player_damage", diagnostic.get("player_damage", 0)))
+	var enemy_damage: int = int(_last_resolution_fields.get("enemy_damage", diagnostic.get("enemy_damage", 0)))
+	var stage_key: String = "%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)]
+	var attempts: int = int(_same_stage_retries.get(stage_key, 0))
+	var shown: float = float(Economy.projected_win_probability)
+	var quote: float = float(Economy.gross_payout_multiplier())
+	var break_even: float = 1.0 / maxf(0.01, quote)
+	var cause: String = ""
+	var failed: bool = true
+	match terminal:
+		"loss":
+			if clock_decided and enemy_alive > player_alive:
+				cause = "clock_outnumbered"
+			elif clock_decided and enemy_alive == player_alive:
+				# Equal survivors sends the award to total remaining health, so a board
+				# can out-damage the enemy and still lose the clock.
+				cause = "clock_equal_survivors_lost_on_health"
+			elif clock_decided and player_alive <= 0:
+				cause = "wiped_on_clock"
+			elif player_alive <= 0:
+				cause = "wiped"
+			else:
+				cause = "lost_fight"
+		"opener_loss":
+			cause = "lost_opener"
+		"opener_stall":
+			cause = "opener_stall"
+		"stage_stall":
+			cause = "stage_stall_after_%d_attempts" % attempts
+		"technical_failure":
+			cause = "harness_fault"
+		"aborted":
+			cause = "harness_abort"
+		"target_reached":
+			cause = "reached_campaign_target"
+			failed = false
+		"battle_budget_reached":
+			cause = "battle_budget_reached"
+			failed = false
+		_:
+			cause = terminal
+	# The questions a loss actually raises. Each is a fact, not a judgement.
+	var notes: Array[String] = []
+	# Every note below is about a run that ENDED badly, so they are gated on failure:
+	# a successful run also finishes holding buckets and would otherwise be tallied as
+	# a case of the same waste.
+	if failed:
+		if capacity > 0 and board_size < capacity:
+			notes.append("board_fielded_%d_of_%d_slots" % [board_size, capacity])
+		if buckets > 0:
+			notes.append("died_holding_%d_buckets" % buckets)
+		if shown <= break_even:
+			notes.append("lost_a_bet_the_odds_called_negative")
+		if shown > 0.5:
+			notes.append("lost_a_favourite")
+		# The signal that matters most for the design: a board that clearly
+		# out-fought the enemy and still lost the stage.
+		if player_damage > enemy_damage * 3 / 2 and player_alive >= enemy_alive:
+			notes.append("out_damaged_the_enemy_and_still_lost")
+		if String(Economy.encounter_quote_kind) in ["BOSS", "MIRROR"]:
+			notes.append("died_on_a_gate_stage")
+		if attempts > 0:
+			notes.append("stage_attempt_%d" % (attempts + 1))
+	return {
+		"terminal": terminal,
+		"failed": failed,
+		"cause": cause,
+		"notes": notes,
+		"chapter": int(GameState.chapter),
+		"round": int(GameState.stage_in_chapter),
+		"global_stage": (int(GameState.chapter) - 1) * 5 + int(GameState.stage_in_chapter),
+		"encounter_kind": String(Economy.encounter_quote_kind),
+		"quoted_multiplier": quote,
+		"break_even_odds": snappedf(break_even, 0.001),
+		"shown_win_odds": snappedf(shown, 0.001),
+		"wager": int(diagnostic.get("wager", 0)),
+		"buckets_at_end": buckets,
+		"board_size": board_size,
+		"board_capacity": capacity,
+		"board_full": capacity > 0 and board_size >= capacity,
+		"stage_attempts": attempts,
+		"clock_decided": clock_decided,
+		"player_alive_after": player_alive,
+		"enemy_alive_after": enemy_alive,
+		"player_damage": player_damage,
+		"enemy_damage": enemy_damage,
+		"damage_ratio": snappedf(float(player_damage) / float(max(1, enemy_damage)), 0.01),
+		"engine_resolution": _last_resolution_line,
+		"battles": _battles,
+		"peak_bankroll": int(Economy.peak_bankroll),
+		"technical_failures": _failures.duplicate(),
+		"player_board": diagnostic.get("post_settlement_player_board", []),
+		"enemy_board": diagnostic.get("post_settlement_enemy_board", []),
+	}
+
 ## The full run record. Written once per round as a checkpoint and again when the run
 ## ends, so a long run that dies for any reason still leaves its data behind - the
 ## deepest runs are the expensive ones, and they were the ones being lost.
-func _run_summary(terminal: String) -> Dictionary:
+func _run_summary(terminal: String, outcome_record: Dictionary = {}) -> Dictionary:
 	return {
 		"schema_version": 1,
 		"harness": JEV_HARNESS_NAME,
@@ -2097,6 +2292,8 @@ func _run_summary(terminal: String) -> Dictionary:
 		# Acceptance targets for the run: a three-star unit, a trait at its top
 		# tier, and a board filled to its capacity. Read from the recorded events.
 		"progression": _progression_summary(),
+		# Why the run stopped, tied to the fight that caused it.
+		"outcome": outcome_record if not outcome_record.is_empty() else _run_outcome_record(terminal),
 	}
 
 ## Cheap insurance for a long run. The full record is a few hundred KB, so writing it

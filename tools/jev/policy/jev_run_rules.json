@@ -13,7 +13,7 @@
   },
   "starter": {
     "rule": "The opening fight is fought with the starter alone and the first shop only opens after it, so pick the opener that kills. Each candidate carries its level-one damage per second, health and armor: prefer a real damage dealer or a frontline body with real attack; a pure absorb tank that deals almost no damage is the weakest opener. Traits only matter once a body exists.",
-    "first_shop": "Buy a second body before any XP: a lone unit cannot beat the stage-two swarm."
+    "first_shop": "Buy a second body before any XP."
   },
   "decision_quality_gates": {
     "economically_implausible_pass_rate_min": 0.30,
@@ -56,11 +56,11 @@
     },
     "vertical": {
       "rule": "When the board stacks a trait or sits one piece below the next threshold, the finishing piece is a good buy - if the tier activates on the deployed board you will field. On a full board the swap costs the replaced unit's trait count.",
-      "one_piece_away": "A trait breakpoint is a strong purchase, not an automatic one. Check that it survives the swap, and keep the two-bucket floor."
+      "one_piece_away": "A trait breakpoint is a strong purchase, not an automatic one: check that it survives the swap."
     },
     "force": {
-      "rule": "Forcing is a gamble, but a committed vertical is the only way a run reaches a three-star: nine copies of one identity. Once the bankroll can afford it, pick the identity you hold the most copies of, reroll toward it, and buy every copy you see - not just the one that completes a combine. Two copies is progress, not a wasted buy.",
-      "when_not_to_force": "Never pass a flex pick you would take in an open shop to reroll for a plan you do not own, and never reroll past the budget you set."
+      "rule": "Forcing is a gamble, but a committed vertical is the only way a run reaches a three-star: nine copies of one identity. Once the bankroll can afford it, pick the identity you hold the most copies of, buy every copy you see - not just the one that completes a combine - and reroll the shelf whenever a combine is one or two copies away and the reroll costs a rounding error next to the bankroll. Two copies is progress, not a wasted buy.",
+      "when_not_to_force": "Never pass a flex pick you would take in an open shop to reroll for a plan you do not own."
     }
   },
   "level": {
