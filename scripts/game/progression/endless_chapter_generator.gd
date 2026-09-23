@@ -14,8 +14,8 @@ const MAX_BOARD_UNITS := 9
 const CHAPTER_RATING_STEP := 32.0
 const CHAPTER_BAND_SIZE := 5.0
 const CHAPTER_BAND_RATING_STEP := 55.0
-## Boss budgets ramp with the player's board instead of jumping straight to the
-## authored plateau at the second chapter.
+## Boss budgets ramp with the player's board and keep ramping, instead of jumping to a
+## plateau and holding there.
 ##
 ## Measured across the recorded Jev runs, the player's board power at the boss
 ## stage climbs 102 -> 249 -> 339 -> 430 -> 557 over chapters 1-5, i.e. 2.4x and
@@ -24,10 +24,19 @@ const CHAPTER_BAND_RATING_STEP := 55.0
 ## 1 -> 2 step, where the player only delivers 2.4x. That step is the hardest
 ## fight in the game - chapter 2's boss was won 49.3% of 69 first attempts
 ## against chapter 1's 59.6% of 99 and chapter 3's 78.1% of 32, which is the
-## difficulty inversion the design asks not to have. The ramp holds the enemy to
-## the player's own growth, then rejoins the authored 2.65 once the curve has
-## caught up; chapter 5 onward is unchanged.
-const BOSS_MULTIPLIER_RAMP: Array[float] = [1.00, 1.80, 2.20, 2.45, 2.65]
+## difficulty inversion the design asks not to have.
+##
+## Matching the player's rated growth is not enough, because the rating under-counts
+## what the player actually accumulates. Measured over the current era, the win rate
+## RISES with the chapter - 71.4% of 77 first attempts in chapter 1, 78.7% of 141 in
+## chapter 2, 82.1% of 84 in chapter 3, 84.6% of 39 in chapter 4, 90.0% of 30 in
+## chapter 5, 94.4% of 18 in chapter 6 - so the game gets easier as it goes, which is
+## the opposite of "hard but winnable and harder as it goes on". The old plateau at
+## 2.65 is why: the enemy stopped growing while the board kept collecting items,
+## levels and slots. The ramp therefore keeps climbing past the plateau.
+const BOSS_MULTIPLIER_RAMP: Array[float] = [1.00, 1.80, 2.20, 2.55, 2.95, 3.35]
+## Added per chapter beyond the ramp, so the late campaign keeps tightening.
+const BOSS_MULTIPLIER_STEP: float = 0.40
 const DEFAULT_TRAIT_THRESHOLDS: Array[int] = [2, 4, 6, 8]
 const TRAIT_BASE_PRESSURE := 0.06
 const TRAIT_TIER_PRESSURE_STEP := 0.04
@@ -159,8 +168,11 @@ static func target_rating_for(chapter: int, stage_index: int) -> int:
 			# BOSS_MULTIPLIER_RAMP. The first entry keeps the raw opening target at
 			# the level-1 runway baseline so the preview quote, which already
 			# accounts for the live boss escalation phases, is not double-counted.
-			var boss_ramp_index: int = clampi(procedural_index - 1, 0, BOSS_MULTIPLIER_RAMP.size() - 1)
-			multiplier = BOSS_MULTIPLIER_RAMP[boss_ramp_index]
+			# Past the ramp the multiplier keeps climbing by BOSS_MULTIPLIER_STEP, so a
+			# late boss does not stop growing while the board keeps collecting power.
+			var boss_ramp_index: int = mini(procedural_index - 1, BOSS_MULTIPLIER_RAMP.size() - 1)
+			var boss_overshoot: int = maxi(0, procedural_index - BOSS_MULTIPLIER_RAMP.size())
+			multiplier = BOSS_MULTIPLIER_RAMP[boss_ramp_index] + BOSS_MULTIPLIER_STEP * float(boss_overshoot)
 		ProgressionConfig.MIRROR_STAGE:
 			multiplier = 2.65
 		_:
@@ -692,6 +704,14 @@ static func _level_for_index_and_id(levels: Dictionary, index: int, id: String) 
 static func _desired_size_for_target(target: int, kind: String) -> int:
 	var rating: int = max(1, int(target))
 	if kind == StageTypes.KIND_BOSS:
+		if rating < 160:
+			# The opening boss is fought by whatever three or four level-1 bodies the first
+			# two shops produced, carrying about one item between them. Measured over the
+			# current era it was a capacity check rather than a fight: a player fielding
+			# three bodies won 43.8% of 16 first attempts and one fielding four won 87.5%
+			# of 8. Only the opening boss sits below this rating, so it fields three and
+			# the tutorial fight stops being decided by whether the fourth body arrived.
+			return 3
 		if rating < 520:
 			return 4
 		return clampi(4 + int(floor(float(max(0, rating - 520)) / 260.0)), 4, MAX_BOARD_UNITS)
