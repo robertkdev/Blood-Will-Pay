@@ -92,6 +92,25 @@ Two directions worth measuring next, in preference order:
    that stage, from two creep stages), and shop level (the rig reaches level 2-3 by then,
    where cost-3 is a 5% roll and cost-4 is impossible).
 
+## Experiment in flight: the first procedural boss at 0.75
+
+`FIRST_PROCEDURAL_BOSS_TARGET_SCALE` in `endless_chapter_generator.gd` scales the chapter
+two boss target to 0.75, taking it from 350 to 262. The chapter one runway boss and every
+chapter from three up are untouched, and the generation probe still passes
+(max relative error 0.120 against a 0.17 gate).
+
+Measured so far: one ten-run batch. The board the rig brings to that stage now *meets* the
+target instead of sitting well under it - power 264 against a target of 262, where before
+it was power 240 against 350 - and four of the six attempts at the stage were won, against
+46 of 103 before. That sample is far too small to claim anything about the win rate: six
+attempts is a confidence interval from about a quarter to nine tenths. The board-to-target
+ratio is also partly a restatement of the change, not independent evidence.
+
+The confirmation metric is the stage win rate at n of about 100, which is what the 46.2%
+figure rests on. At roughly one hundred fights per four to five ten-run batches, that is
+the work still outstanding. If the rate does not move, revert the constant: it is one
+line, and the reasoning above is why it was tried.
+
 ## Standing limits on this kind of measurement
 
 Live fights cannot be replayed. `CombatEngine.process(delta)` takes the render frame's

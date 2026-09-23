@@ -14,6 +14,18 @@ const MAX_BOARD_UNITS := 9
 const CHAPTER_RATING_STEP := 32.0
 const CHAPTER_BAND_SIZE := 5.0
 const CHAPTER_BAND_RATING_STEP := 55.0
+## The first procedural boss target is 2.65x its chapter base, which lands on 350. That
+## stage is the single most common place a recorded Jev run dies: 117 first attempts won
+## 46.2% while the player's board sat at 0.71 of the target, and nothing measured about
+## the board separated the wins from the losses - size, unit levels, items, active
+## traits, board power and bankroll were identical for both outcomes. The chapter three
+## boss (435) is won 70.8% by the same rig, so the ramp is not uniformly tight; it is
+## this one step. Four attempts at 46% is an 8.5% chance of stalling there every run.
+##
+## Scaling the first procedural boss to 0.75 puts it near 262, the band where the same
+## boards win about three in four. This is a measured experiment, not a settled number:
+## the stage win rate is n=100+ per batch, so one batch says whether it moved.
+const FIRST_PROCEDURAL_BOSS_TARGET_SCALE := 0.75
 const DEFAULT_TRAIT_THRESHOLDS: Array[int] = [2, 4, 6, 8]
 const TRAIT_BASE_PRESSURE := 0.06
 const TRAIT_TIER_PRESSURE_STEP := 0.04
@@ -147,6 +159,8 @@ static func target_rating_for(chapter: int, stage_index: int) -> int:
 				# Keep the raw opening target at the level-1 runway baseline so a
 				# four-unit prepared board sees a fair, escalation-adjusted quote.
 				multiplier = 1.00
+			elif procedural_index == 2:
+				multiplier *= FIRST_PROCEDURAL_BOSS_TARGET_SCALE
 		ProgressionConfig.MIRROR_STAGE:
 			multiplier = 2.65
 		_:
