@@ -46,8 +46,14 @@ STATE_DIGEST_LIMIT = 4200
 ## including an 855-bucket chapter-6 run that died to the broken fallback rather than to
 ## the game. RetryPolicy covers exactly the transient class this guards - 5xx statuses,
 ## connection errors and timeouts - and leaves every other exception to propagate.
-API_RETRIES = 4
-API_RETRY_BACKOFF_S = 3.0
+##
+## The budget is sized against the harness, not against a guess about the service: a
+## decision may take DECISION_TIMEOUT_SECONDS (240) before the harness gives up on it, so
+## the retries can spend about a minute and a half inside one call and still land. At four
+## retries a three-second outage was enough to end a run - recorded on seed 21020, which
+## stopped on TypeSafeInternalServerError after 3.3s of backoff with 25 buckets in hand.
+API_RETRIES = 6
+API_RETRY_BACKOFF_S = 2.0
 API_RETRY_MAX_BACKOFF_S = 30.0
 
 
