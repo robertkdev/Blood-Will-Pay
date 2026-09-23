@@ -64,8 +64,9 @@ var _pending_movement_debug_frames: int = 0
 var _trait_runtime: TraitRuntime = null
 var _stage_prepared: bool = false
 var _engine_running: bool = false
-## Prepares so far in this run. Feeds the derived battle seed so a retry is a new fight.
-var _battle_seed_counter: int = 0
+## Prepares so far per stage, keyed "chapter:stage". Feeds the derived battle seed: a
+## repeat of one stage is a new fight, and a prepare for any other stage cannot shift it.
+var _battle_seed_counts: Dictionary = {}
 var _prepared_spec: Dictionary = {}
 var _prepared_chapter: int = 1
 var _prepared_stage_in_chapter: int = 1
@@ -490,8 +491,10 @@ func prepare_stage() -> bool:
 		# anything. With no run seed pinned the value is 0 and the stream stays random.
 		var run_seed: int = RosterCatalog.get_procedural_seed() if RosterCatalog != null else 0
 		if run_seed != 0:
-			_battle_seed_counter += 1
-			var key: String = "%d:%d:%d:%d" % [run_seed, ch, sic, _battle_seed_counter]
+			var stage_key: String = "%d:%d" % [ch, sic]
+			var prepare_count: int = int(_battle_seed_counts.get(stage_key, 0)) + 1
+			_battle_seed_counts[stage_key] = prepare_count
+			var key: String = "%d:%s:%d" % [run_seed, stage_key, prepare_count]
 			_engine.set_seed(int(abs(key.hash())))
 	# Rules: allow provider to tweak state/engine prior to configure
 	StageRuleRunner.pre_engine_config(_state, _engine, spec, ch, sic)
