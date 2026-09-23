@@ -21,6 +21,7 @@ import time
 
 from playtest_judgment.backends import load_env_file
 from typesafe_sdk import Choice, TypeSafeClient
+from typesafe_sdk._core.retry import RetryPolicy
 
 ENDPOINT = "https://api.typesafe.ai"
 # Raised from 5200 when item assignment became a Jev decision. The digest is still
@@ -35,9 +36,19 @@ RULE_DIGEST_LIMIT = 7100
 STATE_DIGEST_LIMIT = 4200
 ## A transient upstream failure must not end a long run. One internal server error
 ## aborted a 47-battle run that was one stage from its target, so a failing call is
-## retried with linear backoff before the controller gives up.
+## retried before the controller gives up.
+##
+## The retry is the SDK's own RetryPolicy, passed to the call it protects. The first
+## version of this hand-rolled its own loop and re-asked through `client.judge`, which
+## the pinned SDK (0.6.0) does not have: the fallback raised AttributeError on its first
+## statement, so the recovery path could never once succeed. Across 15,729 recorded
+## decisions not one was ever logged as `retried`, and four runs ended in `api_error`,
+## including an 855-bucket chapter-6 run that died to the broken fallback rather than to
+## the game. RetryPolicy covers exactly the transient class this guards - 5xx statuses,
+## connection errors and timeouts - and leaves every other exception to propagate.
 API_RETRIES = 4
 API_RETRY_BACKOFF_S = 3.0
+API_RETRY_MAX_BACKOFF_S = 30.0
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -512,6 +523,11 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     with TypeSafeClient(api_key=key, model=model, base_url=ENDPOINT, timeout=args.api_timeout) as client:
+        retry_policy = RetryPolicy(
+            max_retries=API_RETRIES,
+            backoff_initial=API_RETRY_BACKOFF_S,
+            backoff_max=API_RETRY_MAX_BACKOFF_S,
+        )
         while decisions < args.max_decisions:
             found = _next_observation(run_dir, answered)
             if found is None:
@@ -547,49 +563,24 @@ def main(argv: list[str] | None = None) -> int:
                     state={"decision_kind": kind, "observation": observation},
                     questions={"action": question},
                     model=model,
+                    retry=retry_policy,
                 )
             except Exception as exc:
-                # A transient upstream 5xx must not end a run: one TypeSafeInternalServerError
-                # aborted a 47-battle run that was one stage from its target. Retry with
-                # backoff, and only report an error if the service keeps failing.
-                last_error: Exception = exc
-                recovered = False
-                for attempt in range(API_RETRIES):
-                    time.sleep(API_RETRY_BACKOFF_S * (attempt + 1))
-                    try:
-                        api_started = time.time()
-                        response = client.judge(
-                            questions={"action": question},
-                            model=model,
-                        )
-                        recovered = True
-                        _append_jsonl(
-                            transcript,
-                            {
-                                "index": index,
-                                "kind": kind,
-                                "status": "retried",
-                                "error": type(exc).__name__,
-                                "attempt": attempt + 1,
-                                "api_ms": round((time.time() - api_started) * 1000.0, 1),
-                            },
-                        )
-                        break
-                    except Exception as retry_exc:
-                        last_error = retry_exc
-                if not recovered:
-                    errors += 1
-                    record = {
-                        "index": index,
-                        "kind": kind,
-                        "status": "error",
-                        "error": type(last_error).__name__,
-                        "api_ms": round((time.time() - api_started) * 1000.0, 1),
-                    }
-                    _append_jsonl(transcript, record)
-                    summary["stopped"] = "api_error"
-                    summary["last_error"] = record
-                    break
+                # The SDK already retried the transient failures inside `system_one`.
+                # Reaching here means the service kept failing past the retry budget, so
+                # the run ends on a real outage rather than on one lost answer.
+                errors += 1
+                record = {
+                    "index": index,
+                    "kind": kind,
+                    "status": "error",
+                    "error": type(exc).__name__,
+                    "api_ms": round((time.time() - api_started) * 1000.0, 1),
+                }
+                _append_jsonl(transcript, record)
+                summary["stopped"] = "api_error"
+                summary["last_error"] = record
+                break
             api_ms = round((time.time() - api_started) * 1000.0, 1)
             answer = response.answers.get("action")
             if answer is None:
