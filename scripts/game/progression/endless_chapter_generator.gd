@@ -515,6 +515,7 @@ static func _tune_levels(ids: Array[String], target: int, level_cap: int) -> Dic
 	var current: int = _score_ids_with_levels(ids, levels)
 	while current < target:
 		var best_index: int = -1
+		var best_levels: Dictionary = {}
 		var best_next_score: int = current
 		var best_error: int = abs(int(target) - current)
 		for i: int in range(ids.size()):
@@ -522,21 +523,32 @@ static func _tune_levels(ids: Array[String], target: int, level_cap: int) -> Dic
 			var current_level: int = _level_for_index_and_id(levels, i, id)
 			if current_level >= int(level_cap):
 				continue
-			var delta: int = unit_rating(id, current_level + 1) - unit_rating(id, current_level)
-			var next_score: int = current + delta
+			# Score the whole team with the promotion applied. The previous loop added a
+			# bare single-unit rating delta to a trait-adjusted team score - different
+			# quantities - so a trait multiplier on the promoted unit was never counted
+			# and the loop's picture of the board drifted from the board it was building.
+			# Recorded example, chapter 2 stage 3 at target 297: it promoted one unit to
+			# level 4 and left the others at level 1 (morrak1/egress4/pilfer1), a shape
+			# whole-team rescoring does not choose.
+			var trial: Dictionary = levels.duplicate()
+			trial[i] = current_level + 1
+			trial[id] = current_level + 1
+			var next_score: int = _score_ids_with_levels(ids, trial)
 			var next_error: int = abs(int(target) - next_score)
 			if next_error < best_error or best_index < 0:
 				best_index = i
+				best_levels = trial
 				best_next_score = next_score
 				best_error = next_error
 		if best_index < 0:
 			break
 		if best_next_score > target and current >= int(round(float(target) * 0.84)):
 			break
-		var best_id: String = ids[best_index]
-		var next_level: int = _level_for_index_and_id(levels, best_index, best_id) + 1
-		levels[best_index] = next_level
-		levels[best_id] = next_level
+		# Mutate in place: `levels` is the caller's dictionary and rebinding the local
+		# would leave the caller holding the levels from before the loop.
+		levels.clear()
+		for key: Variant in best_levels.keys():
+			levels[key] = best_levels[key]
 		current = best_next_score
 	_improve_levels(ids, levels, target)
 	return levels

@@ -93,7 +93,14 @@ static func clear_runtime() -> void:
 
 static func start_new_run() -> void:
 	RgaStageChallengeDirector.clear_runtime(true)
-	_reset_procedural_runtime(true)
+	# A locked seed is an explicit request for a reproducible campaign: the harness pins
+	# one so two runs of the same seed face the same encounters, and the resume probe
+	# pins one to reload a saved run. This used to pass `true` unconditionally, so it
+	# discarded the seed the caller had just set - and because Main._reset_run_state
+	# calls this from _ready, the pin was always discarded before the first fight.
+	# Measured over the recorded runs: 340 of 745 same-seed chapter/stage groups fielded
+	# a different enemy board. Respect the lock the way clear_runtime already does.
+	_reset_procedural_runtime(not _procedural_seed_locked)
 	_procedural_seed_locked = false
 
 static func ensure_runtime_started() -> void:
@@ -115,6 +122,32 @@ static func set_endless_seed(seed: int) -> void:
 ## should read as "leave the fight random".
 static func get_procedural_seed() -> int:
 	return int(_procedural_seed)
+
+## Write the per-attempt fight seed onto the cached spec the game will actually use.
+##
+## Specs leave this class as `duplicate(true)`, so a caller that mutates the dictionary it
+## was handed changes nothing: CombatManager then finds no `battle_seed` and falls back to
+## its own derivation, while the caller's transcript records a seed that was never played.
+## The Jev harness hit exactly that - its `battle_seed` events named a value the engine
+## never saw. This writes into the cache instead, so a recorded seed is the seed the fight
+## ran under.
+static func set_stage_battle_seed(chapter: int, stage_index: int, battle_seed: int) -> bool:
+	_ensure_procedural_seed()
+	_ensure_procedural_generated_through(maxi(1, int(chapter)))
+	var key: String = _procedural_key(maxi(1, int(chapter)), maxi(1, int(stage_index)))
+	if not _procedural_spec_cache.has(key):
+		return false
+	var cached: Variant = _procedural_spec_cache[key]
+	if not cached is Dictionary:
+		return false
+	var rules: Variant = (cached as Dictionary).get("rules", {})
+	if not rules is Dictionary:
+		# A spec without rules cannot carry a seed; create the branch rather than
+		# silently reporting success.
+		(cached as Dictionary)["rules"] = {}
+		rules = (cached as Dictionary)["rules"]
+	(rules as Dictionary)["battle_seed"] = int(battle_seed)
+	return true
 
 static func snapshot_runtime() -> Dictionary:
 	_ensure_procedural_seed()

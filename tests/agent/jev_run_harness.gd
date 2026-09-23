@@ -830,20 +830,19 @@ func _seed_procedural_roster(seed: int) -> void:
 func _apply_battle_seed(chapter: int, stage_in_chapter: int, attempt: int) -> void:
 	if not _seed_explicit or RosterCatalog == null:
 		return
-	var spec: Variant = RosterCatalog.get_spec(maxi(1, chapter), maxi(1, stage_in_chapter))
-	if not spec is Dictionary:
-		return
-	var rules: Variant = (spec as Dictionary).get("rules", {})
-	if not rules is Dictionary:
-		return
 	var key: String = "%d:%d:%d:%d" % [_campaign_seed, chapter, stage_in_chapter, maxi(1, attempt)]
 	var battle_seed: int = int(abs(key.hash()))
-	(rules as Dictionary)["battle_seed"] = battle_seed
+	# Write through the catalog: get_spec hands back a deep copy, so mutating it here used
+	# to leave the recorded seed unplayed - CombatManager never saw it and derived its own.
+	var applied: bool = RosterCatalog.set_stage_battle_seed(
+		maxi(1, chapter), maxi(1, stage_in_chapter), battle_seed
+	)
 	_append_event("battle_seed", {
 		"chapter": chapter,
 		"stage_in_chapter": stage_in_chapter,
 		"attempt": maxi(1, attempt),
 		"seed": battle_seed,
+		"applied_to_live_spec": applied,
 		"basis": "run_seed:chapter:stage:attempt",
 	})
 
