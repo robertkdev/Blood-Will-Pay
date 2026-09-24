@@ -210,3 +210,54 @@ a shop click. The board was 9 of 9, the bankroll 39,326, and the button disabled
 That points at synthetic input or the fielding pass leaving the UI unable to accept Start
 Battle, not at the game refusing a legal action. The fielding fallback is now reachable and
 self-reporting, which should name the cause next time it happens.
+
+---
+
+# The ten-game scorecard, after the legacy gate was fixed - 2026-09-23 (latest)
+
+Ten grown runs on a fresh seed block, with every fix from this session in place: the
+procedural seed lock, the whole-team level tuning, the planning window, the controller retry,
+the item identity fix, the simulator lifecycle, the chapter-one boss board, the continued boss
+ramp, and the level-four legacy gate.
+
+| seed | chapter | peak bankroll | three-stars | traits | board | level | items | legacies |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
+| 21031 | 6 | 1,820,484 | 6 | 3 | full | 4 | 6 | 2 |
+| 21032 | 3 | 157 | 0 | 3 | full | 2 | 1 | 0 |
+| 21033 | 6 | 90,766 | 5 | 4 | full | 4 | 5 | 1 |
+| 21034 | 1 | 39 | 0 | 3 | full | 2 | 0 | 0 |
+| 21035 | 4 | 24,524 | 1 | 3 | full | 3 | 2 | 0 |
+| 21036 | 4 | 4,233 | 0 | 3 | full | 2 | 3 | 0 |
+| 21037 | 2 | 36 | 0 | 3 | full | 2 | 2 | 0 |
+| 21038 | 2 | 38 | 0 | 4 | full | 2 | 1 | 0 |
+| 21039 | 4 | 21,056 | 1 | 3 | full | 3 | 4 | 0 |
+| 21040 | 5 | 11,160 | 1 | 3 | full | 3 | 3 | 0 |
+
+## Against the criteria the objective states
+
+| criterion | result |
+| --- | --- |
+| after ten games, three-star at least one unit | **5 of 10** runs, six three-stars in the best one |
+| max out at least one trait | **10 of 10** |
+| fully build out a board | **10 of 10** |
+| reach chapter 10 | 0; deepest this batch is chapter 6, and chapter 8 is the all-time best |
+| technical failures | **0 across all ten runs** |
+
+## The shapes the objective asks for are present
+
+- **Super rich and way overpowered**: 1,820,484 buckets and six three-star units in one run;
+  90,766, 24,524, 21,056 and 11,160 in four more.
+- **Loses early**: chapter 1, and two runs out in chapter 2.
+- **Struggles but hangs on**: two runs to chapter 4 and one to chapter 5 on four-figure
+  bankrolls.
+
+## The legacy gate is now verified in play, not assumed
+
+Three legacies were bound across two runs, all of them `applied: true` and chosen by the model
+rather than by the fallback: `martyr_seal` on a level-4 bonko and a level-4 mortem in one run,
+and one more in the run that reached chapter 6 with 90,766 buckets. The runs that used to abort
+at exactly this point now finish with real outcomes and zero technical failures.
+
+One gap was closed while verifying: the heuristic arm has no controller to answer the gate, so
+it would have held the planning beat for the full decision timeout. It now takes the first
+offer there, the same way its item pass is first-fit.

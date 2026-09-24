@@ -1661,7 +1661,12 @@ func _resolve_pending_ascension() -> void:
 		if candidates.is_empty():
 			_append_event("ascension_missing_options", {"unit": unit_label})
 			return
-		var decision: Dictionary = await _ask_decision("ascension", _plan_state(), candidates)
+		# The heuristic arm has no controller, so asking would hold the beat for the whole
+		# decision timeout. It takes the first offer instead, the same way _decide_items
+		# equips first-fit there.
+		var decision: Dictionary = {}
+		if _run_mode == "jev":
+			decision = await _ask_decision("ascension", _plan_state(), candidates)
 		var chosen: String = String(decision.get("choice_id", "")).strip_edges()
 		if chosen == "" or not _candidate_ids(candidates).has(chosen):
 			chosen = String(candidates[0].get("id", ""))
