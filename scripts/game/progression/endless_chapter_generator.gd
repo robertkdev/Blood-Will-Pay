@@ -37,6 +37,26 @@ const CHAPTER_BAND_RATING_STEP := 55.0
 const BOSS_MULTIPLIER_RAMP: Array[float] = [1.00, 1.80, 2.20, 2.55, 2.95, 3.35]
 ## Added per chapter beyond the ramp, so the late campaign keeps tightening.
 const BOSS_MULTIPLIER_STEP: float = 0.40
+## Bodies a boss fields, indexed by chapter.
+##
+## The boss board used to be sized from its rating alone, which pinned every boss from
+## chapter 2 through chapter 5 at exactly four bodies while the player's board grew from
+## four slots towards seven. `EncounterShapeComparisonProbe` reports the resulting ladder
+## as 3 / 4 / 4 / 4 / 4 / 6 / 7 / 8 / 9 / 9 over chapters 1-10: no width change at all
+## through the chapters where runs actually end, then a jump to six.
+##
+## So the width follows the chapter's board instead of the rating: the boss grows with the
+## player, and the rating multiplier stays the difficulty knob. Chapter 1 keeps the three
+## bodies it has always had (the opening boss was a capacity check at four), and the ladder
+## stops at `MAX_BOARD_UNITS`. Measured effect on `BossStageCalibrationProbe`: the middle
+## preparation tier's boss win rate fell 77.8% -> 72.2% over 36 fights, the strongest tier
+## stayed at 100%, and no gate moved outside its tolerance.
+##
+## That strongest tier is why this is a shape fix and not a difficulty claim: six level-3
+## bodies rate 1484-2253 against bosses of 98-510, three to sixteen times the board a
+## recorded run actually fields, so no boss width moves it. `docs/boss_breadth_ladder_2026-09-23.md`
+## records that separately - it is a defect in the gate, not evidence about the game.
+const BOSS_WIDTH_BY_CHAPTER: Array[int] = [3, 4, 5, 5, 6, 6, 7, 7, 8, 9]
 const DEFAULT_TRAIT_THRESHOLDS: Array[int] = [2, 4, 6, 8]
 const TRAIT_BASE_PRESSURE := 0.06
 const TRAIT_TIER_PRESSURE_STEP := 0.04
@@ -299,7 +319,7 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 	if catalog.is_empty():
 		return StageTypes.make_spec(["bonko"], kind, {"target_rating": target, "difficulty_rating": 0, "procedural": true, "endless": true})
 	var theme: Dictionary = _pick_theme(chapter, stage_index, seed, kind)
-	var desired_size: int = _desired_size_for_target(target, kind)
+	var desired_size: int = _desired_size_for_target(target, kind, chapter)
 	var ids: Array[String] = _select_unit_ids(catalog, theme, desired_size, chapter, stage_index, target, seed, kind, state)
 	var level_cap: int = _level_cap_for(chapter, kind)
 	var levels: Dictionary = _tune_levels(ids, target, level_cap)
@@ -701,9 +721,18 @@ static func _level_for_index_and_id(levels: Dictionary, index: int, id: String) 
 		return max(1, int(levels[id]))
 	return 1
 
-static func _desired_size_for_target(target: int, kind: String) -> int:
+static func _desired_size_for_target(target: int, kind: String, chapter: int = 0) -> int:
 	var rating: int = max(1, int(target))
 	if kind == StageTypes.KIND_BOSS:
+		if int(chapter) > 0:
+			# See BOSS_WIDTH_BY_CHAPTER. The rating floor is kept as a guard so a call
+			# that arrives with a chapter but an opening-sized budget still fields the
+			# three-body tutorial boss rather than a full ladder step.
+			if rating < 160:
+				return 3
+			var ladder_index: int = clampi(int(chapter) - 1, 0, BOSS_WIDTH_BY_CHAPTER.size() - 1)
+			return clampi(BOSS_WIDTH_BY_CHAPTER[ladder_index], 3, MAX_BOARD_UNITS)
+		# No chapter context (older callers and probes): keep the rating-only ladder.
 		if rating < 160:
 			# The opening boss is fought by whatever three or four level-1 bodies the first
 			# two shops produced, carrying about one item between them. Measured over the
