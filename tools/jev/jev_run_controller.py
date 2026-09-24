@@ -32,7 +32,12 @@ ENDPOINT = "https://api.typesafe.ai"
 ## quote, and the replacement is longer. Raised again for the reroll pricing rule. The
 ## guard exists so authored rules are never silently dropped from the prompt, not to cap
 ## the policy at a length set before the rule existed.
-RULE_DIGEST_LIMIT = 7100
+## Raised from 7100 when the level rule had to name the enemy's cost tier: on a level-3 shelf
+## the odds for cost 4 are zero, and the rig was sitting at level 3 in chapter 6 with tens of
+## thousands of buckets while the generator fielded cost-4 and cost-5 enemies. The rule and the
+## label guarding the unverified level numbers both have to reach the prompt, and the guard
+## below is what caught the first attempt at this change dropping the STALL rule off the tail.
+RULE_DIGEST_LIMIT = 7400
 STATE_DIGEST_LIMIT = 4200
 ## A transient upstream failure must not end a long run. One internal server error
 ## aborted a 47-battle run that was one stage from its target, so a failing call is

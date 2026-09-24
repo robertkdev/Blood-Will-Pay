@@ -1202,6 +1202,29 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 			high_cost_now * 100.0,
 			high_cost_after * 100.0,
 		]
+	# The decisive fact when a run has stopped improving: the board facing it fields a cost
+	# tier its shelf cannot roll at all. Level 3's shelf is 65/30/5/0/0, so cost 4 is
+	# impossible, and the generator picks enemy units by rating from the whole catalogue from
+	# chapter 2 on. Measured: the rig buys XP a median of once per run, 13 of 30 runs never
+	# buy it, and it sat at level 3 in chapter 6 holding 93,000 buckets. "A cost-3 or better
+	# unit is 5% of rolls" is abstract next to "the board in front of you fields a cost-4 unit
+	# and your shelf is 0% to offer one", so state the second one.
+	var enemy_top_cost: int = _enemy_top_cost()
+	var enemy_tier_now: float = _tier_share(shelf_now, enemy_top_cost)
+	var enemy_tier_after: float = _tier_share(shelf_after, enemy_top_cost)
+	var enemy_tier_note: String = ""
+	if enemy_top_cost >= 4:
+		if enemy_tier_now <= 0.0 and enemy_tier_after > 0.0:
+			enemy_tier_note = " The board facing you fields a cost-%d unit and your shelf cannot offer that tier at all until this level: %.0f%% of rolls after it." % [
+				enemy_top_cost,
+				enemy_tier_after * 100.0,
+			]
+		else:
+			enemy_tier_note = " The board facing you fields a cost-%d unit: your shelf offers that tier on %.0f%% of rolls now and %.0f%% after this level." % [
+				enemy_top_cost,
+				enemy_tier_now * 100.0,
+				enemy_tier_after * 100.0,
+			]
 	var candidates: Array[Dictionary] = [
 		{
 			"id": "buy_xp",
@@ -1216,6 +1239,9 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 			"shelf_is_the_reason": not slot_payoff,
 			"shelf_high_cost_odds_now": snappedf(high_cost_now, 0.001),
 			"shelf_high_cost_odds_after": snappedf(high_cost_after, 0.001),
+			"enemy_top_cost": enemy_top_cost,
+			"shelf_odds_of_enemy_tier_now": snappedf(enemy_tier_now, 0.001),
+			"shelf_odds_of_enemy_tier_after": snappedf(enemy_tier_after, 0.001),
 			"board_size": board_size,
 			"bench_size": bench_units.size(),
 			"benched_bodies_that_gain_a_slot": waiting_bodies,
@@ -1240,7 +1266,7 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 				waiting_bodies,
 				affordable_shelf,
 				shelf_bodies_that_could_gain_a_slot,
-				shelf_note,
+				shelf_note + enemy_tier_note,
 			],
 		},
 		{
@@ -1332,6 +1358,22 @@ func _high_cost_share(probabilities: Dictionary) -> float:
 		if int(cost) >= 3:
 			share += float(probabilities[cost])
 	return clampf(share, 0.0, 1.0)
+
+## The share of rolls that land exactly on one cost tier. Zero when the tier cannot be
+## offered at all, which is the fact that matters: a shelf with no roll for cost 4 cannot
+## answer a board that fields one.
+func _tier_share(probabilities: Dictionary, cost: int) -> float:
+	if cost <= 0 or not probabilities.has(cost):
+		return 0.0
+	return clampf(float(probabilities[cost]), 0.0, 1.0)
+
+## The highest cost tier the enemy board is fielding, so the level decision can be told
+## whether the player's shelf can answer it at all.
+func _enemy_top_cost() -> int:
+	var top: int = 0
+	for unit: Unit in _enemy_units():
+		top = maxi(top, int(unit.cost))
+	return top
 
 func _press_continue(expect_forced: bool, label: String) -> void:
 	# Resolve the chapter contract before asking about the wager so the wager is

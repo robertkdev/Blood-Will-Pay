@@ -40,7 +40,7 @@
       "BOSS": 3.0
     },
     "rule": "The quote is fixed by encounter kind, so the shown win odds alone set the size. At or below 1 / multiplier the bet loses money: take MINIMUM.",
-    "sizing": "Stake the Kelly candidate at the measured band rate the candidates quote, not the odds on screen. ALL_IN wherever the Kelly share is at least a half: replaying every recorded fight sequence, lowering the all-in bar from three quarters to a half lifted the median peak bankroll from 68 to 92 and the p90 from 3,093 to 9,854 on identical fights, with the median closing bankroll unchanged. Below a half the stake is the Kelly share and never the whole bankroll, because a share near a third all-in is what ends runs.",
+    "sizing": "Stake the Kelly candidate at the measured band rate the candidates quote, not the odds on screen. ALL_IN wherever the Kelly share is at least a half: on the recorded fight sequences that bar lifted the median peak bankroll by a third with the median closing bankroll unchanged. Below a half the stake is the Kelly share and never the whole bankroll.",
     "measured_first_attempt": {
       "rule": "Observed win rate of the FIRST attempt at a stage, bucketed by encounter kind and the odds on screen at the time, from 1073 recorded first attempts. Each band is shrunk toward the shown odds with a prior of 20 pseudo-observations, so a band built on three fights cannot drive a stake by itself. Retries are excluded on purpose: they are capped separately because a repeat of a stage the run already lost behaves nothing like a first look.",
       "samples": 1073,
@@ -98,7 +98,7 @@
     }
   },
   "level": {
-    "rule": "Buy XP for a slot when the level-up raises capacity and the slot has a use - a benched body, or shelf_bodies_that_could_gain_a_slot that can be bought and fielded in the same beat. Once capacity is capped by the chapter floor the reason to level is the shelf: the level sets the cost distribution, and the candidate quotes how much of the shop is cost-3 or better before and after. Hold off only while several 1-cost pairs with no upgrades are still the best value.",
+    "rule": "Buy XP for a slot when the level-up raises capacity and the slot has a use - a benched body, or shelf_bodies_that_could_gain_a_slot that can be bought and fielded in the same beat. Once capacity is capped by the chapter floor the reason to level is the shelf: the level sets the cost distribution, and the candidate quotes the shelf odds and the enemy's top cost. If the board facing you fields a cost-4 or cost-5 unit and your odds for that tier are zero - as they are at level 3, 65/30/5/0/0 - then rerolling cannot answer it and the level can. Hold off only while several 1-cost pairs with no upgrades are still the best value.",
     "unit_levels": "Unit level is the biggest middle-game power lever: a level-2 copy is worth well more than a level-1 of the same identity, and three same-level copies convert into one stronger unit. (An earlier 40% / 61% / 79% odds calibration has not been re-verified on this build.)",
     "combine_priority": "Take a duplicate that completes a third copy at a level you already hold when the board has room - but a stronger unit, an item, an extra slot, or a trait breakpoint can supply the same power sooner. A combine is one option, not the required path into chapter 2."
   },
