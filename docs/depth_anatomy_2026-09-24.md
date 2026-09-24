@@ -131,6 +131,27 @@ easier": **why does a 24% stat advantage not win more fights?** That is a combat
 question - targeting, positioning, ability timing, or the clock - and every design lever above
 is blocked behind it.
 
+## 8. A first look at the open question
+
+Two numbers, over 3,010 fights with settlement data, that narrow "why does a 24% stat advantage
+not win more fights":
+
+- **1,234 of 3,010 fights (41%) are clock-decided** - one board does not kill the other.
+- **Among the 1,776 fights that DO resolve, the board that dealt more damage won 1,578 (89%).**
+
+So damage decides almost every fight that gets to be decided by combat, and two fights in five
+never get there. A stat advantage can only pay off inside the 59% of fights that resolve, which
+bounds how much any stat-budget lever can move the overall win rate - and it is a large part of
+why re-pricing, widening and scaling have each been absorbed.
+
+**Caveat, stated because it limits the claim:** I tried to measure the at-the-clock survivor
+comparison directly and could not do it cleanly from these events. The `post_settlement_*`
+counts are *post*-settlement, so they partly encode the result they would be used to explain,
+and the correlation they show (player ahead 75%, tied 59%, behind 31%) is not the at-clock
+comparison the earlier gate measured. That measurement needs the at-clock alive counts, which
+the stage-rule gate reads and the run events do not currently record. Recording them is the
+next small piece of instrumentation this needs.
+
 ## Gates
 
 | gate | result |
