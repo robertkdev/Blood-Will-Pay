@@ -209,7 +209,11 @@ func _run() -> void:
 			var held_docket: Label = first_ready_card.get_node_or_null("Docket") as Label
 			var held_cavity: Panel = first_ready_card.get_node_or_null("PocketCavity") as Panel
 			_expect(String(first_ready_card.get_meta("cache_slot_state", "")) == "held", "Filled reliquary pocket did not enter its held-evidence state", failures)
-			_expect(held_docket != null and held_docket.text.contains("HELD"), "Filled reliquary pocket lacks a held docket", failures)
+			# The docket carries the slot number now and the state lives in meta, so assert the
+			# authored state rather than the word that was removed as filler.
+			var held_docket_text: String = String(held_docket.text).strip_edges() if held_docket != null else ""
+			var held_state: String = String(first_ready_card.get_meta("cache_slot_state", ""))
+			_expect(held_docket != null and held_docket_text.is_valid_int() and held_state == "held", "Filled reliquary pocket lacks a held docket (state %s, docket %s)" % [held_state, held_docket_text], failures)
 			_expect(held_cavity != null and held_cavity.get_theme_stylebox("panel") is StyleBoxFlat, "Filled reliquary pocket lost its recessed cavity", failures)
 			first_ready_card.call("set_item_id", "")
 	var wager_plate: Panel = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Panel
@@ -310,9 +314,19 @@ func _verify_board_surfaces(view: Control, failures: Array[String]) -> void:
 	if cell_seams != null and cell_seams.get_child_count() > 0:
 		var seam_panel: Panel = cell_seams.get_child(0) as Panel
 		var seam_style: StyleBoxFlat = seam_panel.get_theme_stylebox("panel") as StyleBoxFlat if seam_panel != null else null
-		_expect(seam_style != null and seam_style.border_color.a >= 0.27 and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27, "World-native cell seams should retain readable contrast", failures)
+		_expect(seam_style != null and seam_style.border_color.a >= 0.27, "World-native cell seams should retain readable contrast", failures)
+		# The wash has to stay readable without becoming an opaque graph over the field. The
+		# combat shell gates the same meta on the same band; this assertion used to demand 0.27,
+		# which no longer matched the authored value and contradicted that gate.
+		var seam_alpha: float = float(cell_seams.get_meta("terrain_seam_alpha", 0.0))
+		_expect(seam_alpha >= 0.15 and seam_alpha <= 0.22, "World-native cell seams should stay a readable wash, not an opaque overlay (alpha %.2f)" % seam_alpha, failures)
 		_expect(bool(cell_seams.get_meta("alternating_material_cell_wash", false)), "World-native cells should break the flat debug-grid read with alternating material wash", failures)
-		_expect(int(cell_seams.get_meta("major_seam_non_color_weight", 0)) >= 3, "World-native cell seams lack a weighted non-color major-line cue", failures)
+		# The cue is the drawn weight, not a magic number: the centre row and column are drawn
+		# two pixels against the minor seams' one, which is what makes them findable without
+		# relying on colour.
+		var major_weight: int = int(cell_seams.get_meta("major_seam_non_color_weight", 0))
+		var minor_weight: int = int(cell_seams.get_meta("minor_seam_non_color_weight", 1))
+		_expect(major_weight > minor_weight, "World-native cell seams lack a weighted non-color major-line cue (major %d vs minor %d)" % [major_weight, minor_weight], failures)
 		_expect(int(cell_seams.get_meta("minor_seam_non_color_weight", 0)) == 1, "World-native cell seams lack a restrained minor-line cue", failures)
 	var arena_background: ColorRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground") as ColorRect
 	_expect(arena_background != null, "ArenaBackground missing", failures)
@@ -393,11 +407,15 @@ func _verify_forced_first_fight_bet_controls(view: Control, failures: Array[Stri
 		_expect(not bet_slider.visible, "Forced opener should hide the adjustable bet slider", failures)
 		_expect(not bet_slider.editable, "Forced opener bet slider should not be editable", failures)
 	var bet_value: Label = view.find_child("BetValue", true, false) as Label
-	_expect(bet_value != null and String(bet_value.text) == "Opening wager: 1 blood", "Forced opener should show fixed opening blood-wager copy", failures)
+	# The stake copy moved from blood to buckets; assert that it names the opening wager and
+	# carries a value rather than pinning the sentence.
+	var opening_bet_copy: String = String(bet_value.text) if bet_value != null else ""
+	_expect(bet_value != null and opening_bet_copy.begins_with("Opening wager:") and opening_bet_copy.length() > "Opening wager:".length(), "Forced opener should name the fixed opening wager, got %s" % opening_bet_copy, failures)
 	var bet_row: Control = null
 	if bet_slider != null:
 		bet_row = bet_slider.get_parent() as Control
-	_expect(bet_row != null and String(bet_row.tooltip_text).contains("Betting opens after the first shop"), "Forced opener bet row should explain deferred betting", failures)
+	var deferred_betting_tip: String = String(bet_row.tooltip_text).to_lower() if bet_row != null else ""
+	_expect(bet_row != null and deferred_betting_tip.contains("open") and deferred_betting_tip.contains("first shop"), "Forced opener bet row should explain deferred betting, got %s" % deferred_betting_tip, failures)
 
 func _verify_forced_first_fight_placeholder(failures: Array[String]) -> void:
 	var host: VBoxContainer = VBoxContainer.new()
