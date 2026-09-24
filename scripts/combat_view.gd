@@ -1156,7 +1156,9 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		board_status_plate.set_meta("planning_status_priority", "secondary_to_commit" if compact else "primary")
 	var planning_directive: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
-		planning_directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
+		# The order is the arrow. "01 //", "02 //" and "03 //" were numbering an order the line
+		# already states, on the one strip that still carried a full sentence.
+		planning_directive.text = "DEPLOY  >  WAGER  >  COMMIT"
 		planning_directive.add_theme_font_size_override("font_size", 16 if tight_compact else 20)
 		# Anchored on the commit boundary (the seam between the two boards). Anchoring
 		# it at the top of the planning area drew it over the enemy deployment grid.

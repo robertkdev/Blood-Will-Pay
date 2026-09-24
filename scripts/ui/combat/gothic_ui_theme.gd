@@ -1575,7 +1575,8 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 	directive.offset_right = 230.0
 	directive.offset_top = -17.0
 	directive.offset_bottom = 17.0
-	directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
+	# The order is the arrow; the ordinals were numbering it twice.
+	directive.text = "DEPLOY  >  WAGER  >  COMMIT"
 	directive.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	directive.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	# The ordered command needs to survive above the field painters and the compact
