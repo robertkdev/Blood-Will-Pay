@@ -844,8 +844,12 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 		area.add_child(label)
 	label.anchor_left = 0.03 if enemy_side else 0.55
 	label.anchor_right = 0.46 if enemy_side else 0.97
-	label.anchor_top = 0.025 if enemy_side else 0.84
-	label.anchor_bottom = 0.14 if enemy_side else 0.97
+	# The player-side plate used to reach down to 0.97 of its half, which put its bottom edge
+	# one to nine pixels inside the deployment badge's band at every scaled tier - the badge
+	# straddles the seam between the halves, so the plate has to give it that room. Lifting it
+	# eight percent clears the widest of those overlaps with margin.
+	label.anchor_top = 0.025 if enemy_side else 0.76
+	label.anchor_bottom = 0.14 if enemy_side else 0.89
 	label.offset_left = 0.0
 	label.offset_top = 0.0
 	label.offset_right = 0.0

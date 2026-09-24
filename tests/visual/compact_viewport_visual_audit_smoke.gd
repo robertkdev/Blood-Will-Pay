@@ -483,6 +483,17 @@ func _remove_test_settings() -> void:
 	if FileAccess.file_exists(TEST_SETTINGS_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SETTINGS_PATH))
 
+## The wager strip carries the stake, the odds spread and both outcomes with every word
+## stripped out, so the gate checks that the information is present rather than the copy that
+## was deliberately removed.
+func _expect_wager_outcome_information(summary: Label, context: String) -> void:
+	if summary == null:
+		return
+	var text: String = String(summary.text)
+	_expect(text.contains("%"), "%s omitted its odds range" % context)
+	_expect(text.contains("-"), "%s omitted its odds spread" % context)
+	_expect(text.split("/").size() >= 2, "%s omitted its win/loss comparison" % context)
+
 func _expect_control_inside(control: Control, label: String) -> void:
 	_expect(control != null, "%s missing" % label)
 	if control == null:
@@ -649,7 +660,10 @@ func _expect_item_cache_contract(context: String) -> void:
 			# The slot is authored, not an unexplained "+". The wording was removed as filler, so
 			# assert the authored state rather than a sentence.
 			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
-			_expect(String(item_card.get_meta("cache_slot_state", "")) == "ready" and docket != null and docket.text.contains("READY"), "%s empty item slot %s lacks a ready-pocket docket" % [context, String(item_card.name)])
+			# The docket carries the slot number and the state lives in meta - "READY" was
+			# removed as filler, so assert the authored state and that the docket is numbered.
+			var docket_text: String = String(docket.text).strip_edges() if docket != null else ""
+			_expect(String(item_card.get_meta("cache_slot_state", "")) == "ready" and docket != null and docket_text.is_valid_int(), "%s empty item slot %s lacks a ready-pocket docket" % [context, String(item_card.name)])
 			if binding_rail != null and not binding_positions.has(binding_rail.anchor_left):
 				binding_positions.append(binding_rail.anchor_left)
 	_expect(visible_item_slots >= 3, "%s item cache must expose at least three purposeful ready slots" % context)
@@ -675,7 +689,12 @@ func _expect_planning_landmark_contract(context: String, board_column: Control, 
 	_expect(survival_band != null and survival_band.is_visible_in_tree() and bool(survival_band.get_meta("planning_landmark", false)), "%s survival battlefield lane is missing" % context)
 	_expect(survival_label != null and bool(survival_label.get_meta("deployment_badge_clearance", false)), "%s survival landmark lacks deployment-badge clearance metadata" % context)
 	if survival_label != null and planning_directive != null and planning_directive.is_visible_in_tree():
-		_expect(not survival_label.get_global_rect().intersects(planning_directive.get_global_rect()), "%s survival landmark is occluded by the deployment badge" % context)
+		var survival_rect: Rect2 = survival_label.get_global_rect()
+		var directive_rect: Rect2 = planning_directive.get_global_rect()
+		_expect(
+			not survival_rect.intersects(directive_rect),
+			"%s survival landmark is occluded by the deployment badge (landmark %s vs badge %s)" % [context, str(survival_rect), str(directive_rect)]
+		)
 	_expect(hostile_band != null and bool(hostile_band.get_meta("broad_landmark_wash_suppressed", false)), "%s hostile landmark regressed to a broad battlefield wash" % context)
 	_expect(survival_band != null and bool(survival_band.get_meta("broad_landmark_wash_suppressed", false)), "%s survival landmark regressed to a broad battlefield wash" % context)
 	if hostile_band != null and enemy_area != null:
@@ -913,8 +932,7 @@ func _expect_scaled_decision_data(context: String) -> void:
 		_expect_control_inside(resource_strip, "%s blood/level/XP record" % context)
 	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s enlarged layout hid wager outcomes" % context)
 	if wager_summary != null:
-		for required_copy: String in ["Wager", "Win", "After:", "W", "L"]:
-			_expect(wager_summary.text.contains(required_copy), "%s wager outcome record omitted %s" % [context, required_copy])
+		_expect_wager_outcome_information(wager_summary, "%s wager outcome record" % context)
 		_expect_control_inside(wager_summary, "%s wager outcome record" % context)
 
 func _find_progress_source() -> Label:
@@ -1082,8 +1100,7 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
 	if wager_summary != null:
 		_expect(wager_summary.get_theme_font_size("font_size") >= (14 if tight else 18), "%s wager outcome metadata is too small" % context)
-		for required_copy: String in ["Wager", "Win", "After:", "W", "L"]:
-			_expect(wager_summary.text.contains(required_copy), "%s wager outcome metadata omitted %s" % [context, required_copy])
+		_expect_wager_outcome_information(wager_summary, "%s wager outcome metadata" % context)
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
 	if maximum_scale_layout:

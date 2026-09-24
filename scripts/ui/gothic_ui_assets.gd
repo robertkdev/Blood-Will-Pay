@@ -42,7 +42,10 @@ const RELIC_ICON_LEDGER: int = 1
 const RELIC_ICON_CHIT: int = 2
 ## Drawn size of one icon, in the game's own pixels. The sheets are resized down to this once
 ## rather than left at their 512px cell size for the layout to squeeze.
-const ACTION_ICON_PIXELS: int = 40
+## The shelf bar lives in a vertical budget the compact tiers shrink hard, so an icon that is
+## comfortable at 1080p overflows the maximum-scale layout and pushes the shop cards past the
+## bottom edge. 22 keeps the action button's height at what the text-only button used to be.
+const ACTION_ICON_PIXELS: int = 22
 const RELIC_ICON_PIXELS: int = 48
 
 ## One cell of a horizontally laid out icon sheet, resized to `target` pixels wide.
