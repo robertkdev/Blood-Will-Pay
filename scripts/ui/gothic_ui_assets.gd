@@ -10,7 +10,9 @@ const PANEL_PLATE_TRAITS: String = "res://assets/ui/gothic/panel_plate_traits.pn
 const SHOP_CARD_FRAME: String = "res://assets/ui/gothic/shop_card_frame_v2.png"
 const BUTTON_SMALL: String = "res://assets/ui/gothic/button_small_v2.png"
 const BUTTON_PRIMARY: String = "res://assets/ui/gothic/button_primary_v2.png"
-const SCREEN_BACKDROP: String = "res://assets/ui/horror_v1/battlefield_thorn_rupture.png"
+## Generated stone floor with blood, grates and debris at the edges, left even through the
+## middle so the panels and the grid sit on it rather than in a black void.
+const SCREEN_BACKDROP: String = "res://assets/ui/gothic/generated/arena_backdrop.png"
 const BATTLEFIELD_SURFACE: String = "res://assets/ui/gothic/battlefield_surface_horror_v1.png"
 const BATTLEFIELD_SURFACE_TOP: String = "res://assets/ui/gothic/battlefield_surface_horror_v1_top.png"
 const BATTLEFIELD_SURFACE_BOTTOM: String = "res://assets/ui/gothic/battlefield_surface_horror_v1_bottom.png"
