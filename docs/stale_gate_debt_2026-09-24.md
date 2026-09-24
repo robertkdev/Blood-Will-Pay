@@ -38,13 +38,21 @@ The authored value is `0.21`, so the combat gate matched the game. And it demand
 two pixels for major seams against one for minor. Both now assert the contract the game actually
 keeps, which is the first time those two suites have agreed.
 
-## `BettingEconomySmoke` - 6 failures
+## `BettingEconomySmoke`, `NaturalBuyXPVisualSmoke`, `BuyXPTransactionalFeedbackSmoke` - clean
 
-All six are economy assertions (`reset_run should start with configured starting gold`, the
-all-in escrow and payout chain). They do not reference the odds or the shelf controls, and they
-are identical at the commit before the current work. Most likely the live account the Jev
-batches spend against - they run with `-LedgerOmens -1`, which leaves the live profile alone but
-still plays it.
+Eight failures across three suites, fixed in `d17b4ef2`, and **one cause**: the starting reserve
+is no longer a constant.
+
+`Economy.reset_run()` sets `STARTING_BLOOD_BUCKETS + starting_blood_bucket_bonus(...)` - the
+Debtor's Mercy Edict pays a first bucket and one more per 25 Ledger ranks, so the reserve keeps
+growing with the account. That permanent growth across runs is the point of the campaign and the
+user asked for it. Every absolute gold expectation went stale the moment the account played.
+
+| suite | what it assumed |
+| --- | --- |
+| `BettingEconomySmoke` (6) | `reset_run` lands on `STARTING_GOLD`. It now computes the expected value the way the game does; its five dependent assertions (escrow, captured start, payout, remembered preferred bet, all-in loss) followed. |
+| `NaturalBuyXPVisualSmoke` (1) | the guaranteed opener lands on exactly 6 gold. The pool is not a fixed multiple, so the account-independent contract is that the opener paid and cleared the safe-gold threshold. |
+| `BuyXPTransactionalFeedbackSmoke` (1) | the denial sentence has been reworded. Now asserts a refusal that names the action and the reserve floor. |
 
 ## `ArenaPressureVisualSmoke` - 1 failure
 
@@ -62,7 +70,15 @@ The compact audit is the case study: 65 of its 78 failures were copy-matching, s
 genuine 9-failure regression of mine and a 4-failure layout overlap. Clearing the rot first is
 what made the real defects visible.
 
-Two suites have now been taken to zero this way, and the second one showed the other face of the
-same problem: its failures were not hiding a layout bug, they were two gates disagreeing with
-each other about a value the game had already settled. A gate that reads deleted copy cannot
-notice that; a gate that reads the contract can.
+Three more went to zero the same way, and between them they show every face of the problem:
+
+* `CompactViewportVisualAuditSmoke` - copy rot hiding a real regression of mine and a real
+  layout overlap.
+* `UIThemeSmoke` - copy rot hiding two gates that disagreed about a value the game had settled.
+* The three economy suites - no copy rot at all, just **absolute expectations in a game that
+  now grows**. The account starts richer the more it has played, which is the feature.
+
+A gate that reads deleted copy cannot notice any of that. A gate that reads the contract can.
+What is still red is down to two things and both are understood: `PostCombatPlanningBeatSmoke`'s
+result-card block, which contradicts a newer passing smoke and needs a rewrite, and
+`ArenaPressureVisualSmoke`'s single reduced-motion failure.
