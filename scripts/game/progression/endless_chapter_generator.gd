@@ -134,11 +134,15 @@ const THEMES: Array[Dictionary] = [
 static var _catalog_cache: Array[Dictionary] = []
 static var _catalog_by_id: Dictionary = {}
 static var _trait_threshold_cache: Dictionary = {}
+## Whether each trait's ladder has dead zones between its rungs, cached beside
+## the thresholds so the generator reads the same rule the compiler applies.
+static var _trait_exact_cache: Dictionary = {}
 
 static func clear_cache() -> void:
 	_catalog_cache.clear()
 	_catalog_by_id.clear()
 	_trait_threshold_cache.clear()
+	_trait_exact_cache.clear()
 
 static func generate_sequence(start_chapter: int, chapter_count: int, seed: int = DEFAULT_SEED) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -664,10 +668,7 @@ static func _active_trait_rows_for_ids(ids: Array[String], unit_total: int) -> A
 	for trait_id: String in counts.keys():
 		var count: int = int(counts[trait_id])
 		var thresholds: Array[int] = _trait_thresholds_for(trait_id)
-		var tier: int = -1
-		for i: int in range(thresholds.size()):
-			if count >= int(thresholds[i]):
-				tier = i
+		var tier: int = TraitDef.tier_for(count, thresholds, _trait_is_exact(trait_id))
 		if tier < 0:
 			continue
 		var threshold: int = int(thresholds[tier])
@@ -700,17 +701,28 @@ static func _trait_thresholds_for(trait_id: String) -> Array[int]:
 		var cached: Array[int] = _trait_threshold_cache[clean_id]
 		return cached.duplicate()
 	var out: Array[int] = []
+	var exact: bool = false
 	var path: String = "res://data/traits/%s.tres" % clean_id
 	if ResourceLoader.exists(path):
 		var resource: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
 		if resource is TraitDef:
 			var trait_def: TraitDef = resource
+			exact = trait_def.exact_thresholds
 			for value: int in trait_def.thresholds:
 				out.append(int(value))
 	if out.is_empty():
 		out = DEFAULT_TRAIT_THRESHOLDS.duplicate()
 	_trait_threshold_cache[clean_id] = out
+	_trait_exact_cache[clean_id] = exact
 	return out.duplicate()
+
+## Reads the cached dead-zone flag, loading the trait first if it is not cached.
+static func _trait_is_exact(trait_id: String) -> bool:
+	var clean_id: String = String(trait_id).strip_edges()
+	if clean_id == "":
+		return false
+	_trait_thresholds_for(clean_id)
+	return bool(_trait_exact_cache.get(clean_id, false))
 
 static func _level_for_index_and_id(levels: Dictionary, index: int, id: String) -> int:
 	if levels.has(index):

@@ -481,3 +481,38 @@ and has no `unit_sold` accounting yet.
    zones that pay nothing, or is monotone the intent?
 2. 20.2% of corpus fights are missing `top_threshold`, all from the two earliest run roots. Schema
    change or bug?
+
+### 15.7 Trait dead zones, implemented
+
+**Ruling on 15.6(1), 2026-09-24: counts 2 and 4 on Exile and Liaison are dead zones that pay
+nothing.** The engine was computing a monotone tier, so a count of 2 read the same as a count of 1
+and a count of 4 the same as 3.
+
+What was actually wrong was only the *reading*. `scripts/game/traits/effects/exile.gd` already
+implemented the dead zones (`_upgrade_tier_for_count` returns 0 at 2 and 4), but the compiler, the
+enemy generator, and therefore the UI and the rig's `deployed_traits` all reported a monotone tier.
+Liaison's effect reads the compiled tier, so it *did* pay at 2 and 4 - that changes now.
+
+Implementation, one rule in one place:
+
+- `TraitDef.tier_for(count, thresholds, exact)` holds the rule and `TraitDef.exact_thresholds` is
+  the per-trait flag, set true on `Exile.tres` and `Liaison.tres`. A count between two rungs
+  activates nothing, and a count past the top rung keeps the top tier - so 9 Exiles is not worse
+  than 5.
+- `trait_compiler.gd` and `endless_chapter_generator.gd` both call it, and the generator caches the
+  flag beside the thresholds. The harness and the UI read the compiler, so they follow.
+- `tests/rga_testing/validation/composition_trait_balance_evidence.gd` models the same rule so it
+  cannot disagree with the engine.
+
+New probe: `tests/rga_testing/validation/trait_ladder_dead_zone_probe.gd` (with its `.tscn`). It
+asserts the rule table for both ladder shapes, that the authored `.tres` carry the flag, that real
+Exile boards of 1 to 5 bodies compile to tiers `[0, -1, 1, -1, 2]`, that Fortified's ramp is
+unchanged (3 bodies -> tier 0, 5 -> tier 1), and that the generator agrees with the compiler.
+
+Verification: the new probe passes; `MentorLinkNoSharedTraitProbe` and `ItemTraitSystemsProbe`
+pass; `CompositionTraitBalanceEvidence` runs clean end to end; and a heuristic deep harness run on
+seed 21353 finished with zero technical failures and no engine errors. That short run happened not
+to field Exile or Liaison at all, so the probe is the evidence for the rule rather than the run.
+
+Balance consequence worth flagging: enemy teams built around Exile or Liaison at 2 or 4 bodies now
+register a lower trait pressure, so enemy level tuning at those counts shifts.
