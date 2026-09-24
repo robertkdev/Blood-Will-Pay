@@ -21,6 +21,18 @@ const USE_SYNTHETIC_INPUT: bool = false
 const CLEANUP_DRAIN_FRAMES: int = 75
 const DUMP_ORPHAN_NODES: bool = false
 
+## The harness plays the shipped game, but it must not take the desktop to do it. The
+## project boots fullscreen (`window/size/mode=3`), so a run used to cover the whole
+## monitor and make the machine unusable while it played. Runs now get a small windowed
+## frame parked in the corner of the current screen, flagged never to take focus and never
+## on top. The logical viewport stays HARNESS_VIEWPORT through canvas-item content scaling,
+## so the layout the game builds and the coordinates the synthetic events carry are
+## unchanged - only the OS window shrinks.
+const HARNESS_VIEWPORT: Vector2i = Vector2i(1920, 1080)
+const HARNESS_WINDOW_SIZE: Vector2i = Vector2i(960, 540)
+const HARNESS_WINDOW_MARGIN: int = 16
+const HARNESS_CURSOR_SAMPLE_SECONDS: float = 0.25
+
 var _main: Control = null
 var _failures: Array[String] = []
 var _previous_time_scale: float = 1.0
@@ -29,17 +41,20 @@ var _reported_button_fallback: bool = false
 var _reported_drag_fallback: bool = false
 var _actual_saved_opening_entry: Dictionary = {}
 var _actual_opening_entry_forced: bool = false
+var _harness_window_report: Dictionary = {}
+var _cursor_watch_samples: int = 0
+var _cursor_watch_start: Vector2i = Vector2i.ZERO
+var _cursor_watch_min: Vector2i = Vector2i.ZERO
+var _cursor_watch_max: Vector2i = Vector2i.ZERO
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Park here rather than in _run: _run is deferred, which would present the boot
+	# fullscreen for the whole scene load before the window is moved.
+	_park_harness_window(_harness_compact_window())
 	call_deferred("_run")
 
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -741,6 +756,97 @@ func _warp_mouse_for_synthetic_input(position: Vector2) -> void:
 	if not _mouse_warp_requested():
 		return
 	get_viewport().warp_mouse(position)
+
+## Park the harness window so a long run neither covers nor takes the desktop.
+##
+## The project boots fullscreen (`window/size/mode=3`), so a run used to cover the whole
+## monitor and the machine was unusable while it played. The long play lanes now get a
+## borderless window parked in the corner of the current screen, never focused and never on
+## top, with the logical viewport held at HARNESS_VIEWPORT by content scaling - so the layout
+## the game builds and the coordinates the synthetic events carry are unchanged.
+##
+## The fullscreen exit has to go through `WINDOW_FLAG_BORDERLESS`. Asking for
+## `WINDOW_MODE_WINDOWED` from the boot state is ignored and leaves the window in
+## `WINDOW_MODE_EXCLUSIVE_FULLSCREEN`, which is what covered a whole display.
+##
+## Anything that is not a long play lane is left exactly as it was. The short one-shot smokes
+## keep their historical presentation, and the ones that resize the window to probe responsive
+## layouts need the logical viewport to follow the window - which content scaling would stop.
+## `BWP_HARNESS_WINDOW=fullscreen` forces the old presentation even for a long lane.
+static func _harness_fullscreen_requested() -> bool:
+	return OS.get_environment("BWP_HARNESS_WINDOW").strip_edges().to_lower() == "fullscreen"
+
+## Whether this harness entry wants the small background window. The long play lanes - which
+## never resize the window themselves - override this to true.
+func _harness_compact_window() -> bool:
+	return false
+
+func _park_harness_window(compact: bool = false) -> void:
+	var park: bool = compact and not _harness_fullscreen_requested()
+	if park:
+		# KEEP, not EXPAND: the logical viewport must be exactly HARNESS_VIEWPORT whatever the
+		# OS window measures after the borderless switch shaves a few pixels off it.
+		var window: Window = get_window()
+		if window != null:
+			window.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+			window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+			window.content_scale_size = HARNESS_VIEWPORT
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, false)
+		DisplayServer.window_set_size(HARNESS_WINDOW_SIZE)
+		DisplayServer.window_set_position(_parked_window_position())
+		# Last, so nothing above can hand the focus back.
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
+	_harness_window_report = {
+		"presentation": "background" if park else "shipped",
+		"os_window_size": DisplayServer.window_get_size(),
+		"logical_viewport": get_viewport().get_visible_rect().size,
+		"screen_count": DisplayServer.get_screen_count(),
+	}
+	_start_cursor_watch()
+
+static func _parked_window_position() -> Vector2i:
+	var screen: int = DisplayServer.window_get_current_screen()
+	var usable: Rect2i = DisplayServer.screen_get_usable_rect(screen)
+	var corner: Vector2i = usable.position + usable.size - HARNESS_WINDOW_SIZE - Vector2i(HARNESS_WINDOW_MARGIN, HARNESS_WINDOW_MARGIN)
+	return Vector2i(maxi(usable.position.x, corner.x), maxi(usable.position.y, corner.y))
+
+## Watch the real pointer for the whole run without ever moving it.
+##
+## Every click the harness makes goes through Godot's own input queue
+## (`Input.parse_input_event`), so the OS cursor should be untouched; a run that warped it
+## would be visibly holding the machine's mouse. Sampling turns "we believe we stopped
+## warping" into a number that travels with the run's own summary: the furthest the pointer
+## drifted from where it started while the harness was playing.
+func _start_cursor_watch() -> void:
+	if get_node_or_null("HarnessCursorWatch") != null:
+		return
+	var start: Vector2i = DisplayServer.mouse_get_position()
+	_cursor_watch_samples = 0
+	_cursor_watch_start = start
+	_cursor_watch_min = start
+	_cursor_watch_max = start
+	var timer: Timer = Timer.new()
+	timer.name = "HarnessCursorWatch"
+	timer.wait_time = HARNESS_CURSOR_SAMPLE_SECONDS
+	timer.autostart = true
+	timer.timeout.connect(_sample_os_cursor)
+	add_child(timer)
+
+func _sample_os_cursor() -> void:
+	var position: Vector2i = DisplayServer.mouse_get_position()
+	_cursor_watch_samples += 1
+	_cursor_watch_min = Vector2i(mini(_cursor_watch_min.x, position.x), mini(_cursor_watch_min.y, position.y))
+	_cursor_watch_max = Vector2i(maxi(_cursor_watch_max.x, position.x), maxi(_cursor_watch_max.y, position.y))
+
+func _harness_window_summary() -> Dictionary:
+	var report: Dictionary = _harness_window_report.duplicate()
+	report["cursor_samples"] = _cursor_watch_samples
+	report["cursor_max_shift_px"] = maxi(
+		maxi(absi(_cursor_watch_max.x - _cursor_watch_start.x), absi(_cursor_watch_min.x - _cursor_watch_start.x)),
+		maxi(absi(_cursor_watch_max.y - _cursor_watch_start.y), absi(_cursor_watch_min.y - _cursor_watch_start.y)),
+	)
+	return report
 
 func _first_fight_placeholder_visible() -> bool:
 	var grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer

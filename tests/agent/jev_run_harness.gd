@@ -202,13 +202,12 @@ func _take_fight_frame_stats() -> Dictionary:
 		"max_ms": snappedf(ordered[count - 1], 0.01),
 	}
 
+## The Jev lane is the long one; it gets the small background window.
+func _harness_compact_window() -> bool:
+	return true
+
 func _run() -> void:
 	_read_environment()
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -3356,6 +3355,8 @@ func _run_summary(terminal: String, outcome_record: Dictionary = {}) -> Dictiona
 		"events": _events,
 		"decision_counts": _decision_kinds,
 		"technical_failures": _failures,
+		# Where the run's window sat, and how far the real pointer drifted while it played.
+		"window": _harness_window_summary(),
 		# Acceptance targets for the run: a three-star unit, a trait at its top
 		# tier, and a board filled to its capacity. Read from the recorded events.
 		"progression": _progression_summary(),

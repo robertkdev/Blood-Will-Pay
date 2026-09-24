@@ -42,6 +42,11 @@ param(
     # that genuinely needs the pointer warped.
     [switch] $MouseWarp,
 
+    # Runs play in a small window parked in the corner so the machine stays usable while
+    # Jev is going. "fullscreen" restores the old screen-covering presentation.
+    [ValidateSet("background", "fullscreen")]
+    [string] $Window = "background",
+
     # 1.0 is the shipped game speed. Higher values are for fast sweeps only.
     [ValidateRange(0.25, 16.0)]
     [double] $Speed = 1.0,
@@ -93,6 +98,39 @@ if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     $nodePath = (Get-Command node -ErrorAction Stop).Source
 }
 
+# A harness run can outlive its runner - the MCP server holds the Godot process and the
+# window stays. One leaked run from an earlier session was still sitting borderless over a
+# whole display two days later. Clear MCP-spawned runs for this project before starting a
+# new one. Only processes whose parent is a godot-mcp server are touched, so a game the
+# person launched themselves is never killed.
+function Clear-StaleHarnessGodot {
+    param([string] $Project)
+    $escapedProject = [Regex]::Escape($Project)
+    $mcpServers = @{}
+    foreach ($server in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue)) {
+        if ($server.CommandLine -and $server.CommandLine -match 'godot-mcp') {
+            $mcpServers[[int]$server.ProcessId] = $true
+        }
+    }
+    if ($mcpServers.Count -eq 0) {
+        return
+    }
+    $stale = @(Get-CimInstance Win32_Process -Filter "Name LIKE 'Godot%'" -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.CommandLine -and
+            $_.CommandLine -match $escapedProject -and
+            $mcpServers.ContainsKey([int]$_.ParentProcessId)
+        })
+    foreach ($process in $stale) {
+        Write-Host ("Clearing stale harness run still holding this project (pid {0})." -f $process.ProcessId)
+        Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($stale.Count -gt 0) {
+        Start-Sleep -Seconds 1
+    }
+}
+Clear-StaleHarnessGodot -Project $ProjectPath
+
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runDirectory = Join-Path $ArtifactRoot ("runs\{0}-{1}-seed{2}-{3}" -f $Mode, $Lane, $Seed, $stamp)
 New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
@@ -119,6 +157,11 @@ if ($MouseWarp) {
     $env:BWP_MOUSE_WARP = "1"
 } else {
     Remove-Item Env:\BWP_MOUSE_WARP -ErrorAction SilentlyContinue
+}
+if ($Window -eq "fullscreen") {
+    $env:BWP_HARNESS_WINDOW = "fullscreen"
+} else {
+    Remove-Item Env:\BWP_HARNESS_WINDOW -ErrorAction SilentlyContinue
 }
 $env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
 $env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {
