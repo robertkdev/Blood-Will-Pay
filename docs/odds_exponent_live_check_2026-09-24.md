@@ -103,11 +103,29 @@ missing result, and the crash itself is silent unless someone opens `godot.log`.
 This is the most serious defect in the batch, and it is exactly the shape the request named -
 `max team size on both sides`. No prior crash record exists in `docs/`.
 
+### The reporting half is fixed
+
+`Start-JevRun.ps1` reported a crashed run as a row of nulls - no chapter, no battle count, no
+terminal - which is what made this run look like a hole in the batch. The harness already
+writes a per-round `run_checkpoint.json` for exactly this case and `analyze_jev_run.py`
+already falls back to it; only the runner did not.
+
+It now does, and marks why. Re-running the result block from the edited script against the two
+run directories on disk:
+
+| run | terminal | chapter | battles | flags |
+| --- | --- | ---: | ---: | --- |
+| 21204 (crashed) | `in_progress` | 5 | 27 | `summary_is_partial: true`, `summary_source: run_checkpoint.json` |
+| 21201 (completed) | `stage_stall` | 6 | 36 | `summary_is_partial: false` |
+
+So an incomplete run is now legible as incomplete, with its data, instead of
+indistinguishable from a run that produced nothing. The crash itself is untouched.
+
 ## Next
 
-1. Reproduce and fix the 21204 crash. Nine-unit board, item pass, `remove_all` twice - then
-   make the harness flush a partial `run_summary.json` as the run progresses, so a crash
-   reports as an incomplete run with its data rather than as a missing result.
+1. Reproduce and fix the 21204 crash itself. Nine-unit board, item pass, `remove_all` on
+   `Repo` twice returning 0 both times, then `alloc_static` on a null pointer. The reporting
+   half is done, so the next crash will not also cost the batch a row.
 2. Build the concentrated-item probe described above and measure whether the ratio error is
    item effects.
 3. Re-run this seed block once the crash is fixed; 21204 is not a result, it is a gap.

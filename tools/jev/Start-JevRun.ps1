@@ -170,6 +170,16 @@ finally {
 
 $summaryPath = Join-Path $runDirectory "run_summary.json"
 $controllerSummaryPath = Join-Path $runDirectory "controller_summary.json"
+# A run that dies before its end path - a crash, a kill, a timeout - never writes
+# run_summary.json and was reported here as a completely empty result: no chapter, no
+# battle count, no terminal. The harness writes a per-round checkpoint for exactly this
+# reason and the analyzer already falls back to it, so the runner does too. The terminal
+# stays "in_progress" and summary_is_partial says why, so an incomplete run is legible
+# rather than indistinguishable from a run that produced nothing.
+$checkpointPath = Join-Path $runDirectory "run_checkpoint.json"
+$summaryExists = Test-Path -LiteralPath $summaryPath
+$checkpointExists = Test-Path -LiteralPath $checkpointPath
+$effectiveSummaryPath = if ($summaryExists) { $summaryPath } elseif ($checkpointExists) { $checkpointPath } else { "" }
 $result = [ordered]@{
     run_directory = $runDirectory
     mode = $Mode
@@ -179,17 +189,21 @@ $result = [ordered]@{
     starter = $Starter
     scene = $Scene
     godot_log = $runLog
-    run_summary = if (Test-Path -LiteralPath $summaryPath) { $summaryPath } else { $null }
+    run_summary = if ($summaryExists) { $summaryPath } else { $null }
     controller_summary = if (Test-Path -LiteralPath $controllerSummaryPath) { $controllerSummaryPath } else { $null }
+    summary_is_partial = ((-not $summaryExists) -and $checkpointExists)
 }
-if (Test-Path -LiteralPath $summaryPath) {
-    $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+if ($effectiveSummaryPath -ne "") {
+    $summary = Get-Content -LiteralPath $effectiveSummaryPath -Raw | ConvertFrom-Json
     $result["terminal"] = $summary.terminal
     $result["final_chapter"] = $summary.final_chapter
     $result["final_stage_in_chapter"] = $summary.final_stage_in_chapter
     $result["battles"] = $summary.battles
     $result["peak_bankroll"] = $summary.peak_bankroll
     $result["technical_failures"] = @($summary.technical_failures).Count
+    if (-not $summaryExists) {
+        $result["summary_source"] = "run_checkpoint.json (run did not reach its end path)"
+    }
 }
 if (Test-Path -LiteralPath $controllerSummaryPath) {
     $controllerSummary = Get-Content -LiteralPath $controllerSummaryPath -Raw | ConvertFrom-Json
