@@ -280,10 +280,17 @@ func _click_buy_xp(label: String) -> bool:
 		return false
 	var before_gold: int = int(Economy.gold)
 	var before_level: int = int(Shop.get_level())
+	# The shop quotes the level in stake units and multiplies by the current stake unit, so
+	# the charge is BUY_XP_COST only while the stake unit is 1. Assert the price the shop
+	# actually quoted rather than the constant: comparing against 4 failed the moment a level
+	# was bought at stake unit 2 or higher, which is a real, intended charge and not a defect.
+	var quoted_xp_price: int = int(SHOP_CONFIG.BUY_XP_COST)
+	if Shop.has_method("get_progression_price"):
+		quoted_xp_price = int(Shop.get_progression_price())
 	var clicked: bool = await _click_button(button, "%s Buy XP" % label)
 	await _settle_frames(4)
 	_expect(clicked, "%s Buy XP click did not fire" % label)
-	_expect(int(Economy.gold) == before_gold - int(SHOP_CONFIG.BUY_XP_COST), "%s Buy XP should spend exactly %d gold; state=%s" % [label, int(SHOP_CONFIG.BUY_XP_COST), JSON.stringify(_two_stage_state())])
+	_expect(int(Economy.gold) == before_gold - quoted_xp_price, "%s Buy XP should spend exactly the quoted %d gold; state=%s" % [label, quoted_xp_price, JSON.stringify(_two_stage_state())])
 	_expect(int(Shop.get_level()) >= before_level, "%s Buy XP should not reduce level; state=%s" % [label, JSON.stringify(_two_stage_state())])
 	return clicked
 

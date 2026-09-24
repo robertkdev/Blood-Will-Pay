@@ -137,7 +137,11 @@ func _attempt_natural_buy_xp_success() -> bool:
 	_success_stage_in_chapter = before_stage
 	_success_gold_before = before_gold
 	_success_gold_after = int(Economy.gold)
-	_expect(int(Economy.gold) == before_gold - int(SHOP_CONFIG.BUY_XP_COST), "natural Buy XP should spend exactly %d gold" % int(SHOP_CONFIG.BUY_XP_COST))
+	# BUY_XP_COST is quoted in stake units, so the charge is the constant only at stake unit 1.
+	# This smoke runs at the opening, but assert the quoted price anyway so it stays a check
+	# of the contract rather than of a coincidence.
+	var quoted_xp_price: int = int(Shop.get_progression_price()) if Shop.has_method("get_progression_price") else int(SHOP_CONFIG.BUY_XP_COST)
+	_expect(int(Economy.gold) == before_gold - quoted_xp_price, "natural Buy XP should spend exactly the quoted %d gold" % quoted_xp_price)
 	_expect(int(Shop.get_level()) == before_level + 1, "natural Buy XP should advance one shop level")
 	_expect(int(Shop.get_level()) == 2, "natural Buy XP should reach level 2")
 	_expect(int(Shop.get_xp()) == 2, "natural Buy XP should preserve 2 overflow XP at level 2")

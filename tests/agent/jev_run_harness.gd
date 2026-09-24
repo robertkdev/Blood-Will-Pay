@@ -20,6 +20,21 @@ extends "res://tests/pacing/competent_policy_pacing_harness.gd"
 const JEV_HARNESS_NAME: String = "JevRunHarness"
 const DEFAULT_RUN_DIR: String = "user://jev_run"
 const JEV_RULES_PATH: String = "res://tools/jev/policy/jev_run_rules.json"
+## Opt-in levelling strategy, selected with JEV_LEVEL_POLICY=eager.
+##
+## The shipped path asks the model, and the model's rule turns out to have no reachable
+## off-switch: it holds off "only while several 1-cost pairs with no upgrades are still the
+## best value", and on a level-3 shelf that is 65% cost 1 with the rig always collecting
+## duplicates, that is permanently true. Measured over fourteen runs the rig buys XP a mean of
+## 1.5 times, and one run sat at shop level 2 holding 58,490 buckets. Levelling is the only way
+## to reach a cost-4 unit at all, and no player board in the record has ever held one.
+##
+## "eager" does not replace the model. It only takes the case the free-form rule cannot: the
+## price is trivial against the bankroll, the level is still below the tier that matters, and
+## the reserve floor still holds. Every other level question goes to the model exactly as
+## before, so the two arms of the A/B differ in one decision class and nothing else.
+const EAGER_LEVEL_TARGET: int = 7
+const EAGER_LEVEL_PRICE_BANKROLL_RATIO: int = 20
 const DEFAULT_RESERVE_FLOOR_BUCKETS: int = 2
 const DECISION_POLL_SECONDS: float = 0.05
 const DECISION_TIMEOUT_SECONDS: float = 240.0
@@ -91,6 +106,8 @@ var _run_dir: String = DEFAULT_RUN_DIR
 var _run_mode: String = "jev"
 var _lane: String = "campaign"
 var _campaign_seed: int = 4401
+## "eager" opts into the deterministic level rule below; empty keeps the shipped path.
+var _level_policy: String = ""
 ## Set when JEV_LEDGER_OMENS asks for a controlled account depth; see
 ## _seed_account_omens_if_requested.
 var _seeded_account_profile_path: String = ""
@@ -560,6 +577,7 @@ func _read_environment() -> void:
 	var lane_value: String = OS.get_environment("JEV_LANE").strip_edges().to_lower()
 	if lane_value in ["campaign", "deep"]:
 		_lane = lane_value
+	_level_policy = OS.get_environment("JEV_LEVEL_POLICY").strip_edges().to_lower()
 	_capture_planning = OS.get_environment("JEV_CAPTURE_PLANNING").strip_edges() == "1"
 	var capture_budget_value: String = OS.get_environment("JEV_CAPTURE_BUDGET").strip_edges()
 	if capture_budget_value.is_valid_int():
@@ -1155,7 +1173,17 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	if not _level_purchase_is_legal():
 		return false
 	var gold: int = int(Economy.gold)
-	var xp_price: int = int(SHOP_CONFIG.BUY_XP_COST)
+	# The price the shop will actually charge, not the constant.
+	#
+	# ShopConfig expresses the cost in *stake units* (PROGRESSION_STAKE_UNITS = 4) and
+	# Economy.progression_price() multiplies by the current stake unit, so a level bought
+	# at stake unit 3 costs 12 buckets. This read the constant, so from stake unit 2 onward
+	# the level decision was told XP cost 4 when it cost 8, 12, 16 or more - every number
+	# derived from it (buckets_after, the reserve check, the "Spend N of M buckets" line)
+	# was wrong by the stake multiplier, and so was the cost half of the decision the model
+	# was making. The eager path surfaced it as a hard failure because the inherited Buy XP
+	# helper asserts the spend equals the constant.
+	var xp_price: int = int(Shop.get_progression_price())
 	var capacity_now: int = _roster_max_team_size()
 	var capacity_after: int = _level_board_capacity(_level_after_xp_purchase(int(Shop.get_level()), int(Shop.get_xp())))
 	var board_size: int = _board_ids().size()
@@ -1279,6 +1307,26 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 			"effect": "Keep %d buckets for bodies; the board stays at %d of %d slots." % [gold, board_size, capacity_now],
 		},
 	]
+	# Opt-in strategy variant; see EAGER_LEVEL_TARGET. The model is bypassed only for the
+	# decision class it structurally cannot take - trivial price, still below the tier that
+	# reaches cost-4 units, reserve floor intact. Everything else still goes to the model.
+	if _level_policy == "eager":
+		var price_is_trivial: bool = gold >= xp_price * EAGER_LEVEL_PRICE_BANKROLL_RATIO
+		var below_target_level: bool = int(Shop.get_level()) < EAGER_LEVEL_TARGET
+		var reserve_survives: bool = (gold - xp_price) >= _reserve_floor_buckets
+		if price_is_trivial and below_target_level and reserve_survives:
+			var gold_before_eager: int = int(Economy.gold)
+			var bought_eager: bool = await _click_buy_xp(label)
+			_append_event("buy_xp", {
+				"label": label,
+				"before_buys": before_buys,
+				"bought": bought_eager,
+				"gold_before": gold_before_eager,
+				"gold_after": int(Economy.gold),
+				"level_after": int(Shop.get_level()),
+				"policy": "eager",
+			})
+			return bought_eager
 	var state: Dictionary = _plan_state()
 	state["decision_label"] = label
 	state["before_buys"] = before_buys

@@ -31,6 +31,12 @@ param(
     # same play; see jev_run_controller.py --replay-from.
     [string] $ReplayFrom = "",
 
+    # Opt-in levelling strategy. Empty keeps the shipped model decision; "eager" takes the
+    # case the free-form rule cannot - a trivial XP price against the bankroll - so the
+    # two arms of a same-seed A/B differ in exactly that decision class.
+    [ValidateSet("", "eager")]
+    [string] $LevelPolicy = "",
+
     # 1.0 is the shipped game speed. Higher values are for fast sweeps only.
     [ValidateRange(0.25, 16.0)]
     [double] $Speed = 1.0,
@@ -98,6 +104,11 @@ if ($LedgerOmens -ge 0) {
     $env:JEV_LEDGER_OMENS = [string]$LedgerOmens
 } else {
     Remove-Item Env:\JEV_LEDGER_OMENS -ErrorAction SilentlyContinue
+}
+if (-not [string]::IsNullOrWhiteSpace($LevelPolicy)) {
+    $env:JEV_LEVEL_POLICY = $LevelPolicy
+} else {
+    Remove-Item Env:\JEV_LEVEL_POLICY -ErrorAction SilentlyContinue
 }
 $env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
 $env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {
