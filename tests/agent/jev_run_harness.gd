@@ -1212,19 +1212,14 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	var enemy_top_cost: int = _enemy_top_cost()
 	var enemy_tier_now: float = _tier_share(shelf_now, enemy_top_cost)
 	var enemy_tier_after: float = _tier_share(shelf_after, enemy_top_cost)
+	# The tier data below is recorded but deliberately NOT spoken into the prompt. Naming the
+	# enemy's tier in the level decision's effect text was measured and made things worse, not
+	# better: over the same six seeds the rig bought XP less often (median 0 against 1) and
+	# reached shallower (mean chapter 1.83 against 3.70). The likely reason is the one the
+	# policy already records about the slot argument - an advertised level makes early XP look
+	# better than it is and drains the bankroll the doubling ladder needs. The fields stay so a
+	# transcript can be read for whether the rig was ever in a position to answer a tier.
 	var enemy_tier_note: String = ""
-	if enemy_top_cost >= 4:
-		if enemy_tier_now <= 0.0 and enemy_tier_after > 0.0:
-			enemy_tier_note = " The board facing you fields a cost-%d unit and your shelf cannot offer that tier at all until this level: %.0f%% of rolls after it." % [
-				enemy_top_cost,
-				enemy_tier_after * 100.0,
-			]
-		else:
-			enemy_tier_note = " The board facing you fields a cost-%d unit: your shelf offers that tier on %.0f%% of rolls now and %.0f%% after this level." % [
-				enemy_top_cost,
-				enemy_tier_now * 100.0,
-				enemy_tier_after * 100.0,
-			]
 	var candidates: Array[Dictionary] = [
 		{
 			"id": "buy_xp",
