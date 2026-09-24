@@ -2,6 +2,7 @@ extends "res://tests/visual/random_later_shop_progression_smoke.gd"
 
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const ShopAffordabilityLib: Script = preload("res://scripts/game/shop/affordability.gd")
+const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
 const TWO_STAGE_SMOKE_NAME: String = "NaturalBonkoTwoStageMainFlowSmoke"
 const TWO_STAGE_STARTER_ID: String = "bonko"
 const TWO_STAGE_SHOP_SEED: int = 4401
@@ -307,6 +308,15 @@ func _buy_best_two_stage_offer(buy_index: int) -> String:
 			continue
 		if not _can_afford_shop_cost(cost):
 			continue
+		# A slot the game has already disabled is not a candidate.
+		#
+		# The policy used to choose on price and score alone and then click, so a disabled
+		# card - a full bench is the common cause - produced a failed click and a technical
+		# failure instead of a decision. Measured on one heuristic run that was 21 failures
+		# in a single chapter-8 run, and it is the defect that stops this lane from being a
+		# usable deep instrument. See docs/harness_failures_heuristic_lane_2026-09-23.md.
+		if _shop_slot_is_disabled(int(summary.get("slot", -1))):
+			continue
 		var score: int = _two_stage_offer_score(summary)
 		if score > best_score:
 			best_score = score
@@ -320,6 +330,23 @@ func _buy_best_two_stage_offer(buy_index: int) -> String:
 	var clicked: bool = await _click_shop_slot(best_slot)
 	_expect(clicked, "natural two-stage buy %d failed on slot %d; state=%s" % [buy_index, best_slot, JSON.stringify(_two_stage_state())])
 	return best_id if clicked else ""
+
+## True only when the slot's card is found AND the game has disabled it.
+##
+## Deliberately conservative: a slot whose card cannot be located is treated as selectable, so
+## a scene-layout change can never silently switch the policy to buying nothing.
+func _shop_slot_is_disabled(slot_index: int) -> bool:
+	if _main == null or slot_index < 0:
+		return false
+	var grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer
+	if grid == null:
+		return false
+	for child: Node in grid.get_children():
+		var card: Button = child as Button
+		if card == null or int(card.get("slot_index")) != slot_index:
+			continue
+		return card.disabled
+	return false
 
 func _should_skip_full_board_buy(unit_id: String, cost: int) -> bool:
 	var cap: int = _roster_max_team_size()
@@ -561,6 +588,18 @@ func _field_preferred_units(field_ids: Array[String], bench_out_ids: Array[Strin
 			continue
 		var current_cap: int = _roster_max_team_size()
 		if current_cap >= 0 and _board_ids().size() >= current_cap:
+			if _bench_is_full():
+				# A full board and a full bench is a deadlock: this swap needs to bench a body
+				# and there is nowhere to put it, so the drag fails and the run records a
+				# technical failure every single round. Measured on one heuristic run, 18 of
+				# its 26 failures were the same pair - "bench vykos before fielding egress" -
+				# repeated from chapter 6 to chapter 10.
+				#
+				# Declining is the honest answer while the bench is wedged; the alternative
+				# implemented here would be to sell a bench body, which is a strategy change
+				# rather than a correctness fix and is recorded separately in
+				# docs/depth_anatomy_2026-09-24.md. See also docs/harness_failures_heuristic_lane_2026-09-23.md.
+				continue
 			var bench_out_id: String = _next_board_swap_id(field_ids, bench_out_ids)
 			if bench_out_id == "":
 				# No board unit is worth trading away for this one. Skipping is the
@@ -854,6 +893,13 @@ func _roster_max_team_size() -> int:
 	if Roster == null:
 		return -1
 	return int(Roster.get("max_team_size"))
+
+## Bench capacity is the game's, not a guess: Roster owns it and reports it.
+func _bench_is_full() -> bool:
+	var cap: int = int(BenchConstants.BENCH_CAPACITY)
+	if Roster != null and Roster.has_method("slot_count"):
+		cap = int(Roster.call("slot_count"))
+	return cap > 0 and _bench_ids().size() >= cap
 
 func _two_stage_state() -> Dictionary:
 	return {
