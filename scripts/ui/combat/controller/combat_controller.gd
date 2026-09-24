@@ -1120,7 +1120,7 @@ func _update_board_status() -> void:
 		board_capacity_label.tooltip_text = "Deployed units / board slots. Buy XP to add slots."
 	if win_odds_label != null:
 		if manager == null or manager.player_team.is_empty() or manager.enemy_team.is_empty():
-			win_odds_label.text = "Est. Win --"
+			win_odds_label.text = "WIN --"
 			win_odds_label.tooltip_text = "Preview odds appear when both teams are visible."
 		else:
 			var player_rating: float = TeamOddsEstimator.team_rating(manager.player_team)
@@ -1143,7 +1143,7 @@ func _update_board_status() -> void:
 				if economy_node.has_method("quoted_payout"):
 					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
 			var odds_range: Vector2i = TeamOddsEstimator.estimate_range(odds)
-			win_odds_label.text = "Est. Win %d-%d%%" % [odds_range.x, odds_range.y]
+			win_odds_label.text = "WIN %d-%d%%" % [odds_range.x, odds_range.y]
 			win_odds_label.tooltip_text = "Rough model estimate %d%%. Abilities, items, placement, hazards, and live targeting can move the result outside this range. Your board rating %.0f vs enemy %.0f%s. The wager is priced by the encounter tier, not this estimate: %s -> %s gross (%.2fx)." % [
 				odds,
 				player_rating,
@@ -3967,7 +3967,7 @@ func _sync_combat_broadcast_strip(force: bool = false) -> void:
 	combat_broadcast_phase.text = "FIGHT %d" % int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else "FIGHT"
 	var wager: int = int(Economy.current_bet) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else 0
 	combat_broadcast_wager.text = "WAGER %d BLOOD" % wager
-	combat_broadcast_odds.text = String(win_odds_label.text).replace("Est. Win", "ODDS") if win_odds_label != null else "ODDS --"
+	combat_broadcast_odds.text = String(win_odds_label.text).replace("WIN", "ODDS") if win_odds_label != null else "ODDS --"
 	var player_health: Vector2i = _team_health_total(manager.player_team if manager != null else [])
 	var enemy_health: Vector2i = _team_health_total(manager.enemy_team if manager != null else [])
 	combat_broadcast_health.text = "ALLY %d/%d // FOE %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]
@@ -4015,7 +4015,9 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 		record_mark.add_theme_font_size_override("font_size", 18)
 		record_mark.visible = false
 	if board_phase_label != null:
-		board_phase_label.text = "/// FIGHT // SURVIVE" if in_combat else "/// PLAN // COMMIT"
+		# Phase name only. "/// PLAN // COMMIT" and "/// FIGHT // SURVIVE" were decorative
+		# instructions on a strip that already changes colour with the phase.
+		board_phase_label.text = "FIGHT" if in_combat else "PLAN"
 	if in_combat:
 		_combat_pressure_elapsed = 0.0
 		_environmental_pressure_phase = -1
@@ -4059,14 +4061,17 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 		_configure_compact_objective_signal(arena_objective)
 	var planning_directive: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
-		var tight_scale_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
-		planning_directive.text = "DEPLOY // WAGER // COMMIT" if tight_scale_layout else "DEPLOYMENT GRID // SET WAGER // COMMIT"
+		# One word. This strip used to read "DEPLOYMENT GRID // SET WAGER // COMMIT" - a sentence
+		# telling the player what the screen in front of them already shows. The plate's border
+		# and position carry the meaning; the label only needs to name the phase.
+		planning_directive.text = "DEPLOY"
 		planning_directive.add_theme_font_size_override("font_size", 18)
 	if in_combat and parent.has_method("_update_external_backplates"):
 		parent.call_deferred("_update_external_backplates")
 
 func _configure_compact_objective_signal(objective: Label) -> void:
-	objective.text = "LIVE // SURVIVE"
+	# The plate is already red and pulsing in combat; the word carries the rest.
+	objective.text = "LIVE"
 	objective.offset_left = -100.0
 	objective.offset_right = 100.0
 	objective.offset_top = 36.0

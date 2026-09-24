@@ -243,12 +243,13 @@ func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_s
 	if header == null:
 		return
 	var sealed_slots: int = maxi(0, total_slots - occupied_slots - ready_slots)
+	# One word and three counts. The wide variant used to read "EVIDENCE RELIQUARY CACHE /
+	# 00 HELD • 03 READY POCKETS • 15 SEALED IN RESERVE" - eleven words to convey three numbers
+	# on a panel whose shell art and slot colouring already say what it is.
 	header.text = (
-		"CACHE RELIQUARY\n%02d READY / %02d SEALED" % [ready_slots, sealed_slots]
+		"RELIQUARY\n%02d READY / %02d SEALED" % [ready_slots, sealed_slots]
 		if tight_compact
-		else "RELIQUARY CACHE\n%02d HELD  •  %02d READY  •  %02d SEALED" % [occupied_slots, ready_slots, sealed_slots]
-		if compact
-		else "EVIDENCE RELIQUARY CACHE\n%02d HELD  •  %02d READY POCKETS  •  %02d SEALED IN RESERVE" % [occupied_slots, ready_slots, sealed_slots]
+		else "RELIQUARY\n%02d HELD  •  %02d READY  •  %02d SEALED" % [occupied_slots, ready_slots, sealed_slots]
 	)
 	header.custom_minimum_size.y = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
 	header.add_theme_font_size_override("font_size", 11 if tight_compact else 13 if wide_support_rail else 12 if compact else 15)

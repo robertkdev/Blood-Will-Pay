@@ -48,7 +48,7 @@ func _run() -> void:
 	_expect(opener_started, "opening fight did not start immediately after starter select")
 	_expect(not _bottom_planning_visible(), "bottom planning/shop area stayed visible during the opening fight")
 	var active_stage_phase: Label = _main.find_child("PhaseLabel", true, false) as Label
-	_expect(active_stage_phase != null and active_stage_phase.text == "/// FIGHT", "active combat stage strip did not expose /// FIGHT")
+	_expect(active_stage_phase != null and active_stage_phase.text == "FIGHT", "active combat stage strip did not expose its FIGHT phase")
 	_assert_active_combat_shell()
 	if _finish_if_failed():
 		return
@@ -85,7 +85,7 @@ func _run() -> void:
 	_expect(result_banner != null and not result_banner.visible, "battle result overlay remained visible after the authored intermission")
 	var restored_stage_phase: Label = _main.find_child("PhaseLabel", true, false) as Label
 	var restored_stage_bar: Control = _main.find_child("StageProgressTopBar", true, false) as Control
-	_expect(restored_stage_phase != null and restored_stage_phase.text == "/// READY", "planning restored without resetting the resolved stage phase")
+	_expect(restored_stage_phase != null and restored_stage_phase.text == "READY", "planning restored without resetting the resolved stage phase")
 	_expect(restored_stage_bar != null and not bool(restored_stage_bar.get_meta("result_state_active", true)), "planning restored while the stage strip still exposed result metadata")
 	_normalize_restored_planning_capture_timer()
 	await get_tree().process_frame
@@ -391,7 +391,7 @@ func _assert_persistent_combat_chrome(context: String) -> void:
 	_expect(stage_bar != null and stage_bar.is_visible_in_tree(), "%s lost the stage/chapter strip" % context)
 	_expect(chapter_label != null and chapter_label.is_visible_in_tree() and chapter_label.modulate.a >= 0.99, "%s lost persistent chapter copy" % context)
 	_expect(phase_label != null and phase_label.is_visible_in_tree() and phase_label.modulate.a >= 0.99, "%s lost persistent phase copy" % context)
-	_expect(system_menu != null and system_menu.is_visible_in_tree() and system_menu.text == "SYS // MENU" and system_menu.modulate.a >= 0.99, "%s lost the authored persistent system-menu action" % context)
+	_expect(system_menu != null and system_menu.is_visible_in_tree() and system_menu.text == "MENU" and system_menu.modulate.a >= 0.99, "%s lost the authored persistent system-menu action" % context)
 	_expect(system_menu != null and bool(system_menu.get_meta("authored_system_command", false)), "%s system-menu action regressed to a generic fallback button" % context)
 	_expect(chapter_label != null and not chapter_label.text.strip_edges().is_empty(), "%s left the stage strip visibly blank" % context)
 	_expect(phase_label != null and not phase_label.text.strip_edges().is_empty(), "%s left the phase strip visibly blank" % context)

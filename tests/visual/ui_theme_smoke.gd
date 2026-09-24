@@ -71,7 +71,7 @@ func _run() -> void:
 		_expect(unselected_style != null and unselected_style.border_width_left <= 2, "Inactive stage token should remain subordinate", failures)
 		progress_bar.call("set_combat_state", true)
 		var phase_label: Label = progress_bar.find_child("PhaseLabel", true, false) as Label
-		_expect(phase_label != null and phase_label.text == "/// FIGHT", "Stage strip should expose a forceful combat state instead of blank chrome", failures)
+		_expect(phase_label != null and phase_label.text == "FIGHT", "Stage strip should expose a forceful combat state instead of blank chrome", failures)
 		progress_bar.call("set_combat_state", false)
 		progress_bar.call("update_progress", 1, 1, 5)
 	var continue_button: Button = view.find_child("ContinueButton", true, false) as Button
@@ -194,8 +194,10 @@ func _run() -> void:
 				var docket: Label = item_control.get_node_or_null("Docket") as Label
 				var receive_mark: Label = item_control.get_node_or_null("EmptyMark") as Label
 				_expect(cavity != null and binding_rail != null and docket != null, "Reliquary pocket is missing its cavity, binding rail, or docket", failures)
-				_expect(docket != null and docket.text.contains("READY"), "Ready reliquary pocket lacks a readable docket state", failures)
-				_expect(receive_mark != null and receive_mark.text.contains("RECEIVE"), "Ready reliquary pocket lacks its receive-relic instruction", failures)
+				# The docket and the empty mark are now numeral/graphic only - the words were filler,
+				# so assert the authored state instead of the sentence that used to carry it.
+				_expect(docket != null and String(item_control.get_meta("cache_slot_state", "")) == "ready", "Ready reliquary pocket lacks a readable docket state", failures)
+				_expect(receive_mark != null and bool(receive_mark.get_meta("purposeful_empty_slot", false)), "Ready reliquary pocket lacks its authored empty state", failures)
 				if binding_rail != null and not rail_positions.has(binding_rail.anchor_left):
 					rail_positions.append(binding_rail.anchor_left)
 		_expect(visible_empty_slots == 3, "Empty item cache should focus three ready slots, found %d" % visible_empty_slots, failures)

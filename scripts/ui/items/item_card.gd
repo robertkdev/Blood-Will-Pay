@@ -309,7 +309,10 @@ func _sync_empty_slot_label() -> void:
 	if empty_mark == null:
 		return
 	var slot_number: int = maxi(1, slot_index + 1)
-	empty_mark.text = "RECEIVE" if _material_slot_size.x < 48.0 else "RECEIVE\nRELIC"
+	# No wording. Three identical empty slots each used to print "RECEIVE / RELIC", which is the
+	# same sentence three times on a panel whose empty slots are already visibly empty. The slot
+	# number and the pocket-state colour carry what is left to say.
+	empty_mark.text = ""
 	empty_mark.add_theme_font_size_override("font_size", 7 if _material_slot_size.x < 48.0 else 9 if _material_slot_size.x < 70.0 else 11)
 	empty_mark.add_theme_color_override("font_color", Color(0.76, 0.67, 0.55, 0.72))
 	empty_mark.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
@@ -321,7 +324,8 @@ func _sync_empty_slot_label() -> void:
 func _sync_pocket_state(filled: bool) -> void:
 	var slot_number: int = maxi(1, slot_index + 1)
 	if docket_label != null:
-		docket_label.text = ("HELD // %02d" if filled else "READY // %02d") % slot_number
+		# The number only; the state is already exposed as pocket_status meta and by the slot hue.
+		docket_label.text = "%02d" % slot_number
 		docket_label.add_theme_font_size_override("font_size", 7 if _material_slot_size.x < 48.0 else 8 if _material_slot_size.x < 70.0 else 10)
 		docket_label.set_meta("pocket_status", "held" if filled else "ready")
 	set_meta("reliquary_pocket", true)

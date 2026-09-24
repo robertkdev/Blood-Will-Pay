@@ -598,7 +598,7 @@ func _expect_item_cache_contract(context: String) -> void:
 	if left_panel == null or header == null or item_grid == null:
 		return
 	_expect(left_panel.get_global_rect().grow(1.0).encloses(header.get_global_rect()), "%s item-cache label escaped its rail" % context)
-	_expect(header.text.contains("RELIQUARY") and header.text.contains("CACHE"), "%s item-cache label does not identify the upper-left reliquary" % context)
+	_expect(header.text.contains("RELIQUARY"), "%s item-cache label does not identify the upper-left reliquary" % context)
 	_expect(header.text.contains("READY") and header.text.contains("SEALED"), "%s item-cache label lacks ready-pocket and sealed-reserve states" % context)
 	_expect(header.get_theme_font_size("font_size") >= 11, "%s item-cache label is too small" % context)
 	_expect(bool(header.get_meta("material_cache_hierarchy", false)), "%s item cache lacks its constructed docket hierarchy" % context)
@@ -646,7 +646,9 @@ func _expect_item_cache_contract(context: String) -> void:
 		var empty_mark: Label = item_card.get_node_or_null("EmptyMark") as Label
 		if empty_mark != null and empty_mark.visible:
 			ready_item_slots += 1
-			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)) and empty_mark.text.contains("RECEIVE"), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
+			# The slot is authored, not an unexplained "+". The wording was removed as filler, so
+			# assert the authored state rather than a sentence.
+			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
 			_expect(String(item_card.get_meta("cache_slot_state", "")) == "ready" and docket != null and docket.text.contains("READY"), "%s empty item slot %s lacks a ready-pocket docket" % [context, String(item_card.name)])
 			if binding_rail != null and not binding_positions.has(binding_rail.anchor_left):
 				binding_positions.append(binding_rail.anchor_left)
@@ -738,7 +740,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	var system_menu_button: Button = _main.find_child("SystemMenuButton", true, false) as Button
 	if system_menu_button != null and system_menu_button.visible:
 		_expect_control_inside(system_menu_button, "%s system Menu" % context)
-		_expect(system_menu_button.text == "SYS // MENU", "%s system escape hatch reverted to generic Menu copy" % context)
+		_expect(system_menu_button.text == "MENU", "%s system escape hatch reverted to generic Menu copy" % context)
 		_expect(bool(system_menu_button.get_meta("authored_system_command", false)), "%s system escape hatch lacks authored command styling" % context)
 	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
 	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 164.0, "%s Team Metrics rail did not preserve enough board width" % context)

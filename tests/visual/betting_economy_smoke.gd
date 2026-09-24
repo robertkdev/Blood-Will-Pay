@@ -258,9 +258,11 @@ func _verify_post_shop_bet_controls() -> void:
 		_expect(armed_style != null and armed_style.texture != null and String(armed_style.texture.resource_path).ends_with("button_wager_selected.png"), "armed all-in control should use the authored selected wager state")
 	if wager_summary != null:
 		var summary_copy: String = String(wager_summary.text)
-		_expect(summary_copy.contains("Wager") and summary_copy.contains("Win"), "wager summary should state the wager and win estimate: %s" % summary_copy)
-		_expect(summary_copy.contains("All in") and summary_copy.contains("Wager " + BloodBuckets.format_amount(max_bet)), "all-in summary should expose its armed wager: %s" % summary_copy)
-		_expect(summary_copy.contains("Win ") and summary_copy.contains("-") and summary_copy.contains("After: W") and summary_copy.contains(" / L"), "wager summary should show an estimated range and both outcomes: %s" % summary_copy)
+		# The strip is stake / odds-range / win-loss outcomes with no prose; the plate label and
+		# the tooltip carry the words. Assert the information rather than the old sentence.
+		_expect(summary_copy.contains(BloodBuckets.format_amount(max_bet, true)), "wager summary should state the wager: %s" % summary_copy)
+		_expect(summary_copy.contains("All in") and summary_copy.contains(BloodBuckets.format_amount(max_bet)), "all-in summary should expose its armed wager: %s" % summary_copy)
+		_expect(summary_copy.contains("-") and summary_copy.contains("%") and summary_copy.contains(" / "), "wager summary should show an estimated range and both outcomes: %s" % summary_copy)
 	var bottom_storage: Control = _main.find_child("BottomStorageArea", true, false) as Control if _main != null else null
 	var shop_grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer if _main != null else null
 	_expect_control_inside_viewport(bottom_storage, "post-shop footer")

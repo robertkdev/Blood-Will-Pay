@@ -76,7 +76,7 @@ func set_combat_state(in_combat: bool) -> void:
 		return
 	if _result_state_active:
 		return
-	_phase_label.text = "/// FIGHT" if in_combat else "/// READY"
+	_phase_label.text = "FIGHT" if in_combat else "READY"
 	_phase_label.add_theme_color_override("font_color", Color(1.0, 0.22, 0.22, 1.0) if in_combat else Color(0.82, 0.75, 0.64, 0.92))
 	_phase_label.add_theme_constant_override("outline_size", 2 if in_combat else 1)
 	_phase_label.tooltip_text = "Combat active. Hold the line." if in_combat else "Planning state. Prepare the next stage."
@@ -161,7 +161,7 @@ func _ensure_built() -> void:
 	_phase_label = Label.new()
 	_phase_label.name = "PhaseLabel"
 	_phase_label.custom_minimum_size = Vector2(112.0, 0.0)
-	_phase_label.text = "/// READY"
+	_phase_label.text = "READY"
 	_phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_phase_label.mouse_filter = Control.MOUSE_FILTER_PASS

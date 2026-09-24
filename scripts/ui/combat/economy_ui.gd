@@ -335,7 +335,11 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		risk_prefix = "All in  •  "
 	if compact_decision:
 		var locked_suffix: String = " LOCKED" if in_combat else ""
-		wager_summary.text = "%sWager %s%s  •  Win %d-%d%%  •  After: W%s / L%s" % [
+		# Stake, odds, then the two outcomes - no prose. This line used to read
+		# "Wager 1 bucket  •  Win 24-54%  •  After: W10 buckets / L8 buckets", which is a
+		# sentence on a strip whose plate is already labelled and whose tooltip carries the
+		# full explanation for anyone who wants it.
+		wager_summary.text = "%s%s%s  •  %d-%d%%  •  %s / %s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager, true),
 			locked_suffix,
@@ -346,7 +350,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
 	else:
-		wager_summary.text = "%sWager %s%s  •  Win %d-%d%%  •  After: W%s / L%s" % [
+		wager_summary.text = "%s%s%s  •  %d-%d%%  •  %s / %s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager),
 			" LOCKED" if in_combat else "",
