@@ -116,7 +116,8 @@ func _resolve_pending_contract_market() -> void:
 	var pass_button: Button = null
 	var pass_deadline_msec: int = Time.get_ticks_msec() + 3000
 	while Time.get_ticks_msec() < pass_deadline_msec:
-		pass_button = _main.find_child("ContractPass", true, false) as Button if _main != null else null
+		# By structure: the market's authored names survive only when nothing collides.
+		pass_button = _contract_pass_button()
 		if pass_button != null and not pass_button.disabled:
 			break
 		await get_tree().process_frame

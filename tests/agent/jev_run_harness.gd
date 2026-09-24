@@ -1710,11 +1710,9 @@ func _resolve_pending_contract_market() -> void:
 		return
 	var buttons: Array[Button] = []
 	var overlay_node: Control = _main.find_child("ChapterContractOverlay", true, false) as Control if _main != null else null
-	if overlay_node != null:
-		for child: Node in overlay_node.find_children("Contract*", "Button", true, false):
-			var button: Button = child as Button
-			if button != null:
-				buttons.append(button)
+	# By structure, not by name: the market's authored names survive only when nothing
+	# collides, and a rebuild used to leave them as `@Button@<id>`. See the base helper.
+	buttons = _contract_market_buttons(overlay_node)
 	if buttons.is_empty():
 		_append_event("contract_market_missing", _contract_market_probe(overlay_node))
 		return

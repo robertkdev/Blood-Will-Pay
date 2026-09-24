@@ -40,6 +40,19 @@ func _run() -> void:
 	await _settle(0.3)
 	_expect(_market_button_count(view) > 0, "a pending chapter contract did not open a pressable market")
 
+	# The market hides between chapters without clearing its children, so the next build
+	# replaces live siblings. A deferred free let those collide on name and Godot renamed every
+	# button to `@Button@<id>`, which made a fully drawn, fully pressable market invisible to
+	# the rig's name search. The authored names have to survive a rebuild.
+	_expect(view.find_child("ContractPass", true, false) != null, "first build did not name the PASS button")
+	controller.call("_close_contract_market")
+	await _settle(0.15)
+	controller.call("_sync_contract_market_overlay")
+	await _settle(0.3)
+	_expect(view.find_child("ContractPass", true, false) != null, "rebuild lost the authored PASS button name")
+	_expect(view.find_child("ContractChoice0", true, false) != null, "rebuild lost the authored offer button names")
+	_expect(_unnamed_market_buttons(view) == 0, "rebuild left %d market buttons with auto-generated names" % _unnamed_market_buttons(view))
+
 	# Reproduce the recorded dead state: the overlay still up, the choice still pending,
 	# Continue still disabled, and not one button left inside the market.
 	_clear_market_choices(view)
@@ -89,6 +102,18 @@ func _market_choices(view: Control) -> Node:
 		if child is VBoxContainer:
 			return child
 	return null
+
+## Buttons Godot auto-named, i.e. `@Button@<id>` from a name collision. A market built cleanly
+## has none.
+func _unnamed_market_buttons(view: Control) -> int:
+	var overlay: Control = view.find_child("ChapterContractOverlay", true, false) as Control
+	if overlay == null:
+		return 0
+	var count: int = 0
+	for candidate: Node in overlay.find_children("*", "Button", true, false):
+		if String(candidate.name).begins_with("@"):
+			count += 1
+	return count
 
 func _clear_market_choices(view: Control) -> void:
 	var choices: Node = _market_choices(view)

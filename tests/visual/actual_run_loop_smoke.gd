@@ -355,6 +355,43 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 func _clear_continue_gates(_label: String) -> void:
 	await get_tree().process_frame
 
+## Every button the pending chapter contract is asking the player to press.
+##
+## Found by structure, not by name. The market names its buttons `ContractChoice0..` and
+## `ContractPass`, but only while nothing collides - a rebuild that deferred its free left the
+## whole market as `@Button@<id>`, which a name search cannot see. The choice container is
+## unnamed by design, so it is reached through its named sibling and everything pressable
+## inside it counts as an answer. Disabled offers are skipped: pressing one does nothing.
+func _contract_market_buttons(overlay_node: Control) -> Array[Button]:
+	var buttons: Array[Button] = []
+	if overlay_node == null:
+		return buttons
+	var status_label: Label = overlay_node.find_child("ContractStatus", true, false) as Label
+	var stack: Node = status_label.get_parent() if status_label != null else null
+	if stack == null:
+		return buttons
+	for child: Node in stack.get_children():
+		var choices: VBoxContainer = child as VBoxContainer
+		if choices == null:
+			continue
+		for candidate: Node in choices.get_children():
+			var button: Button = candidate as Button
+			if button != null and not button.disabled:
+				buttons.append(button)
+	return buttons
+
+## The PASS choice on the pending chapter contract. A named ContractPass wins when the market
+## still has its authored names; otherwise it is the last pressable choice, which is the order
+## the market builds them in.
+func _contract_pass_button() -> Button:
+	if _main != null:
+		var named: Button = _main.find_child("ContractPass", true, false) as Button
+		if named != null and not named.disabled:
+			return named
+	var overlay: Control = _main.find_child("ChapterContractOverlay", true, false) as Control if _main != null else null
+	var pressable: Array[Button] = _contract_market_buttons(overlay)
+	return pressable[pressable.size() - 1] if not pressable.is_empty() else null
+
 func _set_planning_timer_safe() -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
 	if combat == null:
