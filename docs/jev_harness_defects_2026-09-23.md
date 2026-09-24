@@ -94,3 +94,32 @@ behaviour.
 The Ledger-depth work declared `AccountProfileStoreScript` in a class that already
 inherited it, which failed the first run of the fresh arm at `Parser Error` before the
 run started. Fixed by using the inherited constant.
+
+## 6. The rig could not answer the level-4 legacy gate (fixed, not yet exercised)
+
+A combine that promotes a unit to level 4 opens the legacy-choice overlay, which sets
+`continue_button.disabled = true` and only re-enables it when a legacy is bound. The rig
+resolved the chapter contract gate but had no handling for this one, so a run rich enough to
+combine - exactly the run the design is trying to produce - pressed a button that could not
+act, recorded three `continue button disabled` failures, then `Start Battle did not enter
+combat`, and was filed as a harness abort rather than an outcome.
+
+That is how the three richest runs of the session ended: 4,766,400 buckets at chapter 7,
+95,050 at chapter 5, 42,126 at chapter 6. The mechanism is in the record - the seed 21029 run
+that aborted had a unit at level 4 on the board, and no aborted run has an ascension event,
+because the harness had no way to produce one.
+
+Fixed: the overlay records the unit it is showing, the controller exposes
+`has_pending_ascension()`, `pending_ascension_unit()`, `pending_ascension_options()` and
+`resolve_ascension(legacy_id)`, and the harness answers the gate before the wager, next to the
+contract resolution, asking the same model that makes every other decision. The query keys on
+the overlay rather than the combine queue, because the overlay is what disables the button.
+
+Verification so far: the two seeds that aborted on level-4 boards now finish with zero
+technical failures instead of five and an abort, and a campaign-lane run after the refactor
+reaches its target with zero failures and zero controller errors.
+
+**Still to verify:** an actual pending legacy being resolved in a recorded run. The re-runs
+topped out at unit level 3, so the resolve path never fired. This needs a scenario that forces
+a level-4 combine and then asserts an `ascension_resolved` event with no `continue button
+disabled` - a regression test, not an assumption.
