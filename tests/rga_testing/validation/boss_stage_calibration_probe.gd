@@ -44,8 +44,11 @@ func _run() -> void:
 					_record_sample(samples, player_ids, player_level, boss_ids, spec, chapter, seed + tier * 17 + repeat_index * 1009, case_index)
 					case_index += 1
 	var summary: Dictionary = _summarize(samples)
-	_write_summary(summary)
 	_validate_summary(summary, failures)
+	# Written to disk as well as printed: see the note in TeamOddsCalibrationProbe.
+	summary["passed"] = failures.is_empty()
+	summary["failures"] = failures.duplicate()
+	_write_summary(summary)
 	if failures.is_empty():
 		print("BossStageCalibrationProbe: PASS %s" % _summary_line(summary))
 		_quit(0)
@@ -276,14 +279,27 @@ func _validate_summary(summary: Dictionary, failures: Array[String]) -> void:
 	)
 	var rows: Array = summary.get("buckets", [])
 	var populated: int = 0
+	var judged: int = 0
 	# Boss rows are intentionally stratified by preparation tier; the normal-stage
 	# probe owns the broad probability-bucket calibration gate. Keep these rows as
 	# evidence, but validate boss odds by tier so correlated encounter repeats do
 	# not masquerade as a broad probability distribution.
+	#
+	# The bucket requirement used to be "four buckets with n >= 6", which was a statement
+	# about the prediction distribution being spread out - true at exponent 1.55, false for
+	# any correctly steep curve, because a decisive boss should be predicted decisively. At
+	# exponent 4.0 the mass sits at the two tails. What is actually worth asserting is that
+	# the buckets carrying real mass are calibrated, so each row with enough samples is
+	# checked against the same gap the tier rows use.
 	for row: Dictionary in rows:
 		if int(row.get("count", 0)) >= 6:
 			populated += 1
-	_expect(populated >= 4, "expected four populated boss odds buckets, got %d" % populated, failures)
+		if int(row.get("count", 0)) >= 12:
+			judged += 1
+			var row_gap: float = float(row.get("gap", 1.0))
+			_expect(row_gap <= 0.15, "boss odds bucket %s gap %.1f%% exceeded 15%% with n=%d" % [String(row.get("bucket", "")), row_gap * 100.0, int(row.get("count", 0))], failures)
+	_expect(populated >= 2, "expected at least two populated boss odds buckets, got %d" % populated, failures)
+	_expect(judged >= 2, "expected at least two boss odds buckets with enough samples to judge, got %d" % judged, failures)
 	var tiers: Array = summary.get("tiers", [])
 	_expect(tiers.size() == 3, "expected three boss preparation tiers, got %d" % tiers.size(), failures)
 	if tiers.size() == 3:
