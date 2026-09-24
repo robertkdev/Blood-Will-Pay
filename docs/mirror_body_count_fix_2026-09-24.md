@@ -44,7 +44,7 @@ controller is failing on every run with
 
 ```
 TypeSafeAPIError 402
-billing_error: "Your organization has no available TypeSafe API credits. 
+billing_error: "Your organization has no available TypeSafe API credits.
 Please add more credits and/or set up auto-reload at https://console.typesafe.ai/settings/billing"
 ```
 
