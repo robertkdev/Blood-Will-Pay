@@ -37,6 +37,11 @@ param(
     [ValidateSet("", "eager")]
     [string] $LevelPolicy = "",
 
+    # The harness no longer moves the real OS cursor by default, so a run can play in the
+    # background without taking over the desktop. This restores the old behaviour for a case
+    # that genuinely needs the pointer warped.
+    [switch] $MouseWarp,
+
     # 1.0 is the shipped game speed. Higher values are for fast sweeps only.
     [ValidateRange(0.25, 16.0)]
     [double] $Speed = 1.0,
@@ -109,6 +114,11 @@ if (-not [string]::IsNullOrWhiteSpace($LevelPolicy)) {
     $env:JEV_LEVEL_POLICY = $LevelPolicy
 } else {
     Remove-Item Env:\JEV_LEVEL_POLICY -ErrorAction SilentlyContinue
+}
+if ($MouseWarp) {
+    $env:BWP_MOUSE_WARP = "1"
+} else {
+    Remove-Item Env:\BWP_MOUSE_WARP -ErrorAction SilentlyContinue
 }
 $env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
 $env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {

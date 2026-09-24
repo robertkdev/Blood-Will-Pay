@@ -661,7 +661,7 @@ func _drag_control_to(control: Control, target_pos: Vector2, label: String) -> b
 	return drag_state[0] and drag_state[1]
 
 func _control_mouse_button(control: Control, position: Vector2, pressed: bool) -> void:
-	get_viewport().warp_mouse(position)
+	_warp_mouse_for_synthetic_input(position)
 	var event: InputEventMouseButton = InputEventMouseButton.new()
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
@@ -675,7 +675,7 @@ func _control_mouse_button(control: Control, position: Vector2, pressed: bool) -
 	await get_tree().process_frame
 
 func _control_mouse_motion(control: Control, position: Vector2, left_down: bool) -> void:
-	get_viewport().warp_mouse(position)
+	_warp_mouse_for_synthetic_input(position)
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT if left_down else 0
 	event.position = _local_point(control, position)
@@ -708,7 +708,7 @@ func _mouse_button(position: Vector2, pressed: bool) -> void:
 	await get_tree().process_frame
 
 func _move_mouse(position: Vector2, left_down: bool) -> void:
-	get_viewport().warp_mouse(position)
+	_warp_mouse_for_synthetic_input(position)
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT if left_down else 0
 	event.position = position
@@ -719,6 +719,28 @@ func _move_mouse(position: Vector2, left_down: bool) -> void:
 
 func _flush_synthetic_input() -> void:
 	Input.flush_buffered_events()
+
+## Move the OS cursor to the synthetic event's position - off by default.
+##
+## `warp_mouse` moves the REAL pointer, so a run that plays the game used to take the machine's
+## mouse hostage for its whole duration and the person at the keyboard could not use it.
+##
+## It is not needed. Everything else in these helpers is already engine-level: the event carries
+## `position` and `global_position`, and `Input.parse_input_event` feeds it into Godot's own
+## input queue without touching the OS. The warp was added by 38fcef69 for drag interactions;
+## measured with it off, a full heuristic run played 24 battles to chapter 5 with ZERO click or
+## drag failures - the only failures were the unrelated contract-market ones. Clicks, purchases,
+## item equips, board swaps and repositioning all ran through the synthetic path unchanged.
+##
+## So the default is now no warp, and `BWP_MOUSE_WARP=1` restores the old behaviour for any
+## caller that genuinely needs the OS pointer moved.
+static func _mouse_warp_requested() -> bool:
+	return OS.get_environment("BWP_MOUSE_WARP").strip_edges() == "1"
+
+func _warp_mouse_for_synthetic_input(position: Vector2) -> void:
+	if not _mouse_warp_requested():
+		return
+	get_viewport().warp_mouse(position)
 
 func _first_fight_placeholder_visible() -> bool:
 	var grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer
