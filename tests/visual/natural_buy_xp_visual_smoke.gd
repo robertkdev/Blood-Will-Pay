@@ -152,6 +152,9 @@ func _uses_manual_opening_continue() -> bool:
 	return true
 
 func _button_with_text_prefix(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)

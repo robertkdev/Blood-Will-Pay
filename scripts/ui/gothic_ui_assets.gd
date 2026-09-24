@@ -26,6 +26,55 @@ const UNIT_BASE_ENEMY: String = "res://assets/ui/gothic/unit_base_enemy.png"
 const ARENA_FRAME: String = "res://assets/ui/gothic/arena_frame.png"
 const STATUS_STRIP: String = "res://assets/ui/gothic/status_strip.png"
 
+## Generated icon sheets. Five action cells (reroll, lock, level up, all in, wager) and three
+## reliquary cells (reliquary, ledger, bone chit), laid out left to right.
+const ACTION_ICONS: String = "res://assets/ui/gothic/generated/action_icons.png"
+const RELIC_ICONS: String = "res://assets/ui/gothic/generated/relic_icons.png"
+const ACTION_ICON_REROLL: int = 0
+const ACTION_ICON_LOCK: int = 1
+const ACTION_ICON_LEVEL_UP: int = 2
+const ACTION_ICON_ALL_IN: int = 3
+const ACTION_ICON_WAGER: int = 4
+const RELIC_ICON_RELIQUARY: int = 0
+const RELIC_ICON_LEDGER: int = 1
+const RELIC_ICON_CHIT: int = 2
+## Drawn size of one icon, in the game's own pixels. The sheets are resized down to this once
+## rather than left at their 512px cell size for the layout to squeeze.
+const ACTION_ICON_PIXELS: int = 40
+const RELIC_ICON_PIXELS: int = 48
+
+## One cell of a horizontally laid out icon sheet, resized to `target` pixels wide.
+##
+## The sheets are 512px cells. Handing one straight to a Button makes the button's minimum
+## size 520px tall, and the drawing code then squeezes the icon into whatever the row allows -
+## so the glyph ends up a smudge whose size nothing controls, and `icon_max_width` does not
+## change it. Resizing the cell once gives a texture whose size is the size that gets drawn.
+static func sheet_icon(path: String, cells: int, slot: int, target: int = 40) -> Texture2D:
+	var sheet: Texture2D = TextureUtils.try_load_texture(path)
+	if sheet == null or cells <= 0:
+		return null
+	var width: int = sheet.get_width()
+	var height: int = sheet.get_height()
+	if width < cells or height <= 0:
+		return null
+	var cell: int = int(float(width) / float(cells))
+	if cell <= 0:
+		return null
+	var image: Image = sheet.get_image()
+	if image == null:
+		return null
+	var patch: Image = image.get_region(Rect2i(clampi(slot, 0, cells - 1) * cell, 0, cell, height))
+	if target > 0 and target != cell:
+		var target_height: int = maxi(1, int(round(float(height) * float(target) / float(cell))))
+		patch.resize(target, target_height, Image.INTERPOLATE_LANCZOS)
+	return ImageTexture.create_from_image(patch)
+
+static func action_icon(slot: int) -> Texture2D:
+	return sheet_icon(ACTION_ICONS, 5, slot, ACTION_ICON_PIXELS)
+
+static func relic_icon(slot: int) -> Texture2D:
+	return sheet_icon(RELIC_ICONS, 3, slot, RELIC_ICON_PIXELS)
+
 static func wide_panel_style(modulate: Color = Color.WHITE) -> StyleBoxTexture:
 	return texture_style(PANEL_PLATE_WIDE, Vector4(42.0, 42.0, 42.0, 42.0), Vector4(22.0, 18.0, 22.0, 18.0), modulate)
 

@@ -190,8 +190,9 @@ func _shop_button_evidence() -> Array[Dictionary]:
 	var evidence: Array[Dictionary] = []
 	if _main == null:
 		return evidence
-	for node: Node in _main.find_children("*", "Button", true, false):
-		var button: Button = node as Button
-		if button != null and (button.text.begins_with("Reroll") or button.text.begins_with("Lock") or button.text.begins_with("Buy XP")):
+	# By identity: the shelf actions carry an icon now and their labels are a bare cost.
+	for action_name: String in ["Reroll", "Lock", "Buy XP"]:
+		var button: Button = _button_for_action_text(action_name)
+		if button != null:
 			evidence.append({"text": button.text, "disabled": button.disabled, "visible": button.is_visible_in_tree()})
 	return evidence

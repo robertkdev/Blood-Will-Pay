@@ -85,6 +85,12 @@ func _press_button(button: Button) -> void:
 	button.emit_signal("pressed")
 
 func _button_with_text_prefix(text: String) -> Button:
+	# The shelf action buttons carry an icon now, so find them by identity. This smoke is not
+	# on the shared harness chain and has to resolve the name itself.
+	if _host != null:
+		var named: Button = _host.find_child("BuyXpButton", true, false) as Button
+		if named != null and text.begins_with("Buy XP"):
+			return named
 	if _host == null:
 		return null
 	var buttons: Array[Node] = _host.find_children("*", "Button", true, false)

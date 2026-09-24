@@ -2,6 +2,7 @@ extends RefCounted
 class_name EconomyUI
 
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 const StakesMarket: GDScript = preload("res://scripts/game/economy/stakes_market.gd")
 const TeamOddsEstimator: GDScript = preload("res://scripts/game/combat/team_odds_estimator.gd")
@@ -43,6 +44,11 @@ func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all
 	if all_in_button != null and not all_in_button.is_connected("pressed", Callable(self, "_on_all_in_pressed")):
 		all_in_button.pressed.connect(_on_all_in_pressed)
 	if all_in_button != null:
+		all_in_button.name = "AllInButton"
+		# The chip stack carries the action; the button says the words only when it is armed,
+		# because that is the moment the player needs to be told what they just risked.
+		all_in_button.icon = GothicUIAssets.action_icon(GothicUIAssets.ACTION_ICON_ALL_IN)
+		all_in_button.add_theme_constant_override("icon_max_width", GothicUIAssets.ACTION_ICON_PIXELS)
 		HardcoreUIAssets.apply_button_family(all_in_button, "wager")
 	if _root is Control:
 		var root_control: Control = _root as Control
@@ -289,7 +295,7 @@ func _refresh_all_in_visual(in_combat: bool, forced_first_fight: bool) -> void:
 		and Economy.blood_buckets > 0
 		and int(round(bet_slider.value)) >= int(round(bet_slider.max_value))
 	)
-	all_in_button.text = "ALL IN!" if armed else "All In"
+	all_in_button.text = "ALL IN!" if armed else ""
 	all_in_button.tooltip_text = "Maximum wager armed. Starting battle risks the full bankroll." if armed else "Set the wager to your full available bankroll."
 	if not armed:
 		all_in_button.remove_theme_color_override("font_color")

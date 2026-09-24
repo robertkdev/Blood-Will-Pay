@@ -17,6 +17,7 @@ var background: Panel
 var frame: Panel
 var patina: ColorRect
 var empty_mark: Label
+var pocket_relic: TextureRect
 var pocket_cavity: Panel
 var binding_rail: ColorRect
 var docket_label: Label
@@ -149,6 +150,23 @@ func _ensure_children() -> void:
 		empty_mark.add_theme_color_override("font_color", Color(0.66, 0.59, 0.52, 0.54))
 		empty_mark.z_index = 2
 		add_child(empty_mark)
+	# A ready pocket shows the reliquary mark rather than nothing. The three pockets take the
+	# three authored cells in order - reliquary, ledger, bone chit - so an empty cache still
+	# reads as a place where evidence goes.
+	if pocket_relic == null:
+		pocket_relic = TextureRect.new()
+		pocket_relic.name = "PocketRelic"
+		pocket_relic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pocket_relic.set_anchors_preset(Control.PRESET_FULL_RECT)
+		pocket_relic.offset_left = 0.0
+		pocket_relic.offset_top = 0.0
+		pocket_relic.offset_right = 0.0
+		pocket_relic.offset_bottom = 0.0
+		pocket_relic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pocket_relic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		pocket_relic.modulate = Color(1.0, 1.0, 1.0, 0.30)
+		pocket_relic.z_index = 1
+		add_child(pocket_relic)
 	if frame == null:
 		frame = Panel.new()
 		frame.name = "Frame"
@@ -238,6 +256,8 @@ func _refresh() -> void:
 		icon.texture = null
 		icon.visible = false
 		empty_mark.visible = true
+		if pocket_relic != null:
+			pocket_relic.visible = true
 		tooltip_text = ""
 		mouse_default_cursor_shape = Control.CURSOR_ARROW
 		focus_mode = Control.FOCUS_NONE
@@ -245,6 +265,8 @@ func _refresh() -> void:
 		_sync_pocket_state(false)
 		return
 	empty_mark.visible = false
+	if pocket_relic != null:
+		pocket_relic.visible = false
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	focus_mode = Control.FOCUS_ALL
 	if def != null:
@@ -319,6 +341,8 @@ func _sync_empty_slot_label() -> void:
 	empty_mark.add_theme_constant_override("outline_size", 1)
 	empty_mark.set_meta("purposeful_empty_slot", true)
 	empty_mark.set_meta("ready_pocket_number", slot_number)
+	if pocket_relic != null:
+		pocket_relic.texture = GothicUIAssets.relic_icon(slot_number - 1)
 	_sync_pocket_state(item_id.strip_edges() != "")
 
 func _sync_pocket_state(filled: bool) -> void:

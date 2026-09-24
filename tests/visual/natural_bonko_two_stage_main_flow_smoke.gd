@@ -879,6 +879,9 @@ func _flow_target_round() -> int:
 	return TWO_STAGE_TARGET_ROUND
 
 func _button_with_text(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)

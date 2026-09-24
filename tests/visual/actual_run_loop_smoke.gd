@@ -933,6 +933,9 @@ func _opening_shop_buttons_disabled() -> bool:
 	return _button_with_text_disabled("Reroll") and _button_with_text_disabled("Lock") and _button_with_text_disabled("Buy XP")
 
 func _button_with_text_disabled(text: String) -> bool:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action.disabled
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
@@ -941,6 +944,26 @@ func _button_with_text_disabled(text: String) -> bool:
 		if button != null and button.text.begins_with(text):
 			return button.disabled
 	return false
+
+## The shelf action buttons by stable identity rather than by their visible copy.
+##
+## Their labels are now a bare cost with the action carried by an icon, so matching on copy is
+## both brittle and wrong - it has broken three times in this project already. Callers that
+## still pass the old wording ("Reroll", "Lock", "Buy XP", "All In") resolve here first.
+const ACTION_BUTTON_NAMES: Dictionary = {
+	"Reroll": "RerollButton",
+	"Lock": "LockButton",
+	"Buy XP": "BuyXpButton",
+	"All In": "AllInButton",
+}
+
+func _button_for_action_text(text: String) -> Button:
+	if _main == null:
+		return null
+	var node_name: String = String(ACTION_BUTTON_NAMES.get(text, ""))
+	if node_name == "":
+		return null
+	return _main.find_child(node_name, true, false) as Button
 
 func _deploy_prompt_visible() -> bool:
 	var root: Node = _main.get_node_or_null("CombatView")
