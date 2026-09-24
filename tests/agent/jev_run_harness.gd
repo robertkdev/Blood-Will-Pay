@@ -108,6 +108,12 @@ var _decision_kinds: Dictionary[String, int] = {}
 ## CONTROLLER_LOST_AFTER_TIMEOUTS for why the count matters.
 var _consecutive_decision_timeouts: int = 0
 var _same_stage_retries: Dictionary[String, int] = {}
+## The board that lost each stage this run, so a retry that walks back in with the identical
+## board can be told apart from one that changed something. See _enforce_stall_rule.
+var _lost_board_by_stage: Dictionary[String, String] = {}
+var _deployed_signature_by_stage: Dictionary[String, String] = {}
+## Set while the forced post-loss shopping pass is running, so _plan_state can say why.
+var _stall_reentry_active: bool = false
 ## Planning-beat and shop-revision identity.
 ##
 ## Keying shop telemetry on (chapter, stage) merges repeat attempts at the same
@@ -327,6 +333,8 @@ func _run() -> void:
 			]
 			var attempts: int = int(_same_stage_retries.get(stage_key, 0)) + 1
 			_same_stage_retries[stage_key] = attempts
+			# The board that just lost this stage, for the stall check on the way back in.
+			_lost_board_by_stage[stage_key] = String(_deployed_signature_by_stage.get(stage_key, ""))
 			_append_event("same_stage_retry", {
 				"chapter": int(round_result.get("chapter_before", -1)),
 				"round": int(round_result.get("round_before", -1)),
@@ -1334,6 +1342,9 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	# Start Battle until it is answered, and buying enough copies to combine is exactly what
 	# a rich run does. See _resolve_pending_ascension.
 	await _resolve_pending_ascension()
+	# The rules already forbid walking back into a lost stage with the board that lost it.
+	# Enforce it once, on the board, before the fight is priced.
+	await _enforce_stall_rule(label)
 	# Repair the ranks before anything is priced against the board. A purchased unit
 	# is already on the board by the time the fielding pass looks at it, and the game
 	# puts it in the first free tile - which is the rank that meets the enemy.
@@ -1388,6 +1399,9 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	})
 	var chapter_before: int = int(GameState.chapter)
 	var stage_before: int = int(GameState.stage_in_chapter)
+	# Remember the board that is about to fight, keyed to the stage, so the retry branch can
+	# record it as the board that lost this stage.
+	_deployed_signature_by_stage["%d:%d" % [chapter_before, stage_before]] = _deployed_signature()
 	await _maybe_capture_planning(label)
 	for attempt: int in range(START_BATTLE_ATTEMPTS):
 		await super._press_continue(expect_forced, label)
@@ -1687,6 +1701,72 @@ func _candidate_ids(candidates: Array[Dictionary]) -> Array[String]:
 		ids.append(String(candidate.get("id", "")))
 	return ids
 
+## Everything about the deployed board that a repeat has to change: which units, their level,
+## and the items they hold. Ids alone would call a retry unchanged when the same unit came back
+## a level higher, which is exactly the change the rules ask for.
+func _deployed_signature() -> String:
+	var parts: Array[String] = []
+	for unit: Unit in _board_units():
+		var item_ids: Array[String] = []
+		if Items != null:
+			for item: Variant in Items.get_equipped(unit):
+				item_ids.append(String(item))
+		item_ids.sort()
+		parts.append("%s:%d:%s" % [_unit_id(unit), int(unit.level), ",".join(item_ids)])
+	parts.sort()
+	return "|".join(parts)
+
+## The recorded way runs die: walking back into a stage this run already lost with the board
+## that lost it. It is the single largest cause of endings in the current era - 18 of 34 runs
+## stopped at "stalled after four attempts" - and the rules already forbid it, but the rule
+## lives in a prompt. Measured: 47 of 148 recorded retries began with the identical board, and
+## two thirds of those bought nothing while carrying a median of 131 buckets, so this is a
+## choice rather than something the economy forced.
+##
+## The enforcement is one forced shopping pass, named for what it is, and a recorded event
+## either way. It does not block the fight: a run that genuinely cannot improve its board still
+## has to play the stage, and the transcript should show that it tried.
+func _enforce_stall_rule(label: String) -> void:
+	if _stage_attempt() <= 1:
+		return
+	var stage_key: String = "%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)]
+	var lost_signature: String = String(_lost_board_by_stage.get(stage_key, ""))
+	if lost_signature == "":
+		return
+	var signature: String = _deployed_signature()
+	if signature != lost_signature:
+		return
+	var buckets_before: int = int(Economy.blood_buckets)
+	var offers_before: int = _shop_offers_remaining()
+	var bought: String = ""
+	if offers_before > 0:
+		_stall_reentry_active = true
+		bought = await _buy_best_two_stage_offer(0)
+		_stall_reentry_active = false
+	var changed: bool = _deployed_signature() != signature
+	if not changed and _board_ids().size() < _roster_max_team_size():
+		# A purchase goes to the bench, and the board is often not full - the recorded case
+		# that made this necessary had seven bodies with a capacity of nine, two bench Bonkos,
+		# 129 buckets and a shelf of five offers. Fielding is what turns a bench buy into a
+		# different fight. This fills free slots only - it passes no swap-out candidates, so
+		# the fielding routine cannot displace a body the ordinary flow chose to keep, and a
+		# full board is left to the policy's own composition rules.
+		var room: int = _roster_max_team_size() - _board_ids().size()
+		var bench_ids: Array[String] = _bench_ids()
+		if room > 0 and not bench_ids.is_empty():
+			await _field_preferred_units(bench_ids.slice(0, room), [], "%s stall re-field" % label)
+			changed = _deployed_signature() != signature
+	_append_event("stall_reentry", {
+		"label": label,
+		"stage": stage_key,
+		"attempt": _stage_attempt(),
+		"board": _board_ids(),
+		"buckets": buckets_before,
+		"offers_on_shelf": offers_before,
+		"forced_pass_bought": bought,
+		"board_changed_by_forced_pass": changed,
+	})
+
 # --- observation and candidate construction --------------------------------
 
 func _plan_state() -> Dictionary:
@@ -1741,6 +1821,16 @@ func _plan_state() -> Dictionary:
 			"target_round": _campaign_target_round(),
 		},
 	}
+	if _stall_reentry_active:
+		# The forced pass is only useful if the model knows why it is being asked to shop:
+		# the shop prompt otherwise reads exactly like the ordinary one, and the ordinary one
+		# is what produced the repeat in the first place.
+		state["stall_reentry"] = true
+		state["stall_note"] = (
+			"This exact board already lost this stage - same units, same levels, same items. "
+			+ "Re-entering it unchanged is the recorded way runs end here, and the run has %d "
+			+ "buckets. Buy something that changes the deployed board, or the level that opens a slot."
+		) % int(Economy.blood_buckets)
 	return state
 
 func _board_units() -> Array[Unit]:
