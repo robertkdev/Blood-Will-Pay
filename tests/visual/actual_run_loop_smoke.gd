@@ -30,7 +30,10 @@ const CONTINUE_GATE_ATTEMPTS: int = 3
 ## so the layout the game builds and the coordinates the synthetic events carry are
 ## unchanged - only the OS window shrinks.
 const HARNESS_VIEWPORT: Vector2i = Vector2i(1920, 1080)
-const HARNESS_WINDOW_SIZE: Vector2i = Vector2i(960, 540)
+## How large the parked window is on screen. The logical viewport is HARNESS_VIEWPORT either
+## way, so this is purely how watchable the run is. `BWP_HARNESS_WINDOW_SIZE=960x540` picks
+## another size.
+const HARNESS_WINDOW_SIZE: Vector2i = Vector2i(1280, 720)
 const HARNESS_WINDOW_MARGIN: int = 16
 const HARNESS_CURSOR_SAMPLE_SECONDS: float = 0.25
 
@@ -848,7 +851,7 @@ func _park_harness_window(compact: bool = false) -> void:
 			window.content_scale_size = HARNESS_VIEWPORT
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, false)
-		DisplayServer.window_set_size(HARNESS_WINDOW_SIZE)
+		DisplayServer.window_set_size(_harness_window_size())
 		DisplayServer.window_set_position(_parked_window_position())
 		# Last, so nothing above can hand the focus back.
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
@@ -863,8 +866,19 @@ func _park_harness_window(compact: bool = false) -> void:
 static func _parked_window_position() -> Vector2i:
 	var screen: int = DisplayServer.window_get_current_screen()
 	var usable: Rect2i = DisplayServer.screen_get_usable_rect(screen)
-	var corner: Vector2i = usable.position + usable.size - HARNESS_WINDOW_SIZE - Vector2i(HARNESS_WINDOW_MARGIN, HARNESS_WINDOW_MARGIN)
+	var corner: Vector2i = usable.position + usable.size - _harness_window_size() - Vector2i(HARNESS_WINDOW_MARGIN, HARNESS_WINDOW_MARGIN)
 	return Vector2i(maxi(usable.position.x, corner.x), maxi(usable.position.y, corner.y))
+
+## The parked window's size, from `BWP_HARNESS_WINDOW_SIZE=WxH` when it is well formed.
+static func _harness_window_size() -> Vector2i:
+	var raw: String = OS.get_environment("BWP_HARNESS_WINDOW_SIZE").strip_edges().to_lower()
+	if raw.contains("x"):
+		var parts: PackedStringArray = raw.split("x", false)
+		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+			var width: int = clampi(int(parts[0]), 320, HARNESS_VIEWPORT.x)
+			var height: int = clampi(int(parts[1]), 200, HARNESS_VIEWPORT.y)
+			return Vector2i(width, height)
+	return HARNESS_WINDOW_SIZE
 
 ## Watch the real pointer for the whole run without ever moving it.
 ##

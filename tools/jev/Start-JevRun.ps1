@@ -47,6 +47,11 @@ param(
     [ValidateSet("background", "fullscreen")]
     [string] $Window = "background",
 
+    # Size of the parked window, e.g. 960x540 or 1600x900. Empty uses the harness default
+    # (1280x720). The logical viewport is 1920x1080 either way, so this only changes how
+    # watchable the run is.
+    [string] $WindowSize = "",
+
     # 1.0 is the shipped game speed. Higher values are for fast sweeps only.
     [ValidateRange(0.25, 16.0)]
     [double] $Speed = 1.0,
@@ -162,6 +167,11 @@ if ($Window -eq "fullscreen") {
     $env:BWP_HARNESS_WINDOW = "fullscreen"
 } else {
     Remove-Item Env:\BWP_HARNESS_WINDOW -ErrorAction SilentlyContinue
+}
+if (-not [string]::IsNullOrWhiteSpace($WindowSize)) {
+    $env:BWP_HARNESS_WINDOW_SIZE = $WindowSize
+} else {
+    Remove-Item Env:\BWP_HARNESS_WINDOW_SIZE -ErrorAction SilentlyContinue
 }
 $env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
 $env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {
