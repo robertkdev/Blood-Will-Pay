@@ -49,7 +49,7 @@ regenerating via `extract.ps1` recovered them. **Every success-criterion denomin
 doubled because of that**, so the refreshed numbers in section 5 supersede the earlier ones.
 7 runs still have no `findings.json`; they have no `run_events.jsonl` either.
 
-## 3. Headline: the payout table, not the predictor
+## 3. Headline: every tier is +EV, and that is deliberate
 
 Every encounter tier pays out more than the true odds require, so a stake is +EV in **all four**
 tiers and staking everything is correct play:
@@ -61,19 +61,40 @@ tiers and staking everything is correct play:
 | BOSS | 2,157 | 3.0x | 33.3% | 52.4% | +0.572 |
 | MIRROR | 1,803 | 2.0x | 50.0% | 54.1% | +0.082 |
 
-Only MIRROR is priced honestly. Independently recomputed by the root from `calibration.csv`; it
-reproduces the earlier table exactly. The displayed odds are *pessimistic* in three tiers of four
-(NORMAL quotes 0.593 and delivers 0.833), so **the predictor is not the problem**. That is why the
-bankroll compounds to 2.3e11 in the tail and why "stake everything" is correct.
+Independently recomputed by the root from `calibration.csv`; it reproduces the earlier table
+exactly. Only MIRROR is close to fairly priced.
+
+**Designer ruling, 2026-09-24 - this is intended, and the recommendation to reprice it is
+withdrawn.** In his words: *"to a computer who can calculate odds it should be 100% subsidy. from
+the players perspective that changes because they only see the odds predicted at the beginning of
+planning phase. they have to guess if they upgraded enough to win on their own and that's the
+gamble."* So the +EV is the reward for reading your own board correctly, and the risk lives in the
+player's uncertainty rather than in the price. Do **not** lower the multipliers toward break-even;
+that would delete the intended payout.
+
+Two consequences worth keeping straight:
+
+- The bankroll reaching 2.3e11 is what an unconstrained +EV loop does. It is a symptom to design
+  around (see the ledger work), not evidence of a pricing bug.
+- The displayed-vs-realised gap is still worth a look, but as an **information** question rather
+  than a pricing one. NORMAL displays 0.593 and delivers 0.833, so the number the player uses for
+  their self-assessment systematically under-promises. If the gamble is meant to be the player's
+  own read of their board, an honest display makes that read meaningful; a display that is 24
+  points low makes the game feel harder than it is and makes the rig under-stake. Recalibrating the
+  display toward outcomes is consistent with the design; repricing the payout is not.
 
 ## 4. Corrections to earlier notes (recorded 2026-09-24)
 
-1. **"The odds model is optimistic on NORMAL" is retired.** `strategy.md` section 2 measured the
-   harness's internal `measured_edge` against the 0.50 *break-even* and called the result an
-   over-confident model. Against outcomes the display is pessimistic in 3 of 4 tiers. The failure
-   is the payout table. The out-of-sample check also found the rig's own Jev choices beat the
-   deterministic mechanical rule (125 better / 212 worse), so the model adds value and should keep
-   choosing; only the rate it sizes against needs fixing.
+1. **"The odds model is optimistic on NORMAL" is retired, and so is the payout-table
+   recommendation that briefly replaced it.** `strategy.md` section 2 measured the harness's
+   internal `measured_edge` against the 0.50 *break-even* and called the result an over-confident
+   model; measured against outcomes the display is *pessimistic* in 3 of 4 tiers. That gap is not
+   a pricing error - the designer confirmed on 2026-09-24 that a computer able to recompute the
+   odds is meant to find the wager a straight subsidy, and that the gamble is the player's own
+   guess about their upgrades (section 3). What remains a defect is the rig's sizing: the
+   out-of-sample check found the rig's own Jev choices beat the deterministic mechanical rule
+   (125 better / 212 worse), so the model adds value and should keep choosing; only the rate it
+   sizes against needs fixing.
 2. **"Max out at least one trait" is nearly meaningless as recorded.** `maxed` and `maxed_ladder`
    are separate readings defined side by side at `tests/agent/jev_run_harness.gd:2234-2235`. Five
    traits are one-rung (Cartel `[2]`, Harmony `[2]`, Kaleidoscope `[2]`, and Chronomancer `[1]` /
@@ -300,3 +321,163 @@ Root reconciliation, the `findings.json` backfill of 209 runs, and this document
 Related in-repo notes from the earlier loop, still valid unless contradicted above:
 `docs/enemy_generation_audit_2026-09-23.md`, `docs/odds_calibration_by_encounter_2026-09-24.md`,
 `docs/campaign_growth_ab_2026-09-24.md`, `docs/item_rate_against_chapter_10_2026-09-24.md`.
+
+## 14. Designer rulings of 2026-09-24, and the actions they triggered
+
+Answers given to the six open questions, recorded verbatim where the wording carries the design
+intent.
+
+| # | ruling | action |
+| --- | --- | --- |
+| 1 | *"to a computer who can calculate odds it should be 100% subsidy. from the players perspective that changes because they only see the odds predicted at the beginning of planning phase. they have to guess if they upgraded enough to win on their own and that's the gamble."* | **Repricing withdrawn.** Section 3 rewritten; the displayed-vs-realised gap reclassified from a pricing defect to an information question. |
+| 2 | Reach rate should scale with account-wide upgrades, modelled on the incremental game "The Tower": first run goes nowhere, a beefed-up account outscales the early game. "we need to improve our ledger upgrades. start by researching the tower." | Research in flight: `tower_ledger_brief.md`. |
+| 3 | *"i meant the verticals ... i wanted several runs of different vertical traits so we could compare their viability. the low max traits are more for flex play rather than forcing vert."* | Comparative vertical-trait viability in flight: `trait_verticals.md`. |
+| 4 | The player should be able to max their level, prioritised when they hold an econ lead and can ride the current board for a couple of rounds. | Quantified in flight: `level_economy.md`. See the known rig defect below. |
+| 5 | *"the rig should be allowed to sell. selling is a big part of the game. selling is crucial to building a board with flex play."* | A `sell` decision kind is being added to the rig. |
+| 6 | *"there should only be one game"* | Confirmed: there is only one. See below. |
+
+**Ruling 4 already has a known rig-side cause and an unused fix.** The harness docblock
+(`tests/agent/jev_run_harness.gd:23-40`) records that the model's levelling rule "turns out to have
+no reachable off-switch" - it holds off while cheap pairs remain the best value, which on a
+level-3 shelf is permanently true - and that one run "sat at shop level 2 holding 58,490
+buckets". An opt-in policy already implements exactly the rule the designer describes:
+`JEV_LEVEL_POLICY=eager` buys the level deterministically when the bankroll is at least 20x the XP
+price and the level is still below 7 (`EAGER_LEVEL_TARGET`, `EAGER_LEVEL_PRICE_BANKROLL_RATIO`),
+bypassing the model only for that one decision class so an A/B differs in nothing else. It is off
+by default. So part of the answer to "can the player ever max out their level" is that the rig
+chooses not to, and that choice is already fixable without touching the game.
+
+**Ruling 6: there is only one game, and the confusion was a reporting artifact.** `JEV_MODE=heuristic`
+replays the *same* scene, seed, starter and click path through the harness's inherited rule-based
+policy instead of asking Jev; the harness docblock calls it "a comparable baseline on identical
+seed and starter" (`jev_run_harness.gd:17-18`). It is a control arm, not a second game. The defect
+was that analyses pooled it: it emits no `wager_set` and no `buy_xp` at all and never combines a
+unit past level 1, which is what manufactured the "enters every round with money neither bet nor
+spent" finding and flattened the levelling gradient. Reporting rule from here on: **never pool the
+two arms.** Balance statistics use the Jev arm only; the control arm is the low-variance
+deterministic baseline that `arms_and_growth.md` recommends for growth A/B work.
+
+## 15. Follow-up work on the rulings
+
+Deliverables in `E:\CodexStorage\task-artifacts\gamble-battle-followup-20260924\`.
+
+### 15.1 The shape of the failure is a wall, not a bell
+
+**351 of 555 runs (63%) die at chapter 1 or 2** (112 at ch1, 239 at ch2). There is no smooth
+difficulty ramp to tune: there is a wall at chapter 2 with a thin tail behind it. Two related
+readings: a chapter-10 run's best unit averaged **level 2**, *below* the chapter-6 average, so
+depth is not coming from levelling; and board size saturates at 9 against a `MAX_BOARD_CAPACITY`
+of 16, leaving seven slots no upgrade currently reaches.
+
+### 15.2 Ledger: the "The Tower" research and the first build
+
+Game identified: **The Tower - Idle Tower Defense** (Tech Tree Games), picked on the loop rather
+than the name. Its second run is faster than the first through, in particular, **Enemy Level
+Skip** (a deterministic difficulty-floor reduction, not a stat buff) and **Intro Sprint** (skip
+up to your best wave in the tier, paying no coins for the skipped section). Its permanent layer is
+six stacked systems, and the large multipliers are deliberately kept separate from the
+speed-of-restart systems.
+
+Ranked first of six proposals: a **chapter floor** bought with Omens - rank 15 starts you at
+chapter 2, 30 -> ch3, 45 -> ch4, 60 -> ch5 (25 / 134 / 616 / 2,738 lifetime Omens, so the first
+gate lands after one or two runs). Skipped chapters pay **no buckets and no first-clear items**,
+but still bank their Omens, so no run is wasted.
+
+Why that one: it is the ruling verbatim, and it is **the only proposal the current rig can
+prove**. Floor 3 measures +0.72 mean chapters at paired sd 0.72 (sem 0.03) and floor 4 measures
++1.45, against the +0.50 growth effect that needed ~160 paired runs to separate from a 2.00
+same-arm noise floor. Honest limit: **a floor does not raise the ceiling** - chapter 5/8/10 reach
+is 19.4% / 3.2% / 0.6% before and after, identically, because those runs were already past the
+floor. Ceiling work needs the starting shop level and the income multiplier.
+
+Stated risk: a fully-grown profile has *already* produced a chapter-10 `target_reached` run at
+2.3e11 buckets, so the top end is not defended by difficulty - it is defended by nobody getting
+there. The brief ties every power proposal to converting Red Ink into a Tier ladder, which is
+largely already built in `RED_INK_UNLOCK_CHAPTERS`.
+
+### 15.3 Level economy: the game and the rig are both wrong
+
+- **Price is exactly `4 x stake_unit`**, verified against the data (763 of 764 resolvable charges).
+- **The rebasing erases the player's growth.** `stake_unit` is re-chosen at every chapter boundary
+  so the bankroll stays worth ~75-187 units. So a run that gets richer does **not** buy more of the
+  XP ladder - the ladder's cost is fixed in units and the bankroll is pinned beneath it. This is
+  the structural reason rich runs never level, and it is where Tower-style account growth
+  naturally belongs.
+- Reachable and should be routine: **level 4 by chapter 3-4** (5 buys, 20 units), **level 5 by
+  chapter 4** (9 buys, 36 units), level 7 by chapter 5 (25 buys). Nobody has ever passed level 7.
+  Level 14 needs 556 buys (2,224 units) and is never reachable by saving.
+- The top of the ladder is reachable only through the **within-chapter windfall** the designer
+  described: win big while `stake_unit` is still frozen at the old price. That window is real and
+  large - 267 of 1,506 run-chapters exceeded the normalisation band, and the best single beat
+  could afford 524 purchases (2,096 XP, level 13 from level 1).
+- **The rig wasted it.** By the designer's own definition (econ lead + two straight wins on a
+  board at capacity) the window was open in **864 rounds across 146 runs**, and in **763 of them
+  the run bought zero XP that chapter**. Worst case: `jev-deep-seed21022-20260923-161127` entered
+  a chapter-6 round holding 397,200 buckets - 496 purchases, level 13 - *while sitting at level 1*.
+- **Rig cause:** `_buy_xp_if_needed` buys at most **one** purchase per call, called once plus once
+  per shop purchase (capped at 5), so the ceiling is ~6 per round and the best-ever run total is
+  **25 purchases against a 556-purchase ladder**. The model is asked "one, or none", never "how
+  much of this bankroll should become levels".
+- The loop ran a **rank 67-68 of 99** account, and nothing in the edicts, writs or Red Ink tiers
+  touches `stake_unit`, shop prices or the XP ladder - it is all starting bankroll and slot
+  quantity, which a run outgrows by chapter 4.
+- Levers, with the arithmetic: `HEALTHY_RESERVE_UNITS 75 -> 900` (the whole ladder then fits the
+  normalisation band and spending power finally grows with gold), or `XP_PER_BUY 4 -> 48` (47
+  purchases instead of 556, at the cost of collapsing levels 2-4 into one click). Rig side: a
+  bounded loop that dumps purchases in one beat, with the reserve defined as the next wager rather
+  than the current 2-bucket floor.
+
+### 15.4 Traits: the verticals cannot be ranked yet, but the reason is structural
+
+22 traits: 17 vertical (multi-rung), 5 flex. No ladder is arithmetically unreachable - duplicates
+are allowed, and 52% of fights field two or more copies of one id - but the `[2,4,6,8]` top rung
+needs 8 of 9 slots, and capacity only reaches 9 at chapters 4-5, so the steep ladders cannot even
+be started early.
+
+The blocker: **only 36 of 533 runs (6.8%) ever assembled a vertical at all**, and 11 of the 17
+verticals were never assembled once. So there is almost nothing to rank, and "trap" is the wrong
+label for the eleven - the rig has simply never tried them.
+
+The finding worth acting on is structural. Across all 17 verticals, only **2 units** bridge
+Cartel to a vertical (`kett`, `gable`); 3 bridge Harmony (`nullora`, `knoll`); 5 bridge
+Kaleidoscope. Yet Harmony's own description rewards vertical size, and 14 of 17 verticals have no
+unit that can carry it. The measured cost: Cartel active falls from 88.6% to 44.0% and Harmony
+from 35.9% to 7.9% while the mean active-trait count is identical (4.04 vs 3.96). Matched
+head-to-head, a vertical-largest board wins **-8.8 pp** against a flex-largest board (78 strata).
+Vertical boards are not short of traits; they trade away the auras that pay for bodies that do
+not. Two more: Exile-3 boards have 0.91x matched median power and Mentor-2 0.95x - those traits
+produce no stats.
+
+To settle it properly needs a forced-build mode (`--vertical`): screen all 17 verticals at 30
+runs/arm (570 runs), then confirm five at 10 pp (600 runs), ~1,200 total with final chapter as the
+paired primary endpoint.
+
+### 15.5 Rig selling, implemented and verified
+
+The rig can now sell. A `sell` decision kind was added to `tests/agent/jev_run_harness.gd`
+(311 lines), with a preamble and a safe default in `tools/jev/jev_run_controller.py` (15 lines),
+plus a new `tests/agent/sell_decision_probe.gd` and its `.tscn`.
+
+Design: only **bench** bodies are offered - removing a deployed fighter is composition and belongs
+to the fielding path - candidates are keyed on the unit instance so two copies of one id cannot
+confuse the target, a body one copy from a star-up is never offered, and an empty or timed-out
+decision holds. `basis` records who chose and `reason_kind` records why (`surplus_copy`,
+`off_plan`, `low_cost_body`, `flex_value`).
+
+Verified by the root, not only by the implementing agent: the probe passes
+(`SELL_DECISION_PROBE PASS`), the 27 Python policy and analyzer tests pass, and a heuristic deep
+run on seed 21353 sold four units - each exactly when the bench hit its 10 cap, leaving the board
+untouched, with zero technical failures.
+
+Known limits, stated so they are not mistaken for done: every observed sale so far is
+heuristic-lane (no Jev-chosen sale has been exercised), the freed slot is available to the *next*
+beat's shop rather than the same one, and `analyze_jev_run.py` counts `unit_sell` only generically
+and has no `unit_sold` accounting yet.
+
+### 15.6 Two open questions this work surfaced
+
+1. Exile and Liaison are described as "exactly 1, 3, or 5", but the engine computes a monotone tier
+   (a count of 2 reads no worse than 1, and 4 no better than 3). Should counts 2 and 4 be dead
+   zones that pay nothing, or is monotone the intent?
+2. 20.2% of corpus fights are missing `top_threshold`, all from the two earliest run roots. Schema
+   change or bug?

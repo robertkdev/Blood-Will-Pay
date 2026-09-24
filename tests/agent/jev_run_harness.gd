@@ -66,6 +66,11 @@ const SHOP_CLICK_ATTEMPTS: int = 3
 ## automatically, so placing a component can be a two-step commitment and a single
 ## pass is not enough to place a carried component.
 const ITEM_DECISIONS_PER_BEAT: int = 4
+## Level-1 equivalents a three-star unit consumes: a combine eats three copies, and
+## three combines make a three-star, so nine is the whole ladder. A tenth copy of an
+## identity can never combine into anything, which is what makes it genuinely surplus
+## rather than a body worth holding.
+const THREE_STAR_LEVEL1_EQUIVALENTS: int = 9
 const MAX_REROLLS_PER_SHOP: int = 3
 ## Cap on the wager stake when the planning beat is a repeat of a stage this run has
 ## already lost. See _wager_candidates for the measured retry record behind it.
@@ -1455,6 +1460,10 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	# is already on the board by the time the fielding pass looks at it, and the game
 	# puts it in the first free tile - which is the rank that meets the enemy.
 	await _pull_backline_out_of_the_front_rank(label)
+	# Disposal before equipping, so the item decision can place whatever the sale just
+	# returned to the inventory and the bench slot it freed is available to the next shop.
+	# The sale is optional and the empty answer holds, so this cannot strand the run.
+	await _decide_sell(label)
 	# Items before the wager: a component that completes an item changes the board the
 	# wager is being placed on, so the risk decision has to see the equipped board.
 	await _decide_items(label)
@@ -2658,6 +2667,190 @@ func _item_candidates() -> Array[Dictionary]:
 	})
 	return candidates
 
+## Bench disposal, decided by Jev rather than by a helper.
+##
+## Selling is how a flex player turns a full bench back into board space and buckets, and
+## the rig had no sell decision at all: its bench grew to the hard cap of 10 by chapter 10
+## while its board capped at 9. That is not only untidy - a bench with no empty slot makes
+## `buy_unit` refuse every purchase with BENCH_FULL (shop_transactions.gd:162), so a
+## saturated bench is an economic dead end. The refund is the full purchase value
+## (`_calculate_sell_value`), so a sale is also how gold sitting in dead bodies comes back.
+##
+## Only bench bodies are offered. Taking a deployed fighter off the board is a composition
+## decision and the fielding/swap path owns that; this decision disposes of the surplus.
+##
+## The rules live in `summarize_sell_candidates` so a fixture probe can pin them without a
+## running board, the same way `summarize_offer_facts` is pinned.
+func _sell_candidates() -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	if Roster == null or Shop == null:
+		return candidates
+	var board_ids: Array[String] = _board_ids()
+	var board_traits: Array[String] = []
+	for entry: Dictionary in _trait_snapshot(_board_units()):
+		board_traits.append(String(entry.get("id", "")))
+	# Level-1 equivalents per identity, and how many copies sit at each (identity, level)
+	# pair. Both are the same quantities the shop decision is priced against, so "surplus"
+	# and "combine material" mean the same thing in both decisions.
+	var equivalents: Dictionary[String, int] = {}
+	var group_at_level: Dictionary[String, int] = {}
+	for unit: Unit in _owned_units():
+		if unit == null:
+			continue
+		var owned_id: String = _unit_id(unit)
+		var value: int = 1
+		for _step: int in range(maxi(0, int(unit.level) - 1)):
+			value *= 3
+		equivalents[owned_id] = int(equivalents.get(owned_id, 0)) + value
+		var group_key: String = "%s#%d" % [owned_id, maxi(1, int(unit.level))]
+		group_at_level[group_key] = int(group_at_level.get(group_key, 0)) + 1
+	var records: Array[Dictionary] = []
+	for unit: Unit in Roster.compact():
+		if unit == null:
+			continue
+		var unit_id: String = _unit_id(unit)
+		var level: int = maxi(1, int(unit.level))
+		records.append({
+			"unit_id": unit_id,
+			"unit_key": str(unit.get_instance_id()),
+			"level": level,
+			"cost": maxi(0, int(unit.cost)),
+			"refund": _sell_refund_quote(unit),
+			"traits": unit.traits.duplicate(),
+			"where": "bench",
+			"group_at_level": int(group_at_level.get("%s#%d" % [unit_id, level], 0)),
+			"copies_beyond_three_star": maxi(0, int(equivalents.get(unit_id, 0)) - THREE_STAR_LEVEL1_EQUIVALENTS),
+		})
+	candidates = summarize_sell_candidates(records, {
+		"board_ids": board_ids,
+		"board_traits": board_traits,
+		"bench_full": _bench_is_full(),
+	})
+	if candidates.is_empty():
+		return candidates
+	# Cheapest first: when the bench has to shed bodies, the one worth least is the one to
+	# lose, and the ordering makes that the easy pick without the model having to sort.
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return int(left.get("refund", 0)) < int(right.get("refund", 0))
+	)
+	candidates.append({
+		"id": "hold_units",
+		"label": "Sell nothing this beat.",
+		"effect": "Keep the whole bench. Nothing has to be sold; the next planning beat can still sell.",
+	})
+	return candidates
+
+## The sell decision's rules, separated from the live roster so a fixture can pin them.
+##
+## Only bench bodies are offered: a deployed fighter is composition, and the recorded gap is
+## a bench that grows to its hard cap and can never shrink. Two kinds of body are never
+## offered - one that is a single copy from a star-up (combine material, a strict loss to
+## sell) and anything not on the bench.
+##
+## Every candidate carries the reason it is the least painful to lose:
+##   surplus_copy  - the identity already holds more level-1 equivalents than a three-star
+##                   consumes, so this copy can never combine into anything.
+##   off_plan      - the identity is not on the board and shares no trait with it, so
+##                   fielding it would start a plan the run is not on.
+##   low_cost_body - a cost-1 body that does share a trait: cheap flex, sold before real value.
+##   flex_value    - a cost-2+ body that shares a trait: real value, offered only because a
+##                   full bench stops the run buying anything at all.
+static func summarize_sell_candidates(records: Array[Dictionary], context: Dictionary) -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	var bench_full: bool = bool(context.get("bench_full", false))
+	var board_ids: Array = context.get("board_ids", []) as Array
+	var board_traits: Array = context.get("board_traits", []) as Array
+	for record_value: Variant in records:
+		var record: Dictionary = record_value as Dictionary
+		if record.is_empty():
+			continue
+		if String(record.get("where", "bench")) != "bench":
+			continue
+		# One copy from a star-up is the one thing on a bench that is worth more than its
+		# refund, so it is never offered regardless of how full the bench is.
+		if int(record.get("group_at_level", 0)) >= 2:
+			continue
+		var surplus: int = int(record.get("copies_beyond_three_star", 0))
+		# With room on the bench nothing has to leave it, so only a body that can never be
+		# used is worth offering.
+		if surplus <= 0 and not bench_full:
+			continue
+		var unit_id: String = String(record.get("unit_id", ""))
+		var level: int = int(record.get("level", 1))
+		var cost: int = int(record.get("cost", 0))
+		var refund: int = int(record.get("refund", 0))
+		var on_board: bool = board_ids.has(unit_id)
+		var shares_trait: bool = false
+		for trait_value: Variant in (record.get("traits", []) as Array):
+			if board_traits.has(String(trait_value)):
+				shares_trait = true
+				break
+		var reason_kind: String = ""
+		var reason: String = ""
+		if surplus > 0:
+			reason_kind = "surplus_copy"
+			reason = ("%d copies of %s beyond the nine a three-star consumes: this one can never combine." % [surplus, unit_id])
+		elif not on_board and not shares_trait:
+			reason_kind = "off_plan"
+			reason = ("no empty bench slot, and %s shares no trait with the deployed board, so it is off the plan this run is on." % unit_id)
+		elif cost <= 1:
+			reason_kind = "low_cost_body"
+			reason = ("no empty bench slot, and %s is a cost-1 body - the cheapest thing the bench is holding." % unit_id)
+		else:
+			reason_kind = "flex_value"
+			reason = ("no empty bench slot; %s shares a trait with the board and is worth keeping, so it is only offered because nothing can be bought while the bench is full." % unit_id)
+		candidates.append({
+			# Keyed on the unit instance, exactly as _item_candidates does: two copies of one
+			# identity are two different units, and an id-keyed candidate names the wrong copy.
+			"id": "sell_%s_%s" % [unit_id, String(record.get("unit_key", ""))],
+			"label": "Sell %s (level %d, cost %d) for %d buckets." % [unit_id, level, cost, refund],
+			"effect": "%s Frees one bench slot and credits %d buckets." % [reason, refund],
+			"unit_id": unit_id,
+			"unit_key": String(record.get("unit_key", "")),
+			"level": level,
+			"cost": cost,
+			"refund": refund,
+			"where": "bench",
+			"reason_kind": reason_kind,
+			"reason": reason,
+		})
+	return candidates
+
+## The smallest board a sale is allowed to leave behind: the board the run is actually
+## fighting with, capped by the capacity its level allows. A board above its capacity may
+## shed down to it; a board at capacity may not shed at all. Pure so the rule can be pinned
+## by a fixture rather than inferred from a run.
+static func sell_board_floor(board_size: int, board_capacity: int) -> int:
+	if board_size <= 0:
+		return 0
+	if board_capacity <= 0:
+		return board_size
+	return mini(board_size, board_capacity)
+
+## The refund the game will credit for this unit. Mirrors
+## `ShopTransactions._calculate_sell_value` - the purchase value when the unit was bought,
+## otherwise cost x 3^(level-1) - so a candidate can state what selling it is worth before
+## the choice is made. The recorded event carries the real credit as well, so a divergence
+## between the quote and the payout is visible rather than hidden.
+func _sell_refund_quote(unit: Unit) -> int:
+	if unit == null:
+		return 0
+	if int(unit.purchase_value) > 0:
+		return int(unit.purchase_value)
+	var value: int = maxi(0, int(unit.cost))
+	for _step: int in range(maxi(0, maxi(1, int(unit.level)) - 1)):
+		value *= 3
+	return value
+
+## A bench with no empty slot refuses every purchase, so it is the condition that turns a
+## tidy-up into a blocked economy.
+func _bench_is_full() -> bool:
+	if Roster == null:
+		return false
+	if Roster.has_method("first_empty_slot"):
+		return int(Roster.first_empty_slot()) == -1
+	return Roster.compact().size() >= int(Roster.slot_count())
+
 ## One planning beat can need several item decisions: two components on one unit is a
 ## deliberate two-step play, so a single pass would leave the second one unplaced.
 ## The same estimate the HUD shows, recomputed from the teams that are about to
@@ -2989,6 +3182,124 @@ func _decide_items(label: String) -> void:
 		if not placed:
 			_append_event("decision_rejected", {"kind": "item_equip", "choice_id": chosen, "reason": "not_an_item_candidate"})
 			return
+
+## Bench disposal, asked of the model rather than decided by a helper.
+##
+## A sale is optional. The candidate list always ends with an explicit hold, and the
+## empty answer - which is what a timeout produces - is treated as that same hold, so an
+## upstream hiccup can never sell a body the run wanted to keep. The decision is skipped
+## entirely when nothing but the hold is on offer, so no model call is spent on a question
+## with one answer.
+func _decide_sell(label: String) -> void:
+	# The game refuses every sale during combat, and the status is the same one the shop
+	# uses, so the question is not worth asking then.
+	if int(GameState.phase) == int(GameState.GamePhase.COMBAT):
+		return
+	if _run_mode != "jev":
+		# The heuristic arm has no controller, so asking would stall the run until the
+		# decision timeout. It sells one surplus bench body when the bench is full and
+		# otherwise holds, which keeps the baseline arm's capacity to buy intact.
+		_auto_sell_bench_surplus(label)
+		return
+	var candidates: Array[Dictionary] = _sell_candidates()
+	if candidates.size() <= 1:
+		return
+	var state: Dictionary = _plan_state()
+	state["bench_capacity"] = Roster.slot_count() if Roster != null else 0
+	state["bench_full"] = _bench_is_full()
+	var decision: Dictionary = await _ask_decision("unit_sell", state, candidates)
+	var chosen: String = String(decision.get("choice_id", ""))
+	if _sell_choice_is_hold(chosen):
+		return
+	if not _apply_sell_choice(chosen, candidates, label):
+		_append_event("decision_rejected", {"kind": "unit_sell", "choice_id": chosen, "reason": "not_a_sell_candidate"})
+
+## What "sell nothing" looks like. The empty id is the harness's own timeout fallback, so
+## the hold and a timeout are deliberately the same answer: neither may sell a body.
+static func _sell_choice_is_hold(choice_id: String) -> bool:
+	return choice_id == "" or choice_id == "hold_units"
+
+## Apply a chosen sale through the same call the UI's sell zone makes
+## (combat_controller.gd:2049): the Shop autoload's own `sell_unit`, which clears the bench
+## slot, returns the sold unit's items to the inventory and credits the refund. Returns true
+## only when a sale actually happened.
+##
+## `basis` names who chose the sale, matching how item_equipped and shop_purchase label a
+## policy action: "jev_choice" for the model, "heuristic_first_fit" for the baseline arm.
+func _apply_sell_choice(chosen: String, candidates: Array[Dictionary], label: String, basis: String = "jev_choice") -> bool:
+	for candidate: Dictionary in candidates:
+		if String(candidate.get("id", "")) != chosen:
+			continue
+		if not _sell_keeps_the_board_fieldable(candidate):
+			_append_event("sell_refused", {
+				"choice_id": chosen,
+				"unit_id": String(candidate.get("unit_id", "")),
+				"reason": "would_drop_the_board_below_what_it_fields",
+				"label": label,
+			})
+			return false
+		var target_id: String = String(candidate.get("unit_id", ""))
+		var target_key: String = String(candidate.get("unit_key", ""))
+		# Two copies of one identity are two different units, so the sale is applied to the
+		# instance the candidate was priced on rather than to the first copy of that id.
+		for unit: Unit in Roster.compact():
+			if unit == null or _unit_id(unit) != target_id:
+				continue
+			if target_key != "" and str(unit.get_instance_id()) != target_key:
+				continue
+			var board_before: int = _board_units().size()
+			var bench_before: int = Roster.compact().size()
+			var res: Dictionary = Shop.sell_unit(unit) if Shop != null else {}
+			var ok: bool = bool(res.get("ok", false))
+			_append_event("unit_sold", {
+				"unit_id": target_id,
+				"unit_key": target_key,
+				"level": int(candidate.get("level", 1)),
+				"cost": int(candidate.get("cost", 0)),
+				"quoted_refund": int(candidate.get("refund", 0)),
+				"refund": int(res.get("gold_gained", 0)),
+				"reason_kind": String(candidate.get("reason_kind", "")),
+				"reason": String(candidate.get("reason", "")),
+				"basis": basis,
+				"label": label,
+				"ok": ok,
+				"error": String(res.get("error", "")),
+				"board_before": board_before,
+				"board_after": _board_units().size(),
+				"bench_before": bench_before,
+				"bench_after": Roster.compact().size(),
+			})
+			return ok
+		_append_event("decision_rejected", {"kind": "unit_sell", "choice_id": chosen, "reason": "unit_no_longer_on_the_bench"})
+		return false
+	return false
+
+## A sale may never take the board below what it needs to field. A bench body is not on the
+## board at all, so it cannot move that floor; a body on the board is only allowed out while
+## the board it leaves can still field a team, which is why a board at capacity refuses.
+func _sell_keeps_the_board_fieldable(candidate: Dictionary) -> bool:
+	if String(candidate.get("where", "bench")) != "board":
+		return true
+	# The board is read from the live combat view, so it cannot be judged before one exists.
+	if _main == null:
+		return false
+	var board_size: int = _board_units().size()
+	if board_size <= 0:
+		return false
+	return board_size - 1 >= sell_board_floor(board_size, _roster_max_team_size())
+
+## Deterministic sell rule for the baseline arm: one surplus bench body per planning beat,
+## and only when the bench has no empty slot. It never sells combine material and never
+## touches the board, so the heuristic run stays valid while regaining the ability to buy.
+func _auto_sell_bench_surplus(label: String) -> void:
+	if not _bench_is_full():
+		return
+	var candidates: Array[Dictionary] = _sell_candidates()
+	# The list ends with the hold, so a list of one means only the hold is on offer.
+	if candidates.size() <= 1:
+		return
+	var chosen: String = String(candidates[0].get("id", ""))
+	_apply_sell_choice(chosen, candidates, label, "heuristic_first_fit")
 
 ## Stake options for the wager about to be placed.
 ##

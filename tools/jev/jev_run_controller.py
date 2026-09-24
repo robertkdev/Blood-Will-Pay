@@ -266,6 +266,16 @@ def _kind_preamble(kind: str) -> str:
         )
     if kind == "contract":
         return "This is the chapter contract market. Passing is always valid."
+    if kind == "unit_sell":
+        return (
+            "This is bench disposal. A bench with no empty slot refuses every purchase, so "
+            "selling is how the run buys again and how buckets sitting in dead bodies come "
+            "back as spending power. Sell only the body listed as never able to combine, or "
+            "off the plan the board is on: a body one copy from a star-up, or a body that "
+            "shares a trait with the deployed board, is worth more on the bench than its "
+            "refund. Holding is always valid and is the right answer when every candidate "
+            "is real value."
+        )
     if kind == "ascension":
         return (
             "This is a permanent legacy for a unit that reached level 4, chosen once and saved "
@@ -368,6 +378,11 @@ def _recorded_choices_by_kind(replay_dir: Path) -> dict[str, list[dict]]:
 
 def _safe_choice_id(kind: str, choosable: list[dict]) -> str:
     ids = [str(candidate.get("id", "")) for candidate in choosable]
+    # A sell is optional and disposal is the one decision the harness cannot take back, so
+    # the hold wins whenever it is on the menu - including when a replayed choice cannot be
+    # honoured on this bench.
+    if kind == "unit_sell" and "hold_units" in ids:
+        return "hold_units"
     for preferred in SAFE_CHOICE_PREFERENCE:
         if preferred in ids:
             return preferred
