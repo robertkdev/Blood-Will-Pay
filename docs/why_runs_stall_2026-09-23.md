@@ -73,3 +73,39 @@ Put the decisive fact in front of the level decision: the enemy's cost tier, and
 current shop level can roll it at all. "The board facing you fields a cost-4 unit and your
 shelf has a 0% chance of offering one" is a reason to spend 4 stakes that the current
 candidate payload does not state, and the rig is carrying the money for it.
+
+---
+
+# That next step was taken, measured, and reverted - 2026-09-23 (later)
+
+The enemy tier was put in front of the level decision: the candidate carried the enemy's top
+cost and the odds of rolling exactly that tier before and after the level, and the effect text
+said the decisive case in words. The policy's level rule named it too.
+
+It went the wrong way on every measure. Same six seeds, grouped by the revision each run
+recorded, with nothing else differing:
+
+| revision | XP buys, median / mean | mean chapter | median peak |
+| --- | --- | ---: | ---: |
+| with the tier in the prompt | 0.0 / 0.33 | 1.83 | 51 |
+| reverted | **2.0 / 2.33** | **3.83** | **665** |
+
+The most interesting row is the first: **naming the enemy's tier made the rig buy less XP, not
+more** - a third of a purchase per run against more than two once it was removed. The likely
+reason is the one the policy already records about the slot argument, that advertising a level
+makes early XP look better than it is and drains the bankroll the doubling ladder needs; here
+the extra argument appears to have crowded out the levelling decision rather than encouraged
+it. Seed 21042 is the clearest single case: chapter 1 with the sentence, chapter 7 without it.
+
+Reverted in `d59b76f2`, and the revert is the verified improvement: mean XP purchases more than
+double, mean chapter 1.83 to 3.83, median peak 51 to 665. The enemy-tier fields stay on the
+candidate and are deliberately not spoken into the prompt, because only id, label and effect
+are serialised - they cost nothing and let a transcript be read for whether the rig was ever in
+a position to answer a tier at all.
+
+Two things this settles:
+
+- **A prompt sentence is not a lever.** The low XP rate is real and measured, but arguing for
+  levelling in words made it worse. The next attempt has to change a mechanism.
+- The stall enforcement added the same day is *not* implicated: it was present in both arms of
+  this comparison, so the effect above is the level prompt alone.
