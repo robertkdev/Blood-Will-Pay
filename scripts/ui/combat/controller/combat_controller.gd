@@ -2098,7 +2098,12 @@ func _show_contract_market() -> void:
 	_ensure_contract_market_ui()
 	if _contract_overlay == null or _contract_choices == null:
 		return
-	if _contract_overlay.visible:
+	# An overlay that is visible but holds no choice is a dead market: nothing to press and
+	# Continue stays disabled. The chapter-9 run that reached 40.9M buckets was lost to
+	# exactly that state - the rig recorded `contract_market_missing` with the overlay
+	# visible, the choice pending, Continue disabled and no button on screen. Rebuild rather
+	# than trust visibility alone.
+	if _contract_overlay.visible and _contract_choices.get_child_count() > 0:
 		return
 	var shop_node: Node = _autoload_node("Shop")
 	if shop_node == null or not shop_node.has_method("get_contract_offers"):

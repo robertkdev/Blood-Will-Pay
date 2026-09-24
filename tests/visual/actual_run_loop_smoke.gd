@@ -20,6 +20,7 @@ const FIRST_DEPLOY_BENCH_TOOLTIP: String = "Drag this bench unit to a highlighte
 const USE_SYNTHETIC_INPUT: bool = false
 const CLEANUP_DRAIN_FRAMES: int = 75
 const DUMP_ORPHAN_NODES: bool = false
+const CONTINUE_GATE_ATTEMPTS: int = 3
 
 ## The harness plays the shipped game, but it must not take the desktop to do it. The
 ## project boots fullscreen (`window/size/mode=3`), so a run used to cover the whole
@@ -329,6 +330,18 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	if button == null:
 		_expect(false, "%s continue button missing" % label)
 		return
+	if button.disabled:
+		# A held-down Continue is a gate the rig has to answer, not a dead end. The chapter-9
+		# Jev run pressed it anyway - three times - and the deepest run on record aborted
+		# there, so answer the gate first and only then call it a failure.
+		for _attempt: int in range(CONTINUE_GATE_ATTEMPTS):
+			await _clear_continue_gates(label)
+			button = _main.find_child("ContinueButton", true, false) as Button
+			if button == null or not button.disabled:
+				break
+	if button == null:
+		_expect(false, "%s continue button missing" % label)
+		return
 	if expect_forced:
 		_expect(button.text == "Start Opening Fight", "%s should show Start Opening Fight, got %s" % [label, button.text])
 	else:
@@ -336,6 +349,11 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	_expect(not button.disabled, "%s continue button disabled" % label)
 	if not button.disabled:
 		await _click_button(button, "%s continue button" % label)
+
+## Answer whatever is holding Continue down, then let the game release it. Base harnesses have
+## nothing to answer; the pacing and Jev rigs override this with their gate resolvers.
+func _clear_continue_gates(_label: String) -> void:
+	await get_tree().process_frame
 
 func _set_planning_timer_safe() -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control

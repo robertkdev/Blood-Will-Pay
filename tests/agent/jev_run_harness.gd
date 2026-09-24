@@ -1429,6 +1429,16 @@ func _enemy_top_cost() -> int:
 		top = maxi(top, int(unit.cost))
 	return top
 
+## Both gates that can hold Continue down on this rig: a pending chapter contract and a
+## level-4 legacy choice. Answering them here means a held-down Continue is recoverable rather
+## than a run-ending abort.
+func _clear_continue_gates(_label: String) -> void:
+	# This rig resolves both gates itself, so it does not chain to the pacing override.
+	# The contract resolver only asks the model when it actually found a market to answer,
+	# so a repeated pass over an unreadable market costs nothing.
+	await _resolve_pending_contract_market()
+	await _resolve_pending_ascension()
+
 func _press_continue(expect_forced: bool, label: String) -> void:
 	# Resolve the chapter contract before asking about the wager so the wager is
 	# chosen against the real post-contract reserve, then hand off to the shared
@@ -1706,7 +1716,7 @@ func _resolve_pending_contract_market() -> void:
 			if button != null:
 				buttons.append(button)
 	if buttons.is_empty():
-		_append_event("contract_market_missing", {"chapter": int(GameState.chapter)})
+		_append_event("contract_market_missing", _contract_market_probe(overlay_node))
 		return
 	var candidates: Array[Dictionary] = []
 	for index: int in range(buttons.size()):
@@ -1734,6 +1744,53 @@ func _resolve_pending_contract_market() -> void:
 		})
 		return
 	_append_event("decision_rejected", {"kind": "contract", "choice_id": chosen, "reason": "not_a_contract_candidate"})
+
+## Everything the contract market looked like at the moment the rig could not find a button.
+##
+## The chapter-9 run that reached 40.9M buckets died here: the rig recorded only "missing",
+## so the reason stayed a guess for two turns. The event now carries the state that explains
+## it - the phase, whether the overlay exists and is visible, and every button on screen.
+func _contract_market_probe(overlay_node: Control) -> Dictionary:
+	var overlay_button_names: Array[String] = []
+	var market_layer: CanvasLayer = _main.find_child("ChapterContractLayer", true, false) as CanvasLayer if _main != null else null
+	if overlay_node != null:
+		for candidate: Node in overlay_node.find_children("*", "Button", true, false):
+			overlay_button_names.append(String(candidate.name))
+	var contract_buttons: Array[String] = []
+	if _main != null:
+		for candidate: Node in _main.find_children("Contract*", "Button", true, false):
+			contract_buttons.append(String(candidate.name))
+			if contract_buttons.size() >= 12:
+				break
+	# The choices container is created without a name, so reach it through its named sibling
+	# and report the shape of the market's own stack.
+	var market_stack: Array[String] = []
+	var status_label: Label = _main.find_child("ContractStatus", true, false) as Label if _main != null else null
+	var stack_parent: Node = status_label.get_parent() if status_label != null else null
+	if stack_parent != null:
+		for child: Node in stack_parent.get_children():
+			market_stack.append("%s:%s:%d" % [String(child.name), child.get_class(), child.get_child_count()])
+	return {
+		"chapter": int(GameState.chapter),
+		"phase": int(GameState.phase),
+		"pending_choice": bool(Shop.call("has_pending_contract_choice")),
+		"overlay_found": overlay_node != null,
+		"overlay_visible": overlay_node != null and overlay_node.visible,
+		"overlay_children": overlay_node.get_child_count() if overlay_node != null else -1,
+		"overlay_in_tree": overlay_node != null and overlay_node.is_visible_in_tree(),
+		"overlay_buttons": overlay_button_names,
+		"overlay_button_count": overlay_button_names.size(),
+		"contract_buttons": contract_buttons,
+		"layer_found": market_layer != null,
+		"layer_children": market_layer.get_child_count() if market_layer != null else -1,
+		"view_count": _main.find_children("CombatView", "Control", true, false).size() if _main != null else -1,
+		"market_stack": market_stack,
+		"continue_disabled": _continue_button_is_disabled(),
+	}
+
+func _continue_button_is_disabled() -> bool:
+	var button: Button = _main.find_child("ContinueButton", true, false) as Button if _main != null else null
+	return button != null and button.disabled
 
 ## Answer a pending level-4 legacy choice before the wager is placed.
 ##

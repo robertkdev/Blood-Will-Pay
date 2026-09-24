@@ -129,6 +129,10 @@ func _resolve_pending_contract_market() -> void:
 	if _recorder != null:
 		_recorder.mark("contract_passed", {"chapter": int(GameState.chapter)})
 
+## A chapter contract holds Continue down until it is answered.
+func _clear_continue_gates(_label: String) -> void:
+	await _resolve_pending_contract_market()
+
 func _max_natural_buys_for_round(_chapter_before: int, _round_before: int) -> int:
 	# The baseline fixture limits rounds 1-4 to one purchase. A real player can
 	# make a second affordable purchase when the planning reserve remains intact.
