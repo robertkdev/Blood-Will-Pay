@@ -501,6 +501,18 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		"post_settlement_enemy_alive": _alive_count(enemy_team),
 		"post_settlement_player_board": _team_ids(player_team),
 		"post_settlement_enemy_board": _team_ids(enemy_team),
+		# The engine's own settlement line, which is the only record of the fight's real
+		# survivor counts and damage - the board is rebuilt during settlement, so
+		# post_settlement_* describes the next stage rather than the fight. Without these
+		# the at-the-clock comparison the depth review needs cannot be measured at all;
+		# see docs/depth_anatomy_2026-09-24.md. `clock_decided` is elapsed >= the combat
+		# timeout, so a clock-decided fight's resolution counts ARE its at-clock counts.
+		"resolution_line": _last_resolution_line,
+		"resolution_player_alive": int(_last_resolution_fields.get("player_alive", -1)),
+		"resolution_enemy_alive": int(_last_resolution_fields.get("enemy_alive", -1)),
+		"resolution_player_damage": int(_last_resolution_fields.get("player_damage", -1)),
+		"resolution_enemy_damage": int(_last_resolution_fields.get("enemy_damage", -1)),
+		"clock_decided": _last_combat_elapsed_s >= float(engine.get("combat_timeout_s")) and float(engine.get("combat_timeout_s")) > 0.0,
 		"buckets_after": int(Economy.blood_buckets),
 		"reserve_before_wager": int(Economy.last_blood_reserve_start),
 		"wager": int(Economy.last_wager_start),
@@ -1440,6 +1452,11 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	await _decide_wager(label)
 	_ensure_combat_log_connected()
 	_last_combat_outcome = ""
+	# Clear the previous fight's settlement line too. A fight that ends without the engine
+	# announcing "Combat resolved:" would otherwise inherit the last one's survivor counts
+	# and damage, and the at-the-clock comparison would silently read the wrong fight.
+	_last_resolution_line = ""
+	_last_resolution_fields = {}
 	# Snapshot everything about the fight BEFORE it starts. After settlement the board
 	# is rebuilt for the next planning beat and the units are healed, so a read taken
 	# afterwards describes the next stage, not the fight that just resolved.
