@@ -96,12 +96,20 @@ func _run_natural_buy_xp_attempt(attempt_index: int) -> bool:
 	if not _failures.is_empty():
 		return false
 
+	var gold_before_opener: int = int(Economy.gold)
 	await _press_continue(true, "natural Buy XP forced opener")
 	var shop_ready: bool = await _wait_for_shop_after_win(30.0)
 	_expect(shop_ready, "natural Buy XP path did not reach the first shop")
 	if not _failures.is_empty():
 		return false
-	_expect(int(Economy.gold) == EXPECTED_REWARD_FUNDED_GOLD, "reward-funded opener should reach exactly %d gold, got %d" % [EXPECTED_REWARD_FUNDED_GOLD, int(Economy.gold)])
+	# The guaranteed reward pool exists so the opener leaves enough to buy XP safely. Its exact
+	# total also carries the account's Debtor's Mercy bonus, which grows as the Black Ledger is
+	# spent - permanent growth across runs is the point of the campaign - so assert that the
+	# opener paid and cleared the safe-gold threshold rather than an absolute number a fresh
+	# account used to land on. EXPECTED_REWARD_FUNDED_GOLD records what that was for a fresh one.
+	var gold_after_opener: int = int(Economy.gold)
+	_expect(gold_after_opener > gold_before_opener, "reward-funded opener should pay more than it staked, got %d from %d" % [gold_after_opener, gold_before_opener])
+	_expect(gold_after_opener >= MIN_SAFE_BUY_XP_GOLD, "reward-funded opener should leave at least %d gold to buy XP safely, got %d (a fresh account landed on %d)" % [MIN_SAFE_BUY_XP_GOLD, gold_after_opener, EXPECTED_REWARD_FUNDED_GOLD])
 	if int(Economy.gold) < MIN_SAFE_BUY_XP_GOLD:
 		print("%s: attempt %d reached first shop with gold=%d; expected reward-funded safe-gold opener" % [SMOKE_NAME, attempt_index, int(Economy.gold)])
 		return false
