@@ -118,6 +118,31 @@ gamble while the build is not the thing that decides the fight.
   below threshold* on the same board, which is a reasonable control but not a randomised one.
 - The `cost 4-5` row is empty because the shop never offers it, not because it was tested.
 
+## Addendum: the empty cost-4 row is now filled, and it does not win either
+
+The table above had **zero** player samples at cost 4-5, because no player board had ever held
+one. That is no longer true: the eager level policy (`docs/level_price_bug_and_eager_policy_2026-09-24.md`)
+put cost-4 and cost-5 units on the board in three runs, so the band can be measured.
+
+Player board's highest-cost unit against win rate, first attempts only:
+
+| max unit cost | all first attempts | win rate | chapter 2+ | win rate |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 1,414 | 83% | 853 | 81% |
+| 2 | 592 | 82% | 572 | 81% |
+| 3 | 129 | 86% | 127 | 86% |
+| **4-5** | **13** | **77%** | **13** | **77%** |
+
+Thirteen fights is far too few to call a penalty, and it is not being called one. What it does
+establish is the narrower and more useful thing: **the "higher cost units should make a
+difference" requirement is not satisfied, and it is no longer untested.** With real cost-4 and
+cost-5 bodies on the board the win rate is 77% against 81-86% for cheaper boards, so the
+measurement gives no support to a positive effect. The previous empty row could be explained
+away as an artifact of never reaching the tier; this one cannot.
+
+That is the same conclusion as the level, board-size and trait measurements, reached with the
+missing data filled in: none of the player's investments is what decides a fight.
+
 ## Next
 
 1. **Make fights resolve.** `scripts/game/combat/overtime.gd` already implements a bounded,
