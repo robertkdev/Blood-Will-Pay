@@ -372,6 +372,9 @@ var _ascension_overlay: Control = null
 var _ascension_choices: VBoxContainer = null
 var _ascension_status: Label = null
 var _pending_ascension_units: Array[Unit] = []
+## The unit the legacy overlay is currently showing, so a driver can ask what is pending
+## and answer it without reaching into the overlay's children.
+var _active_ascension_unit: Unit = null
 
 # External engine manager
 var manager: CombatManager
@@ -2337,6 +2340,7 @@ func _show_ascension_choice(unit: Unit) -> void:
 	_ensure_ascension_ui()
 	if _ascension_overlay == null or _ascension_choices == null:
 		return
+	_active_ascension_unit = unit
 	for child: Node in _ascension_choices.get_children():
 		child.queue_free()
 	var display_name: String = String(unit.name).strip_edges()
@@ -2364,6 +2368,41 @@ func _show_ascension_choice(unit: Unit) -> void:
 	_ascension_overlay.visible = true
 	if continue_button != null:
 		continue_button.disabled = true
+
+## Whether a combine has promoted a unit to level 4 and its legacy is still unbound.
+##
+## A promotion to level 4 opens the legacy-choice overlay, which disables Start Battle until
+## the player answers it. Anything that drives this UI has to answer it too, or it presses a
+## button that cannot act: the Jev rig had no handling for this and lost its richest runs to
+## it, because buying enough copies to combine is what opens the overlay in the first place.
+func has_pending_ascension() -> bool:
+	return pending_ascension_unit() != null
+
+## The unit the legacy overlay is asking about, or null when it is not up. Keyed on the
+## overlay rather than on the combine queue because the overlay is what disables Start
+## Battle, and it can be shown for a unit that never sat in the queue.
+func pending_ascension_unit() -> Unit:
+	if _active_ascension_unit == null or not is_instance_valid(_active_ascension_unit):
+		return null
+	if int(_active_ascension_unit.level) < 4:
+		return null
+	if String(_active_ascension_unit.ascension_path_id) != "":
+		return null
+	return _active_ascension_unit
+
+func pending_ascension_options() -> Array[Dictionary]:
+	var unit: Unit = pending_ascension_unit()
+	if unit == null:
+		return []
+	return UnitUpgradePaths.legacy_options(unit)
+
+## Bind a legacy on the unit the overlay is showing, the same way its own buttons do.
+func resolve_ascension(legacy_id: String) -> bool:
+	var unit: Unit = pending_ascension_unit()
+	if unit == null or legacy_id.strip_edges() == "":
+		return false
+	_on_ascension_choice_pressed(unit, legacy_id.strip_edges())
+	return String(unit.ascension_path_id) != ""
 
 func _ensure_ascension_ui() -> void:
 	if _ascension_layer != null and is_instance_valid(_ascension_layer):
@@ -2430,6 +2469,7 @@ func _on_ascension_choice_pressed(unit: Unit, legacy_id: String) -> void:
 	_show_next_ascension_choice()
 
 func _close_ascension_choice() -> void:
+	_active_ascension_unit = null
 	if _ascension_overlay != null:
 		_ascension_overlay.visible = false
 	if continue_button != null and (_contract_overlay == null or not _contract_overlay.visible):

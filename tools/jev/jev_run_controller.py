@@ -265,6 +265,13 @@ def _kind_preamble(kind: str) -> str:
         )
     if kind == "contract":
         return "This is the chapter contract market. Passing is always valid."
+    if kind == "ascension":
+        return (
+            "This is a permanent legacy for a unit that reached level 4, chosen once and saved "
+            "with the run. Each option pairs a trigger with an effect and a risk: pick the one "
+            "whose trigger this board can actually satisfy, and prefer an effect that decides "
+            "the fight in front of you over one that needs a board you do not have."
+        )
     return ""
 
 

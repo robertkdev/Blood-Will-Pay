@@ -39,6 +39,8 @@ const DEEP_MAX_BATTLES: int = 200
 ## The shipped planning countdown in game seconds; see _scale_planning_window_for_sweep.
 const SHIPPED_PLANNING_WINDOW_S: float = 120.0
 const MAX_SAME_STAGE_RETRIES: int = 3
+## A beat can queue more than one level-4 legacy if several units combine.
+const ASCENSION_DECISIONS_PER_BEAT: int = 4
 ## A synthetic mouse event occasionally misses a control that is visibly present and
 ## enabled - observed once across six seeds, on a shop slot, with the card rendered and
 ## mouse_filter 0. That is an input-layer artifact rather than play, but the inherited
@@ -1328,6 +1330,10 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	# chosen against the real post-contract reserve, then hand off to the shared
 	# start-battle click path.
 	await _resolve_pending_contract_market()
+	# The same gate as a contract: a level-4 promotion opens a legacy choice that disables
+	# Start Battle until it is answered, and buying enough copies to combine is exactly what
+	# a rich run does. See _resolve_pending_ascension.
+	await _resolve_pending_ascension()
 	# Repair the ranks before anything is priced against the board. A purchased unit
 	# is already on the board by the time the fielding pass looks at it, and the game
 	# puts it in the first free tile - which is the rank that meets the enemy.
@@ -1613,6 +1619,68 @@ func _resolve_pending_contract_market() -> void:
 		})
 		return
 	_append_event("decision_rejected", {"kind": "contract", "choice_id": chosen, "reason": "not_a_contract_candidate"})
+
+## Answer a pending level-4 legacy choice before the wager is placed.
+##
+## A combine that promotes a unit to level 4 opens the legacy overlay and disables Start
+## Battle until the player picks one. The rig had no handling for it, so the runs rich enough
+## to combine - the ones the design wants - pressed a dead button, tripped three
+## `continue button disabled` failures and were recorded as harness aborts rather than
+## outcomes: 4,766,400 buckets at chapter 7, 95,050 at chapter 5, 42,126 at chapter 6. This
+## asks the same model that makes every other decision, and falls back to the first legacy
+## only if the model returns nothing.
+func _resolve_pending_ascension() -> void:
+	for _pass: int in range(ASCENSION_DECISIONS_PER_BEAT):
+		var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+		if combat == null:
+			return
+		var controller: Variant = combat.get("controller")
+		if controller == null or not controller.has_method("has_pending_ascension"):
+			return
+		if not bool(controller.call("has_pending_ascension")):
+			return
+		var unit: Variant = controller.call("pending_ascension_unit")
+		var unit_label: String = "-"
+		if unit != null and unit is Unit:
+			unit_label = "%s level %d" % [_unit_id(unit as Unit), int((unit as Unit).level)]
+		var candidates: Array[Dictionary] = []
+		for option_value: Variant in controller.call("pending_ascension_options"):
+			var option: Dictionary = option_value as Dictionary
+			var legacy_id: String = String(option.get("id", "")).strip_edges()
+			if legacy_id == "":
+				continue
+			candidates.append({
+				"id": legacy_id,
+				"label": "%s (%s) for %s" % [String(option.get("name", legacy_id)), String(option.get("fit", "conditional fit")), unit_label],
+				"effect": "TRIGGER %s. EFFECT %s. RISK %s" % [
+					String(option.get("trigger", "unknown")),
+					String(option.get("effect", "unknown")),
+					String(option.get("risk", "unknown")),
+				],
+			})
+		if candidates.is_empty():
+			_append_event("ascension_missing_options", {"unit": unit_label})
+			return
+		var decision: Dictionary = await _ask_decision("ascension", _plan_state(), candidates)
+		var chosen: String = String(decision.get("choice_id", "")).strip_edges()
+		if chosen == "" or not _candidate_ids(candidates).has(chosen):
+			chosen = String(candidates[0].get("id", ""))
+		var applied: bool = bool(controller.call("resolve_ascension", chosen))
+		_append_event("ascension_resolved", {
+			"unit": unit_label,
+			"legacy": chosen,
+			"applied": applied,
+			"from_model": String(decision.get("choice_id", "")) == chosen,
+		})
+		await _settle_frames(4)
+		if not applied:
+			return
+
+func _candidate_ids(candidates: Array[Dictionary]) -> Array[String]:
+	var ids: Array[String] = []
+	for candidate: Dictionary in candidates:
+		ids.append(String(candidate.get("id", "")))
+	return ids
 
 # --- observation and candidate construction --------------------------------
 
