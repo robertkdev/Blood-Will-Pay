@@ -2,14 +2,19 @@
 # - 2026-09-24
 
 Four Jev runs on a fresh seed block, grown profile (5991 Omens, rank 67), speed 8, code at
-`86866d92` - the commit that steepened `ODDS_EXPONENT` from 1.55 to 4.0. Three completed.
+`86866d92` - the commit that steepened `ODDS_EXPONENT` from 1.55 to 4.0.
 
-| seed | terminal | chapter | battles | peak bankroll | technical failures |
-| --- | --- | ---: | ---: | ---: | ---: |
-| 21201 | stage_stall | 6 | 36 | 4,702 | 0 |
-| 21202 | stage_stall | 3 | 19 | 3,386 | 0 |
-| 21203 | loss | 3 | 15 | 1,590 | 0 |
-| 21204 | **engine crash** | - | - | - | summary never written |
+| seed | terminal | deepest chapter seen | fights | first attempts | peak bankroll | technical failures |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 21201 | stage_stall | 6 | 37 | 29 | 4,702 | 0 |
+| 21202 | stage_stall | 3 | 20 | 14 | 3,386 | 0 |
+| 21203 | loss | 3 | 16 | 12 | 1,590 | 0 |
+| 21204 | **engine crash** | 5 | 26 | 23 | - | run ended by crash |
+
+All four runs are analysed. Seed 21204 lost its aggregated `run_summary.json` to the crash,
+but its `run_events.jsonl` survived with 339 events including all 26 fights, so it is only the
+summary artifact that is gone - **not the run's evidence**. An earlier draft of this note
+claimed the crash erased its own evidence; that was wrong and is corrected here.
 
 ## The betting changed the way the requirement asked
 
@@ -18,17 +23,17 @@ The standing complaint was that the rig goes into rounds with buckets neither be
 run finally ends, the median wager was **4 buckets against a median bankroll of 778, a 10%
 stake, and 0 of 19 runs wagered at least half their bankroll** (`docs/why_runs_stall_2026-09-23.md`).
 
-Pooled over the 55 first attempts in these three runs, stake as a share of the bankroll
-actually in hand:
+Pooled over the 78 first attempts in all four runs, stake as a share of the bankroll actually
+in hand:
 
 | shown odds | n | mean stake | median stake | all-in |
 | --- | ---: | ---: | ---: | ---: |
-| below 0.50 | 18 | 8% | 2% | 0 / 18 |
-| 0.50 - 0.70 | 15 | 73% | 100% | 10 / 15 |
-| 0.70 - 0.90 | 9 | 100% | 100% | 9 / 9 |
-| 0.90 and up | 13 | 100% | 100% | 13 / 13 |
+| below 0.50 | 29 | 12% | 3% | 0 / 29 |
+| 0.50 - 0.70 | 21 | 69% | 100% | 12 / 21 |
+| 0.70 - 0.90 | 10 | 100% | 100% | 10 / 10 |
+| 0.90 and up | 18 | 100% | 100% | 18 / 18 |
 
-**32 of the 37 fights it rated above 50% were all-in**, against 0 of 19 before. It still holds
+**40 of the 49 fights it rated above 50% were all-in (82%)**, against 0 of 19 before. It still holds
 back below 0.50, which is the behaviour the design asks for rather than a defect.
 
 Peak bankrolls of 4,702 / 3,386 / 1,590 across three runs are also far above the pre-change
@@ -41,15 +46,15 @@ First attempts only, shown odds against what happened:
 
 | shown odds | n | mean shown | observed | gap |
 | --- | ---: | ---: | ---: | ---: |
-| 0-0.29 | 5 | 0.18 | 0.60 | +0.42 |
-| 0.30-0.49 | 13 | 0.43 | 0.69 | +0.26 |
-| 0.50-0.69 | 15 | 0.57 | 0.87 | +0.30 |
-| 0.70-0.89 | 9 | 0.76 | 1.00 | +0.24 |
-| 0.90-1.00 | 13 | 0.98 | 1.00 | +0.02 |
-| **all** | **55** | **0.630** | **0.855** | **+0.225** |
+| 0-0.29 | 9 | 0.17 | 0.67 | +0.50 |
+| 0.30-0.49 | 20 | 0.43 | 0.75 | +0.32 |
+| 0.50-0.69 | 21 | 0.57 | 0.86 | +0.29 |
+| 0.70-0.89 | 10 | 0.77 | 1.00 | +0.23 |
+| 0.90-1.00 | 18 | 0.98 | 1.00 | +0.02 |
+| **all** | **78** | **0.609** | **0.859** | **+0.250** |
 
 **This is not comparable to the 3,144-fight baseline** (mean shown 0.584, observed 0.780, gap
-0.197) - different seed block, 55 fights against 3,144 - so it is not claimed as a regression
+0.197) - different seed block, 78 fights against 3,144 - so it is not claimed as a regression
 or an improvement. What it does show is the *shape* of what is left: the error is now
 one-directional and largest in the middle bands, and the model is pessimistic nearly
 everywhere.
@@ -70,10 +75,9 @@ would settle it: give the representative probe a concentrated item-assignment mo
 items on the strongest body - and check whether the model then under-predicts the way the
 live record does.
 
-## A crash that costs a whole run
+## A crash that costs a run, but not its evidence
 
-Seed 21204 died with **signal 11** and never wrote a `run_summary.json`, so the run produced
-no analysable data at all:
+Seed 21204 died with **signal 11** and never wrote a `run_summary.json`:
 
 ```
 [Items] remove_all on=Repo -> returned=0
@@ -90,15 +94,20 @@ immediately after the item pass touched `Repo` twice. `remove_all` appears in
 `shop_transactions.gd`, `roster.gd` and `combine_service.gd`, and the two consecutive calls
 with nothing returned is itself suspicious.
 
-This is the most serious defect in the batch, and it is exactly the shape the request named:
-`the request asked what happens at max team size on both sides`. A crash loses the run's data
-as well as the run, so it also removes evidence. No prior crash record exists in `docs/`.
+The run's fight data survived in `run_events.jsonl`, because the harness streams events rather
+than buffering them - which is the only reason this run is in the tables above instead of
+being a hole. The loss is the aggregated summary and the terminal outcome. That is still
+worth fixing: `run_summary.json` is what the batch driver reads, so a crashed run reports as a
+missing result, and the crash itself is silent unless someone opens `godot.log`.
+
+This is the most serious defect in the batch, and it is exactly the shape the request named -
+`max team size on both sides`. No prior crash record exists in `docs/`.
 
 ## Next
 
 1. Reproduce and fix the 21204 crash. Nine-unit board, item pass, `remove_all` twice - then
-   make the harness write a partial summary before any run can end so a crash cannot erase
-   its own evidence.
+   make the harness flush a partial `run_summary.json` as the run progresses, so a crash
+   reports as an incomplete run with its data rather than as a missing result.
 2. Build the concentrated-item probe described above and measure whether the ratio error is
    item effects.
 3. Re-run this seed block once the crash is fixed; 21204 is not a result, it is a gap.
