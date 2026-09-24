@@ -14,7 +14,13 @@ func on_pre_spawn(spec: Dictionary, ch: int, _sic: int) -> void:
 	rules["badge"] = "MIRROR"
 	rules["mirror_source"] = "boss_entry_board"
 	spec[StageTypes.KEY_RULES] = rules
-	var ids: Array[String] = MirrorBoardStore.snapshot_ids(ch)
+	# The mirror fields the snapshot's board minus its weakest body; see MirrorBoardStore.mirror_indices
+	# for why one body is the lever that matters here.
+	var all_ids: Array[String] = MirrorBoardStore.snapshot_ids(ch)
+	var ids: Array[String] = []
+	for index: int in MirrorBoardStore.mirror_indices(ch):
+		if index >= 0 and index < all_ids.size():
+			ids.append(all_ids[index])
 	if ids.is_empty():
 		ids.append("bonko")
 	spec[StageTypes.KEY_IDS] = ids
