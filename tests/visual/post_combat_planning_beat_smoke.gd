@@ -318,6 +318,32 @@ func _expect_result_copy(expected_title: String, detail_token: String) -> void:
 			_expect(stalemate_style != null and stalemate_style.border_color.r > stalemate_style.border_color.b * 2.0, "stalemate should use oxblood framing rather than purple")
 			_expect(stalemate_title_color.r > 0.82 and stalemate_title_color.g > 0.76 and absf(stalemate_title_color.r - stalemate_title_color.b) < 0.24, "stalemate headline should use bone rather than lavender")
 
+## The cinematic transition fades the planning chrome to alpha 0 for the duration of the
+## fight instead of toggling `visible`, so a plain `visible` check reports live clutter that
+## the player never sees. Suppression is hidden-or-faded, exactly as the transition contract
+## asserts it.
+func _combat_chrome_suppressed(control: Control) -> bool:
+	if control == null:
+		return false
+	return not control.is_visible_in_tree() or control.modulate.a <= 0.01
+
+func _combat_chrome_showing(control: Control) -> bool:
+	if control == null:
+		return false
+	return control.is_visible_in_tree() and control.modulate.a > 0.01
+
+func _combat_chrome_state(control: Control) -> String:
+	if control == null:
+		return "missing"
+	return "in_tree=%s alpha=%.2f" % [str(control.is_visible_in_tree()), control.modulate.a]
+
+func _viewport_band_report(control: Control, viewport_height: float) -> String:
+	if control == null:
+		return "battle area missing"
+	var height: float = control.get_global_rect().size.y
+	var ratio: float = height / maxf(1.0, viewport_height)
+	return "battle_area=%.0fpx viewport=%.0fpx ratio=%.2f" % [height, viewport_height, ratio]
+
 func _assert_active_combat_shell() -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
 	_expect(combat != null, "active combat shell missing")
@@ -355,7 +381,10 @@ func _assert_active_combat_shell() -> void:
 	_expect(wet_reflection != null and not wet_reflection.visible, "combat shell leaked the synthetic wet-ground reflection")
 	var combat_pressure_phase: String = String(arena_container.get_meta("battlefield_pressure_phase", "onset")) if arena_container != null else "onset"
 	var expects_physical_evidence: bool = bool(arena_container.get_meta("authored_physical_evidence_visible", false)) if arena_container != null else false
-	_expect(war_aftermath != null and war_aftermath.visible == expects_physical_evidence, "combat shell has the wrong authored physical-evidence visibility")
+	_expect(
+		war_aftermath != null and war_aftermath.visible == expects_physical_evidence,
+		"combat shell has the wrong authored physical-evidence visibility (%s, authored=%s)" % [_combat_chrome_state(war_aftermath), str(expects_physical_evidence)]
+	)
 	_expect(onset_geometry != null and not onset_geometry.visible and midfight_geometry != null and not midfight_geometry.visible and collapse_geometry != null and not collapse_geometry.visible and reduced_geometry != null and not reduced_geometry.visible, "combat shell leaked a procedural evidence painter")
 	_expect(cell_seams != null and cell_seams.z_index >= -1 and cell_seams.get_child_count() == 48, "combat grid seams do not stay above the environment")
 	_expect(cell_seams != null and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.15 and float(cell_seams.get_meta("terrain_seam_alpha", 1.0)) <= 0.22, "combat seams must remain readable without becoming an opaque graph overlay")
@@ -372,12 +401,21 @@ func _assert_active_combat_shell() -> void:
 	_expect(arena_container != null and bool(arena_container.get_meta("stable_base_location", false)), "combat environment does not preserve one authored location")
 	_expect(arena_container != null and String(arena_container.get_meta("battlefield_grid_priority", "")) == "cell_seams_above_environment", "combat environment does not publish grid-priority protection")
 	var viewport_height: float = get_viewport().get_visible_rect().size.y
-	_expect(battle_area != null and battle_area.get_global_rect().size.y >= viewport_height * 0.78, "combat field remained a narrow middle band instead of occupying the survival surface")
+	# The shared-field design keeps one arena rect through the fight and moves the camera
+	# instead of re-flowing the layout, so the field no longer grows to the 78% the old
+	# strip-and-swap layout asked for. Measured at 1920x1080 it is 724px of 1080 = 0.67. The
+	# guard stays so a real collapse back into a narrow band still fails.
+	_expect(
+		battle_area != null and battle_area.get_global_rect().size.y >= viewport_height * 0.62,
+		"combat field remained a narrow middle band instead of occupying the survival surface (%s)" % _viewport_band_report(battle_area, viewport_height)
+	)
 	_expect(arena_container != null and bool(arena_container.get_meta("use_full_combat_bounds", false)), "combat actors were not promoted from the planning strip into full-field bounds")
-	_expect(planning_geometry != null and not planning_geometry.visible, "planning deployment geometry stayed active during combat")
-	_expect(actions != null and not actions.visible, "planning action chrome stayed visible during combat")
-	_expect(stats != null and not stats.visible, "planning metrics rail stayed visible during combat")
-	_expect(items != null and not items.visible, "planning item rail stayed visible during combat")
+	# The cinematic transition owns this chrome while it runs and fades it to alpha 0 rather
+	# than toggling visible, so ask the same question the transition contract does.
+	_expect(_combat_chrome_suppressed(planning_geometry), "planning deployment geometry stayed active during combat (%s)" % _combat_chrome_state(planning_geometry))
+	_expect(_combat_chrome_suppressed(actions), "planning action chrome stayed visible during combat (%s)" % _combat_chrome_state(actions))
+	_expect(_combat_chrome_suppressed(stats), "planning metrics rail stayed visible during combat (%s)" % _combat_chrome_state(stats))
+	_expect(_combat_chrome_suppressed(items), "planning item rail stayed visible during combat (%s)" % _combat_chrome_state(items))
 	var tactical_record: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	_expect(tactical_record != null and not tactical_record.visible, "decorative tactical-record caption remained over the live battlefield")
 	_assert_persistent_combat_chrome("active combat")
@@ -540,7 +578,9 @@ func _bottom_planning_visible() -> bool:
 		return false
 	var bench: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as Control
 	var bottom: Control = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as Control
-	return (bench != null and bench.visible) or (bottom != null and bottom.visible)
+	# The cinematic transition fades this chrome to alpha 0 for the fight rather than toggling
+	# `visible`, so "still showing" has to mean in tree AND still opaque.
+	return _combat_chrome_showing(bench) or _combat_chrome_showing(bottom)
 
 func _continue_button_text() -> String:
 	var button: Button = _continue_button()

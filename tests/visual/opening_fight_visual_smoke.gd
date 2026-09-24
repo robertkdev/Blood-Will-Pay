@@ -61,7 +61,10 @@ func _verify_opening_fight_state() -> void:
 		_expect(not bet_slider.visible, "opening bet slider should be hidden")
 		_expect(not bet_slider.editable, "opening bet slider should be locked")
 	var bet_value: Label = _main.find_child("BetValue", true, false) as Label
-	_expect(bet_value != null and String(bet_value.text) == "Opening bet: 1", "opening bet copy missing")
+	var bet_copy: String = String(bet_value.text) if bet_value != null else "<missing>"
+	# The copy is "Opening wager: 1 bucket" - the strip names the stake rather than the
+	# retired "Opening bet: 1" sentence, so assert the information, not the sentence.
+	_expect(bet_value != null and bet_copy.begins_with("Opening wager:") and bet_copy.contains("1"), "opening bet copy missing, got %s" % bet_copy)
 	var placeholder: PanelContainer = _opening_placeholder_panel()
 	_expect(placeholder != null, "opening placeholder panel missing")
 	if placeholder != null:

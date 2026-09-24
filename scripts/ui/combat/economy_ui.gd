@@ -314,8 +314,10 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	var compact_decision: bool = tight_compact or _uses_narrow_compact_copy()
 	if forced_first_fight:
 		var opening_risk: String = BloodBuckets.format_amount(1, compact_decision)
-		var opening_summary: String = "Opening wager: %s" if compact_decision else "Opening wager: %s. Win to unlock the shop."
-		wager_summary.text = opening_summary % opening_risk
+		# Stake only. "Win to unlock the shop" is the opening placeholder's own line directly
+		# under this strip - printing it twice was filler, and at 1920x1080 the longer line
+		# ran into the placeholder text below it.
+		wager_summary.text = "Opening wager: %s" % opening_risk
 		wager_summary.tooltip_text = BloodBuckets.describe(1) + ". Win the forced opener to unlock wager choice and outcome quotes."
 		wager_summary.set_meta("compact_summary_format", "opening_risk")
 		return

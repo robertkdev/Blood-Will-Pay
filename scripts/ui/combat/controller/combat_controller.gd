@@ -4058,7 +4058,7 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 		arena_container.set_meta("use_full_combat_bounds", in_combat)
 	var arena_objective: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
 	if arena_objective != null:
-		_configure_compact_objective_signal(arena_objective)
+		_configure_combat_objective_signal(arena_objective)
 	var planning_directive: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
 		# One word. This strip used to read "DEPLOYMENT GRID // SET WAGER // COMMIT" - a sentence
@@ -4069,19 +4069,53 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 	if in_combat and parent.has_method("_update_external_backplates"):
 		parent.call_deferred("_update_external_backplates")
 
-func _configure_compact_objective_signal(objective: Label) -> void:
-	# The plate is already red and pulsing in combat; the word carries the rest.
-	objective.text = "LIVE"
-	objective.offset_left = -100.0
-	objective.offset_right = 100.0
-	objective.offset_top = 36.0
-	objective.offset_bottom = 58.0
-	objective.add_theme_font_size_override("font_size", 14)
-	objective.add_theme_color_override("font_color", Color(0.86, 0.78, 0.66, 0.92))
-	objective.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
-	VisualTypeSystem.set_utility_bold(objective)
-	objective.set_meta("persistent_copy_uses_utility_face", true)
-	objective.set_meta("persistent_copy_uses_impact_face", false)
+## The combat objective signal: the theme's authored impact-face survival command on a
+## full-size field, the quiet utility stamp on a compact one.
+##
+## This only used to run in its compact form - a 14px utility "LIVE // SURVIVE" - at every
+## window size, so the authored "SURVIVE" plate the theme builds never reached the player.
+## One word naming what the fight asks of them is not filler; it is the signal.
+func _configure_combat_objective_signal(objective: Label) -> void:
+	if _objective_uses_compact_form():
+		objective.text = "LIVE"
+		objective.offset_left = -100.0
+		objective.offset_right = 100.0
+		objective.offset_top = 36.0
+		objective.offset_bottom = 58.0
+		objective.add_theme_font_size_override("font_size", 14)
+		objective.add_theme_color_override("font_color", Color(0.86, 0.78, 0.66, 0.92))
+		objective.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+		VisualTypeSystem.set_utility_bold(objective)
+		objective.set_meta("persistent_copy_uses_utility_face", true)
+		objective.set_meta("persistent_copy_uses_impact_face", false)
+		return
+	objective.text = "SURVIVE"
+	objective.offset_left = -150.0
+	objective.offset_right = 150.0
+	objective.offset_top = 12.0
+	objective.offset_bottom = 42.0
+	objective.add_theme_font_size_override("font_size", 26)
+	objective.add_theme_color_override("font_color", Color(0.98, 0.90, 0.78, 1.0))
+	objective.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.90))
+	objective.add_theme_constant_override("outline_size", 1)
+	var backing: StyleBoxFlat = StyleBoxFlat.new()
+	backing.bg_color = Color(0.012, 0.010, 0.014, 0.88)
+	backing.border_color = Color(0.88, 0.10, 0.09, 0.96)
+	backing.border_width_top = 3
+	backing.border_width_bottom = 2
+	backing.content_margin_left = 10.0
+	backing.content_margin_right = 10.0
+	objective.add_theme_stylebox_override("normal", backing)
+	VisualTypeSystem.set_impact(objective)
+	objective.set_meta("persistent_copy_uses_utility_face", false)
+	objective.set_meta("persistent_copy_uses_impact_face", true)
+
+func _objective_uses_compact_form() -> bool:
+	if parent == null:
+		return false
+	var viewport_size: Vector2 = parent.get_viewport_rect().size
+	var tight_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
+	return tight_layout or viewport_size.x <= 1100.0 or viewport_size.y <= 560.0
 
 func _update_environmental_pressure(delta: float) -> void:
 	if parent == null or _tactical_phase_visual_state != 1:
@@ -4250,7 +4284,11 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("stable_base_location", true)
 	arena.set_meta("landmark_continuity_source", "onset_base_persistent")
 	arena.set_meta("procedural_environment_geometry_suppressed", true)
-	arena.set_meta("authored_physical_evidence_visible", true)
+	# The shared-field camera deliberately holds the authored war-aftermath evidence back, so
+	# the published flag has to say so. It used to claim `true` unconditionally while the code
+	# below hid the very node it describes, which made the environment contract unreadable.
+	var shared_field_camera: bool = bool(arena.get_meta("shared_field_camera", false))
+	arena.set_meta("authored_physical_evidence_visible", not shared_field_camera)
 	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
@@ -4263,7 +4301,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		# The breach is already authored for phase zero; exposing its parent at the
 		# instant combat starts makes the field feel invaded instead of briefly
 		# reverting to an empty tactical grid.
-		aftermath.visible = not bool(arena.get_meta("shared_field_camera", false))
+		aftermath.visible = not shared_field_camera
 		aftermath.modulate = Color(1.0, 1.0, 1.0, 0.82 if effective_phase == 0 and not reduced_motion else 1.0)
 	if onset != null:
 		onset.visible = true
@@ -4396,16 +4434,17 @@ func _protect_persistent_hud_chrome() -> void:
 		instruction_ribbon.z_index = 218
 		instruction_ribbon.modulate = Color.WHITE
 		instruction_ribbon.self_modulate = Color.WHITE
-		# The result card owns the actual advance affordance. Keep the persistent
-		# combat ribbon as a quiet record stamp so the two prompts do not compete.
-		instruction_ribbon.text = "/// RECORD SEALED" if result_visible else "LIVE // SURVIVE"
+		# The result card owns the actual advance affordance, so the ribbon drops to a quiet
+		# record stamp while it is up. The combat command itself comes from the shared
+		# objective configuration, which knows whether this window is compact.
 		if result_visible:
+			instruction_ribbon.text = "/// RECORD SEALED"
 			instruction_ribbon.add_theme_font_size_override("font_size", 20)
 			VisualTypeSystem.set_utility_bold(instruction_ribbon)
 			instruction_ribbon.set_meta("persistent_copy_uses_utility_face", true)
 			instruction_ribbon.set_meta("persistent_copy_uses_impact_face", false)
 		else:
-			_configure_compact_objective_signal(instruction_ribbon)
+			_configure_combat_objective_signal(instruction_ribbon)
 		instruction_ribbon.set_meta("persistent_combat_hierarchy", true)
 	var exchange_signal: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatExchangeSignal") as Label
 	if exchange_signal != null:
