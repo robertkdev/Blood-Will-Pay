@@ -1135,9 +1135,13 @@ func _update_board_status() -> void:
 			var quoted_payout: int = 0
 			var quoted_bet: int = 0
 			if economy_node != null:
+				# The encounter kind has to be known before the odds are quoted: the rating
+				# ratio is honest about a mirror and badly optimistic about a normal wave, so
+				# the quote carries a per-kind correction. See ENCOUNTER_ODDS_BIAS.
+				_sync_encounter_quote_kind(economy_node)
+				odds = TeamOddsEstimator.quote_win_percent(odds, String(economy_node.get("encounter_quote_kind")))
 				if not bool(economy_node.get("combat_active")) and economy_node.has_method("set_projected_win_probability"):
 					economy_node.call("set_projected_win_probability", float(odds) / 100.0)
-				_sync_encounter_quote_kind(economy_node)
 				gross_multiplier = float(economy_node.get("quoted_gross_multiplier"))
 				quoted_bet = int(economy_node.get("current_bet"))
 				if economy_node.has_method("quoted_payout"):
