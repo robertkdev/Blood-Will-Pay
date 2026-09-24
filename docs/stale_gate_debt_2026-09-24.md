@@ -25,12 +25,18 @@ same nodes (`BattleResultAftermath` must be **hidden** behind the result card, "
 the finished battlefield"). That block needs a rewrite against the shared-field design, not a
 patch.
 
-## `UIThemeSmoke` - 5 failures
+## `UIThemeSmoke` - clean, and it was 5
 
-Two are stale copy from the planning-text pass (`"Opening wager: 1 blood"` versus the shipped
-`"Opening wager: 1 bucket"`, and a deferred-betting tooltip sentence that has been reworded).
-Three are real: cell-seam contrast, a missing weighted non-colour major-line cue, and a held
-docket that must contain `HELD` after the docket was reduced to a number.
+Fixed in `5d62facf`. Three were the usual copy rot: the forced opener had to say `Opening wager:
+1 blood` (it says `1 bucket`), the bet row had to contain a tooltip sentence that has since been
+reworded, and a held docket had to contain `HELD` after the docket was reduced to a slot number.
+
+The other two were worse than stale - **they contradicted another passing gate.** This suite
+demanded `terrain_seam_alpha >= 0.27` while the combat shell gates the same meta at `0.15-0.22`.
+The authored value is `0.21`, so the combat gate matched the game. And it demanded
+`major_seam_non_color_weight >= 3`, a number the design never used; the cue is the drawn weight,
+two pixels for major seams against one for minor. Both now assert the contract the game actually
+keeps, which is the first time those two suites have agreed.
 
 ## `BettingEconomySmoke` - 6 failures
 
@@ -55,3 +61,8 @@ exactly this reason, and `_button_for_action_text()` now resolves them that way.
 The compact audit is the case study: 65 of its 78 failures were copy-matching, so they hid a
 genuine 9-failure regression of mine and a 4-failure layout overlap. Clearing the rot first is
 what made the real defects visible.
+
+Two suites have now been taken to zero this way, and the second one showed the other face of the
+same problem: its failures were not hiding a layout bug, they were two gates disagreeing with
+each other about a value the game had already settled. A gate that reads deleted copy cannot
+notice that; a gate that reads the contract can.
