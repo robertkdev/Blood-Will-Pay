@@ -10,6 +10,7 @@ const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.g
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const UnitArtPresentation: GDScript = preload("res://scripts/ui/unit_art_presentation.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
@@ -478,7 +479,10 @@ func _apply_static_style() -> void:
 		_bottom_gradient.visible = false
 	if _icon:
 		_icon.z_index = 2
-		_icon.modulate = Color(1.0, 0.93, 0.82, 1.0)
+		# Portrait presence now comes from the shared character exposure pass, so
+		# the resting tint stays neutral instead of warming the shipped art.
+		_icon.modulate = Color.WHITE
+		UnitArtPresentation.apply_to(_icon, UnitArtPresentation.SURFACE_PORTRAIT)
 		_icon.anchor_left = 0.12
 		_icon.anchor_top = 0.21
 		_icon.anchor_right = 0.88
@@ -608,10 +612,10 @@ func _apply_hover_motion(active: bool) -> void:
 	add_theme_stylebox_override("focus", _make_card_focus_style())
 	if highlight:
 		if _icon != null:
-			_icon.modulate = Color(1.30, 1.27, 1.22, 1.0)
+			_icon.modulate = Color(1.12, 1.10, 1.07, 1.0)
 	else:
 		if _icon != null:
-			_icon.modulate = Color(1.20, 1.20, 1.20, 1.0)
+			_icon.modulate = Color.WHITE
 
 func _show_tooltip() -> void:
 	_clear_tooltip()

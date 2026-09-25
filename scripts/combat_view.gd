@@ -4,6 +4,7 @@ const GothicUITheme := preload("res://scripts/ui/combat/gothic_ui_theme.gd")
 const UIBars := preload("res://scripts/ui/combat/ui_bars.gd")
 const StageProgressTopBarScene: GDScript = preload("res://scripts/ui/combat/stage_progress_top_bar.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const ArenaPracticalFireScript: GDScript = preload("res://scripts/ui/combat/arena_practical_fire.gd")
 
 var _controller_script: Script = null
 
@@ -36,6 +37,7 @@ var _controller_script: Script = null
 var manager: CombatManager
 var controller
 var _teardown_done: bool = false
+var _arena_practical_fire: Control = null
 var stage_progress_top_bar: Control
 var _compact_resource_strip: Label = null
 var _shop_bottom_gutter: Control = null
@@ -115,6 +117,9 @@ func _teardown() -> void:
 	if manager != null and is_instance_valid(manager) and manager.has_method("teardown"):
 		manager.teardown()
 	manager = null
+	if _arena_practical_fire != null and is_instance_valid(_arena_practical_fire):
+		_arena_practical_fire.queue_free()
+	_arena_practical_fire = null
 	theme = null
 	GothicUITheme.clear_runtime()
 	UIBars.clear_runtime()
@@ -393,14 +398,30 @@ func set_player_team_ids(ids: Array) -> void:
 
 func _apply_visual_theme() -> void:
 	GothicUITheme.apply(self)
+	_install_arena_practical_fire()
 	_apply_responsive_layout()
 	call_deferred("_apply_visual_theme_deferred")
 
 func _apply_visual_theme_deferred() -> void:
 	GothicUITheme.apply(self)
+	_install_arena_practical_fire()
 	if controller != null and controller.phase_transition != null:
 		controller.phase_transition.refresh_field_material()
 	_apply_responsive_layout()
+
+## Bounded live-atmosphere hook. The floor raster owns the practical fires, so
+## the effect layer is parented to the floor itself and stays aligned through
+## the shared field camera. It installs nothing while the root-approved flame
+## art is unavailable, and it never touches gameplay, camera or input.
+func _install_arena_practical_fire() -> void:
+	if _arena_practical_fire != null and is_instance_valid(_arena_practical_fire):
+		return
+	if arena_container == null or not is_instance_valid(arena_container):
+		return
+	var floor_surface: Control = arena_container.get_node_or_null("GothicArenaSurface") as Control
+	if floor_surface == null:
+		return
+	_arena_practical_fire = ArenaPracticalFireScript.install(floor_surface)
 
 func _apply_responsive_layout() -> void:
 	if not is_inside_tree():

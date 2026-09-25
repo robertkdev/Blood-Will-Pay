@@ -5,6 +5,7 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const CombatVfxInstallerScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_installer.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const UnitArtPresentation: GDScript = preload("res://scripts/ui/unit_art_presentation.gd")
 const TITLE_WOODLAND_TEXTURE_PATH: String = "res://assets/ui/title/blood_will_pay_title_screen_4k.png"
 const BloodMeterHandle: Texture2D = preload("res://assets/ui/blood_meter_handle.svg")
 
@@ -1244,6 +1245,7 @@ static func _apply_tile(button: Button, is_player: bool) -> void:
 	button.add_theme_stylebox_override("hover", hover_style)
 	button.add_theme_stylebox_override("pressed", hover_style)
 	button.add_theme_stylebox_override("focus", _focus_outline(3))
+	UnitArtPresentation.cover_board_tile(button)
 
 static func _apply_bench_slot(button: Button) -> void:
 	var normal_style: StyleBoxFlat = _style(Color(0.024, 0.021, 0.027, 0.86), Color(0.56, 0.50, 0.41, 0.78), 2, 5)
@@ -1270,6 +1272,7 @@ static func _apply_bench_slot(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", hover_style)
 	button.add_theme_stylebox_override("focus", _focus_outline(5))
 	button.add_theme_stylebox_override("disabled", disabled_style)
+	UnitArtPresentation.cover_board_tile(button)
 
 static func _style_shop_card(button: Button) -> void:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL

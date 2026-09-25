@@ -7,7 +7,12 @@ const PANEL_PLATE_WIDE: String = "res://assets/ui/gothic/panel_plate_wide_v2.png
 const PANEL_PLATE_GRID: String = "res://assets/ui/gothic/panel_plate_grid_v2.png"
 const PANEL_PLATE_ITEM_STORAGE: String = "res://assets/ui/gothic/panel_plate_item_storage.png"
 const PANEL_PLATE_TRAITS: String = "res://assets/ui/gothic/panel_plate_traits.png"
-const SHOP_CARD_FRAME: String = "res://assets/ui/gothic/shop_card_frame_v2.png"
+## Runtime trial frame recovered from Luna's blackened-iron / dim-old-gold pass.
+## Same 150x138 size, alpha bbox and 22px nine-slice as the retained original,
+## so it is a drop-in stylebox swap with no layout change.
+const SHOP_CARD_FRAME: String = "res://assets/ui/gothic/generated/shop_card_frame_luna_v1.png"
+## One-line rollback: point SHOP_CARD_FRAME back at this retained original.
+const SHOP_CARD_FRAME_ROLLBACK: String = "res://assets/ui/gothic/shop_card_frame_v2.png"
 const BUTTON_SMALL: String = "res://assets/ui/gothic/button_small_v2.png"
 const BUTTON_PRIMARY: String = "res://assets/ui/gothic/button_primary_v2.png"
 ## Generated stone floor with blood, grates and debris at the edges, left even through the
