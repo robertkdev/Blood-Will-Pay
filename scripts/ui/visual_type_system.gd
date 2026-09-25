@@ -6,6 +6,7 @@ const FONT_ACTION: FontFile = preload("res://assets/fonts/BarlowCondensed-ExtraB
 const FONT_ACTION_MEDIUM: FontFile = preload("res://assets/fonts/BarlowCondensed-SemiBold.ttf")
 const FONT_UTILITY: FontFile = preload("res://assets/fonts/AtkinsonHyperlegible-Regular.ttf")
 const FONT_UTILITY_BOLD: FontFile = preload("res://assets/fonts/AtkinsonHyperlegible-Bold.ttf")
+const FONT_HEADING: FontFile = preload("res://assets/fonts/Cinzel.ttf")
 
 static func apply_theme(theme: Theme) -> void:
 	if theme == null:
@@ -38,3 +39,7 @@ static func set_utility(control: Control) -> void:
 static func set_utility_bold(control: Control) -> void:
 	if control != null:
 		control.add_theme_font_override("font", FONT_UTILITY_BOLD)
+
+static func set_heading(control: Control) -> void:
+	if control != null:
+		control.add_theme_font_override("font", FONT_HEADING)

@@ -587,6 +587,8 @@ func _expect_connected_planning_composition(context: String, expect_large_tiles:
 	if board_status_plate != null:
 		_expect(board_column.get_global_rect().grow(1.0).encloses(board_status_plate.get_global_rect()), "%s planning status backplate escapes the reserved board column" % context)
 		_expect(not board_status_plate.get_global_rect().intersects(stats_rail.get_global_rect()), "%s planning status backplate collides with Team Metrics" % context)
+		for deployment_grid: Control in [enemy_board, player_board]:
+			_expect(not board_status_plate.get_global_rect().intersects(deployment_grid.get_global_rect()), "%s planning strip covers deployment tiles" % context)
 	if expect_large_tiles and player_board != null and player_board.get_child_count() > 0:
 		var first_tile: Control = player_board.get_child(0) as Control
 		_expect(first_tile != null and first_tile.custom_minimum_size.x >= 55.0, "%s did not enlarge the full-HD deployment grid" % context)
@@ -685,6 +687,12 @@ func _expect_planning_landmark_contract(context: String, board_column: Control, 
 	var planning_directive: Label = board_column.get_node_or_null("PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text == "ENEMY", "%s enemy battlefield marker is missing" % context)
 	_expect(survival_label != null and survival_label.is_visible_in_tree() and survival_label.text == "YOUR TEAM", "%s player battlefield marker is missing" % context)
+	for team_label: Label in [hostile_label, survival_label]:
+		if team_label != null:
+			_expect(team_label.size.y <= 48.0, "%s team marker grew into a tall panel" % context)
+			_expect(board_column.get_global_rect().encloses(team_label.get_global_rect()), "%s team marker escapes the battlefield" % context)
+			for deployment_grid: Control in [enemy_board, player_board]:
+				_expect(not team_label.get_global_rect().intersects(deployment_grid.get_global_rect()), "%s team marker covers deployment tiles" % context)
 	_expect(hostile_band != null and hostile_band.is_visible_in_tree() and bool(hostile_band.get_meta("planning_landmark", false)), "%s hostile battlefield lane is missing" % context)
 	_expect(survival_band != null and survival_band.is_visible_in_tree() and bool(survival_band.get_meta("planning_landmark", false)), "%s survival battlefield lane is missing" % context)
 	_expect(survival_label != null and bool(survival_label.get_meta("deployment_badge_clearance", false)), "%s survival landmark lacks deployment-badge clearance metadata" % context)

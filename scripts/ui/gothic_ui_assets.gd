@@ -16,7 +16,7 @@ const SCREEN_BACKDROP: String = "res://assets/ui/gothic/generated/arena_backdrop
 const BATTLEFIELD_SURFACE: String = "res://assets/ui/gothic/battlefield_surface_horror_v1.png"
 const BATTLEFIELD_SURFACE_TOP: String = "res://assets/ui/gothic/battlefield_surface_horror_v1_top.png"
 const BATTLEFIELD_SURFACE_BOTTOM: String = "res://assets/ui/gothic/battlefield_surface_horror_v1_bottom.png"
-const BATTLEFIELD_SURFACE_ONSET: String = "res://assets/ui/gothic/battlefield_surface_horror_onset_v2.png"
+const BATTLEFIELD_SURFACE_ONSET: String = "res://assets/ui/gothic/generated/arena_firelit_v1.png"
 const BATTLEFIELD_SURFACE_MIDFIGHT: String = "res://assets/ui/gothic/battlefield_surface_horror_midfight_v2.png"
 const BATTLEFIELD_SURFACE_REDUCED_MOTION: String = "res://assets/ui/gothic/battlefield_surface_horror_reduced_motion_v2.png"
 const BOARD_TILE_PLAYER: String = "res://assets/ui/gothic/board_tile_player.png"
@@ -100,6 +100,25 @@ static func small_button_style(modulate: Color = Color.WHITE) -> StyleBoxTexture
 
 static func primary_button_style(modulate: Color = Color.WHITE) -> StyleBoxTexture:
 	return texture_style(BUTTON_PRIMARY, Vector4(26.0, 16.0, 26.0, 16.0), Vector4(22.0, 8.0, 22.0, 8.0), modulate)
+
+static func apply_button_material(button: Button, primary: bool) -> void:
+	var states: Dictionary[String, Color] = {
+		"normal": Color.WHITE,
+		"hover": Color(1.18, 1.12, 1.04),
+		"pressed": Color(0.78, 0.74, 0.68),
+		"hover_pressed": Color(0.90, 0.82, 0.72),
+		"disabled": Color(0.45, 0.45, 0.45, 0.86),
+	}
+	for state: String in states:
+		var style: StyleBoxTexture = primary_button_style(states[state]) if primary else small_button_style(states[state])
+		if style == null:
+			continue
+		# Text and hit areas keep their responsive budget; ornament is only paint.
+		style.content_margin_left = 10.0 if primary else 6.0
+		style.content_margin_right = style.content_margin_left
+		style.content_margin_top = 2.0
+		style.content_margin_bottom = 2.0
+		button.add_theme_stylebox_override(state, style)
 
 static func item_slot_style(modulate: Color = Color.WHITE) -> StyleBoxTexture:
 	return texture_style(BUTTON_SMALL, Vector4(10.0, 10.0, 10.0, 10.0), Vector4(3.0, 3.0, 3.0, 3.0), modulate)

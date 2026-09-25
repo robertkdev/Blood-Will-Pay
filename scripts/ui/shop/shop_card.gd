@@ -113,6 +113,13 @@ func set_data(props: Dictionary) -> void:
 			tex = TextureUtils.try_load_texture(img_path)
 		if tex == null:
 			tex = TextureUtils.make_circle_texture(Color(0.75, 0.75, 0.75), 96)
+		elif bool(props.get("uses_board_art", false)):
+			# Frame the existing unit's upper body; dedicated shop artwork is untouched.
+			var portrait: AtlasTexture = AtlasTexture.new()
+			portrait.atlas = tex
+			portrait.region = Rect2(0.0, 0.0, float(tex.get_width()), float(tex.get_height()) * 0.72)
+			portrait.filter_clip = true
+			tex = portrait
 		_icon.texture = tex
 
 	_update_identity_panel(display_role, display_goal, approaches)
@@ -201,20 +208,28 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_clear_tooltip()
 	if enabled:
 		_clear_global_tooltip_layers()
-	custom_minimum_size = Vector2(120.0, 54.0) if _tight_presentation else Vector2(132.0, 80.0) if enabled else Vector2(150.0, 122.0)
+	var card_height: float = presentation_height(get_viewport_rect().size, _tight_presentation)
+	var portrait_layout: bool = card_height >= 100.0
+	custom_minimum_size = Vector2(120.0 if _tight_presentation else 132.0, card_height)
 	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	set_meta("shop_safe_bottom_gutter", 2.0 if _tight_presentation else 6.0 if enabled else 16.0)
 	if _icon != null:
-		_icon.custom_minimum_size = Vector2.ZERO if enabled else Vector2(112.0, 112.0)
+		_icon.custom_minimum_size = Vector2.ZERO
 		_icon.anchor_left = 0.10 if _tight_presentation else 0.08 if enabled else 0.12
 		_icon.anchor_top = 0.04 if _tight_presentation else 0.05 if enabled else 0.21
 		_icon.anchor_right = 0.90 if _tight_presentation else 0.92 if enabled else 0.88
 		_icon.anchor_bottom = 0.61 if _tight_presentation else 0.66 if enabled else 0.78
+		if portrait_layout:
+			_icon.anchor_left = 0.06
+			_icon.anchor_right = 0.94
+			_icon.anchor_top = 0.04
+			_icon.anchor_bottom = 1.0
+		_icon.offset_bottom = -34.0 if portrait_layout else 0.0
 	if _traits_box != null:
 		_traits_box.visible = false
 		_traits_box.custom_minimum_size = Vector2.ZERO if enabled else Vector2(0.0, 48.0)
 	if _identity_panel != null:
-		_identity_panel.visible = false if enabled else _has_identity_content
+		_identity_panel.visible = false
 		_identity_panel.custom_minimum_size = Vector2.ZERO
 	if _name_label != null:
 		_name_label.anchor_left = 0.0
@@ -229,6 +244,10 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_name_label.clip_text = enabled
 		_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if enabled else TextServer.OVERRUN_NO_TRIMMING
 		_name_label.add_theme_font_size_override("font_size", 14 if _tight_presentation else 16 if enabled else 20)
+		if portrait_layout:
+			_name_label.anchor_top = 1.0
+			_name_label.offset_top = -32.0
+			_name_label.offset_bottom = -6.0
 	if _price_label != null:
 		_price_label.text = _price_copy()
 		_price_label.anchor_left = COMPACT_NAME_SHARE if enabled else 0.76
@@ -243,8 +262,22 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_price_label.clip_text = enabled
 		_price_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if enabled else TextServer.OVERRUN_NO_TRIMMING
 		_price_label.add_theme_font_size_override("font_size", 16 if _tight_presentation else 17 if enabled else 20)
+		if portrait_layout:
+			_price_label.anchor_top = 1.0
+			_price_label.offset_top = -32.0
+			_price_label.offset_bottom = -6.0
 	set_meta("compact_presentation", enabled)
 	set_meta("tight_presentation", _tight_presentation)
+	set_meta("portrait_presentation", portrait_layout)
+
+static func presentation_height(logical_size: Vector2, tight: bool) -> float:
+	if logical_size.x >= 1500.0 and logical_size.y >= 1000.0:
+		return 188.0
+	if logical_size.x >= 1400.0 and logical_size.y >= 800.0:
+		return 144.0
+	if logical_size.x >= 1200.0 and logical_size.y >= 680.0:
+		return 108.0
+	return 54.0 if tight else 80.0
 
 func _price_copy() -> String:
 	return BloodBuckets.format_amount(_price_value, _compact_presentation)
@@ -519,7 +552,8 @@ func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bo
 	style.corner_radius_bottom_left = 0
 	style.shadow_size = 8 if highlighted else 3
 	style.shadow_color = Color(0.58, 0.18, 0.060, 0.30) if highlighted else Color(0.0, 0.0, 0.0, 0.46)
-	return style
+	var tint: Color = Color(0.53, 0.53, 0.53) if disabled_state else Color(0.78, 0.73, 0.68) if pressed_state else Color(1.18, 1.12, 1.04) if highlighted else Color.WHITE
+	return GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(tint), style)
 
 func _make_card_focus_style() -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -574,10 +608,10 @@ func _apply_hover_motion(active: bool) -> void:
 	add_theme_stylebox_override("focus", _make_card_focus_style())
 	if highlight:
 		if _icon != null:
-			_icon.modulate = Color(1.0, 0.93, 0.78, 1.0)
+			_icon.modulate = Color(1.30, 1.27, 1.22, 1.0)
 	else:
 		if _icon != null:
-			_icon.modulate = Color(0.96, 0.91, 0.84, 1.0)
+			_icon.modulate = Color(1.20, 1.20, 1.20, 1.0)
 
 func _show_tooltip() -> void:
 	_clear_tooltip()

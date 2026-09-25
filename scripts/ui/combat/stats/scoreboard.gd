@@ -8,9 +8,9 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 
 @onready var expand_button: Button = $"Header/ExpandButton"
-@onready var body_box: HBoxContainer = $"Body"
-@onready var player_col: VBoxContainer = $"Body/PlayerColumn"
-@onready var enemy_col: VBoxContainer = $"Body/EnemyColumn" # kept for non-overlay mode (currently unused)
+@onready var body_box: HBoxContainer = $"BodyScroll/Body"
+@onready var player_col: VBoxContainer = $"BodyScroll/Body/PlayerColumn"
+@onready var enemy_col: VBoxContainer = $"BodyScroll/Body/EnemyColumn" # kept for non-overlay mode (currently unused)
 @onready var title_label: Label = $"Header/Title"
 
 # Floating overlay to show enemy column without reflowing the main layout

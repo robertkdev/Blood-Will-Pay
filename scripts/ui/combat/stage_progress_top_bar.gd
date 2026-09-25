@@ -303,16 +303,19 @@ func _make_panel_style() -> StyleBox:
 	style.border_width_top = 1
 	style.border_width_right = 1
 	style.border_width_bottom = 2
-	return style
+	var frame_style: StyleBoxTexture = GothicUIAssets.wide_panel_style()
+	if frame_style != null:
+		frame_style.content_margin_left = 8.0
+		frame_style.content_margin_right = 8.0
+		frame_style.content_margin_top = 2.0
+		frame_style.content_margin_bottom = 2.0
+	return GothicUIAssets.style_or_fallback(frame_style, style)
 
 func _make_token_style(selected: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.19, 0.025, 0.038, 0.98) if selected else Color(0.035, 0.031, 0.037, 0.96)
 	style.border_color = Color(0.92, 0.075, 0.11, 1.0) if selected else Color(0.31, 0.29, 0.30, 0.88)
-	style.border_width_left = 5 if selected else 2
-	style.border_width_top = 2 if selected else 1
-	style.border_width_right = 2
-	style.border_width_bottom = 3 if selected else 2
+	style.set_border_width_all(2 if selected else 1)
 	style.content_margin_left = 5.0
 	style.content_margin_top = 2.0
 	style.content_margin_right = 4.0

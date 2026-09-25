@@ -104,6 +104,7 @@ func set_offers(offers: Array) -> void:
                     "package_level": int(off.package_level),
                     "package_kind": String(off.package_kind),
 					"image_path": String(off.shop_card_art_path) if not String(off.shop_card_art_path).strip_edges().is_empty() else String(off.sprite_path),
+                    "uses_board_art": off.shop_card_art_path.strip_edges().is_empty() or off.shop_card_art_path == off.sprite_path,
                     "role": _role_text(roles, primary_role),
                     "roles": roles,
                     "traits": traits,
@@ -159,7 +160,7 @@ func _apply_safe_gutter_layout() -> void:
     var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
     var compact: bool = viewport_size.y <= 1080.0 or viewport_size.x <= 1400.0
     var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0 or (ui_scale >= 1.25 and viewport_size.y <= 720.0)
-    var card_height: float = 54.0 if tight_compact else 80.0 if compact else 122.0
+    var card_height: float = ShopCard.presentation_height(viewport_size, tight_compact)
     var safe_gutter: float = 8.0 if compact else 16.0
     _grid.add_theme_constant_override("h_separation", 6 if tight_compact else 12 if compact else 16)
     if _host_container is VBoxContainer:

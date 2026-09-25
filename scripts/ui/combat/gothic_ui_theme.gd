@@ -1014,8 +1014,8 @@ static func _apply_named_nodes(root: Control) -> void:
 		wager_controls.set_meta("visual_role", "planning_utility_group")
 		_ensure_backplate_on_control(wager_controls, "PlanningUtilitiesPlate", _hard_panel_style(Color(0.032, 0.027, 0.032, 0.98), Color(0.54, 0.45, 0.32, 0.82), false), -5)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea", "GothicBattlePlate", _style(Color(0.016, 0.013, 0.018, 0.38), Color(0.23, 0.19, 0.18, 0.42), 1, 6), -20)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.055, 0.018, 0.022, 0.08), Color(0.72, 0.07, 0.09, 0.88), 2, 1), -5)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.032, 0.038, 0.036, 0.07), Color(0.72, 0.68, 0.58, 0.82), 2, 1), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.032, 0.016, 0.020, 0.12), Color.TRANSPARENT, 0, 0), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.018, 0.022, 0.023, 0.12), Color.TRANSPARENT, 0, 0), -5)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.42, 0.40, 0.38, 0.72), false), 0, 8.0)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.56, 0.52, 0.46, 0.62), false), 0, 8.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.42, 0.40, 0.38, 0.68), false), -2)
@@ -1221,15 +1221,10 @@ static func _apply_color_rect(rect: ColorRect) -> void:
 
 static func _apply_tile(button: Button, is_player: bool) -> void:
 	var bg_color: Color = COLOR_TILE_PLAYER if is_player else COLOR_TILE_ENEMY
-	var cell_index: int = int(String(button.name).get_slice("_", 1))
-	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
-	bg_color.a = 0.52 if strong_seam else 0.42
-	var border_color: Color = Color(0.96, 0.88, 0.68, 0.76 if strong_seam else 0.54) if is_player else Color(0.96, 0.27, 0.19, 0.78 if strong_seam else 0.56)
+	bg_color.a = 0.72
+	var border_color: Color = Color(0.68, 0.60, 0.43, 0.58) if is_player else Color(0.59, 0.20, 0.17, 0.64)
 	var hover_color: Color = Color(0.060, 0.078, 0.070, 0.92) if is_player else Color(0.120, 0.044, 0.040, 0.92)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
-	if not strong_seam:
-		normal_style.border_width_top = 0
-		normal_style.border_width_left = 0
 	var hover_style: StyleBoxFlat = _hover_style(hover_color, COLOR_GOLD_HOT, 2, 3)
 	hover_style.shadow_size = 12
 	var tile_size: float = maxf(button.custom_minimum_size.x, button.custom_minimum_size.y)
@@ -1277,9 +1272,9 @@ static func _apply_bench_slot(button: Button) -> void:
 	button.add_theme_stylebox_override("disabled", disabled_style)
 
 static func _style_shop_card(button: Button) -> void:
-	button.custom_minimum_size = Vector2(144.0, 124.0)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_apply_flat_button_states(button, Color(0.52, 0.31, 0.20, 1.0))
+	if button.has_method("_apply_static_style"):
+		button.call("_apply_static_style")
 	button.add_theme_font_size_override("font_size", 18)
 	button.clip_text = false
 
@@ -1328,6 +1323,7 @@ static func _style_button_node(button: Button, primary: bool) -> void:
 		VisualTypeSystem.set_utility_bold(button)
 		button.add_theme_color_override("font_disabled_color", Color(0.66, 0.60, 0.52, 1.0))
 		_apply_flat_button_states(button, COLOR_BLOOD)
+		GothicUIAssets.apply_button_material(button, true)
 	else:
 		button.custom_minimum_size.y = max(button.custom_minimum_size.y, 34.0)
 		button.add_theme_font_size_override("font_size", 18)
@@ -2850,7 +2846,7 @@ static func _hover_style(bg_color: Color, border_color: Color, border_width: int
 	style.shadow_color = Color(0.74, 0.22, 0.055, 0.34)
 	return style
 
-static func _hard_panel_style(bg_color: Color, accent_color: Color, side_accent: bool) -> StyleBoxFlat:
+static func _hard_panel_style(bg_color: Color, accent_color: Color, side_accent: bool) -> StyleBox:
 	var style: StyleBoxFlat = _style(bg_color, accent_color, 1, 0)
 	style.border_width_left = 5 if side_accent else 2
 	style.border_width_top = 1
@@ -2858,7 +2854,13 @@ static func _hard_panel_style(bg_color: Color, accent_color: Color, side_accent:
 	style.border_width_bottom = 2
 	style.shadow_size = 12
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.58)
-	return style
+	var material: StyleBoxTexture = GothicUIAssets.wide_panel_style()
+	if material != null:
+		material.content_margin_left = style.content_margin_left
+		material.content_margin_right = style.content_margin_right
+		material.content_margin_top = style.content_margin_top
+		material.content_margin_bottom = style.content_margin_bottom
+	return GothicUIAssets.style_or_fallback(material, style)
 
 static func _focus_outline(radius: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -2879,6 +2881,7 @@ static func _apply_flat_button_states(button: Button, accent: Color) -> void:
 	button.add_theme_stylebox_override("hover_pressed", _hard_panel_style(Color(0.20, 0.028, 0.042, 1.0), COLOR_GOLD, true))
 	button.add_theme_stylebox_override("disabled", _hard_panel_style(Color(0.030, 0.027, 0.032, 0.88), Color(0.25, 0.23, 0.24, 0.72), false))
 	button.add_theme_stylebox_override("focus", _focus_outline(0))
+	GothicUIAssets.apply_button_material(button, false)
 
 static func _mark_interactive(button: Button) -> void:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
