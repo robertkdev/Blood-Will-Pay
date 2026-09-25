@@ -2,6 +2,8 @@
 
 This pass uses the supplied concept as a visual reference only. It does not copy
 its game rules, terminology, roster, board topology, or economy.
+Full-screen composition is the design target. Existing smaller-viewport checks
+are regression coverage, not a separate resizable-window design goal.
 
 ## Presentation
 
@@ -12,7 +14,8 @@ its game rules, terminology, roster, board topology, or economy.
   and button states. Red is concentrated on hostility and the commit action.
 - Complete, restrained tile outlines replace the interrupted bright grid.
 - Team metrics scroll within their panel. Planning labels use settled grid
-  bounds and leave deployment tiles unobstructed.
+  bounds and leave deployment tiles unobstructed. Panel titles are inset clear
+  of their frame ornaments in team and individual-unit views.
 - Cinzel is used selectively for gameplay headings and the commit action;
   functional numbers and compact labels retain the existing readable fonts.
 

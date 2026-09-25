@@ -968,8 +968,11 @@ func _expect_scaled_team_metrics(context: String) -> void:
 	var stats_title: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Header/Title") as Label
 	if stats_title != null:
 		var stats_font: Font = stats_title.get_theme_font("font")
-		var stats_text_width: float = stats_font.get_multiline_string_size(stats_title.text, HORIZONTAL_ALIGNMENT_LEFT, stats_title.size.x, stats_title.get_theme_font_size("font_size")).x if stats_font != null else 0.0
-		_expect(stats_text_width <= stats_title.size.x + 1.0, "%s Team Metrics title overflows its rail: text=%.1f width=%.1f" % [context, stats_text_width, stats_title.size.x])
+		var title_style: StyleBox = stats_title.get_theme_stylebox("normal")
+		var text_room: float = stats_title.size.x - title_style.get_minimum_size().x
+		var stats_text_width: float = stats_font.get_string_size(stats_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, stats_title.get_theme_font_size("font_size")).x if stats_font != null else 0.0
+		_expect(stats_text_width <= text_room + 1.0, "%s Team Metrics title overflows its inset: text=%.1f width=%.1f" % [context, stats_text_width, text_room])
+		_expect(title_style.get_content_margin(SIDE_LEFT) >= 14.0, "%s Team Metrics title touches its frame ornament" % context)
 	var compact_rows: int = 0
 	var found_bonko: bool = false
 	var found_berebell: bool = false

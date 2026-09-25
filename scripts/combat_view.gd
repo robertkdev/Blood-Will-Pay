@@ -741,6 +741,12 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		stats_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if tight_compact else HORIZONTAL_ALIGNMENT_LEFT
 		stats_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		stats_title.clip_text = false
+		var title_inset: StyleBoxEmpty = StyleBoxEmpty.new()
+		title_inset.content_margin_left = 18.0
+		title_inset.content_margin_right = 6.0
+		title_inset.content_margin_top = 5.0
+		title_inset.content_margin_bottom = 3.0
+		stats_title.add_theme_stylebox_override("normal", title_inset)
 
 func _apply_planning_focus_hierarchy(compact: bool, tight_compact: bool) -> void:
 	# At readable 125/150% scales the deployment board is the decision spine.
