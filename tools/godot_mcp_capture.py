@@ -350,6 +350,29 @@ def _png_visual_metrics(image_bytes: bytes) -> dict[str, Any]:
     }
 
 
+def _screenshot_freshness(result: Any) -> dict[str, Any]:
+    """Godot-AI may put capture metadata in structured content or JSON text.
+
+    Missing metadata is deliberately not proof of freshness. A cached, nonblank
+    PNG must never become successful evidence merely because its size is right.
+    """
+    candidates: list[Any] = [getattr(result, "structuredContent", None)]
+    for text in _result_texts(result):
+        try:
+            candidates.append(json.loads(text))
+        except json.JSONDecodeError:
+            continue
+    while candidates:
+        candidate: Any = candidates.pop(0)
+        if isinstance(candidate, dict):
+            if "stale_frame" in candidate and "frames_drawn" in candidate:
+                return {key: candidate[key] for key in ("stale_frame", "frames_drawn")}
+            candidates.extend(value for value in candidate.values() if isinstance(value, (dict, list)))
+        elif isinstance(candidate, list):
+            candidates.extend(candidate)
+    return {}
+
+
 async def _capture_visible_frame(
     session: ClientSession,
     session_id: str,
@@ -362,6 +385,7 @@ async def _capture_visible_frame(
     deadline: float = asyncio.get_running_loop().time() + max(wait_seconds, 0.5)
     last_metrics: dict[str, Any] = {}
     attempts: int = 0
+    previous_frame: int | None = None
     while asyncio.get_running_loop().time() < deadline:
         attempts += 1
         screenshot_result: Any = await _call(
@@ -386,6 +410,17 @@ async def _capture_visible_frame(
             )
         image_bytes: bytes = base64.b64decode(image_items[0].data)
         last_metrics = _png_visual_metrics(image_bytes)
+        freshness: dict[str, Any] = _screenshot_freshness(screenshot_result)
+        last_metrics["freshness"] = freshness
+        frames: Any = freshness.get("frames_drawn")
+        fresh: bool = source != "game" or (
+            freshness.get("stale_frame") is False
+            and type(frames) is int
+            and frames > 0
+            and (previous_frame is None or frames > previous_frame)
+        )
+        if type(frames) is int:
+            previous_frame = frames
         dimensions_match: bool = (
             expected_width <= 0
             or expected_height <= 0
@@ -394,13 +429,15 @@ async def _capture_visible_frame(
                 and int(last_metrics["height"]) == expected_height
             )
         )
-        if bool(last_metrics["nonblank"]) and dimensions_match:
+        if bool(last_metrics["nonblank"]) and dimensions_match and fresh:
             return image_items[0], image_bytes, last_metrics, attempts
         await asyncio.sleep(0.5)
     raise TimeoutError(
-        "Godot framebuffer remained blank or at the wrong dimensions after "
+        "Godot framebuffer remained stale, unverifiable, blank, or at the wrong dimensions after "
         f"{wait_seconds:.1f}s and {attempts} capture attempts: "
         f"{json.dumps(last_metrics)}"
+        + (". Game helper omitted freshness metadata; use a helper that reports stale_frame and frames_drawn."
+           if source == "game" and not last_metrics.get("freshness") else "")
     )
 
 
