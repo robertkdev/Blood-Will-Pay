@@ -1,0 +1,10 @@
+{
+  "package": "visual-debug-harness",
+  "version": "0.2.0",
+  "files": {
+    ".gitattributes": "18c369be397cc1afcc9d21b28773bc15f9be2038181bc4e7da6c81488804b72d",
+    "art_preview.gd": "1ceb11c401d6e9c55f193079f1106b9b51fee12ad6316433bc154bd1703933fe",
+    "ArtPreview.tscn": "8903144e7c32f6365f0948b2d32fbf5a2bf608e3da995092af9832d9a83fc62f",
+    "generic_adapter.gd": "f65a997288d053087cb57716f90f4c02adee0b4086145ff2b449791046c4aa01"
+  }
+}

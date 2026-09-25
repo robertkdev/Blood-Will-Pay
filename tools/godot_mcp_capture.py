@@ -350,27 +350,7 @@ def _png_visual_metrics(image_bytes: bytes) -> dict[str, Any]:
     }
 
 
-def _screenshot_freshness(result: Any) -> dict[str, Any]:
-    """Godot-AI may put capture metadata in structured content or JSON text.
-
-    Missing metadata is deliberately not proof of freshness. A cached, nonblank
-    PNG must never become successful evidence merely because its size is right.
-    """
-    candidates: list[Any] = [getattr(result, "structuredContent", None)]
-    for text in _result_texts(result):
-        try:
-            candidates.append(json.loads(text))
-        except json.JSONDecodeError:
-            continue
-    while candidates:
-        candidate: Any = candidates.pop(0)
-        if isinstance(candidate, dict):
-            if "stale_frame" in candidate and "frames_drawn" in candidate:
-                return {key: candidate[key] for key in ("stale_frame", "frames_drawn")}
-            candidates.extend(value for value in candidate.values() if isinstance(value, (dict, list)))
-        elif isinstance(candidate, list):
-            candidates.extend(candidate)
-    return {}
+from visual_debug_harness.godot_art.freshness import screenshot_freshness as _screenshot_freshness, fresh_frame
 
 
 async def _capture_visible_frame(
@@ -413,12 +393,7 @@ async def _capture_visible_frame(
         freshness: dict[str, Any] = _screenshot_freshness(screenshot_result)
         last_metrics["freshness"] = freshness
         frames: Any = freshness.get("frames_drawn")
-        fresh: bool = source != "game" or (
-            freshness.get("stale_frame") is False
-            and type(frames) is int
-            and frames > 0
-            and (previous_frame is None or frames > previous_frame)
-        )
+        fresh: bool = source != "game" or fresh_frame(freshness, previous_frame)
         if type(frames) is int:
             previous_frame = frames
         dimensions_match: bool = (
