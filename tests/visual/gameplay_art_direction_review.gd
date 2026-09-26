@@ -248,7 +248,11 @@ func _assert_layout_stability(ui_scale: float) -> void:
 		var after: Rect2 = controls[index].get_global_rect()
 		var position_drift: float = before[index].position.distance_to(after.position) * ui_scale
 		var size_drift: float = before[index].size.distance_to(after.size) * ui_scale
-		_expect(position_drift <= 1.0 and size_drift <= 1.0, "Repeated layout drifted " + str(controls[index].get_path()))
+		_expect(
+			position_drift <= 1.0 and size_drift <= 1.0,
+			"Repeated layout drifted %s: before %s after %s (position %.2f px, size %.2f px)"
+			% [str(controls[index].get_path()), str(before[index]), str(after), position_drift, size_drift]
+		)
 
 func _assert_composed_bounds(ui_scale: float) -> void:
 	var visible_bounds: Rect2 = _view.get_viewport_rect().grow(1.0)

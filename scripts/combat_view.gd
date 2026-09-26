@@ -569,7 +569,14 @@ func _apply_responsive_layout() -> void:
 			board_half.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_apply_board_tile_size(compact, tight_compact, large_planning_field)
 	_apply_planning_landmarks(compact, tight_compact, large_planning_field)
-	_set_minimum_size("MarginContainer/VBoxContainer/BenchArea/BenchGrid", Vector2(0.0, 38.0 if tight_compact else 46.0 if compact else 88.0))
+	# One owner per node. In the composed tier the dock writes the bench row's
+	# minimum from the board column it hangs under, and it writes it at the end of
+	# this pass. Writing the legacy tier minimum here first and trusting that later
+	# write to replace it left the row's rect stale: only the outer VBox is
+	# re-sorted after this function, so the bench host kept the taller child rect
+	# and overhung its own box by 27px, which is the drift the review scene caught.
+	if not full_hd_dock:
+		_set_minimum_size("MarginContainer/VBoxContainer/BenchArea/BenchGrid", Vector2(0.0, 38.0 if tight_compact else 46.0 if compact else 88.0))
 	var bench_area: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as HBoxContainer
 	if bench_area != null:
 		bench_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
