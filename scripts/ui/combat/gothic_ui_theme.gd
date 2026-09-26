@@ -1045,8 +1045,8 @@ static func _apply_named_nodes(root: Control) -> void:
 		wager_controls.set_meta("visual_role", "planning_utility_group")
 		_ensure_backplate_on_control(wager_controls, "PlanningUtilitiesPlate", _hard_panel_style(Color(0.032, 0.027, 0.032, 0.98), Color(0.52, 0.44, 0.31, 0.78), false), -5)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea", "GothicBattlePlate", _style(Color(0.016, 0.013, 0.018, 0.38), Color(0.23, 0.19, 0.18, 0.42), 1, 6), -20)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.032, 0.016, 0.020, 0.12), Color.TRANSPARENT, 0, 0), -5)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.018, 0.022, 0.023, 0.12), Color.TRANSPARENT, 0, 0), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _territory_tint_style(Color(0.032, 0.016, 0.020, 0.12)), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _territory_tint_style(Color(0.018, 0.022, 0.023, 0.12)), -5)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.44, 0.37, 0.26, 0.72), false), 0, 8.0)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.48, 0.40, 0.28, 0.62), false), 0, 8.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.44, 0.37, 0.26, 0.68), false), -2)
@@ -3005,6 +3005,20 @@ static func _style(bg_color: Color, border_color: Color, border_width: int, radi
 	style.corner_radius_bottom_left = radius
 	style.shadow_size = 5
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.34)
+	return style
+
+## A flat territory tint with no shadow, for plates that cover a whole board half.
+## The generic _style() helper always carries a 5px black shadow, which is right
+## for a small panel and wrong for a full-rect plate: the shadow expands to the
+## whole plate and becomes a wash across the board instead of an edge. That wash
+## was what hid the firelit floor and cost the playfield its highlight. Measured
+## by tests/visual/PlayfieldValueIsolation.tscn and recorded in
+## docs/art/playfield_value_routing_2026-09-26.md.
+static func _territory_tint_style(bg_color: Color) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.border_color = Color.TRANSPARENT
+	style.shadow_size = 0
 	return style
 
 static func _hover_style(bg_color: Color, border_color: Color, border_width: int, radius: int) -> StyleBoxFlat:
