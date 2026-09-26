@@ -380,6 +380,14 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("sample_bias", BOARD_COMBAT_SAMPLE_BIAS)
 		_:
 			# Deployment tiles are the darkest, most detail-dense surface.
+			#
+			# Lifting the top end here was tried, on the theory that the board's
+			# figures own the field's p99: key_light 0.05 -> 0.085 and
+			# highlight_rolloff 0.12 -> 0.07. Measured through the isolation probe it
+			# moved p99 by 0.0016, which is nothing, so the theory was wrong and the
+			# change is not kept. The field's brightest pixels are the fire pools at
+			# the field's edges, not the figures. See
+			# docs/art/playfield_value_routing_2026-09-26.md.
 			material.set_shader_parameter("exposure_gamma", 1.38)
 			material.set_shader_parameter("contrast", 1.03)
 			material.set_shader_parameter("contrast_pivot", 0.26)

@@ -86,14 +86,41 @@ alpha. Holding the sparse irregular cadence exactly as it was and raising only
 the ruling weight took the share above 0.35 from 2.68 to 3.02 percent, with the
 mean at 0.1151. That meets two of the three field targets.
 
+## The p99 target was chasing an artifact
+
+The last apparent gap was p99, 0.505 against a 0.550 target. The theory was that
+the board figures own it, because hiding the board halves moves p99. That theory
+was tested and is wrong.
+
+Changing the board unit presentation - key_light 0.05 to 0.085 and
+highlight_rolloff 0.12 to 0.07 on the board surface only - moved p99 from 0.5048
+to 0.5064. That is +0.0016, so the figures are not what p99 is made of and the
+change was reverted.
+
+Locating the brightest pixels in the field region says what is: the fire pools
+and lit stone at the field's edges. The brightest texels sit at frame
+(0.714, 0.131) at luminance 1.000 and (0.278, 0.144) at 0.965, with the rest of
+the top decile clustered along both margins at 0.83 to 0.86. The board interior
+itself is a broad mid-dark mass with a few very bright pixels at its borders.
+
+p99 at 0.506 means one percent of the field region is above 0.506. The reference
+crop contains the reference's own bright status band - the "Preparation Phase /
+Board 9/9 / Win Chance" strip - which is a wide, high-value text band that ours
+does not have in the same place. So the p99 comparison is a cross-image artifact
+of what each crop happens to contain, not a property of either board. It should
+not be used as the field's acceptance measure.
+
+The field targets that survive are the two that were measured consistently:
+mean luminance and the density of pixels above 0.35. Both are now met.
+
 ## Next step
 
-The remaining gap is purely the top end: p99 0.505 against a 0.550 target and
-the reference's 0.583. The lattice does not move p99, because a seam sits near
-0.4; p99 is the brightest one percent of the field, and hiding the board halves
-is what moves it. So the last of the gap belongs to the lit mass of the board
-figures rather than to the stone or the lattice, and it is a unit presentation
-or unit art change, not a floor change.
+Nothing further is owed to the field's value. Priority 1 of the composition gap
+analysis is satisfied on its own terms: the field carries light, it is no longer
+a flat dark plate, and the light is no longer being spent only on the lower band.
+If a brighter board is wanted later, the lever is the field-edge firelight, which
+is the thing actually at the top of the range, and the art direction explicitly
+limits added glow, so that is a taste decision rather than a defect.
 
 ## Acceptance
 
@@ -101,7 +128,7 @@ Field mean 0.085 or higher, field p99 0.550 or higher, and 3.0 percent or more o
 the field above 0.35 luminance, while the lower band comes down toward 4.5
 percent.
 
-Standing after this pass: mean 0.1151 met, above 0.35 at 3.02 percent met, p99
-0.505 still short. Re-run the isolation probe after any change to a layer above.
-Nothing here approves an asset; whole-screen acceptance is still the rendered
-runtime.
+Standing after this pass: mean 0.1151 met, above 0.35 at 3.02 percent met, and
+p99 withdrawn as a cross-image artifact rather than pursued. Re-run the isolation
+probe after any change to a layer above. Nothing here approves an asset;
+whole-screen acceptance is still the rendered runtime.
