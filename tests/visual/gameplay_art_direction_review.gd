@@ -188,7 +188,23 @@ func _review_frame(capture_id: String, state: String, ui_scale: float) -> void:
 			_expect(card.get_global_rect().encloses(art.get_global_rect()), "Portrait extends outside its purchase target")
 			_expect(card.get_theme_stylebox("normal") is StyleBoxTexture, "Shop card lost its material frame")
 		var commit: Button = _view.get("continue_button") as Button
-		_expect(commit.get_theme_stylebox("normal") is StyleBoxTexture, "Commit action lost its material states")
+		# The commit action's authored material is the flat crimson family, which
+		# ui_theme_smoke pins as restrained flat field furniture; the textured
+		# crimson plaque is declined and kept only for rollback. This step keeps
+		# testing what it was written for - that the action carries authored
+		# material states of its own - rather than requiring the declined texture.
+		var commit_normal: StyleBox = commit.get_theme_stylebox("normal")
+		var commit_hover: StyleBox = commit.get_theme_stylebox("hover")
+		var commit_pressed: StyleBox = commit.get_theme_stylebox("pressed")
+		_expect(commit_normal is StyleBoxFlat, "Commit action lost its flat field material")
+		_expect(
+			commit_hover != null and commit_pressed != null,
+			"Commit action lost its material states"
+		)
+		_expect(
+			commit_hover != commit_normal and commit_pressed != commit_normal,
+			"Commit action material states are not distinct"
+		)
 		_expect(visible_bounds.encloses(commit.get_global_rect()), "Commit action extends beyond the viewport")
 		_expect(commit.size.y * ui_scale >= 96.0, "Commit action is still a thin toolbar control")
 		_expect(not commit.get_global_rect().intersects(grid.get_global_rect()), "Commit action overlaps shop cards")

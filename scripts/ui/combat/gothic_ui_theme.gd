@@ -953,6 +953,13 @@ static func _apply_named_nodes(root: Control) -> void:
 	# The authored stone keeps its identity and its animation; a slightly deeper
 	# modulate locally quiets its high-frequency grain so the figures and their
 	# edges stay the loudest thing on the field. This changes presentation only.
+	#
+	# These two surfaces are not the live floor. phase_transition_controller's
+	# refresh_field_material reasserts them invisible on every theme refresh and
+	# hands the field to GothicArenaSurface, so this modulate does not reach the
+	# composed frame. Lifting it toward neutral was measured on fresh captures and
+	# changed the composed playfield by nothing at all. Value routing is recorded
+	# in docs/art/playfield_value_routing_2026-09-26.md.
 	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicPlanningTopSurface", GothicUIAssets.battlefield_top_texture(), -8, Color(0.86, 0.84, 0.80, 0.98))
 	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(0.86, 0.84, 0.80, 0.98))
 	_ensure_planning_pressure(root)

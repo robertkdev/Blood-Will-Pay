@@ -196,11 +196,11 @@ static func apply_button_material(button: Button, primary: bool) -> void:
 		"disabled": Color(0.45, 0.45, 0.45, 0.86),
 	}
 	for state: String in states:
-		# The commit action keeps a material texture of its own (the root-approved
-		# crimson plaque once it ships, the existing primary plate until then) so
-		# it keeps independent weight. Every other gameplay button is the same
-		# quiet recessed iron as the panels; the legacy silver button plate is no
-		# longer a gameplay surface.
+		# The commit action keeps a material family of its own (the flat crimson
+		# field while the textured plaque is declined) so it keeps independent
+		# weight through the same five authored states. Every other gameplay
+		# button is the same quiet recessed iron as the panels; the legacy silver
+		# button plate is no longer a gameplay surface.
 		var style: StyleBox = gameplay_commit_style(states[state]) if primary else quiet_iron_button_style(state)
 		if style == null:
 			continue
