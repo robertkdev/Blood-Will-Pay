@@ -829,6 +829,12 @@ func _sync_layout() -> void:
 				raw_row.call("set_compact_layout", tight_compact)
 			if raw_row.has_method("set_exact_compact_values"):
 				raw_row.call("set_exact_compact_values", tight_compact)
+			if raw_row.has_method("set_value_column_width"):
+				# The casualty ledger keeps exact values in its tight tier, so its
+				# numeric column is authored for four digits instead of taking the
+				# combat rail's narrow readout. Zero leaves the wider tier alone,
+				# where record emphasis already owns the column.
+				raw_row.call("set_value_column_width", 76.0 if tight_compact else 0.0)
 		var scoreboard_title: Label = scoreboard_holder.get_node_or_null("Scoreboard/Header/Title") as Label
 		if scoreboard_title != null:
 			scoreboard_title.add_theme_font_size_override("font_size", 14 if tight_compact else 21)
