@@ -369,7 +369,12 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("contact_start", 0.82)
 			material.set_shader_parameter("sample_bias", PORTRAIT_SAMPLE_BIAS)
 		SURFACE_COMBAT_UNIT:
-			material.set_shader_parameter("exposure_gamma", 1.40)
+			# Same curve as the board, so a character carries one value family from
+			# deployment into the fight. The doc's combat measure was the field's
+			# p99 over its own median, 3.70 against a 5.0 floor; the combat field
+			# measured 2.75 here, which is a flat mid-grey surface with nothing
+			# standing on it. The figures are the content that has to stand.
+			material.set_shader_parameter("exposure_gamma", 1.55)
 			material.set_shader_parameter("contrast", 1.03)
 			material.set_shader_parameter("contrast_pivot", 0.26)
 			material.set_shader_parameter("key_light", 0.05)
@@ -388,7 +393,15 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			# change is not kept. The field's brightest pixels are the fire pools at
 			# the field's edges, not the figures. See
 			# docs/art/playfield_value_routing_2026-09-26.md.
-			material.set_shader_parameter("exposure_gamma", 1.38)
+			# The board's figures are the field's value family, and the measured
+			# density above 0.35 luminance was 0.0299 against the reference board's
+			# 0.0388 - the hostile ground is now dark, and the figures standing on
+			# it have to carry that. Shadow-weighted exposure is the shared lever:
+			# it lifts every figure's body by the same curve, so the patchwork of
+			# unrelated values in the shipped art converges instead of each sprite
+			# being treated on its own. Lifting key_light was tried before and did
+			# not move p99; this is a different measure and a different term.
+			material.set_shader_parameter("exposure_gamma", 1.55)
 			material.set_shader_parameter("contrast", 1.03)
 			material.set_shader_parameter("contrast_pivot", 0.26)
 			material.set_shader_parameter("key_light", 0.05)
