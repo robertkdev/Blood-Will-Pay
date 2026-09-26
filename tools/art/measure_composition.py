@@ -48,6 +48,21 @@ LEFT_RAIL_X = (0.0, 0.17)
 RIGHT_RAIL_X = (0.83, 1.0)
 RAIL_Y = (0.09, 0.63)
 
+# The lower band's three territories, plus the bands above them. The boxes are
+# proportional, so the reference and our capture are measured the same way even
+# though the two layouts place their edges slightly differently.
+TERRITORIES = {
+    "left_rail": (LEFT_RAIL_X, RAIL_Y),
+    "right_rail": (RIGHT_RAIL_X, RAIL_Y),
+    "field": (FIELD_X, FIELD_Y),
+    "bench_band": ((0.0, 1.0), (0.66, 0.73)),
+    "shop_band": ((0.09, 0.59), (0.73, 1.0)),
+    "wager_band": ((0.59, 0.83), (0.73, 1.0)),
+    "commit_plate": ((0.83, 1.0), (0.73, 1.0)),
+}
+SATURATED_CHROMA = 0.15
+RED_CHROMA = 0.12
+
 
 def _load(path: Path) -> np.ndarray:
     with Image.open(path) as image:
@@ -97,6 +112,42 @@ def _region(rgb: np.ndarray, x_range: tuple[float, float], y_range: tuple[float,
         "share_above_0.35": float((lum > 0.35).mean()),
         "mean_chroma": float(chroma.mean()),
         "warm_ratio": float(region[..., 0].mean() / max(1e-6, region[..., 2].mean())),
+    }
+
+
+def _territory_stats(rgb: np.ndarray, x_range: tuple[float, float], y_range: tuple[float, float]) -> dict:
+    region = _slice(rgb, x_range, y_range)
+    lum = _luminance(region)
+    chroma = region.max(axis=2) - region.min(axis=2)
+    red = (
+        (region[..., 0] > 1.6 * region[..., 1])
+        & (region[..., 0] > 1.6 * region[..., 2])
+        & (chroma >= RED_CHROMA)
+    )
+    return {
+        "mean_luminance": float(lum.mean()),
+        "mean_chroma": float(chroma.mean()),
+        "saturated_fraction": float((chroma >= SATURATED_CHROMA).mean()),
+        "red_fraction": float(red.mean()),
+    }
+
+
+def measure_territories(rgb: np.ndarray) -> dict:
+    stats: dict[str, dict] = {}
+    for name, (x_range, y_range) in TERRITORIES.items():
+        stats[name] = _territory_stats(rgb, x_range, y_range)
+    # Which single territory carries the most saturated mass, and how many
+    # territories red actually marks. The reference concentrates its saturated
+    # mass on the commit plate and spends red on two territories; the gap document
+    # counts five jobs for red on our screen.
+    largest = max(stats.items(), key=lambda item: item[1]["saturated_fraction"])
+    red_jobs = sum(1 for value in stats.values() if value["red_fraction"] >= 0.01)
+    return {
+        "largest_saturated_territory": largest[0],
+        "largest_saturated_fraction": largest[1]["saturated_fraction"],
+        "commit_plate_saturated_fraction": stats["commit_plate"]["saturated_fraction"],
+        "red_territory_count": red_jobs,
+        "regions": stats,
     }
 
 
@@ -186,6 +237,7 @@ def measure(path: Path) -> dict:
                 _brightest_in(row_mean, 2 / 3.0, 1.0)[1]
             ),
         },
+        "territory": measure_territories(rgb),
     }
 
 
@@ -234,6 +286,37 @@ def report(reference: dict, capture: dict) -> str:
             lines.append(
                 f"{name:<44}{ref_value:>12.4f}{cap_value:>12.4f}   {verdict}"
             )
+    ref_territory = reference["territory"]
+    cap_territory = capture["territory"]
+    lines.append("")
+    lines.append(
+        f"{'territory':<44}{'reference':>12}{'capture':>12}"
+    )
+    lines.append(
+        f"{'largest saturated territory':<44}{ref_territory['largest_saturated_territory']:>12}"
+        f"{cap_territory['largest_saturated_territory']:>12}"
+    )
+    lines.append(
+        f"{'its saturated fraction':<44}{ref_territory['largest_saturated_fraction']:>12.4f}"
+        f"{cap_territory['largest_saturated_fraction']:>12.4f}"
+    )
+    lines.append(
+        f"{'commit plate saturated fraction':<44}"
+        f"{ref_territory['commit_plate_saturated_fraction']:>12.4f}"
+        f"{cap_territory['commit_plate_saturated_fraction']:>12.4f}"
+    )
+    lines.append(
+        f"{'territories red marks (>=1 pct)':<44}{ref_territory['red_territory_count']:>12}"
+        f"{cap_territory['red_territory_count']:>12}"
+    )
+    for name in TERRITORIES:
+        ref_region = ref_territory["regions"][name]
+        cap_region = cap_territory["regions"][name]
+        lines.append(
+            f"  {name + ' chroma / sat / red':<42}"
+            f"{ref_region['mean_chroma']:>6.3f}/{ref_region['saturated_fraction']:.3f}/{ref_region['red_fraction']:.3f}"
+            f"{cap_region['mean_chroma']:>6.3f}/{cap_region['saturated_fraction']:.3f}/{cap_region['red_fraction']:.3f}"
+        )
     return "\n".join(lines)
 
 

@@ -326,6 +326,9 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		return
 	var tight_compact: bool = _is_tight_compact_layout()
 	var compact_decision: bool = tight_compact or _uses_narrow_compact_copy()
+	# The dock's opposed outcome rows read these instead of re-deriving the odds,
+	# so the wager's two futures have exactly one calculation behind them.
+	wager_summary.set_meta("outcome_quotes", {"active": false})
 	if forced_first_fight:
 		var opening_risk: String = BloodBuckets.format_amount(1, compact_decision)
 		# Stake only. "Win to unlock the shop" is the opening placeholder's own line directly
@@ -377,6 +380,17 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
 	wager_summary.tooltip_text = "Risk %s. Win reserve %s; loss reserve %s. Rough model estimate %d%%; abilities, items, placement, hazards, and targeting can move the result outside this range. Gross return includes the wager and is priced by the encounter tier, not the estimate." % [BloodBuckets.describe(wager), BloodBuckets.describe(after_win), BloodBuckets.describe(after_loss), odds_percent]
+	wager_summary.set_meta("outcome_quotes", {
+		"active": not in_combat and wager > 0,
+		"locked": in_combat,
+		"win_low": odds_range.x,
+		"win_high": odds_range.y,
+		"loss_low": maxi(0, 100 - odds_range.y),
+		"loss_high": maxi(0, 100 - odds_range.x),
+		"after_win": after_win,
+		"after_loss": after_loss,
+		"wager": wager,
+	})
 
 func set_bet_editable(editable: bool) -> void:
 	if bet_slider:
