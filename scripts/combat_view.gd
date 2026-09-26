@@ -570,7 +570,7 @@ func _apply_responsive_layout() -> void:
 	if bench_area != null:
 		bench_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
-	var shop_card_height: float = ShopCard.presentation_height(effective_size, tight_compact)
+	var shop_card_height: float = ShopCard.presentation_height(effective_size, tight_compact, full_hd_dock)
 	if bottom_storage != null:
 		bottom_storage.custom_minimum_size = Vector2(0.0 if tight_compact else 900.0 if compact else 1120.0, shop_card_height + 14.0)
 		bottom_storage.size_flags_vertical = Control.SIZE_SHRINK_END
@@ -770,11 +770,15 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 	if stats_area != null:
 		stats_area.custom_minimum_size.x = 148.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0
 		stats_area.size_flags_horizontal = Control.SIZE_SHRINK_END
-		stats_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		# The compact tiers keep the metrics rail at its authored compact panel
+		# height instead of stretching it over the whole battlefield: full-height
+		# furniture is a desktop-tier read. The composed dock owns its own rail
+		# height and selects the expanding branch because it is not compact.
+		stats_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_area.modulate.a = 0.80 if maximum_scale_layout else 1.0
 	if stats_panel != null:
 		stats_panel.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
-		stats_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		stats_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_panel.clip_contents = false
 		if stats_panel.has_method("set_responsive_layout"):
 			stats_panel.call("set_responsive_layout", compact, tight_compact)
@@ -1061,7 +1065,8 @@ func _enforce_compact_metric_badges() -> void:
 
 func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
-	var card_size: Vector2 = Vector2(120.0 if tight_compact else 132.0, ShopCard.presentation_height(get_viewport_rect().size, tight_compact))
+	var composed_dock: bool = bool(get_meta("full_hd_dock", false))
+	var card_size: Vector2 = Vector2(120.0 if tight_compact else 132.0, ShopCard.presentation_height(get_viewport_rect().size, tight_compact, composed_dock))
 	if shop_grid != null:
 		shop_grid.add_theme_constant_override("h_separation", 6 if tight_compact else 10 if compact else 16)
 		shop_grid.add_theme_constant_override("v_separation", 4 if tight_compact else 6 if compact else 10)
@@ -1078,7 +1083,7 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 					control.custom_minimum_size = card_size
 					control.clip_contents = tight_compact
 					if control.has_method("set_compact_presentation"):
-						control.call("set_compact_presentation", compact, tight_compact)
+						control.call("set_compact_presentation", compact, tight_compact, composed_dock)
 					elif tight_compact:
 						_apply_tight_shop_placeholder(control)
 					var name_label: Label = control.find_child("Name", true, false) as Label
@@ -1090,7 +1095,10 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 						if tight_compact:
 							name_label.custom_minimum_size.x = 0.0
 					if price_label != null:
-						price_label.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 18 if tight_compact else 20)
+						# The compact card is 132 wide and the price owns 38 percent of
+						# the caption row. Twenty-pixel copy ran past that share, so the
+						# compact tiers keep the card's own authored price size.
+						price_label.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 17)
 						price_label.clip_text = tight_compact
 						if tight_compact:
 							price_label.custom_minimum_size.x = 0.0
@@ -1889,7 +1897,7 @@ func _apply_dock_shop_cells(card_width: float, card_height: float, ui_scale: flo
 		var compact_presentation: bool = bool(card.get_meta("compact_presentation", false))
 		var tight_presentation: bool = bool(card.get_meta("tight_presentation", false))
 		if (not compact_presentation or tight_presentation) and card.has_method("set_compact_presentation"):
-			card.call("set_compact_presentation", true, false)
+			card.call("set_compact_presentation", true, false, true)
 		var cell_size: Vector2 = Vector2(card_width, card_height)
 		if card.custom_minimum_size != cell_size:
 			card.custom_minimum_size = cell_size

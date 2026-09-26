@@ -271,6 +271,14 @@ func _fit_identity_name(unit_name: String, available_width: float) -> String:
 	# measured in the face that is actually drawn, against the rail's own measured
 	# column, so the outer rail is never widened to make a name fit.
 	var roomiest: int = IDENTITY_FONT_SIZE_FLOOR if _compact_layout else IDENTITY_FONT_SIZE_DESKTOP
+	# An unmeasured row has no column yet, so there is nothing to fit against:
+	# keep the complete authored identity (with its duplicate discriminator) and
+	# let the resize pass step it down once the settled column is known. Only a
+	# real measured column may abbreviate a name.
+	if available_width <= 0.0:
+		_compact_identity_font_size = roomiest
+		_compact_identity_mode = "name_only_team_in_chrome" if _compact_layout else "rail_complete_identity"
+		return unit_name
 	var candidate: int = roomiest
 	while candidate >= IDENTITY_FONT_SIZE_FLOOR:
 		if available_width > 0.0 and _compact_text_width(unit_name, font, candidate) + 1.0 <= available_width:
@@ -326,7 +334,11 @@ func _compact_identity_available_width() -> float:
 		return maxf(32.0, name_label.size.x - 8.0)
 	if content_box != null and content_box.size.x > 1.0:
 		return maxf(32.0, content_box.size.x - 60.0)
-	return maxf(32.0, size.x - 70.0)
+	if size.x > 1.0:
+		return maxf(32.0, size.x - 70.0)
+	# The row has not been laid out at all, so no column is known: report an
+	# unmeasured width instead of a provisional floor the identity would clip to.
+	return 0.0
 
 func _compact_text_width(text: String, font: Font, font_size: int) -> float:
 	if font != null:

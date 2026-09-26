@@ -24,6 +24,12 @@ const TOOLTIP_CURSOR_OFFSET: Vector2 = Vector2(18.0, -14.0)
 const TOOLTIP_EDGE_PADDING: float = 12.0
 const COMPACT_TOOLTIP_MIN_HEIGHT: float = 76.0
 const COMPACT_NAME_SHARE: float = 0.62
+## The compact tiers are budgeted cells, not a share of the raw frame:
+## `CompactShopFooterSmoke` holds the compact card to 80-96 logical pixels and the
+## tight card to 54-70, while the composed dock owns its own taller cell through
+## `Composition.shop_card_height` and only asks this for the card's portrait tier.
+const COMPACT_CELL_HEIGHT: float = 88.0
+const TIGHT_CELL_HEIGHT: float = 62.0
 ## A composed dock cell has to be at least this tall before the card trades its
 ## compact summary for the full detail panel. This mirrors the portrait-layout
 ## threshold used by `set_compact_presentation`.
@@ -216,7 +222,7 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 		_has_identity_content = has_identity
 		_identity_panel.visible = _has_identity_content and not _compact_presentation
 
-func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
+func set_compact_presentation(enabled: bool, tight: bool = false, composed_dock: bool = false) -> void:
 	_compact_presentation = enabled
 	_tight_presentation = enabled and tight
 	# Card layout and information access are separate decisions. A composed dock
@@ -230,7 +236,7 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 		_clear_tooltip()
 	if enabled:
 		_clear_global_tooltip_layers()
-	var card_height: float = presentation_height(get_viewport_rect().size, _tight_presentation)
+	var card_height: float = presentation_height(get_viewport_rect().size, _tight_presentation, composed_dock)
 	var portrait_layout: bool = card_height >= 100.0
 	custom_minimum_size = Vector2(120.0 if _tight_presentation else 132.0, card_height)
 	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -444,14 +450,20 @@ func _icon_frame_aspect() -> float:
 		return 1.0
 	return frame_width / frame_height
 
-static func presentation_height(logical_size: Vector2, tight: bool) -> float:
-	if logical_size.x >= 1500.0 and logical_size.y >= 1000.0:
-		return 188.0
-	if logical_size.x >= 1400.0 and logical_size.y >= 800.0:
-		return 144.0
-	if logical_size.x >= 1200.0 and logical_size.y >= 680.0:
-		return 108.0
-	return 54.0 if tight else 80.0
+## The shop band's cell height. The composed dock sizes its own taller cell from
+## `Composition.shop_card_height` and only reads this for the card's portrait
+## tier, so `composed_dock` keeps that presentation intact. Every other tier is a
+## budgeted compact cell: the frame-derived heights (108/144/188) were above the
+## compact budget on every window the compact tier actually serves.
+static func presentation_height(logical_size: Vector2, tight: bool, composed_dock: bool = false) -> float:
+	if composed_dock:
+		if logical_size.x >= 1500.0 and logical_size.y >= 1000.0:
+			return 188.0
+		if logical_size.x >= 1400.0 and logical_size.y >= 800.0:
+			return 144.0
+		if logical_size.x >= 1200.0 and logical_size.y >= 680.0:
+			return 108.0
+	return TIGHT_CELL_HEIGHT if tight else COMPACT_CELL_HEIGHT
 
 func _price_copy() -> String:
 	return BloodBuckets.format_amount(_price_value, _compact_presentation)
