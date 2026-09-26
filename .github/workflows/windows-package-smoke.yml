@@ -105,12 +105,6 @@ jobs:
               $timeoutSeconds = 180
             } elseif ($scene -in @(
               "tests/rga_testing/validation/TeamOddsCalibrationProbe.tscn",
-              # Same live-run-loop class as ActualRunLoopSmoke: it drives real
-              # phases and waits on frames, so its wall time follows the
-              # runner's frame rate rather than its own logic. It passes in
-              # about 15 seconds locally and exceeded the 120s budget on the
-              # runner while every assertion passed.
-              "tests/visual/BettingEconomySmoke.tscn",
               "tests/visual/ActualRunLoopSmoke.tscn"
             )) {
               $timeoutSeconds = 300
