@@ -1340,11 +1340,29 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 	if board_status_plate != null:
 		board_status_plate.size.y = status_height + 4.0
 		board_status_plate.set_meta("authored_status_height", status_height + 4.0)
-		board_status_plate.offset_left = -240.0 if tight_compact else -278.0
-		board_status_plate.offset_right = 240.0 if tight_compact else 278.0
 		board_status_plate.modulate = Color(1.0, 1.0, 1.0, 0.64 if tight_compact else 0.86 if compact else 1.0)
 		board_status_plate.set_meta("planning_status_priority", "secondary_to_commit" if compact else "primary")
-		board_status_plate.add_theme_stylebox_override("panel", GothicUIAssets.status_strip_style())
+		if bool(get_meta("full_hd_dock", false)):
+			# The divider is structure, not furniture. In the composed tier it spans
+			# the field it divides, so it gives the eye the fixed horizon between
+			# hostile and friendly ground that a floating pill could not: measured,
+			# the field's vertical row energy ran at 0.0094 against the reference's
+			# own 0.0203 because nothing in the middle of the board was wide. The
+			# band keeps the shared rule top and bottom, so the two halves still
+			# read as one surface with a seam rather than as two stacked fields.
+			board_status_plate.anchor_left = 0.0
+			board_status_plate.anchor_right = 1.0
+			board_status_plate.offset_left = 0.0
+			board_status_plate.offset_right = 0.0
+			board_status_plate.set_meta("divider_band", "full_width_field_horizon")
+			board_status_plate.add_theme_stylebox_override("panel", GothicUIAssets.divider_band_style())
+		else:
+			board_status_plate.anchor_left = 0.5
+			board_status_plate.anchor_right = 0.5
+			board_status_plate.offset_left = -240.0 if tight_compact else -278.0
+			board_status_plate.offset_right = 240.0 if tight_compact else 278.0
+			board_status_plate.remove_meta("divider_band")
+			board_status_plate.add_theme_stylebox_override("panel", GothicUIAssets.status_strip_style())
 	var planning_directive: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
 		# The order is the arrow. "01 //", "02 //" and "03 //" were numbering an order the line
@@ -2297,6 +2315,26 @@ func _dock_panel_style(kind: String) -> StyleBox:
 	_dock_panel_styles[kind] = style
 	return style
 
+## The lower third is braced by one ruled ledge on the dock band's top edge, the
+## way the reference braces its base: measured, the frame's brightest full-width
+## row sat at y 0.014, its top edge, at luminance 0.2502, while the reference's
+## sits in the lower third at 0.7298 and 0.3549. The ledge is an overlay with no
+## minimum size and no mouse, so it cannot move the dock allocation it marks.
+func _apply_dock_ledge(band: Rect2) -> void:
+	if _lower_dock_layer == null or not is_instance_valid(_lower_dock_layer):
+		return
+	var ledge: ColorRect = _lower_dock_layer.get_node_or_null("GothicDockLedge") as ColorRect
+	if ledge == null:
+		ledge = ColorRect.new()
+		ledge.name = "GothicDockLedge"
+		ledge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ledge.z_index = -3
+		ledge.set_meta("lower_band_accent", "dock_band_ledge")
+		_lower_dock_layer.add_child(ledge)
+	ledge.position = Vector2(band.position.x, band.position.y - 2.0)
+	ledge.size = Vector2(band.size.x, 2.0)
+	ledge.color = GothicUIAssets.COLOR_GAMEPLAY_RULE
+
 ## Keeps each territory on the material its current height can carry.
 func _apply_dock_territory_material(territory: PanelContainer, primary: bool) -> void:
 	if territory == null:
@@ -2372,6 +2410,7 @@ func _refresh_dock_territories() -> bool:
 	_start_plaque.size = bay_rect.size
 	_apply_dock_territory_material(_wager_territory, false)
 	_apply_dock_territory_material(_start_plaque, true)
+	_apply_dock_ledge(band)
 	# Match the bay's padding box to the planned physical padding so the realised
 	# bay footprint equals the planned one at every UI scale.
 	var bay_padding: MarginContainer = _start_plaque.get_node_or_null("Padding") as MarginContainer
