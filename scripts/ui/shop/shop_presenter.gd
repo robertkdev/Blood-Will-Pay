@@ -495,11 +495,43 @@ func _show_message(text: String, seconds: float = 2.0) -> void:
 	if _message_label == null:
 		return
 	_message_label.text = String(text)
+	_reposition_message_label()
 	_message_label.visible = true
 	if _message_timer != null and is_instance_valid(_message_timer):
 		_message_timer.stop()
 		_message_timer.wait_time = max(0.1, float(seconds))
 		_message_timer.start()
+
+## Keep the toast clear of the wager strip.
+##
+## The label is anchored to the bottom of its host, and the wager strip sits in the same
+## band - so a message landed straight on top of the stake and odds, which read as two
+## garbled sentences overlapping. It now sits just above the strip whenever one is on screen,
+## and falls back to the authored band when there is not.
+func _reposition_message_label() -> void:
+	if _message_label == null:
+		return
+	_message_label.offset_top = -214.0
+	_message_label.offset_bottom = -174.0
+	var host: Control = _message_label.get_parent() as Control
+	var strip: Control = _find_wager_strip(host)
+	if host == null or strip == null or not strip.is_visible_in_tree():
+		return
+	var host_rect: Rect2 = host.get_global_rect()
+	var strip_rect: Rect2 = strip.get_global_rect()
+	if host_rect.size.y <= 1.0 or strip_rect.size.y <= 1.0:
+		return
+	var bottom: float = (strip_rect.position.y - 8.0) - host_rect.end.y
+	_message_label.offset_bottom = minf(-174.0, bottom)
+	_message_label.offset_top = _message_label.offset_bottom - 40.0
+
+func _find_wager_strip(host: Control) -> Control:
+	if host == null:
+		return null
+	var tree: SceneTree = host.get_tree()
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.find_child("WagerSummary", true, false) as Control
 
 func _on_message_timer_timeout() -> void:
 	if _message_label != null and is_instance_valid(_message_label):

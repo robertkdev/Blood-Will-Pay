@@ -17,6 +17,7 @@ var background: Panel
 var frame: Panel
 var patina: ColorRect
 var empty_mark: Label
+var pocket_relic: TextureRect
 var pocket_cavity: Panel
 var binding_rail: ColorRect
 var docket_label: Label
@@ -149,6 +150,23 @@ func _ensure_children() -> void:
 		empty_mark.add_theme_color_override("font_color", Color(0.66, 0.59, 0.52, 0.54))
 		empty_mark.z_index = 2
 		add_child(empty_mark)
+	# A ready pocket shows the reliquary mark rather than nothing. The three pockets take the
+	# three authored cells in order - reliquary, ledger, bone chit - so an empty cache still
+	# reads as a place where evidence goes.
+	if pocket_relic == null:
+		pocket_relic = TextureRect.new()
+		pocket_relic.name = "PocketRelic"
+		pocket_relic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pocket_relic.set_anchors_preset(Control.PRESET_FULL_RECT)
+		pocket_relic.offset_left = 0.0
+		pocket_relic.offset_top = 0.0
+		pocket_relic.offset_right = 0.0
+		pocket_relic.offset_bottom = 0.0
+		pocket_relic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pocket_relic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		pocket_relic.modulate = Color(1.0, 1.0, 1.0, 0.30)
+		pocket_relic.z_index = 1
+		add_child(pocket_relic)
 	if frame == null:
 		frame = Panel.new()
 		frame.name = "Frame"
@@ -238,6 +256,8 @@ func _refresh() -> void:
 		icon.texture = null
 		icon.visible = false
 		empty_mark.visible = true
+		if pocket_relic != null:
+			pocket_relic.visible = true
 		tooltip_text = ""
 		mouse_default_cursor_shape = Control.CURSOR_ARROW
 		focus_mode = Control.FOCUS_NONE
@@ -245,6 +265,8 @@ func _refresh() -> void:
 		_sync_pocket_state(false)
 		return
 	empty_mark.visible = false
+	if pocket_relic != null:
+		pocket_relic.visible = false
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	focus_mode = Control.FOCUS_ALL
 	if def != null:
@@ -309,19 +331,25 @@ func _sync_empty_slot_label() -> void:
 	if empty_mark == null:
 		return
 	var slot_number: int = maxi(1, slot_index + 1)
-	empty_mark.text = "RECEIVE" if _material_slot_size.x < 48.0 else "RECEIVE\nRELIC"
+	# No wording. Three identical empty slots each used to print "RECEIVE / RELIC", which is the
+	# same sentence three times on a panel whose empty slots are already visibly empty. The slot
+	# number and the pocket-state colour carry what is left to say.
+	empty_mark.text = ""
 	empty_mark.add_theme_font_size_override("font_size", 7 if _material_slot_size.x < 48.0 else 9 if _material_slot_size.x < 70.0 else 11)
 	empty_mark.add_theme_color_override("font_color", Color(0.76, 0.67, 0.55, 0.72))
 	empty_mark.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
 	empty_mark.add_theme_constant_override("outline_size", 1)
 	empty_mark.set_meta("purposeful_empty_slot", true)
 	empty_mark.set_meta("ready_pocket_number", slot_number)
+	if pocket_relic != null:
+		pocket_relic.texture = GothicUIAssets.relic_icon(slot_number - 1)
 	_sync_pocket_state(item_id.strip_edges() != "")
 
 func _sync_pocket_state(filled: bool) -> void:
 	var slot_number: int = maxi(1, slot_index + 1)
 	if docket_label != null:
-		docket_label.text = ("HELD // %02d" if filled else "READY // %02d") % slot_number
+		# The number only; the state is already exposed as pocket_status meta and by the slot hue.
+		docket_label.text = "%02d" % slot_number
 		docket_label.add_theme_font_size_override("font_size", 7 if _material_slot_size.x < 48.0 else 8 if _material_slot_size.x < 70.0 else 10)
 		docket_label.set_meta("pocket_status", "held" if filled else "ready")
 	set_meta("reliquary_pocket", true)
@@ -372,9 +400,22 @@ func _sync_pocket_geometry() -> void:
 		empty_mark.offset_bottom = -9.0
 
 func _reliquary_outer_style(filled: bool, hovered: bool) -> StyleBoxFlat:
+	# A cache slot is a permanent compartment, so it keeps the authored two-rail
+	# joinery: the outer rail is weighted toward the lower-left like a hinged
+	# reliquary lid, and the inner rail is the faint hairline that marks the
+	# cavity's own edge. The rim and the recess stay in the quiet gameplay-iron
+	# family - the shared GothicUIAssets pocket vocabulary is the single-hairline
+	# version of this material for transient surfaces - so the frame never
+	# out-shouts the relic it holds.
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.058, 0.026, 0.030, 0.99) if filled else Color(0.017, 0.013, 0.017, 0.99)
-	style.border_color = Color(0.94, 0.70, 0.38, 1.0) if hovered else Color(0.64, 0.49, 0.33, 0.98) if filled else Color(0.48, 0.42, 0.36, 0.94)
+	style.bg_color = Color(0.052, 0.024, 0.027, 0.97) if filled else Color(0.016, 0.013, 0.017, 0.97)
+	style.border_color = (
+		Color(0.78, 0.60, 0.36, 0.88)
+		if hovered
+		else Color(0.50, 0.40, 0.31, 0.80)
+		if filled
+		else Color(0.35, 0.30, 0.27, 0.72)
+	)
 	style.border_width_left = 4 if filled or hovered else 3
 	style.border_width_top = 2
 	style.border_width_right = 2
@@ -383,30 +424,32 @@ func _reliquary_outer_style(filled: bool, hovered: bool) -> StyleBoxFlat:
 	style.corner_radius_top_right = 1
 	style.corner_radius_bottom_right = 3
 	style.corner_radius_bottom_left = 1
-	style.shadow_color = Color(0.16, 0.0, 0.012, 0.72) if filled else Color(0.0, 0.0, 0.0, 0.78)
-	style.shadow_size = 6 if hovered else 4
+	style.shadow_color = Color(0.16, 0.0, 0.012, 0.60) if filled else Color(0.0, 0.0, 0.0, 0.70)
+	style.shadow_size = 5 if hovered else 3
+	style.content_margin_left = 4.0
+	style.content_margin_top = 3.0
+	style.content_margin_right = 4.0
+	style.content_margin_bottom = 4.0
 	return style
 
 func _reliquary_cavity_style(filled: bool, hovered: bool) -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.070, 0.022, 0.026, 0.96) if filled else Color(0.006, 0.005, 0.007, 0.98)
-	style.border_color = Color(0.78, 0.20, 0.16, 0.76) if hovered else Color(0.45, 0.11, 0.10, 0.62) if filled else Color(0.32, 0.26, 0.23, 0.70)
-	style.border_width_left = 2
-	style.border_width_top = 3
-	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.94)
-	style.shadow_size = 5
-	return style
+	# The recess inside the rim: the dark interior and one inner shadow line
+	# carry the depth instead of a second pale frame.
+	return GothicUIAssets.relic_cavity_style(filled, hovered)
 
 func _reliquary_inner_style(filled: bool, hovered: bool) -> StyleBoxFlat:
+	# The slot's second rail: a hairline that closes the cavity edge on all four
+	# sides. It carries no fill, so the recess still reads as one quiet field
+	# rather than a stack of pale nested boxes.
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.92, 0.72, 0.44, 0.88) if hovered else Color(0.66, 0.20, 0.16, 0.72) if filled else Color(0.58, 0.51, 0.43, 0.48)
+	style.border_color = (
+		Color(0.80, 0.63, 0.38, 0.52)
+		if hovered
+		else Color(0.56, 0.20, 0.16, 0.44)
+		if filled
+		else Color(0.44, 0.37, 0.30, 0.34)
+	)
 	style.border_width_left = 1
 	style.border_width_top = 1
 	style.border_width_right = 1

@@ -165,3 +165,26 @@ scenarios:
     output_root: "outputs/visual_debug/vdh_runs"
     max_iterations: 3
     telegram_context: "Blood Will Pay unit upgrades"
+
+  - id: art-preview
+    title: Fullscreen art reference and production component preview
+    adapter: godot
+    objective: Compare the art reference with a fresh 1920x1080 fullscreen runtime. Review portrait prominence, spacing, typography, background visibility, surfaces, and composition. Functional checks and readable text alone cannot establish an art-direction pass.
+    capture_command: [python, -B, addons/art_preview/preview.py, evidence]
+    capture_manifest: .godot/art_preview/captures.json
+    runtime_provenance:
+      entrypoint: res://addons/art_preview/ArtPreview.tscn
+      capture_contract: preview.py validates live identity; exact values are in each panel metadata.runtime_provenance
+    required_groups: [composition]
+    evidence:
+      required_cameras: [player]
+      required_layers: [final]
+      required_states: [art_preview]
+      required_viewports: [fullscreen_1920x1080]
+      required_events: [reference_comparison]
+      required_pairs:
+        art_direction: [reference, actual]
+      require_runtime_provenance: true
+      required_runtime_fields: [entrypoint, capture_contract]
+      max_source_age_seconds: 3600
+    output_root: .godot/art_preview/vdh-runs

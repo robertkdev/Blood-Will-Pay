@@ -43,7 +43,7 @@ func _run() -> void:
 	get_tree().root.add_child(main)
 	await _settle_frames(5)
 	var live_system_button: Button = main.get_node_or_null("SystemMenuLayer/SystemMenuButton") as Button
-	_expect(live_system_button != null and live_system_button.text == "SYS // MENU", "live system escape hatch reverted to generic Menu copy")
+	_expect(live_system_button != null and live_system_button.text == "MENU", "live system escape hatch reverted to generic Menu copy")
 	_expect(live_system_button != null and bool(live_system_button.get_meta("authored_system_command", false)), "live system escape hatch lacks authored command styling")
 	var entry_affordance: PanelContainer = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
 	var entry_order: Label = main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance/EntryCopy/EntryOrder") as Label

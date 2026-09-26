@@ -8,6 +8,20 @@ const ITEM_CARD_SCENE_PATH: String = "res://scenes/ui/items/ItemCard.tscn"
 const DEFAULT_MIN_ROWS: int = 3
 const EMPTY_READY_SLOTS: int = 3
 const CACHE_SHELL_NAME: String = "GothicItemsPlate"
+## The cache is always three pockets across; how wide they can be follows from the
+## rail's own width, never the other way round.
+const MATERIAL_COLUMNS: int = 3
+## Share of the rail's inner width the composition pass reserves for the grid's own
+## breathing room when it caps a pocket, and that cap's floor. The composed tier
+## derives its pocket extent with the same numbers, so the two passes agree on the
+## slot size instead of undoing each other every pass.
+const COMPOSED_SLOT_BUDGET: float = 12.0
+const MIN_COMPOSED_SLOT: float = 24.0
+const MIN_HEADER_WRAP_WIDTH: float = 48.0
+## Left/top/right/bottom content margins of the header plate. Shared by the style
+## and by the height the wrapped counts are budgeted with, so the measurement
+## matches the box the text is drawn in.
+const HEADER_CONTENT_MARGINS: Vector4 = Vector4(8.0, 4.0, 6.0, 4.0)
 
 var view: Control
 var left_area: Control
@@ -19,6 +33,10 @@ var _rebuild_queued: bool = false
 var _rebuilding: bool = false
 var _tearing_down: bool = false
 var _item_card_scene: PackedScene = null
+## Last wrapped-header measurement, so the per-frame overwritten check never
+## re-lays-out the counts.
+var _header_height_key: String = ""
+var _header_height_value: float = 0.0
 
 func configure(_view: Control) -> void:
 	_tearing_down = false
@@ -155,36 +173,180 @@ func _defer_material_storage_layout() -> void:
 		return
 	call_deferred("_apply_material_storage_layout")
 
-func _on_process_frame() -> void:
-	if _tearing_down or view == null or grid == null or header == null:
-		return
-	var desired_columns: int = 3
+## Every metric this presenter applies, derived once from the same inputs the
+## application uses. Detection compares the live nodes against these values, so a
+## settled layout is not re-applied on every frame and the comparison can never
+## disagree with what was written.
+##
+## On the composed dock tier the composition pass owns the rail's outer width and
+## has already cleared the legacy interior pins, so the interiors fit the inner
+## width it publishes (`composed_rail_logical`) instead of pinning a desktop one,
+## and the header wraps its counts inside that width rather than forcing the rail
+## wider than the authored physical mass. Lowering a pin is what the legacy
+## `maxf` never allowed, which is why the rail used to grow at enlarged UI scales.
+func _material_storage_metrics() -> Dictionary:
 	var tight_compact: bool = bool(view.get_meta("tight_scale_layout", false))
 	var compact: bool = bool(view.get_meta("compact_layout", false))
 	var viewport_size: Vector2 = view.get_viewport_rect().size
+	var composed_inner: float = float(view.get_meta("composed_rail_logical", 0.0))
+	var composed: bool = bool(view.get_meta("full_hd_dock", false)) and composed_inner > 1.0
 	var wide_support_rail: bool = compact and not tight_compact and viewport_size.x >= 1600.0
-	var desired_header_height: float = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
-	var desired_rail_width: float = 136.0 if tight_compact else 240.0 if wide_support_rail else 180.0 if compact else 286.0
+	# A wide desktop frame is the cache's support tier, whether the legacy compact
+	# pass or the composed dock owns it: the dock draws the rail at its authored
+	# 308 physical width with the desktop pocket extent, which is at or above the
+	# support tier's own floor. The header therefore declares the tier the player
+	# is actually shown, without re-sizing the pockets the dock already owns.
+	var wide_support_tier: bool = wide_support_rail or (composed and viewport_size.x >= 1600.0)
+	var columns: int = MATERIAL_COLUMNS
+	var slot_size: Vector2 = Vector2(40.0, 56.0) if tight_compact else Vector2(70.0, 84.0) if wide_support_rail else Vector2(56.0, 74.0) if compact else Vector2(84.0, 96.0)
+	var horizontal_separation: int = 4 if tight_compact else 6 if compact else 10
+	var vertical_separation: int = 5 if tight_compact else 7 if compact else 10
+	var rail_width: float = 136.0 if tight_compact else 240.0 if wide_support_rail else 180.0 if compact else 286.0
+	var storage_width: float = rail_width
+	var header_height: float = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
+	var header_font_size: int = 11 if tight_compact else 13 if wide_support_rail else 12 if compact else 15
+	var header_wrap: int = TextServer.AUTOWRAP_OFF
+	var ui_scale: float = maxf(1.0, float(view.get_meta("persisted_ui_scale", 1.0)))
+	var composed_rail: float = float(view.get_meta("composed_rail_physical", 0.0)) / ui_scale
+	if composed:
+		var slot_cap: float = maxf(
+			MIN_COMPOSED_SLOT,
+			(composed_inner - float(horizontal_separation) * 2.0 - COMPOSED_SLOT_BUDGET) / float(columns)
+		)
+		# Three pockets have to fit the rail's inner width, and the rail's width is
+		# the axis that cannot grow. While the authored pocket already fits, it is
+		# kept as authored - its height is not what the width constrains, and the
+		# 100 percent composed rail holds it exactly as before. Once the width has to
+		# give, the pocket takes the capped extent the composition pass applies.
+		if slot_size.x > slot_cap:
+			slot_size = Vector2(slot_cap, minf(slot_size.y, slot_cap))
+		# The rail's own outer width belongs to the composition pass, so it is
+		# re-stated at that width (releasing any legacy pin) and the interiors stay
+		# inside the published inner width.
+		rail_width = composed_rail if composed_rail > 1.0 else composed_inner
+		storage_width = composed_inner
+		header_wrap = TextServer.AUTOWRAP_WORD_SMART
+	else:
+		composed = false
+	var occupied_slots: int = int(header.get_meta("occupied_slots", 0))
+	var total_slots: int = maxi(1, int(header.get_meta("total_slots", grid.get_child_count())))
+	var desired_ready_slots: int = mini(EMPTY_READY_SLOTS, maxi(0, total_slots - occupied_slots))
+	var ready_slots: int = int(header.get_meta("ready_slots", desired_ready_slots))
+	var sealed_slots: int = int(header.get_meta("sealed_slots", maxi(0, total_slots - occupied_slots - desired_ready_slots)))
+	var header_text: String = _header_counts_text(occupied_slots, ready_slots, sealed_slots, tight_compact)
+	var header_min_height: float = header_height
+	if composed:
+		header_min_height = _measured_header_height(header_text, header_font_size, storage_width, header_height)
+	return {
+		"composed": composed,
+		"tight_compact": tight_compact,
+		"compact": compact,
+		"wide_support_rail": wide_support_rail,
+		"wide_support_tier": wide_support_tier,
+		"columns": columns,
+		"slot": slot_size,
+		"h_separation": horizontal_separation,
+		"v_separation": vertical_separation,
+		"rail_width": rail_width,
+		"storage_width": storage_width,
+		"header_text": header_text,
+		"header_font_size": header_font_size,
+		"header_min_height": header_min_height,
+		"header_wrap": header_wrap,
+	}
+
+## The counts the header keeps: held, ready pockets and sealed reserve. One word
+## plus the three numbers, on its own line so a narrow rail can wrap the counts
+## without losing any of them.
+func _header_counts_text(occupied_slots: int, ready_slots: int, sealed_slots: int, tight_compact: bool) -> String:
+	return (
+		"RELIQUARY\n%02d READY / %02d SEALED" % [ready_slots, sealed_slots]
+		if tight_compact
+		else "RELIQUARY\n%02d HELD  •  %02d READY  •  %02d SEALED" % [occupied_slots, ready_slots, sealed_slots]
+	)
+
+## Height the counts need once wrapped inside `width`, measured from the label's own
+## font and the header plate's content margins. Measuring is what lets the counts
+## wrap instead of being clipped or pushing the rail wider. Cached by input, so the
+## per-frame check is a string compare rather than a text layout.
+func _measured_header_height(text: String, font_size: int, width: float, minimum_height: float) -> float:
+	var font: Font = header.get_theme_font("font")
+	var key: String = "%s|%d|%.2f|%.2f|%d" % [
+		text,
+		font_size,
+		width,
+		minimum_height,
+		font.get_instance_id() if font != null else 0,
+	]
+	if key == _header_height_key:
+		return _header_height_value
+	var height: float = minimum_height
+	if font != null:
+		var wrap_width: float = maxf(
+			MIN_HEADER_WRAP_WIDTH,
+			width - HEADER_CONTENT_MARGINS.x - HEADER_CONTENT_MARGINS.z
+		)
+		var wrapped: Vector2 = font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, wrap_width, font_size)
+		height = maxf(minimum_height, ceilf(wrapped.y) + HEADER_CONTENT_MARGINS.y + HEADER_CONTENT_MARGINS.w)
+	_header_height_key = key
+	_header_height_value = height
+	return height
+
+## True while any pocket still carries an extent other than the one this tier
+## applies. The composition pass caps the same pockets to the same derived
+## extent, so a settled composed rail reports false in both pass orders.
+func _slot_size_overwritten(slot_size: Vector2) -> bool:
+	for child: Node in grid.get_children():
+		var card: Control = child as Control
+		if card == null:
+			continue
+		if not card.custom_minimum_size.is_equal_approx(slot_size):
+			return true
+	return false
+
+func _on_process_frame() -> void:
+	if _tearing_down or view == null or grid == null or header == null:
+		return
+	var metrics: Dictionary = _material_storage_metrics()
+	var composed: bool = bool(metrics.composed)
+	var rail_width: float = float(metrics.rail_width)
+	var storage_width: float = float(metrics.storage_width)
 	var header_overwritten: bool = (
 		not bool(header.get_meta("reliquary_cache_hierarchy", false))
-		or not header.text.contains("RELIQUARY")
-		or not header.text.contains("READY")
-		or not header.text.contains("SEALED")
-		or header.custom_minimum_size.y < desired_header_height
+		or header.text != String(metrics.header_text)
+		or header.autowrap_mode != int(metrics.header_wrap)
+		or not is_equal_approx(header.custom_minimum_size.y, float(metrics.header_min_height))
 	)
-	var layout_overwritten: bool = left_area.custom_minimum_size.x < desired_rail_width
+	var layout_overwritten: bool = (
+		grid.columns != int(metrics.columns)
+		or grid.get_theme_constant("h_separation") != int(metrics.h_separation)
+		or _slot_size_overwritten(Vector2(metrics.slot))
+	)
+	var width_overwritten: bool
+	if composed:
+		# The composed application assigns these widths, so a different value is
+		# stale; the legacy tiers only floor theirs, so only a smaller value is.
+		width_overwritten = (
+			not is_equal_approx(left_area.custom_minimum_size.x, rail_width)
+			or not is_equal_approx(header.custom_minimum_size.x, storage_width)
+			or not is_equal_approx(grid.custom_minimum_size.x, storage_width)
+		)
+	else:
+		width_overwritten = (
+			left_area.custom_minimum_size.x < rail_width - 0.01
+			or header.custom_minimum_size.x < storage_width - 0.01
+			or grid.custom_minimum_size.x < storage_width - 0.01
+		)
 	var shell: Panel = view.get_node_or_null(CACHE_SHELL_NAME) as Panel
 	var shell_unstyled: bool = shell != null and not bool(shell.get_meta("physical_reliquary_shell", false))
-	if grid.columns != desired_columns or header_overwritten or layout_overwritten or shell_unstyled:
+	if header_overwritten or width_overwritten or layout_overwritten or shell_unstyled:
 		_apply_material_storage_layout()
 
 func _apply_material_storage_layout() -> void:
 	if _tearing_down or view == null or grid == null or header == null:
 		return
-	var tight_compact: bool = bool(view.get_meta("tight_scale_layout", false))
-	var compact: bool = bool(view.get_meta("compact_layout", false))
-	var viewport_size: Vector2 = view.get_viewport_rect().size
-	var wide_support_rail: bool = compact and not tight_compact and viewport_size.x >= 1600.0
+	var metrics: Dictionary = _material_storage_metrics()
+	var composed: bool = bool(metrics.composed)
 	var occupied_slots: int = int(header.get_meta("occupied_slots", 0))
 	var total_slots: int = maxi(1, int(header.get_meta("total_slots", grid.get_child_count())))
 	var desired_ready_slots: int = mini(EMPTY_READY_SLOTS, maxi(0, total_slots - occupied_slots))
@@ -201,22 +363,30 @@ func _apply_material_storage_layout() -> void:
 			ready_slots_shown += 1
 		if card.visible:
 			visible_cards += 1
-	var material_columns: int = 3
-	var slot_size: Vector2 = Vector2(40.0, 56.0) if tight_compact else Vector2(70.0, 84.0) if wide_support_rail else Vector2(56.0, 74.0) if compact else Vector2(84.0, 96.0)
-	var horizontal_separation: int = 4 if tight_compact else 6 if compact else 10
-	var vertical_separation: int = 5 if tight_compact else 7 if compact else 10
+	var material_columns: int = int(metrics.columns)
+	var slot_size: Vector2 = Vector2(metrics.slot)
+	var horizontal_separation: int = int(metrics.h_separation)
+	var vertical_separation: int = int(metrics.v_separation)
 	var visible_rows: int = maxi(1, ceili(float(visible_cards) / float(material_columns)))
 	grid.columns = material_columns
-	var rail_width: float = 136.0 if tight_compact else 240.0 if wide_support_rail else 180.0 if compact else 286.0
-	left_area.custom_minimum_size.x = maxf(left_area.custom_minimum_size.x, rail_width)
-	header.custom_minimum_size.x = maxf(header.custom_minimum_size.x, rail_width)
-	grid.custom_minimum_size.x = maxf(grid.custom_minimum_size.x, rail_width)
+	var rail_width: float = float(metrics.rail_width)
+	var storage_width: float = float(metrics.storage_width)
+	if composed:
+		# Assignment, not maxf: the composed rail's width belongs to the composition
+		# pass, so an interior pin left over from a legacy tier has to be released
+		# downwards as well as raised. Nothing here can widen the outer rail, since
+		# these are the widths that pass published.
+		left_area.custom_minimum_size.x = rail_width
+		header.custom_minimum_size.x = storage_width
+		grid.custom_minimum_size.x = storage_width
+	else:
+		left_area.custom_minimum_size.x = maxf(left_area.custom_minimum_size.x, rail_width)
+		header.custom_minimum_size.x = maxf(header.custom_minimum_size.x, rail_width)
+		grid.custom_minimum_size.x = maxf(grid.custom_minimum_size.x, rail_width)
 	grid.add_theme_constant_override("h_separation", horizontal_separation)
 	grid.add_theme_constant_override("v_separation", vertical_separation)
-	grid.custom_minimum_size.y = maxf(
-		grid.custom_minimum_size.y,
-		float(visible_rows) * slot_size.y + float(maxi(0, visible_rows - 1) * vertical_separation)
-	)
+	var rows_height: float = float(visible_rows) * slot_size.y + float(maxi(0, visible_rows - 1) * vertical_separation)
+	grid.custom_minimum_size.y = rows_height if composed else maxf(grid.custom_minimum_size.y, rows_height)
 	grid.set_meta("material_cache_layout", true)
 	grid.set_meta("visible_ready_slots", ready_slots_shown)
 	grid.set_meta("visible_cache_slots", visible_cards)
@@ -224,7 +394,7 @@ func _apply_material_storage_layout() -> void:
 	grid.set_meta("material_slot_size", slot_size)
 	grid.set_meta("physical_compartment_shell", true)
 	grid.set_meta("ready_slot_contract", EMPTY_READY_SLOTS)
-	grid.set_meta("cache_scale_tier", "tight" if tight_compact else "wide_support" if wide_support_rail else "compact" if compact else "desktop")
+	grid.set_meta("cache_scale_tier", "composed" if composed else "tight" if bool(metrics.tight_compact) else "wide_support" if bool(metrics.wide_support_rail) else "compact" if bool(metrics.compact) else "desktop")
 	for card_node: Node in grid.get_children():
 		var item_card: Control = card_node as Control
 		if item_card != null and item_card.has_method("set_material_slot_presentation"):
@@ -234,31 +404,33 @@ func _apply_material_storage_layout() -> void:
 		router.set_item_grid(_item_grid_helper)
 		for card_node: Node in grid.get_children():
 			router.attach_card(card_node)
-	_apply_material_header_style(occupied_slots, total_slots, ready_slots_shown, tight_compact, compact, wide_support_rail)
-	_apply_cache_shell_style(tight_compact, compact)
+	_apply_material_header_style(occupied_slots, total_slots, ready_slots_shown, metrics)
+	_apply_cache_shell_style(bool(metrics.tight_compact), bool(metrics.compact))
 	grid.queue_sort()
 	left_area.queue_sort()
 
-func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_slots: int, tight_compact: bool, compact: bool, wide_support_rail: bool) -> void:
+func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_slots: int, metrics: Dictionary) -> void:
 	if header == null:
 		return
+	var tight_compact: bool = bool(metrics.tight_compact)
+	var wide_support_tier: bool = bool(metrics.wide_support_tier)
 	var sealed_slots: int = maxi(0, total_slots - occupied_slots - ready_slots)
-	header.text = (
-		"CACHE RELIQUARY\n%02d READY / %02d SEALED" % [ready_slots, sealed_slots]
-		if tight_compact
-		else "RELIQUARY CACHE\n%02d HELD  •  %02d READY  •  %02d SEALED" % [occupied_slots, ready_slots, sealed_slots]
-		if compact
-		else "EVIDENCE RELIQUARY CACHE\n%02d HELD  •  %02d READY POCKETS  •  %02d SEALED IN RESERVE" % [occupied_slots, ready_slots, sealed_slots]
-	)
-	header.custom_minimum_size.y = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
-	header.add_theme_font_size_override("font_size", 11 if tight_compact else 13 if wide_support_rail else 12 if compact else 15)
+	# One word and three counts: held, ready pockets and sealed reserve. The wide
+	# variant used to read "EVIDENCE RELIQUARY CACHE / 00 HELD • 03 READY POCKETS •
+	# 15 SEALED IN RESERVE" - eleven words to convey three numbers on a panel whose
+	# shell art and slot colouring already say what it is.
+	header.text = _header_counts_text(occupied_slots, ready_slots, sealed_slots, tight_compact)
+	header.custom_minimum_size.y = float(metrics.header_min_height)
+	header.add_theme_font_size_override("font_size", int(metrics.header_font_size))
 	header.add_theme_color_override("font_color", Color(0.94, 0.83, 0.68, 1.0))
 	header.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.92))
 	header.add_theme_constant_override("outline_size", 2)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	header.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.clip_text = false
-	header.autowrap_mode = TextServer.AUTOWRAP_OFF
+	# The counts wrap rather than being clipped or widening the rail; the composed
+	# height above is the budget for what the wrap needs.
+	header.autowrap_mode = int(metrics.header_wrap)
 	var header_style: StyleBoxFlat = StyleBoxFlat.new()
 	header_style.bg_color = Color(0.018, 0.013, 0.016, 0.98)
 	header_style.border_color = Color(0.58, 0.43, 0.29, 0.94)
@@ -266,10 +438,10 @@ func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_s
 	header_style.border_width_top = 2
 	header_style.border_width_right = 2
 	header_style.border_width_bottom = 4
-	header_style.content_margin_left = 8.0
-	header_style.content_margin_top = 4.0
-	header_style.content_margin_right = 6.0
-	header_style.content_margin_bottom = 4.0
+	header_style.content_margin_left = HEADER_CONTENT_MARGINS.x
+	header_style.content_margin_top = HEADER_CONTENT_MARGINS.y
+	header_style.content_margin_right = HEADER_CONTENT_MARGINS.z
+	header_style.content_margin_bottom = HEADER_CONTENT_MARGINS.w
 	header_style.shadow_color = Color(0.0, 0.0, 0.0, 0.82)
 	header_style.shadow_size = 4
 	header.add_theme_stylebox_override("normal", header_style)
@@ -279,7 +451,7 @@ func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_s
 	header.set_meta("ready_slots", ready_slots)
 	header.set_meta("sealed_slots", sealed_slots)
 	header.set_meta("header_hierarchy_lines", 2)
-	header.set_meta("wide_support_rail", wide_support_rail)
+	header.set_meta("wide_support_rail", wide_support_tier)
 	header.set_meta("purposeful_empty_focus", occupied_slots == 0 and ready_slots == EMPTY_READY_SLOTS)
 	if grid != null:
 		grid.set_meta("material_header_text", header.text)

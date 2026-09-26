@@ -104,6 +104,7 @@ func set_offers(offers: Array) -> void:
                     "package_level": int(off.package_level),
                     "package_kind": String(off.package_kind),
 					"image_path": String(off.shop_card_art_path) if not String(off.shop_card_art_path).strip_edges().is_empty() else String(off.sprite_path),
+                    "uses_board_art": off.shop_card_art_path.strip_edges().is_empty() or off.shop_card_art_path == off.sprite_path,
                     "role": _role_text(roles, primary_role),
                     "roles": roles,
                     "traits": traits,
@@ -143,27 +144,40 @@ func set_offers(offers: Array) -> void:
     _queue_safe_gutter_layout()
 
 func _queue_safe_gutter_layout() -> void:
-    if _grid == null or _safe_gutter_layout_queued:
+    if _grid == null or not is_instance_valid(_grid) or _safe_gutter_layout_queued:
         return
     _safe_gutter_layout_queued = true
-    call_deferred("_defer_safe_gutter_layout")
+    # Single hop keeps the pending work bounded and tied to a live grid. The
+    # earlier startup crash's exact trigger was never established; this is a
+    # defensive lifetime bound, not a diagnosed cause.
+    call_deferred("_apply_safe_gutter_layout")
 
 func _defer_safe_gutter_layout() -> void:
-    call_deferred("_apply_safe_gutter_layout")
+    # Kept so any existing caller still lands on the same single pass.
+    _queue_safe_gutter_layout()
 
 func _apply_safe_gutter_layout() -> void:
     _safe_gutter_layout_queued = false
-    if _grid == null or not is_instance_valid(_grid):
+    if _grid == null or not is_instance_valid(_grid) or not _grid.is_inside_tree():
         return
     var viewport_size: Vector2 = _grid.get_viewport_rect().size
     var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
     var compact: bool = viewport_size.y <= 1080.0 or viewport_size.x <= 1400.0
     var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0 or (ui_scale >= 1.25 and viewport_size.y <= 720.0)
-    var card_height: float = 54.0 if tight_compact else 80.0 if compact else 122.0
+    var card_height: float = ShopCard.presentation_height(viewport_size, tight_compact)
     var safe_gutter: float = 8.0 if compact else 16.0
+    # When the composed planning dock owns the shop cells it also owns the cell
+    # height, the grid spacing and the host spacing. This pass then keeps only
+    # the backplate safety clamp, so one pass owns each number.
+    if _grid.has_meta("composed_dock_cell_size"):
+        _grid.set_meta("safe_bottom_gutter", safe_gutter)
+        call_deferred("_clamp_shop_backplate")
+        return
     _grid.add_theme_constant_override("h_separation", 6 if tight_compact else 12 if compact else 16)
-    if _host_container is VBoxContainer:
-        (_host_container as VBoxContainer).add_theme_constant_override("separation", 6 if tight_compact else 10)
+    # The host band's own tier pass owns that band's separation: it is the only
+    # pass that knows the maximum-scale budget, where the band's 2px gap is what
+    # keeps the shop and its escape gutter inside a short framebuffer. This pass
+    # keeps the grid spacing and the cell heights, which are the shop's own.
     for child: Node in _grid.get_children():
         var card: Control = child as Control
         if card == null:
@@ -236,6 +250,10 @@ func _make_placeholder(sold: bool) -> Control:
     var compact: bool = _is_compact_viewport()
     var wrap: PanelContainer = PanelContainer.new()
     wrap.set_meta("opening_fight_placeholder", first_fight_placeholder)
+    # The first-fight slot is a shop cell like any other: it declares the same
+    # reflow gutter so the grid keeps one safety rule for every child, including
+    # while the composed dock owns the cell height.
+    wrap.set_meta("shop_safe_bottom_gutter", 8.0)
     wrap.custom_minimum_size = OPENING_PANEL_SIZE if first_fight_placeholder else (Vector2(120.0, 94.0) if compact else Vector2(144.0, 124.0))
     wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if first_fight_placeholder else Control.SIZE_SHRINK_CENTER
     wrap.size_flags_vertical = Control.SIZE_SHRINK_CENTER

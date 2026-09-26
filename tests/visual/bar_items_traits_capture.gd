@@ -1,5 +1,13 @@
 extends Node
 
+## The shelf actions carry an icon now, so this capture resolves them by identity before it
+## falls back to matching copy.
+const SHELF_ACTION_BUTTONS: Dictionary = {
+	"Reroll": "RerollButton",
+	"Lock": "LockButton",
+	"Buy XP": "BuyXpButton",
+}
+
 const MAIN_SCENE: PackedScene = preload("res://scenes/Main.tscn")
 const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition_wait.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/bar_items_traits_pass"
@@ -248,7 +256,12 @@ func _exercise_static_hover_targets() -> bool:
 	if not bool(_view.get_meta("compact_layout", false)):
 		required_button_texts.append_array(["Damage", "DPS", "Casts"])
 	for optional_text: String in ["Reroll", "Lock", "Buy XP", "Start Opening Fight"]:
-		var optional_button: Button = _find_button_by_text(_view, optional_text)
+		var optional_button: Button = null
+		var action_name: String = String(SHELF_ACTION_BUTTONS.get(optional_text, ""))
+		if action_name != "":
+			optional_button = _view.find_child(action_name, true, false) as Button
+		if optional_button == null:
+			optional_button = _find_button_by_text(_view, optional_text)
 		if optional_button != null:
 			targets.append(optional_button)
 	for text: String in required_button_texts:

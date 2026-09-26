@@ -25,10 +25,19 @@ compared on the same seed.
 
 ## The rules
 
-**1. Keep a reserve.** The live floor is two buckets, with a three-bucket retry
-floor in the early chapters. The minimum legal wager is one bucket, so ending a
-planning phase with exactly one bucket is a forced all-in and a loss there ends
-the run; two is the real floor even though the economy will let you spend to one.
+**0. Pick a starter that kills.** The opening fight is fought with the starter
+alone and the first shop only opens after it, so the opener has to end fights on
+its own. Every starter candidate carries its level-one damage per second, health
+and armor. Prefer a real damage dealer, or a frontline body with real attack. A
+pure absorb tank that deals almost no damage is the weakest opener even though its
+health bar looks best, and a support starter has no ally to amplify yet. Buy a
+second body before any XP: a lone unit cannot beat the stage-two swarm.
+
+**1. The reserve floor is about the shop, not the wager.** The live floor is two
+buckets. The minimum legal wager is one bucket, so spending down to one bucket in
+the shop turns the next fight into a forced all-in; that is what the floor stops.
+It does not cap the wager: the stake is the other half of the bankroll and is
+sized by rule 3.
 
 An earlier version of this rule also carried a 75-stake-unit planning target
 taken from the modelling sweep in `analysis/endless_economy/`. That sweep is a
@@ -40,12 +49,28 @@ buyout rate above 10% and an economically implausible pass rate below 30% are
 failure states. Selective buying scored about twice the buy-all policy on
 plausible offers.
 
-**3. Wager only when the odds beat the quote.** The payout quote is fixed by
-encounter kind (`CREEPS 1.5x`, `NORMAL`/`MIRROR` `2.0x`, `ELITE`/`EVENT` `2.5x`,
-`BOSS` `3.0x`), so the break-even win probability is `1 / multiplier`: 66.7% for
-creeps, 50% for normal and mirror fights, 40% for elite and event fights, and
-33.3% for bosses. At or below break-even, bet the minimum. Clearly above it, bet
-more, but never enough that a loss ends the run or empties the next shop.
+**3. All-in when you expect to win; minimum when you do not.** The payout quote is
+fixed by encounter kind (`CREEPS 1.5x`, `NORMAL`/`MIRROR` `2.0x`, `ELITE`/`EVENT`
+`2.5x`, `BOSS` `3.0x`), so the break-even win probability is `1 / multiplier`:
+66.7% for creeps, 50% for normal and mirror fights, 40% for elite and event
+fights, and 33.3% for bosses. At or below break-even the bet loses money: take
+**MINIMUM**.
+
+Above 50% shown odds the board is expected to win, so take **ALL_IN**. An all-in
+win at 2x returns the stake plus the stake again, which doubles the bankroll, and
+that doubling is the only path to a rich run: 3 → 6 → 12 → 36 → 58 has been
+observed on a single seed. Between break-even and 50% take **PRESS** (half the
+bankroll or the Kelly stake, `(shown odds x quote - 1) / (quote - 1)`).
+
+Do not buy in the shop with buckets that are about to be wagered while the odds
+are above 50%: a bucket on the board and a bucket on the wager are the same
+bucket, and the wager pays. When the odds are at or below 50% the board is the
+problem instead, so buy the bodies and the slots that raise the odds before
+sizing the bet.
+
+This replaced an earlier rule that told the model never to wager enough to empty
+the bankroll. A Jev run under that rule wagered the one-bucket minimum in every
+fight, peaked at 6 buckets, and could not clear the chapter-1 boss.
 
 **4. Build two fronts before damage.** Two frontline bodies first, then damage.
 One support at most. Power arrives in several shapes and none of them is always
@@ -86,8 +111,13 @@ a plan you do not own.
 
 **5. Buy level when it converts to capacity.** Level-ups raise board capacity, so
 XP is worth buying when it unlocks room for a benched body, when the board is full
-and the bench is not, or when the shop cannot improve the board and the reserve can
-afford it.
+and the shop cannot improve it, or when the level is the only buy left that adds
+power. The decision itself now carries `capacity_now`, `capacity_after` and
+`benched_bodies_that_gain_a_slot`: a purchase that turns a benched body into a
+fielded one is the highest-value buy in the shop, and passing it while holding a
+full bench is how a run stalls. Capacity is the ceiling on everything else - a
+board that never grows cannot combine, cannot field a third copy, and cannot stack
+a trait.
 
 **5a. Level your units — it is the biggest middle-game lever.** A level-2 copy is
 worth well more than a level-1 of the same identity, and three same-level copies

@@ -281,6 +281,9 @@ func _buy_xp_clicks(count: int, label: String) -> int:
 	return purchased
 
 func _button_with_text(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null or not is_instance_valid(_main):
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)

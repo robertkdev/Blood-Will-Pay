@@ -12,6 +12,9 @@ var _registry: EffectRegistry = null
 # Map[Unit -> Array[String]] of effect ids active for this unit this combat
 var _effects_by_unit: Dictionary = {}
 var _connected_engine: bool = false
+## True while an on-hit event is being dispatched, so bonus damage dealt by an
+## on-hit proc cannot re-enter the same dispatch and recurse.
+var _resolving_hit_event: bool = false
 
 func configure(_manager: CombatManager) -> void:
     manager = _manager
@@ -190,6 +193,20 @@ func _on_ability_cast(team: String, index: int, ability_id: String, target_team:
     _dispatch(u, "ability_cast", {"team": team, "index": index, "ability_id": ability_id, "target_team": target_team, "target_index": target_index, "target_point": target_point})
 
 func _on_hit_applied(team: String, si: int, ti: int, rolled: int, dealt: int, crit: bool, before_hp: int, after_hp: int, _pcd: float, _ecd: float) -> void:
+    # On-hit procs must not proc off each other's damage. Spellblade and Hyperstone
+    # both deal bonus damage from inside this event, and that damage runs back
+    # through the same hit pipeline and re-emits hit_dealt - Spellblade because it
+    # consumed its charge after dealing, Hyperstone because its at-cap bleed has no
+    # charge to consume at all. Both recursed until the interpreter stack overflowed,
+    # which is what killed deep runs and what stutters the frame once a large board
+    # has several on-hit items live at the same time.
+    if _resolving_hit_event:
+        return
+    _resolving_hit_event = true
+    _dispatch_hit_event(team, si, ti, rolled, dealt, crit, before_hp, after_hp)
+    _resolving_hit_event = false
+
+func _dispatch_hit_event(team: String, si: int, ti: int, rolled: int, dealt: int, crit: bool, before_hp: int, after_hp: int) -> void:
     var src: Unit = _unit_at(team, si)
     if src != null:
         _dispatch(src, "hit_dealt", {"team": team, "source_index": si, "target_index": ti, "rolled": rolled, "dealt": dealt, "crit": crit, "before_hp": before_hp, "after_hp": after_hp})

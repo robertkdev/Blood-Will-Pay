@@ -13,7 +13,23 @@ static func _ensure_loaded() -> void:
 	if _loaded:
 		return
 	_scan_dir("res://data/items")
+	_sort_indexes()
 	_loaded = true
+
+## Put every index in a stable order.
+##
+## Items were appended in directory-scan order, which the filesystem does not promise to
+## keep stable. The creep reward roll picks `by_type(...)[random index]`, so two runs of
+## one seed that rolled the same index could still receive different components - a wand
+## in one run and a veil in the other, on identical decisions. Sorting by id makes the
+## roll mean the same thing every time.
+static func _sort_indexes() -> void:
+	var by_id := func(left: ItemDef, right: ItemDef) -> bool:
+		return String(left.id) < String(right.id)
+	for type_key: Variant in _by_type.keys():
+		(_by_type[type_key] as Array).sort_custom(by_id)
+	for tag_key: Variant in _by_tag.keys():
+		(_by_tag[tag_key] as Array).sort_custom(by_id)
 
 static func reload() -> void:
 	_loaded = false

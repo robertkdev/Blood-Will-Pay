@@ -5,12 +5,19 @@ const ScoreboardModelLib := preload("res://scripts/ui/combat/stats/scoreboard_mo
 const ScoreboardRow := preload("res://scripts/ui/combat/stats/scoreboard_row.gd")
 const TooltipSvc := preload("res://scripts/ui/combat/stats/tooltip_service.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
-const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+
+## Physical ledger rhythm: the rail keeps roughly the same physical row height at
+## every UI scale, so 125/150 percent get denser logical rows instead of taller
+## ones that push the rail past its region.
+const ROW_PITCH_PHYSICAL: float = 44.0
+const ROW_PITCH_MIN_LOGICAL: float = 30.0
+const ROW_PITCH_MAX_LOGICAL: float = 48.0
 
 @onready var expand_button: Button = $"Header/ExpandButton"
-@onready var body_box: HBoxContainer = $"Body"
-@onready var player_col: VBoxContainer = $"Body/PlayerColumn"
-@onready var enemy_col: VBoxContainer = $"Body/EnemyColumn" # kept for non-overlay mode (currently unused)
+@onready var body_box: HBoxContainer = $"BodyScroll/Body"
+@onready var player_col: VBoxContainer = $"BodyScroll/Body/PlayerColumn"
+@onready var enemy_col: VBoxContainer = $"BodyScroll/Body/EnemyColumn" # kept for non-overlay mode (currently unused)
 @onready var title_label: Label = $"Header/Title"
 
 # Floating overlay to show enemy column without reflowing the main layout
@@ -42,6 +49,9 @@ func _ready() -> void:
 	if enemy_col:
 		enemy_col.visible = false
 	_sync_responsive_header()
+	_enforce_rail_containment()
+	if not is_connected("resized", Callable(self, "_enforce_rail_containment")):
+		resized.connect(_enforce_rail_containment)
 
 func _exit_tree() -> void:
 	teardown()
@@ -122,6 +132,7 @@ func _process(delta: float) -> void:
 func _rebuild_now() -> void:
 	if tracker == null:
 		return
+	_enforce_rail_containment()
 	var data: Dictionary = model.build(metric, window, norm_mode)
 	_apply_rows(player_col, data.get("player_rows", []), float(data.get("player_total", 0.0)))
 	if not enemy_rows_enabled:
@@ -230,29 +241,27 @@ func _layout_overlay() -> void:
 	var row_count: int = 0
 	if overlay_enemy_col != null:
 		row_count = overlay_enemy_col.get_child_count()
-	var target_height: float = clampf(18.0 + float(row_count) * 62.0, 96.0, area_rect.size.y)
+	var target_height: float = clampf(18.0 + float(row_count) * 48.0, 96.0, area_rect.size.y)
 	overlay.position = Vector2(area_rect.position.x - w, area_rect.position.y)
 	overlay.size = Vector2(w, target_height)
 
 func _make_overlay_style() -> StyleBox:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.018, 0.015, 0.022, 0.96)
-	style.border_color = Color(0.42, 0.050, 0.070, 0.88)
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.shadow_size = 10
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.48)
-	style.content_margin_left = 8
-	style.content_margin_top = 8
-	style.content_margin_right = 8
-	style.content_margin_bottom = 8
-	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.stats_panel_style(), style)
+	# The enemy ledger is a large outer plate, so it takes the shared gameplay
+	# panel material (quiet recessed iron when the approved surface is absent).
+	# The enemy ledger keeps its own crimson edge inside the same material
+	# family, so enemy records stay distinguishable without a second skin.
+	var fallback: StyleBoxFlat = GothicUIAssets.quiet_iron_panel_style(
+		GothicUIAssets.COLOR_GAMEPLAY_RECESS_DEEP,
+		GothicUIAssets.COLOR_GAMEPLAY_CRIMSON,
+		true,
+	)
+	fallback.shadow_size = 10
+	fallback.shadow_color = Color(0.0, 0.0, 0.0, 0.48)
+	fallback.content_margin_left = 8.0
+	fallback.content_margin_top = 8.0
+	fallback.content_margin_right = 8.0
+	fallback.content_margin_bottom = 8.0
+	return GothicUIAssets.gameplay_panel_style(fallback)
 
 func _sync_expand_button() -> void:
 	if expand_button == null:
@@ -294,7 +303,9 @@ func _sync_responsive_header() -> void:
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title_label.add_theme_font_size_override("font_size", 10 if tight_header else 12)
-	title_label.text = "%s // %s" % [_metric_header_label(), _window_header_label()]
+	# A quiet separator reads as a metric identity; the old "//" scanned as
+	# technical identifier truncation.
+	title_label.text = "%s \u00b7 %s" % [_metric_header_label(), _window_header_label()]
 	title_label.tooltip_text = "Current metric: %s, window: %s" % [metric.capitalize(), window]
 	title_label.set_meta("compact_metric_identity", true)
 	header.set_meta("compact_navigation_visible", true)
@@ -305,6 +316,94 @@ func _uses_compact_header() -> bool:
 	if resolved_width <= 0.0:
 		resolved_width = custom_minimum_size.x
 	return resolved_width > 0.0 and resolved_width <= 310.0
+
+## A dense rail is one whose settled width cannot hold the desktop rhythm.
+func _rail_dense() -> bool:
+	return size.x > 0.0 and size.x < 200.0
+
+## The rail's interior owns its containment. Whatever width the composition
+## hands this rail, the ledger scrolls inside it instead of forcing the rail (or
+## the stats panel) wider or taller than its region. This is re-asserted because
+## the theme and the combat view both style rail nodes after this instance is
+## created, and because rows are rebuilt while the rail is already laid out.
+func _enforce_rail_containment() -> void:
+	var dense: bool = _rail_dense()
+	# The rail's width and height are the composition's and the panel's to set;
+	# this node fills what it is given and clips what does not fit.
+	custom_minimum_size = Vector2(0.0, 0.0)
+	clip_contents = true
+	var header: Control = get_node_or_null("Header") as Control
+	if header != null:
+		header.clip_contents = true
+		header.custom_minimum_size = Vector2(0.0, 22.0 if dense else 26.0)
+		header.add_theme_constant_override("separation", 4 if dense else 8)
+	if expand_button != null:
+		expand_button.custom_minimum_size = Vector2(40.0 if dense else 46.0, 22.0 if dense else 24.0)
+		expand_button.clip_text = true
+		expand_button.add_theme_font_size_override("font_size", 10 if dense else 12)
+	if title_label != null:
+		title_label.clip_text = true
+		title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		title_label.custom_minimum_size = Vector2(0.0, 0.0)
+		if _uses_compact_header():
+			title_label.add_theme_font_size_override("font_size", 10 if dense else 12)
+	var scroll: ScrollContainer = get_node_or_null("BodyScroll") as ScrollContainer
+	if scroll != null:
+		scroll.clip_contents = true
+		scroll.custom_minimum_size = Vector2(0.0, 0.0)
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if body_box != null:
+		body_box.custom_minimum_size = Vector2(0.0, 0.0)
+		body_box.add_theme_constant_override("separation", 6 if dense else 16)
+	var columns: Array[VBoxContainer] = [player_col, enemy_col, overlay_enemy_col]
+	for column: VBoxContainer in columns:
+		if column == null:
+			continue
+		column.custom_minimum_size = Vector2(0.0, 0.0)
+		column.alignment = BoxContainer.ALIGNMENT_BEGIN
+		column.add_theme_constant_override("separation", 3 if dense else 4)
+	for row_node: Node in find_children("*", "ScoreboardRow", true, false):
+		var row: ScoreboardRow = row_node as ScoreboardRow
+		if row == null:
+			continue
+		row.custom_minimum_size.x = 0.0
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		row.ensure_quiet_chrome()
+	_sync_row_pitch(scroll)
+
+## One physical row rhythm for every UI scale, capped so the rail's own height
+## still wins when the ledger has more rows than it can show: the rest scroll.
+func _sync_row_pitch(scroll: ScrollContainer) -> void:
+	if player_col == null:
+		return
+	var rows: Array[ScoreboardRow] = []
+	for child: Node in player_col.get_children():
+		var row: ScoreboardRow = child as ScoreboardRow
+		if row != null:
+			rows.append(row)
+	if rows.is_empty():
+		return
+	var ui_scale: float = maxf(1.0, UserSettingsScript.get_ui_scale())
+	var pitch: float = clampf(ROW_PITCH_PHYSICAL / ui_scale, ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
+	if scroll != null and scroll.size.y > 1.0:
+		pitch = clampf(minf(pitch, scroll.size.y / float(rows.size())), ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
+	# One shared numeric column, so the value rules line up down the ledger
+	# instead of stepping with each row's own readout.
+	var widest_column: float = 0.0
+	for row: ScoreboardRow in rows:
+		widest_column = maxf(widest_column, row.requested_value_column_width())
+	for row: ScoreboardRow in rows:
+		row.set_row_pitch(pitch)
+		if widest_column > 0.0:
+			row.set_value_column_width(widest_column)
+	if float(get_meta("row_pitch", -1.0)) != pitch:
+		set_meta("row_pitch", pitch)
+	if float(get_meta("value_column_width", -1.0)) != widest_column:
+		set_meta("value_column_width", widest_column)
 
 func _metric_header_label() -> String:
 	match metric.to_lower():

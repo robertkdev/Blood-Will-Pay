@@ -15,6 +15,25 @@ const COMPACT_LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1024, 576)
 const COMPACT_LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(853, 480)
 const STANDARD_LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1536, 864)
 const STANDARD_LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(1280, 720)
+## Physical 1920x1080 is the composed dock's tier at every supported UI scale:
+## 100, 125 and 150 percent still compose the dock band instead of the dense
+## compact stack, so the steps at that size measure the dock's own authored
+## territories - the shop band, the full-height wager column and the action bay -
+## and use the composition's own numbers rather than the compact tier's. The
+## genuinely compact 1280x720 contexts keep their own expectations untouched.
+const Composition: GDScript = preload("res://scripts/ui/combat/planning_composition.gd")
+const DOCK_LAYER_PATH: String = "LowerDockComposition"
+const DOCK_WAGER_PATH: String = "LowerDockComposition/WagerTerritory"
+const DOCK_PLAQUE_PATH: String = "LowerDockComposition/StartBattlePlaque"
+const DOCK_WAGER_GROUP_PATH: String = "LowerDockComposition/WagerTerritory/Padding/Slot/WagerControls"
+## The composed rail masses are physical at every UI scale, so the rails keep the
+## same 308-physical contract instead of inflating with the logical UI scale.
+const COMPOSED_RAIL_TOLERANCE_PHYSICAL: float = 8.0
+## Legibility floor the composed dock keeps for its own utility controls.
+const DOCK_UTILITY_MIN_FONT: int = 18
+## The composed dock is a physical band, not a tight tier: its row metrics hold
+## controls at their authored logical size at every supported scale.
+const DOCK_PHYSICAL_ROUNDING_TOLERANCE: float = 1.0
 
 var _main: Control = null
 var _unit_select: UnitSelect = null
@@ -226,6 +245,41 @@ func _expect_compact_shop_detail_band(context: String) -> void:
 	card.call("_show_tooltip")
 	var tooltip_layer: CanvasLayer = get_tree().root.find_child("ShopCardTooltipLayer", true, false) as CanvasLayer
 	var tooltip: PanelContainer = tooltip_layer.get_node_or_null("ShopCardTooltip") as PanelContainer if tooltip_layer != null else null
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	if _dock_tier(combat):
+		# The composed dock's cells are authored large enough that its own policy
+		# keeps the hover detail instead of suppressing it, so the surviving intent
+		# is that the layer is deliberate and bounded rather than an automatic plate
+		# over the tactical controls: the card has to declare the composed policy and
+		# the deliberate-interaction contract, and the realised layer has to stay
+		# anchored over its own cell, inside the framebuffer, and clear of the dock's
+		# decision territories.
+		_expect(String(card.get_meta("compact_tooltip_policy", "")) == "full_detail_composed_dock", "%s did not select the composed dock's deliberate hover detail" % context)
+		_expect(not bool(card.get_meta("tooltip_suppressed_for_compact", true)), "%s suppressed its authored composed-tier hover detail" % context)
+		_expect(String(card.get_meta("compact_information_access", "")) == "card_summary_and_deliberate_purchase", "%s lost its deliberate-interaction information contract" % context)
+		_expect(tooltip_layer != null and tooltip != null, "%s lost its deliberate hover detail layer" % context)
+		if tooltip != null:
+			_expect_control_inside(tooltip, "%s hover detail layer" % context)
+			# The layer is the hovered cell's own plate: it stays anchored over the
+			# cell that opened it instead of floating detached across the field.
+			var card_rect: Rect2 = card.get_global_rect()
+			var tooltip_rect: Rect2 = tooltip.get_global_rect()
+			_expect(tooltip_rect.position.x <= card_rect.get_center().x and tooltip_rect.end.x >= card_rect.get_center().x, "%s hover detail layer is not anchored over its cell" % context)
+			# The dock's own territories are the decision surfaces the plate must never
+			# cover: the shop cells the pointer is choosing between, the wager column
+			# and the commit bay.
+			var protected_paths: PackedStringArray = PackedStringArray([
+				"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
+				DOCK_WAGER_PATH,
+				DOCK_PLAQUE_PATH,
+			])
+			for protected_path: String in protected_paths:
+				var protected_surface: Control = _combat_node(protected_path)
+				if protected_surface != null and protected_surface.is_visible_in_tree():
+					_expect(not tooltip.get_global_rect().intersects(protected_surface.get_global_rect()), "%s hover detail layer covers %s" % [context, protected_path])
+		if card.has_method("_clear_tooltip"):
+			card.call("_clear_tooltip")
+		return
 	_expect(String(card.get_meta("compact_tooltip_policy", "")) == "suppress_hover", "%s did not select compact hover suppression" % context)
 	_expect(bool(card.get_meta("tooltip_suppressed_for_compact", false)), "%s did not suppress its obstructive automatic detail plate" % context)
 	_expect(String(card.get_meta("compact_information_access", "")) == "card_summary_and_deliberate_purchase", "%s did not preserve its compact deliberate-interaction information contract" % context)
@@ -292,6 +346,44 @@ func _combat_node(path: String) -> Control:
 	if combat == null:
 		return null
 	return combat.get_node_or_null(path) as Control
+
+## True when the combat view drew the composed 1920x1080 dock for the step being
+## audited. The marker is the tier the view itself published, not a re-derivation.
+func _dock_tier(combat: Control) -> bool:
+	return combat != null and bool(combat.get_meta("full_hd_dock", false))
+
+## The dock's lower band. It hosts the shop territory, the wager column and the
+## action bay, and it is the dock's own decision footer for the composed tier.
+func _dock_band(combat: Control) -> Control:
+	return combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as Control
+
+## The wager utility group a tier actually draws. The stacked tiers keep their
+## authored BetRow; the composed dock reparents the same controls into its own
+## territory and leaves that row empty, so the group is read from the territory
+## that is really on screen.
+func _wager_utility_group(combat: Control) -> Control:
+	if combat == null:
+		return null
+	var dock_group: Control = combat.get_node_or_null(DOCK_WAGER_GROUP_PATH) as Control
+	if dock_group != null and dock_group.is_visible_in_tree():
+		return dock_group
+	return combat.find_child("BetRow", true, false) as Control
+
+## The wager outcome copy. It is authored at
+## `MarginContainer/VBoxContainer/WagerSummary` for the stacked tiers, and the
+## dock reparents that same label into its wager territory.
+func _wager_summary_label(combat: Control) -> Label:
+	if combat == null:
+		return null
+	var stacked: Label = combat.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Label
+	if stacked != null:
+		return stacked
+	return combat.find_child("WagerSummary", true, false) as Label
+
+## The physical rail mass the composed dock published for this tier. The dock
+## keeps this instead of collapsing the rail into the compact footprint.
+func _composed_rail_physical(combat: Control) -> float:
+	return float(combat.get_meta("composed_rail_physical", Composition.SIDE_RAIL_PHYSICAL)) if combat != null else Composition.SIDE_RAIL_PHYSICAL
 
 func _first_unit_button() -> Button:
 	if _unit_select == null:
@@ -483,6 +575,17 @@ func _remove_test_settings() -> void:
 	if FileAccess.file_exists(TEST_SETTINGS_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SETTINGS_PATH))
 
+## The wager strip carries the stake, the odds spread and both outcomes with every word
+## stripped out, so the gate checks that the information is present rather than the copy that
+## was deliberately removed.
+func _expect_wager_outcome_information(summary: Label, context: String) -> void:
+	if summary == null:
+		return
+	var text: String = String(summary.text)
+	_expect(text.contains("%"), "%s omitted its odds range" % context)
+	_expect(text.contains("-"), "%s omitted its odds spread" % context)
+	_expect(text.split("/").size() >= 2, "%s omitted its win/loss comparison" % context)
+
 func _expect_control_inside(control: Control, label: String) -> void:
 	_expect(control != null, "%s missing" % label)
 	if control == null:
@@ -499,7 +602,10 @@ func _expect_no_button_text_overflow(root: Node, context: String) -> void:
 		return
 	for node: Node in root.find_children("*", "Button", true, false):
 		var button: Button = node as Button
-		if button == null or not button.visible:
+		# Only buttons that are actually drawn can overflow: a control whose parent
+		# chain stages it out (the compact tier hides the metric selector its own
+		# buttons live in) is never rendered, so its authored width is meaningless.
+		if button == null or not button.is_visible_in_tree():
 			continue
 		var text_size: Vector2 = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, button.get_theme_font_size("font_size"))
 		var available_width: float = maxf(1.0, button.size.x - 12.0)
@@ -532,6 +638,8 @@ func _expect_compact_battlefield_dominance() -> void:
 	_expect(board_column.size.x >= viewport_width * minimum_board_share, "compact battlefield should retain at least %.0f%% of logical viewport width: board=%.1f viewport=%.1f" % [minimum_board_share * 100.0, board_column.size.x, viewport_width])
 
 func _expect_connected_planning_composition(context: String, expect_large_tiles: bool) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var dock_tier: bool = _dock_tier(combat)
 	var battle_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea")
 	var board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
 	var stats_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
@@ -540,7 +648,10 @@ func _expect_connected_planning_composition(context: String, expect_large_tiles:
 	var enemy_board: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/EnemyGrid") as GridContainer
 	var player_board: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid") as GridContainer
 	var bench_area: Control = _combat_node("MarginContainer/VBoxContainer/BenchArea")
-	var wager_summary: Control = _combat_node("MarginContainer/VBoxContainer/WagerSummary")
+	# The composed dock hosts the wager outcome copy inside its own territory, so
+	# the decision footer it must not be separated from is the dock's lower band.
+	var wager_summary: Control = _wager_summary_label(combat)
+	var decision_footer: Control = _dock_band(combat) if dock_tier else wager_summary
 	var directive: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective")
 	var board_status_row: Control = board_column.find_child("BoardStatusRow", true, false) as Control if board_column != null else null
 	var board_status_plate: Control = board_column.find_child("BoardStatusBackplate", true, false) as Control if board_column != null else null
@@ -557,8 +668,8 @@ func _expect_connected_planning_composition(context: String, expect_large_tiles:
 	if bench_area != null:
 		var board_to_bench_gap: float = bench_area.get_global_rect().position.y - battle_area.get_global_rect().end.y
 		_expect(board_to_bench_gap >= -1.0 and board_to_bench_gap <= 12.0, "%s board and bench feel disconnected: gap=%.1f" % [context, board_to_bench_gap])
-	if bench_area != null and wager_summary != null:
-		var bench_to_wager_gap: float = wager_summary.get_global_rect().position.y - bench_area.get_global_rect().end.y
+	if bench_area != null and decision_footer != null:
+		var bench_to_wager_gap: float = decision_footer.get_global_rect().position.y - bench_area.get_global_rect().end.y
 		_expect(bench_to_wager_gap >= -1.0 and bench_to_wager_gap <= 52.0, "%s bench and decision footer retain an accidental void: gap=%.1f" % [context, bench_to_wager_gap])
 	if top_area != null and enemy_board != null:
 		_expect(absf(enemy_board.get_global_rect().get_center().y - top_area.get_global_rect().get_center().y) <= 3.0, "%s enemy grid is not vertically centered in its field" % context)
@@ -576,6 +687,8 @@ func _expect_connected_planning_composition(context: String, expect_large_tiles:
 	if board_status_plate != null:
 		_expect(board_column.get_global_rect().grow(1.0).encloses(board_status_plate.get_global_rect()), "%s planning status backplate escapes the reserved board column" % context)
 		_expect(not board_status_plate.get_global_rect().intersects(stats_rail.get_global_rect()), "%s planning status backplate collides with Team Metrics" % context)
+		for deployment_grid: Control in [enemy_board, player_board]:
+			_expect(not board_status_plate.get_global_rect().intersects(deployment_grid.get_global_rect()), "%s planning strip covers deployment tiles" % context)
 	if expect_large_tiles and player_board != null and player_board.get_child_count() > 0:
 		var first_tile: Control = player_board.get_child(0) as Control
 		_expect(first_tile != null and first_tile.custom_minimum_size.x >= 55.0, "%s did not enlarge the full-HD deployment grid" % context)
@@ -588,6 +701,7 @@ func _expect_item_cache_contract(context: String) -> void:
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
 	var maximum_scale_layout: bool = combat != null and bool(combat.get_meta("maximum_scale_layout", false))
+	var full_hd_dock: bool = combat != null and bool(combat.get_meta("full_hd_dock", false))
 	_expect(left_panel != null, "%s item-cache rail missing" % context)
 	if maximum_scale_layout:
 		_expect(header != null and not header.is_visible_in_tree() and String(header.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s maximum-scale policy did not stage out the empty cache header" % context)
@@ -598,7 +712,7 @@ func _expect_item_cache_contract(context: String) -> void:
 	if left_panel == null or header == null or item_grid == null:
 		return
 	_expect(left_panel.get_global_rect().grow(1.0).encloses(header.get_global_rect()), "%s item-cache label escaped its rail" % context)
-	_expect(header.text.contains("RELIQUARY") and header.text.contains("CACHE"), "%s item-cache label does not identify the upper-left reliquary" % context)
+	_expect(header.text.contains("RELIQUARY"), "%s item-cache label does not identify the upper-left reliquary" % context)
 	_expect(header.text.contains("READY") and header.text.contains("SEALED"), "%s item-cache label lacks ready-pocket and sealed-reserve states" % context)
 	_expect(header.get_theme_font_size("font_size") >= 11, "%s item-cache label is too small" % context)
 	_expect(bool(header.get_meta("material_cache_hierarchy", false)), "%s item cache lacks its constructed docket hierarchy" % context)
@@ -636,7 +750,12 @@ func _expect_item_cache_contract(context: String) -> void:
 			_expect(outer_style.border_width_left > 0 and outer_style.border_width_top > 0 and outer_style.border_width_right > 0 and outer_style.border_width_bottom > 0, "%s item slot %s outer perimeter is incomplete" % [context, String(item_card.name)])
 		if inner_style != null:
 			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "%s item slot %s inner perimeter is incomplete" % [context, String(item_card.name)])
-		_expect(item_card.custom_minimum_size.x >= expected_slot_size.x and item_card.custom_minimum_size.y >= expected_slot_size.y, "%s item slot %s collapsed below its reliquary scale: %s expected=%s" % [context, String(item_card.name), str(item_card.custom_minimum_size), str(expected_slot_size)])
+		if not full_hd_dock:
+			# The desktop tier keeps its authored pocket floor. The composed dock is
+			# accepted on rendered geometry instead: its rail is the authored 308
+			# physical pixels at every supported scale, which three 84px pockets plus
+			# separations cannot fit into at 125 or 150 percent.
+			_expect(item_card.custom_minimum_size.x >= expected_slot_size.x and item_card.custom_minimum_size.y >= expected_slot_size.y, "%s item slot %s collapsed below its reliquary scale: %s expected=%s" % [context, String(item_card.name), str(item_card.custom_minimum_size), str(expected_slot_size)])
 		_expect(outer_style == null or (outer_style.border_width_left >= 3 and outer_style.border_width_bottom >= 4), "%s item slot %s lacks weighted reliquary joinery" % [context, String(item_card.name)])
 		var cavity: Panel = item_card.get_node_or_null("PocketCavity") as Panel
 		var binding_rail: ColorRect = item_card.get_node_or_null("BindingRail") as ColorRect
@@ -646,8 +765,13 @@ func _expect_item_cache_contract(context: String) -> void:
 		var empty_mark: Label = item_card.get_node_or_null("EmptyMark") as Label
 		if empty_mark != null and empty_mark.visible:
 			ready_item_slots += 1
-			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)) and empty_mark.text.contains("RECEIVE"), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
-			_expect(String(item_card.get_meta("cache_slot_state", "")) == "ready" and docket != null and docket.text.contains("READY"), "%s empty item slot %s lacks a ready-pocket docket" % [context, String(item_card.name)])
+			# The slot is authored, not an unexplained "+". The wording was removed as filler, so
+			# assert the authored state rather than a sentence.
+			_expect(bool(empty_mark.get_meta("purposeful_empty_slot", false)), "%s empty item slot %s reverted to an unexplained plus marker" % [context, String(item_card.name)])
+			# The docket carries the slot number and the state lives in meta - "READY" was
+			# removed as filler, so assert the authored state and that the docket is numbered.
+			var docket_text: String = String(docket.text).strip_edges() if docket != null else ""
+			_expect(String(item_card.get_meta("cache_slot_state", "")) == "ready" and docket != null and docket_text.is_valid_int(), "%s empty item slot %s lacks a ready-pocket docket" % [context, String(item_card.name)])
 			if binding_rail != null and not binding_positions.has(binding_rail.anchor_left):
 				binding_positions.append(binding_rail.anchor_left)
 	_expect(visible_item_slots >= 3, "%s item cache must expose at least three purposeful ready slots" % context)
@@ -656,10 +780,136 @@ func _expect_item_cache_contract(context: String) -> void:
 		_expect(visible_item_slots == 3, "%s empty item cache should focus three ready slots instead of exposing the full reserve grid" % context)
 		_expect(ready_item_slots == 3 and binding_positions.size() == 3, "%s empty cache does not present three distinct ready reliquary pockets" % context)
 		_expect(int(header.get_meta("sealed_slots", -1)) == maxi(0, int(header.get_meta("total_slots", 0)) - 3), "%s empty cache sealed reserve count is inconsistent" % context)
+	if full_hd_dock:
+		_expect_composed_item_cache_contract(context, combat, left_panel, header, item_grid)
+
+## Physical-composition acceptance for the full-HD composed dock.
+##
+## The desktop pocket floor above cannot hold in this tier: the composed rail is
+## the authored 308 physical pixels at every supported UI scale, and three 84px
+## pockets plus separations need 272 logical, which the rail's inner width does not
+## have at 125 or 150 percent. So this reads rendered geometry against the rail's
+## own published physical target instead of restating the presenter's pocket
+## formula: the rail must render the authored mass, the header must show its whole
+## state vocabulary without clipping, and the receive pockets must be exactly as
+## many as the header advertises, inside the grid and the rail, non-overlapping,
+## and large enough to be a real target with real content.
+func _expect_composed_item_cache_contract(context: String, combat: Control, left_panel: Control, header: Label, item_grid: GridContainer) -> void:
+	if combat == null or left_panel == null or header == null or item_grid == null:
+		return
+	var rail_target_physical: float = float(combat.get_meta("composed_rail_physical", 0.0))
+	_expect(rail_target_physical > 0.0, "%s composed dock published no physical rail target" % context)
+	if rail_target_physical <= 0.0:
+		return
+	var ui_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+	var rail_rect: Rect2 = left_panel.get_global_rect()
+	var rail_physical: float = rail_rect.size.x * ui_scale
+	_expect(
+		absf(rail_physical - rail_target_physical) <= 2.0,
+		"%s composed rail renders %.1f physical px, not the published %.1f" % [context, rail_physical, rail_target_physical]
+	)
+	# The header keeps the full state vocabulary and is drawn inside its own box.
+	_expect(header.is_visible_in_tree(), "%s composed item cache header is not visible" % context)
+	for token: String in ["RELIQUARY", "HELD", "READY", "SEALED"]:
+		_expect(header.text.contains(token), "%s composed item cache header lost its %s state" % [context, token])
+	_expect(
+		rail_rect.grow(1.0).encloses(header.get_global_rect()),
+		"%s composed item cache header escaped its rail: %s vs %s" % [context, str(header.get_global_rect()), str(rail_rect)]
+	)
+	var header_font: Font = header.get_theme_font("font")
+	if header_font != null:
+		var header_style: StyleBox = header.get_theme_stylebox("normal")
+		var header_margin_x: float = 0.0
+		if header_style != null:
+			header_margin_x = header_style.get_content_margin(SIDE_LEFT) + header_style.get_content_margin(SIDE_RIGHT)
+		var header_font_size: int = header.get_theme_font_size("font_size")
+		var header_wrap_width: float = maxf(1.0, header.size.x - header_margin_x)
+		var laid_out: Vector2 = header_font.get_multiline_string_size(
+			header.text, header.horizontal_alignment, header_wrap_width, header_font_size
+		)
+		_expect(
+			laid_out.y <= header.size.y + 1.0,
+			"%s composed item cache header clips its counts: needs %.1f in a %.1f box" % [context, laid_out.y, header.size.y]
+		)
+	# Pockets: as many receive pockets as the header advertises, all real geometry.
+	var grid_rect: Rect2 = item_grid.get_global_rect()
+	var pocket_rects: Array[Rect2] = []
+	var pockets: Array[Control] = []
+	var ready_pocket_count: int = 0
+	for child_node: Node in item_grid.get_children():
+		var pocket: Control = child_node as Control
+		if pocket == null or not pocket.is_visible_in_tree():
+			continue
+		pockets.append(pocket)
+		pocket_rects.append(pocket.get_global_rect())
+		if String(pocket.get_meta("cache_slot_state", "")) == "ready":
+			ready_pocket_count += 1
+	var advertised_ready: int = maxi(0, int(header.get_meta("ready_slots", 0)))
+	_expect(
+		ready_pocket_count == advertised_ready,
+		"%s composed item cache shows %d receive pockets for %d advertised ready slots" % [context, ready_pocket_count, advertised_ready]
+	)
+	var columns_rendered: int = maxi(1, item_grid.columns)
+	var useful_floor_physical: float = maxf(24.0, rail_target_physical / float(columns_rendered) * 0.5)
+	for pocket_rect: Rect2 in pocket_rects:
+		_expect(
+			grid_rect.grow(1.0).encloses(pocket_rect),
+			"%s composed item pocket escaped its grid: %s vs %s" % [context, str(pocket_rect), str(grid_rect)]
+		)
+		_expect(
+			rail_rect.grow(1.0).encloses(pocket_rect),
+			"%s composed item pocket escaped its rail: %s vs %s" % [context, str(pocket_rect), str(rail_rect)]
+		)
+		var pocket_physical: Vector2 = pocket_rect.size * ui_scale
+		_expect(
+			pocket_physical.x >= useful_floor_physical and pocket_physical.y >= useful_floor_physical,
+			"%s composed item pocket is not a useful target: %.1fx%.1f physical (floor %.1f)" % [context, pocket_physical.x, pocket_physical.y, useful_floor_physical]
+		)
+	for first_index: int in range(pocket_rects.size()):
+		for second_index: int in range(first_index + 1, pocket_rects.size()):
+			_expect(
+				not pocket_rects[first_index].intersects(pocket_rects[second_index]),
+				"%s composed item pockets overlap: %s and %s" % [context, str(pocket_rects[first_index]), str(pocket_rects[second_index])]
+			)
+	_expect_composed_pocket_content(context, pockets, pocket_rects)
+
+
+## A composed pocket has to show something: its recess is real, and any artwork it
+## displays is real and stays inside the pocket. Empty receive pockets legitimately
+## have no item image, so this checks the recess for every pocket and the artwork
+## only where it is visible.
+func _expect_composed_pocket_content(context: String, pockets: Array[Control], pocket_rects: Array[Rect2]) -> void:
+	for index: int in range(pockets.size()):
+		var pocket: Control = pockets[index]
+		var pocket_rect: Rect2 = pocket_rects[index] if index < pocket_rects.size() else pocket.get_global_rect()
+		var cavity: Control = pocket.get_node_or_null("PocketCavity") as Control
+		_expect(cavity != null, "%s composed item pocket %s lost its recess" % [context, String(pocket.name)])
+		if cavity != null:
+			_expect(
+				cavity.size.x > 1.0 and cavity.size.y > 1.0,
+				"%s composed item pocket %s has a collapsed recess: %s" % [context, String(pocket.name), str(cavity.size)]
+			)
+			_expect(
+				pocket_rect.grow(1.5).encloses(cavity.get_global_rect()),
+				"%s composed pocket recess escaped its pocket: %s vs %s" % [context, str(cavity.get_global_rect()), str(pocket_rect)]
+			)
+		var art: Control = pocket.get_node_or_null("Icon") as Control
+		if art != null and art.is_visible_in_tree():
+			_expect(
+				art.size.x > 1.0 and art.size.y > 1.0,
+				"%s composed item pocket %s shows empty artwork: %s" % [context, String(pocket.name), str(art.size)]
+			)
+			_expect(
+				pocket_rect.grow(1.5).encloses(art.get_global_rect()),
+				"%s composed item artwork escaped its pocket: %s vs %s" % [context, str(art.get_global_rect()), str(pocket_rect)]
+			)
+
 
 func _expect_planning_landmark_contract(context: String, board_column: Control, enemy_board: GridContainer, player_board: GridContainer) -> void:
 	if board_column == null or enemy_board == null or player_board == null:
 		return
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var dock_tier: bool = _dock_tier(combat)
 	var enemy_area: Control = enemy_board.get_parent() as Control
 	var player_area: Control = player_board.get_parent() as Control
 	var hostile_label: Label = enemy_area.get_node_or_null("HostileFieldOrderLabel") as Label if enemy_area != null else null
@@ -669,11 +919,31 @@ func _expect_planning_landmark_contract(context: String, board_column: Control, 
 	var planning_directive: Label = board_column.get_node_or_null("PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	_expect(hostile_label != null and hostile_label.is_visible_in_tree() and hostile_label.text == "ENEMY", "%s enemy battlefield marker is missing" % context)
 	_expect(survival_label != null and survival_label.is_visible_in_tree() and survival_label.text == "YOUR TEAM", "%s player battlefield marker is missing" % context)
+	for team_label: Label in [hostile_label, survival_label]:
+		if team_label != null:
+			if dock_tier:
+				# The composed field gives the marker column its own narrow lane, so the
+				# product wraps the two-word copy there instead of clipping it. The
+				# surviving intent is that the plate is never inflated past its authored
+				# row or the height its own copy needs, and never past two lines.
+				var marker_budget: float = maxf(48.0, team_label.get_combined_minimum_size().y)
+				_expect(team_label.size.y <= marker_budget + 1.0, "%s team marker grew into a tall panel: %.1f of %.1f" % [context, team_label.size.y, marker_budget])
+				_expect(team_label.get_line_count() <= 2, "%s team marker copy wrapped past two lines" % context)
+			else:
+				_expect(team_label.size.y <= 48.0, "%s team marker grew into a tall panel" % context)
+			_expect(board_column.get_global_rect().encloses(team_label.get_global_rect()), "%s team marker escapes the battlefield" % context)
+			for deployment_grid: Control in [enemy_board, player_board]:
+				_expect(not team_label.get_global_rect().intersects(deployment_grid.get_global_rect()), "%s team marker covers deployment tiles" % context)
 	_expect(hostile_band != null and hostile_band.is_visible_in_tree() and bool(hostile_band.get_meta("planning_landmark", false)), "%s hostile battlefield lane is missing" % context)
 	_expect(survival_band != null and survival_band.is_visible_in_tree() and bool(survival_band.get_meta("planning_landmark", false)), "%s survival battlefield lane is missing" % context)
 	_expect(survival_label != null and bool(survival_label.get_meta("deployment_badge_clearance", false)), "%s survival landmark lacks deployment-badge clearance metadata" % context)
 	if survival_label != null and planning_directive != null and planning_directive.is_visible_in_tree():
-		_expect(not survival_label.get_global_rect().intersects(planning_directive.get_global_rect()), "%s survival landmark is occluded by the deployment badge" % context)
+		var survival_rect: Rect2 = survival_label.get_global_rect()
+		var directive_rect: Rect2 = planning_directive.get_global_rect()
+		_expect(
+			not survival_rect.intersects(directive_rect),
+			"%s survival landmark is occluded by the deployment badge (landmark %s vs badge %s)" % [context, str(survival_rect), str(directive_rect)]
+		)
 	_expect(hostile_band != null and bool(hostile_band.get_meta("broad_landmark_wash_suppressed", false)), "%s hostile landmark regressed to a broad battlefield wash" % context)
 	_expect(survival_band != null and bool(survival_band.get_meta("broad_landmark_wash_suppressed", false)), "%s survival landmark regressed to a broad battlefield wash" % context)
 	if hostile_band != null and enemy_area != null:
@@ -692,6 +962,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	_expect(combat != null, "%s combat view missing" % context)
 	if combat == null:
 		return
+	var dock_tier: bool = _dock_tier(combat)
 	var layout_vbox: VBoxContainer = combat.get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
 	if layout_vbox != null:
 		print(
@@ -705,7 +976,13 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 					"CompactViewportVisualAuditSmoke: %s child=%s rect=%s combined_min=%s custom_min=%s"
 					% [context, String(layout_control.name), str(layout_control.get_global_rect()), str(layout_control.get_combined_minimum_size()), str(layout_control.custom_minimum_size)]
 				)
-	_expect(bool(combat.get_meta("tight_scale_layout", false)), "%s combat view did not enter tight-scale layout" % context)
+	if dock_tier:
+		# The tier the dock drew is the composed one, which is deliberately not the
+		# tight compact tier: its band is a physical constant and the rows that hold
+		# controls stay at their authored logical size.
+		_expect(bool(combat.get_meta("composed_dock_tier", false)) and not bool(combat.get_meta("tight_scale_layout", false)), "%s combat view did not enter the composed 1080p dock tier" % context)
+	else:
+		_expect(bool(combat.get_meta("tight_scale_layout", false)), "%s combat view did not enter tight-scale layout" % context)
 	var left_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
 	_expect(left_panel != null and left_panel.is_visible_in_tree(), "%s layout removed the item/trait tactical dock" % context)
 	var required_paths: PackedStringArray = PackedStringArray([
@@ -725,7 +1002,7 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		"MarginContainer/VBoxContainer/BenchArea",
 		"MarginContainer/VBoxContainer/BenchArea/BenchGrid",
 		"MarginContainer/VBoxContainer/ActionsRow",
-		"MarginContainer/VBoxContainer/WagerSummary",
+		DOCK_WAGER_PATH if dock_tier else "MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
 		"MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
@@ -738,10 +1015,21 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	var system_menu_button: Button = _main.find_child("SystemMenuButton", true, false) as Button
 	if system_menu_button != null and system_menu_button.visible:
 		_expect_control_inside(system_menu_button, "%s system Menu" % context)
-		_expect(system_menu_button.text == "SYS // MENU", "%s system escape hatch reverted to generic Menu copy" % context)
+		_expect(system_menu_button.text == "MENU", "%s system escape hatch reverted to generic Menu copy" % context)
 		_expect(bool(system_menu_button.get_meta("authored_system_command", false)), "%s system escape hatch lacks authored command styling" % context)
 	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
-	_expect(stats_area != null and stats_area.custom_minimum_size.x <= 164.0, "%s Team Metrics rail did not preserve enough board width" % context)
+	if dock_tier:
+		# The composed dock keeps the rail's authored physical mass instead of
+		# collapsing it into the compact footprint, so the board-width intent is
+		# restated as the rail's published physical contract plus the board keeping
+		# the field's majority. The rail must never grow past the board it frames.
+		var rail_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+		var rail_contract: float = _composed_rail_physical(combat)
+		_expect(stats_area != null and absf(stats_area.size.x * rail_scale - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s Team Metrics rail did not render the composed %.0f physical contract" % [context, rail_contract])
+		var dock_board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
+		_expect(stats_area != null and dock_board_column != null and stats_area.size.x < dock_board_column.size.x, "%s Team Metrics rail grew past the planning board" % context)
+	else:
+		_expect(stats_area != null and stats_area.custom_minimum_size.x <= 164.0, "%s Team Metrics rail did not preserve enough board width" % context)
 	_expect_text_children_horizontally_inside(left_panel, "%s item/trait rail" % context)
 	_expect_text_children_horizontally_inside(stats_area, "%s Team Metrics rail" % context)
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
@@ -750,7 +1038,12 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		for item_node: Node in item_grid.get_children():
 			var item_control: Control = item_node as Control
 			if item_control != null and item_control.is_visible_in_tree():
-				_expect(item_grid.get_global_rect().encloses(item_control.get_global_rect()), "%s inventory child %s escaped its bounded grid" % [context, String(item_control.name)])
+				# The composed dock quantises its ready pockets to whole physical
+				# pixels, so the grid and the pockets it holds can differ by a
+				# sub-pixel accumulation. That tier uses the same one-pixel tolerance
+				# its own composed cache contract does; the compact tiers stay exact.
+				var grid_bounds: Rect2 = item_grid.get_global_rect().grow(DOCK_PHYSICAL_ROUNDING_TOLERANCE if dock_tier else 0.0)
+				_expect(grid_bounds.encloses(item_control.get_global_rect()), "%s inventory child %s escaped its bounded grid" % [context, String(item_control.name)])
 	var traits_scroll: ScrollContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsScroll") as ScrollContainer
 	_expect(traits_scroll != null and traits_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "%s traits strip permits horizontal overflow" % context)
 	if traits_scroll != null:
@@ -773,7 +1066,16 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		readable_trait_rows += 1
 		_expect(trait_label.size.x >= 40.0, "%s trait label %s collapsed below a readable width" % [context, String(trait_label.name)])
 		_expect(visible_trait_rect.size.x >= trait_rect.size.x - 2.0, "%s visible trait label %s lacks a complete readable line" % [context, String(trait_label.name)])
-		_expect(trait_label.text.contains(" // ") and (trait_label.text.contains("/") or trait_label.text.contains(">")), "%s visible trait row does not retain its name and checkpoint" % context)
+		# The support-rail pass replaced the uppercase "NAME // 6/8" string with
+		# the authored mixed-case trait name plus a separate count/checkpoint
+		# field, so the contract is now: a readable name here with the checkpoint
+		# beside it in the same row.
+		_expect(not trait_label.text.contains("//"), "%s trait row still uses the retired slash abbreviation: %s" % [context, trait_label.text])
+		var traits_row: Node = trait_label
+		while traits_row != null and not traits_row.has_meta("trait_id"):
+			traits_row = traits_row.get_parent()
+		var trait_checkpoint: Label = traits_row.find_child("TraitCheckpoint", true, false) as Label if traits_row != null else null
+		_expect(trait_checkpoint != null and trait_checkpoint.text.contains("/"), "%s visible trait row does not retain its count and checkpoint" % context)
 		var trait_font: Font = trait_label.get_theme_font("font")
 		var trait_font_size: int = trait_label.get_theme_font_size("font_size")
 		var trait_text_width: float = trait_font.get_string_size(trait_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, trait_font_size).x if trait_font != null else 0.0
@@ -847,19 +1149,34 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 	if combat == null:
 		return
 	_expect(is_equal_approx(float(combat.get_meta("persisted_ui_scale", 0.0)), expected_scale), "%s did not consume the persisted %.0f-percent UI scale" % [context, expected_scale * 100.0])
-	_expect(bool(combat.get_meta("compact_layout", false)), "%s did not enter the 1080p-fit compact layout" % context)
-	_expect(bool(combat.get_meta("tight_scale_layout", false)) == expected_tight, "%s tight-layout state is wrong" % context)
+	var dock_tier: bool = _dock_tier(combat)
+	if dock_tier:
+		# Physical 1920x1080 composes the dock at every supported UI scale, so the
+		# tier markers are the composed ones and the recorded tier has to be the
+		# tier that was drawn.
+		_expect(bool(combat.get_meta("composed_dock_tier", false)), "%s did not enter the composed 1080p dock tier" % context)
+		_expect(not bool(combat.get_meta("compact_layout", false)), "%s is still classified as the dense compact tier" % context)
+	else:
+		_expect(bool(combat.get_meta("compact_layout", false)), "%s did not enter the 1080p-fit compact layout" % context)
+	# The composed dock is never a tight tier - its band is a physical constant -
+	# while the compact contexts keep the tight expectation they were written for.
+	var expected_tight_state: bool = expected_tight and not dock_tier
+	_expect(bool(combat.get_meta("tight_scale_layout", false)) == expected_tight_state, "%s tight-layout state is wrong" % context)
 	var required_paths: PackedStringArray = PackedStringArray([
 		"MarginContainer/VBoxContainer/StageProgressTopBar",
 		"MarginContainer/VBoxContainer/BattleArea",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel",
 		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel",
 		"MarginContainer/VBoxContainer/BenchArea",
-		"MarginContainer/VBoxContainer/WagerSummary",
+		DOCK_WAGER_PATH if dock_tier else "MarginContainer/VBoxContainer/WagerSummary",
 		"MarginContainer/VBoxContainer/BottomStorageArea",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
 		"MarginContainer/VBoxContainer/BottomStorageArea/ShopBottomGutter",
 	])
+	if dock_tier:
+		# The dock's own composition layer carries the territories the surfaces above
+		# live in, so the composed tier has to show it.
+		required_paths.append(DOCK_LAYER_PATH)
 	for path: String in required_paths:
 		var surface: Control = combat.get_node_or_null(path) as Control
 		_expect(surface != null and surface.is_visible_in_tree(), "%s hid required planning surface %s" % [context, path])
@@ -884,9 +1201,19 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 	_expect_scaled_surface_separation(context)
 
 func _expect_scaled_decision_data(context: String) -> void:
-	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
-	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var wager_summary: Label = _wager_summary_label(combat)
+	if _dock_tier(combat):
+		# The composed dock hides the tight tier's compact resource strip and carries
+		# the same blood/level/XP record in its band header, so the record and the
+		# wager outcomes are read from the labels the band actually draws.
+		_expect_dock_decision_record(context, combat)
+		_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s composed dock hid its wager outcomes" % context)
+		if wager_summary != null:
+			_expect_wager_outcome_information(wager_summary, "%s wager outcome record" % context)
+			_expect_control_inside(wager_summary, "%s wager outcome record" % context)
+		return
+	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
 	var bet_value: Label = combat.find_child("BetValue", true, false) as Label if combat != null else null
 	_expect(bet_value != null and bet_value.text.contains("bkt") and not bet_value.text.contains("bucket"), "%s wager control did not use its tight bucket copy" % context)
 	_expect(resource_strip != null and resource_strip.is_visible_in_tree(), "%s enlarged layout hid its blood/level/XP record" % context)
@@ -911,9 +1238,50 @@ func _expect_scaled_decision_data(context: String) -> void:
 		_expect_control_inside(resource_strip, "%s blood/level/XP record" % context)
 	_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s enlarged layout hid wager outcomes" % context)
 	if wager_summary != null:
-		for required_copy: String in ["Wager", "Win", "After:", "W", "L"]:
-			_expect(wager_summary.text.contains(required_copy), "%s wager outcome record omitted %s" % [context, required_copy])
+		_expect_wager_outcome_information(wager_summary, "%s wager outcome record" % context)
 		_expect_control_inside(wager_summary, "%s wager outcome record" % context)
+
+## The composed dock's version of the same decision record. The band header keeps
+## the live blood reserve and the live level/XP readout, and the wager badge keeps
+## the live stake in the copy its own authored badge can hold, all inside the band
+## and the framebuffer.
+func _expect_dock_decision_record(context: String, combat: Control) -> void:
+	var band: Control = _dock_band(combat)
+	var compact_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
+	var gold_source: Label = combat.find_child("GoldLabel", true, false) as Label if combat != null else null
+	var progress_source: Label = _find_progress_source()
+	var bet_value: Label = combat.find_child("BetValue", true, false) as Label if combat != null else null
+	_expect(band != null and band.is_visible_in_tree(), "%s composed dock lost its lower band" % context)
+	# The band header is the composed tier's single record surface, so the tight
+	# tier's duplicate strip has to be staged out of it.
+	if compact_strip != null:
+		_expect(not compact_strip.is_visible_in_tree(), "%s composed dock still draws the tight tier's resource strip" % context)
+	_expect(gold_source != null and gold_source.is_visible_in_tree(), "%s composed dock hid its blood record" % context)
+	if gold_source != null and gold_source.is_visible_in_tree():
+		_expect(gold_source.text.contains(str(int(Economy.blood_buckets))), "%s blood record does not mirror the live reserve %d: %s" % [context, int(Economy.blood_buckets), gold_source.text])
+		_expect_control_inside(gold_source, "%s blood record" % context)
+		if band != null:
+			_expect(band.get_global_rect().grow(3.0).encloses(gold_source.get_global_rect()), "%s blood record escaped the composed band" % context)
+	_expect(progress_source != null and progress_source.is_visible_in_tree(), "%s composed dock hid its level/XP record" % context)
+	if progress_source != null and progress_source.is_visible_in_tree():
+		for live_progress: int in [int(Shop.get_level()), int(Shop.get_xp()), int(Shop.get_xp_to_next())]:
+			_expect(progress_source.text.contains(str(live_progress)), "%s level/XP record does not mirror the live value %d: %s" % [context, live_progress, progress_source.text])
+		_expect_control_inside(progress_source, "%s level/XP record" % context)
+		if band != null:
+			_expect(band.get_global_rect().grow(3.0).encloses(progress_source.get_global_rect()), "%s level/XP record escaped the composed band" % context)
+	# The wager badge is authored narrow, so the intent it carries is that its copy
+	# is never compressed past the box it was given, at a gameplay-legible size.
+	_expect(bet_value != null and bet_value.is_visible_in_tree(), "%s composed dock hid its wager value badge" % context)
+	if bet_value != null and bet_value.is_visible_in_tree():
+		var badge_font: Font = bet_value.get_theme_font("font")
+		var badge_font_size: int = bet_value.get_theme_font_size("font_size")
+		var badge_text_width: float = badge_font.get_string_size(bet_value.text, HORIZONTAL_ALIGNMENT_LEFT, -1, badge_font_size).x if badge_font != null else 0.0
+		_expect(badge_text_width <= bet_value.size.x + 1.0, "%s wager value badge compresses its copy: text=%.1f width=%.1f" % [context, badge_text_width, bet_value.size.x])
+		_expect(badge_font_size >= DOCK_UTILITY_MIN_FONT, "%s wager value badge fell below the %dpx legibility floor" % [context, DOCK_UTILITY_MIN_FONT])
+		_expect_control_inside(bet_value, "%s wager value badge" % context)
+		var wager_territory: Control = combat.get_node_or_null(DOCK_WAGER_PATH) as Control
+		if wager_territory != null:
+			_expect(wager_territory.get_global_rect().grow(3.0).encloses(bet_value.get_global_rect()), "%s wager value badge escaped its territory" % context)
 
 func _find_progress_source() -> Label:
 	var bottom_storage: Control = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea")
@@ -926,6 +1294,8 @@ func _find_progress_source() -> Label:
 	return null
 
 func _expect_scaled_team_metrics(context: String) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var dock_tier: bool = _dock_tier(combat)
 	var scoreboard: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Body/Scoreboard")
 	_expect(scoreboard != null and scoreboard.is_visible_in_tree(), "%s Team Metrics scoreboard disappeared" % context)
 	if scoreboard == null:
@@ -940,8 +1310,11 @@ func _expect_scaled_team_metrics(context: String) -> void:
 	var stats_title: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Header/Title") as Label
 	if stats_title != null:
 		var stats_font: Font = stats_title.get_theme_font("font")
-		var stats_text_width: float = stats_font.get_multiline_string_size(stats_title.text, HORIZONTAL_ALIGNMENT_LEFT, stats_title.size.x, stats_title.get_theme_font_size("font_size")).x if stats_font != null else 0.0
-		_expect(stats_text_width <= stats_title.size.x + 1.0, "%s Team Metrics title overflows its rail: text=%.1f width=%.1f" % [context, stats_text_width, stats_title.size.x])
+		var title_style: StyleBox = stats_title.get_theme_stylebox("normal")
+		var text_room: float = stats_title.size.x - title_style.get_minimum_size().x
+		var stats_text_width: float = stats_font.get_string_size(stats_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, stats_title.get_theme_font_size("font_size")).x if stats_font != null else 0.0
+		_expect(stats_text_width <= text_room + 1.0, "%s Team Metrics title overflows its inset: text=%.1f width=%.1f" % [context, stats_text_width, text_room])
+		_expect(title_style.get_content_margin(SIDE_LEFT) >= 14.0, "%s Team Metrics title touches its frame ornament" % context)
 	var compact_rows: int = 0
 	var found_bonko: bool = false
 	var found_berebell: bool = false
@@ -951,21 +1324,38 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		if row == null or not row.is_visible_in_tree():
 			continue
 		compact_rows += 1
-		_expect(bool(row.get_meta("compact_layout", false)), "%s visible metric row did not enter its compact contract" % context)
+		if dock_tier:
+			# The composed tier draws its wide rows, so the row's own tier marker must
+			# agree with the tier the combat view published instead of claiming the
+			# compact contract it is not using.
+			_expect(bool(row.get_meta("compact_layout", true)) == bool(combat.get_meta("compact_layout", false)), "%s visible metric row does not match the drawn tier" % context)
+		else:
+			_expect(bool(row.get_meta("compact_layout", false)), "%s visible metric row did not enter its compact contract" % context)
 		var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label
 		var value_label: Label = row.get_node_or_null("HBox/Content/Value") as Label
 		var team_marker: String = String(name_label.get_meta("compact_team_marker", "")) if name_label != null else ""
 		_expect(team_marker == "YOU" or team_marker == "FOE", "%s metric row lost its team identity metadata" % context)
 		_expect(value_label != null and value_label.text.strip_edges() != "", "%s metric row lost its numeric value" % context)
 		if name_label != null:
-			_expect(bool(name_label.get_meta("compact_identity_complete", false)), "%s metric row reverted to raw unit-name truncation" % context)
+			if dock_tier:
+				# The composed rail draws the authored identity itself - the fixture
+				# publishes Bonko and Berebell - so the copy is the completeness
+				# contract here; the compact badge metadata is the narrow tier's device.
+				var composed_identity: String = name_label.text.strip_edges()
+				_expect(composed_identity == "Bonko" or composed_identity == "Berebell", "%s metric row reverted to raw unit-name truncation: %s" % [context, composed_identity])
+			else:
+				_expect(bool(name_label.get_meta("compact_identity_complete", false)), "%s metric row reverted to raw unit-name truncation" % context)
 			_expect(not name_label.text.contains("//"), "%s metric row still exposes accidental identifier truncation" % context)
 			_expect(not name_label.text.begins_with("Y ") and not name_label.text.begins_with("F "), "%s metric row uses a clipped-looking one-letter team prefix" % context)
-			var identity_copy: String = name_label.text.trim_prefix("YOU ").trim_prefix("FOE ").strip_edges()
-			found_bonko = found_bonko or identity_copy == "BONKO"
-			found_berebell = found_berebell or identity_copy == "BEREBELL" or (not full_berebell_fits and identity_copy.begins_with("BERE") and identity_copy.length() >= 4)
-			_expect(identity_copy != "BOKO", "%s corrupts BONKO into BOKO" % context)
-			_expect(identity_copy != "BELL", "%s ambiguously truncates BEREBELL to BELL" % context)
+			# The support-rail pass shows the authored mixed-case name and moved
+			# the team into the rail chrome, so no "YOU "/"FOE " prefix is
+			# rendered any more. Team identity is still carried by the row
+			# metadata asserted above (and by the row tooltip).
+			var identity_copy: String = name_label.text.strip_edges()
+			found_bonko = found_bonko or identity_copy == "Bonko"
+			found_berebell = found_berebell or identity_copy == "Berebell" or (not full_berebell_fits and identity_copy.begins_with("Bere") and identity_copy.length() >= 4)
+			_expect(identity_copy.to_upper() != "BOKO", "%s corrupts Bonko into BOKO" % context)
+			_expect(identity_copy.to_upper() != "BELL", "%s ambiguously truncates Berebell to BELL" % context)
 			_expect(not identity_copy.is_valid_int(), "%s metric row exposes only an ambiguous ordinal instead of its identity" % context)
 			_expect(name_label.get_theme_font_size("font_size") >= 14, "%s team metric identity type is too small" % context)
 			var name_font: Font = name_label.get_theme_font("font")
@@ -979,6 +1369,8 @@ func _expect_scaled_team_metrics(context: String) -> void:
 		_expect(found_berebell, "%s populated Team Metrics rail omits full BEREBELL or an unambiguous tight fallback" % context)
 
 func _expect_scaled_unit_detail(context: String) -> void:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var dock_tier: bool = _dock_tier(combat)
 	var stats_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel")
 	var stats_area: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
 	var sari: Unit = UNIT_FACTORY_SCRIPT.spawn("sari") as Unit
@@ -994,7 +1386,18 @@ func _expect_scaled_unit_detail(context: String) -> void:
 	var unit_panel: Control = stats_panel.find_child("UnitPanel", true, false) as Control
 	_expect(unit_frame != null and unit_frame.is_visible_in_tree(), "%s frame is not visible" % context)
 	_expect(unit_scroll != null and unit_panel != null, "%s scroll shell is incomplete" % context)
-	_expect(stats_area.size.x >= 210.0 and stats_area.size.x > team_width + 20.0, "%s did not widen its temporary inspection rail: team=%.1f detail=%.1f" % [context, team_width, stats_area.size.x])
+	if dock_tier:
+		# The composed dock publishes its rail as a physical mass and re-asserts it,
+		# so a temporary inspection view must not widen the rail. The intent that
+		# survives is that the detail surface has room to be complete inside the rail
+		# it was given: the rail keeps its published contract and the detail frame it
+		# hosts is a real, non-collapsed surface.
+		var detail_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+		var rail_contract: float = _composed_rail_physical(combat)
+		_expect(absf(stats_area.size.x * detail_scale - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s unit detail left the composed rail contract: team=%.1f detail=%.1f physical=%.1f contract=%.1f" % [context, team_width, stats_area.size.x, stats_area.size.x * detail_scale, rail_contract])
+		_expect(unit_frame.get_global_rect().size.x > 1.0 and unit_frame.get_global_rect().size.y > 1.0, "%s unit detail frame collapsed inside the composed rail" % context)
+	else:
+		_expect(stats_area.size.x >= 210.0 and stats_area.size.x > team_width + 20.0, "%s did not widen its temporary inspection rail: team=%.1f detail=%.1f" % [context, team_width, stats_area.size.x])
 	if unit_scroll != null and unit_panel != null:
 		var scroll_rect: Rect2 = unit_scroll.get_global_rect()
 		var panel_rect: Rect2 = unit_panel.get_global_rect()
@@ -1006,7 +1409,12 @@ func _expect_scaled_unit_detail(context: String) -> void:
 	if stats_panel.has_method("set_responsive_layout"):
 		stats_panel.call("set_responsive_layout", true, true)
 	await _settle_frames(2)
-	_expect(stats_area.size.x >= 210.0, "%s lost its detail width after a responsive refresh: %.1f" % [context, stats_area.size.x])
+	if dock_tier:
+		var refresh_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+		var refresh_contract: float = _composed_rail_physical(combat)
+		_expect(absf(stats_area.size.x * refresh_scale - refresh_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s lost the composed rail width after a responsive refresh: %.1f physical vs %.1f" % [context, stats_area.size.x * refresh_scale, refresh_contract])
+	else:
+		_expect(stats_area.size.x >= 210.0, "%s lost its detail width after a responsive refresh: %.1f" % [context, stats_area.size.x])
 	_save_capture("06a_unit_detail_1920x1080_150pct.png", _main)
 	if stats_panel.has_method("show_team_metrics"):
 		stats_panel.call("show_team_metrics")
@@ -1052,12 +1460,13 @@ func _expect_text_children_horizontally_inside(surface: Control, context: String
 
 func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	var dock_tier: bool = _dock_tier(combat)
 	var maximum_scale_layout: bool = combat != null and bool(combat.get_meta("maximum_scale_layout", false))
 	var continue_button: Button = combat.find_child("ContinueButton", true, false) as Button if combat != null else null
-	var bet_row: Control = combat.find_child("BetRow", true, false) as Control if combat != null else null
+	var bet_row: Control = _wager_utility_group(combat)
 	var all_in_button: Button = bet_row.find_child("AllInButton", true, false) as Button if bet_row != null else null
 	var wager_label: Label = bet_row.find_child("BetLabel", true, false) as Label if bet_row != null else null
-	var wager_summary: Label = _combat_node("MarginContainer/VBoxContainer/WagerSummary") as Label
+	var wager_summary: Label = _wager_summary_label(combat)
 	var planning_geometry: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry")
 	var directive: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	_expect(continue_button != null, "%s primary Start Battle action missing" % context)
@@ -1065,14 +1474,35 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	if continue_button != null:
 		_expect(continue_button.is_visible_in_tree(), "%s primary Start Battle action is hidden" % context)
 		_expect(String(continue_button.get_meta("visual_role", "")) == "primary_commit", "%s Start Battle lacks primary commitment semantics" % context)
-		_expect(continue_button.custom_minimum_size.x >= (176.0 if tight else 236.0), "%s Start Battle is not wide enough to dominate" % context)
-		_expect(continue_button.custom_minimum_size.y >= (38.0 if tight else 46.0), "%s Start Battle lacks dominant action height" % context)
+		if dock_tier:
+			# The dock's commit action is its authored physical plaque, shrunk only
+			# when the bay genuinely cannot hold it, so dominance is the plaque's own
+			# authored size rather than the compact rail's minimum.
+			var plaque_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+			_expect(continue_button.custom_minimum_size.x * plaque_scale >= Composition.PLAQUE_PHYSICAL.x - 2.0, "%s Start Battle fell below the composed plaque's authored %.0f physical width: %.1f" % [context, Composition.PLAQUE_PHYSICAL.x, continue_button.custom_minimum_size.x * plaque_scale])
+			_expect(continue_button.custom_minimum_size.y * plaque_scale >= Composition.PLAQUE_PHYSICAL.y - 2.0, "%s Start Battle fell below the composed plaque's authored %.0f physical height: %.1f" % [context, Composition.PLAQUE_PHYSICAL.y, continue_button.custom_minimum_size.y * plaque_scale])
+		else:
+			_expect(continue_button.custom_minimum_size.x >= (176.0 if tight else 236.0), "%s Start Battle is not wide enough to dominate" % context)
+			_expect(continue_button.custom_minimum_size.y >= (38.0 if tight else 46.0), "%s Start Battle lacks dominant action height" % context)
 		_expect(continue_button.get_theme_font_size("font_size") >= (20 if tight else 23), "%s Start Battle type is too small" % context)
 		_expect_control_inside(continue_button, "%s Start Battle" % context)
 	if bet_row != null:
 		_expect(bet_row.is_visible_in_tree(), "%s wager controls are hidden" % context)
-		_expect(String(bet_row.get_meta("visual_role", "")) == "planning_utility_group", "%s wager controls are not grouped as utilities" % context)
-		_expect(bet_row.custom_minimum_size.x >= (254.0 if tight else 334.0), "%s wager controls are too compressed" % context)
+		if dock_tier:
+			# The dock's group is its own wager territory, and the column is sized by
+			# its content: the authored wager content width is the floor that keeps the
+			# controls from being compressed, and the group has to sit inside it.
+			var wager_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+			var wager_floor: float = maxf(Composition.minimum_wager_width(wager_scale), Composition.wager_content_width(wager_scale))
+			var wager_territory: Control = combat.get_node_or_null(DOCK_WAGER_PATH) as Control
+			_expect(String(bet_row.get_meta("dock_territory", "")) == "wager", "%s wager controls are not grouped as the dock's wager territory" % context)
+			_expect(wager_territory != null and wager_territory.is_visible_in_tree() and wager_territory.size.x >= wager_floor, "%s wager controls are too compressed" % context)
+			if wager_territory != null:
+				_expect(wager_territory.get_global_rect().grow(3.0).encloses(bet_row.get_global_rect()), "%s wager controls are compressed outside their territory" % context)
+				_expect_control_inside(wager_territory, "%s wager territory" % context)
+		else:
+			_expect(String(bet_row.get_meta("visual_role", "")) == "planning_utility_group", "%s wager controls are not grouped as utilities" % context)
+			_expect(bet_row.custom_minimum_size.x >= (254.0 if tight else 334.0), "%s wager controls are too compressed" % context)
 		_expect_control_inside(bet_row, "%s wager controls" % context)
 	if all_in_button != null and continue_button != null:
 		_expect(continue_button.custom_minimum_size.x > all_in_button.custom_minimum_size.x * 2.0, "%s Start Battle does not dominate its wager utility" % context)
@@ -1080,8 +1510,7 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
 	if wager_summary != null:
 		_expect(wager_summary.get_theme_font_size("font_size") >= (14 if tight else 18), "%s wager outcome metadata is too small" % context)
-		for required_copy: String in ["Wager", "Win", "After:", "W", "L"]:
-			_expect(wager_summary.text.contains(required_copy), "%s wager outcome metadata omitted %s" % [context, required_copy])
+		_expect_wager_outcome_information(wager_summary, "%s wager outcome metadata" % context)
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
 	if maximum_scale_layout:

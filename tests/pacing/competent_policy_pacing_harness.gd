@@ -110,7 +110,17 @@ func _resolve_pending_contract_market() -> void:
 		await get_tree().process_frame
 	if not bool(Shop.call("has_pending_contract_choice")):
 		return
-	var pass_button: Button = _main.find_child("ContractPass", true, false) as Button if _main != null else null
+	# The overlay can be visible for a frame while the market rebuilds its buttons
+	# (the previous children are queue_free'd first), so a single lookup raced and
+	# recorded a failure against otherwise good runs. Wait, bounded, for the control.
+	var pass_button: Button = null
+	var pass_deadline_msec: int = Time.get_ticks_msec() + 3000
+	while Time.get_ticks_msec() < pass_deadline_msec:
+		# By structure: the market's authored names survive only when nothing collides.
+		pass_button = _contract_pass_button()
+		if pass_button != null and not pass_button.disabled:
+			break
+		await get_tree().process_frame
 	if pass_button == null or pass_button.disabled:
 		_expect(false, "competent contract market did not expose an actionable PASS choice")
 		return
@@ -119,6 +129,10 @@ func _resolve_pending_contract_market() -> void:
 	await _settle_frames(4)
 	if _recorder != null:
 		_recorder.mark("contract_passed", {"chapter": int(GameState.chapter)})
+
+## A chapter contract holds Continue down until it is answered.
+func _clear_continue_gates(_label: String) -> void:
+	await _resolve_pending_contract_market()
 
 func _max_natural_buys_for_round(_chapter_before: int, _round_before: int) -> int:
 	# The baseline fixture limits rounds 1-4 to one purchase. A real player can

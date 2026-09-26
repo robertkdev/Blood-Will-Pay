@@ -498,6 +498,15 @@ func stop() -> void:
 	if buff_system != null and buff_system.has_method("clear_reverting_stats"):
 		buff_system.clear_reverting_stats()
 
+## Advance the fight by the frame's delta.
+##
+## This is the reason a live run cannot be replayed bit-for-bit. The step comes from the
+## render frame, so both how many steps a fight takes and how large each one is vary
+## between runs; movement integration and every seeded draw inside the fight move with
+## them, and the creep reward rolls share this engine's RNG. Seeding the engine (see
+## combat_manager.prepare_stage) makes a fight reproducible only against an identical
+## step sequence, which the fixed-step LockstepSimulator used by the calibration probes
+## provides and live play does not. Measure live runs by sample, not by replay.
 func process(delta: float) -> void:
 	if not state or (outcome_resolver != null and outcome_resolver.outcome_sent):
 		return

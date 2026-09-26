@@ -2,6 +2,7 @@ extends "res://tests/visual/random_later_shop_progression_smoke.gd"
 
 const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const ShopAffordabilityLib: Script = preload("res://scripts/game/shop/affordability.gd")
+const BenchConstants := preload("res://scripts/constants/bench_constants.gd")
 const TWO_STAGE_SMOKE_NAME: String = "NaturalBonkoTwoStageMainFlowSmoke"
 const TWO_STAGE_STARTER_ID: String = "bonko"
 const TWO_STAGE_SHOP_SEED: int = 4401
@@ -18,12 +19,11 @@ var _two_stage_results: Array[Dictionary] = []
 var _two_stage_battles: int = 0
 var _two_stage_buy_xp_clicks: int = 0
 
+## Plays the game for a long time; give it the small background window.
+func _harness_compact_window() -> bool:
+	return true
+
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -280,10 +280,17 @@ func _click_buy_xp(label: String) -> bool:
 		return false
 	var before_gold: int = int(Economy.gold)
 	var before_level: int = int(Shop.get_level())
+	# The shop quotes the level in stake units and multiplies by the current stake unit, so
+	# the charge is BUY_XP_COST only while the stake unit is 1. Assert the price the shop
+	# actually quoted rather than the constant: comparing against 4 failed the moment a level
+	# was bought at stake unit 2 or higher, which is a real, intended charge and not a defect.
+	var quoted_xp_price: int = int(SHOP_CONFIG.BUY_XP_COST)
+	if Shop.has_method("get_progression_price"):
+		quoted_xp_price = int(Shop.get_progression_price())
 	var clicked: bool = await _click_button(button, "%s Buy XP" % label)
 	await _settle_frames(4)
 	_expect(clicked, "%s Buy XP click did not fire" % label)
-	_expect(int(Economy.gold) == before_gold - int(SHOP_CONFIG.BUY_XP_COST), "%s Buy XP should spend exactly %d gold; state=%s" % [label, int(SHOP_CONFIG.BUY_XP_COST), JSON.stringify(_two_stage_state())])
+	_expect(int(Economy.gold) == before_gold - quoted_xp_price, "%s Buy XP should spend exactly the quoted %d gold; state=%s" % [label, quoted_xp_price, JSON.stringify(_two_stage_state())])
 	_expect(int(Shop.get_level()) >= before_level, "%s Buy XP should not reduce level; state=%s" % [label, JSON.stringify(_two_stage_state())])
 	return clicked
 
@@ -300,6 +307,15 @@ func _buy_best_two_stage_offer(buy_index: int) -> String:
 			continue
 		if not _can_afford_shop_cost(cost):
 			continue
+		# A slot the game has already disabled is not a candidate.
+		#
+		# The policy used to choose on price and score alone and then click, so a disabled
+		# card - a full bench is the common cause - produced a failed click and a technical
+		# failure instead of a decision. Measured on one heuristic run that was 21 failures
+		# in a single chapter-8 run, and it is the defect that stops this lane from being a
+		# usable deep instrument. See docs/harness_failures_heuristic_lane_2026-09-23.md.
+		if _shop_slot_is_disabled(int(summary.get("slot", -1))):
+			continue
 		var score: int = _two_stage_offer_score(summary)
 		if score > best_score:
 			best_score = score
@@ -313,6 +329,23 @@ func _buy_best_two_stage_offer(buy_index: int) -> String:
 	var clicked: bool = await _click_shop_slot(best_slot)
 	_expect(clicked, "natural two-stage buy %d failed on slot %d; state=%s" % [buy_index, best_slot, JSON.stringify(_two_stage_state())])
 	return best_id if clicked else ""
+
+## True only when the slot's card is found AND the game has disabled it.
+##
+## Deliberately conservative: a slot whose card cannot be located is treated as selectable, so
+## a scene-layout change can never silently switch the policy to buying nothing.
+func _shop_slot_is_disabled(slot_index: int) -> bool:
+	if _main == null or slot_index < 0:
+		return false
+	var grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer
+	if grid == null:
+		return false
+	for child: Node in grid.get_children():
+		var card: Button = child as Button
+		if card == null or int(card.get("slot_index")) != slot_index:
+			continue
+		return card.disabled
+	return false
 
 func _should_skip_full_board_buy(unit_id: String, cost: int) -> bool:
 	var cap: int = _roster_max_team_size()
@@ -554,10 +587,27 @@ func _field_preferred_units(field_ids: Array[String], bench_out_ids: Array[Strin
 			continue
 		var current_cap: int = _roster_max_team_size()
 		if current_cap >= 0 and _board_ids().size() >= current_cap:
+			if _bench_is_full():
+				# A full board and a full bench is a deadlock: this swap needs to bench a body
+				# and there is nowhere to put it, so the drag fails and the run records a
+				# technical failure every single round. Measured on one heuristic run, 18 of
+				# its 26 failures were the same pair - "bench vykos before fielding egress" -
+				# repeated from chapter 6 to chapter 10.
+				#
+				# Declining is the honest answer while the bench is wedged; the alternative
+				# implemented here would be to sell a bench body, which is a strategy change
+				# rather than a correctness fix and is recorded separately in
+				# docs/depth_anatomy_2026-09-24.md. See also docs/harness_failures_heuristic_lane_2026-09-23.md.
+				continue
 			var bench_out_id: String = _next_board_swap_id(field_ids, bench_out_ids)
-			_expect(bench_out_id != "", "%s needs a board unit to bench before fielding %s" % [label, field_id])
 			if bench_out_id == "":
-				return swaps
+				# No board unit is worth trading away for this one. Skipping is the
+				# right answer, not a failure: an override may decline a swap that
+				# would bench an invested unit to field a weaker copy of the same id.
+				continue
+			if not _swap_is_worthwhile(bench_out_id, field_id):
+				continue
+			_on_board_swap(bench_out_id, field_id, label)
 			var benched: bool = await _drag_board_unit_id_to_bench(bench_out_id, "%s bench out %s" % [label, bench_out_id])
 			_expect(benched, "%s failed to bench %s before fielding %s" % [label, bench_out_id, field_id])
 			if not benched:
@@ -621,6 +671,17 @@ func _mirror_bench_out_id(candidate_id: String) -> String:
 		return ""
 	return bench_out_id
 
+## Whether a swap is worth making at all. Base allows every swap the chooser returned;
+## the Jev rig refuses to trade an invested board unit for a less invested body.
+func _swap_is_worthwhile(_bench_out_id: String, _field_id: String) -> bool:
+	return true
+
+## Called before a board unit is benched so a fielding swap can be fielded for its
+## own identity. Base is a no-op; the Jev rig records it so a trade-down is visible in
+## the transcript rather than only in a player's memory of watching it happen.
+func _on_board_swap(_bench_out_id: String, _field_id: String, _label: String) -> void:
+	pass
+
 func _next_board_swap_id(field_ids: Array[String], bench_out_ids: Array[String]) -> String:
 	var board: Array[String] = _board_ids()
 	var desired_counts: Dictionary = _id_counts(field_ids)
@@ -642,6 +703,12 @@ func _id_counts(unit_ids: Array[String]) -> Dictionary:
 		counts[unit_id] = int(counts.get(unit_id, 0)) + 1
 	return counts
 
+## Which board tile a unit should be deployed into. The default is the first empty
+## tile, which is index order and therefore the front row first; the Jev rig overrides
+## this to place by role so backliners are not dropped into the front rank.
+func _preferred_board_tile(controller: Variant, _unit_id: String) -> int:
+	return _first_empty_board_tile(controller)
+
 func _drag_bench_unit_id_to_board(unit_id: String, label: String) -> bool:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
 	if combat == null:
@@ -656,6 +723,9 @@ func _drag_bench_unit_id_to_board(unit_id: String, label: String) -> bool:
 	if unit_view == null:
 		return false
 	var target_tile: int = _first_empty_board_tile(controller)
+	var preferred: int = _preferred_board_tile(controller, unit_id)
+	if preferred >= 0:
+		target_tile = preferred
 	if target_tile < 0:
 		return false
 	var moved_unit: Unit = unit_view.unit as Unit
@@ -698,11 +768,18 @@ func _drag_board_unit_id_to_bench(unit_id: String, label: String) -> bool:
 		return true
 	var fallback_view: UnitView = _find_unit_view_by_id(player_grid, unit_id)
 	if fallback_view != null and is_instance_valid(fallback_view):
-		var router: MoveRouter = controller.move_router as MoveRouter
+		# Called through Variant on purpose: a strict `as MoveRouter` cast here can fail
+		# silently and skip the fallback entirely, which looks identical to the game
+		# refusing the move. The deployment path in the Jev harness already documents that
+		# trap for its own grid helper. A silent skip also costs the diagnosis, because the
+		# route status line that would name the reason never prints.
+		var router: Variant = controller.move_router
 		if router != null and router.has_method("route_board_to_bench"):
-			var route_ok: bool = router.route_board_to_bench(fallback_view, target_tile)
-			print("%s: %s fallback board_to_bench route_ok=%s status=%s" % [_flow_smoke_name(), label, str(route_ok), JSON.stringify(router.last_route_status)])
+			var route_ok: bool = bool(router.call("route_board_to_bench", fallback_view, target_tile))
+			print("%s: %s fallback board_to_bench route_ok=%s status=%s" % [_flow_smoke_name(), label, str(route_ok), JSON.stringify(router.get("last_route_status"))])
 			await _settle_frames(6)
+		else:
+			print("%s: %s fallback board_to_bench unavailable (router=%s)" % [_flow_smoke_name(), label, str(router)])
 	return moved_unit != null and Roster.compact().has(moved_unit) and not controller.manager.player_team.has(moved_unit)
 
 func _find_unit_view_by_id(root: Node, unit_id: String) -> UnitView:
@@ -802,6 +879,9 @@ func _flow_target_round() -> int:
 	return TWO_STAGE_TARGET_ROUND
 
 func _button_with_text(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
@@ -815,6 +895,13 @@ func _roster_max_team_size() -> int:
 	if Roster == null:
 		return -1
 	return int(Roster.get("max_team_size"))
+
+## Bench capacity is the game's, not a guess: Roster owns it and reports it.
+func _bench_is_full() -> bool:
+	var cap: int = int(BenchConstants.BENCH_CAPACITY)
+	if Roster != null and Roster.has_method("slot_count"):
+		cap = int(Roster.call("slot_count"))
+	return cap > 0 and _bench_ids().size() >= cap
 
 func _two_stage_state() -> Dictionary:
 	return {

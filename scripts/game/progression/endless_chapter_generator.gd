@@ -14,6 +14,49 @@ const MAX_BOARD_UNITS := 9
 const CHAPTER_RATING_STEP := 32.0
 const CHAPTER_BAND_SIZE := 5.0
 const CHAPTER_BAND_RATING_STEP := 55.0
+## Boss budgets ramp with the player's board and keep ramping, instead of jumping to a
+## plateau and holding there.
+##
+## Measured across the recorded Jev runs, the player's board power at the boss
+## stage climbs 102 -> 249 -> 339 -> 430 -> 557 over chapters 1-5, i.e. 2.4x and
+## then 1.36x and 1.27x. The flat 2.65 multiplier produced enemy budgets of
+## 87 -> 322 -> 435 -> 520 -> 613 over the same chapters: 3.7x at the chapter
+## 1 -> 2 step, where the player only delivers 2.4x. That step is the hardest
+## fight in the game - chapter 2's boss was won 49.3% of 69 first attempts
+## against chapter 1's 59.6% of 99 and chapter 3's 78.1% of 32, which is the
+## difficulty inversion the design asks not to have.
+##
+## Matching the player's rated growth is not enough, because the rating under-counts
+## what the player actually accumulates. Measured over the current era, the win rate
+## RISES with the chapter - 71.4% of 77 first attempts in chapter 1, 78.7% of 141 in
+## chapter 2, 82.1% of 84 in chapter 3, 84.6% of 39 in chapter 4, 90.0% of 30 in
+## chapter 5, 94.4% of 18 in chapter 6 - so the game gets easier as it goes, which is
+## the opposite of "hard but winnable and harder as it goes on". The old plateau at
+## 2.65 is why: the enemy stopped growing while the board kept collecting items,
+## levels and slots. The ramp therefore keeps climbing past the plateau.
+const BOSS_MULTIPLIER_RAMP: Array[float] = [1.00, 1.80, 2.20, 2.55, 2.95, 3.35]
+## Added per chapter beyond the ramp, so the late campaign keeps tightening.
+const BOSS_MULTIPLIER_STEP: float = 0.40
+## Bodies a boss fields, indexed by chapter.
+##
+## The boss board used to be sized from its rating alone, which pinned every boss from
+## chapter 2 through chapter 5 at exactly four bodies while the player's board grew from
+## four slots towards seven. `EncounterShapeComparisonProbe` reports the resulting ladder
+## as 3 / 4 / 4 / 4 / 4 / 6 / 7 / 8 / 9 / 9 over chapters 1-10: no width change at all
+## through the chapters where runs actually end, then a jump to six.
+##
+## So the width follows the chapter's board instead of the rating: the boss grows with the
+## player, and the rating multiplier stays the difficulty knob. Chapter 1 keeps the three
+## bodies it has always had (the opening boss was a capacity check at four), and the ladder
+## stops at `MAX_BOARD_UNITS`. Measured effect on `BossStageCalibrationProbe`: the middle
+## preparation tier's boss win rate fell 77.8% -> 72.2% over 36 fights, the strongest tier
+## stayed at 100%, and no gate moved outside its tolerance.
+##
+## That strongest tier is why this is a shape fix and not a difficulty claim: six level-3
+## bodies rate 1484-2253 against bosses of 98-510, three to sixteen times the board a
+## recorded run actually fields, so no boss width moves it. `docs/boss_breadth_ladder_2026-09-23.md`
+## records that separately - it is a defect in the gate, not evidence about the game.
+const BOSS_WIDTH_BY_CHAPTER: Array[int] = [3, 4, 5, 5, 6, 6, 7, 7, 8, 9]
 const DEFAULT_TRAIT_THRESHOLDS: Array[int] = [2, 4, 6, 8]
 const TRAIT_BASE_PRESSURE := 0.06
 const TRAIT_TIER_PRESSURE_STEP := 0.04
@@ -22,7 +65,14 @@ const TRAIT_COUNT_PRESSURE := 2.0
 
 const DEFAULT_CREEP_REWARDS: Dictionary = {
 	"pool_path": "res://data/creeps/reward_pools/default.tres",
-	"rolls_per_kill": 1,
+	# Each chapter has exactly one creep stage and the reward fires roughly once per
+	# creep stage (measured with the reward debug log), so one roll per kill yields
+	# about 0.58 components per chapter. The pacing target is eight completed items -
+	# sixteen components - by chapter 10, so ten creep stages need about 1.6
+	# components each. The pool's per-roll distribution is fixed by the design
+	# document; the roll count is the rate knob the document leaves open. Three rolls
+	# per trigger lands at ~17.5 components by chapter 10.
+	"rolls_per_kill": 3,
 	"only_creeps": true,
 	"source_team": "player",
 }
@@ -84,11 +134,15 @@ const THEMES: Array[Dictionary] = [
 static var _catalog_cache: Array[Dictionary] = []
 static var _catalog_by_id: Dictionary = {}
 static var _trait_threshold_cache: Dictionary = {}
+## Whether each trait's ladder has dead zones between its rungs, cached beside
+## the thresholds so the generator reads the same rule the compiler applies.
+static var _trait_exact_cache: Dictionary = {}
 
 static func clear_cache() -> void:
 	_catalog_cache.clear()
 	_catalog_by_id.clear()
 	_trait_threshold_cache.clear()
+	_trait_exact_cache.clear()
 
 static func generate_sequence(start_chapter: int, chapter_count: int, seed: int = DEFAULT_SEED) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -134,12 +188,15 @@ static func target_rating_for(chapter: int, stage_index: int) -> int:
 		ProgressionConfig.SECOND_RGA_STAGE:
 			multiplier = 2.25
 		ProgressionConfig.BOSS_STAGE:
-			multiplier = 2.65
-			if procedural_index == 1:
-				# The preview quote accounts for the live boss escalation phases.
-				# Keep the raw opening target at the level-1 runway baseline so a
-				# four-unit prepared board sees a fair, escalation-adjusted quote.
-				multiplier = 1.00
+			# Ramps to the authored 2.65 plateau instead of starting there: see
+			# BOSS_MULTIPLIER_RAMP. The first entry keeps the raw opening target at
+			# the level-1 runway baseline so the preview quote, which already
+			# accounts for the live boss escalation phases, is not double-counted.
+			# Past the ramp the multiplier keeps climbing by BOSS_MULTIPLIER_STEP, so a
+			# late boss does not stop growing while the board keeps collecting power.
+			var boss_ramp_index: int = mini(procedural_index - 1, BOSS_MULTIPLIER_RAMP.size() - 1)
+			var boss_overshoot: int = maxi(0, procedural_index - BOSS_MULTIPLIER_RAMP.size())
+			multiplier = BOSS_MULTIPLIER_RAMP[boss_ramp_index] + BOSS_MULTIPLIER_STEP * float(boss_overshoot)
 		ProgressionConfig.MIRROR_STAGE:
 			multiplier = 2.65
 		_:
@@ -266,7 +323,7 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 	if catalog.is_empty():
 		return StageTypes.make_spec(["bonko"], kind, {"target_rating": target, "difficulty_rating": 0, "procedural": true, "endless": true})
 	var theme: Dictionary = _pick_theme(chapter, stage_index, seed, kind)
-	var desired_size: int = _desired_size_for_target(target, kind)
+	var desired_size: int = _desired_size_for_target(target, kind, chapter)
 	var ids: Array[String] = _select_unit_ids(catalog, theme, desired_size, chapter, stage_index, target, seed, kind, state)
 	var level_cap: int = _level_cap_for(chapter, kind)
 	var levels: Dictionary = _tune_levels(ids, target, level_cap)
@@ -312,6 +369,14 @@ static func _make_budgeted_board_spec(chapter: int, stage_index: int, kind: Stri
 	return StageTypes.make_spec(ids, kind, rules)
 
 static func _select_unit_ids(catalog: Array[Dictionary], theme: Dictionary, desired_size: int, chapter: int, stage_index: int, target: int, seed: int, kind: String, state: Dictionary) -> Array[String]:
+	# This picks by rating from the whole catalog, so a generated board can field cost-4
+	# and cost-5 units long before the player's shop level can offer them: at the chapter
+	# two boss, 61 of 117 recorded fights had a cost-4 enemy unit against a player whose
+	# shop was capped at cost 3, and the player's own board was 82% cost-1. Tested as a
+	# cause of that stage being a coin flip, and it is not one - those fights were won
+	# 46% of the time and the fights without a capstone were won 46% of the time. Across
+	# every stage from target 130 up the split is 76% against 78%. So do not gate the
+	# enemy's cost tier expecting the wall to move; the wall is somewhere else.
 	var selected: Array[String] = []
 	var front_id: String = _pick_best_unit(catalog, selected, theme, chapter, stage_index, target, seed, kind, "front")
 	if front_id != "":
@@ -486,6 +551,7 @@ static func _tune_levels(ids: Array[String], target: int, level_cap: int) -> Dic
 	var current: int = _score_ids_with_levels(ids, levels)
 	while current < target:
 		var best_index: int = -1
+		var best_levels: Dictionary = {}
 		var best_next_score: int = current
 		var best_error: int = abs(int(target) - current)
 		for i: int in range(ids.size()):
@@ -493,21 +559,32 @@ static func _tune_levels(ids: Array[String], target: int, level_cap: int) -> Dic
 			var current_level: int = _level_for_index_and_id(levels, i, id)
 			if current_level >= int(level_cap):
 				continue
-			var delta: int = unit_rating(id, current_level + 1) - unit_rating(id, current_level)
-			var next_score: int = current + delta
+			# Score the whole team with the promotion applied. The previous loop added a
+			# bare single-unit rating delta to a trait-adjusted team score - different
+			# quantities - so a trait multiplier on the promoted unit was never counted
+			# and the loop's picture of the board drifted from the board it was building.
+			# Recorded example, chapter 2 stage 3 at target 297: it promoted one unit to
+			# level 4 and left the others at level 1 (morrak1/egress4/pilfer1), a shape
+			# whole-team rescoring does not choose.
+			var trial: Dictionary = levels.duplicate()
+			trial[i] = current_level + 1
+			trial[id] = current_level + 1
+			var next_score: int = _score_ids_with_levels(ids, trial)
 			var next_error: int = abs(int(target) - next_score)
 			if next_error < best_error or best_index < 0:
 				best_index = i
+				best_levels = trial
 				best_next_score = next_score
 				best_error = next_error
 		if best_index < 0:
 			break
 		if best_next_score > target and current >= int(round(float(target) * 0.84)):
 			break
-		var best_id: String = ids[best_index]
-		var next_level: int = _level_for_index_and_id(levels, best_index, best_id) + 1
-		levels[best_index] = next_level
-		levels[best_id] = next_level
+		# Mutate in place: `levels` is the caller's dictionary and rebinding the local
+		# would leave the caller holding the levels from before the loop.
+		levels.clear()
+		for key: Variant in best_levels.keys():
+			levels[key] = best_levels[key]
 		current = best_next_score
 	_improve_levels(ids, levels, target)
 	return levels
@@ -591,10 +668,7 @@ static func _active_trait_rows_for_ids(ids: Array[String], unit_total: int) -> A
 	for trait_id: String in counts.keys():
 		var count: int = int(counts[trait_id])
 		var thresholds: Array[int] = _trait_thresholds_for(trait_id)
-		var tier: int = -1
-		for i: int in range(thresholds.size()):
-			if count >= int(thresholds[i]):
-				tier = i
+		var tier: int = TraitDef.tier_for(count, thresholds, _trait_is_exact(trait_id))
 		if tier < 0:
 			continue
 		var threshold: int = int(thresholds[tier])
@@ -627,17 +701,28 @@ static func _trait_thresholds_for(trait_id: String) -> Array[int]:
 		var cached: Array[int] = _trait_threshold_cache[clean_id]
 		return cached.duplicate()
 	var out: Array[int] = []
+	var exact: bool = false
 	var path: String = "res://data/traits/%s.tres" % clean_id
 	if ResourceLoader.exists(path):
 		var resource: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
 		if resource is TraitDef:
 			var trait_def: TraitDef = resource
+			exact = trait_def.exact_thresholds
 			for value: int in trait_def.thresholds:
 				out.append(int(value))
 	if out.is_empty():
 		out = DEFAULT_TRAIT_THRESHOLDS.duplicate()
 	_trait_threshold_cache[clean_id] = out
+	_trait_exact_cache[clean_id] = exact
 	return out.duplicate()
+
+## Reads the cached dead-zone flag, loading the trait first if it is not cached.
+static func _trait_is_exact(trait_id: String) -> bool:
+	var clean_id: String = String(trait_id).strip_edges()
+	if clean_id == "":
+		return false
+	_trait_thresholds_for(clean_id)
+	return bool(_trait_exact_cache.get(clean_id, false))
 
 static func _level_for_index_and_id(levels: Dictionary, index: int, id: String) -> int:
 	if levels.has(index):
@@ -648,9 +733,26 @@ static func _level_for_index_and_id(levels: Dictionary, index: int, id: String) 
 		return max(1, int(levels[id]))
 	return 1
 
-static func _desired_size_for_target(target: int, kind: String) -> int:
+static func _desired_size_for_target(target: int, kind: String, chapter: int = 0) -> int:
 	var rating: int = max(1, int(target))
 	if kind == StageTypes.KIND_BOSS:
+		if int(chapter) > 0:
+			# See BOSS_WIDTH_BY_CHAPTER. The rating floor is kept as a guard so a call
+			# that arrives with a chapter but an opening-sized budget still fields the
+			# three-body tutorial boss rather than a full ladder step.
+			if rating < 160:
+				return 3
+			var ladder_index: int = clampi(int(chapter) - 1, 0, BOSS_WIDTH_BY_CHAPTER.size() - 1)
+			return clampi(BOSS_WIDTH_BY_CHAPTER[ladder_index], 3, MAX_BOARD_UNITS)
+		# No chapter context (older callers and probes): keep the rating-only ladder.
+		if rating < 160:
+			# The opening boss is fought by whatever three or four level-1 bodies the first
+			# two shops produced, carrying about one item between them. Measured over the
+			# current era it was a capacity check rather than a fight: a player fielding
+			# three bodies won 43.8% of 16 first attempts and one fielding four won 87.5%
+			# of 8. Only the opening boss sits below this rating, so it fields three and
+			# the tutorial fight stops being decided by whether the fourth body arrived.
+			return 3
 		if rating < 520:
 			return 4
 		return clampi(4 + int(floor(float(max(0, rating - 520)) / 260.0)), 4, MAX_BOARD_UNITS)

@@ -15,22 +15,42 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import statistics
+from typing import Callable
 
 LOW_CONFIDENCE = 0.70
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--run-dir", default="")
+    # Aggregate the prediction check across many runs, which is the sample that
+    # decides whether the pre-fight odds can be trusted with a wager.
+    parser.add_argument("--batch-dir", default="")
     parser.add_argument("--out", default="")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if not args.run_dir and not args.batch_dir:
+        parser.error("--run-dir or --batch-dir is required")
+    return args
 
 
 def _load_json(path: Path) -> dict:
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def _summary_for(run_dir: Path) -> dict:
+    """The run's own summary, falling back to the per-round checkpoint.
+
+    A long run that exits without reaching its end path still leaves a checkpoint,
+    which is the difference between reading chapter 8 and reading nothing.
+    """
+    summary = _load_json(run_dir / "run_summary.json")
+    if summary:
+        return summary
+    return _load_json(run_dir / "run_checkpoint.json")
 
 
 def _load_jsonl(path: Path) -> list[dict]:
@@ -428,6 +448,421 @@ def _audit(summary: dict, events: list[dict], observations: list[dict]) -> dict:
     }
 
 
+def _progression(summary: dict, events: list[dict]) -> dict:
+    """The run's progress against the acceptance targets.
+
+    A three-star unit, a trait taken to its top tier, and a board filled to its
+    capacity are the three things a settled run is supposed to be able to reach.
+    They are read from the recorded events so the run states its own progress; the
+    peak bankroll band comes from the summary because it is a running maximum the
+    harness owns.
+    """
+    max_unit_level = 1
+    levels_by_unit: dict[str, int] = {}
+    three_star: set[str] = set()
+    maxed_traits: set[str] = set()
+    maxed_ladders: set[str] = set()
+    highest_tier: dict[str, int] = {}
+    max_board_size = 0
+    max_board_capacity = 0
+    full_board_beats = 0
+    level_purchases = 0
+    for event in events:
+        kind = event.get("kind")
+        payload = event.get("payload") or {}
+        if kind == "fight_start":
+            owned = payload.get("owned_units") or payload.get("player_units") or []
+            for record in owned:
+                unit_id = str(record.get("id", ""))
+                level = int(record.get("level", 1) or 1)
+                max_unit_level = max(max_unit_level, level)
+                if unit_id:
+                    levels_by_unit[unit_id] = max(levels_by_unit.get(unit_id, 1), level)
+                    if level >= 3:
+                        three_star.add(unit_id)
+            for trait in payload.get("deployed_traits") or []:
+                trait_id = str(trait.get("id", ""))
+                if not trait_id:
+                    continue
+                tier = int(trait.get("tier", -1))
+                highest_tier[trait_id] = max(highest_tier.get(trait_id, -1), tier)
+                # `maxed` is written by the harness once the count has cleared every
+                # threshold on a multi-tier trait's ladder; the count fallback keeps
+                # older transcripts readable and refuses single-threshold auras,
+                # which have no ladder to max.
+                next_threshold = int(trait.get("next_threshold", 1) or 0)
+                tiers_available = int(trait.get("tiers_available", 0) or 0)
+                # `maxed` is the game's own reading (every tier on that trait is live,
+                # including a single-tier aura like Cartel 2/2). `maxed_ladders` is the
+                # stricter multi-tier reading.
+                trait_count = int(trait.get("count", 0) or 0)
+                if bool(trait.get("maxed")) or (next_threshold == 0 and trait_count > 0):
+                    maxed_traits.add(trait_id)
+                if bool(trait.get("maxed_ladder")) or (
+                    next_threshold == 0 and trait_count > 0 and tiers_available > 1
+                ):
+                    maxed_ladders.add(trait_id)
+        elif kind == "round":
+            capacity = int(payload.get("cap_after_shop", 0) or 0)
+            board_size = len(payload.get("board_after_shop") or [])
+            max_board_capacity = max(max_board_capacity, capacity)
+            max_board_size = max(max_board_size, board_size)
+            if capacity > 0 and board_size >= capacity:
+                full_board_beats += 1
+        elif kind == "buy_xp" and payload.get("bought"):
+            level_purchases += 1
+    # The harness now emits its own progression block; prefer it when present so a
+    # single source of truth decides the target flags.
+    harness = summary.get("progression") or {}
+    if harness:
+        max_unit_level = max(max_unit_level, int(harness.get("max_unit_level", 1) or 1))
+        three_star |= {str(node) for node in (harness.get("three_star_units") or [])}
+        maxed_traits |= {str(node) for node in (harness.get("maxed_traits") or [])}
+        max_board_size = max(max_board_size, int(harness.get("max_board_size", 0) or 0))
+        max_board_capacity = max(max_board_capacity, int(harness.get("max_board_capacity", 0) or 0))
+        full_board_beats = max(full_board_beats, int(harness.get("planning_beats_with_a_full_board", 0) or 0))
+    peak_bankroll = int(summary.get("peak_bankroll", 0) or 0)
+    return {
+        "max_unit_level": max_unit_level,
+        "three_star_units": sorted(three_star),
+        "maxed_traits": sorted(maxed_traits),
+        "maxed_ladders": sorted(maxed_ladders),
+        "highest_trait_tier": dict(sorted(highest_tier.items())),
+        "max_board_size": max_board_size,
+        "max_board_capacity": max_board_capacity,
+        "board_filled_to_capacity": max_board_capacity > 0 and max_board_size >= max_board_capacity,
+        "planning_beats_with_a_full_board": full_board_beats,
+        "level_purchases": level_purchases,
+        "peak_bankroll": peak_bankroll,
+        "final_buckets": int(summary.get("buckets", 0) or 0),
+        "targets": {
+            "three_star_a_unit": bool(three_star),
+            "max_a_trait": bool(maxed_traits),
+            "fill_a_board": max_board_capacity > 0 and max_board_size >= max_board_capacity,
+        },
+    }
+
+
+def _items(events: list[dict]) -> dict:
+    """Item flow: components collected and completed items, with the global stage.
+
+    Stages are numbered across chapters (chapter 2 round 5 is stage 10), which is the
+    numbering the design uses for pacing targets. Every fight records the inventory
+    before it starts, so both "did a creep pay" and "how many full items exist by
+    stage N" are answerable from the transcript.
+    """
+    equipped = 0
+    completed = 0
+    completed_ids: list[str] = []
+    inventory_by_stage: list[dict] = []
+    peak_components_held = 0
+    for event in events:
+        kind = event.get("kind")
+        payload = event.get("payload") or {}
+        if kind == "item_equipped":
+            if bool(payload.get("ok", False)):
+                equipped += 1
+                combined_id = str(payload.get("combined_id", "") or "")
+                if combined_id:
+                    completed += 1
+                    completed_ids.append(combined_id)
+        elif kind == "fight_start":
+            inventory = payload.get("inventory") or {}
+            total = sum(int(value or 0) for value in inventory.values()) if isinstance(inventory, dict) else 0
+            peak_components_held = max(peak_components_held, total)
+            chapter = int(event.get("chapter", 1) or 1)
+            stage_in_chapter = int(event.get("stage_in_chapter", 1) or 1)
+            inventory_by_stage.append({
+                "global_stage": (chapter - 1) * 5 + stage_in_chapter,
+                "chapter": chapter,
+                "round": stage_in_chapter,
+                "kind": payload.get("encounter_kind"),
+                "components_held": total,
+            })
+    by_stage_10 = [row for row in inventory_by_stage if row["global_stage"] <= 10]
+    return {
+        "components_equipped": equipped,
+        "items_completed": completed,
+        "completed_item_ids": sorted(set(completed_ids)),
+        "peak_components_held": peak_components_held,
+        "max_global_stage": max((row["global_stage"] for row in inventory_by_stage), default=0),
+        "components_held_by_stage": inventory_by_stage,
+        "items_completed_by_stage_10": completed if (max((row["global_stage"] for row in inventory_by_stage), default=0) <= 10) else None,
+        "inventory_samples_to_stage_10": by_stage_10[-1]["components_held"] if by_stage_10 else 0,
+    }
+
+
+def _board_label(units: list[dict]) -> str:
+    """A compact board description with each unit's level, e.g. bonko2+pilfer1."""
+    parts = []
+    for unit in units or []:
+        if not isinstance(unit, dict):
+            continue
+        unit_id = str(unit.get("id", ""))
+        if not unit_id:
+            continue
+        items = unit.get("items") or []
+        suffix = "+%s" % ",".join(str(item) for item in items) if items else ""
+        parts.append("%s%d%s" % (unit_id, int(unit.get("level", 1) or 1), suffix))
+    return " ".join(parts) if parts else "-"
+
+
+def _tier_of(entry: dict) -> int:
+    """Trait tier with the missing value kept distinct from tier 0.
+
+    TraitCompiler reports -1 for "no threshold met" and 0 for the first live tier,
+    so `entry.get("tier") or -1` collapses a live first tier into "inactive". That
+    bug made every single-threshold trait read as permanently off.
+    """
+    value = entry.get("tier")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return -1
+    return int(value)
+
+
+def _fight_records(events: list[dict]) -> list[dict]:
+    """One row per fight, pairing the pre-fight prediction and boards with the result.
+
+    The pairing is sequential rather than by ``fight_index``: a replayed stage keeps
+    the same battle counter, so two attempts at one stage would share an index and a
+    join on it would silently cross-link them.
+    """
+    records: list[dict] = []
+    pending: dict | None = None
+    for event in events:
+        kind = event.get("kind")
+        payload = event.get("payload") or {}
+        if kind == "fight_start":
+            chapter = int(event.get("chapter", 1) or 1)
+            stage_in_chapter = int(event.get("stage_in_chapter", 1) or 1)
+            pending = {
+                "chapter": chapter,
+                "round": stage_in_chapter,
+                "global_stage": (chapter - 1) * 5 + stage_in_chapter,
+                "label": payload.get("label"),
+                "encounter_kind": payload.get("encounter_kind"),
+                "quoted_multiplier": payload.get("quoted_multiplier"),
+                "shown_win_odds": payload.get("shown_win_odds"),
+                "live_win_odds": payload.get("live_win_odds"),
+                "break_even_odds": (
+                    1.0 / float(payload["quoted_multiplier"])
+                    if isinstance(payload.get("quoted_multiplier"), (int, float))
+                    and float(payload.get("quoted_multiplier") or 0) > 0
+                    else None
+                ),
+                "wager": payload.get("wager"),
+                "buckets_before": payload.get("buckets"),
+                "stake_unit": payload.get("stake_unit"),
+                "player_board": _board_label(payload.get("player_units") or []),
+                "enemy_board": _board_label(payload.get("enemy_units") or []),
+                "player_count": len(payload.get("player_units") or []),
+                "enemy_count": len(payload.get("enemy_units") or []),
+                "player_power": payload.get("player_power"),
+                "enemy_power": payload.get("enemy_power"),
+                "target_rating": payload.get("target_rating"),
+                "deployed_traits": [
+                    "%s%d" % (entry.get("id"), int(entry.get("count", 0) or 0))
+                    for entry in (payload.get("deployed_traits") or [])
+                    if _tier_of(entry) >= 0
+                ],
+                # Split by whether the tier is actually live, so a trait can be scored
+                # against the fights where it was only collected, not active.
+                "active_traits": [
+                    str(entry.get("id"))
+                    for entry in (payload.get("deployed_traits") or [])
+                    if _tier_of(entry) >= 0
+                ],
+                "inactive_traits": [
+                    str(entry.get("id"))
+                    for entry in (payload.get("deployed_traits") or [])
+                    if _tier_of(entry) < 0
+                ],
+            }
+        elif kind == "combat_log" and pending is not None:
+            line = str(payload.get("line", ""))
+            if line.startswith("Combat resolved: "):
+                fields: dict[str, int] = {}
+                for token in line[len("Combat resolved: "):].split(" "):
+                    if "=" not in token:
+                        continue
+                    key, _, value = token.partition("=")
+                    cleaned = value.rstrip(".")
+                    try:
+                        fields[key] = int(float(cleaned))
+                    except ValueError:
+                        continue
+                pending["_resolution_fields"] = fields
+                pending["resolution_line"] = line
+        elif kind == "combat_diagnostic" and pending is not None:
+            timeout_s = float(payload.get("combat_timeout_s", 0.0) or 0.0)
+            elapsed = float(payload.get("engine_reported_elapsed_s", 0.0) or 0.0)
+            pending["result"] = payload.get("outcome")
+            pending["engine_outcome"] = payload.get("engine_outcome")
+            pending["player_damage"] = payload.get("player_damage")
+            pending["enemy_damage"] = payload.get("enemy_damage")
+            pending["elapsed_s"] = elapsed
+            # A fight that used the whole clock was decided by the tie-break ladder.
+            pending["clock_decided"] = bool(timeout_s > 0.0 and elapsed >= timeout_s - 0.3)
+            # The post_settlement_* fields are read after settlement has rebuilt the
+            # board for the next stage, so they are NOT the fight's survivors - a
+            # one-unit enemy showed as "2 alive" after a player victory. The engine's
+            # own "Combat resolved:" line is the only trustworthy record of who was
+            # left standing, so it is preferred and the post-settlement values are
+            # kept apart under their own names.
+            pending["post_settlement_player_alive"] = payload.get("post_settlement_player_alive")
+            pending["post_settlement_enemy_alive"] = payload.get("post_settlement_enemy_alive")
+            resolved = pending.pop("_resolution_fields", None) or {}
+            pending["player_alive_after"] = resolved.get("player_alive")
+            pending["enemy_alive_after"] = resolved.get("enemy_alive")
+            if pending["player_alive_after"] is None:
+                pending["player_alive_after"] = payload.get("post_settlement_player_alive")
+            if pending["enemy_alive_after"] is None:
+                pending["enemy_alive_after"] = payload.get("post_settlement_enemy_alive")
+            result = str(pending.get("result", ""))
+            pending["won"] = True if result == "shop" else (False if result == "loss" else None)
+            # A loss does not advance the stage, so two consecutive records at the same
+            # global stage are the same fight played again. The wager policy treats a
+            # repeat attempt differently from a first look, so the record has to carry
+            # which one it was.
+            previous = records[-1] if records else None
+            if previous is not None and previous.get("global_stage") == pending.get("global_stage"):
+                pending["stage_attempt"] = int(previous.get("stage_attempt", 1) or 1) + 1
+            else:
+                pending["stage_attempt"] = 1
+            records.append(pending)
+            pending = None
+    return records
+
+
+def _prediction_quality(records: list[dict]) -> dict:
+    """How well the shown pre-fight odds matched actual results.
+
+    Ties are excluded from the win-rate comparison: a tie refunds the wager and is
+    not a win or a loss, so counting it either way would bias the estimate.
+    """
+    decided = [
+        row
+        for row in records
+        if isinstance(row.get("shown_win_odds"), (int, float)) and row.get("won") is not None
+    ]
+    ties = sum(1 for row in records if row.get("won") is None and row.get("result") is not None)
+    if not decided:
+        return {"samples": 0, "ties": ties}
+    brier = sum(
+        (float(row["shown_win_odds"]) - (1.0 if row["won"] else 0.0)) ** 2 for row in decided
+    ) / len(decided)
+    predicted_mean = sum(float(row["shown_win_odds"]) for row in decided) / len(decided)
+    observed_mean = sum(1 for row in decided if row["won"]) / len(decided)
+    buckets: dict[str, dict] = {}
+    for row in decided:
+        shown = float(row["shown_win_odds"])
+        lower = int(shown * 10) / 10
+        key = "%.1f-%.1f" % (lower, lower + 0.1)
+        bucket = buckets.setdefault(key, {"samples": 0, "predicted": 0.0, "wins": 0})
+        bucket["samples"] += 1
+        bucket["predicted"] += shown
+        bucket["wins"] += 1 if row["won"] else 0
+    out_of_tolerance = []
+    for key, bucket in buckets.items():
+        bucket["predicted"] = round(bucket["predicted"] / bucket["samples"], 4)
+        bucket["observed"] = round(bucket["wins"] / bucket["samples"], 4)
+        bucket["gap"] = round(bucket["observed"] - bucket["predicted"], 4)
+        # Two-sigma binomial tolerance; small buckets will rarely trip it.
+        p = bucket["predicted"]
+        n = bucket["samples"]
+        sigma = (p * (1.0 - p) / n) ** 0.5 if 0.0 < p < 1.0 else 0.0
+        bucket["tolerance"] = round(2.0 * sigma, 4)
+        bucket["outside_tolerance"] = bool(sigma > 0.0 and abs(bucket["gap"]) > 2.0 * sigma)
+        if bucket["outside_tolerance"]:
+            out_of_tolerance.append(key)
+    # Favourite rule: does the "odds above 50%" call actually win more often than not?
+    favourites = [row for row in decided if float(row["shown_win_odds"]) > 0.5]
+    favourite_wins = sum(1 for row in favourites if row["won"])
+    # Display staleness: how far the number the player acted on sat below the odds
+    # recomputed from the board that actually fought.
+    stale = [
+        row
+        for row in decided
+        if isinstance(row.get("live_win_odds"), (int, float)) and float(row["live_win_odds"]) > 0
+    ]
+    staleness = None
+    if stale:
+        staleness = {
+            "samples": len(stale),
+            "mean_shown": round(sum(float(row["shown_win_odds"]) for row in stale) / len(stale), 4),
+            "mean_live": round(sum(float(row["live_win_odds"]) for row in stale) / len(stale), 4),
+            "mean_gap": round(
+                sum(float(row["live_win_odds"]) - float(row["shown_win_odds"]) for row in stale) / len(stale), 4
+            ),
+        }
+
+    # Where the estimate stops describing the fight.
+    #
+    # The estimator compares summed team power, so it barely moves when one side
+    # simply has more bodies on the field. Measured against the recorded results it
+    # is wrong in exactly that spot: the side with one extra body wins about 95% of
+    # the time while the shown odds stay near a coin flip, and a one-body deficit
+    # loses about as heavily. Grouping the decided fights this way is what turns
+    # "the middle bands are off" into "buy a body or do not take the bet", and it is
+    # the first thing to read before retuning the odds curve.
+    def _group(key_for: Callable[[dict], str | None]) -> dict[str, dict]:
+        grouped: dict[str, dict] = {}
+        for row in decided:
+            key = key_for(row)
+            if key is None:
+                continue
+            group = grouped.setdefault(key, {"samples": 0, "predicted": 0.0, "wins": 0})
+            group["samples"] += 1
+            group["predicted"] += float(row["shown_win_odds"])
+            group["wins"] += 1 if row["won"] else 0
+        for group in grouped.values():
+            group["predicted"] = round(group["predicted"] / group["samples"], 4)
+            group["observed"] = round(group["wins"] / group["samples"], 4)
+            group["gap"] = round(group["observed"] - group["predicted"], 4)
+        return dict(
+            sorted(
+                grouped.items(),
+                key=lambda item: (int(item[0]),) if item[0].lstrip("+-").isdigit() else (0, item[0]),
+            )
+        )
+
+    def _size_key(row: dict) -> str | None:
+        player_count = row.get("player_count")
+        enemy_count = row.get("enemy_count")
+        if not isinstance(player_count, int) or not isinstance(enemy_count, int):
+            return None
+        # Clamped so the buckets stay populated once boards reach the late cap.
+        delta = max(-5, min(5, player_count - enemy_count))
+        return "%+d" % delta
+
+    size_advantage = _group(_size_key)
+    clock_split = _group(lambda row: "clock_decided" if row.get("clock_decided") else "live")
+    # First look versus rematch. The enemy board is generated once per stage, so a
+    # repeat attempt is the same fight against a board that already won once.
+    attempt_split = _group(
+        lambda row: (
+            "first_attempt" if int(row.get("stage_attempt") or 1) <= 1 else "same_stage_retry"
+        )
+    )
+    return {
+        "samples": len(decided),
+        "ties": ties,
+        "predicted_mean": round(predicted_mean, 4),
+        "observed_mean": round(observed_mean, 4),
+        "gap": round(observed_mean - predicted_mean, 4),
+        "brier": round(brier, 4),
+        "buckets": buckets,
+        "buckets_outside_tolerance": sorted(out_of_tolerance),
+        "favourite_calls": len(favourites),
+        "favourite_call_win_rate": round(favourite_wins / len(favourites), 4) if favourites else None,
+        "clock_decided": sum(1 for row in decided if row.get("clock_decided")),
+        "display_staleness": staleness,
+        "size_advantage": size_advantage,
+        "clock_split": clock_split,
+        "attempt_split": attempt_split,
+    }
+
+
 def _calibration(events: list[dict]) -> dict:
     pairs = []
     pending = None
@@ -488,6 +923,9 @@ def _findings(
     engine_errors: list[str],
     combat: dict,
     experience: dict,
+    progression: dict | None = None,
+    items: dict | None = None,
+    prediction: dict | None = None,
 ) -> list[dict]:
     findings: list[dict] = []
     terminal = str(summary.get("terminal", "unknown"))
@@ -759,6 +1197,67 @@ def _findings(
                 },
                 "recommendation": "Compare this against the shipped countdown: a beat that gives far more time than the choice needs reads as waiting, and one that gives less reads as a scramble.",
             })
+    if progression:
+        if int(progression.get("max_board_capacity", 0) or 0) <= 3:
+            findings.append({
+                "id": "board-never-grew",
+                "severity": "high",
+                "title": "The board capacity never rose above the starting three slots",
+                "evidence": {
+                    "max_board_capacity": progression.get("max_board_capacity"),
+                    "max_board_size": progression.get("max_board_size"),
+                    "level_purchases": progression.get("level_purchases"),
+                },
+                "recommendation": "Capacity is the ceiling on every other plan: a board stuck at three slots cannot field a fourth body, cannot hold three copies of one unit through a combine, and cannot stack a trait ladder. Either the level purchase is not being priced against the benched bodies it would field, or the early bankroll cannot pay for it.",
+            })
+        if not (progression.get("targets") or {}).get("three_star_a_unit"):
+            findings.append({
+                "id": "no-three-star",
+                "severity": "info",
+                "title": "No unit reached level 3 in this run",
+                "evidence": {
+                    "max_unit_level": progression.get("max_unit_level"),
+                    "peak_bankroll": progression.get("peak_bankroll"),
+                    "level_purchases": progression.get("level_purchases"),
+                },
+                "recommendation": "A three-star is nine copies of one identity, so a run has to be rich enough to buy duplicates on purpose. Read this as the power ceiling question - a run that never gets near a bad copy of a unit is not offering the vertical the shop odds imply.",
+            })
+    if items:
+        # The pacing target is eight completed items (sixteen components) by stage 10.
+        completed = int(items.get("items_completed", 0) or 0)
+        peak_stage = int(items.get("max_global_stage", 0) or 0)
+        if peak_stage >= 10 and completed < 8:
+            findings.append({
+                "id": "item-flow-short-of-target",
+                "severity": "high",
+                "title": "The run reached stage %d with %d completed items against a target of 8" % (peak_stage, completed),
+                "evidence": {
+                    "items_completed": completed,
+                    "components_equipped": items.get("components_equipped"),
+                    "peak_components_held": items.get("peak_components_held"),
+                    "components_by_stage": items.get("components_held_by_stage"),
+                },
+                "recommendation": "Components only arrive from creep rewards, and each chapter contains one creep stage with one creep. At the configured 58.33% component rate that is about 0.58 component rolls per chapter, so the item curve cannot approach the target no matter how well the run plays. Fix the reward rate, the number of creeps per creep stage, or the number of creep stages per chapter - the per-roll probabilities are already documented and correct.",
+            })
+    if prediction and int(prediction.get("samples", 0) or 0) >= 20:
+        outside = prediction.get("buckets_outside_tolerance") or []
+        favourite_rate = prediction.get("favourite_call_win_rate")
+        if outside or (isinstance(favourite_rate, (int, float)) and favourite_rate < 0.5):
+            findings.append({
+                "id": "prediction-miscalibrated",
+                "severity": "high",
+                "title": "The shown pre-fight odds do not match the results in %d of %d fights" % (len(outside), prediction.get("samples")),
+                "evidence": {
+                    "predicted_mean": prediction.get("predicted_mean"),
+                    "observed_mean": prediction.get("observed_mean"),
+                    "gap": prediction.get("gap"),
+                    "brier": prediction.get("brier"),
+                    "buckets_outside_tolerance": outside,
+                    "buckets": prediction.get("buckets"),
+                    "favourite_call_win_rate": favourite_rate,
+                },
+                "recommendation": "The whole wager loop is priced on this estimate. A favourite call above 0.50 is a usable signal, but the middle bands are not: the estimator compares summed team power while a clock-decided fight is awarded by surviving units first, so a board that is merely out-numbered loses a fight the power ratio called close. Either model the survivor-count ladder in the estimate or stop fights resolving on the clock.",
+            })
     return findings
 
 
@@ -770,6 +1269,10 @@ def _render(
     findings: list[dict],
     run_dir: Path,
     experience: dict | None = None,
+    progression: dict | None = None,
+    items: dict | None = None,
+    fights: list[dict] | None = None,
+    prediction: dict | None = None,
 ) -> str:
     lines = [
         "# Jev run report",
@@ -819,6 +1322,48 @@ def _render(
                 break_even_odds=wager.get("break_even_odds"),
             )
         )
+    if progression:
+        targets = progression.get("targets") or {}
+        lines.extend(["", "## Progression against the targets", ""])
+        lines.append(
+            "- Board: max %s of %s slots  |  filled to capacity: %s  |  level purchases: %s"
+            % (
+                progression.get("max_board_size"),
+                progression.get("max_board_capacity"),
+                progression.get("board_filled_to_capacity"),
+                progression.get("level_purchases"),
+            )
+        )
+        lines.append(
+            "- Units: highest level %s  |  three-star: %s"
+            % (progression.get("max_unit_level"), progression.get("three_star_units") or "none")
+        )
+        lines.append(
+            "- Traits: maxed %s  |  highest tier per trait: %s"
+            % (progression.get("maxed_traits") or "none", progression.get("highest_trait_tier"))
+        )
+        lines.append(
+            "- Bankroll: peak %s  final %s"
+            % (progression.get("peak_bankroll"), progression.get("final_buckets"))
+        )
+        lines.append(f"- Targets met: {json.dumps(targets)}")
+    if items:
+        lines.extend(["", "## Item flow", ""])
+        lines.append(
+            "- Components equipped: %s  |  completed items: %s  |  peak components held at once: %s"
+            % (
+                items.get("components_equipped"),
+                items.get("items_completed"),
+                items.get("peak_components_held"),
+            )
+        )
+        lines.append(
+            "- Farthest global stage: %s  (target: 8 completed items by stage 10)"
+            % items.get("max_global_stage")
+        )
+        completed_names = items.get("completed_item_ids") or []
+        if completed_names:
+            lines.append("- Completed: %s" % ", ".join(completed_names))
     lines.extend(["", "## Calibration of the shown win odds", ""])
     if calibration.get("samples"):
         lines.append(
@@ -830,6 +1375,76 @@ def _render(
             )
     else:
         lines.append("- Not enough pre-fight odds samples were recorded.")
+    if fights:
+        lines.extend(["", "## Prediction versus result, fight by fight", ""])
+        lines.append(
+            "| stage | kind | shown | break-even | wager | board | enemy | result | clock | damage for/against |"
+        )
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+        for row in fights:
+            shown = row.get("shown_win_odds")
+            break_even = row.get("break_even_odds")
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s/%s |"
+                % (
+                    row.get("global_stage"),
+                    row.get("encounter_kind"),
+                    f"{float(shown):.2f}" if isinstance(shown, (int, float)) else "-",
+                    f"{float(break_even):.2f}" if isinstance(break_even, (int, float)) else "-",
+                    row.get("wager"),
+                    row.get("player_board"),
+                    row.get("enemy_board"),
+                    "%s(%s)" % (row.get("result"), "win" if row.get("won") else "loss") if row.get("won") is not None else row.get("result"),
+                    "yes" if row.get("clock_decided") else "no",
+                    row.get("player_damage"),
+                    row.get("enemy_damage"),
+                )
+            )
+        lines.append("")
+        lines.append(
+            "- Wager sizing is a claim about these numbers. A favourite call is any fight with shown odds above 0.50; "
+            "it should win more often than it loses. The board columns list each unit with its level."
+        )
+    if prediction and prediction.get("samples"):
+        lines.extend(["", "## Prediction quality", ""])
+        lines.append(
+            "- Samples: %s (ties excluded: %s)  Predicted mean: %s  Observed mean: %s  Gap: %s  Brier: %s"
+            % (
+                prediction.get("samples"),
+                prediction.get("ties"),
+                prediction.get("predicted_mean"),
+                prediction.get("observed_mean"),
+                prediction.get("gap"),
+                prediction.get("brier"),
+            )
+        )
+        lines.append(
+            "- Buckets outside the two-sigma tolerance: %s  |  clock-decided fights: %s"
+            % (prediction.get("buckets_outside_tolerance") or "none", prediction.get("clock_decided"))
+        )
+        if prediction.get("favourite_calls"):
+            lines.append(
+                "- Favourite calls (shown odds > 0.50): %s, won %s of them (%.0f%%)"
+                % (
+                    prediction.get("favourite_calls"),
+                    int(round(float(prediction.get("favourite_call_win_rate") or 0.0) * prediction["favourite_calls"])),
+                    (prediction.get("favourite_call_win_rate") or 0.0) * 100.0,
+                )
+            )
+        for label, band in (
+            ("Body advantage (player units minus enemy units)", "size_advantage"),
+            ("How the fight was resolved", "clock_split"),
+            ("First look versus same-stage retry", "attempt_split"),
+        ):
+            groups = prediction.get(band) or {}
+            if not groups:
+                continue
+            lines.append("- %s (key: n, predicted, observed, gap):" % label)
+            for key, group in groups.items():
+                lines.append(
+                    "  - %s: n=%s predicted=%s observed=%s gap=%+0.3f"
+                    % (key, group.get("samples"), group.get("predicted"), group.get("observed"), group.get("gap") or 0.0)
+                )
     if experience:
         lines.extend(["", "## Experience for an average player", ""])
         lines.append(
@@ -855,6 +1470,52 @@ def _render(
                 experience.get("planning_allowance_seconds"),
             )
         )
+    outcome = (summary.get("outcome") or {})
+    if outcome:
+        lines.extend(["", "## Why the run stopped", ""])
+        lines.append(
+            "- Terminal `%s` (failed: %s)  cause: `%s`"
+            % (outcome.get("terminal"), outcome.get("failed"), outcome.get("cause"))
+        )
+        lines.append(
+            "- Died at chapter %s round %s (global stage %s) on a %s fight, stage attempt %s"
+            % (
+                outcome.get("chapter"),
+                outcome.get("round"),
+                outcome.get("global_stage"),
+                outcome.get("encounter_kind"),
+                int(outcome.get("stage_attempts") or 0) + 1,
+            )
+        )
+        lines.append(
+            "- Shown odds %s against break-even %s at a %sx quote; wagered %s of the bankroll, ended with %s buckets"
+            % (
+                outcome.get("shown_win_odds"),
+                outcome.get("break_even_odds"),
+                outcome.get("quoted_multiplier"),
+                outcome.get("wager"),
+                outcome.get("buckets_at_end"),
+            )
+        )
+        lines.append(
+            "- Board %s of %s slots (full: %s)  |  clock decided: %s  |  alive after: %s vs %s  |  damage %s/%s"
+            % (
+                outcome.get("board_size"),
+                outcome.get("board_capacity"),
+                outcome.get("board_full"),
+                outcome.get("clock_decided"),
+                outcome.get("player_alive_after"),
+                outcome.get("enemy_alive_after"),
+                outcome.get("player_damage"),
+                outcome.get("enemy_damage"),
+            )
+        )
+        if outcome.get("notes"):
+            lines.append("- Notes: %s" % json.dumps(outcome.get("notes")))
+        if outcome.get("player_board"):
+            lines.append("- Final player board: %s" % outcome.get("player_board"))
+        if outcome.get("enemy_board"):
+            lines.append("- Final enemy board: %s" % outcome.get("enemy_board"))
     lines.extend(["", "## Findings", ""])
     for finding in findings:
         lines.append(f"### [{finding['severity']}] {finding['title']}")
@@ -866,10 +1527,487 @@ def _render(
     return "\n".join(lines)
 
 
+def _run_dirs_from_batch(path: Path) -> list[Path]:
+    batch_json = path / "batch.json"
+    if batch_json.exists():
+        rows = json.loads(batch_json.read_text(encoding="utf-8-sig"))
+        found = [Path(str(row["run_directory"])) for row in rows if row.get("run_directory")]
+        if found:
+            return found
+    if (path / "run_summary.json").exists():
+        return [path]
+    return sorted(
+        (
+            child
+            for child in path.iterdir()
+            if (child / "run_summary.json").exists() or (child / "run_checkpoint.json").exists()
+        ),
+        key=lambda item: item.name,
+    )
+
+
+def _trait_effectiveness(fights: list[dict]) -> dict:
+    """Win rate with a trait active against the win rate without it.
+
+    Observational, not causal: a run that is winning survives long enough to stack
+    traits, so every number here is confounded by run length. It is still the
+    cheapest way to notice a trait that looks dead, and it is reported with its
+    sample size so nobody reads a five-fight bucket as a verdict.
+    """
+    active: dict[str, list[int]] = {}
+    inactive: dict[str, list[int]] = {}
+    for fight in fights:
+        if fight.get("won") is None:
+            continue
+        won = 1 if fight.get("won") else 0
+        for entry in fight.get("active_traits") or []:
+            bucket = active.setdefault(str(entry), [0, 0])
+            bucket[0] += 1
+            bucket[1] += won
+        for entry in fight.get("inactive_traits") or []:
+            bucket = inactive.setdefault(str(entry), [0, 0])
+            bucket[0] += 1
+            bucket[1] += won
+    rows = []
+    for trait_id in sorted(set(active) | set(inactive)):
+        a_n, a_w = active.get(trait_id, [0, 0])
+        i_n, i_w = inactive.get(trait_id, [0, 0])
+        rows.append({
+            "trait": trait_id,
+            "active_fights": a_n,
+            "active_win_rate": round(a_w / a_n, 3) if a_n else None,
+            "inactive_fights": i_n,
+            "inactive_win_rate": round(i_w / i_n, 3) if i_n else None,
+            "delta": round((a_w / a_n) - (i_w / i_n), 3) if a_n and i_n else None,
+        })
+    rows.sort(key=lambda row: (row["delta"] is None, row["delta"] if row["delta"] is not None else 0.0))
+    return {
+        "note": "observational; run length confounds every row",
+        "rows": rows,
+    }
+
+
+def _batch_analysis(run_dirs: list[Path]) -> dict:
+    """Aggregate the prediction check and the acceptance targets across runs.
+
+    A single run has too few fights to say whether the shown odds are honest; the
+    decision that matters is whether the whole sample can carry a wager.
+    """
+    all_fights: list[dict] = []
+    runs: list[dict] = []
+    for run_dir in run_dirs:
+        summary = _summary_for(run_dir)
+        events = _load_jsonl(run_dir / "run_events.jsonl")
+        if not summary and not events:
+            continue
+        fights = _fight_records(events)
+        all_fights.extend(fights)
+        progression = _progression(summary, events)
+        items = _items(events)
+        runs.append({
+            "run_directory": str(run_dir),
+            "mode": summary.get("mode"),
+            "lane": summary.get("lane"),
+            "seed": summary.get("seed"),
+            "terminal": summary.get("terminal"),
+            "final_chapter": summary.get("final_chapter"),
+            "battles": summary.get("battles"),
+            "peak_bankroll": summary.get("peak_bankroll"),
+            "technical_failures": len(summary.get("technical_failures") or []),
+            "three_star_units": progression.get("three_star_units"),
+            "maxed_traits": progression.get("maxed_traits"),
+            "maxed_ladders": progression.get("maxed_ladders"),
+            "max_unit_level": progression.get("max_unit_level"),
+            "board": "%s/%s" % (progression.get("max_board_size"), progression.get("max_board_capacity")),
+            "items_completed": items.get("items_completed"),
+            "components_equipped": items.get("components_equipped"),
+            "max_global_stage": items.get("max_global_stage"),
+            "outcome": summary.get("outcome") or {},
+        })
+    # Where and why runs actually end. This is the failure population, kept separate
+    # from the per-run detail so "runs die at the boss with a slot open" is visible
+    # across the sample without reading ten reports.
+    failure_causes: dict[str, int] = {}
+    failure_stages: dict[str, int] = {}
+    failure_kinds: dict[str, int] = {}
+    failure_notes: dict[str, int] = {}
+    failures = [row["outcome"] for row in runs if (row.get("outcome") or {}).get("failed")]
+    for outcome in failures:
+        cause = str(outcome.get("cause", "unknown"))
+        failure_causes[cause] = failure_causes.get(cause, 0) + 1
+        stage_key = "ch%s:%s" % (outcome.get("chapter"), outcome.get("round"))
+        failure_stages[stage_key] = failure_stages.get(stage_key, 0) + 1
+        kind = str(outcome.get("encounter_kind", "unknown"))
+        failure_kinds[kind] = failure_kinds.get(kind, 0) + 1
+        for note in outcome.get("notes") or []:
+            # Bucket the numeric parts so the tallies stay comparable.
+            key = re.sub(r"\d+", "N", str(note))
+            failure_notes[key] = failure_notes.get(key, 0) + 1
+    failure_summary = {
+        "runs_failed": len(failures),
+        "causes": dict(sorted(failure_causes.items(), key=lambda item: -item[1])),
+        "by_stage": dict(sorted(failure_stages.items(), key=lambda item: -item[1])),
+        "by_encounter_kind": dict(sorted(failure_kinds.items(), key=lambda item: -item[1])),
+        "notes": dict(sorted(failure_notes.items(), key=lambda item: -item[1])),
+    }
+    prediction = _prediction_quality(all_fights)
+    trait_effectiveness = _trait_effectiveness(all_fights)
+    # The difficulty ramp against the player's actual power, per global stage. This
+    # is the curve to read before changing any per-chapter constant.
+    by_stage: dict[int, dict] = {}
+    for row in all_fights:
+        stage = int(row.get("global_stage") or 0)
+        if stage <= 0:
+            continue
+        entry = by_stage.setdefault(stage, {
+            "global_stage": stage,
+            "fights": 0,
+            "player_power": 0.0,
+            "enemy_power": 0.0,
+            "target_rating": 0.0,
+            "wins": 0,
+            "odds": 0.0,
+            "power_samples": 0,
+            "odds_samples": 0,
+        })
+        entry["fights"] += 1
+        if row.get("won"):
+            entry["wins"] += 1
+        if isinstance(row.get("player_power"), (int, float)) and isinstance(row.get("enemy_power"), (int, float)):
+            entry["player_power"] += float(row["player_power"])
+            entry["enemy_power"] += float(row["enemy_power"])
+            entry["power_samples"] += 1
+        if isinstance(row.get("target_rating"), (int, float)):
+            entry["target_rating"] += float(row["target_rating"])
+        if isinstance(row.get("shown_win_odds"), (int, float)):
+            entry["odds"] += float(row["shown_win_odds"])
+            entry["odds_samples"] += 1
+    power_curve = []
+    for stage in sorted(by_stage):
+        entry = by_stage[stage]
+        samples = max(1, entry["power_samples"])
+        power_curve.append({
+            "global_stage": stage,
+            "fights": entry["fights"],
+            "win_rate": round(entry["wins"] / max(1, entry["fights"]), 3),
+            "mean_player_power": round(entry["player_power"] / samples, 1),
+            "mean_enemy_power": round(entry["enemy_power"] / samples, 1),
+            "mean_power_ratio": round(
+                (entry["player_power"] / samples) / max(0.01, entry["enemy_power"] / samples), 3
+            ),
+            "mean_target_rating": round(entry["target_rating"] / max(1, entry["fights"]), 1),
+            "mean_shown_odds": round(entry["odds"] / max(1, entry["odds_samples"]), 3),
+        })
+    # Difficulty should rise with the chapter, so the boss win rate should not rise.
+    # This is the gate for "bosses are not harder early than late": a chapter whose boss
+    # is won more often than the previous chapter's is a curve inversion, and a chapter
+    # with too few boss fights to carry a rate is reported but cannot pass judgement.
+    chapter_rows: dict[int, dict] = {}
+    for row in all_fights:
+        chapter = int(row.get("chapter") or 0)
+        if chapter <= 0:
+            continue
+        entry = chapter_rows.setdefault(chapter, {
+            "fights": 0,
+            "wins": 0,
+            "boss_fights": 0,
+            "boss_wins": 0,
+            "clock": 0,
+            "ratio_sum": 0.0,
+            "ratio_samples": 0,
+            "target_sum": 0.0,
+            "target_samples": 0,
+        })
+        entry["fights"] += 1
+        if row.get("won"):
+            entry["wins"] += 1
+        if row.get("clock_decided"):
+            entry["clock"] += 1
+        if str(row.get("encounter_kind")) == "BOSS":
+            entry["boss_fights"] += 1
+            if row.get("won"):
+                entry["boss_wins"] += 1
+        player_power = row.get("player_power")
+        enemy_power = row.get("enemy_power")
+        if isinstance(player_power, (int, float)) and isinstance(enemy_power, (int, float)) and float(enemy_power) > 0:
+            entry["ratio_sum"] += float(player_power) / float(enemy_power)
+            entry["ratio_samples"] += 1
+        if isinstance(row.get("target_rating"), (int, float)):
+            entry["target_sum"] += float(row["target_rating"])
+            entry["target_samples"] += 1
+    # Five boss fights is the floor for a rate worth reading; below that the row is
+    # reported with a null rate rather than being silently dropped.
+    chapter_difficulty: list[dict] = []
+    for chapter in sorted(chapter_rows):
+        entry = chapter_rows[chapter]
+        boss_fights = entry["boss_fights"]
+        chapter_difficulty.append({
+            "chapter": chapter,
+            "fights": entry["fights"],
+            "win_rate": round(entry["wins"] / max(1, entry["fights"]), 3),
+            "boss_fights": boss_fights,
+            "boss_win_rate": round(entry["boss_wins"] / boss_fights, 3) if boss_fights >= 5 else None,
+            "mean_power_ratio": round(entry["ratio_sum"] / max(1, entry["ratio_samples"]), 3),
+            "mean_target_rating": round(entry["target_sum"] / max(1, entry["target_samples"]), 1),
+            "clock_decided_share": round(entry["clock"] / max(1, entry["fights"]), 3),
+        })
+    inversions: list[dict] = []
+    rated = [row for row in chapter_difficulty if row["boss_win_rate"] is not None]
+    for before, after in zip(rated, rated[1:]):
+        if after["boss_win_rate"] > before["boss_win_rate"] + 0.05:
+            inversions.append({
+                "easier_chapter": after["chapter"],
+                "easier_boss_win_rate": after["boss_win_rate"],
+                "harder_chapter": before["chapter"],
+                "harder_boss_win_rate": before["boss_win_rate"],
+            })
+
+    # The acceptance targets, counted across the sample.
+    runs_reaching_chapter_10 = sum(1 for row in runs if int(row.get("final_chapter") or 0) >= 10)
+    runs_with_three_star = sum(1 for row in runs if row.get("three_star_units"))
+    runs_with_maxed_trait = sum(1 for row in runs if row.get("maxed_traits"))
+    runs_with_maxed_ladder = sum(1 for row in runs if row.get("maxed_ladders"))
+    runs_with_full_board = sum(
+        1
+        for row in runs
+        if row.get("board") and row["board"].split("/")[0] == row["board"].split("/")[1]
+    )
+    runs_with_eight_items = sum(1 for row in runs if int(row.get("items_completed") or 0) >= 8)
+    return {
+        "runs": runs,
+        "fights": all_fights,
+        "prediction": prediction,
+        "power_curve": power_curve,
+        "chapter_difficulty": chapter_difficulty,
+        "chapter_difficulty_inversions": inversions,
+        "trait_effectiveness": trait_effectiveness,
+        "failure_summary": failure_summary,
+        "acceptance": {
+            "runs": len(runs),
+            "reached_chapter_10": runs_reaching_chapter_10,
+            "three_star_a_unit": runs_with_three_star,
+            "maxed_a_trait": runs_with_maxed_trait,
+            "maxed_a_multi_tier_trait": runs_with_maxed_ladder,
+            "filled_a_board": runs_with_full_board,
+            "eight_items": runs_with_eight_items,
+            "peak_bankroll_max": max((int(row.get("peak_bankroll") or 0) for row in runs), default=0),
+            "terminals": {
+                terminal: sum(1 for row in runs if row.get("terminal") == terminal)
+                for terminal in sorted({str(row.get("terminal")) for row in runs})
+            },
+        },
+    }
+
+
+def _render_batch(batch: dict) -> str:
+    prediction = batch.get("prediction") or {}
+    acceptance = batch.get("acceptance") or {}
+    lines = [
+        "# Jev batch analysis",
+        "",
+        "## Runs",
+        "",
+        "| seed | terminal | chapter | battles | peak | fails | max lvl | board | items | 3-star | maxed trait |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in batch.get("runs", []):
+        lines.append(
+            "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+            % (
+                row.get("seed"),
+                row.get("terminal"),
+                row.get("final_chapter"),
+                row.get("battles"),
+                row.get("peak_bankroll"),
+                row.get("technical_failures"),
+                row.get("max_unit_level"),
+                row.get("board"),
+                row.get("items_completed"),
+                ",".join(row.get("three_star_units") or []) or "-",
+                ",".join(row.get("maxed_traits") or []) or "-",
+            )
+        )
+    lines.extend(["", "## Acceptance targets", ""])
+    lines.append(
+        "- Runs: %s  |  reached chapter 10: %s  |  three-starred a unit: %s  |  maxed a trait: %s (multi-tier: %s)  |  filled a board: %s  |  8+ items: %s"
+        % (
+            acceptance.get("runs"),
+            acceptance.get("reached_chapter_10"),
+            acceptance.get("three_star_a_unit"),
+            acceptance.get("maxed_a_trait"),
+            acceptance.get("maxed_a_multi_tier_trait"),
+            acceptance.get("filled_a_board"),
+            acceptance.get("eight_items"),
+        )
+    )
+    lines.append("- Terminals: %s  |  highest peak bankroll: %s" % (acceptance.get("terminals"), acceptance.get("peak_bankroll_max")))
+    failure_summary = batch.get("failure_summary") or {}
+    if failure_summary.get("runs_failed"):
+        lines.extend(["", "## Why runs ended", ""])
+        lines.append("- Runs that failed: %s of %s" % (failure_summary.get("runs_failed"), acceptance.get("runs")))
+        lines.append("- Causes: %s" % json.dumps(failure_summary.get("causes")))
+        lines.append("- By stage: %s" % json.dumps(failure_summary.get("by_stage")))
+        lines.append("- By encounter kind: %s" % json.dumps(failure_summary.get("by_encounter_kind")))
+        lines.append("- Recurring notes: %s" % json.dumps(failure_summary.get("notes")))
+    if batch.get("power_curve"):
+        lines.extend(["", "## Difficulty ramp versus player power, by global stage", ""])
+        lines.append("| stage | fights | win rate | player power | enemy power | ratio | target rating | mean shown odds |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+        for row in batch["power_curve"]:
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (
+                    row.get("global_stage"),
+                    row.get("fights"),
+                    row.get("win_rate"),
+                    row.get("mean_player_power"),
+                    row.get("mean_enemy_power"),
+                    row.get("mean_power_ratio"),
+                    row.get("mean_target_rating"),
+                    row.get("mean_shown_odds"),
+                )
+            )
+        lines.append("")
+        lines.append("- A ratio below 1.0 at a stage means the player board was, on average, the weaker one on the model's own rating.")
+    if batch.get("chapter_difficulty"):
+        lines.extend(["", "## Boss difficulty by chapter (the curve gate)", ""])
+        lines.append("Difficulty should rise with the chapter, so the boss win rate should not rise. Five boss fights is the floor for a rate worth reading.")
+        lines.append("")
+        lines.append("| chapter | fights | win rate | boss fights | boss win rate | power ratio | target | clock-decided |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+        for row in batch["chapter_difficulty"]:
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (
+                    row.get("chapter"),
+                    row.get("fights"),
+                    row.get("win_rate"),
+                    row.get("boss_fights"),
+                    row.get("boss_win_rate") if row.get("boss_win_rate") is not None else "-",
+                    row.get("mean_power_ratio"),
+                    row.get("mean_target_rating"),
+                    row.get("clock_decided_share"),
+                )
+            )
+        inversions = batch.get("chapter_difficulty_inversions") or []
+        if inversions:
+            lines.append("")
+            for row in inversions:
+                lines.append(
+                    "- Curve inversion: chapter %s is easier than chapter %s (%s against %s)."
+                    % (
+                        row.get("easier_chapter"),
+                        row.get("harder_chapter"),
+                        row.get("easier_boss_win_rate"),
+                        row.get("harder_boss_win_rate"),
+                    )
+                )
+        else:
+            lines.append("")
+            lines.append("- No inversion detected in the chapters with enough boss fights.")
+    trait_effectiveness = batch.get("trait_effectiveness") or {}
+    if trait_effectiveness.get("rows"):
+        lines.extend(["", "## Trait effectiveness (observational)", ""])
+        lines.append("- %s" % trait_effectiveness.get("note"))
+        lines.append("")
+        lines.append("| trait | active fights | active win% | inactive fights | inactive win% | delta |")
+        lines.append("| --- | --- | --- | --- | --- | --- |")
+        for row in trait_effectiveness["rows"]:
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s |"
+                % (
+                    row.get("trait"),
+                    row.get("active_fights"),
+                    row.get("active_win_rate"),
+                    row.get("inactive_fights"),
+                    row.get("inactive_win_rate"),
+                    row.get("delta"),
+                )
+            )
+    lines.extend(["", "## Prediction quality across the sample", ""])
+    if prediction.get("samples"):
+        lines.append(
+            "- Fights with a decided result: %s (ties excluded: %s)  Predicted mean: %s  Observed mean: %s  Gap: %s  Brier: %s"
+            % (
+                prediction.get("samples"),
+                prediction.get("ties"),
+                prediction.get("predicted_mean"),
+                prediction.get("observed_mean"),
+                prediction.get("gap"),
+                prediction.get("brier"),
+            )
+        )
+        lines.append("")
+        lines.append("| shown odds band | n | predicted | observed | gap | 2-sigma | outside |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- |")
+        for key in sorted(prediction.get("buckets", {})):
+            bucket = prediction["buckets"][key]
+            lines.append(
+                "| %s | %s | %s | %s | %s | %s | %s |"
+                % (
+                    key,
+                    bucket.get("samples"),
+                    bucket.get("predicted"),
+                    bucket.get("observed"),
+                    bucket.get("gap"),
+                    bucket.get("tolerance"),
+                    "yes" if bucket.get("outside_tolerance") else "no",
+                )
+            )
+        if prediction.get("favourite_calls"):
+            lines.append("")
+            lines.append(
+                "- Favourite calls (shown odds > 0.50): %s, win rate %s. If this is not clearly above 0.50 the odds cannot be mapped straight onto a wager."
+                % (prediction.get("favourite_calls"), prediction.get("favourite_call_win_rate"))
+            )
+        lines.append("- Clock-decided fights in the sample: %s" % prediction.get("clock_decided"))
+        # Two cuts that explain most of the residual error: how many bodies each side
+        # fielded, and whether the fight ended on the clock instead of on damage.
+        for title, band, key_label in (
+            ("Body advantage (player units minus enemy units)", "size_advantage", "delta"),
+            ("Resolution", "clock_split", "result"),
+            ("First look versus same-stage retry", "attempt_split", "attempt"),
+        ):
+            groups = prediction.get(band) or {}
+            if not groups:
+                continue
+            lines.append("")
+            lines.append("**%s**" % title)
+            lines.append("")
+            lines.append("| %s | n | predicted | observed | gap |" % key_label)
+            lines.append("| --- | --- | --- | --- | --- |")
+            for key, group in groups.items():
+                lines.append(
+                    "| %s | %s | %s | %s | %+0.3f |"
+                    % (key, group.get("samples"), group.get("predicted"), group.get("observed"), group.get("gap") or 0.0)
+                )
+    else:
+        lines.append("- No decided fights were found in the collected runs.")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    if args.batch_dir:
+        batch_root = Path(args.batch_dir).resolve()
+        run_dirs = _run_dirs_from_batch(batch_root)
+        batch = _batch_analysis(run_dirs)
+        out_dir = Path(args.out).resolve() if args.out else batch_root
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "cross_run.json").write_text(
+            json.dumps(batch, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        (out_dir / "cross_run.md").write_text(_render_batch(batch), encoding="utf-8")
+        print(json.dumps({
+            "runs": len(batch["runs"]),
+            "fights": len(batch["fights"]),
+            "prediction": batch["prediction"],
+            "acceptance": batch["acceptance"],
+            "report": str(out_dir / "cross_run.md"),
+        }, indent=2))
+        return 0
     run_dir = Path(args.run_dir).resolve()
-    summary = _load_json(run_dir / "run_summary.json")
+    summary = _summary_for(run_dir)
     decisions = _load_jsonl(run_dir / "decisions.jsonl")
     events = _load_jsonl(run_dir / "run_events.jsonl")
     observations = _observations(run_dir)
@@ -878,14 +2016,19 @@ def main(argv: list[str] | None = None) -> int:
     latency = _decision_latency(decisions)
     audit = _audit(summary, events, observations)
     calibration = _calibration(events)
+    progression = _progression(summary, events)
+    items = _items(events)
+    fights = _fight_records(events)
+    prediction = _prediction_quality(fights)
     engine_errors = _engine_errors(run_dir)
-    findings = _findings(summary, latency, audit, calibration, observations, engine_errors, combat, experience)
+    findings = _findings(summary, latency, audit, calibration, observations, engine_errors, combat, experience, progression, items, prediction)
     result = {
         "run_dir": str(run_dir),
         "summary": {
             key: summary.get(key)
             for key in (
                 "mode",
+                "lane",
                 "seed",
                 "starter",
                 "terminal",
@@ -902,12 +2045,19 @@ def main(argv: list[str] | None = None) -> int:
         "engine_errors": engine_errors,
         "combat": combat,
         "experience": experience,
+        "progression": progression,
+        "items": items,
+        "fights": fights,
+        "prediction": prediction,
         "findings": findings,
     }
     out_dir = Path(args.out).resolve() if args.out else run_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "findings.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-    (out_dir / "report.md").write_text(_render(summary, latency, audit, calibration, findings, run_dir, experience), encoding="utf-8")
+    (out_dir / "report.md").write_text(
+        _render(summary, latency, audit, calibration, findings, run_dir, experience, progression, items, fights, prediction),
+        encoding="utf-8",
+    )
     print(json.dumps({
         "terminal": summary.get("terminal"),
         "decisions": latency.get("decisions"),

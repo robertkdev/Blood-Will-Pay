@@ -75,7 +75,9 @@ func _verify_compact_identity_contract(team: String, unit_name: String) -> void:
 	var name_label: Label = row_node.get_node_or_null("HBox/Content/Name") as Label
 	var value_well: Panel = row_node.get_node_or_null("HBox/Content/ValueWell") as Panel
 	var actual: String = name_label.text if name_label != null else ""
-	_expect(actual.contains(unit_name.to_upper()), "narrow compact identity lost the full %s name: %s" % [unit_name.to_upper(), actual])
+	# The compact rail renders the authored mixed-case name and keeps the team
+	# in the rail chrome instead of a repeated "YOU "/"FOE " prefix.
+	_expect(actual.contains(unit_name), "narrow compact identity lost the full %s name: %s" % [unit_name, actual])
 	_expect(name_label != null and bool(name_label.get_meta("compact_identity_preserves_unit_name", false)), "narrow compact identity should preserve the full authored name for %s" % unit_name)
 	_expect(name_label != null and String(name_label.get_meta("compact_team_marker", "")) == ("FOE" if team == "enemy" else "YOU"), "compact identity lost its team metadata for %s" % unit_name)
 	_expect(name_label != null and String(name_label.get_meta("compact_identity_mode", "")) == "name_only_team_in_chrome", "narrow compact identity should deliberately move team identity into row chrome")
@@ -87,7 +89,7 @@ func _verify_compact_identity_contract(team: String, unit_name: String) -> void:
 	await get_tree().process_frame
 	row_node.refresh_compact_identity()
 	var intermediate_copy: String = name_label.text if name_label != null else ""
-	_expect(intermediate_copy.contains(unit_name.to_upper()), "150-percent rail fixture lost %s: %s" % [unit_name.to_upper(), intermediate_copy])
+	_expect(intermediate_copy.contains(unit_name), "150-percent rail fixture lost %s: %s" % [unit_name, intermediate_copy])
 	_expect(not intermediate_copy.begins_with("Y ") and not intermediate_copy.begins_with("F "), "150-percent rail fixture uses a clipped-looking one-letter team prefix: %s" % intermediate_copy)
 	_expect(name_label != null and value_well != null and name_label.get_global_rect().end.x <= value_well.get_global_rect().position.x - 4.0, "150-percent rail identity collides with its boxed numeric value for %s" % unit_name)
 	row_node.size = Vector2(240.0, 40.0)
@@ -96,9 +98,10 @@ func _verify_compact_identity_contract(team: String, unit_name: String) -> void:
 	row_node.set_exact_compact_values(true)
 	await get_tree().process_frame
 	row_node.refresh_compact_identity()
-	var full_expected: String = "%s %s" % ["FOE" if team == "enemy" else "YOU", unit_name.to_upper()]
-	_expect(name_label != null and name_label.text == full_expected, "wider compact row should restore full identity %s" % full_expected)
-	_expect(name_label != null and String(name_label.get_meta("compact_identity_mode", "")) == "full_badge", "wider compact row did not restore full badge mode")
+	var full_expected: String = unit_name
+	_expect(name_label != null and name_label.text == full_expected, "wider compact row should restore the complete identity %s" % full_expected)
+	_expect(name_label != null and String(name_label.get_meta("compact_team_marker", "")) == ("FOE" if team == "enemy" else "YOU"), "wider compact row lost its team identity metadata")
+	_expect(name_label != null and String(name_label.get_meta("compact_identity_mode", "")) == "name_only_team_in_chrome", "wider compact row did not keep team identity in the rail chrome")
 	remove_child(row_node)
 	row_node.free()
 

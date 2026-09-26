@@ -7,6 +7,11 @@ const LivingLedgerCatalogScript: GDScript = preload("res://scripts/game/account/
 
 const DEFAULT_JOURNAL_PATH: String = "user://omen_run_journal_v1.json"
 
+## Ledger ranks per extra starting blood bucket beyond Debtor's Mercy's first one.
+const DEBTORS_MERCY_RANKS_PER_BUCKET: int = 25
+## Ledger ranks per extra board body beyond Wide Table's first one.
+const WIDE_TABLE_RANKS_PER_SLOT: int = 40
+
 static func profile(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> Dictionary:
 	var result: Dictionary = AccountProfileStoreScript.load_or_create(path)
 	if bool(result.get("ok", false)):
@@ -79,7 +84,25 @@ static func has_equipped_edict(edict_id: String, path: String = AccountProfileSt
 	return _has_equipped_edict(profile(path), edict_id)
 
 static func starting_blood_bucket_bonus(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> int:
-	return 1 if has_equipped_edict("debtors_mercy", path) else 0
+	return _rank_scaled_edict_bonus("debtors_mercy", DEBTORS_MERCY_RANKS_PER_BUCKET, path)
+
+## Extra board bodies the equipped Wide Table Edict grants this run.
+static func board_capacity_bonus(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> int:
+	return _rank_scaled_edict_bonus("wide_table", WIDE_TABLE_RANKS_PER_SLOT, path)
+
+## The permanent layer has to keep paying out across the whole 99-rank ladder. A flat
+## "+1 and then inert" Edict is bought once and then does nothing for the rest of the
+## campaign, which is why a rank-66 account fielded the same board as a fresh one.
+## These two Edicts are worth a first step plus one more per `ranks_per_step` Ledger
+## ranks, so play, lose, come back is worth something every time the account grows.
+static func _rank_scaled_edict_bonus(edict_id: String, ranks_per_step: int, path: String) -> int:
+	if not has_equipped_edict(edict_id, path):
+		return 0
+	var current: Dictionary = profile(path)
+	var lifetime: int = max(0, int(current.get("lifetime_omens", 0)))
+	var rank: int = int(LivingLedgerCatalogScript.rank_progress(lifetime).get("rank", 1))
+	var step: int = max(1, int(ranks_per_step))
+	return 1 + int(floor(float(max(0, rank - 1)) / float(step)))
 
 static func starting_gold_bonus(path: String = AccountProfileStoreScript.DEFAULT_PATH) -> int:
 	# Legacy compatibility for callers that predate the blood-bucket economy.

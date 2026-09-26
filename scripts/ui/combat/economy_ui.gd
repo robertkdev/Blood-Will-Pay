@@ -2,6 +2,7 @@ extends RefCounted
 class_name EconomyUI
 
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 const StakesMarket: GDScript = preload("res://scripts/game/economy/stakes_market.gd")
 const TeamOddsEstimator: GDScript = preload("res://scripts/game/combat/team_odds_estimator.gd")
@@ -43,6 +44,11 @@ func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all
 	if all_in_button != null and not all_in_button.is_connected("pressed", Callable(self, "_on_all_in_pressed")):
 		all_in_button.pressed.connect(_on_all_in_pressed)
 	if all_in_button != null:
+		all_in_button.name = "AllInButton"
+		# The chip stack carries the action; the button says the words only when it is armed,
+		# because that is the moment the player needs to be told what they just risked.
+		all_in_button.icon = GothicUIAssets.action_icon(GothicUIAssets.ACTION_ICON_ALL_IN)
+		all_in_button.add_theme_constant_override("icon_max_width", GothicUIAssets.ACTION_ICON_PIXELS)
 		HardcoreUIAssets.apply_button_family(all_in_button, "wager")
 	if _root is Control:
 		var root_control: Control = _root as Control
@@ -230,7 +236,15 @@ func refresh() -> void:
 
 	# Hide static "Wager:" labels whenever the slider is hidden; bet_value carries the state copy.
 	if _bet_row:
-		_bet_row.tooltip_text = "Opening fight uses the default bucket wager. Wager controls open after the first shop." if forced_first_fight else ""
+		var deferred_betting_tip: String = "Opening fight uses the default bucket wager. Wager controls open after the first shop." if forced_first_fight else ""
+		_bet_row.tooltip_text = deferred_betting_tip
+		# The composed dock moves the slider into its own wager row, which empties
+		# this one. The explanation has to sit on the row that actually holds the
+		# control as well, or the pointer lands on an unexplained disabled slider.
+		if bet_slider != null:
+			var live_row: Control = bet_slider.get_parent() as Control
+			if live_row != null and live_row != _bet_row:
+				live_row.tooltip_text = deferred_betting_tip
 		for ch: Node in _bet_row.get_children():
 			if ch is Label and ch != bet_value:
 				(ch as Label).visible = not in_combat and not forced_first_fight
@@ -289,7 +303,7 @@ func _refresh_all_in_visual(in_combat: bool, forced_first_fight: bool) -> void:
 		and Economy.blood_buckets > 0
 		and int(round(bet_slider.value)) >= int(round(bet_slider.max_value))
 	)
-	all_in_button.text = "ALL IN!" if armed else "All In"
+	all_in_button.text = "ALL IN!" if armed else ""
 	all_in_button.tooltip_text = "Maximum wager armed. Starting battle risks the full bankroll." if armed else "Set the wager to your full available bankroll."
 	if not armed:
 		all_in_button.remove_theme_color_override("font_color")
@@ -314,8 +328,10 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 	var compact_decision: bool = tight_compact or _uses_narrow_compact_copy()
 	if forced_first_fight:
 		var opening_risk: String = BloodBuckets.format_amount(1, compact_decision)
-		var opening_summary: String = "Opening wager: %s" if compact_decision else "Opening wager: %s. Win to unlock the shop."
-		wager_summary.text = opening_summary % opening_risk
+		# Stake only. "Win to unlock the shop" is the opening placeholder's own line directly
+		# under this strip - printing it twice was filler, and at 1920x1080 the longer line
+		# ran into the placeholder text below it.
+		wager_summary.text = "Opening wager: %s" % opening_risk
 		wager_summary.tooltip_text = BloodBuckets.describe(1) + ". Win the forced opener to unlock wager choice and outcome quotes."
 		wager_summary.set_meta("compact_summary_format", "opening_risk")
 		return
@@ -335,7 +351,11 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		risk_prefix = "All in  •  "
 	if compact_decision:
 		var locked_suffix: String = " LOCKED" if in_combat else ""
-		wager_summary.text = "%sWager %s%s  •  Win %d-%d%%  •  After: W%s / L%s" % [
+		# Stake, odds, then the two outcomes - no prose. This line used to read
+		# "Wager 1 bucket  •  Win 24-54%  •  After: W10 buckets / L8 buckets", which is a
+		# sentence on a strip whose plate is already labelled and whose tooltip carries the
+		# full explanation for anyone who wants it.
+		wager_summary.text = "%s%s%s  •  %d-%d%%  •  %s / %s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager, true),
 			locked_suffix,
@@ -346,7 +366,7 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		]
 		wager_summary.set_meta("compact_summary_format", "risk_win_bank")
 	else:
-		wager_summary.text = "%sWager %s%s  •  Win %d-%d%%  •  After: W%s / L%s" % [
+		wager_summary.text = "%s%s%s  •  %d-%d%%  •  %s / %s" % [
 			risk_prefix,
 			BloodBuckets.format_amount(wager),
 			" LOCKED" if in_combat else "",

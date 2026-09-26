@@ -18,12 +18,11 @@ const MAX_RANDOM_DEPLOY_ATTEMPTS: int = 10
 var _sample_results: Array[Dictionary] = []
 var _random_audit_gold_added: int = 0
 
+## Plays the game for a long time; give it the small background window.
+func _harness_compact_window() -> bool:
+	return true
+
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -240,6 +239,9 @@ func _roster_max_team_size() -> int:
 	return int(Roster.get("max_team_size"))
 
 func _button_with_text(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
@@ -250,6 +252,9 @@ func _button_with_text(text: String) -> Button:
 	return null
 
 func _button_with_text_prefix(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)

@@ -30,18 +30,24 @@ size_flags_horizontal = 3
 layout_mode = 2
 text = "Scoreboard"
 
-[node name="Body" type="HBoxContainer" parent="."]
+[node name="BodyScroll" type="ScrollContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Body" type="HBoxContainer" parent="BodyScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 16
 
-[node name="PlayerColumn" type="VBoxContainer" parent="Body"]
+[node name="PlayerColumn" type="VBoxContainer" parent="BodyScroll/Body"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="EnemyColumn" type="VBoxContainer" parent="Body"]
+[node name="EnemyColumn" type="VBoxContainer" parent="BodyScroll/Body"]
 visible = false
 layout_mode = 2
 size_flags_horizontal = 3
