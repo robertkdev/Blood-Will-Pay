@@ -174,8 +174,10 @@ func _apply_safe_gutter_layout() -> void:
         call_deferred("_clamp_shop_backplate")
         return
     _grid.add_theme_constant_override("h_separation", 6 if tight_compact else 12 if compact else 16)
-    if _host_container != null and is_instance_valid(_host_container) and _host_container is VBoxContainer:
-        (_host_container as VBoxContainer).add_theme_constant_override("separation", 6 if tight_compact else 10)
+    # The host band's own tier pass owns that band's separation: it is the only
+    # pass that knows the maximum-scale budget, where the band's 2px gap is what
+    # keeps the shop and its escape gutter inside a short framebuffer. This pass
+    # keeps the grid spacing and the cell heights, which are the shop's own.
     for child: Node in _grid.get_children():
         var card: Control = child as Control
         if card == null:

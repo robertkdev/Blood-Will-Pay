@@ -353,7 +353,14 @@ func show_team_metrics() -> void:
         unit_panel.visible = false
         unit_panel.set_process(false)
     _apply_unit_detail_layout()
+    # Switching modes changes the heading copy, and the heading's font size is
+    # fitted to its room from that copy. Without re-fitting here the rail keeps
+    # the size it chose for the previous label: "Player Unit" fits its inset at a
+    # size where "Team Metrics" is 107px wide in a 93px inset, so the heading
+    # clipped on the way back from unit detail.
+    _enforce_rail_interior()
     call_deferred("_apply_unit_detail_layout")
+    call_deferred("_enforce_rail_interior")
 
 func show_unit_metrics_ctx(team: String, index: int, u: Unit) -> void:
     _unit_team = String(team)
@@ -376,7 +383,11 @@ func show_unit_metrics(u: Unit) -> void:
     if scoreboard:
         scoreboard.visible = false
     _apply_unit_detail_layout()
+    # Same reason as show_team_metrics(): the heading copy changed, so the fitted
+    # size has to be recomputed for the new copy.
+    _enforce_rail_interior()
     call_deferred("_apply_unit_detail_layout")
+    call_deferred("_enforce_rail_interior")
 
 func _ensure_unit_scroll_frame() -> void:
     var body: Control = $"VBox/Body" as Control

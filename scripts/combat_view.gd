@@ -628,6 +628,7 @@ func _finalize_responsive_layout() -> void:
 	_apply_shop_action_bar_layout(compact, tight_compact)
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
 	var vbox: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
+	_apply_compact_frame_budget(margin, vbox)
 	if vbox != null:
 		vbox.queue_sort()
 	if margin != null:
@@ -635,6 +636,50 @@ func _finalize_responsive_layout() -> void:
 		margin.queue_sort()
 	call_deferred("_update_external_backplates")
 	call_deferred("_position_planning_labels")
+
+## No tier may lay a required surface past the framebuffer. The tier minima are
+## authored per tier, but the frame a tier lands in is not: a 1280x720 physical
+## frame at 150 percent UI is an 853x480 logical one, where the stage bar, the
+## field, the bench, the wager quote and the shop band with its escape gutter add
+## up to 482 logical against the 472 left inside the margins. The field is the
+## only row that already owns surplus vertical budget, so it gives up the
+## difference. The composed dock never reaches this pass: it budgets the field
+## from the frame directly.
+func _apply_compact_frame_budget(margin: MarginContainer, vbox: VBoxContainer) -> void:
+	if vbox == null or bool(get_meta("full_hd_dock", false)) or _dock_composition_active:
+		return
+	var frame_height: float = get_viewport_rect().size.y
+	if frame_height <= 1.0:
+		return
+	var outer: float = 0.0
+	if margin != null:
+		outer = float(margin.get_theme_constant("margin_top")) + float(margin.get_theme_constant("margin_bottom"))
+	var overflow: float = outer + vbox.get_combined_minimum_size().y - frame_height
+	if overflow <= 0.0:
+		return
+	var battle_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
+	if battle_area == null:
+		return
+	# One spare logical pixel absorbs the container rounding that would otherwise
+	# put the bottom edge back on the framebuffer line.
+	var trimmed: float = maxf(_compact_field_floor(), battle_area.custom_minimum_size.y - (overflow + 1.0))
+	if trimmed < battle_area.custom_minimum_size.y:
+		battle_area.custom_minimum_size.y = trimmed
+		vbox.queue_sort()
+
+## The field's own floor: both deployment grids plus the seam the planning strip
+## is centred in, so a budget trim can never squeeze the boards below the rows
+## they have to show.
+func _compact_field_floor() -> float:
+	var grid_total: float = 0.0
+	for grid_path: String in [
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/EnemyGrid",
+		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid",
+	]:
+		var grid: Control = get_node_or_null(grid_path) as Control
+		if grid != null:
+			grid_total += grid.get_combined_minimum_size().y
+	return maxf(160.0, grid_total + 12.0)
 
 func _effective_ui_viewport_size(viewport_size: Vector2) -> Vector2:
 	# Godot's viewport rect already reports logical UI coordinates after
@@ -995,9 +1040,16 @@ func _position_planning_labels() -> void:
 		return
 	# Use settled grid bounds so enlarged UI cannot cover a deployment row.
 	var gap_center: float = (enemy_grid.get_global_rect().end.y + player_grid.global_position.y) * 0.5
+	# The status strip is centred on that seam, so the seam is also its height
+	# budget: a strip taller than the gap it sits in covers the deployment row it
+	# reports on. The bound is always re-derived from the authored height, never
+	# from the strip's current one, so a mid-layout pass cannot ratchet the strip
+	# down and leave it there once the grids settle.
+	var seam: float = maxf(8.0, player_grid.global_position.y - enemy_grid.get_global_rect().end.y - 1.0)
 	for node_name: String in ["BoardStatusRow", "BoardStatusBackplate"]:
 		var status: Control = find_child(node_name, true, false) as Control
 		if status != null:
+			status.size.y = minf(float(status.get_meta("authored_status_height", status.size.y)), seam)
 			status.global_position.y = gap_center - status.size.y * 0.5
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		var area: Control = grid.get_parent() as Control
@@ -1247,6 +1299,7 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 	if board_status_row != null:
 		board_status_row.custom_minimum_size = Vector2(468.0 if tight_compact else 540.0, status_height)
 		board_status_row.size.y = status_height
+		board_status_row.set_meta("authored_status_height", status_height)
 		board_status_row.add_theme_constant_override("separation", 8)
 		board_status_row.offset_left = -234.0 if tight_compact else -270.0
 		board_status_row.offset_right = 234.0 if tight_compact else 270.0
@@ -1268,6 +1321,7 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 	var board_status_plate: Panel = find_child("BoardStatusBackplate", true, false) as Panel
 	if board_status_plate != null:
 		board_status_plate.size.y = status_height + 4.0
+		board_status_plate.set_meta("authored_status_height", status_height + 4.0)
 		board_status_plate.offset_left = -240.0 if tight_compact else -278.0
 		board_status_plate.offset_right = 240.0 if tight_compact else 278.0
 		board_status_plate.modulate = Color(1.0, 1.0, 1.0, 0.64 if tight_compact else 0.86 if compact else 1.0)
