@@ -66,6 +66,11 @@ const GAMEPLAY_COMMIT_SURFACE_SIZE: Vector2 = Vector2(256.0, 144.0)
 ## were authored with. The rejected v2 surface is never used, and the 40px bands
 ## below stay separate from the panels' own content insets.
 const GAMEPLAY_PANEL_SURFACE_ENABLED: bool = true
+## The crimson action plaque is declined for the commit action: that control's
+## acceptance contract is restrained flat field furniture, and the plaque's own
+## relief reads as a second frame inside its bay. The file is kept for provenance
+## and one-line rollback, exactly like the rejected v2 panel.
+const GAMEPLAY_COMMIT_SURFACE_ENABLED: bool = false
 ## A surface at least this wide and tall can carry the 40px nine-slice bands
 ## without the rim becoming the whole surface. Small controls keep the flat iron.
 const GAMEPLAY_PANEL_MIN_SPAN: float = 80.0
@@ -486,9 +491,20 @@ static func gameplay_panel_style_for(surface_size: Vector2, fallback: StyleBox =
 		return fallback if fallback != null else quiet_iron_recess_style()
 	return gameplay_panel_style(fallback, content_insets)
 
-## The commit action's material: root-approved plaque when present at the audited
-## size, otherwise the existing primary button material, then the crimson flat.
+## The commit action's material: the flat crimson family while the plaque surface
+## is declined (`GAMEPLAY_COMMIT_SURFACE_ENABLED`), otherwise the root-approved
+## plaque when present at the audited size, then the existing primary button
+## material, then the crimson flat.
 static func gameplay_commit_style(modulate: Color = Color.WHITE, content_insets: Vector4 = GAMEPLAY_COMMIT_CONTENT_INSETS) -> StyleBox:
+	if not GAMEPLAY_COMMIT_SURFACE_ENABLED:
+		# Surface declined: the commit action keeps the flat crimson family, which
+		# is the same material the plaque falls back to.
+		var declined: StyleBoxFlat = quiet_iron_commit_style(modulate)
+		declined.content_margin_left = content_insets.x
+		declined.content_margin_top = content_insets.y
+		declined.content_margin_right = content_insets.z
+		declined.content_margin_bottom = content_insets.w
+		return declined
 	var harvested: StyleBoxTexture = approved_surface_style(
 		GAMEPLAY_COMMIT_SURFACE, GAMEPLAY_COMMIT_SURFACE_SIZE, GAMEPLAY_COMMIT_SLICE_PX, content_insets
 	)
@@ -524,6 +540,7 @@ static func gameplay_material_status() -> Dictionary:
 		"commit_slice_px": GAMEPLAY_COMMIT_SLICE_PX,
 		"commit_content_insets": GAMEPLAY_COMMIT_CONTENT_INSETS,
 		"commit_shipping": approved_surface_present(GAMEPLAY_COMMIT_SURFACE, GAMEPLAY_COMMIT_SURFACE_SIZE),
+		"commit_surface_enabled": GAMEPLAY_COMMIT_SURFACE_ENABLED,
 	}
 
 ## True when the shipping file exists and matches the audited source size.

@@ -978,13 +978,19 @@ static func _apply_named_nodes(root: Control) -> void:
 	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/GoldLabel", 24, COLOR_GOLD, true)
 	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetLabel", 18, COLOR_TEXT, false)
 	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetValue", 20, COLOR_TEXT, false)
-	# The wager strip is supporting information: muted, regular weight, so the
-	# region headings and the action keep their precedence.
+	# The wager strip is supporting information, but it is a functional readout:
+	# muted colour keeps it subordinate while the legibility face keeps the odds
+	# and the stake scannable at a glance.
 	_style_label(root, "MarginContainer/VBoxContainer/WagerSummary", 18, COLOR_TEXT_MUTED, false)
 	var wager_summary_label: Label = root.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Label
 	if wager_summary_label != null:
-		VisualTypeSystem.set_gameplay_body(wager_summary_label)
+		VisualTypeSystem.set_utility_bold(wager_summary_label)
 	_style_label(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle", 18, COLOR_GOLD, true)
+	var traits_title_label: Label = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle") as Label
+	if traits_title_label != null:
+		# The rail's shell is a functional docket, not a ceremonial heading: the
+		# legibility face carries the section label above the trait rows.
+		VisualTypeSystem.set_utility_bold(traits_title_label)
 	_style_label_by_name(root, "GoldLabel", 22, COLOR_GOLD, true)
 	_style_label_by_name(root, "BetLabel", 16, COLOR_TEXT_MUTED, false)
 	_style_label_by_name(root, "BetValue", 17, COLOR_TEXT, false)
@@ -1146,11 +1152,12 @@ static func _apply_label_node(label: Label) -> void:
 		label.add_theme_color_override("font_color", COLOR_GOLD)
 		VisualTypeSystem.set_gameplay_heading(label)
 	elif label.name == "TraitsTitle":
-		# The rail's heading is a section heading: the gameplay ceremony face at a
-		# restrained size. The rows below it are presenter-owned and were skipped
+		# The rail's heading is a functional docket label, not a ceremonial one:
+		# the legibility face at a restrained size keeps it readable above the
+		# trait rows. The rows below it are presenter-owned and were skipped
 		# above, so a fitted trait name is never re-measured or re-weighted here.
 		_style_label_node(label, max(18, label.get_theme_font_size("font_size")), Color(0.94, 0.90, 0.82, 1.0), false)
-		VisualTypeSystem.set_gameplay_heading(label)
+		VisualTypeSystem.set_utility_bold(label)
 	elif label.name == "Role" or label.name == "RoleBadge":
 		label.add_theme_font_size_override("font_size", 16)
 		label.add_theme_color_override("font_color", Color(0.78, 0.73, 0.66, 1.0))
@@ -1261,20 +1268,29 @@ static func _apply_color_rect(rect: ColorRect) -> void:
 		rect.color = Color(0.20, 0.45, 0.66, 0.94)
 
 static func _apply_tile(button: Button, is_player: bool) -> void:
-	# One continuous deployment surface. A cell is a quiet ruling on the stone:
-	# no interior fill, one uniform hairline top and right edge, and no emphasis
-	# weight. Neighbours share that single line, so the union reads as a ruled
-	# lattice over the authored floor rather than a box or an open bracket. The
-	# side hue alone (warm bone / oxblood) separates the two territories, and the
-	# territory guides still carry the structural boundary. Geometry (the square
-	# cell and its grid slot) is unchanged; only the paint is.
+	# One continuous deployment surface. A cell is a weighted ruling on the stone:
+	# no interior fill, a shared right edge on every cell, and an authored strong
+	# seam on a sparse irregular set. Neighbours therefore do not agree about how
+	# heavy their top line is, so the union reads as a ruled lattice over the
+	# authored floor instead of a uniform developer grid. The side hue (warm bone /
+	# oxblood) separates the two territories, and the territory guides still carry
+	# the structural boundary. Geometry (the square cell and its grid slot) is
+	# unchanged; only the paint is.
 	var bg_color: Color = Color(0.0, 0.0, 0.0, 0.0)
-	var border_color: Color = Color(0.60, 0.55, 0.42, 0.26) if is_player else Color(0.55, 0.24, 0.20, 0.28)
+	# Authored seam cadence: most cells carry only the shared right edge, and a
+	# sparse irregular set carries the full ruling. That is what keeps the
+	# deployment lattice reading as stone courses instead of a uniform developer
+	# grid, and it is why neighbours disagree about how heavy their top line is.
+	var cell_index: int = int(String(button.name).get_slice("_", 1))
+	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
+	var border_color: Color = Color(0.96, 0.88, 0.68, 0.76 if strong_seam else 0.58) if is_player else Color(0.96, 0.27, 0.19, 0.80 if strong_seam else 0.64)
 	var hover_color: Color = Color(0.055, 0.070, 0.064, 0.34) if is_player else Color(0.115, 0.042, 0.038, 0.34)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
 	normal_style.shadow_size = 0
 	normal_style.border_width_left = 0
 	normal_style.border_width_bottom = 0
+	if not strong_seam:
+		normal_style.border_width_top = 0
 	# Hover is the only moment a cell gains a full ring: interaction feedback is
 	# worth one transient outline, and it is not part of the resting surface.
 	var hover_style: StyleBoxFlat = _hover_style(hover_color, COLOR_GOLD_HOT, 1, 3)

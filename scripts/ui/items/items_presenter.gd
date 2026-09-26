@@ -188,7 +188,15 @@ func _material_storage_metrics() -> Dictionary:
 	var tight_compact: bool = bool(view.get_meta("tight_scale_layout", false))
 	var compact: bool = bool(view.get_meta("compact_layout", false))
 	var viewport_size: Vector2 = view.get_viewport_rect().size
+	var composed_inner: float = float(view.get_meta("composed_rail_logical", 0.0))
+	var composed: bool = bool(view.get_meta("full_hd_dock", false)) and composed_inner > 1.0
 	var wide_support_rail: bool = compact and not tight_compact and viewport_size.x >= 1600.0
+	# A wide desktop frame is the cache's support tier, whether the legacy compact
+	# pass or the composed dock owns it: the dock draws the rail at its authored
+	# 308 physical width with the desktop pocket extent, which is at or above the
+	# support tier's own floor. The header therefore declares the tier the player
+	# is actually shown, without re-sizing the pockets the dock already owns.
+	var wide_support_tier: bool = wide_support_rail or (composed and viewport_size.x >= 1600.0)
 	var columns: int = MATERIAL_COLUMNS
 	var slot_size: Vector2 = Vector2(40.0, 56.0) if tight_compact else Vector2(70.0, 84.0) if wide_support_rail else Vector2(56.0, 74.0) if compact else Vector2(84.0, 96.0)
 	var horizontal_separation: int = 4 if tight_compact else 6 if compact else 10
@@ -198,11 +206,9 @@ func _material_storage_metrics() -> Dictionary:
 	var header_height: float = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
 	var header_font_size: int = 11 if tight_compact else 13 if wide_support_rail else 12 if compact else 15
 	var header_wrap: int = TextServer.AUTOWRAP_OFF
-	var composed: bool = bool(view.get_meta("full_hd_dock", false))
-	var composed_inner: float = float(view.get_meta("composed_rail_logical", 0.0))
 	var ui_scale: float = maxf(1.0, float(view.get_meta("persisted_ui_scale", 1.0)))
 	var composed_rail: float = float(view.get_meta("composed_rail_physical", 0.0)) / ui_scale
-	if composed and composed_inner > 1.0:
+	if composed:
 		var slot_cap: float = maxf(
 			MIN_COMPOSED_SLOT,
 			(composed_inner - float(horizontal_separation) * 2.0 - COMPOSED_SLOT_BUDGET) / float(columns)
@@ -236,6 +242,7 @@ func _material_storage_metrics() -> Dictionary:
 		"tight_compact": tight_compact,
 		"compact": compact,
 		"wide_support_rail": wide_support_rail,
+		"wide_support_tier": wide_support_tier,
 		"columns": columns,
 		"slot": slot_size,
 		"h_separation": horizontal_separation,
@@ -406,7 +413,7 @@ func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_s
 	if header == null:
 		return
 	var tight_compact: bool = bool(metrics.tight_compact)
-	var wide_support_rail: bool = bool(metrics.wide_support_rail)
+	var wide_support_tier: bool = bool(metrics.wide_support_tier)
 	var sealed_slots: int = maxi(0, total_slots - occupied_slots - ready_slots)
 	# One word and three counts: held, ready pockets and sealed reserve. The wide
 	# variant used to read "EVIDENCE RELIQUARY CACHE / 00 HELD • 03 READY POCKETS •
@@ -444,7 +451,7 @@ func _apply_material_header_style(occupied_slots: int, total_slots: int, ready_s
 	header.set_meta("ready_slots", ready_slots)
 	header.set_meta("sealed_slots", sealed_slots)
 	header.set_meta("header_hierarchy_lines", 2)
-	header.set_meta("wide_support_rail", wide_support_rail)
+	header.set_meta("wide_support_rail", wide_support_tier)
 	header.set_meta("purposeful_empty_focus", occupied_slots == 0 and ready_slots == EMPTY_READY_SLOTS)
 	if grid != null:
 		grid.set_meta("material_header_text", header.text)

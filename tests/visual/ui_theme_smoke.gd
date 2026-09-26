@@ -216,8 +216,26 @@ func _run() -> void:
 			_expect(held_docket != null and held_docket_text.is_valid_int() and held_state == "held", "Filled reliquary pocket lacks a held docket (state %s, docket %s)" % [held_state, held_docket_text], failures)
 			_expect(held_cavity != null and held_cavity.get_theme_stylebox("panel") is StyleBoxFlat, "Filled reliquary pocket lost its recessed cavity", failures)
 			first_ready_card.call("set_item_id", "")
-	var wager_plate: Panel = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Panel
-	_expect(wager_plate != null, "Wager summary should have a quiet backplate over the battlefield texture", failures)
+	# The composed dock replaces the quote's own overlay plate with the wager
+	# territory's recessed bay, and suppresses the legacy plate by path. The
+	# backplate contract is therefore asserted on whichever host the live tier
+	# actually draws, and it keeps testing that the quote sits on quiet recessed
+	# furniture rather than on bare battlefield texture.
+	var wager_backplate: Control = null
+	if bool(view.get_meta("full_hd_dock", false)):
+		wager_backplate = view.get_node_or_null("LowerDockComposition/WagerTerritory") as Control
+	else:
+		wager_backplate = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Control
+	_expect(wager_backplate != null, "Wager summary should have a quiet backplate over the battlefield texture", failures)
+	if wager_backplate != null:
+		var wager_plate_style: StyleBoxFlat = wager_backplate.get_theme_stylebox("panel") as StyleBoxFlat
+		_expect(
+			wager_plate_style != null
+				and wager_plate_style.bg_color.a >= 0.60
+				and wager_plate_style.bg_color.get_luminance() <= 0.12,
+			"Wager backplate should be a quiet recessed panel, not bare battlefield texture",
+			failures
+		)
 	var traits_panel: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
 	_expect(traits_panel != null, "Traits panel should live inside the left storage dock", failures)
 	if traits_panel != null:

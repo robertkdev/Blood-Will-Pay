@@ -54,8 +54,11 @@ const SHOP_HEADER_HEIGHT: float = 44.0
 const SHOP_CARD_MIN_HEIGHT: float = 104.0
 const SHOP_CARD_MAX_HEIGHT: float = 232.0
 const DOCK_GUTTER_HEIGHT: float = 10.0
-const DOCK_SEPARATION_HEIGHT: float = 6.0
-const CARD_GAP: float = 10.0
+## The composed dock keeps the authored compact gutter contract: the shop header
+## and the card row stay far enough apart to read as separate territories, and
+## the cards keep pointer-clear gutters between them.
+const DOCK_SEPARATION_HEIGHT: float = 10.0
+const CARD_GAP: float = 12.0
 ## Architectural gaps between territories stay physical.
 const DOCK_GAP_PHYSICAL: float = 12.0
 const DOCK_GAP_MIN_LOGICAL: float = 8.0

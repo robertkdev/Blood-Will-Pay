@@ -248,6 +248,10 @@ func _make_placeholder(sold: bool) -> Control:
     var compact: bool = _is_compact_viewport()
     var wrap: PanelContainer = PanelContainer.new()
     wrap.set_meta("opening_fight_placeholder", first_fight_placeholder)
+    # The first-fight slot is a shop cell like any other: it declares the same
+    # reflow gutter so the grid keeps one safety rule for every child, including
+    # while the composed dock owns the cell height.
+    wrap.set_meta("shop_safe_bottom_gutter", 8.0)
     wrap.custom_minimum_size = OPENING_PANEL_SIZE if first_fight_placeholder else (Vector2(120.0, 94.0) if compact else Vector2(144.0, 124.0))
     wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if first_fight_placeholder else Control.SIZE_SHRINK_CENTER
     wrap.size_flags_vertical = Control.SIZE_SHRINK_CENTER

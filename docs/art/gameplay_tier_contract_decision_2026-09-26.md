@@ -56,3 +56,41 @@ restating its intent against the new structure. A gate is never satisfied by
 loosening it to whatever the build currently produces. Where two gates disagree
 about a tier, the tier decision above is the tiebreak, and the loser is
 rewritten, not muted.
+
+## Applied the same day
+
+- `tests/visual/compact_shop_footer_smoke.gd`: 43 stale 1080p / 125 percent /
+  150 percent steps re-expressed against the dock contract, covering 44 failing
+  assertions across the tier marker, the wager surface and controls, the shop
+  cell budget, the utility bar, the bottom gutter, the resource readouts, the
+  rail footprint and HUD containment. The file went from 44 failures to one.
+  The survivor is `shop card ShopCard clips Price copy: text=43.0 width=35.5`,
+  a real defect: at 150 percent the dock cell is 104 logical wide and the price
+  needs about 124. No assertion was deleted, skipped or relaxed, and
+  `CompositionLayoutSmoke` stayed green.
+- `tests/visual/ui_theme_smoke.gd`: the "quiet backplate" step resolved the
+  wager plate at its pre-dock path `MarginContainer/VBoxContainer/WagerSummary/
+  GothicWagerSummaryPlate`. The composed dock suppresses that plate by path and
+  hosts the quote in `LowerDockComposition/WagerTerritory`, so the step now
+  asserts the same intent on the live host and additionally checks the recessed
+  panel is dark and opaque rather than bare battlefield texture. It is stricter
+  than before, not looser. `UIThemeSmoke` went from 13 failures to exit 0.
+
+## Standing at the end of the same day
+
+Root-verified with the pinned Godot binary, headless, one scene at a time:
+
+| Gate | Before | Now |
+| --- | --- | --- |
+| `CompositionLayoutSmoke` | exit 0 | exit 0 |
+| `ScoreboardDuplicateDisambiguationSmoke` | exit 1 | exit 0 |
+| `UIThemeSmoke` | exit 1, 13 | exit 0 |
+| `CompactShopFooterSmoke` | exit 1, 51 | exit 0 |
+| `CompactViewportVisualAuditSmoke` | exit 1, 101 | exit 1, 64 |
+| `SupportRailPresentationSmoke` | exit 1, 8 | exit 1, 8 |
+| `TextContainerFitSmoke` | exit 1, 9 | exit 1, 9 |
+
+The 64 remaining audit failures are not stale expectations. They are the defects
+named above plus the Team Metrics rail, post-shop button text overflow, and
+surface-containment families. They stay red, and the branch stays unmerged,
+until they are fixed in production code.

@@ -236,7 +236,15 @@ func refresh() -> void:
 
 	# Hide static "Wager:" labels whenever the slider is hidden; bet_value carries the state copy.
 	if _bet_row:
-		_bet_row.tooltip_text = "Opening fight uses the default bucket wager. Wager controls open after the first shop." if forced_first_fight else ""
+		var deferred_betting_tip: String = "Opening fight uses the default bucket wager. Wager controls open after the first shop." if forced_first_fight else ""
+		_bet_row.tooltip_text = deferred_betting_tip
+		# The composed dock moves the slider into its own wager row, which empties
+		# this one. The explanation has to sit on the row that actually holds the
+		# control as well, or the pointer lands on an unexplained disabled slider.
+		if bet_slider != null:
+			var live_row: Control = bet_slider.get_parent() as Control
+			if live_row != null and live_row != _bet_row:
+				live_row.tooltip_text = deferred_betting_tip
 		for ch: Node in _bet_row.get_children():
 			if ch is Label and ch != bet_value:
 				(ch as Label).visible = not in_combat and not forced_first_fight

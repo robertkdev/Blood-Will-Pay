@@ -1820,7 +1820,7 @@ func _apply_dock_shop(dock_height: float, ui_scale: float) -> void:
 	if bottom_storage == null:
 		return
 	var gap: float = Composition.shop_card_gap()
-	var slots: int = maxi(1, shop_grid.get_child_count()) if shop_grid != null else 5
+	var slots: int = _dock_shop_slots()
 	var card_height: float = Composition.shop_card_height(dock_height)
 	var card_width: float = Composition.shop_card_width(card_height)
 	# The shop width comes from the authored cell size, never from the width the
@@ -1864,6 +1864,24 @@ func _apply_dock_shop(dock_height: float, ui_scale: float) -> void:
 			footer_gutter.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_apply_dock_shop_cells(card_width, card_height, ui_scale)
 
+## The shop territory keeps the shop's authored five-cell span however many
+## cells the panel is currently showing. The opening-fight state presents one
+## wide explanatory panel instead of five cards, and a territory sized to that
+## single cell would leave the panel lying across the wager column.
+func _dock_shop_slots() -> int:
+	var live: int = maxi(1, shop_grid.get_child_count()) if shop_grid != null else ShopConfig.SLOT_COUNT
+	return maxi(ShopConfig.SLOT_COUNT, live)
+
+## The horizontal inset a shop cell's own surface style applies to its content.
+## A PanelContainer's minimum size is its content plus these margins, so the
+## content budget a placeholder may claim is the authored cell minus them.
+func _dock_cell_content_inset(card: Control) -> float:
+	var style_name: String = "panel" if card is PanelContainer else "normal"
+	var style: StyleBox = card.get_theme_stylebox(style_name)
+	if style == null:
+		return 0.0
+	return style.get_margin(SIDE_LEFT) + style.get_margin(SIDE_RIGHT)
+
 ## Five taller card cells across the shop territory. Re-applied while the dock
 ## is live because the shop rebuilds its own grid geometry on every refresh.
 func _apply_dock_shop_cells(card_width: float, card_height: float, ui_scale: float) -> void:
@@ -1878,8 +1896,12 @@ func _apply_dock_shop_cells(card_width: float, card_height: float, ui_scale: flo
 	# yields its own gutter numbers on this marker, and the shop-card presenter
 	# keys its composed-dock detail policy off the same marker name.
 	shop_grid.set_meta("composed_dock_cell_size", Vector2(card_width, card_height))
-	shop_grid.set_meta("composed_dock_slots", maxi(1, shop_grid.get_child_count()))
-	var grid_size: Vector2 = Vector2(Composition.shop_width_for(card_width, maxi(1, shop_grid.get_child_count()), gap), card_height)
+	var slots: int = _dock_shop_slots()
+	shop_grid.set_meta("composed_dock_slots", slots)
+	# The authored shop span, not the live child count: the grid's own minimum
+	# has to agree with the territory the dock allocated.
+	var shop_span: float = Composition.shop_width_for(card_width, slots, gap)
+	var grid_size: Vector2 = Vector2(shop_span, card_height)
 	if shop_grid.custom_minimum_size != grid_size:
 		shop_grid.custom_minimum_size = grid_size
 	# Inside the right-anchored group the card row keeps its authored span at the
@@ -1888,21 +1910,46 @@ func _apply_dock_shop_cells(card_width: float, card_height: float, ui_scale: flo
 		shop_grid.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	for child: Node in shop_grid.get_children():
 		var card: Control = child as Control
-		if card == null or bool(card.get_meta("opening_fight_placeholder", false)):
+		if card == null:
 			continue
+		# The opening-fight panel is one cell showing the whole territory, so it
+		# keeps the authored span rather than the five-card cell width. Its own
+		# explanatory hint wraps inside that span, so it needs no cell squeeze.
+		var opening_panel: bool = bool(card.get_meta("opening_fight_placeholder", false))
+		var cell_width: float = shop_span if opening_panel else card_width
+		var cell_size: Vector2 = Vector2(cell_width, card_height)
 		# Compact card presentation already draws the portrait-first vertical
 		# card the dock wants; the dock only makes the cell taller. It is applied
 		# only when the shop's own pass has not already left the card that way,
 		# because the presentation call clears hover state.
-		var compact_presentation: bool = bool(card.get_meta("compact_presentation", false))
-		var tight_presentation: bool = bool(card.get_meta("tight_presentation", false))
-		if (not compact_presentation or tight_presentation) and card.has_method("set_compact_presentation"):
-			card.call("set_compact_presentation", true, false, true)
-		var cell_size: Vector2 = Vector2(card_width, card_height)
-		if card.custom_minimum_size != cell_size:
-			card.custom_minimum_size = cell_size
+		if not opening_panel:
+			var compact_presentation: bool = bool(card.get_meta("compact_presentation", false))
+			var tight_presentation: bool = bool(card.get_meta("tight_presentation", false))
+			if (not compact_presentation or tight_presentation) and card.has_method("set_compact_presentation"):
+				card.call("set_compact_presentation", true, false, true, card_width)
+		if opening_panel:
+			# The opening-fight panel is one cell tall on purpose: it keeps its
+			# authored height and only has its width bounded to the territory.
+			var panel_size: Vector2 = Vector2(minf(cell_width, maxf(1.0, card.custom_minimum_size.x)), card.custom_minimum_size.y)
+			if card.custom_minimum_size != panel_size:
+				card.custom_minimum_size = panel_size
+		else:
+			if card.custom_minimum_size != cell_size:
+				card.custom_minimum_size = cell_size
+			card.set_meta("dock_card_height", card_height)
 		card.clip_contents = false
-		card.set_meta("dock_card_height", card_height)
+		# A placeholder authors a wider compact minimum (120/144 logical, or the
+		# opening panel's 560) and its inner labels carry their own. Inside the
+		# dock the authored cell is the authority: a descendant that still asks
+		# for more width would inflate the grid past the authored shop span, and
+		# the shop territory would then lie over the wager column.
+		var content_width: float = maxf(1.0, cell_width - _dock_cell_content_inset(card))
+		for descendant_node: Node in card.find_children("*", "Control", true, false):
+			var descendant: Control = descendant_node as Control
+			if descendant == null:
+				continue
+			if descendant.custom_minimum_size.x > content_width:
+				descendant.custom_minimum_size.x = content_width
 
 ## The shop header is the runtime button bar the shop presenter mounts above
 ## its grid; it is identified by its own reroll control rather than by index.
@@ -2327,6 +2374,13 @@ func _place_dock_controls(wager_rect: Rect2, plaque_rect: Rect2) -> void:
 				continue
 			if control.get_parent() != control_home:
 				_reparent_dock_control(control, control_home)
+		# The authored row carries the deferred-wager explanation. It has to travel
+		# with the slider the dock just took out of it, so the row the pointer now
+		# lands on explains the deferred bet instead of leaving it blank.
+		if _wager_row != null and is_instance_valid(_wager_row) and bet_slider != null:
+			var live_wager_row: Control = bet_slider.get_parent() as Control
+			if live_wager_row != null and live_wager_row != _wager_row:
+				live_wager_row.tooltip_text = _wager_row.tooltip_text
 		var value_home: Control = _wager_value_row if _wager_value_row != null and is_instance_valid(_wager_value_row) else _wager_controls
 		for control: Control in [bet_value, all_in_button]:
 			if control == null:

@@ -327,6 +327,10 @@ func _make_token_style(selected: bool) -> StyleBoxFlat:
 	style.bg_color = Color(0.19, 0.025, 0.038, 0.98) if selected else Color(0.035, 0.031, 0.037, 0.96)
 	style.border_color = Color(0.92, 0.075, 0.11, 1.0) if selected else Color(0.31, 0.29, 0.30, 0.88)
 	style.set_border_width_all(2 if selected else 1)
+	if selected:
+		# The current stage is the strip's one commitment mark: a forceful
+		# structural edge, where the completed tokens stay subordinate hairlines.
+		style.border_width_left = 5
 	style.content_margin_left = 5.0
 	style.content_margin_top = 2.0
 	style.content_margin_right = 4.0

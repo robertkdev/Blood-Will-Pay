@@ -24,6 +24,14 @@ const TOOLTIP_CURSOR_OFFSET: Vector2 = Vector2(18.0, -14.0)
 const TOOLTIP_EDGE_PADDING: float = 12.0
 const COMPACT_TOOLTIP_MIN_HEIGHT: float = 76.0
 const COMPACT_NAME_SHARE: float = 0.62
+## The shared caption row splits at `COMPACT_NAME_SHARE`, so the compact price
+## share is 0.38 of the cell. The tier's price copy ("0 bkt") measures 43.0
+## logical at the dock's 17px font plus its own 4px right inset, so holding the
+## name and the price on one row needs (43.0 + 4.0) / 0.38 = 124 logical of
+## card. The composed dock's 150-percent cell is 97 logical wide and the dock
+## band has no width left to widen it, so below this width the caption stacks:
+## the name keeps a full-width row and the price takes the row beneath it.
+const CAPTION_STACK_MAX_WIDTH: float = 124.0
 ## The compact tiers are budgeted cells, not a share of the raw frame:
 ## `CompactShopFooterSmoke` holds the compact card to 80-96 logical pixels and the
 ## tight card to 54-70, while the composed dock owns its own taller cell through
@@ -222,9 +230,13 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 		_has_identity_content = has_identity
 		_identity_panel.visible = _has_identity_content and not _compact_presentation
 
-func set_compact_presentation(enabled: bool, tight: bool = false, composed_dock: bool = false) -> void:
+func set_compact_presentation(enabled: bool, tight: bool = false, composed_dock: bool = false, cell_width: float = 0.0) -> void:
 	_compact_presentation = enabled
 	_tight_presentation = enabled and tight
+	# The composed dock owns its cell width and passes it in, so the caption can
+	# answer the cell it actually has: below the shared row's own requirement the
+	# caption stacks instead of clipping the price (see CAPTION_STACK_MAX_WIDTH).
+	var stack_caption: bool = enabled and composed_dock and cell_width > 1.0 and cell_width < CAPTION_STACK_MAX_WIDTH
 	# Card layout and information access are separate decisions. A composed dock
 	# keeps the compact portrait layout at full HD while still having room for
 	# real detail, so only a genuinely small tier (no composed dock marker)
@@ -252,7 +264,8 @@ func set_compact_presentation(enabled: bool, tight: bool = false, composed_dock:
 			_icon.anchor_right = 0.94
 			_icon.anchor_top = 0.04
 			_icon.anchor_bottom = 1.0
-		_icon.offset_bottom = -34.0 if portrait_layout else 0.0
+		# A stacked caption rides one row lower than the shared row.
+		_icon.offset_bottom = -52.0 if stack_caption else -34.0 if portrait_layout else 0.0
 	if _traits_box != null:
 		_traits_box.visible = false
 		_traits_box.custom_minimum_size = Vector2.ZERO if enabled else Vector2(0.0, 48.0)
@@ -274,8 +287,17 @@ func set_compact_presentation(enabled: bool, tight: bool = false, composed_dock:
 		_name_label.add_theme_font_size_override("font_size", 14 if _tight_presentation else 16 if enabled else 20)
 		if portrait_layout:
 			_name_label.anchor_top = 1.0
-			_name_label.offset_top = -32.0
-			_name_label.offset_bottom = -6.0
+			if stack_caption:
+				# Stacked: the name spans the cell instead of holding the 62
+				# percent column, which a 97-logical cell cannot fit it into.
+				_name_label.anchor_right = 1.0
+				_name_label.offset_left = 4.0
+				_name_label.offset_right = -4.0
+				_name_label.offset_top = -50.0
+				_name_label.offset_bottom = -26.0
+			else:
+				_name_label.offset_top = -32.0
+				_name_label.offset_bottom = -6.0
 	if _price_label != null:
 		_price_label.text = _price_copy()
 		_price_label.anchor_left = COMPACT_NAME_SHARE if enabled else 0.76
@@ -292,8 +314,18 @@ func set_compact_presentation(enabled: bool, tight: bool = false, composed_dock:
 		_price_label.add_theme_font_size_override("font_size", 16 if _tight_presentation else 17 if enabled else 20)
 		if portrait_layout:
 			_price_label.anchor_top = 1.0
-			_price_label.offset_top = -32.0
-			_price_label.offset_bottom = -6.0
+			if stack_caption:
+				# Stacked: the price takes the full row under the name. Its 38
+				# percent share of a 97-logical cell is 33 logical, and the copy
+				# needs 43.
+				_price_label.anchor_left = 0.0
+				_price_label.offset_left = 4.0
+				_price_label.offset_right = -4.0
+				_price_label.offset_top = -26.0
+				_price_label.offset_bottom = -2.0
+			else:
+				_price_label.offset_top = -32.0
+				_price_label.offset_bottom = -6.0
 	set_meta("compact_presentation", enabled)
 	set_meta("tight_presentation", _tight_presentation)
 	set_meta("portrait_presentation", portrait_layout)
