@@ -1961,7 +1961,20 @@ func _apply_dock_shop(dock_height: float, ui_scale: float) -> void:
 ## wide explanatory panel instead of five cards, and a territory sized to that
 ## single cell would leave the panel lying across the wager column.
 func _dock_shop_slots() -> int:
-	var live: int = maxi(1, shop_grid.get_child_count()) if shop_grid != null else ShopConfig.SLOT_COUNT
+	# A rebuild frees the previous cells with `queue_free()` in the frame that adds
+	# the replacements, so the raw child count also measures the pending deletions.
+	# Reading those made the dock author a territory two to three cells too wide
+	# from its own last output, and every such write re-queued the re-assert from
+	# inside the same frame - the dock never settled. Only cells actually being
+	# shown count; pending deletions and an empty grid both resolve to the
+	# authored span.
+	var live: int = 0
+	if shop_grid != null:
+		for child: Node in shop_grid.get_children():
+			if not child.is_queued_for_deletion():
+				live += 1
+	if live < 1:
+		live = ShopConfig.SLOT_COUNT
 	return maxi(ShopConfig.SLOT_COUNT, live)
 
 ## The horizontal inset a shop cell's own surface style applies to its content.
