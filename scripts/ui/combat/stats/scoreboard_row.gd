@@ -312,8 +312,7 @@ func _apply_visual_style() -> void:
 			fill_color = Color(minf(1.0, fill_color.r + 0.10), minf(1.0, fill_color.g + 0.06), minf(1.0, fill_color.b + 0.05), 1.0)
 		bar_fill.color = fill_color
 	if name_label != null:
-		var identity_size: int = 22 if _record_emphasis else _compact_identity_font_size
-		name_label.add_theme_font_size_override("font_size", identity_size)
+		_apply_identity_font()
 		VisualTypeSystem.set_gameplay_name(name_label)
 		name_label.add_theme_color_override("font_color", COLOR_NAME_HOVER if _hovered else COLOR_NAME)
 	if value_label != null:
@@ -324,14 +323,28 @@ func _apply_visual_style() -> void:
 		value_label.clip_text = true
 		value_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 
+## The identity is fitted against the column this row actually settled at, and
+## that column is only known once the anchored label has been laid out. A
+## resize therefore re-runs the fit and re-applies the chosen size, so a size
+## picked against a provisional column can never be left clipping the settled
+## one.
+func _refit_identity() -> void:
+	_update_identity()
+	_apply_identity_font()
+
+func _apply_identity_font() -> void:
+	if name_label == null:
+		return
+	name_label.add_theme_font_size_override("font_size", 22 if _record_emphasis else _compact_identity_font_size)
+
 func _compact_identity_available_width() -> float:
 	if name_label == null:
 		return 72.0
 	if name_label.size.x > 1.0:
-		# Compact rails can settle a few pixels narrower after the row text is
-		# first measured. Reserve that final-layout inset so the authored name
-		# never wins against a provisional width and then clips at 125/150%.
-		return maxf(32.0, name_label.size.x - 8.0)
+		# The fit re-runs against this settled column (see `_refit_identity`), so
+		# only a hairline guard is needed; a wider reservation would push a
+		# complete authored name out of the rail it already fits.
+		return maxf(32.0, name_label.size.x - 2.0)
 	if content_box != null and content_box.size.x > 1.0:
 		return maxf(32.0, content_box.size.x - 60.0)
 	if size.x > 1.0:
@@ -596,7 +609,10 @@ func _format_value(v: float) -> String:
 		return String.num(v, 1)
 	if metric_key == "casts":
 		return str(int(round(v)))
-	if _compact_layout and _exact_compact_values and absi(int(round(v))) < 10000:
+	# The exact-value contract is the caller's, not the tier's: a rail that asks
+	# for exact compact values keeps them whether or not it also flags a compact
+	# layout, so a support rail never rounds an authored figure into "9.1k".
+	if _exact_compact_values and absi(int(round(v))) < 10000:
 		return str(int(round(v)))
 	if v >= 1000000.0:
 		return String.num(v/1000000.0, 1) + "m"
@@ -648,10 +664,15 @@ func _ready() -> void:
 		resized.connect(_update_bar)
 	if content_box and not content_box.is_connected("resized", Callable(self, "_update_bar")):
 		content_box.resized.connect(_update_bar)
-	if not is_connected("resized", Callable(self, "_update_identity")):
-		resized.connect(_update_identity)
-	if content_box and not content_box.is_connected("resized", Callable(self, "_update_identity")):
-		content_box.resized.connect(_update_identity)
+	# The identity fit reads the settled name column, so it is re-run (and the
+	# chosen size re-applied) whenever the row, its content or the label itself
+	# resizes. `_refit_identity` covers `_update_identity` plus the font.
+	if not is_connected("resized", Callable(self, "_refit_identity")):
+		resized.connect(_refit_identity)
+	if content_box and not content_box.is_connected("resized", Callable(self, "_refit_identity")):
+		content_box.resized.connect(_refit_identity)
+	if name_label and not name_label.is_connected("resized", Callable(self, "_refit_identity")):
+		name_label.resized.connect(_refit_identity)
 	if value_label:
 		value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_center_value_label()

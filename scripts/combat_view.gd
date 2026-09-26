@@ -1281,6 +1281,13 @@ func _apply_functional_typography(compact: bool, tight_compact: bool) -> void:
 			var trait_label: Label = candidate as Label
 			if trait_label == null:
 				continue
+			# The presenter's own fields are exempt: it measures the drawn
+			# count/checkpoint string and reserves exactly that width, so
+			# releasing the minimum here would crush the field back to one
+			# pixel and clip its denominator.
+			if trait_label.name == "TraitName" or trait_label.name == "TraitCheckpoint" \
+					or trait_label.has_meta("trait_name_source") or trait_label.has_meta("trait_name_complete"):
+				continue
 			trait_label.custom_minimum_size.x = 0.0
 			trait_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	if stats_panel != null and tight_compact:

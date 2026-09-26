@@ -189,7 +189,7 @@ func rebuild(force: bool = true) -> void:
 	var board_team: Array = (manager.player_team if manager else [])
 	var compiled: Dictionary = {}
 	if TraitCompiler and board_team is Array:
-		compiled = TraitCompiler.compile(board_team)
+		compiled = _compile_board(board_team)
 	var counts: Dictionary = compiled.get("counts", {})
 	var tiers: Dictionary = compiled.get("tiers", {})
 
@@ -232,7 +232,7 @@ func _current_trait_signature() -> String:
 	var board_team: Array = (manager.player_team if manager else [])
 	var compiled: Dictionary = {}
 	if TraitCompiler and board_team is Array:
-		compiled = TraitCompiler.compile(board_team)
+		compiled = _compile_board(board_team)
 	var counts: Dictionary = compiled.get("counts", {})
 	var keys: Array = counts.keys()
 	keys.sort()
@@ -246,6 +246,16 @@ func _current_trait_signature() -> String:
 			signature += "|"
 		signature += String(parts[index])
 	return signature
+
+## The manager publishes the on-board team as an untyped Array while
+## TraitCompiler.compile() takes a typed Array[Unit]; coerce at the boundary so
+## the call itself never fails its typed-array contract.
+func _compile_board(board_team: Array) -> Dictionary:
+	var roster: Array[Unit] = []
+	for entry: Variant in board_team:
+		if entry is Unit:
+			roster.append(entry)
+	return TraitCompiler.compile(roster)
 
 func _item_grid() -> Control:
 	if view == null:

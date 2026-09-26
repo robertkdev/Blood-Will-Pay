@@ -37,6 +37,14 @@ var _unit_team: String = "player"
 var _unit_index: int = -1
 
 func _ready() -> void:
+    # The composed StatsArea column owns this rail's rect. A rail placed directly
+    # under a plain host would instead inherit this scene's full-rect anchors and
+    # stretch past the rect it was handed, which makes the rail's own settled
+    # width - and the dense-tier decision that follows from it - dishonest. Keep
+    # the rect the host gave the rail; a container still owns it either way.
+    var host: Control = get_parent_control()
+    if host != null and not (host is Container):
+        set_anchors_preset(Control.PRESET_TOP_LEFT, true)
     _configure_input_routing()
     _ensure_unit_scroll_frame()
     if not resized.is_connected(Callable(self, "_apply_unit_detail_layout")):

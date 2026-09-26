@@ -360,8 +360,11 @@ func _apply_caption_band() -> void:
 	_caption_band.anchor_right = maxf(_name_label.anchor_right, _price_label.anchor_right)
 	_caption_band.anchor_top = _name_label.anchor_top
 	_caption_band.anchor_bottom = 1.0
-	_caption_band.offset_left = -3.0
-	_caption_band.offset_right = 3.0
+	# Paint-only band, and it stays inside the card it belongs to: the shared
+	# caption row already spans the card, so a negative/positive overhang only
+	# painted 3px past the card's own edges and overflowed its parent.
+	_caption_band.offset_left = 0.0
+	_caption_band.offset_right = 0.0
 	_caption_band.offset_top = _name_label.offset_top - 3.0
 	_caption_band.offset_bottom = -1.0
 
