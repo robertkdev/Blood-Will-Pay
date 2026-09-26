@@ -47,6 +47,11 @@ const COLOR_GAMEPLAY_EDGE: Color = Color(0.47, 0.39, 0.27, 0.72)
 const COLOR_GAMEPLAY_EDGE_DIM: Color = Color(0.33, 0.28, 0.23, 0.62)
 const COLOR_GAMEPLAY_CRIMSON: Color = Color(0.42, 0.048, 0.060, 0.98)
 const COLOR_GAMEPLAY_CRIMSON_HOT: Color = Color(0.62, 0.075, 0.075, 0.99)
+## The light lip that caps a band. The concept reference braces its lower third
+## with rules in this weight and temperature, and its planning divider is one of
+## them widened into a band, so both uses share one colour and one thickness
+## instead of each inventing its own edge.
+const COLOR_GAMEPLAY_RULE: Color = Color(0.72, 0.61, 0.38, 0.70)
 
 ## Gameplay surfaces. Each helper returns its documented fallback while a file is
 ## absent or does not match the audited source size, so an unapproved or resized
@@ -292,6 +297,23 @@ static func arena_frame_style(modulate: Color = Color.WHITE) -> StyleBoxTexture:
 
 static func status_strip_style(modulate: Color = Color.WHITE) -> StyleBoxTexture:
 	return texture_style(STATUS_STRIP, Vector4(54.0, 24.0, 54.0, 24.0), Vector4(16.0, 6.0, 16.0, 6.0), modulate)
+
+## The planning divider, drawn rather than textured.
+##
+## The reference's divider does structural work: it is a wide recessed band
+## capped by a rule top and bottom, so it reads as the horizon between hostile
+## and friendly ground. The textured status strip is a pill of its own shape, so
+## widening it only produced a longer pill; this band is the shape the divider
+## needs and it carries the shared rule colour.
+static func divider_band_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = COLOR_GAMEPLAY_RECESS
+	style.border_color = COLOR_GAMEPLAY_RULE
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_width_left = 0
+	style.border_width_right = 0
+	return style
 
 static func focus_outline_style(radius: int = 5, border_color: Color = Color(1.0, 0.80, 0.43, 1.0), border_width: int = 2) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
