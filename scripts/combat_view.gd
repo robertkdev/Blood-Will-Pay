@@ -6,6 +6,7 @@ const StageProgressTopBarScene: GDScript = preload("res://scripts/ui/combat/stag
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const ArenaPracticalFireScript: GDScript = preload("res://scripts/ui/combat/arena_practical_fire.gd")
 const Composition: GDScript = preload("res://scripts/ui/combat/planning_composition.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 var _controller_script: Script = null
 
@@ -50,6 +51,7 @@ var _plaque_slot: Control = null
 var _wager_controls: VBoxContainer = null
 var _wager_value_row: HBoxContainer = null
 var _wager_control_row: HBoxContainer = null
+var _wager_outcomes: VBoxContainer = null
 var _wager_label: Label = null
 var _wager_row: HBoxContainer = null
 var _dock_composition_active: bool = false
@@ -2507,6 +2509,149 @@ func _apply_dock_wager_quote(wager_rect: Rect2, ui_scale: float) -> void:
 		wager_summary.remove_meta("dock_quote_style_previous")
 	wager_summary.set_meta("dock_territory", "wager_quote")
 
+## The wager territory's shape language.
+##
+## The reference spends the same two futures as two opposed rows - one gain, one
+## loss, with opposed colours and the number on the right - so the decision reads
+## before any of it is parsed as prose. Measured, our wager band was the quietest
+## territory on the screen (saturated fraction 0.012 against the reference's
+## 0.032, and no red at all against 0.014): the whole decision was a single dense
+## line. The rows state the same facts the line already states - the reserve each
+## future lands on - and take no new numbers, so there is still one calculation.
+func _ensure_dock_wager_outcomes() -> void:
+	if _wager_controls == null or not is_instance_valid(_wager_controls):
+		return
+	if _wager_outcomes != null and is_instance_valid(_wager_outcomes):
+		return
+	var outcomes: VBoxContainer = _wager_controls.get_node_or_null("WagerOutcomes") as VBoxContainer
+	if outcomes == null:
+		outcomes = VBoxContainer.new()
+		outcomes.name = "WagerOutcomes"
+		outcomes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		outcomes.add_theme_constant_override("separation", 2)
+		outcomes.set_meta("visual_role", "wager_outcome_rows")
+		_wager_controls.add_child(outcomes)
+	for row_name: String in ["WagerWinRow", "WagerLossRow"]:
+		if outcomes.get_node_or_null(row_name) != null:
+			continue
+		# Each future wears its own plate: the reference tints its loss row and
+		# leaves the gain row on the dark panel, and the two rows then read as a
+		# bordered block instead of as two more lines of text.
+		var row: PanelContainer = PanelContainer.new()
+		row.name = row_name
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var line: HBoxContainer = HBoxContainer.new()
+		line.name = "OutcomeLine"
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_theme_constant_override("separation", 10)
+		var caption: Label = Label.new()
+		caption.name = "OutcomeCaption"
+		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var value: Label = Label.new()
+		value.name = "OutcomeValue"
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.add_child(caption)
+		line.add_child(value)
+		row.add_child(line)
+		outcomes.add_child(row)
+	_wager_outcomes = outcomes
+
+func _apply_dock_wager_outcomes() -> void:
+	_ensure_dock_wager_outcomes()
+	if _wager_outcomes == null or wager_summary == null:
+		return
+	var quotes: Variant = wager_summary.get_meta("outcome_quotes", null)
+	if not (quotes is Dictionary):
+		_wager_outcomes.visible = false
+		return
+	var data: Dictionary = quotes as Dictionary
+	if not bool(data.get("active", false)):
+		# The opener and the locked combat wager have one outcome, not two.
+		_wager_outcomes.visible = false
+		return
+	_wager_outcomes.visible = true
+	# Authored composition scale only, which is the same distinction the stage bar
+	# uses to compact itself. An enlarged UI leaves the shipped frame 1280x720
+	# logical, where two more rows push the wager territory past the viewport -
+	# the review scene caught exactly that at 150 percent. The disclosure is not a
+	# hidden fact: the same two futures stay in the summary line and the tooltip at
+	# every scale.
+	if bool(get_meta("full_hd_dock", false)) and float(get_meta("persisted_ui_scale", 1.0)) > 1.0:
+		_wager_outcomes.visible = false
+		return
+	var compact: bool = bool(get_meta("compact_layout", false))
+	var tight: bool = bool(get_meta("tight_scale_layout", false))
+	var caption_size: int = 13 if tight else 14 if compact else 16
+	var value_size: int = 15 if tight else 17 if compact else 19
+	_write_wager_outcome_row(
+		"WagerWinRow",
+		"WIN  %d-%d%%" % [int(data.get("win_low", 0)), int(data.get("win_high", 0))],
+		BloodBuckets.format_amount(int(data.get("after_win", 0))),
+		GothicUIAssets.COLOR_GAMEPLAY_RULE,
+		Color(0.72, 0.61, 0.38, 0.10),
+		caption_size,
+		value_size
+	)
+	_write_wager_outcome_row(
+		"WagerLossRow",
+		"LOSS  %d-%d%%" % [int(data.get("loss_low", 0)), int(data.get("loss_high", 0))],
+		BloodBuckets.format_amount(int(data.get("after_loss", 0))),
+		GothicUIAssets.COLOR_GAMEPLAY_CRIMSON_HOT,
+		Color(0.62, 0.075, 0.075, 0.20),
+		caption_size,
+		value_size
+	)
+	_wager_outcomes.set_meta(
+		"wager_outcome_rows",
+		"%d-%d / %d-%d" % [
+			int(data.get("win_low", 0)),
+			int(data.get("win_high", 0)),
+			int(data.get("loss_low", 0)),
+			int(data.get("loss_high", 0)),
+		]
+	)
+
+func _write_wager_outcome_row(
+	row_name: String,
+	caption_text: String,
+	value_text: String,
+	value_color: Color,
+	plate_color: Color,
+	caption_size: int,
+	value_size: int
+) -> void:
+	var row: PanelContainer = _wager_outcomes.get_node_or_null(row_name) as PanelContainer
+	if row == null:
+		return
+	var plate: StyleBoxFlat = StyleBoxFlat.new()
+	plate.bg_color = plate_color
+	plate.border_color = Color(value_color.r, value_color.g, value_color.b, 0.34)
+	plate.border_width_left = 2
+	plate.border_width_right = 0
+	plate.border_width_top = 0
+	plate.border_width_bottom = 0
+	plate.content_margin_left = 8.0
+	plate.content_margin_right = 8.0
+	plate.content_margin_top = 3.0
+	plate.content_margin_bottom = 3.0
+	row.add_theme_stylebox_override("panel", plate)
+	var caption: Label = row.get_node_or_null("OutcomeLine/OutcomeCaption") as Label
+	if caption != null:
+		caption.text = caption_text
+		caption.add_theme_font_size_override("font_size", caption_size)
+		caption.add_theme_color_override("font_color", Color(0.72, 0.68, 0.62, 0.92))
+	var value: Label = row.get_node_or_null("OutcomeLine/OutcomeValue") as Label
+	if value != null:
+		value.text = value_text
+		value.add_theme_font_size_override("font_size", value_size)
+		value.add_theme_color_override("font_color", value_color)
+
 func _place_dock_controls(wager_rect: Rect2, plaque_rect: Rect2) -> void:
 	_ensure_dock_wager_column()
 	if _wager_controls != null:
@@ -2547,6 +2692,11 @@ func _place_dock_controls(wager_rect: Rect2, plaque_rect: Rect2) -> void:
 		if _wager_row != null and is_instance_valid(_wager_row):
 			_wager_row.visible = false
 			_wager_row.custom_minimum_size = Vector2.ZERO
+		# The two futures close the column: heading, control, value, outcomes.
+		_ensure_dock_wager_outcomes()
+		if _wager_outcomes != null and is_instance_valid(_wager_outcomes):
+			_wager_controls.move_child(_wager_outcomes, _wager_controls.get_child_count() - 1)
+		_apply_dock_wager_outcomes()
 		_wager_controls.set_meta("dock_territory", "wager")
 		_wager_controls.set_meta("dock_rect", wager_rect)
 	if continue_button != null and _plaque_slot != null:
