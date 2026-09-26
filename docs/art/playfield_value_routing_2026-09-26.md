@@ -62,26 +62,46 @@ still short".
 
 ## What the board's value is made of now
 
-Hiding the arena surface changes the board region by nothing, which is the
-evidence that the tiles own it: the board area is painted by
-`board_tile_player.png` and `board_tile_enemy.png`, with the plates as a slight
-tint over them, and the firelit plate showing only around the board's edges
-where the braziers and cloth are. Those two tile textures measure 0.134 and
-0.100 mean luminance with p99 near 0.27, so the board is lit evenly with almost
-no lit accent in it.
+Eighteen layers were isolated. The board region's mean is owned by the two
+planning halves' own content: hiding either half darkens the field and costs it
+real highlight, and hiding the whole content row drops the share above 0.35 from
+3.02 to 1.03 percent. Everything behind that content contributes nothing at all,
+including `GothicArenaSurface`, `GothicScreenBackdrop`, the void `ColorRect`,
+`GothicBattlePlate` and `GothicArenaVignette`. The probe re-asserts each hide
+immediately before the capture, so a layer the game's refresh loop re-shows
+cannot read as a false zero.
+
+An earlier version of this note claimed the board is painted by
+`board_tile_player.png` and `board_tile_enemy.png`. That is wrong and is
+withdrawn: `_apply_tile` sets the cell background to `Color(0, 0, 0, 0)` and the
+cells are seam rulings only, and `board_tile_style()` has no callers, so those
+textures are not on screen. Which layer supplies the stone under the cells is
+still not identified, and it is not needed to act on the top end.
+
+## The seam lattice
+
+The field's brightest authored mark is the deployment lattice, and it was
+carrying it at a weight the field could not read: 1px rules at 0.58 to 0.80
+alpha. Holding the sparse irregular cadence exactly as it was and raising only
+the ruling weight took the share above 0.35 from 2.68 to 3.02 percent, with the
+mean at 0.1151. That meets two of the three field targets.
 
 ## Next step
 
-The remaining gap is the top end, not the middle: p99 0.5049 against a 0.550
-target, and 2.68 percent above 0.35 against 3.0. That belongs to the tile
-textures, which need lit structure - wet stone highlights, lit edge bevels, and
-a stronger hostile/friendly split - while their means stay where they are. This
-is an authored-art change in the asset lane, not a brightness curve.
+The remaining gap is purely the top end: p99 0.505 against a 0.550 target and
+the reference's 0.583. The lattice does not move p99, because a seam sits near
+0.4; p99 is the brightest one percent of the field, and hiding the board halves
+is what moves it. So the last of the gap belongs to the lit mass of the board
+figures rather than to the stone or the lattice, and it is a unit presentation
+or unit art change, not a floor change.
 
 ## Acceptance
 
 Field mean 0.085 or higher, field p99 0.550 or higher, and 3.0 percent or more of
 the field above 0.35 luminance, while the lower band comes down toward 4.5
-percent. Re-run the isolation probe after any change to the layers above.
+percent.
+
+Standing after this pass: mean 0.1151 met, above 0.35 at 3.02 percent met, p99
+0.505 still short. Re-run the isolation probe after any change to a layer above.
 Nothing here approves an asset; whole-screen acceptance is still the rendered
 runtime.

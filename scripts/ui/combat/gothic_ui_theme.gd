@@ -1290,7 +1290,12 @@ static func _apply_tile(button: Button, is_player: bool) -> void:
 	# grid, and it is why neighbours disagree about how heavy their top line is.
 	var cell_index: int = int(String(button.name).get_slice("_", 1))
 	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
-	var border_color: Color = Color(0.96, 0.88, 0.68, 0.76 if strong_seam else 0.58) if is_player else Color(0.96, 0.27, 0.19, 0.80 if strong_seam else 0.64)
+	# The lattice is the board's brightest authored mark, so it carries the
+	# territory hue at a weight the field can actually read. The cadence above
+	# stays sparse and irregular; only the ruling's weight changed, because the
+	# measured field was short of highlight and the seams are the cheapest place
+	# to put it back. See docs/art/playfield_value_routing_2026-09-26.md.
+	var border_color: Color = Color(0.97, 0.90, 0.70, 0.92 if strong_seam else 0.74) if is_player else Color(0.98, 0.31, 0.22, 0.98 if strong_seam else 0.86)
 	var hover_color: Color = Color(0.055, 0.070, 0.064, 0.34) if is_player else Color(0.115, 0.042, 0.038, 0.34)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
 	normal_style.shadow_size = 0

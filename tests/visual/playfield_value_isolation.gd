@@ -35,6 +35,13 @@ const LAYERS: Array[Dictionary] = [
 	{"id": "08_no_arena_pressure", "path": ARENA_ROOT + "/GothicArenaPressureSurface"},
 	{"id": "09_no_arena_combat_focus", "path": ARENA_ROOT + "/ArenaCombatFocusPainter"},
 	{"id": "10_no_planning_surfaces", "path": PLANNING_ROOT + "/TopArea/GothicPlanningTopSurface"},
+	{"id": "11_no_screen_backdrop", "path": "GothicScreenBackdrop"},
+	{"id": "12_no_void_rect", "path": "ColorRect"},
+	{"id": "13_no_battle_plate", "path": "MarginContainer/VBoxContainer/BattleArea/GothicBattlePlate"},
+	{"id": "14_no_arena_vignette", "path": ARENA_ROOT + "/GothicArenaVignette"},
+	{"id": "15_no_top_half", "path": PLANNING_ROOT + "/TopArea"},
+	{"id": "16_no_bottom_half", "path": PLANNING_ROOT + "/BottomArea"},
+	{"id": "17_no_content_row", "path": "MarginContainer/VBoxContainer/BattleArea/ContentRow"},
 ]
 
 var _view: Control = null
@@ -121,6 +128,13 @@ func _capture_layer(id: String, node_path: String) -> void:
 		was_visible = target.visible
 		target.visible = false
 	await _settle_frames(8)
+	# The game's own refresh loop re-applies the theme on a cadence, and a theme
+	# pass can restore a layer this probe just hid. Re-assert the hide immediately
+	# before the capture so a layer that is re-shown every refresh is still
+	# measured honestly instead of silently reading as "no contribution".
+	if target != null:
+		target.visible = false
+	await _settle_frames(3)
 	var saved: bool = _save_frame(id)
 	if target != null:
 		target.visible = was_visible
