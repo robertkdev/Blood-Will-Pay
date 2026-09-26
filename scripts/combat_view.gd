@@ -56,6 +56,10 @@ var _dock_composition_active: bool = false
 var _dock_reassert_queued: bool = false
 var _composed_rail_presenter_width: float = -1.0
 var _dock_reassert_running: bool = false
+## The composed field's settled allocation (board width, frame-budgeted board
+## space, UI scale). A live phase transition re-applies it verbatim instead of
+## re-deriving the stack; see `_apply_dock_composition`.
+var _dock_settled_field: Dictionary = {}
 var _dock_plaque_fit_queued: bool = false
 var _dock_material_revision: int = 0
 var _dock_panel_styles: Dictionary[String, StyleBox] = {}
@@ -1589,6 +1593,7 @@ func _apply_dock_composition(full_hd_dock: bool) -> void:
 		var settled_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 		if settled_storage != null and settled_storage.custom_minimum_size.y > 1.0:
 			_apply_dock_shop(settled_storage.custom_minimum_size.y, ui_scale)
+			_reassert_composed_field()
 			call_deferred("_refresh_dock_territories")
 		return
 	var rail_width: float = Composition.side_rail_width(ui_scale)
@@ -1611,6 +1616,11 @@ func _apply_dock_composition(full_hd_dock: bool) -> void:
 	var board_space: float = _apply_dock_vertical_budget(ui_scale, dock_height, bench_tile, viewport_size)
 	_apply_dock_field(board_width_value, board_space, ui_scale)
 	_apply_dock_shop(dock_height, ui_scale)
+	_dock_settled_field = {
+		"board_width": board_width_value,
+		"board_space": board_space,
+		"ui_scale": ui_scale,
+	}
 	_connect_dock_reassert_sources()
 	_dock_composition_active = true
 	# Territory geometry and control placement are written from the deferred pass
@@ -1679,24 +1689,45 @@ func _apply_dock_vertical_budget(ui_scale: float, dock_height: float, bench_tile
 		quote_min = maxf(quote_min, wager_summary.get_combined_minimum_size().y)
 	var reserved: float = Composition.DOCK_MARGIN + _dock_bottom_margin() + top_bar_min + bench_tile.y + quote_min + dock_height + separation * rows
 	var board_space: float = maxf(200.0, viewport_size.y - reserved)
+	_write_composed_field_minima(board_space, scale)
+	return board_space
+
+## The composed field's vertical minima, written in one place because two passes
+## own them: the full composed pass and the re-assert a live phase transition
+## runs instead of it. The re-assert has to restore these, not just the shop
+## band, or the field falls back to the legacy desktop height inside the dock.
+func _write_composed_field_minima(board_space: float, ui_scale: float) -> void:
 	var battle_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	if battle_area != null:
 		battle_area.custom_minimum_size.y = board_space
 	var item_grid: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as Control
 	if item_grid != null:
-		item_grid.custom_minimum_size.y = Composition.physical_px(132.0, scale, 74.0)
+		item_grid.custom_minimum_size.y = Composition.physical_px(132.0, ui_scale, 74.0)
 	var traits_panel: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
 	if traits_panel != null:
-		traits_panel.custom_minimum_size.y = Composition.physical_px(352.0, scale, 170.0)
+		traits_panel.custom_minimum_size.y = Composition.physical_px(352.0, ui_scale, 170.0)
 	if stats_panel != null:
-		stats_panel.custom_minimum_size.y = Composition.physical_px(540.0, scale, 250.0)
+		stats_panel.custom_minimum_size.y = Composition.physical_px(540.0, ui_scale, 250.0)
 	var left_rail: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
 	if left_rail != null:
 		left_rail.custom_minimum_size.y = board_space
 	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	if stats_area != null:
 		stats_area.custom_minimum_size.y = board_space
-	return board_space
+
+## Re-applies the settled composed field while a phase transition animates it.
+## `_apply_responsive_layout` has already written the legacy stack's desktop
+## minima by the time the composed pass runs, so a bare re-assert of the shop
+## band left the field at its desktop height and pushed the band off the frame.
+func _reassert_composed_field() -> void:
+	var board_space: float = float(_dock_settled_field.get("board_space", 0.0))
+	if board_space <= 1.0:
+		return
+	var ui_scale: float = float(_dock_settled_field.get("ui_scale", 1.0))
+	var board_width_value: float = float(_dock_settled_field.get("board_width", 0.0))
+	_write_composed_field_minima(board_space, ui_scale)
+	_apply_dock_field(board_width_value, board_space, ui_scale)
+	_apply_dock_bench(Composition.board_span(board_width_value, ui_scale), ui_scale)
 
 ## Both support rails take the same substantial width. The field centre then
 ## agrees with the screen centre, which is what lets the bench sit under the
@@ -2654,6 +2685,7 @@ func _restore_command_bar_order(bar: HBoxContainer) -> void:
 
 func _release_dock_composition() -> void:
 	_dock_composition_active = false
+	_dock_settled_field.clear()
 	# Clear the composed bench offset so the authored tiers centre normally.
 	var bench_area: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as HBoxContainer
 	_clear_composed_bench_spacers(bench_area)
