@@ -2,6 +2,8 @@ extends RefCounted
 class_name TraitsPresenter
 
 const TraitCompiler := preload("res://scripts/game/traits/trait_compiler.gd")
+const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const TRAIT_ICON_SCENE_PATH: String = "res://scenes/ui/traits/TraitIcon.tscn"
 
 var view: Control
@@ -18,6 +20,41 @@ const PADDING_X: int = 10
 const SPACING: int = 6
 const ROW_HEIGHT: int = 48
 const ICON_SIZE: int = 40
+
+# Support-rail furniture: one quiet recessed row per trait. Activation keeps a
+# single structural left edge plus a small checkpoint ladder; the trait's own
+# symbol carries identity, and the count/checkpoint reads as its own field
+# instead of a slash-joined uppercase string.
+## Quiet recessed rows: the interior wash stays near-black in both states and a
+## single muted edge carries activation, so the strip has one accent per row
+## instead of a red box, a bright plate and a loud pip row competing.
+const COLOR_ROW_ACTIVE_BG: Color = Color(0.055, 0.032, 0.030, 0.62)
+const COLOR_ROW_INACTIVE_BG: Color = Color(0.022, 0.021, 0.026, 0.52)
+const COLOR_ROW_ACTIVE_EDGE: Color = Color(0.42, 0.105, 0.115, 0.88)
+const COLOR_ROW_INACTIVE_EDGE: Color = Color(0.15, 0.13, 0.14, 0.75)
+const COLOR_NAME_ACTIVE: Color = Color(0.94, 0.89, 0.80, 1.0)
+const COLOR_NAME_INACTIVE: Color = Color(0.68, 0.64, 0.59, 0.94)
+const COLOR_VALUE_ACTIVE: Color = Color(0.88, 0.70, 0.42, 0.98)
+const COLOR_VALUE_INACTIVE: Color = Color(0.55, 0.50, 0.46, 0.92)
+const COLOR_PIP_REACHED: Color = Color(0.82, 0.52, 0.26, 0.96)
+const COLOR_PIP_REACHED_INACTIVE: Color = Color(0.44, 0.30, 0.22, 0.90)
+const COLOR_PIP_UNMET: Color = Color(0.28, 0.25, 0.24, 0.90)
+const NAME_LINE_MIN_HEIGHT: float = 19.0
+const MIN_NAME_FONT_SIZE: int = 10
+const MIN_ICON_SIZE: float = 20.0
+## Below this rail width the strip is dense: shorter rows, smaller symbols and
+## tighter margins. The settled rail width decides, not the UI tier.
+const DENSE_RAIL_WIDTH: float = 200.0
+## Room the strip reserves for its own vertical scrollbar so the row interior
+## can never end up wider than the scroll viewport.
+const SCROLLBAR_ALLOWANCE: float = 16.0
+## One physical row rhythm for every UI scale, so an enlarged UI gets denser
+## logical rows instead of taller ones that push the strip past its region.
+const ROW_PITCH_PHYSICAL: float = 46.0
+const ROW_MIN_HEIGHT: float = 30.0
+const ROW_MAX_HEIGHT: float = 48.0
+## Traits the strip tries to keep visible before it starts scrolling.
+const TARGET_VISIBLE_ROWS: float = 5.0
 
 var _layout_width: float = float(WIDTH)
 var _layout_row_height: float = float(ROW_HEIGHT)
@@ -51,6 +88,8 @@ func initialize() -> void:
 	rebuild()
 
 func set_compact_layout(width: float, row_height: float, icon_size: float, compact: bool) -> void:
+	# Hints only: once the rail has settled its own width, _update_layout derives
+	# the dense presentation from that width instead.
 	_layout_width = maxf(96.0, width)
 	_layout_row_height = maxf(32.0, row_height)
 	_layout_icon_size = maxf(22.0, icon_size)
@@ -69,9 +108,11 @@ func teardown() -> void:
 	if manager != null and is_instance_valid(manager) and manager.is_connected("team_stats_updated", Callable(self, "_on_team_stats_updated")):
 		manager.team_stats_updated.disconnect(_on_team_stats_updated)
 	if _vbox != null and is_instance_valid(_vbox):
-		for c in _vbox.get_children():
-			if c is Node:
-				c.queue_free()
+		for c: Node in _vbox.get_children():
+			# Detach before freeing: a queued node still counts toward the rail's
+			# measured interior minimum until idle deletion.
+			_vbox.remove_child(c)
+			c.queue_free()
 	_overlay = null
 	_scroll = null
 	_vbox = null
@@ -138,7 +179,10 @@ func rebuild(force: bool = true) -> void:
 		diagnostic_rebuild_calls += 1
 	# Clear existing
 	if _vbox:
-		for c in _vbox.get_children():
+		for c: Node in _vbox.get_children():
+			# Detach first so the rebuilt rows never coexist with the outgoing
+			# ones inside a measured minimum-size pass.
+			_vbox.remove_child(c)
 			c.queue_free()
 
 	# Pull on-board team only
@@ -211,14 +255,30 @@ func _item_grid() -> Control:
 func _update_layout() -> void:
 	if _overlay == null or _scroll == null:
 		return
-	# Preserve the width selected by the combat view. The former fixed 296px
-	# reset caused compact rails to overflow their 125%/150% viewport.
-	_overlay.custom_minimum_size.x = _layout_width
+	# The rail's real allotted width is the authority; the pushed width is only an
+	# early hint. Row height, symbol size and density all follow that width, so
+	# the strip adapts wherever the composition puts it.
+	if _overlay.size.x > 1.0:
+		_layout_width = maxf(96.0, _overlay.size.x)
+		_layout_row_height = _row_height_for(_layout_width)
+		_layout_icon_size = clampf(minf(_icon_size_for_width(_layout_width), _layout_row_height - 4.0), MIN_ICON_SIZE, 40.0)
+		_compact_layout = _layout_width < DENSE_RAIL_WIDTH
+	# The composition and the combat view own the rail's outer width. This only
+	# measures the rect it was given; it never claims one, so the rail is never
+	# widened by its own interior minimum.
 	_scroll.visible = true
+	_scroll.clip_contents = true
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	if _vbox:
-		_vbox.custom_minimum_size.x = maxf(1.0, _layout_width - float(PADDING_X * 2))
+		_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_vbox.add_theme_constant_override("separation", 2 if _compact_layout else SPACING)
+		# Re-fit every row for the current rail width so a resize can never leave
+		# a stale name or icon size behind.
+		for child: Node in _vbox.get_children():
+			var row: PanelContainer = child as PanelContainer
+			if row != null:
+				_apply_trait_row_layout(row)
 
 func _compare_traits(a: String, b: String, counts: Dictionary, thresholds_by_id: Dictionary, use_checkpoint: bool) -> bool:
 	var count_a: int = int(counts.get(a, 0))
@@ -241,10 +301,10 @@ func _add_trait_row(id: String, active_trait: bool, count: int, tier: int, thres
 		return
 	var row: PanelContainer = PanelContainer.new()
 	row.name = "TraitRow_%s" % id.to_lower().replace(" ", "_").replace("-", "_")
-	row.custom_minimum_size = Vector2(_layout_width - float(PADDING_X * 2), _layout_row_height)
+	row.custom_minimum_size = Vector2(0.0, _layout_row_height)
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.mouse_filter = Control.MOUSE_FILTER_PASS
-	row.clip_contents = _compact_layout
+	row.clip_contents = false
 	row.set_meta("trait_id", id)
 	row.set_meta("trait_count", count)
 	row.set_meta("trait_active", active_trait)
@@ -254,23 +314,26 @@ func _add_trait_row(id: String, active_trait: bool, count: int, tier: int, thres
 	var margin: MarginContainer = MarginContainer.new()
 	margin.name = "Margin"
 	margin.mouse_filter = Control.MOUSE_FILTER_PASS
-	margin.add_theme_constant_override("margin_left", 3 if _compact_layout else 6)
-	margin.add_theme_constant_override("margin_top", 2 if _compact_layout else 4)
-	margin.add_theme_constant_override("margin_right", 3 if _compact_layout else 6)
-	margin.add_theme_constant_override("margin_bottom", 2 if _compact_layout else 4)
+	margin.add_theme_constant_override("margin_left", _row_margin_x())
+	margin.add_theme_constant_override("margin_top", _row_margin_y())
+	margin.add_theme_constant_override("margin_right", _row_margin_x())
+	margin.add_theme_constant_override("margin_bottom", _row_margin_y())
 	row.add_child(margin)
 
 	var hbox: HBoxContainer = HBoxContainer.new()
 	hbox.name = "Row"
 	hbox.mouse_filter = Control.MOUSE_FILTER_PASS
-	hbox.add_theme_constant_override("separation", 3 if _compact_layout else 8)
+	hbox.add_theme_constant_override("separation", _row_separation())
 	margin.add_child(hbox)
 
+	# The authored trait symbol is the fastest way to read this rail, and it is
+	# also the hover and focus surface for the trait tooltip. It stays visible at
+	# every rail width instead of collapsing into text-only telemetry.
 	var trait_icon_scene: PackedScene = _get_trait_icon_scene()
 	var icon: Control = trait_icon_scene.instantiate() as Control if trait_icon_scene != null else null
 	if icon != null:
-		icon.custom_minimum_size = Vector2(_layout_icon_size, _layout_icon_size)
-		icon.clip_contents = _compact_layout
+		icon.custom_minimum_size = Vector2(_icon_size(), _icon_size())
+		icon.clip_contents = false
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		if icon.has_method("set_trait"):
 			icon.call("set_trait", id)
@@ -287,92 +350,311 @@ func _add_trait_row(id: String, active_trait: bool, count: int, tier: int, thres
 	text_box.add_theme_constant_override("separation", 0)
 	hbox.add_child(text_box)
 
+	var display_name: String = _trait_display_name(id)
 	var name_label: Label = Label.new()
 	name_label.name = "TraitName"
-	name_label.text = _trait_display_name(id)
+	name_label.text = display_name
 	name_label.clip_text = true
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	name_label.add_theme_font_size_override("font_size", 12 if _compact_layout else 14)
-	name_label.add_theme_color_override("font_color", Color(0.94, 0.87, 0.72, 1.0) if active_trait else Color(0.70, 0.66, 0.60, 0.92))
+	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.custom_minimum_size.y = NAME_LINE_MIN_HEIGHT
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.tooltip_text = display_name
+	VisualTypeSystem.set_gameplay_name(name_label)
+	name_label.add_theme_color_override("font_color", COLOR_NAME_ACTIVE if active_trait else COLOR_NAME_INACTIVE)
 	text_box.add_child(name_label)
 
-	var checkpoint_label: Label = Label.new()
-	checkpoint_label.name = "TraitCheckpoint"
-	checkpoint_label.text = _compact_checkpoint_text(id, count, active_trait, thresholds_by_id) if _compact_layout else _checkpoint_text(id, count, active_trait, thresholds_by_id)
-	checkpoint_label.clip_text = true
-	checkpoint_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	checkpoint_label.add_theme_font_size_override("font_size", 11)
-	checkpoint_label.add_theme_color_override("font_color", Color(0.78, 0.62, 0.40, 0.96) if active_trait else Color(0.52, 0.48, 0.44, 0.90))
-	text_box.add_child(checkpoint_label)
+	# The count and its checkpoint are their own quiet field, followed by a
+	# small ladder of activation marks. Nothing here needs an uppercase slash
+	# string to stay readable.
+	var meta_box: HBoxContainer = HBoxContainer.new()
+	meta_box.name = "Meta"
+	meta_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meta_box.add_theme_constant_override("separation", 6)
+	text_box.add_child(meta_box)
 
-	var count_label: Label = Label.new()
-	count_label.name = "TraitCount"
-	count_label.custom_minimum_size = Vector2(22.0, _layout_row_height - 4.0) if _compact_layout else Vector2(30.0, 38.0)
-	count_label.text = str(count)
-	count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	count_label.add_theme_font_size_override("font_size", 16 if _compact_layout else 18)
-	count_label.add_theme_color_override("font_color", Color(1.0, 0.78, 0.36, 1.0) if active_trait else Color(0.72, 0.66, 0.58, 0.92))
-	count_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.68))
-	count_label.add_theme_constant_override("outline_size", 1)
-	hbox.add_child(count_label)
+	var progress_label: Label = Label.new()
+	progress_label.name = "TraitCheckpoint"
+	progress_label.text = _progress_text(id, count, active_trait, thresholds_by_id)
+	progress_label.clip_text = true
+	progress_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	progress_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	progress_label.tooltip_text = _checkpoint_text(id, count, active_trait, thresholds_by_id)
+	VisualTypeSystem.set_gameplay_numeric(progress_label)
+	progress_label.add_theme_color_override("font_color", COLOR_VALUE_ACTIVE if active_trait else COLOR_VALUE_INACTIVE)
+	meta_box.add_child(progress_label)
+
+	var pips: HBoxContainer = HBoxContainer.new()
+	pips.name = "TraitPips"
+	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pips.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pips.add_theme_constant_override("separation", 2)
+	meta_box.add_child(pips)
+	# The marks are populated by _apply_trait_row_layout below, which knows the
+	# rail width and can size them so the count/checkpoint keeps its room.
 
 	_vbox.add_child(row)
 	_apply_trait_row_layout(row)
 
 func _apply_trait_row_layout(row: PanelContainer) -> void:
-	row.custom_minimum_size = Vector2(_layout_width - float(PADDING_X * 2), _layout_row_height)
-	row.clip_contents = _compact_layout
+	# No horizontal minimum: the rail's width is the composition's to set, and the
+	# row fills whatever it is given. Name fitting measures that rect instead.
+	row.custom_minimum_size = Vector2(0.0, _layout_row_height)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.clip_contents = false
 	var margin: MarginContainer = row.get_node_or_null("Margin") as MarginContainer
 	if margin != null:
-		margin.add_theme_constant_override("margin_left", 3 if _compact_layout else 6)
-		margin.add_theme_constant_override("margin_top", 2 if _compact_layout else 4)
-		margin.add_theme_constant_override("margin_right", 3 if _compact_layout else 6)
-		margin.add_theme_constant_override("margin_bottom", 2 if _compact_layout else 4)
+		margin.add_theme_constant_override("margin_left", _row_margin_x())
+		margin.add_theme_constant_override("margin_top", _row_margin_y())
+		margin.add_theme_constant_override("margin_right", _row_margin_x())
+		margin.add_theme_constant_override("margin_bottom", _row_margin_y())
 	var row_box: HBoxContainer = row.get_node_or_null("Margin/Row") as HBoxContainer
 	if row_box == null:
 		return
-	row_box.add_theme_constant_override("separation", 3 if _compact_layout else 8)
-	for child: Node in row_box.get_children():
-		var child_control: Control = child as Control
-		if child_control == null:
-			continue
-		if child_control.name == "TraitIcon":
-			child_control.visible = not _compact_layout
-			child_control.custom_minimum_size = Vector2(_layout_icon_size, _layout_icon_size)
-			child_control.clip_contents = _compact_layout
-			for descendant: Node in child_control.find_children("*", "Control", true, false):
-				var icon_child: Control = descendant as Control
-				if icon_child != null:
-					icon_child.custom_minimum_size = Vector2.ZERO if _compact_layout else Vector2(40.3, 40.3)
+	row_box.add_theme_constant_override("separation", _row_separation())
+	var icon: Control = row_box.get_node_or_null("TraitIcon") as Control
+	if icon != null:
+		icon.visible = true
+		icon.custom_minimum_size = Vector2(_icon_size(), _icon_size())
+		icon.clip_contents = false
+		for descendant: Node in icon.find_children("*", "Control", true, false):
+			var icon_child: Control = descendant as Control
+			if icon_child != null:
+				icon_child.custom_minimum_size = Vector2.ZERO
 	var name_label: Label = row.get_node_or_null("Margin/Row/Text/TraitName") as Label
-	var checkpoint_label: Label = row.get_node_or_null("Margin/Row/Text/TraitCheckpoint") as Label
-	var count_label: Label = row.get_node_or_null("Margin/Row/TraitCount") as Label
+	var progress_label: Label = row.get_node_or_null("Margin/Row/Text/Meta/TraitCheckpoint") as Label
+	var pips: HBoxContainer = row.get_node_or_null("Margin/Row/Text/Meta/TraitPips") as HBoxContainer
 	var trait_id: String = String(row.get_meta("trait_id", ""))
 	var trait_count: int = int(row.get_meta("trait_count", 0))
 	var trait_active: bool = bool(row.get_meta("trait_active", false))
 	var trait_thresholds: Dictionary = row.get_meta("trait_thresholds", {}) as Dictionary
+	var display_name: String = _trait_display_name(trait_id)
+	var available_width: float = _name_available_width(row)
 	if name_label != null:
-		name_label.custom_minimum_size.x = 0.0
-		name_label.custom_minimum_size.y = 20.0 if _compact_layout else 0.0
+		# Re-assert the role before measuring: the fit has to use the face that
+		# will actually be drawn, not a sibling face with different metrics.
+		VisualTypeSystem.set_gameplay_name(name_label)
+	var name_font: Font = name_label.get_theme_font("font") if name_label != null else VisualTypeSystem.FONT_UTILITY
+	var fit: Dictionary = _fit_trait_name(display_name, available_width, name_font)
+	var chosen_size: int = int(fit.get("font_size", MIN_NAME_FONT_SIZE))
+	var progress_size: int = maxi(MIN_NAME_FONT_SIZE, chosen_size - 2)
+	var value_width: float = 0.0
+	if name_label != null:
+		var fitted_name: String = String(fit.get("text", display_name))
+		name_label.text = fitted_name
+		name_label.set_meta("trait_name_source", display_name)
+		name_label.set_meta("trait_name_complete", fitted_name == display_name)
+		name_label.tooltip_text = display_name
 		name_label.clip_text = true
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		var display_name: String = _trait_display_name(trait_id)
-		var compact_name: String = display_name.left(6).to_upper()
-		name_label.text = "%s // %s" % [compact_name, _compact_checkpoint_text(trait_id, trait_count, trait_active, trait_thresholds)] if _compact_layout else display_name
-		name_label.tooltip_text = display_name
-		name_label.add_theme_font_size_override("font_size", 13 if _compact_layout else 14)
-	if checkpoint_label != null:
-		checkpoint_label.custom_minimum_size.x = 0.0
-		checkpoint_label.clip_text = true
-		checkpoint_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		checkpoint_label.visible = not _compact_layout
-		checkpoint_label.text = _compact_checkpoint_text(trait_id, trait_count, trait_active, trait_thresholds) if _compact_layout else _checkpoint_text(trait_id, trait_count, trait_active, trait_thresholds)
-		checkpoint_label.add_theme_font_size_override("font_size", 11)
-	if count_label != null:
-		count_label.visible = not _compact_layout
-		count_label.custom_minimum_size = Vector2(22.0, _layout_row_height - 4.0) if _compact_layout else Vector2(30.0, 38.0)
-		count_label.add_theme_font_size_override("font_size", 16 if _compact_layout else 18)
+		name_label.custom_minimum_size = Vector2(0.0, NAME_LINE_MIN_HEIGHT)
+		name_label.add_theme_font_size_override("font_size", chosen_size)
+		name_label.add_theme_color_override("font_color", COLOR_NAME_ACTIVE if trait_active else COLOR_NAME_INACTIVE)
+	if progress_label != null:
+		VisualTypeSystem.set_gameplay_numeric(progress_label)
+		var progress_text: String = _progress_text(trait_id, trait_count, trait_active, trait_thresholds)
+		progress_label.text = progress_text
+		progress_label.tooltip_text = _checkpoint_text(trait_id, trait_count, trait_active, trait_thresholds)
+		progress_label.add_theme_font_size_override("font_size", progress_size)
+		progress_label.add_theme_color_override("font_color", COLOR_VALUE_ACTIVE if trait_active else COLOR_VALUE_INACTIVE)
+		# The label lives in an HBox beside the pip row, and a clipped label is
+		# measured at zero, so an underestimated reservation silently eats the
+		# last glyph (it clipped the checkpoint's denominator). Reserve the width
+		# the drawn string actually needs in the face that is actually rendered,
+		# plus a hair of slack for hinting.
+		var value_font: Font = progress_label.get_theme_font("font")
+		value_width = _text_width(progress_text, value_font, progress_size) + 2.0
+		progress_label.custom_minimum_size = Vector2(value_width, 0.0)
+		progress_label.clip_text = true
+		progress_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	if pips != null:
+		_update_trait_pips(pips, _thresholds_for(trait_id, trait_thresholds), trait_count, trait_active, available_width, value_width)
+
+# --- Support-rail geometry and quiet marks ---
+
+func _row_content_width() -> float:
+	return maxf(64.0, _layout_width - float(PADDING_X * 2) - SCROLLBAR_ALLOWANCE)
+
+func _row_margin_x() -> int:
+	if _layout_width < 150.0:
+		return 2
+	if _layout_width < DENSE_RAIL_WIDTH:
+		return 3
+	if _layout_width < 260.0:
+		return 4
+	return 6
+
+func _row_margin_y() -> int:
+	return 1 if _compact_layout else 4
+
+func _row_separation() -> int:
+	return 5 if _layout_width < 150.0 else 6 if _compact_layout else 8
+
+## Traits want the largest readable name the rail can hold; the rail width, not
+## the UI tier, decides how far down the candidate list we walk.
+func _preferred_name_font_size() -> int:
+	return 14
+
+func _row_height_for_width(width: float) -> float:
+	if width < 150.0:
+		return 32.0
+	if width < DENSE_RAIL_WIDTH:
+		return 36.0
+	if width < 260.0:
+		return 42.0
+	return 48.0
+
+## Row height is the smaller of what the width can carry and the physical row
+## rhythm the current UI scale budgets, capped by the strip's own viewport so a
+## long trait list scrolls instead of growing the rail.
+func _row_height_for(width: float) -> float:
+	var ui_scale: float = maxf(1.0, UserSettingsScript.get_ui_scale())
+	var physical_height: float = clampf(ROW_PITCH_PHYSICAL / ui_scale, ROW_MIN_HEIGHT, ROW_MAX_HEIGHT)
+	var wanted: float = minf(_row_height_for_width(width), physical_height)
+	if _scroll != null and _scroll.size.y > 1.0:
+		wanted = minf(wanted, _scroll.size.y / TARGET_VISIBLE_ROWS)
+	return clampf(wanted, ROW_MIN_HEIGHT, ROW_MAX_HEIGHT)
+
+func _icon_size_for_width(width: float) -> float:
+	if width < 150.0:
+		return 22.0
+	if width < DENSE_RAIL_WIDTH:
+		return 24.0
+	if width < 260.0:
+		return 28.0
+	return 30.0
+
+func _icon_size() -> float:
+	return clampf(_layout_icon_size, MIN_ICON_SIZE, 40.0)
+
+func _name_available_width(row: Control) -> float:
+	var icon_width: float = 0.0
+	var separation: float = 0.0
+	var row_box: HBoxContainer = row.get_node_or_null("Margin/Row") as HBoxContainer
+	if row_box != null:
+		separation = float(row_box.get_theme_constant("separation"))
+		var icon: Control = row_box.get_node_or_null("TraitIcon") as Control
+		if icon != null:
+			icon_width = icon.custom_minimum_size.x
+			if icon_width <= 0.0:
+				icon_width = icon.size.x
+	return maxf(32.0, _row_content_width() - float(_row_margin_x() * 2) - icon_width - separation)
+
+func _fit_trait_name(display_name: String, available_width: float, font: Font = null) -> Dictionary:
+	if font == null:
+		font = VisualTypeSystem.FONT_UTILITY
+	var preferred: int = _preferred_name_font_size()
+	var chosen_size: int = MIN_NAME_FONT_SIZE
+	for step: int in range(preferred - MIN_NAME_FONT_SIZE + 1):
+		var candidate: int = preferred - step
+		chosen_size = candidate
+		if _text_width(display_name, font, candidate) + 1.0 <= available_width:
+			return {"text": display_name, "font_size": candidate}
+	# Only a genuinely narrow rail abbreviates, and the authored name stays
+	# complete in the row tooltip.
+	return {"text": _trim_text_to_width(display_name, font, chosen_size, available_width), "font_size": chosen_size}
+
+func _text_width(text: String, font: Font, font_size: int) -> float:
+	if font != null:
+		return font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+	return float(text.length() * 7)
+
+func _trim_text_to_width(text: String, font: Font, font_size: int, max_width: float) -> String:
+	if text.length() <= 1:
+		return text
+	var suffix: String = "..."
+	var trimmed: String = text
+	while trimmed.length() > 1 and _text_width(trimmed + suffix, font, font_size) > max_width:
+		trimmed = trimmed.left(trimmed.length() - 1)
+	return trimmed + suffix
+
+func _progress_text(id: String, count: int, active_trait: bool, thresholds_by_id: Dictionary) -> String:
+	var bound: int = _activation_checkpoint(id, count, thresholds_by_id) if active_trait else _next_checkpoint(id, count, thresholds_by_id)
+	if bound <= 0:
+		return str(count)
+	return "%d / %d" % [count, bound]
+
+func _update_trait_pips(pips: HBoxContainer, thresholds: Array[int], count: int, active_trait: bool, available_width: float = 0.0, value_width: float = 0.0) -> void:
+	if pips == null:
+		return
+	var reached: int = 0
+	for threshold: int in thresholds:
+		if count >= threshold:
+			reached += 1
+	var pip_size: float = 5.0 if _compact_layout else 6.0
+	var pip_separation: int = 2
+	var show_marks: bool = not thresholds.is_empty()
+	if show_marks and available_width > 0.0:
+		# The value keeps its own room; the marks shrink before anything is
+		# clipped. A truly narrow rail drops the marks rather than overflowing.
+		var available_for_pips: float = available_width - value_width - 6.0
+		var count_pips: int = thresholds.size()
+		var nominal_total: float = float(count_pips) * pip_size + float(maxi(0, count_pips - 1) * pip_separation)
+		if nominal_total > available_for_pips:
+			pip_separation = 1
+			var floor_total: float = float(count_pips) * 3.0 + float(maxi(0, count_pips - 1))
+			if floor_total > available_for_pips:
+				show_marks = false
+			else:
+				pip_size = clampf((available_for_pips - float(maxi(0, count_pips - 1))) / float(count_pips), 3.0, pip_size)
+	# This runs from layout/resize paths, so it must be idempotent: the marks are
+	# reconciled in place, and a pass whose marks already match returns without
+	# touching the container or its children.
+	var wanted_count: int = thresholds.size() if show_marks else 0
+	var signature: String = "%d/%d/%s/%.1f/%d" % [wanted_count, reached, str(active_trait), pip_size, pip_separation]
+	if String(pips.get_meta("pip_signature", "")) == signature:
+		pips.visible = show_marks
+		return
+	pips.set_meta("pip_signature", signature)
+	pips.visible = show_marks
+	_reconcile_trait_pips(pips, wanted_count)
+	if not show_marks:
+		return
+	pips.add_theme_constant_override("separation", pip_separation)
+	for index in range(wanted_count):
+		var pip: Panel = pips.get_child(index) as Panel
+		if pip == null:
+			continue
+		pip.custom_minimum_size = Vector2(pip_size, pip_size)
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pip.add_theme_stylebox_override("panel", _make_pip_style(index < reached, active_trait))
+
+## Grows or shrinks the mark row in place. Extra marks are detached before they
+## are freed, so an oversized minimum can never survive into the next layout
+## pass while the node waits for idle deletion.
+func _reconcile_trait_pips(pips: HBoxContainer, wanted_count: int) -> void:
+	while pips.get_child_count() > wanted_count:
+		var extra: Node = pips.get_child(pips.get_child_count() - 1)
+		pips.remove_child(extra)
+		extra.queue_free()
+	var index: int = pips.get_child_count()
+	while index < wanted_count:
+		var pip: Panel = Panel.new()
+		pip.name = "Pip_%d" % index
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pips.add_child(pip)
+		index += 1
+
+func _make_pip_style(reached: bool, active_trait: bool) -> StyleBox:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.corner_radius_top_left = 1
+	style.corner_radius_top_right = 1
+	style.corner_radius_bottom_right = 1
+	style.corner_radius_bottom_left = 1
+	if reached:
+		style.bg_color = COLOR_PIP_REACHED if active_trait else COLOR_PIP_REACHED_INACTIVE
+	else:
+		style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+		style.border_color = COLOR_PIP_UNMET
+		style.border_width_left = 1
+		style.border_width_top = 1
+		style.border_width_right = 1
+		style.border_width_bottom = 1
+	return style
 
 func _get_trait_icon_scene() -> PackedScene:
 	if _trait_icon_scene == null:
@@ -381,16 +663,18 @@ func _get_trait_icon_scene() -> PackedScene:
 
 func _make_trait_row_style(active_trait: bool) -> StyleBox:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.080, 0.039, 0.036, 0.94) if active_trait else Color(0.026, 0.023, 0.029, 0.92)
-	style.border_color = Color(0.78, 0.095, 0.11, 0.94) if active_trait else Color(0.25, 0.23, 0.25, 0.88)
+	style.bg_color = COLOR_ROW_ACTIVE_BG if active_trait else COLOR_ROW_INACTIVE_BG
+	style.border_color = COLOR_ROW_ACTIVE_EDGE if active_trait else COLOR_ROW_INACTIVE_EDGE
+	# One structural left edge marks an active trait. The former bright red
+	# rectangle on all four sides made every active row shout at once.
 	style.border_width_left = 5 if active_trait else 2
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 2
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 0
 	style.content_margin_left = 2.0
-	style.content_margin_top = 1.0
+	style.content_margin_top = 0.0
 	style.content_margin_right = 2.0
-	style.content_margin_bottom = 1.0
+	style.content_margin_bottom = 0.0
 	return style
 
 func _checkpoint_text(id: String, count: int, active_trait: bool, thresholds_by_id: Dictionary) -> String:
@@ -401,14 +685,6 @@ func _checkpoint_text(id: String, count: int, active_trait: bool, thresholds_by_
 	if next_checkpoint > 0:
 		return "next %d" % next_checkpoint
 	return "inactive"
-
-func _compact_checkpoint_text(id: String, count: int, active_trait: bool, thresholds_by_id: Dictionary) -> String:
-	if active_trait:
-		return "%d/%d" % [count, _activation_checkpoint(id, count, thresholds_by_id)]
-	var next_checkpoint: int = _next_checkpoint(id, count, thresholds_by_id)
-	if next_checkpoint > 0:
-		return "%d>%d" % [count, next_checkpoint]
-	return "%d/OFF" % count
 
 func _activation_checkpoint(id: String, count: int, thresholds_by_id: Dictionary) -> int:
 	var checkpoint: int = 0

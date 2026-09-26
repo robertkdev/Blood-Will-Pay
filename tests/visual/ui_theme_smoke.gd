@@ -236,8 +236,13 @@ func _run() -> void:
 	scoreboard_row.set_row_data({"team": "player", "display_name": "Morrak", "value": 17.0, "share": 1.0, "metric": "damage"})
 	var compact_identity: Label = scoreboard_row.get_node_or_null("HBox/Content/Name") as Label
 	var compact_copy: String = compact_identity.text if compact_identity != null else ""
-	_expect(compact_identity != null and compact_copy == "YOU MORRAK", "Wide compact scoreboard should preserve the full team badge and stable unit identity", failures)
-	_expect(compact_identity != null and String(compact_identity.get_meta("compact_identity_mode", "")) == "full_badge", "Wide compact scoreboard did not enter full-badge identity mode", failures)
+	# The support-rail pass shows the authored mixed-case name and lets the rail
+	# chrome (plus the row metadata and tooltip) carry the team, instead of
+	# repeating a bold "YOU " prefix on every row.
+	_expect(compact_identity != null and compact_copy == "Morrak", "Wide compact scoreboard should preserve the complete authored unit name", failures)
+	_expect(compact_identity != null and bool(compact_identity.get_meta("compact_identity_preserves_unit_name", false)), "Wide compact scoreboard lost its unit-name preservation contract", failures)
+	_expect(compact_identity != null and String(compact_identity.get_meta("compact_team_marker", "")) == "YOU", "Wide compact scoreboard lost its team identity metadata", failures)
+	_expect(compact_identity != null and String(compact_identity.get_meta("compact_identity_mode", "")) == "name_only_team_in_chrome", "Wide compact scoreboard did not move team identity into the rail chrome", failures)
 	_expect(compact_identity != null and bool(compact_identity.get_meta("compact_identity_complete", false)), "Compact scoreboard identity lacks its completeness contract", failures)
 	scoreboard_row.queue_free()
 	if failures.size() > 0:

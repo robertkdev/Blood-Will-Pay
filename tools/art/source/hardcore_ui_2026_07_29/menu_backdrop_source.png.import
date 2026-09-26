@@ -3,15 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dc066psca4fou"
-path="res://.godot/imported/menu_backdrop_source.png-8195dcaf7b99f2cf8541a531532449bb.ctex"
-metadata={
-"vram_texture": false
-}
+valid=false
 
 [deps]
 
 source_file="res://tools/art/source/hardcore_ui_2026_07_29/menu_backdrop_source.png"
-dest_files=["res://.godot/imported/menu_backdrop_source.png-8195dcaf7b99f2cf8541a531532449bb.ctex"]
 
 [params]
 

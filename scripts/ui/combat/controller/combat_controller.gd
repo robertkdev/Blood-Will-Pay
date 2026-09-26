@@ -4061,7 +4061,12 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 			battle_area.custom_minimum_size.y = float(battle_area.get_meta("planning_minimum_height", 604.0))
 			battle_area.remove_meta("planning_minimum_height")
 	if stage_label != null:
-		stage_label.visible = not in_combat and not bool(parent.get_meta("compact_layout", false))
+		# The composed planning tier keeps the stage progress bar as the only
+		# heading; leaving this label visible made the countdown insert a new row
+		# that shifted the field, bench and lower dock below the framebuffer.
+		stage_label.visible = not in_combat \
+			and not bool(parent.get_meta("compact_layout", false)) \
+			and not bool(parent.get_meta("full_hd_dock", false))
 	var planning_timer: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Control
 	if planning_timer != null:
 		planning_timer.visible = false

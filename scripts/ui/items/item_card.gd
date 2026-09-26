@@ -400,51 +400,20 @@ func _sync_pocket_geometry() -> void:
 		empty_mark.offset_bottom = -9.0
 
 func _reliquary_outer_style(filled: bool, hovered: bool) -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.058, 0.026, 0.030, 0.99) if filled else Color(0.017, 0.013, 0.017, 0.99)
-	style.border_color = Color(0.94, 0.70, 0.38, 1.0) if hovered else Color(0.64, 0.49, 0.33, 0.98) if filled else Color(0.48, 0.42, 0.36, 0.94)
-	style.border_width_left = 4 if filled or hovered else 3
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 5 if filled or hovered else 4
-	style.corner_radius_top_left = 2
-	style.corner_radius_top_right = 1
-	style.corner_radius_bottom_right = 3
-	style.corner_radius_bottom_left = 1
-	style.shadow_color = Color(0.16, 0.0, 0.012, 0.72) if filled else Color(0.0, 0.0, 0.0, 0.78)
-	style.shadow_size = 6 if hovered else 4
-	return style
+	# One thin iron/brass rim over a quiet recess. The material lives in the
+	# shared GothicUIAssets vocabulary so a relic pocket, a bench slot and the
+	# shop hover tooltip cannot drift into three frame thicknesses. The slot's
+	# state (filled / hovered) still travels through unchanged.
+	return GothicUIAssets.relic_pocket_style(filled, hovered)
 
 func _reliquary_cavity_style(filled: bool, hovered: bool) -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.070, 0.022, 0.026, 0.96) if filled else Color(0.006, 0.005, 0.007, 0.98)
-	style.border_color = Color(0.78, 0.20, 0.16, 0.76) if hovered else Color(0.45, 0.11, 0.10, 0.62) if filled else Color(0.32, 0.26, 0.23, 0.70)
-	style.border_width_left = 2
-	style.border_width_top = 3
-	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.94)
-	style.shadow_size = 5
-	return style
+	# The recess inside that single rim: the dark interior and one inner shadow
+	# line carry the depth instead of a second pale frame.
+	return GothicUIAssets.relic_cavity_style(filled, hovered)
 
-func _reliquary_inner_style(filled: bool, hovered: bool) -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	style.border_color = Color(0.92, 0.72, 0.44, 0.88) if hovered else Color(0.66, 0.20, 0.16, 0.72) if filled else Color(0.58, 0.51, 0.43, 0.48)
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 1
-	style.corner_radius_top_right = 1
-	style.corner_radius_bottom_right = 2
-	style.corner_radius_bottom_left = 2
-	style.draw_center = false
-	return style
+func _reliquary_inner_style(filled: bool, hovered: bool) -> StyleBox:
+	# A reliquary slot keeps exactly one rim, so the inner frame draws nothing.
+	return GothicUIAssets.relic_inner_style(filled, hovered)
 
 func _on_mouse_entered() -> void:
 	_hovered = true

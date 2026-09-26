@@ -8,6 +8,29 @@ const FONT_UTILITY: FontFile = preload("res://assets/fonts/AtkinsonHyperlegible-
 const FONT_UTILITY_BOLD: FontFile = preload("res://assets/fonts/AtkinsonHyperlegible-Bold.ttf")
 const FONT_HEADING: FontFile = preload("res://assets/fonts/Cinzel.ttf")
 
+## Gameplay type roles.
+##
+## Gameplay text has three jobs and should not need a fourth face:
+##   - `set_gameplay_heading` - Cinzel, atmospheric section and stage headings.
+##   - `set_gameplay_name` / `set_gameplay_body` - the legible utility face at
+##     regular weight, for identity names and descriptive copy.
+##   - `set_gameplay_numeric` - the utility face at bold weight, reserved for a
+##     value that has to be scanned quickly.
+## The condensed impact/action faces (`FONT_IMPACT`, `FONT_ACTION`) stay with the
+## title, menu and starter presentation; using them on gameplay readouts is what
+## made functional text outweigh the headings.
+static func set_gameplay_heading(control: Control) -> void:
+	set_heading(control)
+
+static func set_gameplay_name(control: Control) -> void:
+	set_utility(control)
+
+static func set_gameplay_body(control: Control) -> void:
+	set_utility(control)
+
+static func set_gameplay_numeric(control: Control) -> void:
+	set_utility_bold(control)
+
 static func apply_theme(theme: Theme) -> void:
 	if theme == null:
 		return

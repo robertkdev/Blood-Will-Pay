@@ -144,17 +144,21 @@ func set_offers(offers: Array) -> void:
     _queue_safe_gutter_layout()
 
 func _queue_safe_gutter_layout() -> void:
-    if _grid == null or _safe_gutter_layout_queued:
+    if _grid == null or not is_instance_valid(_grid) or _safe_gutter_layout_queued:
         return
     _safe_gutter_layout_queued = true
-    call_deferred("_defer_safe_gutter_layout")
+    # Single hop keeps the pending work bounded and tied to a live grid. The
+    # earlier startup crash's exact trigger was never established; this is a
+    # defensive lifetime bound, not a diagnosed cause.
+    call_deferred("_apply_safe_gutter_layout")
 
 func _defer_safe_gutter_layout() -> void:
-    call_deferred("_apply_safe_gutter_layout")
+    # Kept so any existing caller still lands on the same single pass.
+    _queue_safe_gutter_layout()
 
 func _apply_safe_gutter_layout() -> void:
     _safe_gutter_layout_queued = false
-    if _grid == null or not is_instance_valid(_grid):
+    if _grid == null or not is_instance_valid(_grid) or not _grid.is_inside_tree():
         return
     var viewport_size: Vector2 = _grid.get_viewport_rect().size
     var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
@@ -162,8 +166,15 @@ func _apply_safe_gutter_layout() -> void:
     var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0 or (ui_scale >= 1.25 and viewport_size.y <= 720.0)
     var card_height: float = ShopCard.presentation_height(viewport_size, tight_compact)
     var safe_gutter: float = 8.0 if compact else 16.0
+    # When the composed planning dock owns the shop cells it also owns the cell
+    # height, the grid spacing and the host spacing. This pass then keeps only
+    # the backplate safety clamp, so one pass owns each number.
+    if _grid.has_meta("composed_dock_cell_size"):
+        _grid.set_meta("safe_bottom_gutter", safe_gutter)
+        call_deferred("_clamp_shop_backplate")
+        return
     _grid.add_theme_constant_override("h_separation", 6 if tight_compact else 12 if compact else 16)
-    if _host_container is VBoxContainer:
+    if _host_container != null and is_instance_valid(_host_container) and _host_container is VBoxContainer:
         (_host_container as VBoxContainer).add_theme_constant_override("separation", 6 if tight_compact else 10)
     for child: Node in _grid.get_children():
         var card: Control = child as Control

@@ -319,21 +319,23 @@ func _assert_compact_metric_identity_contract() -> void:
 	row.set_row_data({"team": "player", "index": 0, "display_name": "Bonko", "value": 12.0, "share": 0.5, "metric": "damage"})
 	await _settle_frames(2)
 	var name_label: Label = row.get_node_or_null("HBox/Content/Name") as Label
-	_expect(name_label != null and name_label.text.contains("BONKO"), "compact 178px metric row abbreviates BONKO despite sufficient rail width")
+	# The compact rail shows the authored mixed-case name and keeps the team in
+	# the rail chrome instead of a repeated "YOU "/"FOE " prefix.
+	_expect(name_label != null and name_label.text.contains("Bonko"), "compact 178px metric row abbreviates Bonko despite sufficient rail width")
 	row.set_row_data({"team": "enemy", "index": 0, "display_name": "Berebell", "value": 12.0, "share": 0.5, "metric": "damage"})
 	await _settle_frames(2)
-	_expect(name_label != null and name_label.text.contains("BEREBELL"), "compact 178px metric row abbreviates BEREBELL despite sufficient rail width")
+	_expect(name_label != null and name_label.text.contains("Berebell"), "compact 178px metric row abbreviates Berebell despite sufficient rail width")
 	row.size = Vector2(136.0, 40.0)
 	await _settle_frames(2)
 	row.set_row_data({"team": "enemy", "index": 0, "display_name": "Berebell", "value": 12.0, "share": 0.5, "metric": "damage"})
 	await _settle_frames(2)
 	if name_label != null:
-		_expect(not name_label.text.contains("BELL") or name_label.text.contains("BEREBELL"), "tight metric fallback regressed to the ambiguous BELL label")
-		_expect(name_label.text.contains("BERE"), "tight metric fallback lost BEREBELL's distinctive prefix: %s" % name_label.text)
+		_expect(not name_label.text.contains("Bell") or name_label.text.contains("Berebell"), "tight metric fallback regressed to the ambiguous Bell label")
+		_expect(name_label.text.contains("Bere"), "tight metric fallback lost Berebell's distinctive prefix: %s" % name_label.text)
 	row.set_row_data({"team": "player", "index": 0, "display_name": "Bonko", "value": 12.0, "share": 0.5, "metric": "damage"})
 	await _settle_frames(2)
 	if name_label != null:
-		_expect(name_label.text.contains("BONKO"), "tight metric fallback regressed to the ambiguous BOKO label: %s" % name_label.text)
+		_expect(name_label.text.contains("Bonko"), "tight metric fallback regressed to the ambiguous Boko label: %s" % name_label.text)
 	row.queue_free()
 
 func _assert_tight_scale_hud_containment() -> void:

@@ -68,7 +68,8 @@ func update_progress(chapter: int, stage_in_chapter: int, total_stages: int) -> 
 		if number_label != null:
 			number_label.text = "%02d" % stage_number
 			number_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.68, 1.0) if selected else Color(0.60, 0.57, 0.54, 0.90))
-			number_label.add_theme_constant_override("outline_size", 2 if selected else 1)
+			number_label.add_theme_constant_override("outline_size", 1)
+			VisualTypeSystem.set_gameplay_numeric(number_label)
 
 func set_combat_state(in_combat: bool) -> void:
 	_ensure_built()
@@ -109,11 +110,17 @@ func set_compact_layout(compact: bool) -> void:
 		_row.add_theme_constant_override("separation", 7 if compact else 10)
 	if _chapter_label != null:
 		_chapter_label.custom_minimum_size = Vector2(130.0 if compact else 150.0, 0.0)
-		_chapter_label.add_theme_font_size_override("font_size", 20 if compact else 24)
-		VisualTypeSystem.set_action(_chapter_label)
+		_chapter_label.add_theme_font_size_override("font_size", 20 if compact else 22)
+		VisualTypeSystem.set_gameplay_heading(_chapter_label)
 	if _phase_label != null:
 		_phase_label.custom_minimum_size = Vector2(92.0 if compact else 112.0, 0.0)
-		_phase_label.add_theme_font_size_override("font_size", 18 if compact else 21)
+		_phase_label.add_theme_font_size_override("font_size", 15 if compact else 16)
+		VisualTypeSystem.set_gameplay_body(_phase_label)
+	for token: PanelContainer in _tokens:
+		var number_label: Label = token.get_node_or_null("Number") as Label
+		if number_label != null:
+			number_label.add_theme_font_size_override("font_size", 16 if compact else 18)
+			VisualTypeSystem.set_gameplay_numeric(number_label)
 	var token_size: Vector2 = COMPACT_TOKEN_SIZE if compact else TOKEN_SIZE
 	for token: PanelContainer in _tokens:
 		token.custom_minimum_size = token_size
@@ -150,12 +157,14 @@ func _ensure_built() -> void:
 	_chapter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_chapter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_chapter_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	_chapter_label.add_theme_font_size_override("font_size", 24)
-	VisualTypeSystem.set_action(_chapter_label)
+	_chapter_label.add_theme_font_size_override("font_size", 22)
+	# The chapter is the strip's one ceremonial word: the gameplay heading face at
+	# a restrained size, not the condensed broadcast lettering.
+	VisualTypeSystem.set_gameplay_heading(_chapter_label)
 	_chapter_label.add_theme_color_override("font_color", Color(0.96, 0.84, 0.60, 1.0))
-	_chapter_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.72))
-	_chapter_label.add_theme_constant_override("shadow_offset_x", 1)
-	_chapter_label.add_theme_constant_override("shadow_offset_y", 2)
+	_chapter_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.62))
+	_chapter_label.add_theme_constant_override("shadow_offset_x", 0)
+	_chapter_label.add_theme_constant_override("shadow_offset_y", 1)
 	_row.add_child(_chapter_label)
 
 	_phase_label = Label.new()
@@ -165,11 +174,13 @@ func _ensure_built() -> void:
 	_phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_phase_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	_phase_label.add_theme_font_size_override("font_size", 21)
+	_phase_label.add_theme_font_size_override("font_size", 16)
 	_phase_label.add_theme_color_override("font_color", Color(0.82, 0.75, 0.64, 0.92))
 	_phase_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
 	_phase_label.add_theme_constant_override("outline_size", 1)
-	VisualTypeSystem.set_action(_phase_label)
+	# Phase and step numbers use the legible gameplay utility roles: the state
+	# word regular, the numerals semibold.
+	VisualTypeSystem.set_gameplay_body(_phase_label)
 	_row.add_child(_phase_label)
 
 	for index: int in range(STAGE_TOOLTIPS.size()):
@@ -190,11 +201,11 @@ func _make_token(index: int) -> PanelContainer:
 	number_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	number_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	number_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	number_label.add_theme_font_size_override("font_size", 21)
+	number_label.add_theme_font_size_override("font_size", 18)
 	number_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.68, 1.0) if index == 0 else Color(0.60, 0.57, 0.54, 0.90))
 	number_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.88))
-	number_label.add_theme_constant_override("outline_size", 2 if index == 0 else 1)
-	VisualTypeSystem.set_action(number_label)
+	number_label.add_theme_constant_override("outline_size", 1)
+	VisualTypeSystem.set_gameplay_numeric(number_label)
 	token.add_child(number_label)
 	var compat_icon: TextureRect = TextureRect.new()
 	compat_icon.name = "StageIcon%d" % int(index + 1)

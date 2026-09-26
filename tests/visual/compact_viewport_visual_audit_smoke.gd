@@ -601,6 +601,7 @@ func _expect_item_cache_contract(context: String) -> void:
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
 	var maximum_scale_layout: bool = combat != null and bool(combat.get_meta("maximum_scale_layout", false))
+	var full_hd_dock: bool = combat != null and bool(combat.get_meta("full_hd_dock", false))
 	_expect(left_panel != null, "%s item-cache rail missing" % context)
 	if maximum_scale_layout:
 		_expect(header != null and not header.is_visible_in_tree() and String(header.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s maximum-scale policy did not stage out the empty cache header" % context)
@@ -649,7 +650,12 @@ func _expect_item_cache_contract(context: String) -> void:
 			_expect(outer_style.border_width_left > 0 and outer_style.border_width_top > 0 and outer_style.border_width_right > 0 and outer_style.border_width_bottom > 0, "%s item slot %s outer perimeter is incomplete" % [context, String(item_card.name)])
 		if inner_style != null:
 			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "%s item slot %s inner perimeter is incomplete" % [context, String(item_card.name)])
-		_expect(item_card.custom_minimum_size.x >= expected_slot_size.x and item_card.custom_minimum_size.y >= expected_slot_size.y, "%s item slot %s collapsed below its reliquary scale: %s expected=%s" % [context, String(item_card.name), str(item_card.custom_minimum_size), str(expected_slot_size)])
+		if not full_hd_dock:
+			# The desktop tier keeps its authored pocket floor. The composed dock is
+			# accepted on rendered geometry instead: its rail is the authored 308
+			# physical pixels at every supported scale, which three 84px pockets plus
+			# separations cannot fit into at 125 or 150 percent.
+			_expect(item_card.custom_minimum_size.x >= expected_slot_size.x and item_card.custom_minimum_size.y >= expected_slot_size.y, "%s item slot %s collapsed below its reliquary scale: %s expected=%s" % [context, String(item_card.name), str(item_card.custom_minimum_size), str(expected_slot_size)])
 		_expect(outer_style == null or (outer_style.border_width_left >= 3 and outer_style.border_width_bottom >= 4), "%s item slot %s lacks weighted reliquary joinery" % [context, String(item_card.name)])
 		var cavity: Panel = item_card.get_node_or_null("PocketCavity") as Panel
 		var binding_rail: ColorRect = item_card.get_node_or_null("BindingRail") as ColorRect
@@ -674,6 +680,130 @@ func _expect_item_cache_contract(context: String) -> void:
 		_expect(visible_item_slots == 3, "%s empty item cache should focus three ready slots instead of exposing the full reserve grid" % context)
 		_expect(ready_item_slots == 3 and binding_positions.size() == 3, "%s empty cache does not present three distinct ready reliquary pockets" % context)
 		_expect(int(header.get_meta("sealed_slots", -1)) == maxi(0, int(header.get_meta("total_slots", 0)) - 3), "%s empty cache sealed reserve count is inconsistent" % context)
+	if full_hd_dock:
+		_expect_composed_item_cache_contract(context, combat, left_panel, header, item_grid)
+
+## Physical-composition acceptance for the full-HD composed dock.
+##
+## The desktop pocket floor above cannot hold in this tier: the composed rail is
+## the authored 308 physical pixels at every supported UI scale, and three 84px
+## pockets plus separations need 272 logical, which the rail's inner width does not
+## have at 125 or 150 percent. So this reads rendered geometry against the rail's
+## own published physical target instead of restating the presenter's pocket
+## formula: the rail must render the authored mass, the header must show its whole
+## state vocabulary without clipping, and the receive pockets must be exactly as
+## many as the header advertises, inside the grid and the rail, non-overlapping,
+## and large enough to be a real target with real content.
+func _expect_composed_item_cache_contract(context: String, combat: Control, left_panel: Control, header: Label, item_grid: GridContainer) -> void:
+	if combat == null or left_panel == null or header == null or item_grid == null:
+		return
+	var rail_target_physical: float = float(combat.get_meta("composed_rail_physical", 0.0))
+	_expect(rail_target_physical > 0.0, "%s composed dock published no physical rail target" % context)
+	if rail_target_physical <= 0.0:
+		return
+	var ui_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+	var rail_rect: Rect2 = left_panel.get_global_rect()
+	var rail_physical: float = rail_rect.size.x * ui_scale
+	_expect(
+		absf(rail_physical - rail_target_physical) <= 2.0,
+		"%s composed rail renders %.1f physical px, not the published %.1f" % [context, rail_physical, rail_target_physical]
+	)
+	# The header keeps the full state vocabulary and is drawn inside its own box.
+	_expect(header.is_visible_in_tree(), "%s composed item cache header is not visible" % context)
+	for token: String in ["RELIQUARY", "HELD", "READY", "SEALED"]:
+		_expect(header.text.contains(token), "%s composed item cache header lost its %s state" % [context, token])
+	_expect(
+		rail_rect.grow(1.0).encloses(header.get_global_rect()),
+		"%s composed item cache header escaped its rail: %s vs %s" % [context, str(header.get_global_rect()), str(rail_rect)]
+	)
+	var header_font: Font = header.get_theme_font("font")
+	if header_font != null:
+		var header_style: StyleBox = header.get_theme_stylebox("normal")
+		var header_margin_x: float = 0.0
+		if header_style != null:
+			header_margin_x = header_style.get_content_margin(SIDE_LEFT) + header_style.get_content_margin(SIDE_RIGHT)
+		var header_font_size: int = header.get_theme_font_size("font_size")
+		var header_wrap_width: float = maxf(1.0, header.size.x - header_margin_x)
+		var laid_out: Vector2 = header_font.get_multiline_string_size(
+			header.text, header.horizontal_alignment, header_wrap_width, header_font_size
+		)
+		_expect(
+			laid_out.y <= header.size.y + 1.0,
+			"%s composed item cache header clips its counts: needs %.1f in a %.1f box" % [context, laid_out.y, header.size.y]
+		)
+	# Pockets: as many receive pockets as the header advertises, all real geometry.
+	var grid_rect: Rect2 = item_grid.get_global_rect()
+	var pocket_rects: Array[Rect2] = []
+	var pockets: Array[Control] = []
+	var ready_pocket_count: int = 0
+	for child_node: Node in item_grid.get_children():
+		var pocket: Control = child_node as Control
+		if pocket == null or not pocket.is_visible_in_tree():
+			continue
+		pockets.append(pocket)
+		pocket_rects.append(pocket.get_global_rect())
+		if String(pocket.get_meta("cache_slot_state", "")) == "ready":
+			ready_pocket_count += 1
+	var advertised_ready: int = maxi(0, int(header.get_meta("ready_slots", 0)))
+	_expect(
+		ready_pocket_count == advertised_ready,
+		"%s composed item cache shows %d receive pockets for %d advertised ready slots" % [context, ready_pocket_count, advertised_ready]
+	)
+	var columns_rendered: int = maxi(1, item_grid.columns)
+	var useful_floor_physical: float = maxf(24.0, rail_target_physical / float(columns_rendered) * 0.5)
+	for pocket_rect: Rect2 in pocket_rects:
+		_expect(
+			grid_rect.grow(1.0).encloses(pocket_rect),
+			"%s composed item pocket escaped its grid: %s vs %s" % [context, str(pocket_rect), str(grid_rect)]
+		)
+		_expect(
+			rail_rect.grow(1.0).encloses(pocket_rect),
+			"%s composed item pocket escaped its rail: %s vs %s" % [context, str(pocket_rect), str(rail_rect)]
+		)
+		var pocket_physical: Vector2 = pocket_rect.size * ui_scale
+		_expect(
+			pocket_physical.x >= useful_floor_physical and pocket_physical.y >= useful_floor_physical,
+			"%s composed item pocket is not a useful target: %.1fx%.1f physical (floor %.1f)" % [context, pocket_physical.x, pocket_physical.y, useful_floor_physical]
+		)
+	for first_index: int in range(pocket_rects.size()):
+		for second_index: int in range(first_index + 1, pocket_rects.size()):
+			_expect(
+				not pocket_rects[first_index].intersects(pocket_rects[second_index]),
+				"%s composed item pockets overlap: %s and %s" % [context, str(pocket_rects[first_index]), str(pocket_rects[second_index])]
+			)
+	_expect_composed_pocket_content(context, pockets, pocket_rects)
+
+
+## A composed pocket has to show something: its recess is real, and any artwork it
+## displays is real and stays inside the pocket. Empty receive pockets legitimately
+## have no item image, so this checks the recess for every pocket and the artwork
+## only where it is visible.
+func _expect_composed_pocket_content(context: String, pockets: Array[Control], pocket_rects: Array[Rect2]) -> void:
+	for index: int in range(pockets.size()):
+		var pocket: Control = pockets[index]
+		var pocket_rect: Rect2 = pocket_rects[index] if index < pocket_rects.size() else pocket.get_global_rect()
+		var cavity: Control = pocket.get_node_or_null("PocketCavity") as Control
+		_expect(cavity != null, "%s composed item pocket %s lost its recess" % [context, String(pocket.name)])
+		if cavity != null:
+			_expect(
+				cavity.size.x > 1.0 and cavity.size.y > 1.0,
+				"%s composed item pocket %s has a collapsed recess: %s" % [context, String(pocket.name), str(cavity.size)]
+			)
+			_expect(
+				pocket_rect.grow(1.5).encloses(cavity.get_global_rect()),
+				"%s composed pocket recess escaped its pocket: %s vs %s" % [context, str(cavity.get_global_rect()), str(pocket_rect)]
+			)
+		var art: Control = pocket.get_node_or_null("Icon") as Control
+		if art != null and art.is_visible_in_tree():
+			_expect(
+				art.size.x > 1.0 and art.size.y > 1.0,
+				"%s composed item pocket %s shows empty artwork: %s" % [context, String(pocket.name), str(art.size)]
+			)
+			_expect(
+				pocket_rect.grow(1.5).encloses(art.get_global_rect()),
+				"%s composed item artwork escaped its pocket: %s vs %s" % [context, str(art.get_global_rect()), str(pocket_rect)]
+			)
+
 
 func _expect_planning_landmark_contract(context: String, board_column: Control, enemy_board: GridContainer, player_board: GridContainer) -> void:
 	if board_column == null or enemy_board == null or player_board == null:
@@ -802,7 +932,16 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		readable_trait_rows += 1
 		_expect(trait_label.size.x >= 40.0, "%s trait label %s collapsed below a readable width" % [context, String(trait_label.name)])
 		_expect(visible_trait_rect.size.x >= trait_rect.size.x - 2.0, "%s visible trait label %s lacks a complete readable line" % [context, String(trait_label.name)])
-		_expect(trait_label.text.contains(" // ") and (trait_label.text.contains("/") or trait_label.text.contains(">")), "%s visible trait row does not retain its name and checkpoint" % context)
+		# The support-rail pass replaced the uppercase "NAME // 6/8" string with
+		# the authored mixed-case trait name plus a separate count/checkpoint
+		# field, so the contract is now: a readable name here with the checkpoint
+		# beside it in the same row.
+		_expect(not trait_label.text.contains("//"), "%s trait row still uses the retired slash abbreviation: %s" % [context, trait_label.text])
+		var traits_row: Node = trait_label
+		while traits_row != null and not traits_row.has_meta("trait_id"):
+			traits_row = traits_row.get_parent()
+		var trait_checkpoint: Label = traits_row.find_child("TraitCheckpoint", true, false) as Label if traits_row != null else null
+		_expect(trait_checkpoint != null and trait_checkpoint.text.contains("/"), "%s visible trait row does not retain its count and checkpoint" % context)
 		var trait_font: Font = trait_label.get_theme_font("font")
 		var trait_font_size: int = trait_label.get_theme_font_size("font_size")
 		var trait_text_width: float = trait_font.get_string_size(trait_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, trait_font_size).x if trait_font != null else 0.0
@@ -992,11 +1131,15 @@ func _expect_scaled_team_metrics(context: String) -> void:
 			_expect(bool(name_label.get_meta("compact_identity_complete", false)), "%s metric row reverted to raw unit-name truncation" % context)
 			_expect(not name_label.text.contains("//"), "%s metric row still exposes accidental identifier truncation" % context)
 			_expect(not name_label.text.begins_with("Y ") and not name_label.text.begins_with("F "), "%s metric row uses a clipped-looking one-letter team prefix" % context)
-			var identity_copy: String = name_label.text.trim_prefix("YOU ").trim_prefix("FOE ").strip_edges()
-			found_bonko = found_bonko or identity_copy == "BONKO"
-			found_berebell = found_berebell or identity_copy == "BEREBELL" or (not full_berebell_fits and identity_copy.begins_with("BERE") and identity_copy.length() >= 4)
-			_expect(identity_copy != "BOKO", "%s corrupts BONKO into BOKO" % context)
-			_expect(identity_copy != "BELL", "%s ambiguously truncates BEREBELL to BELL" % context)
+			# The support-rail pass shows the authored mixed-case name and moved
+			# the team into the rail chrome, so no "YOU "/"FOE " prefix is
+			# rendered any more. Team identity is still carried by the row
+			# metadata asserted above (and by the row tooltip).
+			var identity_copy: String = name_label.text.strip_edges()
+			found_bonko = found_bonko or identity_copy == "Bonko"
+			found_berebell = found_berebell or identity_copy == "Berebell" or (not full_berebell_fits and identity_copy.begins_with("Bere") and identity_copy.length() >= 4)
+			_expect(identity_copy.to_upper() != "BOKO", "%s corrupts Bonko into BOKO" % context)
+			_expect(identity_copy.to_upper() != "BELL", "%s ambiguously truncates Berebell to BELL" % context)
 			_expect(not identity_copy.is_valid_int(), "%s metric row exposes only an ambiguous ordinal instead of its identity" % context)
 			_expect(name_label.get_theme_font_size("font_size") >= 14, "%s team metric identity type is too small" % context)
 			var name_font: Font = name_label.get_theme_font("font")

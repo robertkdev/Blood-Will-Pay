@@ -592,6 +592,10 @@ func _update_texture() -> void:
 		# old flat lavender disk as a false placeholder to the player.
 		tex = _make_obscured_combat_silhouette_texture()
 	sprite.texture = tex
+	# The material is applied when the sprite node is created, but the texture is
+	# assigned here; presentation therefore follows the assignment so the sprite
+	# is sampled from the prepared, mipmapped copy.
+	UnitArtPresentation.apply_to(sprite, UnitArtPresentation.SURFACE_COMBAT_UNIT)
 	var render_mode: String = "obscured_battlefield_silhouette" if uses_fallback_silhouette else "authored_sprite_asset"
 	sprite.set_meta("combat_sprite_render_mode", render_mode)
 	sprite.set_meta("combat_sprite_lavender_placeholder", false)

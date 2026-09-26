@@ -8,7 +8,6 @@ const UnitFactory := preload("res://scripts/unit_factory.gd")
 const UnitTargetingText := preload("res://scripts/ui/unit_targeting_text.gd")
 const UnitUpgradePaths := preload("res://scripts/game/units/unit_upgrade_paths.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
-const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
 const UnitArtPresentation: GDScript = preload("res://scripts/ui/unit_art_presentation.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
@@ -25,6 +24,10 @@ const TOOLTIP_CURSOR_OFFSET: Vector2 = Vector2(18.0, -14.0)
 const TOOLTIP_EDGE_PADDING: float = 12.0
 const COMPACT_TOOLTIP_MIN_HEIGHT: float = 76.0
 const COMPACT_NAME_SHARE: float = 0.62
+## A composed dock cell has to be at least this tall before the card trades its
+## compact summary for the full detail panel. This mirrors the portrait-layout
+## threshold used by `set_compact_presentation`.
+const COMPOSED_DOCK_DETAIL_MIN_CELL_HEIGHT: float = 100.0
 
 @onready var _icon: TextureRect = $Icon
 @onready var _name_label: Label = $Name
@@ -49,6 +52,8 @@ var _has_identity_content: bool = false
 var _tooltip: PanelContainer = null
 var _tooltip_layer: CanvasLayer = null
 var _tooltip_scroll: ScrollContainer = null
+## Resolved once per hover: whether this card may show the full-detail panel.
+var _tooltip_full_detail: bool = false
 var _tooltip_title: String = ""
 var _tooltip_subtitle: String = ""
 var _tooltip_lines: Array[String] = []
@@ -58,6 +63,17 @@ var _status_tip: String = ""
 var _package_level: int = 1
 var _package_kind: String = "standard"
 var _price_value: int = 0
+var _unit_texture: Texture2D = null
+var _uses_board_art: bool = false
+## The source the live portrait atlas was built from, the window it selects, and
+## the aspect that window was measured for. Together they let a re-layout tell an
+## unchanged crop apart from a stale one, so only the second case rebuilds.
+var _portrait_source: Texture2D = null
+var _portrait_region: Rect2 = Rect2()
+var _portrait_frame_aspect: float = 0.0
+var _portrait_atlas: AtlasTexture = null
+var _portrait_refresh_queued: bool = false
+var _caption_band: Panel = null
 
 func _resolve_child(paths: Array) -> Node:
 	for p in paths:
@@ -73,6 +89,9 @@ func _ready() -> void:
 	tooltip_text = ""
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# Connected before the first style pass, because that pass moves the icon's
+	# anchors: the window has to follow the first rect it produces too.
+	_wire_portrait_refresh()
 	_apply_static_style()
 	_wire_hover()
 	if not is_connected("pressed", Callable(self, "_on_pressed")):
@@ -114,14 +133,11 @@ func set_data(props: Dictionary) -> void:
 			tex = TextureUtils.try_load_texture(img_path)
 		if tex == null:
 			tex = TextureUtils.make_circle_texture(Color(0.75, 0.75, 0.75), 96)
-		elif bool(props.get("uses_board_art", false)):
-			# Frame the existing unit's upper body; dedicated shop artwork is untouched.
-			var portrait: AtlasTexture = AtlasTexture.new()
-			portrait.atlas = tex
-			portrait.region = Rect2(0.0, 0.0, float(tex.get_width()), float(tex.get_height()) * 0.72)
-			portrait.filter_clip = true
-			tex = portrait
-		_icon.texture = tex
+			_uses_board_art = false
+		else:
+			_uses_board_art = bool(props.get("uses_board_art", false))
+		_unit_texture = tex
+		_apply_portrait_crop()
 
 	_update_identity_panel(display_role, display_goal, approaches)
 	_set_traits(traits)
@@ -203,8 +219,13 @@ func _update_identity_panel(display_role: String, display_goal: String, approach
 func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	_compact_presentation = enabled
 	_tight_presentation = enabled and tight
-	set_meta("compact_tooltip_policy", "suppress_hover" if enabled else "full_detail")
-	set_meta("tooltip_suppressed_for_compact", enabled)
+	# Card layout and information access are separate decisions. A composed dock
+	# keeps the compact portrait layout at full HD while still having room for
+	# real detail, so only a genuinely small tier (no composed dock marker)
+	# suppresses the detail panel.
+	var full_detail: bool = not enabled or _full_detail_tooltip_allowed()
+	set_meta("compact_tooltip_policy", "suppress_hover" if not full_detail else "full_detail_composed_dock" if enabled else "full_detail")
+	set_meta("tooltip_suppressed_for_compact", not full_detail)
 	if _tooltip != null and is_instance_valid(_tooltip):
 		_clear_tooltip()
 	if enabled:
@@ -270,6 +291,158 @@ func set_compact_presentation(enabled: bool, tight: bool = false) -> void:
 	set_meta("compact_presentation", enabled)
 	set_meta("tight_presentation", _tight_presentation)
 	set_meta("portrait_presentation", portrait_layout)
+	# The framing follows the icon window, so it is rebuilt after the anchors are
+	# settled rather than at texture-assignment time.
+	_apply_portrait_crop()
+	_apply_caption_band()
+
+## A calm caption strip under the portrait.
+##
+## The card image used to run straight into a thin name/price row, which made the
+## card read as image-heavy and abruptly terminated. This paints one quiet
+## recessed band across the caption row, with a single warm hairline as the
+## divider between portrait and caption. It is paint only: the band sits behind
+## the labels (z 5 against their z 6), ignores the mouse, and carries no content
+## margins, so no label's text rect or purchasing behaviour changes.
+func _apply_caption_band() -> void:
+	if _name_label == null or _price_label == null:
+		return
+	if _caption_band == null or not is_instance_valid(_caption_band):
+		_caption_band = Panel.new()
+		_caption_band.name = "ShopCaptionBand"
+		_caption_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_caption_band.show_behind_parent = false
+		_caption_band.z_index = 5
+		add_child(_caption_band)
+		_caption_band.add_theme_stylebox_override("panel", GothicUIAssets.quiet_iron_panel_style(
+			Color(0.012, 0.010, 0.014, 0.78), Color(0.42, 0.35, 0.25, 0.45)
+		))
+		_caption_band.set_meta("caption_band", true)
+	_caption_band.anchor_left = minf(_name_label.anchor_left, _price_label.anchor_left)
+	_caption_band.anchor_right = maxf(_name_label.anchor_right, _price_label.anchor_right)
+	_caption_band.anchor_top = _name_label.anchor_top
+	_caption_band.anchor_bottom = 1.0
+	_caption_band.offset_left = -3.0
+	_caption_band.offset_right = 3.0
+	_caption_band.offset_top = _name_label.offset_top - 3.0
+	_caption_band.offset_bottom = -1.0
+
+## Present the shop image as a portrait over the board sprite.
+##
+## Board art is a full figure, so a fixed top band turns wide poses, staffs and
+## shields into clipped bodies and gives every card a different focal scale.
+## `UnitArtPresentation.portrait_region` measures this sprite's own alpha profile
+## and returns a head-and-shoulder window that never cuts the head, keeps a wide
+## body or weapon readable, and is shaped like the card's own icon window so the
+## source is not stretched. Dedicated shop art is authored for the card and is
+## used uncropped, exactly as before.
+##
+## The window is read from the icon's laid-out rect, and a card is normally
+## hydrated before its container has given it that rect, so the crop measured at
+## assignment time belongs to whatever transient size the layout was in. Because
+## the window is measured *for* that aspect, a stale one stays letterboxed inside
+## the settled rect instead of filling it. The rect is therefore re-measured on
+## every icon resize (see `_wire_portrait_refresh`) and rebuilt only when the
+## measured window actually changed.
+func _apply_portrait_crop() -> void:
+	if _icon == null:
+		return
+	var texture: Texture2D = _unit_texture
+	if texture == null:
+		return
+	if not _uses_board_art:
+		# Dedicated shop art is authored for the card and is used uncropped.
+		_forget_portrait_crop()
+		_icon.texture = texture
+		UnitArtPresentation.apply_to(_icon, UnitArtPresentation.SURFACE_PORTRAIT)
+		return
+	var frame_aspect: float = _icon_frame_aspect()
+	var region: Rect2 = UnitArtPresentation.portrait_region(texture, frame_aspect)
+	if region.size.x <= 0.0 or region.size.y <= 0.0:
+		_forget_portrait_crop()
+		_icon.texture = texture
+		UnitArtPresentation.apply_to(_icon, UnitArtPresentation.SURFACE_PORTRAIT)
+		return
+	if _portrait_atlas != null and _portrait_source == texture and _icon.texture == _portrait_atlas and _portrait_atlas.region.is_equal_approx(region):
+		# Same window, same source, and the node still shows this atlas: the
+		# re-layout only needs the metadata to stay truthful.
+		_publish_portrait_crop(region, frame_aspect)
+		return
+	var portrait: AtlasTexture = AtlasTexture.new()
+	# Prepared sampling source under the same region: the crop and filter_clip are
+	# unchanged, only the atlas carries a mip chain.
+	portrait.atlas = UnitArtPresentation.prepared_texture(texture)
+	portrait.region = region
+	portrait.filter_clip = true
+	_portrait_source = texture
+	_portrait_atlas = portrait
+	_icon.texture = portrait
+	_publish_portrait_crop(region, frame_aspect)
+	# Presentation follows the assignment, so it holds whenever the card is
+	# styled: the material, the prepared sampling source and the mipmap filter all
+	# apply to the texture that was just set.
+	UnitArtPresentation.apply_to(_icon, UnitArtPresentation.SURFACE_PORTRAIT)
+
+## Re-measure the window whenever the icon's own rect moves. A container pass can
+## resize a child more than once before it settles, so the re-measure is
+## coalesced and deferred: one measurement per settled rect, read after the
+## layout of the frame that moved it.
+func _wire_portrait_refresh() -> void:
+	if _icon == null:
+		return
+	if not _icon.resized.is_connected(Callable(self, "_queue_portrait_refresh")):
+		_icon.resized.connect(_queue_portrait_refresh)
+
+func _queue_portrait_refresh() -> void:
+	if _portrait_refresh_queued:
+		return
+	_portrait_refresh_queued = true
+	call_deferred("_refresh_portrait_crop")
+
+func _refresh_portrait_crop() -> void:
+	_portrait_refresh_queued = false
+	if not is_inside_tree():
+		return
+	_apply_portrait_crop()
+
+## The capture tooling reads these two, so they report the window the card is
+## actually using rather than the one it happened to be built with. The cached
+## values are the comparison, so an unchanged window is not rewritten.
+func _publish_portrait_crop(region: Rect2, frame_aspect: float) -> void:
+	if not is_equal_approx(_portrait_frame_aspect, frame_aspect):
+		_portrait_frame_aspect = frame_aspect
+		set_meta("shop_portrait_frame_aspect", frame_aspect)
+	if not _portrait_region.is_equal_approx(region):
+		_portrait_region = region
+		set_meta("shop_portrait_region", region)
+
+## Used when this card shows no crop at all: dedicated shop art or an empty
+## region. The metadata is cleared rather than left describing a window the card
+## no longer draws.
+func _forget_portrait_crop() -> void:
+	_portrait_source = null
+	_portrait_region = Rect2()
+	_portrait_frame_aspect = 0.0
+	_portrait_atlas = null
+	if has_meta("shop_portrait_region"):
+		remove_meta("shop_portrait_region")
+	if has_meta("shop_portrait_frame_aspect"):
+		remove_meta("shop_portrait_frame_aspect")
+
+## Aspect of the icon window the crop has to fill. The live rect is the authority;
+## the card's authored minimum size and the icon anchors are only the provisional
+## answer for the frame before the container has laid the card out, so the card
+## still draws something sane before `_wire_portrait_refresh` re-measures.
+func _icon_frame_aspect() -> float:
+	if _icon != null and _icon.size.x > 1.0 and _icon.size.y > 1.0:
+		return _icon.size.x / _icon.size.y
+	if _icon == null:
+		return 1.0
+	var frame_width: float = maxf(1.0, custom_minimum_size.x) * maxf(0.05, _icon.anchor_right - _icon.anchor_left)
+	var frame_height: float = maxf(1.0, custom_minimum_size.y) * maxf(0.05, _icon.anchor_bottom - _icon.anchor_top) + _icon.offset_bottom
+	if frame_height <= 1.0:
+		return 1.0
+	return frame_width / frame_height
 
 static func presentation_height(logical_size: Vector2, tight: bool) -> float:
 	if logical_size.x >= 1500.0 and logical_size.y >= 1000.0:
@@ -508,7 +681,7 @@ func _apply_static_style() -> void:
 		_legacy_role_label.visible = false
 	if _role_badge:
 		_role_badge.add_theme_font_size_override("font_size", 16)
-		VisualTypeSystem.set_action(_role_badge)
+		VisualTypeSystem.set_gameplay_name(_role_badge)
 		_role_badge.add_theme_color_override("font_color", COLOR_GOLD)
 		_role_badge.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.70))
 		_role_badge.add_theme_constant_override("outline_size", 1)
@@ -516,16 +689,22 @@ func _apply_static_style() -> void:
 		_goal_label.add_theme_color_override("font_color", COLOR_MUTED)
 	if _name_label:
 		_name_label.z_index = 6
-		_name_label.add_theme_font_size_override("font_size", 20)
-		VisualTypeSystem.set_utility_bold(_name_label)
+		_name_label.add_theme_font_size_override("font_size", 18)
+		# The card presents a character, so the name is a name: regular utility
+		# weight rather than the display face, which was outweighing the art.
+		VisualTypeSystem.set_gameplay_name(_name_label)
 		_name_label.add_theme_color_override("font_color", COLOR_TEXT)
 		_name_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_name_label.add_theme_constant_override("outline_size", 1)
 	if _price_label:
 		_price_label.z_index = 6
-		_price_label.add_theme_font_size_override("font_size", 20)
-		VisualTypeSystem.set_action(_price_label)
-		_price_label.add_theme_color_override("font_color", COLOR_GOLD)
+		# Price stays a value, but in a duller gold at the caption's own size so it
+		# reads second to the name instead of competing with it.
+		_price_label.add_theme_font_size_override("font_size", 18)
+		# Restrained numeric: the utility face at bold weight, not condensed
+		# impact lettering competing with the price of five cards in a row.
+		VisualTypeSystem.set_gameplay_numeric(_price_label)
+		_price_label.add_theme_color_override("font_color", Color(0.86, 0.70, 0.44, 1.0))
 		_price_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 		_price_label.add_theme_constant_override("outline_size", 1)
 	set_compact_presentation(compact, tight_compact)
@@ -583,6 +762,10 @@ func _wire_hover() -> void:
 
 func _sync_pivot() -> void:
 	pivot_offset = size * 0.5
+	# The icon is anchored to this card, so a card resize is also a portrait-window
+	# resize; queueing here covers the pass where the icon's own signal is still
+	# one layout step behind.
+	_queue_portrait_refresh()
 
 func _on_hover_entered() -> void:
 	_hovered = true
@@ -617,13 +800,49 @@ func _apply_hover_motion(active: bool) -> void:
 		if _icon != null:
 			_icon.modulate = Color.WHITE
 
+## Full-detail access for the composed dock.
+##
+## `combat_view._apply_dock_shop_cells` drives this card's compact portrait
+## layout at full HD, but that layout is a visual choice, not a space
+## constraint: the dock has room for the real detail panel. The dock already
+## publishes `composed_dock_cell_size` on its ShopGrid, so the card uses that
+## existing marker to tell "composed layout" apart from a genuinely small
+## compact tier. The dock runs at small tiers too, so the marker alone is not
+## enough: the cell the composition chose must be portrait-tall (the same
+## threshold this card uses for its portrait layout) and the viewport must be
+## wide enough to host the panel beside the purchase targets. Keep this marker
+## coordinated with the composition worker.
+func _full_detail_tooltip_allowed() -> bool:
+	if not _compact_presentation:
+		return true
+	var dock: Control = _composed_dock_host()
+	if dock == null:
+		return false
+	var cell_size: Vector2 = dock.get_meta("composed_dock_cell_size", Vector2.ZERO) as Vector2
+	if cell_size.y < COMPOSED_DOCK_DETAIL_MIN_CELL_HEIGHT:
+		return false
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		return false
+	return viewport.get_visible_rect().size.x >= TOOLTIP_WIDTH + TOOLTIP_EDGE_PADDING * 2.0
+
+func _composed_dock_host() -> Control:
+	var context: Node = get_parent()
+	while context != null:
+		var control: Control = context as Control
+		if control != null and String(control.name) == "ShopGrid" and control.has_meta("composed_dock_cell_size"):
+			return control
+		context = context.get_parent()
+	return null
+
 func _show_tooltip() -> void:
 	_clear_tooltip()
 	set_meta("tooltip_suppressed_for_compact", false)
 	if not is_inside_tree():
 		return
 	_clear_global_tooltip_layers()
-	if _compact_presentation:
+	_tooltip_full_detail = _full_detail_tooltip_allowed()
+	if not _tooltip_full_detail:
 		set_meta("tooltip_suppressed_for_compact", true)
 		set_meta("compact_information_access", "card_summary_and_deliberate_purchase")
 		return
@@ -637,15 +856,15 @@ func _show_tooltip() -> void:
 	tooltip.name = "ShopCardTooltip"
 	tooltip.top_level = true
 	tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tooltip.clip_contents = _compact_presentation
+	tooltip.clip_contents = not _tooltip_full_detail
 	tooltip.z_index = 950
 	tooltip.set_meta("source_card_instance_id", get_instance_id())
 	tooltip.set_meta("source_offer_id", offer_id)
-	tooltip.set_meta("presentation_mode", "pinned_shop_band" if _compact_presentation else "cursor_detail")
-	tooltip.set_meta("non_obstructive_region", "shop_grid_band" if _compact_presentation else "viewport_edge")
-	tooltip.set_meta("information_access", "vertical_scroll_complete" if _compact_presentation else "fully_expanded")
+	tooltip.set_meta("presentation_mode", "cursor_detail" if _tooltip_full_detail else "pinned_shop_band")
+	tooltip.set_meta("non_obstructive_region", "viewport_edge" if _tooltip_full_detail else "shop_grid_band")
+	tooltip.set_meta("information_access", "fully_expanded" if _tooltip_full_detail else "vertical_scroll_complete")
 	tooltip.set_meta("detail_line_count", lines.size() + 2)
-	if _compact_presentation:
+	if not _tooltip_full_detail:
 		var detail_rect: Rect2 = _shop_band_rect()
 		var source_rect: Rect2 = get_global_rect()
 		var source_remains_visible: bool = not detail_rect.intersects(source_rect)
@@ -660,9 +879,9 @@ func _show_tooltip() -> void:
 	var box: VBoxContainer = VBoxContainer.new()
 	box.name = "Rows"
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_theme_constant_override("separation", 2 if _compact_presentation else 5)
+	box.add_theme_constant_override("separation", 5 if _tooltip_full_detail else 2)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if _compact_presentation:
+	if not _tooltip_full_detail:
 		var scroll: ScrollContainer = ScrollContainer.new()
 		scroll.name = "DetailScroll"
 		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -721,9 +940,9 @@ func _add_tooltip_label(parent: VBoxContainer, label_text: String, font_size: in
 	var label: Label = Label.new()
 	label.text = String(label_text)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.custom_minimum_size.x = 0.0 if _compact_presentation else TOOLTIP_WIDTH - 24.0
+	label.custom_minimum_size.x = TOOLTIP_WIDTH - 24.0 if _tooltip_full_detail else 0.0
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var presentation_font_size: int = mini(font_size, 15) if _compact_presentation else font_size
+	var presentation_font_size: int = font_size if _tooltip_full_detail else mini(font_size, 15)
 	label.add_theme_font_size_override("font_size", presentation_font_size)
 	if presentation_font_size >= 22:
 		VisualTypeSystem.set_action(label)
@@ -739,7 +958,7 @@ func _move_tooltip(viewport_pos: Vector2) -> void:
 	if _tooltip == null or not is_instance_valid(_tooltip):
 		return
 	_sync_tooltip_size()
-	if _compact_presentation:
+	if not _tooltip_full_detail:
 		_tooltip.global_position = _shop_band_rect().position
 		return
 	_tooltip.global_position = _clamped_tooltip_position(viewport_pos + TOOLTIP_CURSOR_OFFSET)
@@ -747,7 +966,7 @@ func _move_tooltip(viewport_pos: Vector2) -> void:
 func _sync_tooltip_size() -> void:
 	if _tooltip == null or not is_instance_valid(_tooltip):
 		return
-	if _compact_presentation:
+	if not _tooltip_full_detail:
 		var band_rect: Rect2 = _shop_band_rect()
 		var pinned_height: float = band_rect.size.y
 		_tooltip.custom_minimum_size = Vector2(band_rect.size.x, pinned_height)
@@ -761,7 +980,7 @@ func _sync_tooltip_size() -> void:
 	_tooltip.size.y = max(84.0, _tooltip.get_combined_minimum_size().y)
 
 func _tooltip_panel_width() -> float:
-	if not _compact_presentation:
+	if _tooltip_full_detail:
 		return TOOLTIP_WIDTH
 	return _shop_band_rect().size.x
 
@@ -842,24 +1061,12 @@ func _clamped_tooltip_position(raw_position: Vector2) -> Vector2:
 	return next_position
 
 func _make_tooltip_style() -> StyleBox:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.024, 0.020, 0.028, 0.985)
-	style.border_color = Color(0.72, 0.46, 0.22, 0.95)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_right = 5
-	style.corner_radius_bottom_left = 5
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 10
-	style.content_margin_bottom = 10
-	style.shadow_size = 14
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.62)
-	return GothicUIAssets.style_or_fallback(HardcoreUIAssets.texture_style(HardcoreUIAssets.GOTHIC_V3_ROOT + "utility_tooltip.png", Vector4(28.0, 24.0, 28.0, 24.0), Vector4(12.0, 10.0, 12.0, 10.0)), style)
+	# The hover panel is a transient interaction surface, so it shares the
+	# permanent panel vocabulary: quiet recessed iron behind one thin aged-brass
+	# rim, with the content insets this layout already assumes. The previous
+	# hardcore utility_tooltip texture framed it with a thick pale rounded border
+	# that read as a different interface from the rails it opened over.
+	return GothicUIAssets.tooltip_panel_style()
 
 func _clear_tooltip() -> void:
 	if _tooltip != null and is_instance_valid(_tooltip):
