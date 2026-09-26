@@ -1,0 +1,4 @@
+{
+  "user_data_name": "Blood Will Pay",
+  "archive_before_run": ["account_profile_v1.json", "account_run_journal_v1.json", "active_run_v1.json"]
+}
