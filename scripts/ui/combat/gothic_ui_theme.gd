@@ -1045,8 +1045,14 @@ static func _apply_named_nodes(root: Control) -> void:
 		wager_controls.set_meta("visual_role", "planning_utility_group")
 		_ensure_backplate_on_control(wager_controls, "PlanningUtilitiesPlate", _hard_panel_style(Color(0.032, 0.027, 0.032, 0.98), Color(0.52, 0.44, 0.31, 0.78), false), -5)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea", "GothicBattlePlate", _style(Color(0.016, 0.013, 0.018, 0.38), Color(0.23, 0.19, 0.18, 0.42), 1, 6), -20)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _territory_tint_style(Color(0.032, 0.016, 0.020, 0.12)), -5)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _territory_tint_style(Color(0.018, 0.022, 0.023, 0.12)), -5)
+	# The two halves are different ground, not the same stone with a different
+	# ruling colour. Measured, our halves were inverted against the reference: the
+	# friendly half sat 0.0106 *darker* than the hostile one where the reference's
+	# sits 0.0258 brighter, and the temperature split was 0.088 against 0.663, so
+	# both halves read as one surface and the figures had nothing to stand against.
+	# Hostile ground is now a dark oxblood, friendly ground a cooler quiet stone.
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _territory_tint_style(Color(0.090, 0.022, 0.025, 0.46)), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _territory_tint_style(Color(0.100, 0.114, 0.128, 0.22)), -5)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.44, 0.37, 0.26, 0.72), false), 0, 8.0)
 	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.48, 0.40, 0.28, 0.62), false), 0, 8.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.44, 0.37, 0.26, 0.68), false), -2)
@@ -1295,7 +1301,10 @@ static func _apply_tile(button: Button, is_player: bool) -> void:
 	# stays sparse and irregular; only the ruling's weight changed, because the
 	# measured field was short of highlight and the seams are the cheapest place
 	# to put it back. See docs/art/playfield_value_routing_2026-09-26.md.
-	var border_color: Color = Color(0.97, 0.90, 0.70, 0.92 if strong_seam else 0.74) if is_player else Color(0.98, 0.31, 0.22, 0.98 if strong_seam else 0.86)
+	# The hostile ruling holds its weight now that the ground beneath it is dark:
+	# on the old light stone the same line read heavy enough, and on oxblood the
+	# field's hot density fell with it.
+	var border_color: Color = Color(0.97, 0.90, 0.70, 0.94 if strong_seam else 0.78) if is_player else Color(0.99, 0.33, 0.23, 1.0 if strong_seam else 0.92)
 	var hover_color: Color = Color(0.055, 0.070, 0.064, 0.34) if is_player else Color(0.115, 0.042, 0.038, 0.34)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
 	normal_style.shadow_size = 0

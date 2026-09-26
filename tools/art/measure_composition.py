@@ -38,6 +38,11 @@ from PIL import Image
 
 FIELD_X = (0.26, 0.72)
 FIELD_Y = (0.09, 0.63)
+# The two field halves, measured apart because the reference separates them by
+# value and temperature: the hostile half runs dark and warm, the friendly half
+# lighter and cooler, and the figures stand against both.
+ENEMY_HALF_Y = (0.10, 0.34)
+PLAYER_HALF_Y = (0.38, 0.62)
 LOWER_Y = (0.66, 1.0)
 LEFT_RAIL_X = (0.0, 0.17)
 RIGHT_RAIL_X = (0.83, 1.0)
@@ -76,6 +81,23 @@ def _rail_border(rgb: np.ndarray, x_range: tuple[float, float]) -> float:
     if column_means.size < 2:
         return 0.0
     return float(np.max(np.abs(np.diff(column_means))))
+
+
+def _region(rgb: np.ndarray, x_range: tuple[float, float], y_range: tuple[float, float]) -> dict:
+    region = _slice(rgb, x_range, y_range)
+    lum = _luminance(region)
+    chroma = region.max(axis=2) - region.min(axis=2)
+    median = float(np.median(lum))
+    p99 = float(np.percentile(lum, 99))
+    return {
+        "mean_luminance": float(lum.mean()),
+        "median_luminance": median,
+        "p99_luminance": p99,
+        "p99_over_median": float(p99 / max(1e-6, median)),
+        "share_above_0.35": float((lum > 0.35).mean()),
+        "mean_chroma": float(chroma.mean()),
+        "warm_ratio": float(region[..., 0].mean() / max(1e-6, region[..., 2].mean())),
+    }
 
 
 def measure(path: Path) -> dict:
@@ -124,6 +146,32 @@ def measure(path: Path) -> dict:
             "right_p99_luminance": float(
                 np.percentile(_luminance(_slice(rgb, RIGHT_RAIL_X, RAIL_Y)), 99)
             ),
+        },
+        "halves": {
+            "enemy_mean_luminance": _region(rgb, FIELD_X, ENEMY_HALF_Y)["mean_luminance"],
+            "enemy_median_luminance": _region(rgb, FIELD_X, ENEMY_HALF_Y)["median_luminance"],
+            "enemy_p99_luminance": _region(rgb, FIELD_X, ENEMY_HALF_Y)["p99_luminance"],
+            "enemy_warm_ratio": _region(rgb, FIELD_X, ENEMY_HALF_Y)["warm_ratio"],
+            "enemy_mean_chroma": _region(rgb, FIELD_X, ENEMY_HALF_Y)["mean_chroma"],
+            "player_mean_luminance": _region(rgb, FIELD_X, PLAYER_HALF_Y)["mean_luminance"],
+            "player_median_luminance": _region(rgb, FIELD_X, PLAYER_HALF_Y)["median_luminance"],
+            "player_p99_luminance": _region(rgb, FIELD_X, PLAYER_HALF_Y)["p99_luminance"],
+            "player_warm_ratio": _region(rgb, FIELD_X, PLAYER_HALF_Y)["warm_ratio"],
+            "player_mean_chroma": _region(rgb, FIELD_X, PLAYER_HALF_Y)["mean_chroma"],
+            "half_value_separation": (
+                _region(rgb, FIELD_X, PLAYER_HALF_Y)["median_luminance"]
+                - _region(rgb, FIELD_X, ENEMY_HALF_Y)["median_luminance"]
+            ),
+            "half_temperature_separation": (
+                _region(rgb, FIELD_X, ENEMY_HALF_Y)["warm_ratio"]
+                - _region(rgb, FIELD_X, PLAYER_HALF_Y)["warm_ratio"]
+            ),
+        },
+        # The doc's combat target: how far the field's top end stands above its
+        # own middle. A low ratio is the numeric signature of a flat surface with
+        # nothing standing on it.
+        "figure_contrast": {
+            "field_p99_over_median": _region(rgb, FIELD_X, FIELD_Y)["p99_over_median"],
         },
         "rows": {
             "energy_full_frame": _energy(row_mean),
@@ -177,7 +225,7 @@ def report(reference: dict, capture: dict) -> str:
         "",
         f"{'metric':<44}{'reference':>12}{'capture':>12}   verdict",
     ]
-    for section in ("frame", "field", "lower_band", "rails", "rows"):
+    for section in ("frame", "field", "halves", "figure_contrast", "lower_band", "rails", "rows"):
         for key in reference[section]:
             name = f"{section}.{key}"
             ref_value = reference[section][key]
