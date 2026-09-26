@@ -5,6 +5,7 @@ const UIBars := preload("res://scripts/ui/combat/ui_bars.gd")
 const UnitEffectPlayer := preload("res://scripts/ui/vfx/unit_effect_player.gd")
 const TextureUtils := preload("res://scripts/util/texture_utils.gd")
 const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
+const UnitArtPresentation: GDScript = preload("res://scripts/ui/unit_art_presentation.gd")
 const COMBAT_READOUT_WIDTH_RATIO: float = 0.64
 const COMBAT_READOUT_MIN_WIDTH: float = 92.0
 # Keep telemetry close enough to its silhouette that target ownership remains
@@ -229,6 +230,7 @@ func _ensure_sprite() -> void:
 	if sprite and is_instance_valid(sprite):
 		if sprite.get_parent() != self:
 			add_child(sprite)
+		UnitArtPresentation.apply_to(sprite, UnitArtPresentation.SURFACE_COMBAT_UNIT)
 		return
 	sprite = TextureRect.new()
 	sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -243,6 +245,7 @@ func _ensure_sprite() -> void:
 	sprite.offset_bottom = 0.0
 	sprite.z_index = 4
 	add_child(sprite)
+	UnitArtPresentation.apply_to(sprite, UnitArtPresentation.SURFACE_COMBAT_UNIT)
 	_update_effect_player_sprite()
 
 func _ensure_bars() -> void:
@@ -589,6 +592,10 @@ func _update_texture() -> void:
 		# old flat lavender disk as a false placeholder to the player.
 		tex = _make_obscured_combat_silhouette_texture()
 	sprite.texture = tex
+	# The material is applied when the sprite node is created, but the texture is
+	# assigned here; presentation therefore follows the assignment so the sprite
+	# is sampled from the prepared, mipmapped copy.
+	UnitArtPresentation.apply_to(sprite, UnitArtPresentation.SURFACE_COMBAT_UNIT)
 	var render_mode: String = "obscured_battlefield_silhouette" if uses_fallback_silhouette else "authored_sprite_asset"
 	sprite.set_meta("combat_sprite_render_mode", render_mode)
 	sprite.set_meta("combat_sprite_lavender_placeholder", false)

@@ -11,6 +11,10 @@ const UnitPanelScript: Script = preload("res://scripts/ui/combat/stats/unit_pane
 
 var _view: Control = null
 var _manager: CombatManager = null
+## Real frame times during the sampled battle. The choppiness reported at max team
+## size is frame pacing, not simulation correctness, so the harness has to measure
+## the frame, not just the outcome.
+var _frame_ms: Array[float] = []
 var _counts: Dictionary[String, int] = {
 	"team_stats_updated": 0,
 	"stats_updated": 0,
@@ -84,10 +88,12 @@ func _run() -> void:
 	var actor_diag: Dictionary = UnitActorScript.diagnostic_snapshot()
 	var trait_diag: Dictionary = TraitsPresenterScript.diagnostic_snapshot()
 	var unit_panel_diag: Dictionary = UnitPanelScript.diagnostic_snapshot()
+	var frame_stats: Dictionary = _frame_stats()
 	print("PerfCombatUiSignals: elapsed_ms=", elapsed_ms,
 		" sampled_s=", _fmtn(sampled_seconds),
 		" sim_s=", _fmtn(sim_s),
 		" active=", battle_active,
+		" frame_ms=", frame_stats,
 		" signals=", _counts,
 		" unit_view=", unit_diag,
 		" unit_actor=", actor_diag,
@@ -162,13 +168,34 @@ func _wait_for_engine(timeout_s: float) -> Variant:
 
 func _sample_until_done(limit_s: float) -> float:
 	var sampled_s: float = 0.0
+	_frame_ms.clear()
 	while sampled_s < max(0.0, limit_s):
 		var engine: Variant = _manager.get_engine() if _manager != null else null
 		if engine == null or engine.state == null or not bool(engine.state.battle_active):
 			break
 		await get_tree().process_frame
-		sampled_s += _frame_delta()
+		var delta_s: float = _frame_delta()
+		_frame_ms.append(delta_s * 1000.0)
+		sampled_s += delta_s
 	return sampled_s
+
+func _frame_stats() -> Dictionary:
+	if _frame_ms.is_empty():
+		return {"frames": 0}
+	var ordered: Array[float] = _frame_ms.duplicate()
+	ordered.sort()
+	var total: float = 0.0
+	for value: float in ordered:
+		total += value
+	var p50: float = ordered[int(floor(float(ordered.size() - 1) * 0.50))]
+	var p95: float = ordered[int(ceil(float(ordered.size() - 1) * 0.95))]
+	return {
+		"frames": ordered.size(),
+		"mean_ms": snappedf(total / float(ordered.size()), 0.01),
+		"p50_ms": snappedf(p50, 0.01),
+		"p95_ms": snappedf(p95, 0.01),
+		"max_ms": snappedf(ordered[ordered.size() - 1], 0.01),
+	}
 
 func _frame_delta() -> float:
 	return max(0.001, float(get_process_delta_time()))

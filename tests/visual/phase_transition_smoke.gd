@@ -29,6 +29,8 @@ func _run() -> void:
 	var manager: CombatManager = combat.get("manager") as CombatManager
 	var transition: Variant = controller.get("phase_transition")
 	var planning: Control = combat.get("planning_area") as Control
+	var composed_dock: Control = combat.get_node_or_null("LowerDockComposition") as Control
+	_expect(composed_dock != null, "full-HD planning did not create the composed dock")
 	var planning_rect: Rect2 = planning.get_global_rect()
 	var floor_surface: Control = combat.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as Control
 	var planning_floor_rect: Rect2 = floor_surface.get_global_rect()
@@ -61,6 +63,8 @@ func _run() -> void:
 			break
 	_expect(inspected_preparation, "entry skipped the preparation-frame witness")
 	_expect(String(transition.call("get_state_name")) == "combat", "entry did not reach combat")
+	if composed_dock != null:
+		_expect(not composed_dock.is_visible_in_tree() or composed_dock.modulate.a <= 0.01, "composed dock remained visible during combat")
 	var gate: Dictionary = controller.call("get_pre_unfreeze_gate_snapshot") as Dictionary
 	var before: Dictionary = gate.get("last_entry", {}) as Dictionary
 	var after: Dictionary = gate.get("released_entry", {}) as Dictionary
@@ -119,6 +123,8 @@ func _run() -> void:
 				for node_path: String in ["BattleArea/ContentRow/LeftItemArea", "BattleArea/ContentRow/StatsArea", "BenchArea", "BottomStorageArea"]:
 					var chrome: Control = combat.get_node("MarginContainer/VBoxContainer/" + node_path) as Control
 					_expect(not chrome.is_visible_in_tree() or chrome.modulate.a <= 0.01, "planning chrome flashed before the pullback reveal: %s" % node_path)
+				if composed_dock != null:
+					_expect(not composed_dock.is_visible_in_tree() or composed_dock.modulate.a <= 0.01, "composed dock flashed before the pullback reveal")
 		elif saw_return and transition_state == "idle":
 			break
 	_expect(saw_return, "dismissal skipped the reverse transition")
@@ -134,6 +140,8 @@ func _run() -> void:
 	_expect(stage_heading.visible == heading_visible, "return introduced a duplicate chapter heading")
 	_expect(int(controller.get("_intermission_finish_count")) == 1, "repeated advance settled the fight twice")
 	_expect(not bool(transition.call("is_layout_locked")), "planning input/layout lock survived the return")
+	if composed_dock != null:
+		_expect(composed_dock.is_visible_in_tree() and composed_dock.modulate.a >= 0.95, "composed dock did not return with planning")
 	await _run_reduced_motion_contract()
 	print("TransitionContinuitySmoke: " + ("OK" if _failures.is_empty() else str(_failures)))
 	var report: FileAccess = FileAccess.open("user://transition_continuity_result.json", FileAccess.WRITE)

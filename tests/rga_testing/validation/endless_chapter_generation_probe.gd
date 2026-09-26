@@ -118,7 +118,15 @@ func _validate_spec(seed: int, chapter: int, stage_index: int, spec: Dictionary,
 	if kind == StageTypes.KIND_NORMAL:
 		_expect(rules.has("rga_challenge"), "seed %d chapter %d stage %d normal board missing RGA challenge metadata" % [seed, chapter, stage_index], failures)
 	if kind == StageTypes.KIND_BOSS:
-		_expect(ids.size() >= 4, "seed %d chapter %d boss should have at least 4 units" % [seed, chapter], failures)
+		# Every boss fields at least four bodies except the opening one. The four-body
+		# minimum exists because three-unit bosses were not hard for prepared 4-6 unit
+		# teams, and that reasoning does not reach the opening boss: its board is whatever
+		# three or four level-1 bodies the first two shops produced. Measured over the
+		# current era, a player fielding three bodies won 43.8% of 16 first attempts at it
+		# and one fielding four won 87.5% of 8, so the four-body boss made the tutorial a
+		# capacity check. The opening boss fields three; every other boss keeps the floor.
+		var boss_floor: int = 3 if int(chapter) <= 1 else 4
+		_expect(ids.size() >= boss_floor, "seed %d chapter %d boss should have at least %d units" % [seed, chapter, boss_floor], failures)
 
 func _validate_recent_signature(seed: int, chapter: int, stage_index: int, ids: Array, recent_signatures: Array[String], failures: Array[String]) -> void:
 	var signature_ids: Array[String] = []

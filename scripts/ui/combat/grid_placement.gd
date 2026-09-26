@@ -89,6 +89,41 @@ func teardown() -> void:
 	player_grid = null
 	enemy_grid = null
 
+## Tile for an auto-placed unit, chosen by role.
+##
+## The previous rule took the first free tile walking outward from the base, which is
+## index order and therefore the front rank first. Boards came out with the mages and
+## marksmen in the rank that meets the enemy and the tanks standing behind them.
+## Frontline roles now prefer the front rank and everything else the back rank, each
+## falling through the remaining tiles so a full board still deploys.
+const FRONTLINE_PLACEMENT_ROLES: Array[String] = ["tank", "brawler", "assassin"]
+
+func _pick_tile_for_role(unit: Unit, used_tiles: Dictionary, tiles_count: int, base: int) -> int:
+	if tiles_count <= 0:
+		return -1
+	var columns: int = maxi(1, int(grid_w))
+	var rows: int = maxi(1, int(ceil(float(tiles_count) / float(columns))))
+	var frontline: bool = unit != null and FRONTLINE_PLACEMENT_ROLES.has(String(unit.primary_role))
+	var row_order: Array[int] = []
+	if frontline:
+		for row: int in range(rows):
+			row_order.append(row)
+	else:
+		for row: int in range(rows - 1, -1, -1):
+			row_order.append(row)
+	for row: int in row_order:
+		for column: int in range(columns):
+			var index: int = row * columns + column
+			if index < tiles_count and not used_tiles.has(index):
+				return index
+	# Every tile in the preferred ranks is taken; fall back to the old walk so a full
+	# board still places its last unit instead of dropping it.
+	for off: int in range(tiles_count):
+		var cand: int = (base + off) % tiles_count
+		if not used_tiles.has(cand):
+			return cand
+	return -1
+
 func _build_grids() -> void:
 	player_tiles.clear()
 	enemy_tiles.clear()
@@ -188,13 +223,7 @@ func rebuild_player_views(player_team: Array, allow_drag: bool) -> void:
 		# If missing/invalid or already used by another unit, pick the next free near base
 		if tile_idx < 0 or tile_idx >= tiles_count or used_tiles.has(tile_idx):
 			var base: int = _player_base_tile_idx if _player_base_tile_idx >= 0 else 0
-			var picked: int = -1
-			if tiles_count > 0:
-				for off in range(tiles_count):
-					var cand: int = (base + off) % tiles_count
-					if not used_tiles.has(cand):
-						picked = cand
-						break
+			var picked: int = _pick_tile_for_role(pu, used_tiles, tiles_count, base)
 			if picked < 0:
 				picked = max(0, min(tiles_count - 1, 0))
 			tile_idx = picked

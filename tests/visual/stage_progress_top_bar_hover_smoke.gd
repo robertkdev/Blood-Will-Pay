@@ -21,20 +21,21 @@ func _run() -> void:
 	await get_tree().process_frame
 	var icon: TextureRect = top_bar.find_child("StageIcon4", true, false) as TextureRect
 	_expect(icon != null, "missing boss stage icon", failures)
+	var token: PanelContainer = top_bar.find_child("StageToken4", true, false) as PanelContainer
+	_expect(token != null, "missing visible boss stage token", failures)
+	if token != null:
+		_expect(token.tooltip_text.contains("Round 4: Boss"), "boss token should retain the native hover description", failures)
+		_expect(token.mouse_filter == Control.MOUSE_FILTER_PASS, "visible token must receive hover", failures)
+		_expect(top_bar.get_theme_stylebox("panel") is StyleBoxTexture, "chapter bar should retain its material frame", failures)
+		var token_rect: Rect2 = token.get_global_rect()
+		token.emit_signal("mouse_entered")
+		await get_tree().process_frame
+		_expect(token.get_global_rect().is_equal_approx(token_rect), "hover must not resize a stage token", failures)
+		_expect(_control_inside_viewport(top_bar), "chapter bar should stay within the viewport", failures)
+		token.emit_signal("mouse_exited")
+		await get_tree().process_frame
 	if icon != null:
-		_expect(String(icon.tooltip_text) == "", "stage icon should suppress native tooltip text", failures)
-		_expect(String(icon.get_meta("stage_hover_text", "")).contains("Stage 4: Boss"), "stage icon should retain hover text metadata", failures)
-		icon.emit_signal("mouse_entered")
-		await get_tree().process_frame
-		var tooltip: PanelContainer = get_tree().root.find_child("StageProgressTooltip", true, false) as PanelContainer
-		_expect(tooltip != null, "hover should create StageProgressTooltip", failures)
-		if tooltip != null:
-			_expect(tooltip.get_theme_stylebox("panel") is StyleBoxTexture, "stage hover should use gothic generated panel style", failures)
-			_expect(_tooltip_contains(tooltip, "Stage 4: Boss"), "stage hover should show boss title", failures)
-			_expect(_control_inside_viewport(tooltip), "stage hover should stay inside viewport", failures)
-		icon.emit_signal("mouse_exited")
-		await get_tree().process_frame
-		_expect(get_tree().root.find_child("StageProgressTooltip", true, false) == null, "hover exit should clear StageProgressTooltip", failures)
+		_expect(icon.mouse_filter == Control.MOUSE_FILTER_IGNORE, "transparent compatibility icon must not intercept hover", failures)
 	if failures.is_empty():
 		print("StageProgressTopBarHoverSmoke: PASS")
 		get_tree().quit(0)
@@ -42,15 +43,6 @@ func _run() -> void:
 	for failure: String in failures:
 		push_error("StageProgressTopBarHoverSmoke: %s" % failure)
 	get_tree().quit(1)
-
-func _tooltip_contains(root: Control, needle: String) -> bool:
-	if root == null:
-		return false
-	for node: Node in root.find_children("*", "Label", true, false):
-		var label: Label = node as Label
-		if label != null and String(label.text).contains(needle):
-			return true
-	return false
 
 func _control_inside_viewport(control: Control) -> bool:
 	if control == null:

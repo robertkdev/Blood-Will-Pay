@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("campaign")]
+    # campaign stops at the chapter-2 round-4 target; deep keeps playing so the
+    # power curve (capacity, combines, trait ladders, bankroll) is observable.
+    [ValidateSet("campaign", "deep")]
     [string] $Lane = "campaign",
 
     # -1 keeps the shipped random shop rolls; pass a seed only when a run must be
@@ -24,12 +26,44 @@ param(
 
     [string] $GodotPath = "",
 
+    # Replay a recorded run's decisions instead of asking the model. The rig's choices
+    # are held fixed so a game-side or rules-side change can be measured against the
+    # same play; see jev_run_controller.py --replay-from.
+    [string] $ReplayFrom = "",
+
+    # Opt-in levelling strategy. Empty keeps the shipped model decision; "eager" takes the
+    # case the free-form rule cannot - a trivial XP price against the bankroll - so the
+    # two arms of a same-seed A/B differ in exactly that decision class.
+    [ValidateSet("", "eager")]
+    [string] $LevelPolicy = "",
+
+    # The harness no longer moves the real OS cursor by default, so a run can play in the
+    # background without taking over the desktop. This restores the old behaviour for a case
+    # that genuinely needs the pointer warped.
+    [switch] $MouseWarp,
+
+    # Runs play in a small window parked in the corner so the machine stays usable while
+    # Jev is going. "fullscreen" restores the old screen-covering presentation.
+    [ValidateSet("background", "fullscreen")]
+    [string] $Window = "background",
+
+    # Size of the parked window, e.g. 960x540 or 1600x900. Empty uses the harness default
+    # (1280x720). The logical viewport is 1920x1080 either way, so this only changes how
+    # watchable the run is.
+    [string] $WindowSize = "",
+
     # 1.0 is the shipped game speed. Higher values are for fast sweeps only.
     [ValidateRange(0.25, 16.0)]
     [double] $Speed = 1.0,
 
     # Fast-sweep only: hold the planning beat open instead of the shipped countdown.
     [switch] $HoldPlanningTimer,
+
+    # Ledger depth for this arm. -1 leaves the live account alone; 0 is a clean
+    # profile and a positive value rebuilds the account at that many lifetime Omens
+    # in its own profile file. Two arms on the same seeds are how campaign growth is
+    # measured; see _seed_account_omens_if_requested in the harness.
+    [int] $LedgerOmens = -1,
 
     [ValidateRange(1, 240)]
     [int] $TimeoutMinutes = 45,
@@ -69,6 +103,39 @@ if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     $nodePath = (Get-Command node -ErrorAction Stop).Source
 }
 
+# A harness run can outlive its runner - the MCP server holds the Godot process and the
+# window stays. One leaked run from an earlier session was still sitting borderless over a
+# whole display two days later. Clear MCP-spawned runs for this project before starting a
+# new one. Only processes whose parent is a godot-mcp server are touched, so a game the
+# person launched themselves is never killed.
+function Clear-StaleHarnessGodot {
+    param([string] $Project)
+    $escapedProject = [Regex]::Escape($Project)
+    $mcpServers = @{}
+    foreach ($server in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue)) {
+        if ($server.CommandLine -and $server.CommandLine -match 'godot-mcp') {
+            $mcpServers[[int]$server.ProcessId] = $true
+        }
+    }
+    if ($mcpServers.Count -eq 0) {
+        return
+    }
+    $stale = @(Get-CimInstance Win32_Process -Filter "Name LIKE 'Godot%'" -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.CommandLine -and
+            $_.CommandLine -match $escapedProject -and
+            $mcpServers.ContainsKey([int]$_.ParentProcessId)
+        })
+    foreach ($process in $stale) {
+        Write-Host ("Clearing stale harness run still holding this project (pid {0})." -f $process.ProcessId)
+        Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($stale.Count -gt 0) {
+        Start-Sleep -Seconds 1
+    }
+}
+Clear-StaleHarnessGodot -Project $ProjectPath
+
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runDirectory = Join-Path $ArtifactRoot ("runs\{0}-{1}-seed{2}-{3}" -f $Mode, $Lane, $Seed, $stamp)
 New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
@@ -79,7 +146,33 @@ $env:JEV_MODE = $Mode
 $env:JEV_RUN_SEED = [string]$Seed
 $env:JEV_STARTER = $Starter
 $env:JEV_SPEED = $Speed.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+$env:JEV_LANE = $Lane
 $env:JEV_REAL_TIMER = if ($HoldPlanningTimer) { "0" } else { "1" }
+if ($LedgerOmens -ge 0) {
+    $env:JEV_LEDGER_OMENS = [string]$LedgerOmens
+} else {
+    Remove-Item Env:\JEV_LEDGER_OMENS -ErrorAction SilentlyContinue
+}
+if (-not [string]::IsNullOrWhiteSpace($LevelPolicy)) {
+    $env:JEV_LEVEL_POLICY = $LevelPolicy
+} else {
+    Remove-Item Env:\JEV_LEVEL_POLICY -ErrorAction SilentlyContinue
+}
+if ($MouseWarp) {
+    $env:BWP_MOUSE_WARP = "1"
+} else {
+    Remove-Item Env:\BWP_MOUSE_WARP -ErrorAction SilentlyContinue
+}
+if ($Window -eq "fullscreen") {
+    $env:BWP_HARNESS_WINDOW = "fullscreen"
+} else {
+    Remove-Item Env:\BWP_HARNESS_WINDOW -ErrorAction SilentlyContinue
+}
+if (-not [string]::IsNullOrWhiteSpace($WindowSize)) {
+    $env:BWP_HARNESS_WINDOW_SIZE = $WindowSize
+} else {
+    Remove-Item Env:\BWP_HARNESS_WINDOW_SIZE -ErrorAction SilentlyContinue
+}
 $env:JEV_REVISION = (git -C $ProjectPath rev-parse HEAD 2>$null)
 $env:JEV_RULES_SHA = if (Test-Path -LiteralPath $rulesPath) {
     (Get-FileHash -LiteralPath $rulesPath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -102,6 +195,9 @@ try {
             "--run-dir", $runDirectory,
             "--rules", $rulesPath
         )
+        if (-not [string]::IsNullOrWhiteSpace($ReplayFrom)) {
+            $controllerArguments += @("--replay-from", $ReplayFrom)
+        }
         $controllerProcess = Start-Process -FilePath $controllerPython `
             -ArgumentList $controllerArguments `
             -RedirectStandardOutput $controllerLog `
@@ -148,6 +244,16 @@ finally {
 
 $summaryPath = Join-Path $runDirectory "run_summary.json"
 $controllerSummaryPath = Join-Path $runDirectory "controller_summary.json"
+# A run that dies before its end path - a crash, a kill, a timeout - never writes
+# run_summary.json and was reported here as a completely empty result: no chapter, no
+# battle count, no terminal. The harness writes a per-round checkpoint for exactly this
+# reason and the analyzer already falls back to it, so the runner does too. The terminal
+# stays "in_progress" and summary_is_partial says why, so an incomplete run is legible
+# rather than indistinguishable from a run that produced nothing.
+$checkpointPath = Join-Path $runDirectory "run_checkpoint.json"
+$summaryExists = Test-Path -LiteralPath $summaryPath
+$checkpointExists = Test-Path -LiteralPath $checkpointPath
+$effectiveSummaryPath = if ($summaryExists) { $summaryPath } elseif ($checkpointExists) { $checkpointPath } else { "" }
 $result = [ordered]@{
     run_directory = $runDirectory
     mode = $Mode
@@ -157,17 +263,21 @@ $result = [ordered]@{
     starter = $Starter
     scene = $Scene
     godot_log = $runLog
-    run_summary = if (Test-Path -LiteralPath $summaryPath) { $summaryPath } else { $null }
+    run_summary = if ($summaryExists) { $summaryPath } else { $null }
     controller_summary = if (Test-Path -LiteralPath $controllerSummaryPath) { $controllerSummaryPath } else { $null }
+    summary_is_partial = ((-not $summaryExists) -and $checkpointExists)
 }
-if (Test-Path -LiteralPath $summaryPath) {
-    $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+if ($effectiveSummaryPath -ne "") {
+    $summary = Get-Content -LiteralPath $effectiveSummaryPath -Raw | ConvertFrom-Json
     $result["terminal"] = $summary.terminal
     $result["final_chapter"] = $summary.final_chapter
     $result["final_stage_in_chapter"] = $summary.final_stage_in_chapter
     $result["battles"] = $summary.battles
     $result["peak_bankroll"] = $summary.peak_bankroll
     $result["technical_failures"] = @($summary.technical_failures).Count
+    if (-not $summaryExists) {
+        $result["summary_source"] = "run_checkpoint.json (run did not reach its end path)"
+    }
 }
 if (Test-Path -LiteralPath $controllerSummaryPath) {
     $controllerSummary = Get-Content -LiteralPath $controllerSummaryPath -Raw | ConvertFrom-Json
@@ -175,3 +285,6 @@ if (Test-Path -LiteralPath $controllerSummaryPath) {
     $result["controller_errors"] = $controllerSummary.errors
 }
 $result | ConvertTo-Json -Depth 5
+# Also written to the run directory so a batch driver does not have to parse the
+# combined stdout of the node runner and this script.
+$result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runDirectory "run_result.json") -Encoding UTF8

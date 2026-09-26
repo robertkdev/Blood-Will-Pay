@@ -32,12 +32,11 @@ var _campaign_report: Dictionary[String, Variant] = {}
 var _loss_report: Dictionary[String, Variant] = {}
 var _awaiting_opening_decision: bool = false
 
+## Plays the game for a long time; give it the small background window.
+func _harness_compact_window() -> bool:
+	return true
+
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true

@@ -96,12 +96,20 @@ func _run_natural_buy_xp_attempt(attempt_index: int) -> bool:
 	if not _failures.is_empty():
 		return false
 
+	var gold_before_opener: int = int(Economy.gold)
 	await _press_continue(true, "natural Buy XP forced opener")
 	var shop_ready: bool = await _wait_for_shop_after_win(30.0)
 	_expect(shop_ready, "natural Buy XP path did not reach the first shop")
 	if not _failures.is_empty():
 		return false
-	_expect(int(Economy.gold) == EXPECTED_REWARD_FUNDED_GOLD, "reward-funded opener should reach exactly %d gold, got %d" % [EXPECTED_REWARD_FUNDED_GOLD, int(Economy.gold)])
+	# The guaranteed reward pool exists so the opener leaves enough to buy XP safely. Its exact
+	# total also carries the account's Debtor's Mercy bonus, which grows as the Black Ledger is
+	# spent - permanent growth across runs is the point of the campaign - so assert that the
+	# opener paid and cleared the safe-gold threshold rather than an absolute number a fresh
+	# account used to land on. EXPECTED_REWARD_FUNDED_GOLD records what that was for a fresh one.
+	var gold_after_opener: int = int(Economy.gold)
+	_expect(gold_after_opener > gold_before_opener, "reward-funded opener should pay more than it staked, got %d from %d" % [gold_after_opener, gold_before_opener])
+	_expect(gold_after_opener >= MIN_SAFE_BUY_XP_GOLD, "reward-funded opener should leave at least %d gold to buy XP safely, got %d (a fresh account landed on %d)" % [MIN_SAFE_BUY_XP_GOLD, gold_after_opener, EXPECTED_REWARD_FUNDED_GOLD])
 	if int(Economy.gold) < MIN_SAFE_BUY_XP_GOLD:
 		print("%s: attempt %d reached first shop with gold=%d; expected reward-funded safe-gold opener" % [SMOKE_NAME, attempt_index, int(Economy.gold)])
 		return false
@@ -137,7 +145,11 @@ func _attempt_natural_buy_xp_success() -> bool:
 	_success_stage_in_chapter = before_stage
 	_success_gold_before = before_gold
 	_success_gold_after = int(Economy.gold)
-	_expect(int(Economy.gold) == before_gold - int(SHOP_CONFIG.BUY_XP_COST), "natural Buy XP should spend exactly %d gold" % int(SHOP_CONFIG.BUY_XP_COST))
+	# BUY_XP_COST is quoted in stake units, so the charge is the constant only at stake unit 1.
+	# This smoke runs at the opening, but assert the quoted price anyway so it stays a check
+	# of the contract rather than of a coincidence.
+	var quoted_xp_price: int = int(Shop.get_progression_price()) if Shop.has_method("get_progression_price") else int(SHOP_CONFIG.BUY_XP_COST)
+	_expect(int(Economy.gold) == before_gold - quoted_xp_price, "natural Buy XP should spend exactly the quoted %d gold" % quoted_xp_price)
 	_expect(int(Shop.get_level()) == before_level + 1, "natural Buy XP should advance one shop level")
 	_expect(int(Shop.get_level()) == 2, "natural Buy XP should reach level 2")
 	_expect(int(Shop.get_xp()) == 2, "natural Buy XP should preserve 2 overflow XP at level 2")
@@ -148,6 +160,9 @@ func _uses_manual_opening_continue() -> bool:
 	return true
 
 func _button_with_text_prefix(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)

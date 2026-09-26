@@ -372,6 +372,9 @@ var _ascension_overlay: Control = null
 var _ascension_choices: VBoxContainer = null
 var _ascension_status: Label = null
 var _pending_ascension_units: Array[Unit] = []
+## The unit the legacy overlay is currently showing, so a driver can ask what is pending
+## and answer it without reaching into the overlay's children.
+var _active_ascension_unit: Unit = null
 
 # External engine manager
 var manager: CombatManager
@@ -1117,7 +1120,7 @@ func _update_board_status() -> void:
 		board_capacity_label.tooltip_text = "Deployed units / board slots. Buy XP to add slots."
 	if win_odds_label != null:
 		if manager == null or manager.player_team.is_empty() or manager.enemy_team.is_empty():
-			win_odds_label.text = "Est. Win --"
+			win_odds_label.text = "WIN --"
 			win_odds_label.tooltip_text = "Preview odds appear when both teams are visible."
 		else:
 			var player_rating: float = TeamOddsEstimator.team_rating(manager.player_team)
@@ -1132,15 +1135,19 @@ func _update_board_status() -> void:
 			var quoted_payout: int = 0
 			var quoted_bet: int = 0
 			if economy_node != null:
+				# The encounter kind has to be known before the odds are quoted: the rating
+				# ratio is honest about a mirror and badly optimistic about a normal wave, so
+				# the quote carries a per-kind correction. See ENCOUNTER_ODDS_BIAS.
+				_sync_encounter_quote_kind(economy_node)
+				odds = TeamOddsEstimator.quote_win_percent(odds, String(economy_node.get("encounter_quote_kind")))
 				if not bool(economy_node.get("combat_active")) and economy_node.has_method("set_projected_win_probability"):
 					economy_node.call("set_projected_win_probability", float(odds) / 100.0)
-				_sync_encounter_quote_kind(economy_node)
 				gross_multiplier = float(economy_node.get("quoted_gross_multiplier"))
 				quoted_bet = int(economy_node.get("current_bet"))
 				if economy_node.has_method("quoted_payout"):
 					quoted_payout = int(economy_node.call("quoted_payout", quoted_bet))
 			var odds_range: Vector2i = TeamOddsEstimator.estimate_range(odds)
-			win_odds_label.text = "Est. Win %d-%d%%" % [odds_range.x, odds_range.y]
+			win_odds_label.text = "WIN %d-%d%%" % [odds_range.x, odds_range.y]
 			win_odds_label.tooltip_text = "Rough model estimate %d%%. Abilities, items, placement, hazards, and live targeting can move the result outside this range. Your board rating %.0f vs enemy %.0f%s. The wager is priced by the encounter tier, not this estimate: %s -> %s gross (%.2fx)." % [
 				odds,
 				player_rating,
@@ -2095,13 +2102,20 @@ func _show_contract_market() -> void:
 	_ensure_contract_market_ui()
 	if _contract_overlay == null or _contract_choices == null:
 		return
-	if _contract_overlay.visible:
+	# Rebuild when a visible market has nothing to press. A visible-but-empty market is a dead
+	# end - Continue stays down and there is no button to answer it - so visibility alone does
+	# not mean the market is already built.
+	if _contract_overlay.visible and _contract_choices.get_child_count() > 0:
 		return
 	var shop_node: Node = _autoload_node("Shop")
 	if shop_node == null or not shop_node.has_method("get_contract_offers"):
 		return
+	# Replace, do not defer. `queue_free` leaves the previous chapter's buttons in place for
+	# the rest of the frame, so the replacements collide on name and Godot renames them to
+	# `@Button@<id>`. That is what made a fully drawn, fully pressable market unreadable to the
+	# Jev rig: `ContractChoice0`/`ContractPass` were gone, and the rig searches by name.
 	for child: Node in _contract_choices.get_children():
-		child.queue_free()
+		child.free()
 	var offers: Array = shop_node.call("get_contract_offers")
 	for index: int in range(offers.size()):
 		var offer: Dictionary = offers[index] as Dictionary
@@ -2337,6 +2351,7 @@ func _show_ascension_choice(unit: Unit) -> void:
 	_ensure_ascension_ui()
 	if _ascension_overlay == null or _ascension_choices == null:
 		return
+	_active_ascension_unit = unit
 	for child: Node in _ascension_choices.get_children():
 		child.queue_free()
 	var display_name: String = String(unit.name).strip_edges()
@@ -2364,6 +2379,41 @@ func _show_ascension_choice(unit: Unit) -> void:
 	_ascension_overlay.visible = true
 	if continue_button != null:
 		continue_button.disabled = true
+
+## Whether a combine has promoted a unit to level 4 and its legacy is still unbound.
+##
+## A promotion to level 4 opens the legacy-choice overlay, which disables Start Battle until
+## the player answers it. Anything that drives this UI has to answer it too, or it presses a
+## button that cannot act: the Jev rig had no handling for this and lost its richest runs to
+## it, because buying enough copies to combine is what opens the overlay in the first place.
+func has_pending_ascension() -> bool:
+	return pending_ascension_unit() != null
+
+## The unit the legacy overlay is asking about, or null when it is not up. Keyed on the
+## overlay rather than on the combine queue because the overlay is what disables Start
+## Battle, and it can be shown for a unit that never sat in the queue.
+func pending_ascension_unit() -> Unit:
+	if _active_ascension_unit == null or not is_instance_valid(_active_ascension_unit):
+		return null
+	if int(_active_ascension_unit.level) < 4:
+		return null
+	if String(_active_ascension_unit.ascension_path_id) != "":
+		return null
+	return _active_ascension_unit
+
+func pending_ascension_options() -> Array[Dictionary]:
+	var unit: Unit = pending_ascension_unit()
+	if unit == null:
+		return []
+	return UnitUpgradePaths.legacy_options(unit)
+
+## Bind a legacy on the unit the overlay is showing, the same way its own buttons do.
+func resolve_ascension(legacy_id: String) -> bool:
+	var unit: Unit = pending_ascension_unit()
+	if unit == null or legacy_id.strip_edges() == "":
+		return false
+	_on_ascension_choice_pressed(unit, legacy_id.strip_edges())
+	return String(unit.ascension_path_id) != ""
 
 func _ensure_ascension_ui() -> void:
 	if _ascension_layer != null and is_instance_valid(_ascension_layer):
@@ -2430,6 +2480,7 @@ func _on_ascension_choice_pressed(unit: Unit, legacy_id: String) -> void:
 	_show_next_ascension_choice()
 
 func _close_ascension_choice() -> void:
+	_active_ascension_unit = null
 	if _ascension_overlay != null:
 		_ascension_overlay.visible = false
 	if continue_button != null and (_contract_overlay == null or not _contract_overlay.visible):
@@ -3927,7 +3978,7 @@ func _sync_combat_broadcast_strip(force: bool = false) -> void:
 	combat_broadcast_phase.text = "FIGHT %d" % int(GameState.stage_in_chapter) if Engine.has_singleton("GameState") or parent.has_node("/root/GameState") else "FIGHT"
 	var wager: int = int(Economy.current_bet) if Engine.has_singleton("Economy") or parent.has_node("/root/Economy") else 0
 	combat_broadcast_wager.text = "WAGER %d BLOOD" % wager
-	combat_broadcast_odds.text = String(win_odds_label.text).replace("Est. Win", "ODDS") if win_odds_label != null else "ODDS --"
+	combat_broadcast_odds.text = String(win_odds_label.text).replace("WIN", "ODDS") if win_odds_label != null else "ODDS --"
 	var player_health: Vector2i = _team_health_total(manager.player_team if manager != null else [])
 	var enemy_health: Vector2i = _team_health_total(manager.enemy_team if manager != null else [])
 	combat_broadcast_health.text = "ALLY %d/%d // FOE %d/%d" % [player_health.x, player_health.y, enemy_health.x, enemy_health.y]
@@ -3975,7 +4026,9 @@ func sync_tactical_phase_visuals(force: bool = false) -> void:
 		record_mark.add_theme_font_size_override("font_size", 18)
 		record_mark.visible = false
 	if board_phase_label != null:
-		board_phase_label.text = "/// FIGHT // SURVIVE" if in_combat else "/// PLAN // COMMIT"
+		# Phase name only. "/// PLAN // COMMIT" and "/// FIGHT // SURVIVE" were decorative
+		# instructions on a strip that already changes colour with the phase.
+		board_phase_label.text = "FIGHT" if in_combat else "PLAN"
 	if in_combat:
 		_combat_pressure_elapsed = 0.0
 		_environmental_pressure_phase = -1
@@ -4008,7 +4061,12 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 			battle_area.custom_minimum_size.y = float(battle_area.get_meta("planning_minimum_height", 604.0))
 			battle_area.remove_meta("planning_minimum_height")
 	if stage_label != null:
-		stage_label.visible = not in_combat and not bool(parent.get_meta("compact_layout", false))
+		# The composed planning tier keeps the stage progress bar as the only
+		# heading; leaving this label visible made the countdown insert a new row
+		# that shifted the field, bench and lower dock below the framebuffer.
+		stage_label.visible = not in_combat \
+			and not bool(parent.get_meta("compact_layout", false)) \
+			and not bool(parent.get_meta("full_hd_dock", false))
 	var planning_timer: Control = parent.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Control
 	if planning_timer != null:
 		planning_timer.visible = false
@@ -4016,27 +4074,64 @@ func _update_tactical_shell_layout(in_combat: bool) -> void:
 		arena_container.set_meta("use_full_combat_bounds", in_combat)
 	var arena_objective: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatObjectiveSignal") as Label
 	if arena_objective != null:
-		_configure_compact_objective_signal(arena_objective)
+		_configure_combat_objective_signal(arena_objective)
 	var planning_directive: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
 	if planning_directive != null:
-		var tight_scale_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
-		planning_directive.text = "DEPLOY // WAGER // COMMIT" if tight_scale_layout else "DEPLOYMENT GRID // SET WAGER // COMMIT"
+		# One word. This strip used to read "DEPLOYMENT GRID // SET WAGER // COMMIT" - a sentence
+		# telling the player what the screen in front of them already shows. The plate's border
+		# and position carry the meaning; the label only needs to name the phase.
+		planning_directive.text = "DEPLOY"
 		planning_directive.add_theme_font_size_override("font_size", 18)
 	if in_combat and parent.has_method("_update_external_backplates"):
 		parent.call_deferred("_update_external_backplates")
 
-func _configure_compact_objective_signal(objective: Label) -> void:
-	objective.text = "LIVE // SURVIVE"
-	objective.offset_left = -100.0
-	objective.offset_right = 100.0
-	objective.offset_top = 36.0
-	objective.offset_bottom = 58.0
-	objective.add_theme_font_size_override("font_size", 14)
-	objective.add_theme_color_override("font_color", Color(0.86, 0.78, 0.66, 0.92))
-	objective.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
-	VisualTypeSystem.set_utility_bold(objective)
-	objective.set_meta("persistent_copy_uses_utility_face", true)
-	objective.set_meta("persistent_copy_uses_impact_face", false)
+## The combat objective signal: the theme's authored impact-face survival command on a
+## full-size field, the quiet utility stamp on a compact one.
+##
+## This only used to run in its compact form - a 14px utility "LIVE // SURVIVE" - at every
+## window size, so the authored "SURVIVE" plate the theme builds never reached the player.
+## One word naming what the fight asks of them is not filler; it is the signal.
+func _configure_combat_objective_signal(objective: Label) -> void:
+	if _objective_uses_compact_form():
+		objective.text = "LIVE"
+		objective.offset_left = -100.0
+		objective.offset_right = 100.0
+		objective.offset_top = 36.0
+		objective.offset_bottom = 58.0
+		objective.add_theme_font_size_override("font_size", 14)
+		objective.add_theme_color_override("font_color", Color(0.86, 0.78, 0.66, 0.92))
+		objective.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+		VisualTypeSystem.set_utility_bold(objective)
+		objective.set_meta("persistent_copy_uses_utility_face", true)
+		objective.set_meta("persistent_copy_uses_impact_face", false)
+		return
+	objective.text = "SURVIVE"
+	objective.offset_left = -150.0
+	objective.offset_right = 150.0
+	objective.offset_top = 12.0
+	objective.offset_bottom = 42.0
+	objective.add_theme_font_size_override("font_size", 26)
+	objective.add_theme_color_override("font_color", Color(0.98, 0.90, 0.78, 1.0))
+	objective.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.90))
+	objective.add_theme_constant_override("outline_size", 1)
+	var backing: StyleBoxFlat = StyleBoxFlat.new()
+	backing.bg_color = Color(0.012, 0.010, 0.014, 0.88)
+	backing.border_color = Color(0.88, 0.10, 0.09, 0.96)
+	backing.border_width_top = 3
+	backing.border_width_bottom = 2
+	backing.content_margin_left = 10.0
+	backing.content_margin_right = 10.0
+	objective.add_theme_stylebox_override("normal", backing)
+	VisualTypeSystem.set_impact(objective)
+	objective.set_meta("persistent_copy_uses_utility_face", false)
+	objective.set_meta("persistent_copy_uses_impact_face", true)
+
+func _objective_uses_compact_form() -> bool:
+	if parent == null:
+		return false
+	var viewport_size: Vector2 = parent.get_viewport_rect().size
+	var tight_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
+	return tight_layout or viewport_size.x <= 1100.0 or viewport_size.y <= 560.0
 
 func _update_environmental_pressure(delta: float) -> void:
 	if parent == null or _tactical_phase_visual_state != 1:
@@ -4205,7 +4300,11 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 	arena.set_meta("stable_base_location", true)
 	arena.set_meta("landmark_continuity_source", "onset_base_persistent")
 	arena.set_meta("procedural_environment_geometry_suppressed", true)
-	arena.set_meta("authored_physical_evidence_visible", true)
+	# The shared-field camera deliberately holds the authored war-aftermath evidence back, so
+	# the published flag has to say so. It used to claim `true` unconditionally while the code
+	# below hid the very node it describes, which made the environment contract unreadable.
+	var shared_field_camera: bool = bool(arena.get_meta("shared_field_camera", false))
+	arena.set_meta("authored_physical_evidence_visible", not shared_field_camera)
 	arena.set_meta("battlefield_grid_priority", "cell_seams_above_environment")
 	arena.set_meta("battlefield_composition_revision", int(arena.get_meta("battlefield_composition_revision", 0)) + 1)
 	var aftermath: Control = arena.get_node_or_null("ArenaWarAftermath") as Control
@@ -4218,7 +4317,7 @@ func _apply_environmental_pressure_composition(phase: int, reduced_motion: bool,
 		# The breach is already authored for phase zero; exposing its parent at the
 		# instant combat starts makes the field feel invaded instead of briefly
 		# reverting to an empty tactical grid.
-		aftermath.visible = not bool(arena.get_meta("shared_field_camera", false))
+		aftermath.visible = not shared_field_camera
 		aftermath.modulate = Color(1.0, 1.0, 1.0, 0.82 if effective_phase == 0 and not reduced_motion else 1.0)
 	if onset != null:
 		onset.visible = true
@@ -4351,16 +4450,17 @@ func _protect_persistent_hud_chrome() -> void:
 		instruction_ribbon.z_index = 218
 		instruction_ribbon.modulate = Color.WHITE
 		instruction_ribbon.self_modulate = Color.WHITE
-		# The result card owns the actual advance affordance. Keep the persistent
-		# combat ribbon as a quiet record stamp so the two prompts do not compete.
-		instruction_ribbon.text = "/// RECORD SEALED" if result_visible else "LIVE // SURVIVE"
+		# The result card owns the actual advance affordance, so the ribbon drops to a quiet
+		# record stamp while it is up. The combat command itself comes from the shared
+		# objective configuration, which knows whether this window is compact.
 		if result_visible:
+			instruction_ribbon.text = "/// RECORD SEALED"
 			instruction_ribbon.add_theme_font_size_override("font_size", 20)
 			VisualTypeSystem.set_utility_bold(instruction_ribbon)
 			instruction_ribbon.set_meta("persistent_copy_uses_utility_face", true)
 			instruction_ribbon.set_meta("persistent_copy_uses_impact_face", false)
 		else:
-			_configure_compact_objective_signal(instruction_ribbon)
+			_configure_combat_objective_signal(instruction_ribbon)
 		instruction_ribbon.set_meta("persistent_combat_hierarchy", true)
 	var exchange_signal: Label = parent.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/CombatThreatBoundary/CombatExchangeSignal") as Label
 	if exchange_signal != null:

@@ -150,7 +150,7 @@ func _validate_trait_cases(cases: Array[Variant]) -> Array[Variant]:
 		if threshold_index >= 0 and threshold_index < thresholds.size():
 			active_count_expected = thresholds[threshold_index]
 		var below_count_expected: int = max(0, active_count_expected - 1)
-		var below_tier_expected: int = _tier_for_count(thresholds, below_count_expected)
+		var below_tier_expected: int = _tier_for_count(thresholds, below_count_expected, trait_id)
 		_expect(int(active_snapshot.get("count", -999)) == active_count_expected, "%s compiler active count expected %d but got %d" % [case_id, active_count_expected, int(active_snapshot.get("count", -999))])
 		_expect(int(active_snapshot.get("tier", -999)) == threshold_index, "%s compiler active tier expected %d but got %d" % [case_id, threshold_index, int(active_snapshot.get("tier", -999))])
 		_expect(int(below_snapshot.get("count", -999)) == below_count_expected, "%s compiler below count expected %d but got %d" % [case_id, below_count_expected, int(below_snapshot.get("count", -999))])
@@ -618,12 +618,22 @@ func _print_summary(composition_evidence: Dictionary[String, Variant], trait_evi
 		var below: Dictionary[String, Variant] = _string_variant_dictionary(summary.get("below", {}))
 		print("CompositionTraitBalanceEvidence: trait=%s active_wins=%d below_wins=%d active_stall=%.2f below_stall=%.2f active_heal=%.1f below_heal=%.1f" % [trait_id, int(active.get("wins", 0)), int(below.get("wins", 0)), float(active.get("stall_rate", 0.0)), float(below.get("stall_rate", 0.0)), float(active.get("mean_healing", 0.0)), float(below.get("mean_healing", 0.0))])
 
-func _tier_for_count(thresholds: Array[int], count: int) -> int:
-	var tier: int = -1
-	for index: int in range(thresholds.size()):
-		if count >= thresholds[index]:
-			tier = index
-	return tier
+func _tier_for_count(thresholds: Array[int], count: int, trait_id: String) -> int:
+	return TraitDef.tier_for(count, thresholds, _trait_ladder_is_exact(trait_id))
+
+## Mirrors the compiler's dead-zone read so this evidence file cannot disagree
+## with the engine about what "active" means.
+func _trait_ladder_is_exact(trait_id: String) -> bool:
+	var clean_id: String = trait_id.strip_edges()
+	if clean_id == "":
+		return false
+	var path: String = "res://data/traits/%s.tres" % clean_id
+	if not ResourceLoader.exists(path):
+		return false
+	var resource: Resource = ResourceLoader.load(path)
+	if resource is TraitDef:
+		return (resource as TraitDef).exact_thresholds
+	return false
 
 func _string_variant_dictionary(value: Variant) -> Dictionary[String, Variant]:
 	var output: Dictionary[String, Variant] = {}

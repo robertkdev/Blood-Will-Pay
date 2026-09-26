@@ -42,6 +42,11 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	var info: Dictionary = scen.make(state, job.team_a_ids, job.team_b_ids, job.map_params)
 	_apply_stage_spec(state.player_team, meta_root.get("player_stage_spec", null), meta_root, "player")
 	_apply_stage_spec(state.enemy_team, meta_root.get("enemy_stage_spec", null), meta_root, "enemy")
+	# The enemy spec drives the encounter-level rules the engine needs before configure().
+	var enemy_spec: Variant = meta_root.get("enemy_stage_spec", null)
+	var enemy_chapter: int = max(1, int(meta_root.get("enemy_stage_chapter", 1)))
+	var enemy_stage_index: int = max(1, int(meta_root.get("enemy_stage_index", 1)))
+	var has_enemy_spec: bool = enemy_spec is Dictionary and not (enemy_spec as Dictionary).is_empty()
 
 	# Engine setup
 	var engine: CombatEngine = CombatEngine.new()
@@ -58,6 +63,11 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	if requested_caps.size() > 0:
 		engine.emit_position_telemetry = requested_caps.has(TelemetryCapabilities.CAP_MOBILITY) or requested_caps.has(TelemetryCapabilities.CAP_ZONES)
 		engine.emit_target_telemetry = requested_caps.has(TelemetryCapabilities.CAP_TARGETS)
+	# Before configure(), matching the live order: configure_encounter_escalation stores the
+	# config while engine.state is still null, and configure() is what applies it to the
+	# runtime with the real state.
+	if has_enemy_spec:
+		StageRuleRunner.pre_engine_config(state, engine, enemy_spec, enemy_chapter, enemy_stage_index)
 	engine.configure(state, BattleState.first_alive(state.player_team), 1, Callable())
 	# Item loadouts are test metadata, not a live autoload contract. Apply them
 	# through the same catalog modifiers and EffectRegistry handlers used by
@@ -248,6 +258,10 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	if collector != null and collector.has_method("attach"):
 		collector.attach(engine, state, true)
 	engine.start()
+	if has_enemy_spec:
+		# CreepsRule is the provider that uses this hook, so skipping it also left creep
+		# stages running without their battle-start rules.
+		StageRuleRunner.on_battle_start(state, engine, enemy_spec, enemy_chapter, enemy_stage_index)
 	trait_runtime.on_battle_start()
 	if item_runtime != null:
 		item_runtime.on_battle_started()
@@ -343,6 +357,16 @@ func run(job: DataModels.SimJob, collect_events: bool = false, collector: Varian
 	outcome.frames = int(round(sim_time / delta_s))
 	outcome.team_a_alive = _alive_count(state.player_team)
 	outcome.team_b_alive = _alive_count(state.enemy_team)
+	# Encounter escalation is configured by a rule provider and applied inside
+	# configure(). Expose what actually reached the engine so a probe can assert the
+	# encounter it measured is the encounter it predicted, rather than inferring it from
+	# a win rate that moved.
+	var escalation: RefCounted = engine.encounter_escalation_runtime
+	if escalation != null:
+		var phase_list: Variant = escalation.get("phases")
+		result["enemy_escalation_configured_phases"] = (phase_list as Array).size() if phase_list is Array else 0
+		result["enemy_escalation_enabled"] = bool(escalation.get("enabled"))
+		result["enemy_escalation_fired_phases"] = int(escalation.get("next_phase_index"))
 	if bool(meta_root.get("collect_reliability_diagnostics", false)) or outcome.result == "timeout":
 		result["reliability"] = _reliability_snapshot(engine, state, pending_hits.size(), outcome)
 	if bool(jmeta_root.get("perf_movement_diagnostics", false)) and engine.arena_state != null and engine.arena_state.has_method("diagnostics_snapshot"):
@@ -424,6 +448,13 @@ func _apply_stage_spec(units: Array, raw_spec: Variant, metadata: Dictionary, si
 	var index_key: String = "%s_stage_index" % side
 	var chapter: int = max(1, int(metadata.get(chapter_key, 1)))
 	var stage_index: int = max(1, int(metadata.get(index_key, 1)))
+	# CombatManager runs the hooks in this order: pre_spawn -> build -> post_spawn ->
+	# pre_engine_config -> configure -> start -> on_battle_start. This simulator used to
+	# run post_spawn alone, so a provider that only prepares engine configuration never
+	# reached the fight. BossRule is one: it writes rules.escalation in pre_spawn and
+	# hands it to the engine in pre_engine_config, so every boss measured here was a boss
+	# without its escalation phases.
+	StageRuleRunner.pre_spawn(spec, chapter, stage_index)
 	StageRuleRunner.post_spawn(units, spec, chapter, stage_index)
 
 # --- capability derivation -----------------------------------------------

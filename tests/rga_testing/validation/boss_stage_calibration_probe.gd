@@ -44,8 +44,11 @@ func _run() -> void:
 					_record_sample(samples, player_ids, player_level, boss_ids, spec, chapter, seed + tier * 17 + repeat_index * 1009, case_index)
 					case_index += 1
 	var summary: Dictionary = _summarize(samples)
-	_write_summary(summary)
 	_validate_summary(summary, failures)
+	# Written to disk as well as printed: see the note in TeamOddsCalibrationProbe.
+	summary["passed"] = failures.is_empty()
+	summary["failures"] = failures.duplicate()
+	_write_summary(summary)
 	if failures.is_empty():
 		print("BossStageCalibrationProbe: PASS %s" % _summary_line(summary))
 		_quit(0)
@@ -99,6 +102,12 @@ func _record_sample(samples: Array[Dictionary], player_ids: Array[String], playe
 		"chapter": chapter,
 		"sim_index": sim_index,
 		"seed": sim_seed,
+		# What the engine actually ran. A boss sample whose escalation phases never reached
+		# the engine is a different encounter from the one the prediction priced, and the
+		# probe used to have no way to tell.
+		"escalation_phases": int(result.get("enemy_escalation_configured_phases", 0)),
+		"escalation_enabled": bool(result.get("enemy_escalation_enabled", false)),
+		"escalation_fired": int(result.get("enemy_escalation_fired_phases", 0)),
 		"player": player_ids.duplicate(),
 		"boss": boss_ids.duplicate(),
 		"predicted": predicted_percent,
@@ -169,7 +178,13 @@ func _summarize(samples: Array[Dictionary]) -> Dictionary:
 	var timeout_count: int = 0
 	var wins: int = 0
 	var tier_rows: Dictionary = {}
+	var escalation_configured: int = 0
+	var escalation_fired: int = 0
 	for sample: Dictionary in samples:
+		if int(sample.get("escalation_phases", 0)) > 0:
+			escalation_configured += 1
+		if int(sample.get("escalation_fired", 0)) > 0:
+			escalation_fired += 1
 		var predicted_percent: int = int(sample.get("predicted", 50))
 		var predicted: float = float(predicted_percent) / 100.0
 		var actual: float = float(sample.get("actual", 0.5))
@@ -232,6 +247,8 @@ func _summarize(samples: Array[Dictionary]) -> Dictionary:
 		"brier": brier_sum / float(count),
 		"timeouts": timeout_count,
 		"timeout_rate": float(timeout_count) / float(count),
+		"escalation_configured_samples": escalation_configured,
+		"escalation_fired_samples": escalation_fired,
 		"buckets": rows,
 		"tiers": tier_summaries,
 		"rows": samples,
@@ -243,16 +260,46 @@ func _validate_summary(summary: Dictionary, failures: Array[String]) -> void:
 	_expect(int(summary.get("samples", 0)) == CHAPTERS.size() * 3 * 3 * SEEDS_PER_CASE, "unexpected boss sample count", failures)
 	_expect(int(summary.get("timeouts", 0)) == 0, "boss calibration had timeouts", failures)
 	_expect(float(summary.get("overall_gap", 1.0)) <= 0.12, "boss overall odds gap %.1f%% exceeded 12%%" % (float(summary.get("overall_gap", 1.0)) * 100.0), failures)
+	# The prediction prices an escalating boss. If the escalation never reaches the engine
+	# the fight is a different encounter, so a passing gap would be two different things
+	# agreeing with each other. LockstepSimulator ran only post_spawn once, which is exactly
+	# how this gate went green while measuring a boss with no phases.
+	var samples: int = int(summary.get("samples", 0))
+	_expect(
+		int(summary.get("escalation_configured_samples", 0)) == samples,
+		"only %d of %d boss samples had escalation phases configured on the engine" % [
+			int(summary.get("escalation_configured_samples", 0)), samples,
+		],
+		failures
+	)
+	_expect(
+		int(summary.get("escalation_fired_samples", 0)) > 0,
+		"no boss sample ever fired an escalation phase; the phases are configured but unreachable",
+		failures
+	)
 	var rows: Array = summary.get("buckets", [])
 	var populated: int = 0
+	var judged: int = 0
 	# Boss rows are intentionally stratified by preparation tier; the normal-stage
 	# probe owns the broad probability-bucket calibration gate. Keep these rows as
 	# evidence, but validate boss odds by tier so correlated encounter repeats do
 	# not masquerade as a broad probability distribution.
+	#
+	# The bucket requirement used to be "four buckets with n >= 6", which was a statement
+	# about the prediction distribution being spread out - true at exponent 1.55, false for
+	# any correctly steep curve, because a decisive boss should be predicted decisively. At
+	# exponent 4.0 the mass sits at the two tails. What is actually worth asserting is that
+	# the buckets carrying real mass are calibrated, so each row with enough samples is
+	# checked against the same gap the tier rows use.
 	for row: Dictionary in rows:
 		if int(row.get("count", 0)) >= 6:
 			populated += 1
-	_expect(populated >= 4, "expected four populated boss odds buckets, got %d" % populated, failures)
+		if int(row.get("count", 0)) >= 12:
+			judged += 1
+			var row_gap: float = float(row.get("gap", 1.0))
+			_expect(row_gap <= 0.15, "boss odds bucket %s gap %.1f%% exceeded 15%% with n=%d" % [String(row.get("bucket", "")), row_gap * 100.0, int(row.get("count", 0))], failures)
+	_expect(populated >= 2, "expected at least two populated boss odds buckets, got %d" % populated, failures)
+	_expect(judged >= 2, "expected at least two boss odds buckets with enough samples to judge, got %d" % judged, failures)
 	var tiers: Array = summary.get("tiers", [])
 	_expect(tiers.size() == 3, "expected three boss preparation tiers, got %d" % tiers.size(), failures)
 	if tiers.size() == 3:
@@ -307,6 +354,10 @@ func _summary_line(summary: Dictionary) -> String:
 	parts.append("brier=%.3f" % float(summary.get("brier", 0.0)))
 	parts.append("wins=%d" % int(summary.get("wins", 0)))
 	parts.append("timeouts=%d" % int(summary.get("timeouts", 0)))
+	parts.append("escalation_configured=%d/%d" % [
+		int(summary.get("escalation_configured_samples", 0)), int(summary.get("samples", 0)),
+	])
+	parts.append("escalation_fired_samples=%d" % int(summary.get("escalation_fired_samples", 0)))
 	var bucket_parts: Array[String] = []
 	for row: Dictionary in summary.get("buckets", []):
 		bucket_parts.append("%s n=%d pred=%.1f obs=%.1f gap=%.1f" % [String(row.get("bucket", "")), int(row.get("count", 0)), float(row.get("predicted", 0.0)) * 100.0, float(row.get("observed", 0.0)) * 100.0, float(row.get("gap", 0.0)) * 100.0])

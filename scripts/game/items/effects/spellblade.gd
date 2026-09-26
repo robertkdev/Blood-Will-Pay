@@ -30,12 +30,15 @@ func on_event(u: Unit, ev: String, data: Dictionary) -> void:
         var ti: int = int(data.get("target_index", -1))
         if ti < 0:
             return
-        var bonus: int = int(max(0.0, round(float(u.spell_power) * pct)))
-        if bonus > 0:
-            var AbilityEffects = load("res://scripts/game/abilities/effects.gd")
-            AbilityEffects.damage_single(engine, st, team, index, ti, bonus, "magic")
+        # Consume the charge before dealing the bonus. The bonus damage re-enters the
+        # hit pipeline, so decrementing afterwards let this handler read the old count
+        # and chain another bonus, then another, until the stack overflowed.
         left -= 1
         meta["hits_left"] = left
         tag["data"] = meta
         if left <= 0:
             tag["remaining"] = 0.0
+        var bonus: int = int(max(0.0, round(float(u.spell_power) * pct)))
+        if bonus > 0:
+            var AbilityEffects = load("res://scripts/game/abilities/effects.gd")
+            AbilityEffects.damage_single(engine, st, team, index, ti, bonus, "magic")

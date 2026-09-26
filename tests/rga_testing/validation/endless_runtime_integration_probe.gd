@@ -243,14 +243,55 @@ func _validate_mirror_runtime(failures: Array[String]) -> void:
 	MirrorBoardStore.capture_boss_board(FIRST_PROCEDURAL_CHAPTER, source_units)
 	var mirror_spec: Dictionary = RosterCatalog.get_spec(FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
 	StageRuleRunner.pre_spawn(mirror_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
-	_expect(_same_strings(_spec_ids(mirror_spec), ["sari", "paisley"]), "procedural mirror pre-spawn should use boss-entry snapshot ids", failures)
+	# The mirror fields the snapshot's board minus its weakest body. See
+	# MirrorBoardStore.mirror_indices: the mirror copies the player's board, so it always has
+	# the same body count, and body count - not stats - is what decides a fight in this game
+	# (docs/body_count_is_the_win_rate_2026-09-24.md). Fielding one fewer body is the lever;
+	# cutting its stats was tried and reverted because it left the count alone.
+	var expected_mirror_ids: Array[String] = []
+	var snapshot_ids: Array[String] = MirrorBoardStore.snapshot_ids(FIRST_PROCEDURAL_CHAPTER)
+	for index: int in MirrorBoardStore.mirror_indices(FIRST_PROCEDURAL_CHAPTER):
+		if index >= 0 and index < snapshot_ids.size():
+			expected_mirror_ids.append(snapshot_ids[index])
+	_expect(expected_mirror_ids.size() == source_units.size() - 1, "mirror should field one fewer body than the snapshot, expected a drop of 1", failures)
+	_expect(_same_strings(_spec_ids(mirror_spec), expected_mirror_ids), "procedural mirror pre-spawn should use the snapshot ids minus its weakest body, got %s expected %s" % [JSON.stringify(_spec_ids(mirror_spec)), JSON.stringify(expected_mirror_ids)], failures)
+	# Independent of the store's own index helper: the dropped unit must be the one the rating
+	# model scores lowest. Without this the assertions above only prove the store is
+	# self-consistent.
+	if expected_mirror_ids.size() == source_units.size() - 1:
+		var dropped_id: String = ""
+		var weakest_id: String = ""
+		var weakest_rating: float = INF
+		for unit: Unit in source_units:
+			var unit_name: String = String(unit.id)
+			if not expected_mirror_ids.has(unit_name):
+				dropped_id = unit_name
+			var rating: float = TeamOddsEstimator.unit_rating(unit)
+			if rating < weakest_rating:
+				weakest_rating = rating
+				weakest_id = unit_name
+		_expect(dropped_id == weakest_id, "mirror should drop its weakest body: dropped %s but %s rates lowest" % [dropped_id, weakest_id], failures)
 	var spawner: EnemySpawner = EnemySpawner.new()
 	var enemies: Array[Unit] = spawner.build_for_spec(mirror_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
 	StageRuleRunner.post_spawn(enemies, mirror_spec, FIRST_PROCEDURAL_CHAPTER, ProgressionConfig.MIRROR_STAGE)
-	_expect(enemies.size() == 2, "procedural mirror should spawn snapshot enemy count", failures)
-	if enemies.size() >= 2:
-		_expect(String(enemies[0].id) == "sari" and int(enemies[0].level) == 4 and int(enemies[0].max_hp) == 777, "procedural mirror first unit did not copy snapshot stats", failures)
-		_expect(String(enemies[1].id) == "paisley" and int(enemies[1].level) == 3 and int(enemies[1].max_hp) == 555, "procedural mirror second unit did not copy snapshot stats", failures)
+	_expect(enemies.size() == expected_mirror_ids.size(), "procedural mirror should spawn %d bodies, got %d" % [expected_mirror_ids.size(), enemies.size()], failures)
+	for index: int in range(min(enemies.size(), expected_mirror_ids.size())):
+		var unit: Unit = enemies[index]
+		var expected_id: String = expected_mirror_ids[index]
+		var origin_index: int = snapshot_ids.find(expected_id)
+		var origin_level: int = -1
+		var origin_hp: int = -1
+		if expected_id == "sari":
+			origin_level = 4
+			origin_hp = 777
+		elif expected_id == "paisley":
+			origin_level = 3
+			origin_hp = 555
+		_expect(
+			String(unit.id) == expected_id and int(unit.level) == origin_level and int(unit.max_hp) == origin_hp,
+			"procedural mirror body %d should be id=%s level=%d hp=%d, got id=%s level=%d hp=%d (origin_index=%d)" % [index, expected_id, origin_level, origin_hp, String(unit.id), int(unit.level), int(unit.max_hp), origin_index],
+			failures
+		)
 
 func _expected_kind_for(stage_index: int) -> String:
 	if stage_index == int(ProgressionConfig.CREEP_STAGE):

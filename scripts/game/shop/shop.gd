@@ -369,7 +369,7 @@ func _sync_roster_max_team_size() -> void:
 	if not _has_autoload("Roster"):
 		return
 	var level_delta: int = max(0, get_level() - int(ShopConfig.STARTING_LEVEL))
-	var target_size: int = int(ShopConfig.DEFAULT_BOARD_CAPACITY) + level_delta
+	var target_size: int = int(ShopConfig.DEFAULT_BOARD_CAPACITY) + level_delta + _ledger_board_capacity_bonus()
 	if _contracts != null:
 		target_size += max(0, int(_contracts.stable_board_bonus))
 	if _is_opening_retry_team_bonus_active():
@@ -396,6 +396,16 @@ func _is_past_opening_fight() -> bool:
 	if not _has_autoload("GameState"):
 		return false
 	return int(GameState.chapter) > 1 or int(GameState.stage_in_chapter) >= 2
+
+## The Ledger's Wide Table permanent widens the board for an account that has grown.
+## It feeds the same capacity result as level and contracts, so the first shop of a
+## veteran run can deploy what a fresh account has to level up for.
+func _ledger_board_capacity_bonus() -> int:
+	if not _has_autoload("Economy"):
+		return 0
+	if not Economy.has_method("ledger_board_capacity_bonus"):
+		return 0
+	return max(0, int(Economy.call("ledger_board_capacity_bonus")))
 
 func _is_opening_retry_team_bonus_active() -> bool:
 	if not _opening_retry_team_bonus_active:

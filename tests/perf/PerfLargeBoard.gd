@@ -106,6 +106,20 @@ func _run_sample(label: String, team_size: int, sample_index: int) -> Dictionary
 	var collector: RefCounted = pipeline._new_combined_aggregator(false)
 	var sim: LockstepSimulator = LockstepSimulator.new()
 	var out: Dictionary = sim.run(job, false, collector)
+	var movement: Variant = out.get("movement_diagnostics", null)
+	if movement is Dictionary:
+		for section: String in ["phases_usec", "slot_side_usec", "slot_group_sizes", "slot_group_usec", "slot_phase_usec"]:
+			var values: Variant = (movement as Dictionary).get(section, {})
+			if not (values is Dictionary) or (values as Dictionary).is_empty():
+				continue
+			var keys: Array = (values as Dictionary).keys()
+			keys.sort()
+			var parts: Array[String] = []
+			for key: Variant in keys:
+				# slot_group_sizes counts calls; the other sections accumulate microseconds.
+				var divisor: float = 1.0 if section == "slot_group_sizes" else 1000.0
+				parts.append("%s=%.1f" % [String(key), float((values as Dictionary)[key]) / divisor])
+			print("PerfLargeBoard movement %s#%d %s: %s" % [label, sample_index, section, "  ".join(parts)])
 	var elapsed_ms: int = Time.get_ticks_msec() - start_ms
 	var outcome: Variant = out.get("engine_outcome", null)
 	var frames: int = -1
@@ -162,7 +176,11 @@ func _make_job(label: String, team_size: int, sample_index: int) -> DataModels.S
 		"profile": "perf_large_board",
 		"perf_collision_iterations": 2,
 		"perf_friendly_soft": true,
-		"perf_avoidance_weight": 0.6
+		"perf_avoidance_weight": 0.6,
+		# Ask the movement service to report where its own time goes. The engine-level
+		# breakdown says movement is about three fifths of a max-size fight, and this is
+		# the sub-breakdown that says which phase inside it to attack.
+		"perf_movement_diagnostics": true,
 	}
 	return job
 

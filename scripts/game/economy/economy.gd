@@ -83,7 +83,9 @@ func _ready() -> void:
 
 func reset_run() -> void:
 	ledger_loadout = AccountProgressionScript.ledger_run_loadout(account_profile_path)
-	blood_buckets = STARTING_BLOOD_BUCKETS + (1 if has_ledger_edict("debtors_mercy") else 0)
+	# Debtor's Mercy pays a first bucket and then one more per 25 Ledger ranks, so the
+	# starting reserve keeps growing with the account instead of being a one-off.
+	blood_buckets = STARTING_BLOOD_BUCKETS + AccountProgressionScript.starting_blood_bucket_bonus(account_profile_path)
 	current_bet = min(1, blood_buckets)
 	preferred_bet = current_bet
 	peak_bankroll = blood_buckets
@@ -117,6 +119,14 @@ func has_ledger_edict(edict_id: String) -> bool:
 		if String(entry).strip_edges().to_lower() == edict_id.strip_edges().to_lower():
 			return true
 	return false
+
+## Extra board bodies the equipped Wide Table Edict grants this run. The Ledger only
+## changes between runs, so reading the account here is stable inside a run; Shop
+## calls it whenever it recomputes board capacity.
+func ledger_board_capacity_bonus() -> int:
+	if not has_ledger_edict("wide_table"):
+		return 0
+	return max(0, int(AccountProgressionScript.board_capacity_bonus(account_profile_path)))
 
 func set_projected_win_probability(probability: float) -> void:
 	projected_win_probability = clampf(float(probability), 0.01, 1.0)

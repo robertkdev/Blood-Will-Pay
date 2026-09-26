@@ -38,7 +38,11 @@ func _run() -> void:
 	_expect(int(Economy.gold) == 4, "4-blood Buy XP denial should leave reserve unchanged")
 	_expect(int(Shop.get_level()) == 1, "4g Buy XP denial should leave level unchanged")
 	_expect(int(Shop.get_xp()) == 0, "4g Buy XP denial should leave XP unchanged")
-	_expect(_label_with_text("Need +1 blood to buy XP and keep 1 health.") != null, "4-blood Buy XP denial should show reserve-floor feedback")
+	# The denial sentence has been reworded since this was written, so assert the information
+	# the player needs - that the action was refused and why - instead of the old wording.
+	var denial: Label = _label_containing("buy xp")
+	var denial_copy: String = String(denial.text) if denial != null else "<none>"
+	_expect(denial != null and denial_copy.to_lower().contains("reserve"), "4-blood Buy XP denial should show reserve-floor feedback, got %s" % denial_copy)
 	_expect(_label_with_text("Lvl 1 (0/2)") != null, "4g Buy XP denial should leave progress label at Lvl 1 (0/2)")
 
 	_set_gold(6)
@@ -85,6 +89,12 @@ func _press_button(button: Button) -> void:
 	button.emit_signal("pressed")
 
 func _button_with_text_prefix(text: String) -> Button:
+	# The shelf action buttons carry an icon now, so find them by identity. This smoke is not
+	# on the shared harness chain and has to resolve the name itself.
+	if _host != null:
+		var named: Button = _host.find_child("BuyXpButton", true, false) as Button
+		if named != null and text.begins_with("Buy XP"):
+			return named
 	if _host == null:
 		return null
 	var buttons: Array[Node] = _host.find_children("*", "Button", true, false)
@@ -96,6 +106,21 @@ func _button_with_text_prefix(text: String) -> Button:
 
 func _label_with_text(text: String) -> Label:
 	return _find_label_with_text(_host, text)
+
+## The first label whose text contains `text`, case-insensitively.
+func _label_containing(text: String) -> Label:
+	return _find_label_containing(_host, String(text).to_lower())
+
+func _find_label_containing(root: Node, needle: String) -> Label:
+	if root == null:
+		return null
+	if root is Label and String((root as Label).text).to_lower().contains(needle):
+		return root as Label
+	for child: Node in root.get_children():
+		var found: Label = _find_label_containing(child, needle)
+		if found != null:
+			return found
+	return null
 
 func _find_label_with_text(root: Node, text: String) -> Label:
 	if root == null:

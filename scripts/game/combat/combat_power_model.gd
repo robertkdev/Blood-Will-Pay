@@ -11,7 +11,26 @@ const MIN_POWER: float = 1.0
 const RAW_POWER_DIVISOR: float = 100.0
 const TRAIT_TIER_STEP: float = 0.075
 const TRAIT_COUNT_STEP: float = 0.012
-const ODDS_EXPONENT: float = 1.55
+## Steepness of the win-odds curve, which is drawn through the ratio of the two team
+## ratings: p = player^E / (player^E + enemy^E).
+##
+## 1.55 was far too flat. Three independent measurements agree, and the passing window is
+## E in roughly [3.1, 5.2]:
+##
+##   source                                  n     worst bucket miss at 1.55   at 4.0
+##   recorded live first attempts          3,144        0.218 (mean abs)         -
+##   TeamOddsRepresentativeProbe             144        0.293                   0.060
+##   TeamOddsCalibrationProbe (synthetic)    144        0.124                   0.088
+##   BossStageCalibrationProbe tier gaps     108        0.129                   0.088
+##
+## Fitted directly on the recorded live first attempts the exponent is 3.11; the two
+## simulated populations prefer 4.0-5.0. 4.0 is the compromise - inside the window with
+## margin on every gate - and nothing outside [3.1, 5.2] passes all three.
+##
+## Only the displayed win odds move with this constant. The generator fits enemy boards to
+## a rating target and never reads the odds, so the difficulty curve is untouched.
+## See docs/odds_exponent_fitted_2026-09-23.md.
+const ODDS_EXPONENT: float = 4.0
 
 static var _unit_power_cache: Dictionary = {}
 static var _team_power_cache: Dictionary = {}
@@ -77,7 +96,11 @@ static func team_power_for_ids(ids: Array[String], levels: Dictionary = {}, stat
 		if absf(float(stat_scale) - 1.0) >= 0.001:
 			rules["stat_scale"] = float(stat_scale)
 		var spec: Dictionary = StageTypes.make_spec(ids, StageTypes.KIND_NORMAL, rules)
-		StageRuleRunner.post_spawn(units, spec, 1, 1)
+		# Scoring must be a pure function of the ids, levels and scale that make up the
+		# cache key. With live contract / Red Ink multipliers applied here, the cached
+		# rating depended on when the combination was first scored, and the generator's
+		# budget fitting silently absorbed difficulty it was supposed to keep.
+		StageRuleRunner.post_spawn(units, spec, 1, 1, false)
 	var base_power: float = 0.0
 	for unit: Unit in units:
 		base_power += unit_power(unit)

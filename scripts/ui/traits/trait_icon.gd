@@ -10,13 +10,16 @@ const ICON_OVERRIDES := {
 	"Liaison": "res://assets/traits/liason_symbol.png",
 }
 const ICON_TEMPLATE := "res://assets/traits/%s_symbol.png"
-const COLOR_ACTIVE: Color = Color(0.34, 0.20, 0.060, 0.94)
-const COLOR_INACTIVE: Color = Color(0.030, 0.026, 0.034, 0.88)
-const COLOR_HOVER_ACTIVE: Color = Color(0.64, 0.39, 0.095, 0.99)
-const COLOR_HOVER_INACTIVE: Color = Color(0.105, 0.070, 0.080, 0.97)
-const COLOR_ICON_ACTIVE: Color = Color(1.0, 0.86, 0.58, 1.0)
-const COLOR_ICON_INACTIVE: Color = Color(0.62, 0.56, 0.50, 0.82)
-const COLOR_ICON_HOVER: Color = Color(1.0, 0.91, 0.70, 1.0)
+# Quiet recessed plates. The authored symbol keeps the identity, but it sits on a
+# near-black plate and is held below full brightness, so the strip reads as one
+# restrained accent instead of a row of bright gold medallions.
+const COLOR_ACTIVE: Color = Color(0.045, 0.036, 0.030, 0.88)
+const COLOR_INACTIVE: Color = Color(0.016, 0.015, 0.019, 0.80)
+const COLOR_HOVER_ACTIVE: Color = Color(0.085, 0.062, 0.042, 0.94)
+const COLOR_HOVER_INACTIVE: Color = Color(0.045, 0.036, 0.038, 0.92)
+const COLOR_ICON_ACTIVE: Color = Color(0.86, 0.75, 0.58, 1.0)
+const COLOR_ICON_INACTIVE: Color = Color(0.56, 0.52, 0.48, 0.78)
+const COLOR_ICON_HOVER: Color = Color(0.95, 0.85, 0.66, 1.0)
 const HOVER_DELAY: float = 0.08
 const HIDE_DELAY: float = 0.14
 const TOOLTIP_GROUP: String = "gothic_hover_tooltip"

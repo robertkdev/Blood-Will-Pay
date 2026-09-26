@@ -284,7 +284,7 @@ func _build_system_menu() -> void:
 
 	_system_menu_button = Button.new()
 	_system_menu_button.name = "SystemMenuButton"
-	_system_menu_button.text = "SYS // MENU"
+	_system_menu_button.text = "MENU"
 	# Native delayed tooltips can remain onscreen while automated scale changes
 	# and result transitions move the button, obscuring unrelated tactical UI.
 	# The visible SYS // MENU label is already self-describing.

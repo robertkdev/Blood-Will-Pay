@@ -4,6 +4,7 @@ class_name UnitView
 const UI = preload("res://scripts/constants/ui_constants.gd")
 const TextureUtils = preload("res://scripts/util/texture_utils.gd")
 const UnitEffectPlayer = preload("res://scripts/ui/vfx/unit_effect_player.gd")
+const UnitArtPresentation = preload("res://scripts/ui/unit_art_presentation.gd")
 
 var unit
 var sprite
@@ -242,6 +243,11 @@ func _refresh_sprite(force: bool = false) -> void:
 	if tex == null:
 		tex = TextureUtils.make_circle_texture(Color(0.8, 0.8, 0.8), 96)
 	sprite.texture = tex
+	# Sampling presentation has to follow this assignment, not precede it: the
+	# board hook can present the view before this texture exists. Re-applying here
+	# is idempotent and reuses the cached prepared copy, so it stays off the hot
+	# path unless the sprite path actually changed.
+	UnitArtPresentation.apply_to(sprite, UnitArtPresentation.SURFACE_BOARD_UNIT)
 	_sprite_path_cache = sprite_path
 
 func _refresh_bars() -> void:

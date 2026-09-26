@@ -3,15 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cc1rf18mo50xk"
-path="res://.godot/imported/hardcore_components_source.png-0f16990f2bb9f5f7373fb0097f166fd9.ctex"
-metadata={
-"vram_texture": false
-}
+valid=false
 
 [deps]
 
 source_file="res://tools/art/source/hardcore_ui_2026_07_29/hardcore_components_source.png"
-dest_files=["res://.godot/imported/hardcore_components_source.png-0f16990f2bb9f5f7373fb0097f166fd9.ctex"]
 
 [params]
 

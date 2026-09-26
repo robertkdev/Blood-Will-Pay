@@ -1,6 +1,8 @@
 extends Object
 class_name MirrorBoardStore
 
+const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
+
 static var _snapshots_by_chapter: Dictionary = {}
 
 static func clear_runtime() -> void:
@@ -45,13 +47,54 @@ static func snapshot_ids(ch: int) -> Array[String]:
 			out.append(unit_id)
 	return out
 
+## Snapshot indices the mirror actually fields, weakest body dropped.
+##
+## The mirror copies the player's own boss-entry board, so it always has the same number of
+## bodies as the player - and body count, not stats, is what decides a fight in this game.
+## Measured over 2,474 first attempts, the player's win rate is a step function of the
+## body-count difference: even bodies 53%, one extra body 92%, six extra 100%
+## (docs/body_count_is_the_win_rate_2026-09-24.md). A same-size mirror is therefore a coin
+## flip *by construction*, which is exactly what it measures as: 57% overall and 45% in
+## chapter 2, one per chapter, and 65 of 145 recorded runs ended on one.
+##
+## Cutting its stats was tried and reverted - it left the body count alone, so a 20% stat cut
+## did not move the outcome. Dropping one body is the lever the table actually supports.
+##
+## The weakest body is the one rated lowest by the same model the generator fits against, at
+## the level the snapshot recorded. A snapshot of a single unit is left alone: an empty mirror
+## is not a fight.
+static func mirror_indices(ch: int) -> Array[int]:
+	var c: int = max(1, int(ch))
+	var snapshots: Array = _snapshots_by_chapter.get(c, [])
+	var out: Array[int] = []
+	for index: int in range(snapshots.size()):
+		# Same filter snapshot_ids uses, so the two lists stay index-aligned.
+		if snapshots[index] is Dictionary and String((snapshots[index] as Dictionary).get("id", "")).strip_edges() != "":
+			out.append(index)
+	if out.size() <= 1:
+		return out
+	var weakest_position: int = 0
+	var weakest_rating: float = INF
+	for position: int in range(out.size()):
+		var snapshot: Dictionary = snapshots[out[position]]
+		var rating: float = CombatPowerModel.unit_power_for_id(
+			String(snapshot.get("id", "")),
+			int(snapshot.get("level", 1))
+		)
+		if rating < weakest_rating:
+			weakest_rating = rating
+			weakest_position = position
+	out.remove_at(weakest_position)
+	return out
+
 static func apply_snapshot_to_units(ch: int, units: Array) -> void:
 	var c: int = max(1, int(ch))
 	var snapshots: Array = _snapshots_by_chapter.get(c, [])
-	var count: int = min(units.size(), snapshots.size())
+	var indices: Array[int] = mirror_indices(c)
+	var count: int = min(units.size(), indices.size())
 	for i: int in range(count):
 		var unit: Unit = units[i] as Unit
-		var snapshot_value: Variant = snapshots[i]
+		var snapshot_value: Variant = snapshots[indices[i]]
 		if unit == null or not (snapshot_value is Dictionary):
 			continue
 		_apply_snapshot(unit, snapshot_value as Dictionary)
@@ -135,7 +178,10 @@ static func _force_items(unit: Unit, items: Array[String]) -> void:
 	var items_node: Variant = _items_singleton()
 	if items_node == null or not items_node.has_method("force_set_equipped"):
 		return
-	items_node.call("force_set_equipped", unit, items)
+	# A snapshot restore must keep duplicates: a boss-entry unit holding two Guards was
+	# mirrored with one, while its copied stats still matched, so the mirror lost a
+	# Guard trigger without the rating showing it.
+	items_node.call("force_set_equipped", unit, items, true)
 
 static func _items_singleton() -> Variant:
 	var loop: MainLoop = Engine.get_main_loop()

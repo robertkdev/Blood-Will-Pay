@@ -70,7 +70,10 @@ func _audit_assisted_buy_xp_to_level_two() -> void:
 	var clicked: bool = await _click_button(button, "premium deploy Buy XP")
 	_expect(clicked, "premium deploy Buy XP click did not fire")
 	await _settle_frames(4)
-	_expect(int(Economy.gold) == before_gold - int(SHOP_CONFIG.BUY_XP_COST), "premium deploy Buy XP should spend exactly %d gold" % int(SHOP_CONFIG.BUY_XP_COST))
+	# See the note in natural_buy_xp_visual_smoke: BUY_XP_COST is in stake units, so assert the
+	# price the shop actually quoted rather than the constant.
+	var quoted_xp_price: int = int(Shop.get_progression_price()) if Shop.has_method("get_progression_price") else int(SHOP_CONFIG.BUY_XP_COST)
+	_expect(int(Economy.gold) == before_gold - quoted_xp_price, "premium deploy Buy XP should spend exactly the quoted %d gold" % quoted_xp_price)
 	_expect(int(Shop.get_level()) == before_level + 1, "premium deploy Buy XP should advance one shop level")
 	_expect(int(Shop.get_level()) == 2, "premium deploy Buy XP should reach level 2")
 	_expect(int(Shop.get_xp()) == 2, "premium deploy Buy XP should preserve 2 overflow XP at level 2")
@@ -126,6 +129,9 @@ func _first_premium_id() -> String:
 	return premium_ids[0]
 
 func _button_with_text(text: String) -> Button:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action
 	if _main == null:
 		return null
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)

@@ -20,6 +20,22 @@ const FIRST_DEPLOY_BENCH_TOOLTIP: String = "Drag this bench unit to a highlighte
 const USE_SYNTHETIC_INPUT: bool = false
 const CLEANUP_DRAIN_FRAMES: int = 75
 const DUMP_ORPHAN_NODES: bool = false
+const CONTINUE_GATE_ATTEMPTS: int = 3
+
+## The harness plays the shipped game, but it must not take the desktop to do it. The
+## project boots fullscreen (`window/size/mode=3`), so a run used to cover the whole
+## monitor and make the machine unusable while it played. Runs now get a small windowed
+## frame parked in the corner of the current screen, flagged never to take focus and never
+## on top. The logical viewport stays HARNESS_VIEWPORT through canvas-item content scaling,
+## so the layout the game builds and the coordinates the synthetic events carry are
+## unchanged - only the OS window shrinks.
+const HARNESS_VIEWPORT: Vector2i = Vector2i(1920, 1080)
+## How large the parked window is on screen. The logical viewport is HARNESS_VIEWPORT either
+## way, so this is purely how watchable the run is. `BWP_HARNESS_WINDOW_SIZE=960x540` picks
+## another size.
+const HARNESS_WINDOW_SIZE: Vector2i = Vector2i(1280, 720)
+const HARNESS_WINDOW_MARGIN: int = 16
+const HARNESS_CURSOR_SAMPLE_SECONDS: float = 0.25
 
 var _main: Control = null
 var _failures: Array[String] = []
@@ -29,17 +45,20 @@ var _reported_button_fallback: bool = false
 var _reported_drag_fallback: bool = false
 var _actual_saved_opening_entry: Dictionary = {}
 var _actual_opening_entry_forced: bool = false
+var _harness_window_report: Dictionary = {}
+var _cursor_watch_samples: int = 0
+var _cursor_watch_start: Vector2i = Vector2i.ZERO
+var _cursor_watch_min: Vector2i = Vector2i.ZERO
+var _cursor_watch_max: Vector2i = Vector2i.ZERO
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Park here rather than in _run: _run is deferred, which would present the boot
+	# fullscreen for the whole scene load before the window is moved.
+	_park_harness_window(_harness_compact_window())
 	call_deferred("_run")
 
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -314,6 +333,18 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	if button == null:
 		_expect(false, "%s continue button missing" % label)
 		return
+	if button.disabled:
+		# A held-down Continue is a gate the rig has to answer, not a dead end. The chapter-9
+		# Jev run pressed it anyway - three times - and the deepest run on record aborted
+		# there, so answer the gate first and only then call it a failure.
+		for _attempt: int in range(CONTINUE_GATE_ATTEMPTS):
+			await _clear_continue_gates(label)
+			button = _main.find_child("ContinueButton", true, false) as Button
+			if button == null or not button.disabled:
+				break
+	if button == null:
+		_expect(false, "%s continue button missing" % label)
+		return
 	if expect_forced:
 		_expect(button.text == "Start Opening Fight", "%s should show Start Opening Fight, got %s" % [label, button.text])
 	else:
@@ -321,6 +352,48 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 	_expect(not button.disabled, "%s continue button disabled" % label)
 	if not button.disabled:
 		await _click_button(button, "%s continue button" % label)
+
+## Answer whatever is holding Continue down, then let the game release it. Base harnesses have
+## nothing to answer; the pacing and Jev rigs override this with their gate resolvers.
+func _clear_continue_gates(_label: String) -> void:
+	await get_tree().process_frame
+
+## Every button the pending chapter contract is asking the player to press.
+##
+## Found by structure, not by name. The market names its buttons `ContractChoice0..` and
+## `ContractPass`, but only while nothing collides - a rebuild that deferred its free left the
+## whole market as `@Button@<id>`, which a name search cannot see. The choice container is
+## unnamed by design, so it is reached through its named sibling and everything pressable
+## inside it counts as an answer. Disabled offers are skipped: pressing one does nothing.
+func _contract_market_buttons(overlay_node: Control) -> Array[Button]:
+	var buttons: Array[Button] = []
+	if overlay_node == null:
+		return buttons
+	var status_label: Label = overlay_node.find_child("ContractStatus", true, false) as Label
+	var stack: Node = status_label.get_parent() if status_label != null else null
+	if stack == null:
+		return buttons
+	for child: Node in stack.get_children():
+		var choices: VBoxContainer = child as VBoxContainer
+		if choices == null:
+			continue
+		for candidate: Node in choices.get_children():
+			var button: Button = candidate as Button
+			if button != null and not button.disabled:
+				buttons.append(button)
+	return buttons
+
+## The PASS choice on the pending chapter contract. A named ContractPass wins when the market
+## still has its authored names; otherwise it is the last pressable choice, which is the order
+## the market builds them in.
+func _contract_pass_button() -> Button:
+	if _main != null:
+		var named: Button = _main.find_child("ContractPass", true, false) as Button
+		if named != null and not named.disabled:
+			return named
+	var overlay: Control = _main.find_child("ChapterContractOverlay", true, false) as Control if _main != null else null
+	var pressable: Array[Button] = _contract_market_buttons(overlay)
+	return pressable[pressable.size() - 1] if not pressable.is_empty() else null
 
 func _set_planning_timer_safe() -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control
@@ -661,7 +734,7 @@ func _drag_control_to(control: Control, target_pos: Vector2, label: String) -> b
 	return drag_state[0] and drag_state[1]
 
 func _control_mouse_button(control: Control, position: Vector2, pressed: bool) -> void:
-	get_viewport().warp_mouse(position)
+	_warp_mouse_for_synthetic_input(position)
 	var event: InputEventMouseButton = InputEventMouseButton.new()
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
@@ -675,7 +748,7 @@ func _control_mouse_button(control: Control, position: Vector2, pressed: bool) -
 	await get_tree().process_frame
 
 func _control_mouse_motion(control: Control, position: Vector2, left_down: bool) -> void:
-	get_viewport().warp_mouse(position)
+	_warp_mouse_for_synthetic_input(position)
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT if left_down else 0
 	event.position = _local_point(control, position)
@@ -708,7 +781,7 @@ func _mouse_button(position: Vector2, pressed: bool) -> void:
 	await get_tree().process_frame
 
 func _move_mouse(position: Vector2, left_down: bool) -> void:
-	get_viewport().warp_mouse(position)
+	_warp_mouse_for_synthetic_input(position)
 	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT if left_down else 0
 	event.position = position
@@ -719,6 +792,130 @@ func _move_mouse(position: Vector2, left_down: bool) -> void:
 
 func _flush_synthetic_input() -> void:
 	Input.flush_buffered_events()
+
+## Move the OS cursor to the synthetic event's position - off by default.
+##
+## `warp_mouse` moves the REAL pointer, so a run that plays the game used to take the machine's
+## mouse hostage for its whole duration and the person at the keyboard could not use it.
+##
+## It is not needed. Everything else in these helpers is already engine-level: the event carries
+## `position` and `global_position`, and `Input.parse_input_event` feeds it into Godot's own
+## input queue without touching the OS. The warp was added by 38fcef69 for drag interactions;
+## measured with it off, a full heuristic run played 24 battles to chapter 5 with ZERO click or
+## drag failures - the only failures were the unrelated contract-market ones. Clicks, purchases,
+## item equips, board swaps and repositioning all ran through the synthetic path unchanged.
+##
+## So the default is now no warp, and `BWP_MOUSE_WARP=1` restores the old behaviour for any
+## caller that genuinely needs the OS pointer moved.
+static func _mouse_warp_requested() -> bool:
+	return OS.get_environment("BWP_MOUSE_WARP").strip_edges() == "1"
+
+func _warp_mouse_for_synthetic_input(position: Vector2) -> void:
+	if not _mouse_warp_requested():
+		return
+	get_viewport().warp_mouse(position)
+
+## Park the harness window so a long run neither covers nor takes the desktop.
+##
+## The project boots fullscreen (`window/size/mode=3`), so a run used to cover the whole
+## monitor and the machine was unusable while it played. The long play lanes now get a
+## borderless window parked in the corner of the current screen, never focused and never on
+## top, with the logical viewport held at HARNESS_VIEWPORT by content scaling - so the layout
+## the game builds and the coordinates the synthetic events carry are unchanged.
+##
+## The fullscreen exit has to go through `WINDOW_FLAG_BORDERLESS`. Asking for
+## `WINDOW_MODE_WINDOWED` from the boot state is ignored and leaves the window in
+## `WINDOW_MODE_EXCLUSIVE_FULLSCREEN`, which is what covered a whole display.
+##
+## Anything that is not a long play lane is left exactly as it was. The short one-shot smokes
+## keep their historical presentation, and the ones that resize the window to probe responsive
+## layouts need the logical viewport to follow the window - which content scaling would stop.
+## `BWP_HARNESS_WINDOW=fullscreen` forces the old presentation even for a long lane.
+static func _harness_fullscreen_requested() -> bool:
+	return OS.get_environment("BWP_HARNESS_WINDOW").strip_edges().to_lower() == "fullscreen"
+
+## Whether this harness entry wants the small background window. The long play lanes - which
+## never resize the window themselves - override this to true.
+func _harness_compact_window() -> bool:
+	return false
+
+func _park_harness_window(compact: bool = false) -> void:
+	var park: bool = compact and not _harness_fullscreen_requested()
+	if park:
+		# KEEP, not EXPAND: the logical viewport must be exactly HARNESS_VIEWPORT whatever the
+		# OS window measures after the borderless switch shaves a few pixels off it.
+		var window: Window = get_window()
+		if window != null:
+			window.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+			window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+			window.content_scale_size = HARNESS_VIEWPORT
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, false)
+		DisplayServer.window_set_size(_harness_window_size())
+		DisplayServer.window_set_position(_parked_window_position())
+		# Last, so nothing above can hand the focus back.
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
+	_harness_window_report = {
+		"presentation": "background" if park else "shipped",
+		"os_window_size": DisplayServer.window_get_size(),
+		"logical_viewport": get_viewport().get_visible_rect().size,
+		"screen_count": DisplayServer.get_screen_count(),
+	}
+	_start_cursor_watch()
+
+static func _parked_window_position() -> Vector2i:
+	var screen: int = DisplayServer.window_get_current_screen()
+	var usable: Rect2i = DisplayServer.screen_get_usable_rect(screen)
+	var corner: Vector2i = usable.position + usable.size - _harness_window_size() - Vector2i(HARNESS_WINDOW_MARGIN, HARNESS_WINDOW_MARGIN)
+	return Vector2i(maxi(usable.position.x, corner.x), maxi(usable.position.y, corner.y))
+
+## The parked window's size, from `BWP_HARNESS_WINDOW_SIZE=WxH` when it is well formed.
+static func _harness_window_size() -> Vector2i:
+	var raw: String = OS.get_environment("BWP_HARNESS_WINDOW_SIZE").strip_edges().to_lower()
+	if raw.contains("x"):
+		var parts: PackedStringArray = raw.split("x", false)
+		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+			var width: int = clampi(int(parts[0]), 320, HARNESS_VIEWPORT.x)
+			var height: int = clampi(int(parts[1]), 200, HARNESS_VIEWPORT.y)
+			return Vector2i(width, height)
+	return HARNESS_WINDOW_SIZE
+
+## Watch the real pointer for the whole run without ever moving it.
+##
+## Every click the harness makes goes through Godot's own input queue
+## (`Input.parse_input_event`), so the OS cursor should be untouched; a run that warped it
+## would be visibly holding the machine's mouse. Sampling turns "we believe we stopped
+## warping" into a number that travels with the run's own summary: the furthest the pointer
+## drifted from where it started while the harness was playing.
+func _start_cursor_watch() -> void:
+	if get_node_or_null("HarnessCursorWatch") != null:
+		return
+	var start: Vector2i = DisplayServer.mouse_get_position()
+	_cursor_watch_samples = 0
+	_cursor_watch_start = start
+	_cursor_watch_min = start
+	_cursor_watch_max = start
+	var timer: Timer = Timer.new()
+	timer.name = "HarnessCursorWatch"
+	timer.wait_time = HARNESS_CURSOR_SAMPLE_SECONDS
+	timer.autostart = true
+	timer.timeout.connect(_sample_os_cursor)
+	add_child(timer)
+
+func _sample_os_cursor() -> void:
+	var position: Vector2i = DisplayServer.mouse_get_position()
+	_cursor_watch_samples += 1
+	_cursor_watch_min = Vector2i(mini(_cursor_watch_min.x, position.x), mini(_cursor_watch_min.y, position.y))
+	_cursor_watch_max = Vector2i(maxi(_cursor_watch_max.x, position.x), maxi(_cursor_watch_max.y, position.y))
+
+func _harness_window_summary() -> Dictionary:
+	var report: Dictionary = _harness_window_report.duplicate()
+	report["cursor_samples"] = _cursor_watch_samples
+	report["cursor_max_shift_px"] = maxi(
+		maxi(absi(_cursor_watch_max.x - _cursor_watch_start.x), absi(_cursor_watch_min.x - _cursor_watch_start.x)),
+		maxi(absi(_cursor_watch_max.y - _cursor_watch_start.y), absi(_cursor_watch_min.y - _cursor_watch_start.y)),
+	)
+	return report
 
 func _first_fight_placeholder_visible() -> bool:
 	var grid: GridContainer = _main.find_child("ShopGrid", true, false) as GridContainer
@@ -736,6 +933,9 @@ func _opening_shop_buttons_disabled() -> bool:
 	return _button_with_text_disabled("Reroll") and _button_with_text_disabled("Lock") and _button_with_text_disabled("Buy XP")
 
 func _button_with_text_disabled(text: String) -> bool:
+	var action: Button = _button_for_action_text(text)
+	if action != null:
+		return action.disabled
 	var buttons: Array[Node] = _main.find_children("*", "Button", true, false)
 	for node: Node in buttons:
 		var button: Button = node as Button
@@ -744,6 +944,26 @@ func _button_with_text_disabled(text: String) -> bool:
 		if button != null and button.text.begins_with(text):
 			return button.disabled
 	return false
+
+## The shelf action buttons by stable identity rather than by their visible copy.
+##
+## Their labels are now a bare cost with the action carried by an icon, so matching on copy is
+## both brittle and wrong - it has broken three times in this project already. Callers that
+## still pass the old wording ("Reroll", "Lock", "Buy XP", "All In") resolve here first.
+const ACTION_BUTTON_NAMES: Dictionary = {
+	"Reroll": "RerollButton",
+	"Lock": "LockButton",
+	"Buy XP": "BuyXpButton",
+	"All In": "AllInButton",
+}
+
+func _button_for_action_text(text: String) -> Button:
+	if _main == null:
+		return null
+	var node_name: String = String(ACTION_BUTTON_NAMES.get(text, ""))
+	if node_name == "":
+		return null
+	return _main.find_child(node_name, true, false) as Button
 
 func _deploy_prompt_visible() -> bool:
 	var root: Node = _main.get_node_or_null("CombatView")

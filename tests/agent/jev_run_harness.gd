@@ -20,13 +20,42 @@ extends "res://tests/pacing/competent_policy_pacing_harness.gd"
 const JEV_HARNESS_NAME: String = "JevRunHarness"
 const DEFAULT_RUN_DIR: String = "user://jev_run"
 const JEV_RULES_PATH: String = "res://tools/jev/policy/jev_run_rules.json"
+## Opt-in levelling strategy, selected with JEV_LEVEL_POLICY=eager.
+##
+## The shipped path asks the model, and the model's rule turns out to have no reachable
+## off-switch: it holds off "only while several 1-cost pairs with no upgrades are still the
+## best value", and on a level-3 shelf that is 65% cost 1 with the rig always collecting
+## duplicates, that is permanently true. Measured over fourteen runs the rig buys XP a mean of
+## 1.5 times, and one run sat at shop level 2 holding 58,490 buckets. Levelling is the only way
+## to reach a cost-4 unit at all, and no player board in the record has ever held one.
+##
+## "eager" does not replace the model. It only takes the case the free-form rule cannot: the
+## price is trivial against the bankroll, the level is still below the tier that matters, and
+## the reserve floor still holds. Every other level question goes to the model exactly as
+## before, so the two arms of the A/B differ in one decision class and nothing else.
+const EAGER_LEVEL_TARGET: int = 7
+const EAGER_LEVEL_PRICE_BANKROLL_RATIO: int = 20
 const DEFAULT_RESERVE_FLOOR_BUCKETS: int = 2
 const DECISION_POLL_SECONDS: float = 0.05
 const DECISION_TIMEOUT_SECONDS: float = 240.0
 const CAMPAIGN_TARGET_CHAPTER: int = 2
 const CAMPAIGN_TARGET_ROUND: int = 4
 const CAMPAIGN_MAX_BATTLES: int = 30
+## The deep lane keeps playing after the campaign target. A three-star unit is nine
+## copies, a maxed trait ladder needs a board the early chapters cannot build, and a
+## rich bankroll needs chapters to compound in - none of that is observable in a run
+## that stops the moment it clears chapter 2 round 4. The campaign target is still
+## recorded as a milestone inside a deep run.
+## Chapter 10 is the "good run" marker: eight completed items are a chapter-10
+## pacing target, and five stages per chapter means a chapter-10 run is ~50 fights.
+const DEEP_TARGET_CHAPTER: int = 10
+const DEEP_TARGET_ROUND: int = 4
+const DEEP_MAX_BATTLES: int = 200
+## The shipped planning countdown in game seconds; see _scale_planning_window_for_sweep.
+const SHIPPED_PLANNING_WINDOW_S: float = 120.0
 const MAX_SAME_STAGE_RETRIES: int = 3
+## A beat can queue more than one level-4 legacy if several units combine.
+const ASCENSION_DECISIONS_PER_BEAT: int = 4
 ## A synthetic mouse event occasionally misses a control that is visibly present and
 ## enabled - observed once across six seeds, on a shop slot, with the card rendered and
 ## mouse_filter 0. That is an input-layer artifact rather than play, but the inherited
@@ -37,8 +66,26 @@ const SHOP_CLICK_ATTEMPTS: int = 3
 ## automatically, so placing a component can be a two-step commitment and a single
 ## pass is not enough to place a carried component.
 const ITEM_DECISIONS_PER_BEAT: int = 4
+## Level-1 equivalents a three-star unit consumes: a combine eats three copies, and
+## three combines make a three-star, so nine is the whole ladder. A tenth copy of an
+## identity can never combine into anything, which is what makes it genuinely surplus
+## rather than a body worth holding.
+const THREE_STAR_LEVEL1_EQUIVALENTS: int = 9
 const MAX_REROLLS_PER_SHOP: int = 3
-const WAGER_PRESET_SHARES: Array[float] = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+## Cap on the wager stake when the planning beat is a repeat of a stage this run has
+## already lost. See _wager_candidates for the measured retry record behind it.
+const RETRY_STAKE_CAP: float = 0.25
+## Most units one planning beat will pull out of the front rank. A placement the
+## engine refuses must not turn the beat into a drag loop.
+const REPOSITION_ROLE_FIX_LIMIT: int = 3
+## Consecutive unanswered decisions that mean the controller is gone rather than
+## briefly unavailable. One hiccup falls back to the safe default; this many in a row
+## ends the run, because every later decision would cost a full timeout first.
+const CONTROLLER_LOST_AFTER_TIMEOUTS: int = 3
+## A synthetic Start Battle click is occasionally swallowed while an overlay is
+## fading out, which aborts an otherwise good run. The press is retried a bounded
+## number of times, and only while the same planning beat is still open.
+const START_BATTLE_ATTEMPTS: int = 3
 const COMBAT_LOG_KEYWORDS: Array[String] = [
 	"timeout",
 	"stalemate",
@@ -62,14 +109,33 @@ const INHERITED_POLICY_ASSERTION_PREFIXES: Array[String] = [
 
 var _run_dir: String = DEFAULT_RUN_DIR
 var _run_mode: String = "jev"
+var _lane: String = "campaign"
 var _campaign_seed: int = 4401
+## "eager" opts into the deterministic level rule below; empty keeps the shipped path.
+var _level_policy: String = ""
+## Set when JEV_LEDGER_OMENS asks for a controlled account depth; see
+## _seed_account_omens_if_requested.
+var _seeded_account_profile_path: String = ""
+var _seeded_account_journal_path: String = ""
+var _seeded_account_omens: int = 0
+var _seeded_account_rank: int = 1
+var _seeded_account_saved: bool = false
 var _decision_index: int = 0
 var _starter_id: String = "bonko"
 var _battles: int = 0
 var _rounds: Array[Dictionary] = []
 var _events: Array[Dictionary] = []
 var _decision_kinds: Dictionary[String, int] = {}
+## Unanswered decisions in a row. Reset by any answered decision; see
+## CONTROLLER_LOST_AFTER_TIMEOUTS for why the count matters.
+var _consecutive_decision_timeouts: int = 0
 var _same_stage_retries: Dictionary[String, int] = {}
+## The board that lost each stage this run, so a retry that walks back in with the identical
+## board can be told apart from one that changed something. See _enforce_stall_rule.
+var _lost_board_by_stage: Dictionary[String, String] = {}
+var _deployed_signature_by_stage: Dictionary[String, String] = {}
+## Set while the forced post-loss shopping pass is running, so _plan_state can say why.
+var _stall_reentry_active: bool = false
 ## Planning-beat and shop-revision identity.
 ##
 ## Keying shop telemetry on (chapter, stage) merges repeat attempts at the same
@@ -93,14 +159,60 @@ var _last_combat_outcome: String = ""
 ## engine's own resolution line because the battle state is already reset by the
 ## time the diagnostic runs, which made a post-settlement read report zero.
 var _last_combat_elapsed_s: float = -1.0
+## The chapter-2 campaign milestone inside a deeper lane, recorded once.
+var _campaign_milestone_met: bool = false
+## Real frame times while a fight is on screen. The board grows to nine units a side
+## in the deep lane, and the player-visible complaint at that size is frame pacing,
+## so the transcript records the frames rather than only the outcome.
+var _fight_frame_ms: Array[float] = []
+var _previous_frame_process: bool = false
+## Optional planning-beat screenshots. A UI report ("this banner covers the enemy
+## grid") needs a real rendered frame to confirm against, and the run is already
+## driving the real 1920x1080 scene. Off unless JEV_CAPTURE_PLANNING is set, and
+## bounded per run so a sweep cannot fill a disk.
+var _capture_planning: bool = false
+var _capture_budget: int = 3
+## The fight that ended the run, kept so the failure record can say what actually
+## happened rather than only that the run stopped.
+var _last_combat_diagnostic: Dictionary = {}
+## The engine's own settlement line for the most recent fight, and its parsed fields.
+## The board is rebuilt during settlement, so only this line records the survivors.
+var _last_resolution_line: String = ""
+var _last_resolution_fields: Dictionary = {}
+
+func _process(delta: float) -> void:
+	if int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active):
+		_fight_frame_ms.append(maxf(0.0, float(delta)) * 1000.0)
+		_previous_frame_process = true
+	elif _previous_frame_process:
+		# The fight just ended; leave the buffer for the diagnostic that follows.
+		_previous_frame_process = false
+
+## Percentiles of the frames recorded since the last reset.
+func _take_fight_frame_stats() -> Dictionary:
+	if _fight_frame_ms.is_empty():
+		return {}
+	var ordered: Array[float] = _fight_frame_ms.duplicate()
+	_fight_frame_ms.clear()
+	ordered.sort()
+	var total: float = 0.0
+	for value: float in ordered:
+		total += value
+	var count: int = ordered.size()
+	return {
+		"frames": count,
+		"mean_ms": snappedf(total / float(count), 0.01),
+		"p50_ms": snappedf(ordered[int(floor(float(count - 1) * 0.50))], 0.01),
+		"p95_ms": snappedf(ordered[int(ceil(float(count - 1) * 0.95))], 0.01),
+		"max_ms": snappedf(ordered[count - 1], 0.01),
+	}
+
+## The Jev lane is the long one; it gets the small background window.
+func _harness_compact_window() -> bool:
+	return true
 
 func _run() -> void:
 	_read_environment()
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	var window: Window = get_window()
-	if window != null:
-		window.size = Vector2i(1920, 1080)
-		window.content_scale_size = Vector2i(1920, 1080)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -109,15 +221,21 @@ func _run() -> void:
 		Shop.error.connect(_on_shop_error)
 	if _seed_explicit:
 		_set_shop_seed(_campaign_seed)
+		_seed_procedural_roster(_campaign_seed)
 	_prepare_run_dir()
-	print("%s: boot mode=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
+	# The Ledger is spent between runs, so this has to happen before the run freezes its
+	# loadout. See _prepare_campaign_loadout for what the account was doing before this.
+	_seed_account_omens_if_requested()
+	_prepare_campaign_loadout()
+	print("%s: boot mode=%s lane=%s seed=%s speed=%.2f real_timer=%s target=chapter %d round %d" % [
 		JEV_HARNESS_NAME,
 		_run_mode,
+		_lane,
 		str(_campaign_seed) if _seed_explicit else "random",
 		_speed_scale,
 		str(_use_real_timer),
-		CAMPAIGN_TARGET_CHAPTER,
-		CAMPAIGN_TARGET_ROUND,
+		_campaign_target_chapter(),
+		_campaign_target_round(),
 	])
 	_append_event("run_start", {
 		"mode": _run_mode,
@@ -129,8 +247,11 @@ func _run() -> void:
 		"shop_seed_explicit": _seed_explicit,
 		"time_scale": _speed_scale,
 		"real_planning_timer": _use_real_timer,
-		"target_chapter": CAMPAIGN_TARGET_CHAPTER,
-		"target_round": CAMPAIGN_TARGET_ROUND,
+		"lane": _lane,
+		"target_chapter": _campaign_target_chapter(),
+		"target_round": _campaign_target_round(),
+		"campaign_target_chapter": CAMPAIGN_TARGET_CHAPTER,
+		"campaign_target_round": CAMPAIGN_TARGET_ROUND,
 		"engine_time_scale": Engine.time_scale,
 		"entrypoint": "scenes/Main.tscn",
 		"player_facing_entrypoint": true,
@@ -140,6 +261,7 @@ func _run() -> void:
 	})
 
 	_start_main_scene()
+	_apply_seeded_account_paths()
 	await _settle_frames(10)
 	await _ensure_unit_select()
 	await _decide_starter()
@@ -155,6 +277,7 @@ func _run() -> void:
 	var opener_attempts: int = 0
 	while opener_attempts < MAX_SAME_STAGE_RETRIES:
 		opener_attempts += 1
+		_apply_battle_seed(int(GameState.chapter), int(GameState.stage_in_chapter), opener_attempts)
 		await _start_opening_fight_if_waiting()
 		opener_result = await _wait_for_first_result(_flow_first_fight_timeout())
 		_append_event("opener_result", {
@@ -181,10 +304,19 @@ func _run() -> void:
 		return
 	_battles = 1
 
-	while _battles < CAMPAIGN_MAX_BATTLES and not _campaign_target_reached():
+	while _battles < _campaign_max_battles() and not _campaign_target_reached():
+		if _lane == "deep" and not _campaign_milestone_met and _campaign_milestone_reached():
+			_campaign_milestone_met = true
+			_append_event("campaign_milestone", {
+				"chapter": int(GameState.chapter),
+				"round": int(GameState.stage_in_chapter),
+				"battles": _battles,
+			})
 		var round_wall_start: float = Time.get_unix_time_from_system()
 		var decisions_before_round: int = _decision_index
 		var planning_before_round: float = _planning_time_left()
+		# Before the beat opens the next stage, so the fight it prepares carries the seed.
+		_apply_battle_seed(int(GameState.chapter), int(GameState.stage_in_chapter), _stage_attempt())
 		var round_result: Dictionary = await _play_two_stage_round()
 		_rounds.append(round_result)
 		_append_event("round", round_result)
@@ -213,6 +345,7 @@ func _run() -> void:
 			return
 		if bool(round_result.get("advanced", false)):
 			_battles += 1
+			_checkpoint_run()
 			continue
 		if _can_retry_after_same_stage(round_result):
 			var stage_key: String = "%d:%d" % [
@@ -221,6 +354,8 @@ func _run() -> void:
 			]
 			var attempts: int = int(_same_stage_retries.get(stage_key, 0)) + 1
 			_same_stage_retries[stage_key] = attempts
+			# The board that just lost this stage, for the stall check on the way back in.
+			_lost_board_by_stage[stage_key] = String(_deployed_signature_by_stage.get(stage_key, ""))
 			_append_event("same_stage_retry", {
 				"chapter": int(round_result.get("chapter_before", -1)),
 				"round": int(round_result.get("round_before", -1)),
@@ -242,6 +377,7 @@ func _run() -> void:
 				_finish_jev_run("stage_stall")
 				return
 			_battles += 1
+			_checkpoint_run()
 			continue
 		if String(round_result.get("fight_result", "")) == "loss":
 			_append_event("run_end", {"reason": "loss", "chapter": int(GameState.chapter), "round": int(GameState.stage_in_chapter)})
@@ -255,6 +391,22 @@ func _run() -> void:
 	_finish_jev_run("target_reached" if _campaign_target_reached() else "battle_budget_reached")
 
 func _campaign_target_reached() -> bool:
+	if int(GameState.chapter) > _campaign_target_chapter():
+		return true
+	return int(GameState.chapter) == _campaign_target_chapter() and int(GameState.stage_in_chapter) >= _campaign_target_round()
+
+func _campaign_target_chapter() -> int:
+	return DEEP_TARGET_CHAPTER if _lane == "deep" else CAMPAIGN_TARGET_CHAPTER
+
+func _campaign_target_round() -> int:
+	return DEEP_TARGET_ROUND if _lane == "deep" else CAMPAIGN_TARGET_ROUND
+
+func _campaign_max_battles() -> int:
+	return DEEP_MAX_BATTLES if _lane == "deep" else CAMPAIGN_MAX_BATTLES
+
+## The chapter-2 milestone inside a deeper lane. Recorded once so a deep run still
+## states whether it cleared the original campaign target.
+func _campaign_milestone_reached() -> bool:
 	if int(GameState.chapter) > CAMPAIGN_TARGET_CHAPTER:
 		return true
 	return int(GameState.chapter) == CAMPAIGN_TARGET_CHAPTER and int(GameState.stage_in_chapter) >= CAMPAIGN_TARGET_ROUND
@@ -334,7 +486,7 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		return
 	var player_team: Array = manager.get("player_team")
 	var enemy_team: Array = manager.get("enemy_team")
-	_append_event("combat_diagnostic", {
+	var payload: Dictionary = {
 		"outcome": outcome,
 		"engine_outcome": _last_combat_outcome,
 		"fight_index": _battles + 1,
@@ -353,11 +505,29 @@ func _record_combat_diagnostic(outcome: String) -> void:
 		"post_settlement_enemy_alive": _alive_count(enemy_team),
 		"post_settlement_player_board": _team_ids(player_team),
 		"post_settlement_enemy_board": _team_ids(enemy_team),
+		# The engine's own settlement line, which is the only record of the fight's real
+		# survivor counts and damage - the board is rebuilt during settlement, so
+		# post_settlement_* describes the next stage rather than the fight. Without these
+		# the at-the-clock comparison the depth review needs cannot be measured at all;
+		# see docs/depth_anatomy_2026-09-24.md. `clock_decided` is elapsed >= the combat
+		# timeout, so a clock-decided fight's resolution counts ARE its at-clock counts.
+		"resolution_line": _last_resolution_line,
+		"resolution_player_alive": int(_last_resolution_fields.get("player_alive", -1)),
+		"resolution_enemy_alive": int(_last_resolution_fields.get("enemy_alive", -1)),
+		"resolution_player_damage": int(_last_resolution_fields.get("player_damage", -1)),
+		"resolution_enemy_damage": int(_last_resolution_fields.get("enemy_damage", -1)),
+		"clock_decided": _last_combat_elapsed_s >= float(engine.get("combat_timeout_s")) and float(engine.get("combat_timeout_s")) > 0.0,
 		"buckets_after": int(Economy.blood_buckets),
 		"reserve_before_wager": int(Economy.last_blood_reserve_start),
 		"wager": int(Economy.last_wager_start),
 		"combat_active": bool(Economy.combat_active),
-	})
+		# Frame pacing for the fight that just ended, at the board size it ran with.
+		"frame_ms": _take_fight_frame_stats(),
+		"board_size": player_team.size() + enemy_team.size(),
+	}
+	# Kept so the failure record can describe the fight that ended the run.
+	_last_combat_diagnostic = payload
+	_append_event("combat_diagnostic", payload)
 
 func _alive_count(team: Array) -> int:
 	var count: int = 0
@@ -420,6 +590,14 @@ func _read_environment() -> void:
 	var starter_value: String = OS.get_environment("JEV_STARTER").strip_edges().to_lower()
 	if not starter_value.is_empty():
 		_starter_id = starter_value
+	var lane_value: String = OS.get_environment("JEV_LANE").strip_edges().to_lower()
+	if lane_value in ["campaign", "deep"]:
+		_lane = lane_value
+	_level_policy = OS.get_environment("JEV_LEVEL_POLICY").strip_edges().to_lower()
+	_capture_planning = OS.get_environment("JEV_CAPTURE_PLANNING").strip_edges() == "1"
+	var capture_budget_value: String = OS.get_environment("JEV_CAPTURE_BUDGET").strip_edges()
+	if capture_budget_value.is_valid_int():
+		_capture_budget = max(0, capture_budget_value.to_int())
 	_reserve_floor_buckets = _load_reserve_floor()
 
 func _set_planning_timer_safe() -> void:
@@ -427,24 +605,290 @@ func _set_planning_timer_safe() -> void:
 	# fight when it expires: that countdown is part of what "playable" means, so by
 	# default the run leaves it alone. Only the fast-sweep mode holds it open.
 	if _use_real_timer:
+		_scale_planning_window_for_sweep()
 		return
 	super._set_planning_timer_safe()
 
+## Give the rig the same wall-clock planning budget a player gets.
+##
+## The countdown advances on the engine's scaled delta, so running the sweep at 8x also
+## burns the planning window eight times faster in wall-clock terms. A shop the rig needs
+## a dozen Jev round-trips to work then runs out of time, the beat closes before Start
+## Battle is pressed, and the harness aborts the run. That is how the richest run in the
+## record died - chapter 6 round 4, 24,491 buckets, 16 decisions in the final shop, and
+## `start_not_entered` - and it biases every depth measurement against exactly the deep,
+## decision-heavy runs the design is trying to produce. Scaling the window by the sweep
+## factor keeps the rig's wall-clock budget equal to a player's while the fights still
+## resolve at speed.
+func _scale_planning_window_for_sweep() -> void:
+	if _speed_scale <= 1.0:
+		return
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	if combat == null:
+		return
+	var previous_total: float = float(combat.get("planning_timer_total"))
+	if previous_total <= 0.0:
+		previous_total = SHIPPED_PLANNING_WINDOW_S
+	var target: float = SHIPPED_PLANNING_WINDOW_S * _speed_scale
+	# A fresh planning beat resets the window to the shipped total, so lift anything
+	# still at or below it. A window already at the sweep budget is left alone: this
+	# runs once per beat, and scaling the scaled value compounds it (120 -> 960 ->
+	# 7680 -> ...), which is a window no fight can ever close.
+	if previous_total >= target:
+		return
+	combat.set("planning_timer_total", target)
+	var left: float = float(combat.get("planning_time_left"))
+	if left > 0.0 and left <= previous_total:
+		combat.set("planning_time_left", left * (target / previous_total))
+
 func _load_reserve_floor() -> int:
 	# The floor lives in the policy file so the rules and the guard cannot drift.
-	var raw_text: String = FileAccess.get_file_as_string(JEV_RULES_PATH) if FileAccess.file_exists(JEV_RULES_PATH) else ""
-	var trimmed: String = raw_text.strip_edges()
-	if trimmed.length() < 2 or not trimmed.begins_with("{"):
-		return DEFAULT_RESERVE_FLOOR_BUCKETS
-	var parsed: Variant = JSON.parse_string(trimmed)
-	if not parsed is Dictionary:
-		return DEFAULT_RESERVE_FLOOR_BUCKETS
-	var reserve: Variant = (parsed as Dictionary).get("reserve", {})
+	var parsed: Dictionary = _policy_document()
+	var reserve: Variant = parsed.get("reserve", {})
 	if reserve is Dictionary:
 		var floor_value: Variant = (reserve as Dictionary).get("minimum_reserve_buckets", DEFAULT_RESERVE_FLOOR_BUCKETS)
 		if floor_value is float or floor_value is int:
 			return max(1, int(floor_value))
 	return DEFAULT_RESERVE_FLOOR_BUCKETS
+
+## The authored policy document, or an empty dictionary when it cannot be read.
+func _policy_document() -> Dictionary:
+	var raw_text: String = FileAccess.get_file_as_string(JEV_RULES_PATH) if FileAccess.file_exists(JEV_RULES_PATH) else ""
+	var trimmed: String = raw_text.strip_edges()
+	if trimmed.length() < 2 or not trimmed.begins_with("{"):
+		return {}
+	var parsed: Variant = JSON.parse_string(trimmed)
+	return parsed if parsed is Dictionary else {}
+
+## Win rate to size a first-attempt stake from, at the odds on screen.
+##
+## The displayed estimate is pessimistic - it reads 0.4 on normal stages the rig wins
+## 0.73 of and 0.4 on bosses it wins 0.40 of - so staking the shown number leaves the
+## profitable bands under-bet. The measured band rate in the policy file is shrunk
+## toward the shown odds by `prior_strength` pseudo-observations, so a band built on
+## three fights cannot size a stake on its own. Unknown kinds and bands fall back to
+## the shown odds, which is the conservative answer.
+func _measured_first_attempt_win_rate(quote_kind: String, shown_odds: float) -> float:
+	var measured: Variant = _policy_document().get("wager", {})
+	if not measured is Dictionary:
+		return shown_odds
+	var section: Variant = (measured as Dictionary).get("measured_first_attempt", {})
+	if not section is Dictionary:
+		return shown_odds
+	var bands: Variant = (section as Dictionary).get("bands", {})
+	if not bands is Dictionary:
+		return shown_odds
+	var rows: Variant = (bands as Dictionary).get(quote_kind, [])
+	if not rows is Array or (rows as Array).is_empty():
+		return shown_odds
+	var prior: float = maxf(0.0, float((section as Dictionary).get("prior_strength", 0)))
+	var found: Dictionary = {}
+	var found_band: float = -1.0
+	for row: Variant in (rows as Array):
+		if not row is Dictionary:
+			continue
+		var band: float = float((row as Dictionary).get("shown", -1.0))
+		if band < 0.0:
+			continue
+		if shown_odds + 0.0001 >= band and band > found_band:
+			found = row as Dictionary
+			found_band = band
+	if found_band < 0.0:
+		return shown_odds
+	var samples: float = maxf(0.0, float(found.get("samples", 0)))
+	var observed: float = clampf(float(found.get("observed", shown_odds)), 0.0, 1.0)
+	if samples + prior <= 0.0:
+		return shown_odds
+	return clampf((samples * observed + prior * shown_odds) / (samples + prior), 0.01, 0.99)
+
+## What the Ledger should buy, in the order that changes a run soonest.
+##
+## Three Edicts change a fight: Debtor's Mercy adds starting blood buckets, which the
+## doubling ladder compounds from the very first wager; Wide Table adds board bodies, the
+## quantity that separated winners from losers at the first boss; and House Courtesy makes
+## the first paid reroll free. Iron Memory is next because it buys the third Edict slot, and
+## the rest are Omen income - income is what pays for later runs, so it is equipped last.
+const CAMPAIGN_EDICT_PURCHASE_ORDER: Array[String] = [
+	"debtors_mercy", "house_courtesy", "wide_table", "iron_memory", "widows_thread", "foremans_seal", "third_margin",
+]
+const CAMPAIGN_EDICT_EQUIP_ORDER: Array[String] = [
+	"debtors_mercy", "wide_table", "house_courtesy", "widows_thread", "foremans_seal", "third_margin",
+]
+
+## Spend the Ledger between runs.
+##
+## Rebuild the account at a chosen Ledger depth, so one batch can compare a fresh
+## profile against a grown one on the same seeds. That comparison is the only way to
+## test the incremental promise - play, lose, and come back further - because a batch
+## that inherits the live account has already spent every Edict before the first run.
+## JEV_LEDGER_OMENS=0 is a clean account; JEV_LEDGER_OMENS=5331 is the rank-66 account
+## the recorded batches have been farming.
+##
+## The arm runs against its own profile file, so a fresh arm cannot wipe the live
+## account's accumulated Omens. Unset leaves the live profile in place. The file is
+## written here and the path is handed to Main by _apply_seeded_account_paths once the
+## main scene exists, so the run freezes its loadout against the seeded account.
+func _seed_account_omens_if_requested() -> void:
+	var raw: String = OS.get_environment("JEV_LEDGER_OMENS").strip_edges()
+	if raw.is_empty() or not raw.is_valid_int():
+		return
+	var omens: int = max(0, raw.to_int())
+	_seeded_account_rank = int(LivingLedgerCatalog.rank_progress(omens).get("rank", 1))
+	_seeded_account_omens = omens
+	_seeded_account_profile_path = "user://jev_account_ledger%d.json" % omens
+	_seeded_account_journal_path = "user://jev_journal_ledger%d.json" % omens
+	var rebuilt: Dictionary = AccountProfileStoreScript.default_profile()
+	rebuilt["lifetime_omens"] = omens
+	rebuilt["omens_balance"] = omens
+	var saved: Dictionary = AccountProfileStoreScript.save_profile(rebuilt, _seeded_account_profile_path)
+	_seeded_account_saved = bool(saved.get("ok", false))
+
+## Point Main and Economy at the seeded account. Runs immediately after the main scene
+## is instantiated and before any starter is chosen, which is the window in which the
+## run settles its Ledger loadout.
+func _apply_seeded_account_paths() -> void:
+	if _seeded_account_profile_path == "":
+		return
+	if _main != null and _main.has_method("set_account_progression_paths"):
+		_main.call("set_account_progression_paths", _seeded_account_profile_path, _seeded_account_journal_path)
+	if Economy != null and Economy.has_method("reset_run"):
+		# Economy caches the loadout and opening reserve in reset_run, and the autoload
+		# booted against the live profile before the harness could redirect it.
+		Economy.call("reset_run")
+	print("%s: seeded account to %d lifetime Omens (rank %d, profile=%s, saved=%s)" % [
+		JEV_HARNESS_NAME, _seeded_account_omens, _seeded_account_rank,
+		_seeded_account_profile_path, str(_seeded_account_saved),
+	])
+	_append_event("campaign_seed", {
+		"lifetime_omens": _seeded_account_omens,
+		"rank": _seeded_account_rank,
+		"profile_path": _seeded_account_profile_path,
+		"saved": _seeded_account_saved,
+	})
+
+## Spend the Ledger between runs.
+##
+## The account earns an Omen for every unique victory and had never spent one: after all
+## the recorded runs the profile held 5,331 lifetime Omens at Ledger rank 66, with every
+## Edict gate open, zero Edicts unlocked and zero equipped. The permanent layer the game
+## is built on - play, lose, come back stronger - was inert for the rig, so no batch could
+## ever have shown campaign growth. This buys what is affordable in the order above,
+## equips what fits, and records both so a run's loadout is readable in its transcript.
+func _prepare_campaign_loadout() -> void:
+	# Resolved once so the spend/equip pass and the run's own loadout read the same
+	# account: the default live profile, or the isolated one a Ledger-depth arm seeded.
+	var path: String = _resolved_account_profile_path()
+	var before: Dictionary = AccountProgression.profile(path)
+	var omens_before: int = int(before.get("omens_balance", 0))
+	var purchased: Array[String] = []
+	for edict_id: String in CAMPAIGN_EDICT_PURCHASE_ORDER:
+		if _string_list(AccountProgression.profile(path).get("unlocked_edict_ids", [])).has(edict_id):
+			continue
+		var purchase: Dictionary = AccountProgression.purchase_edict(edict_id, path)
+		if bool(purchase.get("ok", false)):
+			purchased.append(edict_id)
+	var after_purchase: Dictionary = AccountProgression.profile(path)
+	var slots: int = AccountProgression.max_edict_slots(after_purchase)
+	var unlocked: Array[String] = _string_list(after_purchase.get("unlocked_edict_ids", []))
+	var already: Array[String] = _string_list(after_purchase.get("equipped_edict_ids", []))
+	var equipped: Array[String] = []
+	for edict_id: String in CAMPAIGN_EDICT_EQUIP_ORDER:
+		if equipped.size() >= slots:
+			break
+		if not unlocked.has(edict_id):
+			continue
+		if already.has(edict_id):
+			equipped.append(edict_id)
+			continue
+		var toggled: Dictionary = AccountProgression.toggle_edict(edict_id, path)
+		if bool(toggled.get("ok", false)):
+			equipped.append(edict_id)
+	var after: Dictionary = AccountProgression.profile(path)
+	_append_event("campaign_prep", {
+		"omens_before": omens_before,
+		"omens_after": int(after.get("omens_balance", 0)),
+		"lifetime_omens": int(after.get("lifetime_omens", 0)),
+		"purchased": purchased,
+		"equipped": equipped,
+		"edict_slots": slots,
+		"unlocked_edict_ids": _string_list(after.get("unlocked_edict_ids", [])),
+		"starting_blood_bucket_bonus": AccountProgression.starting_blood_bucket_bonus(path),
+		"board_capacity_bonus": AccountProgression.board_capacity_bonus(path),
+		"red_ink_tier": int(after.get("selected_red_ink", 0)),
+	})
+	print("%s: ledger prep omens %d -> %d, bought %s, equipped %s" % [
+		JEV_HARNESS_NAME,
+		omens_before,
+		int(after.get("omens_balance", 0)),
+		str(purchased),
+		str(equipped),
+	])
+
+## The account this run reads. A Ledger-depth arm points Main at its own profile file;
+## every other run uses the live account.
+func _resolved_account_profile_path() -> String:
+	if _seeded_account_profile_path != "":
+		return _seeded_account_profile_path
+	if _main == null:
+		return AccountProfileStoreScript.DEFAULT_PATH
+	var value: Variant = _main.get("account_profile_path")
+	if value == null:
+		return AccountProfileStoreScript.DEFAULT_PATH
+	var path: String = String(value).strip_edges()
+	return path if path != "" else AccountProfileStoreScript.DEFAULT_PATH
+
+func _string_list(value: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if value is Array:
+		for entry: Variant in (value as Array):
+			out.append(String(entry))
+	elif value is PackedStringArray:
+		for entry: String in (value as PackedStringArray):
+			out.append(entry)
+	return out
+
+## Pin the procedural roster to the run seed, the way the visual smokes and the RGA
+## probes already do. The rig was seeding only the shop, so the seeded-run contract was
+## half-wired.
+##
+## This is necessary but NOT sufficient: after wiring it, two runs of seed 55555 still
+## generated different enemies for the same stage (luna in one, bo in the other), and a
+## replay of one run's recorded decisions still diverged there while the opener, the
+## shop offers and the purchases matched exactly. So at least one more source of
+## run-to-run variation exists in enemy generation or in the reward rolls - the first
+## divergence in the replayed pair was an item drop (an orb in one run, nothing in the
+## other). Until that is found, same-seed runs are samples and not replicates.
+func _seed_procedural_roster(seed: int) -> void:
+	# Called statically: RosterCatalog is a static-only class here, so has_method() on it
+	# is a parser error, not a guard.
+	RosterCatalog.set_procedural_seed(seed)
+
+## Give the fight about to start a seed a replay can reproduce.
+##
+## The live battle path never seeded the engine, so CombatEngine.start() randomised its
+## own stream, and the creep reward rolls draw from that same stream - two runs with
+## identical decisions dropped different components (an orb and nothing) and were fed
+## different enemies. The seed is derived from the run seed, the stage and the ATTEMPT:
+## per stage alone would make a retry an exact replay of the loss before it, which would
+## turn every stall into a guaranteed stall.
+func _apply_battle_seed(chapter: int, stage_in_chapter: int, attempt: int) -> void:
+	if not _seed_explicit or RosterCatalog == null:
+		return
+	var key: String = "%d:%d:%d:%d" % [_campaign_seed, chapter, stage_in_chapter, maxi(1, attempt)]
+	var battle_seed: int = int(abs(key.hash()))
+	# Write through the catalog: get_spec hands back a deep copy, so mutating it here used
+	# to leave the recorded seed unplayed - CombatManager never saw it and derived its own.
+	var applied: bool = RosterCatalog.set_stage_battle_seed(
+		maxi(1, chapter), maxi(1, stage_in_chapter), battle_seed
+	)
+	_append_event("battle_seed", {
+		"chapter": chapter,
+		"stage_in_chapter": stage_in_chapter,
+		"attempt": maxi(1, attempt),
+		"seed": battle_seed,
+		"applied_to_live_spec": applied,
+		"basis": "run_seed:chapter:stage:attempt",
+	})
 
 func _prepare_run_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(_run_dir)
@@ -489,13 +933,27 @@ func _flow_shop_seed() -> int:
 	return _campaign_seed
 
 func _flow_target_chapter() -> int:
-	return CAMPAIGN_TARGET_CHAPTER
+	return _campaign_target_chapter()
 
 func _flow_target_round() -> int:
-	return CAMPAIGN_TARGET_ROUND
+	return _campaign_target_round()
 
 func _flow_max_battles() -> int:
-	return CAMPAIGN_MAX_BATTLES
+	return _campaign_max_battles()
+
+## The inherited fixture caps a shop at two purchases, and at one in chapter 1 rounds
+## 1-4, so a scripted pacing test stays deterministic. That cap - not the economy -
+## is what stopped the rig from ever accumulating the nine copies a three-star needs:
+## a Jev run reached a 12,751-bucket bankroll and could still only buy two cards per
+## beat. A player with money buys the shelf.
+func _max_natural_buys_for_round(_chapter_before: int, _round_before: int) -> int:
+	return int(SHOP_CONFIG.SLOT_COUNT)
+
+## The gate exists to protect a scripted script's chapter-1 boss purchase. With the
+## shop now open to the whole shelf, the reserve floor in the affordability rules is
+## the thing that protects the bankroll, so this stays out of the way.
+func _should_reserve_gold_for_round_four_gate(_chapter_before: int, _round_before: int) -> bool:
+	return false
 
 func _flow_verbose_round_logs() -> bool:
 	return true
@@ -516,10 +974,43 @@ func _decide_starter() -> void:
 		var label: String = unit_id
 		if button != null and not button.text.strip_edges().is_empty():
 			label = button.text.strip_edges().replace("\n", " / ")
+		var meta: Dictionary = select.items_by_id.get(unit_id, {}) as Dictionary
+		var primary_role: String = String(meta.get("primary_role", ""))
+		var primary_goal: String = String(meta.get("primary_goal", ""))
+		var traits: Array[String] = []
+		for raw_trait: Variant in (meta.get("traits", []) as Array):
+			traits.append(String(raw_trait))
+		# The opener is fought with the starter alone, so its level-1 damage and
+		# durability are the two facts that decide whether it survives until the
+		# first shop can add a body. They are read from the same factory the game
+		# spawns the unit with, not from a hand-written table.
+		var opening_damage: float = 0.0
+		var opening_health: int = 0
+		var opening_armor: float = 0.0
+		var probe: Unit = UnitFactory.spawn(unit_id)
+		if probe != null:
+			opening_damage = snappedf(float(probe.attack_damage) * float(probe.attack_speed), 0.1)
+			opening_health = int(probe.max_hp)
+			opening_armor = float(probe.armor)
 		candidates.append({
 			"id": unit_id,
 			"label": label,
-			"effect": "Start the run with %s." % unit_id,
+			"primary_role": primary_role,
+			"primary_goal": primary_goal,
+			"traits": traits,
+			"cost": int(meta.get("cost", 0)),
+			"level_one_damage_per_second": opening_damage,
+			"level_one_max_hp": opening_health,
+			"level_one_armor": opening_armor,
+			"effect": "Start the run with %s (%s, %s, traits %s). Level 1: %.1f damage per second, %d health, %.0f armor. The opening fight is fought with this unit alone." % [
+				unit_id,
+				primary_role if not primary_role.is_empty() else "unknown role",
+				primary_goal if not primary_goal.is_empty() else "unknown goal",
+				", ".join(traits) if not traits.is_empty() else "none",
+				opening_damage,
+				opening_health,
+				opening_armor,
+			],
 		})
 	if candidates.is_empty():
 		_abort_run("no starter candidates were offered")
@@ -642,6 +1133,7 @@ func _reroll_button() -> Button:
 ## mouse event; only the retries are new. Only the final attempt's failure is kept, so a
 ## control that genuinely cannot be clicked still fails loudly.
 func _click_button(button: Button, label: String) -> bool:
+	var failures_at_start: int = _failures.size()
 	for attempt: int in range(SHOP_CLICK_ATTEMPTS):
 		var failures_before: int = _failures.size()
 		var clicked: bool = await super._click_button(button, label)
@@ -650,13 +1142,29 @@ func _click_button(button: Button, label: String) -> bool:
 				_append_event("click_retry", {"label": label, "attempt": attempt + 1})
 			return true
 		if attempt + 1 >= SHOP_CLICK_ATTEMPTS:
-			return false
+			break
 		# Discard this attempt's recorded failure: it is an input miss we are retrying,
 		# not a finding. The final attempt's failure is left in place.
 		while _failures.size() > failures_before:
 			_failures.remove_at(_failures.size() - 1)
 		await _settle_frames(4)
-	return false
+	# Every synthetic attempt was swallowed. The control is still rendered, enabled and
+	# in the tree, so this is an input-layer artifact rather than a finding about the
+	# game; it was recorded on every run of the ten-game batch against the same shop
+	# slot. Emit the signal so the run can continue, record it explicitly, and drop the
+	# retry failures so a recovered input miss cannot invalidate a transcript.
+	if button == null or not is_instance_valid(button) or not button.is_inside_tree() or button.disabled:
+		return false
+	while _failures.size() > failures_at_start:
+		_failures.remove_at(_failures.size() - 1)
+	_append_event("click_fallback", {
+		"label": label,
+		"attempts": SHOP_CLICK_ATTEMPTS,
+		"rect": str(button.get_global_rect()),
+	})
+	button.emit_signal("pressed")
+	await _settle_frames(4)
+	return true
 
 func _click_reroll() -> bool:
 	var button: Button = _reroll_button()
@@ -681,18 +1189,160 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	if not _level_purchase_is_legal():
 		return false
 	var gold: int = int(Economy.gold)
+	# The price the shop will actually charge, not the constant.
+	#
+	# ShopConfig expresses the cost in *stake units* (PROGRESSION_STAKE_UNITS = 4) and
+	# Economy.progression_price() multiplies by the current stake unit, so a level bought
+	# at stake unit 3 costs 12 buckets. This read the constant, so from stake unit 2 onward
+	# the level decision was told XP cost 4 when it cost 8, 12, 16 or more - every number
+	# derived from it (buckets_after, the reserve check, the "Spend N of M buckets" line)
+	# was wrong by the stake multiplier, and so was the cost half of the decision the model
+	# was making. The eager path surfaced it as a hard failure because the inherited Buy XP
+	# helper asserts the spend equals the constant.
+	var xp_price: int = int(Shop.get_progression_price())
+	var capacity_now: int = _roster_max_team_size()
+	var capacity_after: int = _level_board_capacity(_level_after_xp_purchase(int(Shop.get_level()), int(Shop.get_xp())))
+	var board_size: int = _board_ids().size()
+	var bench_units: Array[String] = _bench_ids()
+	# A level purchase is only worth the buckets when the slot it opens has a body
+	# waiting for it. Stating that count is the difference between "buy XP" as an
+	# abstraction and a payoff the decision can price.
+	var waiting_bodies: int = min(bench_units.size(), max(0, capacity_after - board_size))
+	# The level question is asked before the shop purchases, so a bench of zero does
+	# not mean the slot is useless: the shelf may hold bodies that would fill it in the
+	# same planning beat. Without this the decision passed on every level purchase at
+	# the chapter-1 boss while holding twelve buckets and a three-slot board.
+	var affordable_shelf: int = 0
+	var affordable_shelf_ids: Array[String] = []
+	for offer_summary: Dictionary in _offer_summaries():
+		var shelf_cost: int = int(offer_summary.get("cost", 0))
+		var shelf_id: String = String(offer_summary.get("id", ""))
+		if shelf_id.is_empty() or shelf_cost <= 0:
+			continue
+		if not _can_afford_shop_cost(shelf_cost):
+			continue
+		affordable_shelf += 1
+		affordable_shelf_ids.append(shelf_id)
+	var shelf_bodies_that_could_gain_a_slot: int = min(affordable_shelf, max(0, capacity_after - board_size))
+	var level_gain_note: String = "no extra slot" if capacity_after <= capacity_now else "+%d board slot" % (capacity_after - capacity_now)
+	# The other half of what a level buys. Board capacity also comes from chapter
+	# floors, so once the board is full at the stage's cap the slot argument for XP
+	# disappears and the level decision used to pass forever. The shelf is what is
+	# left: the level sets the cost distribution, and a level-3 shelf has a 5% chance
+	# of a cost-3 unit and none above that. A run reached chapter six on a level-3
+	# shelf, held 151 buckets it never spent, and lost with a damage ratio of 0.33.
+	var shelf_now: Dictionary = ShopOdds.get_cost_probabilities(int(Shop.get_level()))
+	var shelf_after: Dictionary = ShopOdds.get_cost_probabilities(int(Shop.get_level()) + 1)
+	var high_cost_now: float = _high_cost_share(shelf_now)
+	var high_cost_after: float = _high_cost_share(shelf_after)
+	# The shelf is only offered as a reason when the slot argument is spent. Advertised
+	# on every level question it made early XP look better than it is, and a batch paid
+	# for it: 130 battles against 155 with the same wager policy and a peak of 13
+	# against 169, because the early level-ups drained the bankroll the ladder needs.
+	var slot_payoff: bool = capacity_after > capacity_now
+	var shelf_note: String = ""
+	if not slot_payoff:
+		shelf_note = " Shelf quality is the reason here: a cost-3 or better unit is %.0f%% of rolls now and %.0f%% after this level." % [
+			high_cost_now * 100.0,
+			high_cost_after * 100.0,
+		]
+	# The decisive fact when a run has stopped improving: the board facing it fields a cost
+	# tier its shelf cannot roll at all. Level 3's shelf is 65/30/5/0/0, so cost 4 is
+	# impossible, and the generator picks enemy units by rating from the whole catalogue from
+	# chapter 2 on. Measured: the rig buys XP a median of once per run, 13 of 30 runs never
+	# buy it, and it sat at level 3 in chapter 6 holding 93,000 buckets. "A cost-3 or better
+	# unit is 5% of rolls" is abstract next to "the board in front of you fields a cost-4 unit
+	# and your shelf is 0% to offer one", so state the second one.
+	var enemy_top_cost: int = _enemy_top_cost()
+	var enemy_tier_now: float = _tier_share(shelf_now, enemy_top_cost)
+	var enemy_tier_after: float = _tier_share(shelf_after, enemy_top_cost)
+	# The tier data below is recorded but deliberately NOT spoken into the prompt. Naming the
+	# enemy's tier in the level decision's effect text was measured and made things worse, not
+	# better: over the same six seeds the rig bought XP less often (median 0 against 1) and
+	# reached shallower (mean chapter 1.83 against 3.70). The likely reason is the one the
+	# policy already records about the slot argument - an advertised level makes early XP look
+	# better than it is and drains the bankroll the doubling ladder needs. The fields stay so a
+	# transcript can be read for whether the rig was ever in a position to answer a tier.
+	var enemy_tier_note: String = ""
 	var candidates: Array[Dictionary] = [
 		{
 			"id": "buy_xp",
 			"label": "Buy XP for %d buckets (level %d -> capacity %d)." % [
-				int(SHOP_CONFIG.BUY_XP_COST),
+				xp_price,
 				int(Shop.get_level()),
-				_level_board_capacity(_level_after_xp_purchase(int(Shop.get_level()), int(Shop.get_xp()))),
+				capacity_after,
 			],
-			"effect": "Spend %d of %d buckets on %d XP." % [int(SHOP_CONFIG.BUY_XP_COST), gold, int(SHOP_CONFIG.XP_PER_BUY)],
+			"capacity_now": capacity_now,
+			"capacity_after": capacity_after,
+			"capacity_delta": capacity_after - capacity_now,
+			"shelf_is_the_reason": not slot_payoff,
+			"shelf_high_cost_odds_now": snappedf(high_cost_now, 0.001),
+			"shelf_high_cost_odds_after": snappedf(high_cost_after, 0.001),
+			"enemy_top_cost": enemy_top_cost,
+			"shelf_odds_of_enemy_tier_now": snappedf(enemy_tier_now, 0.001),
+			"shelf_odds_of_enemy_tier_after": snappedf(enemy_tier_after, 0.001),
+			"board_size": board_size,
+			"bench_size": bench_units.size(),
+			"benched_bodies_that_gain_a_slot": waiting_bodies,
+			"bench": bench_units,
+			"buckets_after": gold - xp_price,
+			"reserve_floor": _reserve_floor_buckets,
+			"encounter_kind": String(Economy.encounter_quote_kind),
+			"affordable_offers_on_shelf": affordable_shelf,
+			"affordable_shelf_ids": affordable_shelf_ids,
+			"shelf_bodies_that_could_gain_a_slot": shelf_bodies_that_could_gain_a_slot,
+			"effect": "Spend %d of %d buckets on %d XP, leaving %d. Board %d of %d now, %d of %d after (%s). Bench holds %d unit(s); %d would gain a slot, and the shelf offers %d affordable body(ies) (%d of them could be bought and fielded in this same beat).%s" % [
+				xp_price,
+				gold,
+				int(SHOP_CONFIG.XP_PER_BUY),
+				gold - xp_price,
+				board_size,
+				capacity_now,
+				board_size,
+				capacity_after,
+				level_gain_note,
+				bench_units.size(),
+				waiting_bodies,
+				affordable_shelf,
+				shelf_bodies_that_could_gain_a_slot,
+				shelf_note + enemy_tier_note,
+			],
 		},
-		{"id": "pass", "label": "Do not buy XP now.", "effect": "Keep %d buckets for bodies." % gold},
+		{
+			"id": "pass",
+			"label": "Do not buy XP now.",
+			"capacity_now": capacity_now,
+			"capacity_after": capacity_now,
+			"capacity_delta": 0,
+			"board_size": board_size,
+			"bench_size": bench_units.size(),
+			"benched_bodies_that_gain_a_slot": 0,
+			"buckets_after": gold,
+			"reserve_floor": _reserve_floor_buckets,
+			"encounter_kind": String(Economy.encounter_quote_kind),
+			"effect": "Keep %d buckets for bodies; the board stays at %d of %d slots." % [gold, board_size, capacity_now],
+		},
 	]
+	# Opt-in strategy variant; see EAGER_LEVEL_TARGET. The model is bypassed only for the
+	# decision class it structurally cannot take - trivial price, still below the tier that
+	# reaches cost-4 units, reserve floor intact. Everything else still goes to the model.
+	if _level_policy == "eager":
+		var price_is_trivial: bool = gold >= xp_price * EAGER_LEVEL_PRICE_BANKROLL_RATIO
+		var below_target_level: bool = int(Shop.get_level()) < EAGER_LEVEL_TARGET
+		var reserve_survives: bool = (gold - xp_price) >= _reserve_floor_buckets
+		if price_is_trivial and below_target_level and reserve_survives:
+			var gold_before_eager: int = int(Economy.gold)
+			var bought_eager: bool = await _click_buy_xp(label)
+			_append_event("buy_xp", {
+				"label": label,
+				"before_buys": before_buys,
+				"bought": bought_eager,
+				"gold_before": gold_before_eager,
+				"gold_after": int(Economy.gold),
+				"level_after": int(Shop.get_level()),
+				"policy": "eager",
+			})
+			return bought_eager
 	var state: Dictionary = _plan_state()
 	state["decision_label"] = label
 	state["before_buys"] = before_buys
@@ -700,7 +1350,6 @@ func _buy_xp_if_needed(label: String, before_buys: bool = false) -> bool:
 	var chosen: String = String(decision.get("choice_id", ""))
 	if chosen != "buy_xp":
 		return false
-	var xp_price: int = int(SHOP_CONFIG.BUY_XP_COST)
 	var xp_reserve_after: int = int(Economy.gold) - xp_price
 	if xp_reserve_after < _reserve_floor_buckets:
 		var confirmed_xp: bool = await _confirm_reserve_break(
@@ -756,17 +1405,76 @@ func _level_purchase_is_legal() -> bool:
 		return false
 	return int(Economy.gold) >= int(SHOP_CONFIG.BUY_XP_COST)
 
+## Share of shop rolls that are cost 3 or better, at the given cost distribution.
+##
+## Cost 3 and up is where the middle-game bodies live: the level-3 distribution is
+## 65% / 30% / 5% across costs 1-3 with nothing above, while level 8 puts a little
+## over a quarter of rolls on costs 4-5. Quoted to the level decision so "level for
+## the shelf" is a number instead of a hunch.
+func _high_cost_share(probabilities: Dictionary) -> float:
+	var share: float = 0.0
+	for cost: Variant in probabilities.keys():
+		if int(cost) >= 3:
+			share += float(probabilities[cost])
+	return clampf(share, 0.0, 1.0)
+
+## The share of rolls that land exactly on one cost tier. Zero when the tier cannot be
+## offered at all, which is the fact that matters: a shelf with no roll for cost 4 cannot
+## answer a board that fields one.
+func _tier_share(probabilities: Dictionary, cost: int) -> float:
+	if cost <= 0 or not probabilities.has(cost):
+		return 0.0
+	return clampf(float(probabilities[cost]), 0.0, 1.0)
+
+## The highest cost tier the enemy board is fielding, so the level decision can be told
+## whether the player's shelf can answer it at all.
+func _enemy_top_cost() -> int:
+	var top: int = 0
+	for unit: Unit in _enemy_units():
+		top = maxi(top, int(unit.cost))
+	return top
+
+## Both gates that can hold Continue down on this rig: a pending chapter contract and a
+## level-4 legacy choice. Answering them here means a held-down Continue is recoverable rather
+## than a run-ending abort.
+func _clear_continue_gates(_label: String) -> void:
+	# This rig resolves both gates itself, so it does not chain to the pacing override.
+	# The contract resolver only asks the model when it actually found a market to answer,
+	# so a repeated pass over an unreadable market costs nothing.
+	await _resolve_pending_contract_market()
+	await _resolve_pending_ascension()
+
 func _press_continue(expect_forced: bool, label: String) -> void:
 	# Resolve the chapter contract before asking about the wager so the wager is
 	# chosen against the real post-contract reserve, then hand off to the shared
 	# start-battle click path.
 	await _resolve_pending_contract_market()
+	# The same gate as a contract: a level-4 promotion opens a legacy choice that disables
+	# Start Battle until it is answered, and buying enough copies to combine is exactly what
+	# a rich run does. See _resolve_pending_ascension.
+	await _resolve_pending_ascension()
+	# The rules already forbid walking back into a lost stage with the board that lost it.
+	# Enforce it once, on the board, before the fight is priced.
+	await _enforce_stall_rule(label)
+	# Repair the ranks before anything is priced against the board. A purchased unit
+	# is already on the board by the time the fielding pass looks at it, and the game
+	# puts it in the first free tile - which is the rank that meets the enemy.
+	await _pull_backline_out_of_the_front_rank(label)
+	# Disposal before equipping, so the item decision can place whatever the sale just
+	# returned to the inventory and the bench slot it freed is available to the next shop.
+	# The sale is optional and the empty answer holds, so this cannot strand the run.
+	await _decide_sell(label)
 	# Items before the wager: a component that completes an item changes the board the
 	# wager is being placed on, so the risk decision has to see the equipped board.
 	await _decide_items(label)
 	await _decide_wager(label)
 	_ensure_combat_log_connected()
 	_last_combat_outcome = ""
+	# Clear the previous fight's settlement line too. A fight that ends without the engine
+	# announcing "Combat resolved:" would otherwise inherit the last one's survivor counts
+	# and damage, and the at-the-clock comparison would silently read the wrong fight.
+	_last_resolution_line = ""
+	_last_resolution_fields = {}
 	# Snapshot everything about the fight BEFORE it starts. After settlement the board
 	# is rebuilt for the next planning beat and the units are healed, so a read taken
 	# afterwards describes the next stage, not the fight that just resolved.
@@ -781,6 +1489,16 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"player_units": _team_units_snapshot(_board_units(), _player_placements()),
 		"enemy_units": _team_units_snapshot(_enemy_units(), _enemy_placements()),
 		"enemy_traits": _trait_snapshot(_enemy_units()),
+		# Both teams' model ratings, plus the stage's target rating. The preview odds
+		# are a function of the first two, so recording them is what makes "the ramp
+		# outran the board" a measurement instead of an inference from the boards.
+		"player_power": snappedf(CombatPowerModel.team_power(_board_units()), 0.01),
+		"enemy_power": snappedf(CombatPowerModel.team_power(_enemy_units()), 0.01),
+		"target_rating": _stage_target_rating(),
+		# Board plus bench with each unit's level. The round payload records ids
+		# only, so a combine into a level-2/3 unit is invisible without this, and
+		# a three-star waiting on the bench would never show up at all.
+		"owned_units": _roster_snapshot(),
 		# Creep stages are the documented item source. Recording the inventory before
 		# every fight is what makes "did a creep round actually pay out?" answerable from
 		# the transcript instead of inferred.
@@ -791,9 +1509,71 @@ func _press_continue(expect_forced: bool, label: String) -> void:
 		"encounter_kind": String(Economy.encounter_quote_kind),
 		"quoted_multiplier": float(Economy.gross_payout_multiplier()),
 		"shown_win_odds": float(Economy.projected_win_probability),
+		# The number the decision actually acted on is Economy.projected_win_probability,
+		# which the combat view refreshes on its own signals. That refresh can lag the
+		# final board - items are equipped after deployment - so the odds are also
+		# recomputed here from the teams that are about to fight. Comparing the two in
+		# the transcript separates "the display is stale" from "the model is wrong".
+		"live_win_odds": _live_win_odds(),
 		"planning_seconds_left": snappedf(_planning_time_left(), 0.01),
 	})
-	await super._press_continue(expect_forced, label)
+	var chapter_before: int = int(GameState.chapter)
+	var stage_before: int = int(GameState.stage_in_chapter)
+	# Remember the board that is about to fight, keyed to the stage, so the retry branch can
+	# record it as the board that lost this stage.
+	_deployed_signature_by_stage["%d:%d" % [chapter_before, stage_before]] = _deployed_signature()
+	await _maybe_capture_planning(label)
+	for attempt: int in range(START_BATTLE_ATTEMPTS):
+		await super._press_continue(expect_forced, label)
+		if await _fight_started_or_stage_moved(chapter_before, stage_before):
+			return
+		if attempt + 1 >= START_BATTLE_ATTEMPTS:
+			return
+		# The click was swallowed but the beat is still open and unchanged, so the
+		# retry presses the same Start Battle button rather than starting anything new.
+		_append_event("start_battle_retry", {"label": label, "attempt": attempt + 1})
+		await _settle_frames(8)
+
+## Save a frame of the live planning beat so a UI layout report can be checked
+## against the real render instead of a description. Bounded per run.
+func _maybe_capture_planning(label: String) -> void:
+	if not _capture_planning or _capture_budget <= 0:
+		return
+	_capture_budget -= 1
+	await RenderingServer.frame_post_draw
+	var texture: ViewportTexture = get_viewport().get_texture()
+	if texture == null:
+		return
+	var image: Image = texture.get_image()
+	if image == null:
+		return
+	var file_name: String = "planning_ch%d_r%d_%d.png" % [
+		int(GameState.chapter),
+		int(GameState.stage_in_chapter),
+		_capture_budget,
+	]
+	var error: int = image.save_png(_run_dir.path_join(file_name))
+	_append_event("planning_capture", {
+		"file": file_name,
+		"label": label,
+		"ok": error == OK,
+		"board": _board_ids(),
+		"board_capacity": _roster_max_team_size(),
+		"enemy_count": _enemy_units().size(),
+		"viewport": str(get_viewport().get_visible_rect().size),
+	})
+
+## True once combat is live or the stage already moved on. Both mean the Start
+## Battle press took effect; the second case is a fight that resolved fast.
+func _fight_started_or_stage_moved(chapter_before: int, stage_before: int) -> bool:
+	var deadline: int = Time.get_ticks_msec() + 2000
+	while Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+		if int(GameState.phase) == int(GameState.GamePhase.COMBAT) or bool(Economy.combat_active):
+			return true
+		if int(GameState.chapter) != chapter_before or int(GameState.stage_in_chapter) != stage_before:
+			return true
+	return false
 
 func _ensure_combat_log_connected() -> void:
 	# The engine explains a forced result (timeout, stalled board) through
@@ -809,6 +1589,21 @@ func _on_combat_log_line(text: String) -> void:
 	# for the outcome: a defeat can leave the bankroll untouched (the early retry
 	# transfusion), so a bankroll-only read used to report a loss as a draw.
 	if text.begins_with("Combat resolved: "):
+		# Keep the engine's own settlement line. It is the only record of the fight's
+		# real survivor counts: the board is rebuilt during settlement, so reading the
+		# teams afterwards describes the next stage.
+		_last_resolution_line = text
+		var fields: Dictionary = {}
+		for field_token: String in text.substr("Combat resolved: ".length()).split(" "):
+			if "=" not in field_token:
+				continue
+			var key: String = field_token.split("=")[0]
+			var value_text: String = field_token.split("=")[1].trim_suffix(".")
+			if value_text.is_valid_int():
+				fields[key] = value_text.to_int()
+			elif value_text.is_valid_float():
+				fields[key] = value_text.to_float()
+		_last_resolution_fields = fields
 		var remainder: String = text.substr("Combat resolved: ".length())
 		_last_combat_outcome = remainder.split(" ")[0].strip_edges()
 		for token: String in remainder.split(" "):
@@ -844,38 +1639,64 @@ func _decide_wager(label: String) -> void:
 	var reserve: int = int(Economy.blood_buckets)
 	if reserve <= 0:
 		return
-	var candidates: Array[Dictionary] = _wager_candidates(reserve)
+	var stage_attempt: int = _stage_attempt()
+	var candidates: Array[Dictionary] = _wager_candidates(reserve, stage_attempt)
 	if candidates.is_empty():
 		return
 	if candidates.size() == 1:
 		# One legal wager is not a decision, but it still has to be applied: the
 		# economy remembers the previous preferred wager, and leaving it stale can
 		# stake buckets the planner never chose.
-		_apply_wager(int(candidates[0].get("wager", 1)), label, reserve, true)
+		_apply_wager(int(candidates[0].get("wager", 1)), label, reserve, true, stage_attempt)
 		return
 	var state: Dictionary = _plan_state()
 	state["decision_label"] = label
+	state["stage_attempt"] = stage_attempt
 	var decision: Dictionary = await _ask_decision("wager", state, candidates)
 	var chosen: String = String(decision.get("choice_id", ""))
 	for candidate: Dictionary in candidates:
 		if String(candidate.get("id", "")) != chosen:
 			continue
-		_apply_wager(int(candidate.get("wager", 0)), label, reserve, false)
+		_apply_wager(int(candidate.get("wager", 0)), label, reserve, false, stage_attempt)
 		return
 	_append_event("decision_rejected", {"kind": "wager", "choice_id": chosen, "reason": "not_a_wager_candidate"})
 
-func _apply_wager(wager: int, label: String, reserve: int, auto_applied: bool) -> void:
+## Which attempt at the current stage this planning beat is.
+##
+## A loss does not advance the stage, so the chapter/stage pair still names the fight
+## about to start and the retry tally for that pair is the number of losses already
+## taken there.
+func _stage_attempt() -> int:
+	var stage_key: String = "%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)]
+	return int(_same_stage_retries.get(stage_key, 0)) + 1
+
+func _apply_wager(wager: int, label: String, reserve: int, auto_applied: bool, stage_attempt: int = 1) -> void:
 	Economy.set_bet(wager)
+	# The rate the stake was sized from travels with the wager, so a transcript can
+	# tell "bet small on the displayed number" apart from "bet small on the measured
+	# band rate" without re-deriving the table.
+	var quote_kind: String = String(Economy.encounter_quote_kind)
+	var shown_odds: float = float(Economy.projected_win_probability)
+	var stake_odds: float = shown_odds
+	var stake_basis: String = "shown odds"
+	if int(stage_attempt) < 2:
+		stake_odds = _measured_first_attempt_win_rate(quote_kind, shown_odds)
+		if absf(stake_odds - shown_odds) >= 0.001:
+			stake_basis = "measured band rate"
 	_append_event("wager_set", {
 		"label": label,
+		"stage_attempt": stage_attempt,
 		"requested": wager,
 		"applied": int(Economy.current_bet),
 		"auto_applied": auto_applied,
 		"reserve_before": reserve,
 		"reserve_if_loss": reserve - int(Economy.current_bet),
-		"quote_kind": String(Economy.encounter_quote_kind),
+		"quote_kind": quote_kind,
 		"quoted_multiplier": float(Economy.gross_payout_multiplier()),
-		"shown_win_odds": float(Economy.projected_win_probability),
+		"shown_win_odds": shown_odds,
+		"stake_odds": snappedf(stake_odds, 0.001),
+		"stake_basis": stake_basis,
+		"measured_edge": snappedf(stake_odds * float(Economy.gross_payout_multiplier()) - 1.0, 0.001),
 		"break_even_odds": 1.0 / max(0.01, float(Economy.gross_payout_multiplier())),
 		"stake_unit": int(Economy.stake_unit),
 	})
@@ -898,13 +1719,11 @@ func _resolve_pending_contract_market() -> void:
 		return
 	var buttons: Array[Button] = []
 	var overlay_node: Control = _main.find_child("ChapterContractOverlay", true, false) as Control if _main != null else null
-	if overlay_node != null:
-		for child: Node in overlay_node.find_children("Contract*", "Button", true, false):
-			var button: Button = child as Button
-			if button != null:
-				buttons.append(button)
+	# By structure, not by name: the market's authored names survive only when nothing
+	# collides, and a rebuild used to leave them as `@Button@<id>`. See the base helper.
+	buttons = _contract_market_buttons(overlay_node)
 	if buttons.is_empty():
-		_append_event("contract_market_missing", {"chapter": int(GameState.chapter)})
+		_append_event("contract_market_missing", _contract_market_probe(overlay_node))
 		return
 	var candidates: Array[Dictionary] = []
 	for index: int in range(buttons.size()):
@@ -932,6 +1751,186 @@ func _resolve_pending_contract_market() -> void:
 		})
 		return
 	_append_event("decision_rejected", {"kind": "contract", "choice_id": chosen, "reason": "not_a_contract_candidate"})
+
+## Everything the contract market looked like at the moment the rig could not find a button.
+##
+## The chapter-9 run that reached 40.9M buckets died here: the rig recorded only "missing",
+## so the reason stayed a guess for two turns. The event now carries the state that explains
+## it - the phase, whether the overlay exists and is visible, and every button on screen.
+func _contract_market_probe(overlay_node: Control) -> Dictionary:
+	var overlay_button_names: Array[String] = []
+	var market_layer: CanvasLayer = _main.find_child("ChapterContractLayer", true, false) as CanvasLayer if _main != null else null
+	if overlay_node != null:
+		for candidate: Node in overlay_node.find_children("*", "Button", true, false):
+			overlay_button_names.append(String(candidate.name))
+	var contract_buttons: Array[String] = []
+	if _main != null:
+		for candidate: Node in _main.find_children("Contract*", "Button", true, false):
+			contract_buttons.append(String(candidate.name))
+			if contract_buttons.size() >= 12:
+				break
+	# The choices container is created without a name, so reach it through its named sibling
+	# and report the shape of the market's own stack.
+	var market_stack: Array[String] = []
+	var status_label: Label = _main.find_child("ContractStatus", true, false) as Label if _main != null else null
+	var stack_parent: Node = status_label.get_parent() if status_label != null else null
+	if stack_parent != null:
+		for child: Node in stack_parent.get_children():
+			market_stack.append("%s:%s:%d" % [String(child.name), child.get_class(), child.get_child_count()])
+	return {
+		"chapter": int(GameState.chapter),
+		"phase": int(GameState.phase),
+		"pending_choice": bool(Shop.call("has_pending_contract_choice")),
+		"overlay_found": overlay_node != null,
+		"overlay_visible": overlay_node != null and overlay_node.visible,
+		"overlay_children": overlay_node.get_child_count() if overlay_node != null else -1,
+		"overlay_in_tree": overlay_node != null and overlay_node.is_visible_in_tree(),
+		"overlay_buttons": overlay_button_names,
+		"overlay_button_count": overlay_button_names.size(),
+		"contract_buttons": contract_buttons,
+		"layer_found": market_layer != null,
+		"layer_children": market_layer.get_child_count() if market_layer != null else -1,
+		"view_count": _main.find_children("CombatView", "Control", true, false).size() if _main != null else -1,
+		"market_stack": market_stack,
+		"continue_disabled": _continue_button_is_disabled(),
+	}
+
+func _continue_button_is_disabled() -> bool:
+	var button: Button = _main.find_child("ContinueButton", true, false) as Button if _main != null else null
+	return button != null and button.disabled
+
+## Answer a pending level-4 legacy choice before the wager is placed.
+##
+## A combine that promotes a unit to level 4 opens the legacy overlay and disables Start
+## Battle until the player picks one. The rig had no handling for it, so the runs rich enough
+## to combine - the ones the design wants - pressed a dead button, tripped three
+## `continue button disabled` failures and were recorded as harness aborts rather than
+## outcomes: 4,766,400 buckets at chapter 7, 95,050 at chapter 5, 42,126 at chapter 6. This
+## asks the same model that makes every other decision, and falls back to the first legacy
+## only if the model returns nothing.
+func _resolve_pending_ascension() -> void:
+	for _pass: int in range(ASCENSION_DECISIONS_PER_BEAT):
+		var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+		if combat == null:
+			return
+		var controller: Variant = combat.get("controller")
+		if controller == null or not controller.has_method("has_pending_ascension"):
+			return
+		if not bool(controller.call("has_pending_ascension")):
+			return
+		var unit: Variant = controller.call("pending_ascension_unit")
+		var unit_label: String = "-"
+		if unit != null and unit is Unit:
+			unit_label = "%s level %d" % [_unit_id(unit as Unit), int((unit as Unit).level)]
+		var candidates: Array[Dictionary] = []
+		for option_value: Variant in controller.call("pending_ascension_options"):
+			var option: Dictionary = option_value as Dictionary
+			var legacy_id: String = String(option.get("id", "")).strip_edges()
+			if legacy_id == "":
+				continue
+			candidates.append({
+				"id": legacy_id,
+				"label": "%s (%s) for %s" % [String(option.get("name", legacy_id)), String(option.get("fit", "conditional fit")), unit_label],
+				"effect": "TRIGGER %s. EFFECT %s. RISK %s" % [
+					String(option.get("trigger", "unknown")),
+					String(option.get("effect", "unknown")),
+					String(option.get("risk", "unknown")),
+				],
+			})
+		if candidates.is_empty():
+			_append_event("ascension_missing_options", {"unit": unit_label})
+			return
+		# The heuristic arm has no controller, so asking would hold the beat for the whole
+		# decision timeout. It takes the first offer instead, the same way _decide_items
+		# equips first-fit there.
+		var decision: Dictionary = {}
+		if _run_mode == "jev":
+			decision = await _ask_decision("ascension", _plan_state(), candidates)
+		var chosen: String = String(decision.get("choice_id", "")).strip_edges()
+		if chosen == "" or not _candidate_ids(candidates).has(chosen):
+			chosen = String(candidates[0].get("id", ""))
+		var applied: bool = bool(controller.call("resolve_ascension", chosen))
+		_append_event("ascension_resolved", {
+			"unit": unit_label,
+			"legacy": chosen,
+			"applied": applied,
+			"from_model": String(decision.get("choice_id", "")) == chosen,
+		})
+		await _settle_frames(4)
+		if not applied:
+			return
+
+func _candidate_ids(candidates: Array[Dictionary]) -> Array[String]:
+	var ids: Array[String] = []
+	for candidate: Dictionary in candidates:
+		ids.append(String(candidate.get("id", "")))
+	return ids
+
+## Everything about the deployed board that a repeat has to change: which units, their level,
+## and the items they hold. Ids alone would call a retry unchanged when the same unit came back
+## a level higher, which is exactly the change the rules ask for.
+func _deployed_signature() -> String:
+	var parts: Array[String] = []
+	for unit: Unit in _board_units():
+		var item_ids: Array[String] = []
+		if Items != null:
+			for item: Variant in Items.get_equipped(unit):
+				item_ids.append(String(item))
+		item_ids.sort()
+		parts.append("%s:%d:%s" % [_unit_id(unit), int(unit.level), ",".join(item_ids)])
+	parts.sort()
+	return "|".join(parts)
+
+## The recorded way runs die: walking back into a stage this run already lost with the board
+## that lost it. It is the single largest cause of endings in the current era - 18 of 34 runs
+## stopped at "stalled after four attempts" - and the rules already forbid it, but the rule
+## lives in a prompt. Measured: 47 of 148 recorded retries began with the identical board, and
+## two thirds of those bought nothing while carrying a median of 131 buckets, so this is a
+## choice rather than something the economy forced.
+##
+## The enforcement is one forced shopping pass, named for what it is, and a recorded event
+## either way. It does not block the fight: a run that genuinely cannot improve its board still
+## has to play the stage, and the transcript should show that it tried.
+func _enforce_stall_rule(label: String) -> void:
+	if _stage_attempt() <= 1:
+		return
+	var stage_key: String = "%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)]
+	var lost_signature: String = String(_lost_board_by_stage.get(stage_key, ""))
+	if lost_signature == "":
+		return
+	var signature: String = _deployed_signature()
+	if signature != lost_signature:
+		return
+	var buckets_before: int = int(Economy.blood_buckets)
+	var offers_before: int = _shop_offers_remaining()
+	var bought: String = ""
+	if offers_before > 0:
+		_stall_reentry_active = true
+		bought = await _buy_best_two_stage_offer(0)
+		_stall_reentry_active = false
+	var changed: bool = _deployed_signature() != signature
+	if not changed and _board_ids().size() < _roster_max_team_size():
+		# A purchase goes to the bench, and the board is often not full - the recorded case
+		# that made this necessary had seven bodies with a capacity of nine, two bench Bonkos,
+		# 129 buckets and a shelf of five offers. Fielding is what turns a bench buy into a
+		# different fight. This fills free slots only - it passes no swap-out candidates, so
+		# the fielding routine cannot displace a body the ordinary flow chose to keep, and a
+		# full board is left to the policy's own composition rules.
+		var room: int = _roster_max_team_size() - _board_ids().size()
+		var bench_ids: Array[String] = _bench_ids()
+		if room > 0 and not bench_ids.is_empty():
+			await _field_preferred_units(bench_ids.slice(0, room), [], "%s stall re-field" % label)
+			changed = _deployed_signature() != signature
+	_append_event("stall_reentry", {
+		"label": label,
+		"stage": stage_key,
+		"attempt": _stage_attempt(),
+		"board": _board_ids(),
+		"buckets": buckets_before,
+		"offers_on_shelf": offers_before,
+		"forced_pass_bought": bought,
+		"board_changed_by_forced_pass": changed,
+	})
 
 # --- observation and candidate construction --------------------------------
 
@@ -970,12 +1969,33 @@ func _plan_state() -> Dictionary:
 		# a trait" be true while the board activated nothing.
 		"traits": _trait_snapshot(_board_units()),
 		"traits_owned": _trait_snapshot(_owned_units()),
+		# Which unit the run is actually committed to, and how close it is to a
+		# three-star, so every decision can price an offer against the plan.
+		"vertical": _vertical_summary(),
+		# The cheapest trait ladder to finish, so a run has a reason to stack one.
+		"trait_goal": _trait_goal_summary(),
 		"planning_time_left": float(controller_node.get("planning_time_left")) if controller_node != null else -1.0,
 		"planning_timer_total": float(controller_node.get("planning_timer_total")) if controller_node != null else -1.0,
 		"time_scale": Engine.time_scale,
 		"shop_seed_explicit": _seed_explicit,
-		"campaign": {"mode": _run_mode, "seed": _campaign_seed, "target_chapter": CAMPAIGN_TARGET_CHAPTER, "target_round": CAMPAIGN_TARGET_ROUND},
+		"campaign": {
+			"mode": _run_mode,
+			"lane": _lane,
+			"seed": _campaign_seed,
+			"target_chapter": _campaign_target_chapter(),
+			"target_round": _campaign_target_round(),
+		},
 	}
+	if _stall_reentry_active:
+		# The forced pass is only useful if the model knows why it is being asked to shop:
+		# the shop prompt otherwise reads exactly like the ordinary one, and the ordinary one
+		# is what produced the repeat in the first place.
+		state["stall_reentry"] = true
+		state["stall_note"] = (
+			"This exact board already lost this stage - same units, same levels, same items. "
+			+ "Re-entering it unchanged is the recorded way runs end here, and the run has %d "
+			+ "buckets. Buy something that changes the deployed board, or the level that opens a slot."
+		) % int(Economy.blood_buckets)
 	return state
 
 func _board_units() -> Array[Unit]:
@@ -1044,12 +2064,141 @@ func _team_units_snapshot(team: Array[Unit], placements: Array[int]) -> Array[Di
 		})
 	return records
 
+## The trait closest to being maxed, and how many more unique bodies it needs.
+##
+## Traits count unique units, so maxing one is a board-composition goal, not a
+## duplicate goal: the cheapest top tier among the traits already held is the one to
+## chase. Reported as a fact because nothing in the run had a reason to stack a trait,
+## which is why no run has ever maxed one.
+func _trait_goal_summary() -> Dictionary:
+	var best: Dictionary = {}
+	for entry: Dictionary in _trait_snapshot(_owned_units()):
+		var top: int = int(entry.get("top_threshold", 0))
+		if top < 2:
+			# A single-rung trait is an always-on aura, not a ladder to climb.
+			continue
+		var count: int = int(entry.get("count", 0))
+		var needed: int = maxi(0, top - count)
+		if needed <= 0:
+			continue
+		if best.is_empty() or needed < int(best.get("more_needed", 9999)):
+			best = {
+				"trait_id": String(entry.get("id", "")),
+				"owned_unique": count,
+				"top_threshold": top,
+				"more_needed": needed,
+				"already_maxed": int(entry.get("next_threshold", 1)) == 0,
+			}
+	return best
+
+## The player's own revealed commitment: the identity they hold the most copies of,
+## measured in level-1 equivalents because a combine consumes three of them, so a
+## three-star is nine. Reported as a fact so the model does not have to re-derive
+## which unit it is committed to in every shop - left to re-decide, it spread eight
+## purchases across five identities and never finished a single combine.
+func _vertical_summary() -> Dictionary:
+	var equivalents: Dictionary[String, int] = {}
+	for unit: Unit in _owned_units():
+		if unit == null:
+			continue
+		var unit_id: String = _unit_id(unit)
+		if unit_id.is_empty():
+			continue
+		var value: int = 1
+		for _step: int in range(maxi(0, int(unit.level) - 1)):
+			value *= 3
+		equivalents[unit_id] = int(equivalents.get(unit_id, 0)) + value
+	var target_id: String = ""
+	var best: int = 0
+	for candidate_id: String in equivalents.keys():
+		var count: int = int(equivalents[candidate_id])
+		if count > best or (count == best and target_id != "" and candidate_id < target_id):
+			best = count
+			target_id = candidate_id
+	if target_id.is_empty():
+		return {}
+	return {
+		"target_id": target_id,
+		"level1_equivalents": best,
+		"copies_to_three_star": maxi(0, 9 - best),
+		"progress_percent": int(round(100.0 * float(mini(best, 9)) / 9.0)),
+	}
+
 func _owned_units() -> Array[Unit]:
 	var units: Array[Unit] = _board_units()
 	for bench_unit: Unit in Roster.compact():
 		if bench_unit != null and not units.has(bench_unit):
 			units.append(bench_unit)
 	return units
+
+## Every owned unit with its level and where it sits. A combine is only visible in
+## the transcript if the level of each owned unit is recorded: the round payload
+## carries ids, and a upgraded unit benched for a beat would otherwise vanish.
+func _roster_snapshot() -> Array[Dictionary]:
+	var records: Array[Dictionary] = []
+	var seen: Array[Unit] = []
+	for unit: Unit in _board_units():
+		if unit == null or seen.has(unit):
+			continue
+		seen.append(unit)
+		records.append({"id": _unit_id(unit), "level": int(unit.level), "where": "board"})
+	# Direct reference rather than Engine.has_singleton: a script autoload is not an
+	# engine singleton, so that guard was always false and the bench half of this
+	# snapshot was silently empty - a combined unit sitting on the bench could not be
+	# seen at all.
+	for bench_unit: Unit in Roster.compact():
+		if bench_unit == null or seen.has(bench_unit):
+			continue
+		seen.append(bench_unit)
+		records.append({"id": _unit_id(bench_unit), "level": int(bench_unit.level), "where": "bench"})
+	return records
+
+## Running maxima for the acceptance targets: a three-star unit, a trait at its top
+## tier, and a board filled to its capacity. Derived from the recorded events so a
+## run states its own progress instead of leaving it to be inferred by hand.
+func _progression_summary() -> Dictionary:
+	var max_unit_level: int = 1
+	var three_star_ids: Dictionary[String, bool] = {}
+	var maxed_traits: Dictionary[String, bool] = {}
+	var max_board_size: int = 0
+	var max_board_capacity: int = 0
+	var planning_beats_with_a_full_board: int = 0
+	var peak_shop_level: int = int(Shop.get_level())
+	for event: Dictionary in _events:
+		var kind: String = String(event.get("kind", ""))
+		var payload: Dictionary = event.get("payload", {}) as Dictionary
+		if kind == "fight_start":
+			var owned: Array = payload.get("owned_units", []) as Array
+			if owned.is_empty():
+				owned = payload.get("player_units", []) as Array
+			for record_value: Variant in owned:
+				var record: Dictionary = record_value as Dictionary
+				var unit_level: int = int(record.get("level", 1))
+				max_unit_level = max(max_unit_level, unit_level)
+				if unit_level >= 3:
+					three_star_ids[String(record.get("id", ""))] = true
+			for trait_value: Variant in (payload.get("deployed_traits", []) as Array):
+				var trait_entry: Dictionary = trait_value as Dictionary
+				if bool(trait_entry.get("maxed", false)):
+					maxed_traits[String(trait_entry.get("id", ""))] = true
+		elif kind == "round":
+			var capacity: int = int(payload.get("cap_after_shop", 0))
+			var board_size: int = (payload.get("board_after_shop", []) as Array).size()
+			max_board_capacity = max(max_board_capacity, capacity)
+			max_board_size = max(max_board_size, board_size)
+			peak_shop_level = max(peak_shop_level, int(payload.get("level_after_shop", 0)))
+			if capacity > 0 and board_size >= capacity:
+				planning_beats_with_a_full_board += 1
+	return {
+		"max_unit_level": max_unit_level,
+		"three_star_units": three_star_ids.keys(),
+		"maxed_traits": maxed_traits.keys(),
+		"max_board_size": max_board_size,
+		"max_board_capacity": max_board_capacity,
+		"board_filled_to_capacity": max_board_capacity > 0 and max_board_size >= max_board_capacity,
+		"planning_beats_with_a_full_board": planning_beats_with_a_full_board,
+		"peak_shop_level": peak_shop_level,
+	}
 
 func _trait_snapshot(units: Array[Unit]) -> Array[Dictionary]:
 	# Traits count unique units, so a second copy of a unit you already field is an
@@ -1069,13 +2218,30 @@ func _trait_snapshot(units: Array[Unit]) -> Array[Dictionary]:
 			if int(raw_threshold) > count:
 				next_threshold = int(raw_threshold)
 				break
+		# TraitCompiler reports tier -1 when no threshold is met, and tier 0 is a
+		# live first tier: StackUtils.active() is `tier >= 0`, and the player-facing
+		# TraitsPresenter partitions on `tier >= 0` too. Reporting tier 0 as inactive
+		# told the model a trait that the engine had already switched on was off.
+		var tier_index: int = int(tiers.get(trait_id, -1))
 		snapshot.append({
 			"id": trait_id,
 			"count": count,
-			"tier": int(tiers.get(trait_id, 0)),
-			"active": int(tiers.get(trait_id, 0)) > 0,
+			"tier": tier_index,
+			"active": tier_index >= 0,
 			"next_threshold": next_threshold,
+			# The last rung on this trait's ladder. Needed to price "how many more
+			# unique bodies to MAX it", which is a different question from the next
+			# tier and is the one the acceptance target asks.
+			"top_threshold": int(ladder[ladder.size() - 1]) if ladder.size() > 0 else 0,
 			"needed": max(0, next_threshold - count) if next_threshold > 0 else 0,
+			"tiers_available": ladder.size(),
+			# No remaining checkpoint means the count has cleared every threshold, which
+			# is what the game itself calls a maxed trait - Cartel at 2/2 shows as maxed
+			# in the UI. `maxed_ladder` is the harder reading, restricted to traits that
+			# actually have more than one tier; both are reported so a single-threshold
+			# aura cannot be mistaken for a stacked build.
+			"maxed": next_threshold == 0 and count > 0,
+			"maxed_ladder": next_threshold == 0 and count > 0 and ladder.size() > 1,
 		})
 	snapshot.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
 		return int(left.get("count", 0)) > int(right.get("count", 0))
@@ -1163,9 +2329,49 @@ static func summarize_offer_facts(
 		"deploy_requires_replacement": board_copies <= 0 and not board_has_room,
 	}
 
+## Whether the rendered card for a slot is actually buyable right now. Resolved from
+## the grid the same way the click path resolves it, so the candidate list and the
+## click cannot disagree about which offers are live.
+func _shop_slot_is_purchasable(slot_index: int, unit_id: String) -> bool:
+	if slot_index < 0:
+		return false
+	var combat: Node = _main.get_node_or_null("CombatView") if _main != null else null
+	if combat == null:
+		return false
+	var grid: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid") as GridContainer
+	if grid == null:
+		return false
+	for child: Node in grid.get_children():
+		var card: ShopCard = child as ShopCard
+		if card == null or int(card.slot_index) != slot_index:
+			continue
+		if card.disabled:
+			return false
+		return unit_id == "" or String(card.offer_id) == unit_id
+	return false
+
 func _shop_candidates() -> Array[Dictionary]:
 	var candidates: Array[Dictionary] = []
 	var summaries: Array[Dictionary] = _offer_summaries()
+	# What one bucket is worth on the upcoming wager. A purchase is paid for in the
+	# same currency, so every offer states what it displaces.
+	var wager_kind: String = String(Economy.encounter_quote_kind)
+	var wager_multiplier: float = float(Economy.gross_payout_multiplier())
+	var wager_odds: float = float(Economy.projected_win_probability)
+	# The same rate the stake is sized from: the measured band rate on a first attempt,
+	# the displayed number on a retry. Spending and betting draw on one currency, so both
+	# decisions have to price the alternative the same way - pricing a purchase against
+	# the pessimistic display while the stake is sized from the measured rate made
+	# buying look cheaper than it is.
+	var wager_rate: float = wager_odds
+	var wager_rate_basis: String = "shown odds"
+	if _stage_attempt() < 2:
+		wager_rate = _measured_first_attempt_win_rate(wager_kind, wager_odds)
+		if absf(wager_rate - wager_odds) >= 0.001:
+			wager_rate_basis = "measured band rate"
+	var ev_per_bucket: float = wager_rate * (wager_multiplier - 1.0) - (1.0 - wager_rate)
+	var vertical: Dictionary = _vertical_summary()
+	var vertical_target_id: String = String(vertical.get("target_id", ""))
 	var board_ids: Array[String] = _board_ids()
 	var bench_ids: Array[String] = _bench_ids()
 	var board_has_room: bool = board_ids.size() < _roster_max_team_size()
@@ -1179,6 +2385,11 @@ func _shop_candidates() -> Array[Dictionary]:
 		var unit_id: String = String(summary.get("id", ""))
 		var cost: int = int(summary.get("cost", 0))
 		if unit_id == "" or cost <= 0:
+			continue
+		# The shelf can still list an offer whose card has already been sold or
+		# disabled. Offering it would have the model choose something it cannot buy,
+		# and the click path then records "slot N is disabled" against the run.
+		if not _shop_slot_is_purchasable(int(summary.get("slot", -1)), unit_id):
 			continue
 		if not _can_afford_shop_cost(cost):
 			candidates.append({
@@ -1224,6 +2435,16 @@ func _shop_candidates() -> Array[Dictionary]:
 		var activation_text: String = ""
 		if not activates_traits.is_empty():
 			activation_text = " Similarly activates %s once deployed." % ", ".join(activates_traits)
+		# Whether this offer advances the run's own committed vertical, and where that
+		# leaves the three-star.
+		var is_vertical: bool = vertical_target_id != "" and unit_id == vertical_target_id
+		var vertical_text: String = ""
+		if is_vertical:
+			var have: int = int(vertical.get("level1_equivalents", 0))
+			vertical_text = " This is your committed vertical (%s): %d of 9 level-1 copies toward a three-star." % [
+				vertical_target_id,
+				have + (1 if offer_level <= 1 else 3),
+			]
 		candidates.append({
 			"id": "offer_%d" % int(summary.get("slot", -1)),
 			"label": "%s (cost %d, %s%s)" % [
@@ -1232,7 +2453,7 @@ func _shop_candidates() -> Array[Dictionary]:
 				String(summary.get("primary_role", "unit")),
 				", owns %d copies" % copies if copies > 0 else "",
 			],
-			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s Leaves %d buckets." % [
+			"effect": "Buy %s at level %d for %d buckets; %d copies owned, %s. %s%s%s Leaves %d buckets. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx at %s %.0f%%)." % [
 				unit_id,
 				offer_level,
 				cost,
@@ -1240,8 +2461,19 @@ func _shop_candidates() -> Array[Dictionary]:
 				combine_text,
 				trait_text,
 				activation_text,
+				vertical_text,
 				int(Economy.gold) - cost,
+				cost,
+				ev_per_bucket * float(cost),
+				wager_kind,
+				wager_multiplier,
+				wager_rate_basis,
+				wager_rate * 100.0,
 			],
+			"is_vertical_target": is_vertical,
+			"wager_expected_value_foregone": snappedf(ev_per_bucket * float(cost), 0.01),
+			"wager_edge_per_bucket": snappedf(ev_per_bucket, 0.01),
+			"wager_rate_basis": wager_rate_basis,
 			"affordable": true,
 			"slot": int(summary.get("slot", -1)),
 			"unit_id": unit_id,
@@ -1263,15 +2495,51 @@ func _shop_candidates() -> Array[Dictionary]:
 			"deploy_requires_replacement": bool(facts.get("deploy_requires_replacement", false)),
 			"buckets_after": int(Economy.gold) - cost,
 		})
+	var pass_kind: String = String(Economy.encounter_quote_kind)
+	var pass_multiplier: float = float(Economy.gross_payout_multiplier())
+	var pass_odds: float = float(Economy.projected_win_probability)
+	# A pass is only a real decision if the buckets it keeps have a stated use. The
+	# wager is the immediate one, so its expected value is quoted here too.
+	var pass_buckets: int = int(Economy.gold)
+	var pass_ev: float = pass_odds * float(pass_buckets * (pass_multiplier - 1.0)) - (1.0 - pass_odds) * float(pass_buckets)
 	var pass_candidate: Dictionary = {
 		"id": "pass",
 		"label": "Buy nothing in this shop.",
-		"effect": "Keep all %d buckets for the wager, the next shop, or level XP." % int(Economy.gold),
+		"effect": "Keep all %d buckets for the wager, the next shop, or level XP. The %s fight quotes %.2fx at shown odds %.0f%%, so this bankroll is worth about %+.2f buckets on the wager." % [
+			pass_buckets,
+			pass_kind,
+			pass_multiplier,
+			pass_odds * 100.0,
+			pass_ev,
+		],
+		"kept_buckets": pass_buckets,
+		"wager_expected_value_if_kept": snappedf(pass_ev, 0.01),
+		"shown_win_odds": pass_odds,
+		"break_even_odds": 1.0 / max(0.01, pass_multiplier),
 		"affordable": true,
 	}
 	candidates.append(pass_candidate)
 	var reroll_price: int = int(Economy.reroll_price())
 	if reroll_price > 0 and int(Economy.gold) - reroll_price >= _reserve_floor_buckets:
+		# A reroll is only a real gamble when the model can see what it is chasing and
+		# what the roll costs relative to the bankroll. A run with a 14,436-bucket
+		# bankroll rerolled once in thirty-five fights and finished one copy short of
+		# two separate three-stars.
+		var progress: Dictionary = _best_combine_progress()
+		var reroll_bankroll: int = int(Economy.gold)
+		var reroll_cost_text: String = (
+			"a rounding error against the bankroll"
+			if reroll_bankroll >= reroll_price * 50
+			else "%.1f%% of the bankroll" % (100.0 * float(reroll_price) / float(max(1, reroll_bankroll)))
+		)
+		var progress_text: String = " No three-of-a-kind is in progress."
+		if not progress.is_empty():
+			progress_text = " Closest combine: %s at level %d, %d of 3 held - %d more completes it." % [
+				String(progress.get("id", "")),
+				int(progress.get("level", 1)),
+				int(progress.get("have", 0)),
+				int(progress.get("need", 0)),
+			]
 		candidates.append({
 			"id": "reroll",
 			"label": "Reroll the shop for %d buckets." % reroll_price,
@@ -1279,11 +2547,58 @@ func _shop_candidates() -> Array[Dictionary]:
 			# when the new roll beats the flex pick in front of you", which pre-judged
 			# the action inside the candidate itself. Every policy variant then produced
 			# identical decisions, so the stance being compared never reached the model.
-			"effect": "Replace every current offer with a new roll. Costs %d buckets and leaves %d. What arrives is not known in advance." % [reroll_price, int(Economy.gold) - reroll_price],
+			# Priced like a purchase, because it is the same currency. A reroll was the
+			# only spend decision that never stated what the wager would have paid: over
+			# 1802 recorded planning beats the rig rerolled in 347 of them and bought
+			# nothing in 43% of those, which is 3018 buckets - more than a third of all
+			# shop spending - spent on shelves it then declined.
+			"effect": "Replace every current offer with a new roll. Costs %d buckets (%s) and leaves %d.%s What arrives is not known in advance. Those %d buckets would be worth %+.2f on the %s wager instead (%.2fx at %s %.0f%%), and 43%% of the reroll beats on record bought nothing from the new shelf." % [
+				reroll_price,
+				reroll_cost_text,
+				reroll_bankroll - reroll_price,
+				progress_text,
+				reroll_price,
+				ev_per_bucket * float(reroll_price),
+				wager_kind,
+				wager_multiplier,
+				wager_rate_basis,
+				wager_rate * 100.0,
+			],
 			"affordable": true,
 			"cost": reroll_price,
+			"wager_expected_value_foregone": snappedf(ev_per_bucket * float(reroll_price), 0.01),
+			"wager_edge_per_bucket": snappedf(ev_per_bucket, 0.01),
+			"wager_rate_basis": wager_rate_basis,
+			"reroll_beats_that_bought_nothing": 0.43,
+			"combined_cost_text": reroll_cost_text,
+			"combine_progress": progress,
 		})
 	return candidates
+
+## The three-of-a-kind closest to completing, across everything owned. Grouped by
+## identity AND level because that is how CombineService groups them.
+func _best_combine_progress() -> Dictionary:
+	var groups: Dictionary[String, int] = {}
+	for unit: Unit in _owned_units():
+		if unit == null:
+			continue
+		var key: String = "%s#%d" % [_unit_id(unit), int(unit.level)]
+		groups[key] = int(groups.get(key, 0)) + 1
+	var best: Dictionary = {}
+	for key: String in groups.keys():
+		var count: int = int(groups[key])
+		if count < 2:
+			continue
+		if count <= int(best.get("have", 0)):
+			continue
+		var parts: PackedStringArray = key.split("#")
+		best = {
+			"id": String(parts[0]),
+			"level": int(parts[1]) if parts.size() > 1 else 1,
+			"have": count,
+			"need": maxi(0, 3 - count),
+		}
+	return best
 
 ## Item assignment, decided by Jev rather than by a helper.
 ##
@@ -1299,6 +2614,13 @@ func _item_candidates() -> Array[Dictionary]:
 	var board: Array[Unit] = _board_units()
 	if board.is_empty():
 		return candidates
+	# A board can hold two copies of one unit - 305 of 438 recorded fight snapshots do -
+	# and a candidate keyed on the unit id alone names the wrong copy when it is applied:
+	# the saturated copy was matched first, the game refused the equip with `no_slot`, and
+	# the component stayed in the inventory. 204 such refusals are on record. Key each
+	# candidate on the unit instance, and give the second copy of an id a distinct label
+	# so the choice is legible to the player as well.
+	var ordinal_by_id: Dictionary = {}
 	for raw_id: Variant in inventory.keys():
 		var item_id: String = String(raw_id).strip_edges()
 		if item_id == "" or item_id == "remover" or int(inventory[raw_id]) <= 0:
@@ -1317,19 +2639,24 @@ func _item_candidates() -> Array[Dictionary]:
 			if Items.get_equipped(unit).size() >= Items.slot_count(unit):
 				continue
 			var unit_id: String = _unit_id(unit)
+			var ordinal: int = int(ordinal_by_id.get(unit_id, 0)) + 1
+			ordinal_by_id[unit_id] = ordinal
+			var unit_label: String = unit_id if ordinal == 1 else "%s#%d" % [unit_id, ordinal]
+			var unit_key: String = str(unit.get_instance_id())
 			candidates.append({
-				"id": "equip_%s_on_%s" % [item_id, unit_id],
-				"label": "Equip %s to %s (level %d, %s)." % [item_name, unit_id, int(unit.level), String(unit.get("primary_role")) if unit.get("primary_role") != null else "unit"],
+				"id": "equip_%s_on_%s_%s" % [item_id, unit_id, unit_key],
+				"label": "Equip %s to %s (level %d, %s)." % [item_name, unit_label, int(unit.level), String(unit.get("primary_role")) if unit.get("primary_role") != null else "unit"],
 				"effect": "Put %s (%s%s%s) on %s, which currently holds %s. Two components on one unit combine automatically." % [
 					item_name,
 					item_kind,
 					", tags: " + item_tags if item_tags != "" else "",
 					", mods: " + item_mods if item_mods != "{}" else "",
-					unit_id,
+					unit_label,
 					", ".join(Items.get_equipped(unit)) if not Items.get_equipped(unit).is_empty() else "nothing",
 				],
 				"item_id": item_id,
 				"unit_id": unit_id,
+				"unit_key": unit_key,
 			})
 	if candidates.is_empty():
 		return candidates
@@ -1340,9 +2667,474 @@ func _item_candidates() -> Array[Dictionary]:
 	})
 	return candidates
 
+## Bench disposal, decided by Jev rather than by a helper.
+##
+## Selling is how a flex player turns a full bench back into board space and buckets, and
+## the rig had no sell decision at all: its bench grew to the hard cap of 10 by chapter 10
+## while its board capped at 9. That is not only untidy - a bench with no empty slot makes
+## `buy_unit` refuse every purchase with BENCH_FULL (shop_transactions.gd:162), so a
+## saturated bench is an economic dead end. The refund is the full purchase value
+## (`_calculate_sell_value`), so a sale is also how gold sitting in dead bodies comes back.
+##
+## Only bench bodies are offered. Taking a deployed fighter off the board is a composition
+## decision and the fielding/swap path owns that; this decision disposes of the surplus.
+##
+## The rules live in `summarize_sell_candidates` so a fixture probe can pin them without a
+## running board, the same way `summarize_offer_facts` is pinned.
+func _sell_candidates() -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	if Roster == null or Shop == null:
+		return candidates
+	var board_ids: Array[String] = _board_ids()
+	var board_traits: Array[String] = []
+	for entry: Dictionary in _trait_snapshot(_board_units()):
+		board_traits.append(String(entry.get("id", "")))
+	# Level-1 equivalents per identity, and how many copies sit at each (identity, level)
+	# pair. Both are the same quantities the shop decision is priced against, so "surplus"
+	# and "combine material" mean the same thing in both decisions.
+	var equivalents: Dictionary[String, int] = {}
+	var group_at_level: Dictionary[String, int] = {}
+	for unit: Unit in _owned_units():
+		if unit == null:
+			continue
+		var owned_id: String = _unit_id(unit)
+		var value: int = 1
+		for _step: int in range(maxi(0, int(unit.level) - 1)):
+			value *= 3
+		equivalents[owned_id] = int(equivalents.get(owned_id, 0)) + value
+		var group_key: String = "%s#%d" % [owned_id, maxi(1, int(unit.level))]
+		group_at_level[group_key] = int(group_at_level.get(group_key, 0)) + 1
+	var records: Array[Dictionary] = []
+	for unit: Unit in Roster.compact():
+		if unit == null:
+			continue
+		var unit_id: String = _unit_id(unit)
+		var level: int = maxi(1, int(unit.level))
+		records.append({
+			"unit_id": unit_id,
+			"unit_key": str(unit.get_instance_id()),
+			"level": level,
+			"cost": maxi(0, int(unit.cost)),
+			"refund": _sell_refund_quote(unit),
+			"traits": unit.traits.duplicate(),
+			"where": "bench",
+			"group_at_level": int(group_at_level.get("%s#%d" % [unit_id, level], 0)),
+			"copies_beyond_three_star": maxi(0, int(equivalents.get(unit_id, 0)) - THREE_STAR_LEVEL1_EQUIVALENTS),
+		})
+	candidates = summarize_sell_candidates(records, {
+		"board_ids": board_ids,
+		"board_traits": board_traits,
+		"bench_full": _bench_is_full(),
+	})
+	if candidates.is_empty():
+		return candidates
+	# Cheapest first: when the bench has to shed bodies, the one worth least is the one to
+	# lose, and the ordering makes that the easy pick without the model having to sort.
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return int(left.get("refund", 0)) < int(right.get("refund", 0))
+	)
+	candidates.append({
+		"id": "hold_units",
+		"label": "Sell nothing this beat.",
+		"effect": "Keep the whole bench. Nothing has to be sold; the next planning beat can still sell.",
+	})
+	return candidates
+
+## The sell decision's rules, separated from the live roster so a fixture can pin them.
+##
+## Only bench bodies are offered: a deployed fighter is composition, and the recorded gap is
+## a bench that grows to its hard cap and can never shrink. Two kinds of body are never
+## offered - one that is a single copy from a star-up (combine material, a strict loss to
+## sell) and anything not on the bench.
+##
+## Every candidate carries the reason it is the least painful to lose:
+##   surplus_copy  - the identity already holds more level-1 equivalents than a three-star
+##                   consumes, so this copy can never combine into anything.
+##   off_plan      - the identity is not on the board and shares no trait with it, so
+##                   fielding it would start a plan the run is not on.
+##   low_cost_body - a cost-1 body that does share a trait: cheap flex, sold before real value.
+##   flex_value    - a cost-2+ body that shares a trait: real value, offered only because a
+##                   full bench stops the run buying anything at all.
+static func summarize_sell_candidates(records: Array[Dictionary], context: Dictionary) -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = []
+	var bench_full: bool = bool(context.get("bench_full", false))
+	var board_ids: Array = context.get("board_ids", []) as Array
+	var board_traits: Array = context.get("board_traits", []) as Array
+	for record_value: Variant in records:
+		var record: Dictionary = record_value as Dictionary
+		if record.is_empty():
+			continue
+		if String(record.get("where", "bench")) != "bench":
+			continue
+		# One copy from a star-up is the one thing on a bench that is worth more than its
+		# refund, so it is never offered regardless of how full the bench is.
+		if int(record.get("group_at_level", 0)) >= 2:
+			continue
+		var surplus: int = int(record.get("copies_beyond_three_star", 0))
+		# With room on the bench nothing has to leave it, so only a body that can never be
+		# used is worth offering.
+		if surplus <= 0 and not bench_full:
+			continue
+		var unit_id: String = String(record.get("unit_id", ""))
+		var level: int = int(record.get("level", 1))
+		var cost: int = int(record.get("cost", 0))
+		var refund: int = int(record.get("refund", 0))
+		var on_board: bool = board_ids.has(unit_id)
+		var shares_trait: bool = false
+		for trait_value: Variant in (record.get("traits", []) as Array):
+			if board_traits.has(String(trait_value)):
+				shares_trait = true
+				break
+		var reason_kind: String = ""
+		var reason: String = ""
+		if surplus > 0:
+			reason_kind = "surplus_copy"
+			reason = ("%d copies of %s beyond the nine a three-star consumes: this one can never combine." % [surplus, unit_id])
+		elif not on_board and not shares_trait:
+			reason_kind = "off_plan"
+			reason = ("no empty bench slot, and %s shares no trait with the deployed board, so it is off the plan this run is on." % unit_id)
+		elif cost <= 1:
+			reason_kind = "low_cost_body"
+			reason = ("no empty bench slot, and %s is a cost-1 body - the cheapest thing the bench is holding." % unit_id)
+		else:
+			reason_kind = "flex_value"
+			reason = ("no empty bench slot; %s shares a trait with the board and is worth keeping, so it is only offered because nothing can be bought while the bench is full." % unit_id)
+		candidates.append({
+			# Keyed on the unit instance, exactly as _item_candidates does: two copies of one
+			# identity are two different units, and an id-keyed candidate names the wrong copy.
+			"id": "sell_%s_%s" % [unit_id, String(record.get("unit_key", ""))],
+			"label": "Sell %s (level %d, cost %d) for %d buckets." % [unit_id, level, cost, refund],
+			"effect": "%s Frees one bench slot and credits %d buckets." % [reason, refund],
+			"unit_id": unit_id,
+			"unit_key": String(record.get("unit_key", "")),
+			"level": level,
+			"cost": cost,
+			"refund": refund,
+			"where": "bench",
+			"reason_kind": reason_kind,
+			"reason": reason,
+		})
+	return candidates
+
+## The smallest board a sale is allowed to leave behind: the board the run is actually
+## fighting with, capped by the capacity its level allows. A board above its capacity may
+## shed down to it; a board at capacity may not shed at all. Pure so the rule can be pinned
+## by a fixture rather than inferred from a run.
+static func sell_board_floor(board_size: int, board_capacity: int) -> int:
+	if board_size <= 0:
+		return 0
+	if board_capacity <= 0:
+		return board_size
+	return mini(board_size, board_capacity)
+
+## The refund the game will credit for this unit. Mirrors
+## `ShopTransactions._calculate_sell_value` - the purchase value when the unit was bought,
+## otherwise cost x 3^(level-1) - so a candidate can state what selling it is worth before
+## the choice is made. The recorded event carries the real credit as well, so a divergence
+## between the quote and the payout is visible rather than hidden.
+func _sell_refund_quote(unit: Unit) -> int:
+	if unit == null:
+		return 0
+	if int(unit.purchase_value) > 0:
+		return int(unit.purchase_value)
+	var value: int = maxi(0, int(unit.cost))
+	for _step: int in range(maxi(0, maxi(1, int(unit.level)) - 1)):
+		value *= 3
+	return value
+
+## A bench with no empty slot refuses every purchase, so it is the condition that turns a
+## tidy-up into a blocked economy.
+func _bench_is_full() -> bool:
+	if Roster == null:
+		return false
+	if Roster.has_method("first_empty_slot"):
+		return int(Roster.first_empty_slot()) == -1
+	return Roster.compact().size() >= int(Roster.slot_count())
+
 ## One planning beat can need several item decisions: two components on one unit is a
 ## deliberate two-step play, so a single pass would leave the second one unplaced.
+## The same estimate the HUD shows, recomputed from the teams that are about to
+## fight. Uses the game's own estimator so the two numbers are directly comparable.
+func _live_win_odds() -> float:
+	var player_team: Array[Unit] = _board_units()
+	var enemy_team: Array[Unit] = _enemy_units()
+	if player_team.is_empty() or enemy_team.is_empty():
+		return -1.0
+	var boss_factor: float = 1.0
+	if RosterUtils.is_boss_stage(int(GameState.stage_in_chapter)):
+		boss_factor = TeamOddsEstimator.BOSS_ESCALATION_PREVIEW_FACTOR
+	var percent: int = TeamOddsEstimator.estimate_from_ratings(
+		TeamOddsEstimator.team_rating(player_team),
+		TeamOddsEstimator.team_rating(enemy_team),
+		boss_factor,
+	)
+	return snappedf(float(percent) / 100.0, 0.001)
+
+## The stage's design target rating. Read from the already-generated spec for the
+## stage being fought; the procedural chapter is cached by the time a fight starts.
+func _stage_target_rating() -> int:
+	if RosterCatalog == null:
+		return -1
+	var spec: Variant = RosterCatalog.get_spec(int(GameState.chapter), int(GameState.stage_in_chapter))
+	if not spec is Dictionary:
+		return -1
+	# StageTypes.make_spec only emits ids/kind/rules, so the target lives under rules.
+	# Reading the top level returned -1 for every stage of every run.
+	var rules: Variant = spec.get("rules", {})
+	if rules is Dictionary:
+		return int((rules as Dictionary).get("target_rating", -1))
+	return -1
+
+## Never trade a board unit away for a less invested body.
+##
+## The same defect as the id-collision trade-down, one step wider: the fielding plan
+## is built from id strings, so it cannot see that the "grint" it wants to bench is a
+## three-star holding an item and the "berebell" replacing it is a fresh level 1. A
+## replacement has to be at least as invested as the unit leaving, which still allows
+## upgrades and like-for-like role swaps while refusing to throw away levels or items.
+func _swap_is_worthwhile(bench_out_id: String, field_id: String) -> bool:
+	var out_unit: Unit = _board_unit_with_id(bench_out_id)
+	var in_unit: Unit = _bench_unit_with_id(field_id)
+	if out_unit == null or in_unit == null:
+		return true
+	return _investment(in_unit) >= _investment(out_unit)
+
+## Record every board swap with the levels and item counts on both sides, so a
+## trade-down (benching an invested unit to field a weaker copy) is visible as data
+## instead of something only a player watching the screen would notice.
+func _on_board_swap(bench_out_id: String, field_id: String, label: String) -> void:
+	var out_unit: Unit = _board_unit_with_id(bench_out_id)
+	var in_unit: Unit = _bench_unit_with_id(field_id)
+	_append_event("board_swap", {
+		"label": label,
+		"bench_ids": _bench_ids(),
+		"out_id": bench_out_id,
+		"out_level": int(out_unit.level) if out_unit != null else -1,
+		"out_items": Items.get_equipped(out_unit).size() if (out_unit != null and Items != null) else 0,
+		"in_id": field_id,
+		"in_level": int(in_unit.level) if in_unit != null else -1,
+		"in_items": Items.get_equipped(in_unit).size() if (in_unit != null and Items != null) else 0,
+		"trade_down": out_unit != null and in_unit != null and _investment(in_unit) < _investment(out_unit),
+	})
+
+## Which board unit to trade away when a bench unit is being fielded.
+##
+## The inherited chooser works on id strings, so it cannot tell a level-3 Bonko
+## holding three items from a freshly bought level-1 Bonko - both are "bonko". It
+## benched the invested one and fielded the fresh copy, repeatedly: the run slammed
+## three items onto a Bonko, watched it get benched for a level-1 copy, lost, bought
+## another, and did it again. Investment is never worth trading down, so an
+## invested board unit is not a swap candidate while a weaker same-id copy waits on
+## the bench, and the weakest board unit is preferred otherwise.
+func _next_board_swap_id(field_ids: Array[String], bench_out_ids: Array[String]) -> String:
+	var board: Array[String] = _board_ids()
+	var desired_counts: Dictionary = _id_counts(field_ids)
+	var seen_counts: Dictionary = {}
+	for unit_id: String in bench_out_ids:
+		if not board.has(unit_id):
+			continue
+		seen_counts[unit_id] = int(seen_counts.get(unit_id, 0)) + 1
+		if int(seen_counts.get(unit_id, 0)) > int(desired_counts.get(unit_id, 0)):
+			return unit_id
+	var worst_id: String = ""
+	var worst_score: int = 1 << 30
+	for board_id: String in board:
+		var board_unit: Unit = _board_unit_with_id(board_id)
+		if board_unit == null:
+			continue
+		var bench_copy: Unit = _bench_unit_with_id(board_id)
+		if bench_copy != null and _investment(bench_copy) <= _investment(board_unit):
+			# Trading this copy down for a weaker one of the same identity is never
+			# worth it; leave it alone.
+			continue
+		# A unit the fielding plan does not want is the natural swap; otherwise take
+		# the least invested body.
+		var score: int = _investment(board_unit)
+		if not field_ids.has(board_id):
+			score -= 1000
+		if score < worst_score:
+			worst_score = score
+			worst_id = board_id
+	return worst_id
+
+## Rough value of a unit: level first, then how many items it carries.
+func _investment(unit: Unit) -> int:
+	if unit == null:
+		return 0
+	var item_count: int = 0
+	if Items != null:
+		item_count = Items.get_equipped(unit).size()
+	return maxi(1, int(unit.level)) * 100 + item_count
+
+func _board_unit_with_id(unit_id: String) -> Unit:
+	for unit: Unit in _board_units():
+		if unit != null and _unit_id(unit) == unit_id:
+			return unit
+	return null
+
+func _bench_unit_with_id(unit_id: String) -> Unit:
+	# No Engine.has_singleton guard: a script autoload is not an engine singleton, so
+	# that check is always false and this lookup silently returned null every time,
+	# which is why a swap guard could not see the unit it was trading away.
+	for unit: Unit in Roster.compact():
+		if unit != null and _unit_id(unit) == unit_id:
+			return unit
+	return null
+
+## Deploy by role instead of by first empty tile.
+##
+## The player board is 8 columns x 3 rows and index 0 is the top row, which is the
+## rank that faces the enemy. Filling the first empty tile therefore put every early
+## unit in the front rank: a run was observed holding mage at tile 2, support at 3,
+## marksman at 5/6 and tank at 4 - all in row 0, so the backline was tanking. Front
+## roles take the front rank first; everyone else starts in the back rank.
+const BOARD_COLUMNS: int = 8
+const FRONTLINE_ROLES: Array[String] = ["tank", "brawler", "assassin"]
+
+func _preferred_board_tile(controller: Variant, unit_id: String) -> int:
+	if controller == null or controller.player_grid_helper == null:
+		return -1
+	# Called through Variant on purpose: a strict `as BoardGrid` cast here silently
+	# failed and the deployment fell back to the first empty tile, which is what put
+	# the backline in the front rank.
+	var helper: Variant = controller.player_grid_helper
+	if not helper.has_method("size") or not helper.has_method("is_occupied"):
+		return -1
+	var tile_count: int = int(helper.call("size"))
+	if tile_count <= 0:
+		return -1
+	var rows: int = maxi(1, int(tile_count / BOARD_COLUMNS))
+	var frontline: bool = FRONTLINE_ROLES.has(_unit_role(unit_id))
+	# Front roles fill row 0 outward; back roles fill the last row outward. Both fall
+	# back through the remaining rows so a large board still deploys.
+	var row_order: Array[int] = []
+	if frontline:
+		for row: int in range(rows):
+			row_order.append(row)
+	else:
+		for row: int in range(rows - 1, -1, -1):
+			row_order.append(row)
+	for row: int in row_order:
+		for column: int in range(BOARD_COLUMNS):
+			var index: int = row * BOARD_COLUMNS + column
+			if index < tile_count and not bool(helper.call("is_occupied", index)):
+				return index
+	return -1
+
+## Move backline units out of the rank that meets the enemy.
+##
+## The role preference in _preferred_board_tile only runs on the drag path, and a
+## bought unit is already on the board before that path is reached: the game places it
+## in the first free tile, which is the rank that faces the enemy. Recorded
+## placements showed a support standing in tile 2 beside the frontline while a free
+## back-row tile went unused, and across the archive only the runs that fielded nine
+## units put most of their backline behind the front rank at all.
+##
+## This runs before the wager so the board being priced is the board that fights, and
+## it moves at most REPOSITION_ROLE_FIX_LIMIT units per beat so a placement the engine
+## refuses cannot turn the planning beat into a drag loop.
+func _pull_backline_out_of_the_front_rank(label: String) -> int:
+	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
+	if combat == null:
+		return 0
+	var controller: Variant = combat.get("controller")
+	if controller == null or controller.player_grid_helper == null:
+		return 0
+	var helper: Variant = controller.player_grid_helper
+	if not helper.has_method("size") or not helper.has_method("is_occupied") or not helper.has_method("get_center"):
+		return 0
+	var player_grid: GridContainer = combat.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid") as GridContainer
+	if player_grid == null:
+		return 0
+	var tile_count: int = int(helper.call("size"))
+	var rows: int = maxi(1, int(tile_count / BOARD_COLUMNS))
+	if rows < 2:
+		return 0
+	var placements: Array[int] = _player_placements()
+	var board: Array[Unit] = _board_units()
+	var moved: int = 0
+	for index: int in range(board.size()):
+		if moved >= REPOSITION_ROLE_FIX_LIMIT:
+			break
+		var unit: Unit = board[index]
+		if unit == null:
+			continue
+		if FRONTLINE_ROLES.has(_unit_role(_unit_id(unit))):
+			continue
+		var tile: int = int(placements[index]) if index < placements.size() else -1
+		if tile < 0 or int(tile / BOARD_COLUMNS) != 0:
+			continue
+		var target: int = -1
+		for row: int in range(rows - 1, 0, -1):
+			for column: int in range(BOARD_COLUMNS):
+				var candidate: int = row * BOARD_COLUMNS + column
+				if candidate < tile_count and not bool(helper.call("is_occupied", candidate)):
+					target = candidate
+					break
+			if target >= 0:
+				break
+		if target < 0:
+			break
+		var view: UnitView = _find_unit_view_by_id(player_grid, _unit_id(unit))
+		if view == null:
+			continue
+		var center: Vector2 = helper.call("get_center", target)
+		var dragged: bool = await _drag_control_to(view, center, "%s pull %s back" % [label, _unit_id(unit)])
+		await _settle_frames(4)
+		if dragged:
+			moved += 1
+			_append_event("reposition_role_fix", {
+				"unit_id": _unit_id(unit),
+				"from_tile": tile,
+				"to_tile": target,
+				"label": label,
+			})
+	return moved
+
+## Deterministic item handling for the baseline arm. Components only do anything
+## once they are equipped, so the control run places each held component on the
+## first board unit with a free slot rather than leaving the inventory untouched.
+func _auto_equip_items(label: String) -> void:
+	if Items == null:
+		return
+	for _round: int in range(ITEM_DECISIONS_PER_BEAT):
+		var inventory: Dictionary = Items.get_inventory_snapshot()
+		var item_id: String = ""
+		for raw_id: Variant in inventory.keys():
+			if int(inventory[raw_id]) > 0:
+				item_id = String(raw_id)
+				break
+		if item_id.is_empty():
+			return
+		var placed: bool = false
+		for unit: Unit in _board_units():
+			if unit == null:
+				continue
+			if Items.get_equipped(unit).size() >= Items.slot_count(unit):
+				continue
+			var res: Dictionary = Items.equip(unit, item_id)
+			_append_event("item_equipped", {
+				"item_id": item_id,
+				"unit_id": _unit_id(unit),
+				"ok": bool(res.get("ok", false)),
+				"reason": String(res.get("reason", "")),
+				"combined_id": String(res.get("combined_id", "")),
+				"label": label,
+				"basis": "heuristic_first_fit",
+			})
+			if bool(res.get("ok", false)):
+				placed = true
+				break
+		if not placed:
+			return
+
 func _decide_items(label: String) -> void:
+	# The heuristic arm has no controller, so asking would stall the run until the
+	# decision timeout. It equips first-fit instead, so the baseline arm keeps
+	# comparable power and still finishes on the same seed.
+	if _run_mode != "jev":
+		_auto_equip_items(label)
+		return
 	for _round: int in range(ITEM_DECISIONS_PER_BEAT):
 		var candidates: Array[Dictionary] = _item_candidates()
 		if candidates.size() <= 1:
@@ -1366,13 +3158,19 @@ func _decide_items(label: String) -> void:
 			if String(candidate.get("id", "")) != chosen:
 				continue
 			var target_id: String = String(candidate.get("unit_id", ""))
+			var target_key: String = String(candidate.get("unit_key", ""))
 			for unit: Unit in _board_units():
 				if _unit_id(unit) != target_id:
+					continue
+				# Two copies of one unit are two different units: apply the equip to the
+				# instance the candidate was priced on, not to the first copy of that id.
+				if target_key != "" and str(unit.get_instance_id()) != target_key:
 					continue
 				var res: Dictionary = Items.equip(unit, String(candidate.get("item_id", "")))
 				_append_event("item_equipped", {
 					"item_id": String(candidate.get("item_id", "")),
 					"unit_id": target_id,
+					"unit_key": target_key,
 					"ok": bool(res.get("ok", false)),
 					"reason": String(res.get("reason", "")),
 					"combined_id": String(res.get("combined_id", "")),
@@ -1385,39 +3183,254 @@ func _decide_items(label: String) -> void:
 			_append_event("decision_rejected", {"kind": "item_equip", "choice_id": chosen, "reason": "not_an_item_candidate"})
 			return
 
-func _wager_candidates(reserve: int) -> Array[Dictionary]:
-	var candidates: Array[Dictionary] = []
-	var seen: Dictionary[int, bool] = {}
+## Bench disposal, asked of the model rather than decided by a helper.
+##
+## A sale is optional. The candidate list always ends with an explicit hold, and the
+## empty answer - which is what a timeout produces - is treated as that same hold, so an
+## upstream hiccup can never sell a body the run wanted to keep. The decision is skipped
+## entirely when nothing but the hold is on offer, so no model call is spent on a question
+## with one answer.
+func _decide_sell(label: String) -> void:
+	# The game refuses every sale during combat, and the status is the same one the shop
+	# uses, so the question is not worth asking then.
+	if int(GameState.phase) == int(GameState.GamePhase.COMBAT):
+		return
+	if _run_mode != "jev":
+		# The heuristic arm has no controller, so asking would stall the run until the
+		# decision timeout. It sells one surplus bench body when the bench is full and
+		# otherwise holds, which keeps the baseline arm's capacity to buy intact.
+		_auto_sell_bench_surplus(label)
+		return
+	var candidates: Array[Dictionary] = _sell_candidates()
+	if candidates.size() <= 1:
+		return
+	var state: Dictionary = _plan_state()
+	state["bench_capacity"] = Roster.slot_count() if Roster != null else 0
+	state["bench_full"] = _bench_is_full()
+	var decision: Dictionary = await _ask_decision("unit_sell", state, candidates)
+	var chosen: String = String(decision.get("choice_id", ""))
+	if _sell_choice_is_hold(chosen):
+		return
+	if not _apply_sell_choice(chosen, candidates, label):
+		_append_event("decision_rejected", {"kind": "unit_sell", "choice_id": chosen, "reason": "not_a_sell_candidate"})
+
+## What "sell nothing" looks like. The empty id is the harness's own timeout fallback, so
+## the hold and a timeout are deliberately the same answer: neither may sell a body.
+static func _sell_choice_is_hold(choice_id: String) -> bool:
+	return choice_id == "" or choice_id == "hold_units"
+
+## Apply a chosen sale through the same call the UI's sell zone makes
+## (combat_controller.gd:2049): the Shop autoload's own `sell_unit`, which clears the bench
+## slot, returns the sold unit's items to the inventory and credits the refund. Returns true
+## only when a sale actually happened.
+##
+## `basis` names who chose the sale, matching how item_equipped and shop_purchase label a
+## policy action: "jev_choice" for the model, "heuristic_first_fit" for the baseline arm.
+func _apply_sell_choice(chosen: String, candidates: Array[Dictionary], label: String, basis: String = "jev_choice") -> bool:
+	for candidate: Dictionary in candidates:
+		if String(candidate.get("id", "")) != chosen:
+			continue
+		if not _sell_keeps_the_board_fieldable(candidate):
+			_append_event("sell_refused", {
+				"choice_id": chosen,
+				"unit_id": String(candidate.get("unit_id", "")),
+				"reason": "would_drop_the_board_below_what_it_fields",
+				"label": label,
+			})
+			return false
+		var target_id: String = String(candidate.get("unit_id", ""))
+		var target_key: String = String(candidate.get("unit_key", ""))
+		# Two copies of one identity are two different units, so the sale is applied to the
+		# instance the candidate was priced on rather than to the first copy of that id.
+		for unit: Unit in Roster.compact():
+			if unit == null or _unit_id(unit) != target_id:
+				continue
+			if target_key != "" and str(unit.get_instance_id()) != target_key:
+				continue
+			var board_before: int = _board_units().size()
+			var bench_before: int = Roster.compact().size()
+			var res: Dictionary = Shop.sell_unit(unit) if Shop != null else {}
+			var ok: bool = bool(res.get("ok", false))
+			_append_event("unit_sold", {
+				"unit_id": target_id,
+				"unit_key": target_key,
+				"level": int(candidate.get("level", 1)),
+				"cost": int(candidate.get("cost", 0)),
+				"quoted_refund": int(candidate.get("refund", 0)),
+				"refund": int(res.get("gold_gained", 0)),
+				"reason_kind": String(candidate.get("reason_kind", "")),
+				"reason": String(candidate.get("reason", "")),
+				"basis": basis,
+				"label": label,
+				"ok": ok,
+				"error": String(res.get("error", "")),
+				"board_before": board_before,
+				"board_after": _board_units().size(),
+				"bench_before": bench_before,
+				"bench_after": Roster.compact().size(),
+			})
+			return ok
+		_append_event("decision_rejected", {"kind": "unit_sell", "choice_id": chosen, "reason": "unit_no_longer_on_the_bench"})
+		return false
+	return false
+
+## A sale may never take the board below what it needs to field. A bench body is not on the
+## board at all, so it cannot move that floor; a body on the board is only allowed out while
+## the board it leaves can still field a team, which is why a board at capacity refuses.
+func _sell_keeps_the_board_fieldable(candidate: Dictionary) -> bool:
+	if String(candidate.get("where", "bench")) != "board":
+		return true
+	# The board is read from the live combat view, so it cannot be judged before one exists.
+	if _main == null:
+		return false
+	var board_size: int = _board_units().size()
+	if board_size <= 0:
+		return false
+	return board_size - 1 >= sell_board_floor(board_size, _roster_max_team_size())
+
+## Deterministic sell rule for the baseline arm: one surplus bench body per planning beat,
+## and only when the bench has no empty slot. It never sells combine material and never
+## touches the board, so the heuristic run stays valid while regaining the ability to buy.
+func _auto_sell_bench_surplus(label: String) -> void:
+	if not _bench_is_full():
+		return
+	var candidates: Array[Dictionary] = _sell_candidates()
+	# The list ends with the hold, so a list of one means only the hold is on offer.
+	if candidates.size() <= 1:
+		return
+	var chosen: String = String(candidates[0].get("id", ""))
+	_apply_sell_choice(chosen, candidates, label, "heuristic_first_fit")
+
+## Stake options for the wager about to be placed.
+##
+## ``stage_attempt`` is the attempt number at the current stage. A repeat of a stage
+## the run has already lost is not the same bet as the first look at it, and the
+## recorded results say the shown odds do not know the difference: across 559 retry
+## fights the quoted-40% band returned -0.81 expected buckets per bucket staked while
+## the first attempts in the same band returned +0.15, and the rig was staking about
+## 46% of its bankroll on the retries. The generated enemy does not change between
+## attempts, so the loss already taken is real information the power model cannot see.
+## Retries are therefore capped instead of being priced like a fresh read.
+func _wager_candidates(reserve: int, stage_attempt: int = 1) -> Array[Dictionary]:
 	var quote_kind: String = String(Economy.encounter_quote_kind)
 	var multiplier: float = float(Economy.gross_payout_multiplier())
 	var shown_odds: float = float(Economy.projected_win_probability)
 	var break_even: float = 1.0 / max(0.01, multiplier)
-	for share: float in WAGER_PRESET_SHARES:
-		var wager: int = int(round(float(reserve) * share))
-		wager = clampi(wager, 1, reserve)
+	var net_odds: float = maxf(0.01, multiplier - 1.0)
+	var retry: bool = int(stage_attempt) >= 2
+	var retry_cap: int = maxi(1, int(round(float(reserve) * RETRY_STAKE_CAP)))
+	# What the stake is sized from. A first attempt uses the measured band rate from
+	# the policy file, because the displayed estimate is pessimistic in bands that
+	# are profitable; a retry keeps the displayed number, since the retry record says
+	# the displayed number is if anything too generous there.
+	var stake_odds: float = shown_odds
+	var stake_basis: String = "shown odds"
+	if not retry:
+		stake_odds = _measured_first_attempt_win_rate(quote_kind, shown_odds)
+		if absf(stake_odds - shown_odds) >= 0.001:
+			stake_basis = "measured band rate"
+	var measured_edge: float = stake_odds * multiplier - 1.0
+	# Kelly: the stake that grows the bankroll fastest at these odds, for a bet paying
+	# `multiplier` including the stake. A near-lock pushes it toward the whole
+	# bankroll; a marginal edge pushes it toward the minimum.
+	var kelly_fraction: float = clampf(measured_edge / net_odds, -1.0, 1.0)
+	var kelly_wager: int = clampi(int(round(float(reserve) * maxf(0.0, kelly_fraction))), 1, reserve)
+	# Named stakes rather than anonymous bankroll fractions. The model is choosing an
+	# intent, and "25% of the bankroll" collapses onto the same integer as "minimum"
+	# as soon as the bankroll is small, which is how every early wager became a
+	# one-bucket bet.
+	var plans: Array[Dictionary] = [
+		{
+			"stake": 1,
+			"role": "minimum",
+			"why": "The smallest legal wager. Correct only when the measured edge is negative.",
+		},
+		{
+			"stake": kelly_wager,
+			"role": "kelly",
+			"why": "The stake that grows the bankroll fastest at the measured rate. Correct when the measured edge is positive and the run can carry the full Kelly swing.",
+		},
+		{
+			"stake": maxi(1, int(round(float(reserve) * kelly_fraction * 0.5))),
+			"role": "half_kelly",
+			"why": "Half the growth-optimal stake, which gives up a quarter of the growth rate for half the swing. Correct when the measured edge is clear but the run cannot afford the full Kelly drawdown.",
+		},
+		{
+			"stake": reserve,
+			"role": "all_in",
+			"why": "The whole bankroll. Correct wherever the Kelly share is at least a half: on the recorded fight sequences that bar lifted the median peak bankroll by a third and the p90 threefold with the median closing bankroll unchanged. Below a half it is over-betting and the record shows it ending runs.",
+		},
+	]
+	var candidates: Array[Dictionary] = []
+	var seen: Dictionary[int, bool] = {}
+	for plan: Dictionary in plans:
+		var role: String = String(plan.get("role", "stake"))
+		var planned_stake: int = clampi(int(plan.get("stake", 1)), 1, reserve)
+		var wager: int = planned_stake
+		if retry:
+			wager = mini(wager, retry_cap)
 		if seen.has(wager):
 			continue
 		seen[wager] = true
+		var capped: bool = retry and planned_stake > wager
 		var payout: int = int(Economy.quoted_payout(wager))
+		var profit: int = payout - wager
+		var actual_share: int = int(round(100.0 * float(wager) / float(max(1, reserve))))
+		# Expected value of the wager at the rate the stake was sized from, so a
+		# candidate that looks marginal on the screen cannot be quoted as marginal
+		# when the recorded band rate says it is profitable.
+		var expected_value: float = stake_odds * float(profit) - (1.0 - stake_odds) * float(wager)
+		var retry_note: String = ""
+		if retry:
+			retry_note = " ATTEMPT %d AT THIS STAGE: the stake is capped at %d of %d buckets. This exact generated enemy has already beaten this board once, and the recorded retries returned about -0.8 expected buckets per bucket staked in this odds band while first attempts in the same band returned +0.15. The loss already taken is information the odds on screen cannot price." % [
+				int(stage_attempt),
+				retry_cap,
+				reserve,
+			]
 		candidates.append({
 			"id": "wager_%d" % wager,
-			"label": "Wager %d of %d buckets (%d%% of the bankroll); win returns %d, loss leaves %d." % [
+			"label": "%s: wager %d of %d buckets (%d%% of the bankroll); a win pays %d gross for %+d profit, a loss leaves %d." % [
+				"RETRY-CAPPED" if capped else role.to_upper(),
 				wager,
 				reserve,
-				int(round(share * 100.0)),
+				actual_share,
 				payout,
+				profit,
 				reserve - wager,
 			],
-			"effect": "%s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%%. Loss leaves %d buckets." % [
+			"effect": "%s %s quote %.2fx, break-even win odds %.0f%%, shown odds %.0f%%, %s %.0f%% (edge %+.2f buckets per bucket staked; Kelly stake %d of %d). Expected value %+.2f buckets. Loss leaves %d buckets.%s" % [
+				String(plan.get("why", "")),
 				quote_kind,
 				multiplier,
 				break_even * 100.0,
 				shown_odds * 100.0,
+				stake_basis,
+				stake_odds * 100.0,
+				measured_edge,
+				kelly_wager,
+				reserve,
+				expected_value,
 				reserve - wager,
+				retry_note,
 			],
 			"wager": wager,
-			"share": share,
+			"role": role,
+			"stake_odds": snappedf(stake_odds, 0.001),
+			"stake_basis": stake_basis,
+			"measured_edge": snappedf(measured_edge, 0.001),
+			"stage_attempt": int(stage_attempt),
+			"retry": retry,
+			"retry_capped": capped,
+			"share": float(wager) / float(max(1, reserve)),
+			"is_all_in": wager >= reserve,
+			"is_pressing": role in ["half_kelly", "kelly", "press", "all_in"],
+			"kelly_fraction": snappedf(kelly_fraction, 0.001),
+			"kelly_wager": kelly_wager,
+			"is_kelly_sized": wager == kelly_wager,
 			"payout_if_win": payout,
+			"profit_if_win": profit,
+			"shown_win_odds": shown_odds,
+			"expected_value_buckets": snappedf(expected_value, 0.01),
 			"buckets_if_loss": reserve - wager,
 			"break_even_odds": break_even,
 		})
@@ -1458,9 +3471,45 @@ func _ask_decision(kind: String, state: Dictionary, candidates: Array[Dictionary
 				var decision: Dictionary = parsed as Dictionary
 				if int(decision.get("index", -1)) == _decision_index:
 					_decision_kinds[kind] = int(_decision_kinds.get(kind, 0)) + 1
+					_consecutive_decision_timeouts = 0
 					return decision
 		await get_tree().create_timer(DECISION_POLL_SECONDS, true, false, true).timeout
-	_abort_run("Jev decision %d (%s) was not answered within %d seconds" % [_decision_index, kind, int(DECISION_TIMEOUT_SECONDS)])
+	# The controller did not answer. Every caller treats an empty decision as its safe
+	# default (pass, minimum wager, hold, back out), so the run continues and the
+	# transcript records exactly where it fell back. Aborting here threw away a
+	# 47-battle run that was one stage from its target because of one upstream 5xx.
+	_append_event("decision_timeout", {
+		"index": _decision_index,
+		"kind": kind,
+		"timeout_seconds": int(DECISION_TIMEOUT_SECONDS),
+		"fallback": "safe_default",
+		"consecutive": _consecutive_decision_timeouts + 1,
+	})
+	print("%s: decision %d (%s) unanswered after %ds; continuing on the safe default" % [
+		JEV_HARNESS_NAME,
+		_decision_index,
+		kind,
+		int(DECISION_TIMEOUT_SECONDS),
+	])
+	# One unanswered decision is an upstream hiccup and the safe default keeps the run
+	# alive; a controller that has died is a different thing. Every later decision then
+	# costs the full timeout, so a dead controller turned one run into hours of wall
+	# clock on safe defaults - and the transcript would still be labelled a Jev run.
+	# End it as its own terminal so the batch and the analysis can tell the difference.
+	_consecutive_decision_timeouts += 1
+	if _consecutive_decision_timeouts >= CONTROLLER_LOST_AFTER_TIMEOUTS:
+		_append_event("run_end", {
+			"reason": "controller_lost",
+			"consecutive_timeouts": _consecutive_decision_timeouts,
+			"chapter": int(GameState.chapter),
+			"round": int(GameState.stage_in_chapter),
+		})
+		print("%s: %d consecutive unanswered decisions; ending the run as controller_lost" % [
+			JEV_HARNESS_NAME,
+			_consecutive_decision_timeouts,
+		])
+		_finish_jev_run("controller_lost")
+		return {}
 	return {}
 
 func _write_run_file(file_name: String, text: String) -> void:
@@ -1502,23 +3551,11 @@ func _abort_run(reason: String) -> void:
 func _finish_jev_run(terminal: String) -> void:
 	Engine.time_scale = 1.0
 	UnitFactory.suppress_validation_warnings = _previous_suppress_validation_warnings
-	var summary: Dictionary = {
-		"schema_version": 1,
-		"harness": JEV_HARNESS_NAME,
-		"mode": _run_mode,
-		"seed": _campaign_seed,
-		"starter": _starter_id,
-		"terminal": terminal,
-		"final_chapter": int(GameState.chapter),
-		"final_stage_in_chapter": int(GameState.stage_in_chapter),
-		"battles": _battles,
-		"peak_bankroll": int(Economy.peak_bankroll),
-		"buckets": int(Economy.blood_buckets),
-		"rounds": _rounds,
-		"events": _events,
-		"decision_counts": _decision_kinds,
-		"technical_failures": _failures,
-	}
+	# Computed once so the event and the summary cannot disagree about why the run
+	# stopped.
+	var outcome_record: Dictionary = _run_outcome_record(terminal)
+	_append_event("run_outcome", outcome_record)
+	var summary: Dictionary = _run_summary(terminal, outcome_record)
 	_write_run_file("run_summary.json", JSON.stringify(summary, "  "))
 	var verdict: String = "OK" if _failures.is_empty() else "FAIL"
 	print("%s: %s terminal=%s chapter=%d round=%d battles=%d peak=%d buckets=%d decisions=%s" % [
@@ -1539,3 +3576,163 @@ func _finish_jev_run(terminal: String) -> void:
 	_cleanup_runtime()
 	var exit_code: int = 0 if _failures.is_empty() else 1
 	get_tree().process_frame.connect(_quit_after_cleanup.bind(exit_code, CLEANUP_DRAIN_FRAMES), CONNECT_ONE_SHOT)
+
+## Why the run stopped, in the terms the design can act on.
+##
+## A terminal like "loss" says nothing about whether the board was outnumbered on
+## the clock, wiped outright, or beaten after spending nothing. This record ties the
+## ending to the fight that caused it: the encounter, the odds against the quote, the
+## wager, both boards, whether the clock decided it, and whether the run died with
+## board slots or buckets still in hand.
+func _run_outcome_record(terminal: String) -> Dictionary:
+	var diagnostic: Dictionary = _last_combat_diagnostic
+	var player_team: Array = diagnostic.get("post_settlement_player_board", [])
+	var board_size: int = _board_ids().size()
+	var capacity: int = _roster_max_team_size()
+	var buckets: int = int(Economy.blood_buckets)
+	var elapsed: float = float(diagnostic.get("engine_reported_elapsed_s", 0.0))
+	var timeout_s: float = float(diagnostic.get("combat_timeout_s", 0.0))
+	var clock_decided: bool = timeout_s > 0.0 and elapsed >= timeout_s - 0.3
+	# Prefer the engine's own settlement line: post-settlement team reads describe the
+	# board that was rebuilt for the next stage, not the fight that just ended.
+	var player_alive: int = int(_last_resolution_fields.get("player_alive", diagnostic.get("post_settlement_player_alive", -1)))
+	var enemy_alive: int = int(_last_resolution_fields.get("enemy_alive", diagnostic.get("post_settlement_enemy_alive", -1)))
+	var player_damage: int = int(_last_resolution_fields.get("player_damage", diagnostic.get("player_damage", 0)))
+	var enemy_damage: int = int(_last_resolution_fields.get("enemy_damage", diagnostic.get("enemy_damage", 0)))
+	var stage_key: String = "%d:%d" % [int(GameState.chapter), int(GameState.stage_in_chapter)]
+	var attempts: int = int(_same_stage_retries.get(stage_key, 0))
+	var shown: float = float(Economy.projected_win_probability)
+	var quote: float = float(Economy.gross_payout_multiplier())
+	var break_even: float = 1.0 / maxf(0.01, quote)
+	var cause: String = ""
+	var failed: bool = true
+	match terminal:
+		"loss":
+			if clock_decided and enemy_alive > player_alive:
+				cause = "clock_outnumbered"
+			elif clock_decided and enemy_alive == player_alive:
+				# Equal survivors sends the award to total remaining health, so a board
+				# can out-damage the enemy and still lose the clock.
+				cause = "clock_equal_survivors_lost_on_health"
+			elif clock_decided and player_alive <= 0:
+				cause = "wiped_on_clock"
+			elif player_alive <= 0:
+				cause = "wiped"
+			else:
+				cause = "lost_fight"
+		"opener_loss":
+			cause = "lost_opener"
+		"opener_stall":
+			cause = "opener_stall"
+		"stage_stall":
+			cause = "stage_stall_after_%d_attempts" % attempts
+		"technical_failure":
+			cause = "harness_fault"
+		"controller_lost":
+			# The decision source stopped answering, so the run is a harness outage
+			# rather than a game result and must not be read as one.
+			cause = "harness_controller_lost"
+		"aborted":
+			cause = "harness_abort"
+		"target_reached":
+			cause = "reached_campaign_target"
+			failed = false
+		"battle_budget_reached":
+			cause = "battle_budget_reached"
+			failed = false
+		_:
+			cause = terminal
+	# The questions a loss actually raises. Each is a fact, not a judgement.
+	var notes: Array[String] = []
+	# Every note below is about a run that ENDED badly, so they are gated on failure:
+	# a successful run also finishes holding buckets and would otherwise be tallied as
+	# a case of the same waste.
+	# A harness outage is not a game loss either: a run cut off when the controller died
+	# still holds buckets and can still be mid-stage, and counting those as design
+	# signals would put harness noise into the loss tally.
+	var game_result: bool = terminal in ["loss", "opener_loss", "opener_stall", "stage_stall"]
+	if failed and game_result:
+		if capacity > 0 and board_size < capacity:
+			notes.append("board_fielded_%d_of_%d_slots" % [board_size, capacity])
+		if buckets > 0:
+			notes.append("died_holding_%d_buckets" % buckets)
+		if shown <= break_even:
+			notes.append("lost_a_bet_the_odds_called_negative")
+		if shown > 0.5:
+			notes.append("lost_a_favourite")
+		# The signal that matters most for the design: a board that clearly
+		# out-fought the enemy and still lost the stage.
+		if player_damage > enemy_damage * 3 / 2 and player_alive >= enemy_alive:
+			notes.append("out_damaged_the_enemy_and_still_lost")
+		if String(Economy.encounter_quote_kind) in ["BOSS", "MIRROR"]:
+			notes.append("died_on_a_gate_stage")
+		if attempts > 0:
+			notes.append("stage_attempt_%d" % (attempts + 1))
+	return {
+		"terminal": terminal,
+		"failed": failed,
+		"cause": cause,
+		"notes": notes,
+		"chapter": int(GameState.chapter),
+		"round": int(GameState.stage_in_chapter),
+		"global_stage": (int(GameState.chapter) - 1) * 5 + int(GameState.stage_in_chapter),
+		"encounter_kind": String(Economy.encounter_quote_kind),
+		"quoted_multiplier": quote,
+		"break_even_odds": snappedf(break_even, 0.001),
+		"shown_win_odds": snappedf(shown, 0.001),
+		"wager": int(diagnostic.get("wager", 0)),
+		"buckets_at_end": buckets,
+		"board_size": board_size,
+		"board_capacity": capacity,
+		"board_full": capacity > 0 and board_size >= capacity,
+		"stage_attempts": attempts,
+		"clock_decided": clock_decided,
+		"player_alive_after": player_alive,
+		"enemy_alive_after": enemy_alive,
+		"player_damage": player_damage,
+		"enemy_damage": enemy_damage,
+		"damage_ratio": snappedf(float(player_damage) / float(max(1, enemy_damage)), 0.01),
+		"engine_resolution": _last_resolution_line,
+		"battles": _battles,
+		"peak_bankroll": int(Economy.peak_bankroll),
+		"technical_failures": _failures.duplicate(),
+		"player_board": diagnostic.get("post_settlement_player_board", []),
+		"enemy_board": diagnostic.get("post_settlement_enemy_board", []),
+	}
+
+## The full run record. Written once per round as a checkpoint and again when the run
+## ends, so a long run that dies for any reason still leaves its data behind - the
+## deepest runs are the expensive ones, and they were the ones being lost.
+func _run_summary(terminal: String, outcome_record: Dictionary = {}) -> Dictionary:
+	return {
+		"schema_version": 1,
+		"harness": JEV_HARNESS_NAME,
+		"mode": _run_mode,
+		"lane": _lane,
+		"seed": _campaign_seed,
+		"starter": _starter_id,
+		"terminal": terminal,
+		"final_chapter": int(GameState.chapter),
+		"final_stage_in_chapter": int(GameState.stage_in_chapter),
+		"battles": _battles,
+		"peak_bankroll": int(Economy.peak_bankroll),
+		"buckets": int(Economy.blood_buckets),
+		"rounds": _rounds,
+		"events": _events,
+		"decision_counts": _decision_kinds,
+		"technical_failures": _failures,
+		# Where the run's window sat, and how far the real pointer drifted while it played.
+		"window": _harness_window_summary(),
+		# Acceptance targets for the run: a three-star unit, a trait at its top
+		# tier, and a board filled to its capacity. Read from the recorded events.
+		"progression": _progression_summary(),
+		# Why the run stopped, tied to the fight that caused it.
+		"outcome": outcome_record if not outcome_record.is_empty() else _run_outcome_record(terminal),
+	}
+
+## Cheap insurance for a long run. The full record is a few hundred KB, so writing it
+## once per round is not free, but losing a nine-minute chapter-8 run to a silent exit
+## costs far more.
+func _checkpoint_run() -> void:
+	var summary: Dictionary = _run_summary("in_progress")
+	_write_run_file("run_checkpoint.json", JSON.stringify(summary, "  "))

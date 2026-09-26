@@ -2,11 +2,15 @@ extends RefCounted
 class_name ShopButtons
 
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
+const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 
 signal reroll_pressed()
 signal lock_pressed()
 signal buy_xp_pressed()
+
+## A lock with no label still needs to look like a button rather than a glyph.
+const ACTION_ICON_ONLY_WIDTH: int = 56
 
 var _host: Container = null
 var _bar: HBoxContainer = null
@@ -36,16 +40,30 @@ func _ensure_bar() -> void:
 	# Prefer top placement
 	_host.move_child(_bar, 0)
 	_reroll = Button.new()
+	_reroll.name = "RerollButton"
 	_reroll.text = _reroll_action_text
+	_reroll.icon = GothicUIAssets.action_icon(GothicUIAssets.ACTION_ICON_REROLL)
+	_reroll.add_theme_constant_override("icon_max_width", GothicUIAssets.ACTION_ICON_PIXELS)
+	_reroll.tooltip_text = "Reroll the shelf"
 	_reroll.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_reroll.pressed.connect(_on_reroll_button_pressed)
 	_lock = Button.new()
-	_lock.text = "Lock"
+	_lock.name = "LockButton"
+	# The padlock reads on its own; the word is the tooltip.
+	_lock.text = ""
+	_lock.icon = GothicUIAssets.action_icon(GothicUIAssets.ACTION_ICON_LOCK)
+	_lock.add_theme_constant_override("icon_max_width", GothicUIAssets.ACTION_ICON_PIXELS)
+	_lock.tooltip_text = "Lock the shelf so a reroll leaves it alone"
+	_lock.custom_minimum_size = Vector2(ACTION_ICON_ONLY_WIDTH, 0.0)
 	_lock.toggle_mode = true
 	_lock.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_lock.pressed.connect(func(): emit_signal("lock_pressed"))
 	_buy_xp = Button.new()
+	_buy_xp.name = "BuyXpButton"
+	_buy_xp.icon = GothicUIAssets.action_icon(GothicUIAssets.ACTION_ICON_LEVEL_UP)
+	_buy_xp.add_theme_constant_override("icon_max_width", GothicUIAssets.ACTION_ICON_PIXELS)
 	_buy_xp.text = "Buy XP"
+	_buy_xp.tooltip_text = "Buy XP to add a board slot"
 	_buy_xp.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_buy_xp.pressed.connect(func(): emit_signal("buy_xp_pressed"))
 	for action_button: Button in [_reroll, _lock, _buy_xp]:
@@ -114,20 +132,23 @@ func set_progress(level: int, xp: int, xp_to_next: int) -> void:
 		_progress_label.text = "Lvl %d (%d/%d)" % [int(level), cur, need]
 
 func set_action_prices(reroll_price: int, progression_price: int, progression_mode: String, command_rank: int = 0) -> void:
-	_reroll_action_text = "Reroll — %s" % BloodBuckets.format_amount(max(0, int(reroll_price)), true)
-	_reroll_action_tooltip = BloodBuckets.describe(max(0, int(reroll_price)))
+	# The icon carries the action, so the button only needs the number. The words live in the
+	# tooltip, which is where a player looks when the glyph is not enough.
+	_reroll_action_text = BloodBuckets.format_amount(max(0, int(reroll_price)), true)
+	_reroll_action_tooltip = "Reroll the shelf — %s" % BloodBuckets.describe(max(0, int(reroll_price)))
 	if _reroll != null:
 		if not _reroll_pending:
 			_reroll.text = _reroll_action_text
 			_reroll.tooltip_text = _reroll_action_tooltip
 	if _buy_xp != null:
+		var progression_cost: String = BloodBuckets.format_amount(max(0, int(progression_price)), true)
 		if String(progression_mode) == "command":
-			_buy_xp.text = "Command Research — %s" % BloodBuckets.format_amount(max(0, int(progression_price)), true)
+			_buy_xp.text = "Command Research — %s" % progression_cost
 			if _progress_label != null:
 				_progress_label.text = "Command Rank %d" % max(0, int(command_rank))
 		else:
-			_buy_xp.text = "Buy XP — %s" % BloodBuckets.format_amount(max(0, int(progression_price)), true)
-		_buy_xp.tooltip_text = BloodBuckets.describe(max(0, int(progression_price)))
+			_buy_xp.text = progression_cost
+		_buy_xp.tooltip_text = "Buy XP — %s" % BloodBuckets.describe(max(0, int(progression_price)))
 
 func set_progression_available(available: bool, progression_mode: String) -> void:
 	if _buy_xp == null:

@@ -533,40 +533,19 @@ func _make_tag_style() -> StyleBoxFlat:
     return sb
 
 func _make_stat_card_style() -> StyleBox:
-    var sb: StyleBoxFlat = StyleBoxFlat.new()
-    sb.bg_color = COLOR_PANEL_SOFT
-    sb.border_color = Color(0.24, 0.21, 0.22, 0.88)
-    sb.border_width_left = 1
-    sb.border_width_top = 1
-    sb.border_width_right = 1
-    sb.border_width_bottom = 1
-    sb.corner_radius_top_left = 4
-    sb.corner_radius_top_right = 4
-    sb.corner_radius_bottom_right = 4
-    sb.corner_radius_bottom_left = 4
-    sb.content_margin_left = 4
-    sb.content_margin_right = 4
-    sb.content_margin_top = 4
-    sb.content_margin_bottom = 4
-    return GothicUIAssets.style_or_fallback(GothicUIAssets.shop_card_style(Color(0.90, 0.88, 0.82, 0.92)), sb)
+    # A compact stat cell is a row-scale control: it uses the quiet flat
+    # gameplay material rather than a large panel texture, and the pale
+    # shop-card rim is gone.
+    return GothicUIAssets.quiet_iron_recess_style()
 
 func _make_footer_chip_style() -> StyleBox:
-    var sb: StyleBoxFlat = StyleBoxFlat.new()
-    sb.bg_color = Color(0.030, 0.026, 0.034, 0.90)
-    sb.border_color = Color(0.30, 0.24, 0.22, 0.78)
-    sb.border_width_left = 1
-    sb.border_width_top = 1
-    sb.border_width_right = 1
-    sb.border_width_bottom = 1
-    sb.corner_radius_top_left = 4
-    sb.corner_radius_top_right = 4
-    sb.corner_radius_bottom_right = 4
-    sb.corner_radius_bottom_left = 4
-    sb.content_margin_left = 6
-    sb.content_margin_right = 6
-    sb.content_margin_top = 2
-    sb.content_margin_bottom = 2
-    return GothicUIAssets.style_or_fallback(GothicUIAssets.small_button_style(Color(0.82, 0.80, 0.76, 0.86)), sb)
+    # Footer chips are row-scale too: quiet flat iron, not a button texture.
+    var chip: StyleBoxFlat = GothicUIAssets.quiet_iron_recess_style()
+    chip.content_margin_left = 6.0
+    chip.content_margin_right = 6.0
+    chip.content_margin_top = 2.0
+    chip.content_margin_bottom = 2.0
+    return chip
 
 func _style_footer_labels() -> void:
     var footer: FlowContainer = $"VBox/Footer"

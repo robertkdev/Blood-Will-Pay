@@ -134,7 +134,7 @@ func _ready() -> void:
 			scoreboard.call("set_expanded", true)
 		var overlay: Control = scoreboard.get("overlay") as Control
 		_expect(overlay == null or not overlay.visible, "Loss scoreboard overlay escaped modal", failures)
-		var enemy_column: VBoxContainer = scoreboard.get_node_or_null("Body/EnemyColumn") as VBoxContainer
+		var enemy_column: VBoxContainer = scoreboard.get_node_or_null("BodyScroll/Body/EnemyColumn") as VBoxContainer
 		_expect(enemy_column != null and enemy_column.get_child_count() == 0, "Loss scoreboard should not keep hidden enemy rows", failures)
 		var labels: Array[String] = _label_texts(screen)
 		var all_label_text: String = "\n".join(labels)

@@ -20,7 +20,19 @@ static func pre_spawn(spec: Dictionary, ch: int, sic: int) -> void:
 	if p and p.has_method("on_pre_spawn"):
 		p.on_pre_spawn(spec, int(ch), int(sic))
 
-static func post_spawn(units: Array, spec: Dictionary, ch: int, sic: int) -> void:
+## `include_encounter_modifiers` exists for the rating model. Those multipliers are
+## live encounter state - the current chapter contract and Economy's Red Ink - and a
+## caller scoring a board to compare against a fixed target must not have them baked
+## in: the value would depend on when the combination was first scored, and budget
+## fitting would quietly absorb the intended extra difficulty. Encounter construction
+## keeps the default so the fight itself is unchanged.
+static func post_spawn(
+	units: Array,
+	spec: Dictionary,
+	ch: int,
+	sic: int,
+	include_encounter_modifiers: bool = true
+) -> void:
 	var p: Variant = _provider_for(spec, ch)
 	if p and p.has_method("on_post_spawn"):
 		p.on_post_spawn(units, spec, int(ch), int(sic))
@@ -29,8 +41,9 @@ static func post_spawn(units: Array, spec: Dictionary, ch: int, sic: int) -> voi
 	_apply_stat_overrides(units, spec)
 	_apply_stat_scales(units, spec)
 	_apply_item_overrides(units, spec)
-	apply_enemy_multiplier(units, _current_contract_enemy_multiplier())
-	apply_red_ink_multiplier(units, _current_red_ink_enemy_multiplier())
+	if include_encounter_modifiers:
+		apply_enemy_multiplier(units, _current_contract_enemy_multiplier())
+		apply_red_ink_multiplier(units, _current_red_ink_enemy_multiplier())
 
 static func pre_engine_config(state: Variant, engine: Variant, spec: Dictionary, ch: int, sic: int) -> void:
 	var p: Variant = _provider_for(spec, ch)

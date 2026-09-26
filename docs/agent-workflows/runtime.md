@@ -3,11 +3,11 @@
 All code and resource paths are relative to the selected repository root. Verify live tool schemas and selected checkout paths before using examples.
 
 ## Running (MCP Only)
-- Agents MUST run the project exclusively via MCP `run_project(projectPath="<abs_project_dir>", scene="<scene>.tscn")`.
-- Do not pass `.` for `projectPath`; it resolves relative to the MCP host process and may not be the repo root.
-- Example (this repo): `projectPath="C:\Users\Flipm\Documents\blood-will-pay"`.
-- Choose the scene appropriate for the task; do not assume `scenes/Main.tscn`.
-- Never invoke the `godot` executable or pass `-s`; if the editor is needed, use MCP `launch_editor(projectPath)`.
+- Launch the selected checkout's editor through the installed MCP launcher (`launch_editor(project_path="<absolute checkout>")`). Check the live schema; legacy camelCase examples below are for the legacy server only.
+- Run through Godot-AI `project_run(mode="custom", scene="res://<scene>.tscn", autosave=false, session_id="<verified session>")`. Select by both the absolute project path and editor PID; never target an unrelated editor's active session.
+- Never invoke the Godot executable directly or pass `-s`. The art-preview CLI's `launch --launcher` route uses the pinned restricted launcher over MCP and keeps it alive until its editor closes.
+- Use `logs_read(source="game"|"editor", include_details=true, session_id=...)` for this Godot-AI version. `get_debug_output` below applies only to the legacy runner.
+- Fullscreen art composition: [native art-preview workflow](../../addons/art_preview/README.md). The main `art-preview` visual-harness scenario requires a real reference/runtime pair; functional tests do not establish art-direction acceptance.
 
 Common scenes to run via MCP
 - Game: `scenes/Main.tscn`
@@ -66,7 +66,7 @@ Output locations
 
 ### Pre-Submit Debug Run (Runtime-Affecting Changes)
 - For gameplay, script, resource, or runtime-affecting changes, run at least one appropriate scene via MCP in debug before submitting. For instruction-only or documentation-only changes, review content, references, scope, and `git diff --check`; do not launch a game solely for those edits.
-- Immediately call `get_debug_output()` and ensure the `errors` array is empty.
+- Immediately read the selected run with Godot-AI `logs_read` (game and editor, including details) and require no current-run errors. With the legacy runner, call `get_debug_output()` and require an empty `errors` array.
 - If any script parse errors, assertions, or engine errors appear (e.g., "SCRIPT ERROR", "ASSERT FAILED"), do not submit; fix issues or adjust the scene.
 - Suggested defaults:
   - General unit validation: `tests/rga_testing/validation/RoleMatrixProbe.tscn`

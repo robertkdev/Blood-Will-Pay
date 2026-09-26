@@ -5,6 +5,7 @@ const GothicUIAssets: GDScript = preload("res://scripts/ui/gothic_ui_assets.gd")
 const HardcoreUIAssets: GDScript = preload("res://scripts/ui/hardcore_ui_assets.gd")
 const CombatVfxInstallerScript: GDScript = preload("res://scripts/ui/combat/combat_vfx_installer.gd")
 const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.gd")
+const UnitArtPresentation: GDScript = preload("res://scripts/ui/unit_art_presentation.gd")
 const TITLE_WOODLAND_TEXTURE_PATH: String = "res://assets/ui/title/blood_will_pay_title_screen_4k.png"
 const BloodMeterHandle: Texture2D = preload("res://assets/ui/blood_meter_handle.svg")
 
@@ -949,8 +950,18 @@ static func _apply_named_nodes(root: Control) -> void:
 	_configure_combat_layout(root)
 	_ensure_combat_vfx_installer(root)
 	_clear_battlefield_rect(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground")
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicPlanningTopSurface", GothicUIAssets.battlefield_top_texture(), -8, Color(0.98, 0.97, 0.94, 0.98))
-	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(0.98, 0.97, 0.94, 0.98))
+	# The authored stone keeps its identity and its animation; a slightly deeper
+	# modulate locally quiets its high-frequency grain so the figures and their
+	# edges stay the loudest thing on the field. This changes presentation only.
+	#
+	# These two surfaces are not the live floor. phase_transition_controller's
+	# refresh_field_material reasserts them invisible on every theme refresh and
+	# hands the field to GothicArenaSurface, so this modulate does not reach the
+	# composed frame. Lifting it toward neutral was measured on fresh captures and
+	# changed the composed playfield by nothing at all. Value routing is recorded
+	# in docs/art/playfield_value_routing_2026-09-26.md.
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicPlanningTopSurface", GothicUIAssets.battlefield_top_texture(), -8, Color(0.86, 0.84, 0.80, 0.98))
+	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlanningBottomSurface", GothicUIAssets.battlefield_bottom_texture(), -8, Color(0.86, 0.84, 0.80, 0.98))
 	_ensure_planning_pressure(root)
 	_ensure_planning_phase_geometry(root)
 	_ensure_texture_backdrop(root, "MarginContainer/VBoxContainer/BattleArea/ArenaContainer", "GothicArenaSurface", GothicUIAssets.battlefield_onset_texture(), -7, Color(1.0, 1.0, 1.0, 0.96))
@@ -974,30 +985,50 @@ static func _apply_named_nodes(root: Control) -> void:
 	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/GoldLabel", 24, COLOR_GOLD, true)
 	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetLabel", 18, COLOR_TEXT, false)
 	_style_label(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow/BetValue", 20, COLOR_TEXT, false)
-	_style_label(root, "MarginContainer/VBoxContainer/WagerSummary", 20, COLOR_TEXT, true)
+	# The wager strip is supporting information, but it is a functional readout:
+	# muted colour keeps it subordinate while the legibility face keeps the odds
+	# and the stake scannable at a glance.
+	_style_label(root, "MarginContainer/VBoxContainer/WagerSummary", 18, COLOR_TEXT_MUTED, false)
+	var wager_summary_label: Label = root.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Label
+	if wager_summary_label != null:
+		VisualTypeSystem.set_utility_bold(wager_summary_label)
 	_style_label(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle", 18, COLOR_GOLD, true)
+	var traits_title_label: Label = root.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle") as Label
+	if traits_title_label != null:
+		# The rail's shell is a functional docket, not a ceremonial heading: the
+		# legibility face carries the section label above the trait rows.
+		VisualTypeSystem.set_utility_bold(traits_title_label)
 	_style_label_by_name(root, "GoldLabel", 22, COLOR_GOLD, true)
 	_style_label_by_name(root, "BetLabel", 16, COLOR_TEXT_MUTED, false)
 	_style_label_by_name(root, "BetValue", 17, COLOR_TEXT, false)
 	_style_button(root, "MarginContainer/VBoxContainer/ActionsRow/ContinueButton", true)
 	_style_button(root, "MarginContainer/VBoxContainer/ActionsRow/AttackButton", false)
 	_style_button(root, "TopBar/MenuButton", false)
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(310.0, 596.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(286.0, 596.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(286.0, 164.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(286.0, 398.0))
-	_set_min_size_by_name(root, "StatsPanel", Vector2(292.0, 560.0))
-	_set_min_size_by_name(root, "Scoreboard", Vector2(294.0, 430.0))
-	_set_min_size_by_name(root, "MetricTabs", Vector2(294.0, 52.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/ActionsRow", Vector2(1120.0, 56.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(226.0, 46.0))
-	_set_min_size_by_name(root, "BetRow", Vector2(226.0, 46.0))
 	var opening_shop: bool = _shop_grid_is_opening(root)
-	_set_min_size(root, "MarginContainer/VBoxContainer/BottomStorageArea", Vector2(1120.0, 152.0))
-	_set_min_size(root, "MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(560.0, 108.0) if opening_shop else Vector2(1120.0, 108.0))
+	# Geometry ownership. When the composed layout is driving it publishes
+	# `composed_rail_physical` on its host (308px rails at full HD), and the theme
+	# then applies no size minimums at all - not even collapse guards - so the
+	# composed numbers are the only authority. The old theme-side rail minimums
+	# (StatsArea 310, StatsPanel 292x560, LeftItemArea / ItemStorageGrid /
+	# TraitsPanel 286, Scoreboard 294x430, MetricTabs 294) and the lower-band
+	# minimums are skipped in that case and kept only for uncomposed fixtures.
+	# The removed values are recorded here so the composition worker can fold any
+	# still-wanted floor into the composed layout.
+	if not _composed_geometry_owned(root):
+		_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(0.0, 596.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(0.0, 596.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(0.0, 164.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(0.0, 398.0))
+		_set_min_size_by_name(root, "StatsPanel", Vector2(0.0, 560.0))
+		_set_min_size_by_name(root, "MetricTabs", Vector2(0.0, 52.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/ActionsRow", Vector2(1120.0, 56.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/ActionsRow/BetRow", Vector2(226.0, 46.0))
+		_set_min_size_by_name(root, "BetRow", Vector2(226.0, 46.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/BottomStorageArea", Vector2(1120.0, 152.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Vector2(560.0, 108.0) if opening_shop else Vector2(1120.0, 108.0))
+		_set_min_size(root, "MarginContainer/VBoxContainer/BenchArea/BenchGrid", Vector2(0.0, 88.0))
 	_set_size_flags(root, "MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid", Control.SIZE_SHRINK_CENTER if opening_shop else Control.SIZE_EXPAND_FILL)
-	_set_min_size(root, "MarginContainer/VBoxContainer/BenchArea/BenchGrid", Vector2(0.0, 88.0))
 	_add_grid_separator(root, "MarginContainer/VBoxContainer", 6)
 	_add_grid_separator(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow", 20)
 	_add_grid_separator(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn", 8)
@@ -1008,21 +1039,21 @@ static func _apply_named_nodes(root: Control) -> void:
 	_style_shop_command_bar(root)
 	var actions_row: Control = root.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as Control
 	if actions_row != null:
-		_ensure_backplate_on_control(actions_row, "PlanningCommandRecordPlate", _hard_panel_style(Color(0.020, 0.016, 0.022, 0.96), Color(0.68, 0.055, 0.085, 0.88), true), -5)
+		_ensure_backplate_on_control(actions_row, "PlanningCommandRecordPlate", _hard_panel_style(Color(0.020, 0.016, 0.022, 0.96), Color(0.60, 0.060, 0.075, 0.80), true), -5)
 	var wager_controls: Control = root.get_node_or_null("MarginContainer/VBoxContainer/ActionsRow/BetRow") as Control
 	if wager_controls != null:
 		wager_controls.set_meta("visual_role", "planning_utility_group")
-		_ensure_backplate_on_control(wager_controls, "PlanningUtilitiesPlate", _hard_panel_style(Color(0.032, 0.027, 0.032, 0.98), Color(0.54, 0.45, 0.32, 0.82), false), -5)
+		_ensure_backplate_on_control(wager_controls, "PlanningUtilitiesPlate", _hard_panel_style(Color(0.032, 0.027, 0.032, 0.98), Color(0.52, 0.44, 0.31, 0.78), false), -5)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea", "GothicBattlePlate", _style(Color(0.016, 0.013, 0.018, 0.38), Color(0.23, 0.19, 0.18, 0.42), 1, 6), -20)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _style(Color(0.055, 0.018, 0.022, 0.08), Color(0.72, 0.07, 0.09, 0.88), 2, 1), -5)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _style(Color(0.032, 0.038, 0.036, 0.07), Color(0.72, 0.68, 0.58, 0.82), 2, 1), -5)
-	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.42, 0.40, 0.38, 0.72), false), 0, 8.0)
-	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.56, 0.52, 0.46, 0.62), false), 0, 8.0)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.42, 0.40, 0.38, 0.68), false), -2)
-	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BenchArea/BenchGrid", "GothicBenchPlate", _hard_panel_style(Color(0.018, 0.016, 0.020, 0.88), Color(0.72, 0.64, 0.52, 0.64), false), 0, 8.0)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea", "GothicEnemyPlate", _territory_tint_style(Color(0.032, 0.016, 0.020, 0.12)), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea", "GothicPlayerPlate", _territory_tint_style(Color(0.018, 0.022, 0.023, 0.12)), -5)
+	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", "GothicStatsAreaPlate", _hard_panel_style(Color(0.020, 0.018, 0.022, 0.94), Color(0.44, 0.37, 0.26, 0.72), false), 0, 8.0)
+	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", "GothicItemsPlate", _hard_panel_style(Color(0.018, 0.017, 0.020, 0.90), Color(0.48, 0.40, 0.28, 0.62), false), 0, 8.0)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", "GothicTraitsPlate", _hard_panel_style(Color(0.018, 0.016, 0.021, 0.94), Color(0.44, 0.37, 0.26, 0.68), false), -2)
+	_ensure_external_backplate(root, "MarginContainer/VBoxContainer/BenchArea/BenchGrid", "GothicBenchPlate", _hard_panel_style(Color(0.018, 0.016, 0.020, 0.88), Color(0.50, 0.42, 0.30, 0.64), false), 0, 8.0)
 	_ensure_backplate(root, "MarginContainer/VBoxContainer/ActionsRow/GoldLabel", "GothicGoldPlate", _style(Color(0.085, 0.061, 0.033, 0.74), Color(0.78, 0.48, 0.20, 0.72), 1, 4), -5)
 	_ensure_backplate_by_name(root, "GoldLabel", "GothicGoldPlate", _style(Color(0.085, 0.061, 0.033, 0.76), Color(0.78, 0.48, 0.20, 0.76), 1, 4), -5)
-	_ensure_backplate(root, "MarginContainer/VBoxContainer/WagerSummary", "GothicWagerSummaryPlate", _hard_panel_style(Color(0.018, 0.016, 0.020, 0.92), Color(0.68, 0.61, 0.50, 0.72), false), -5)
+	_ensure_backplate(root, "MarginContainer/VBoxContainer/WagerSummary", "GothicWagerSummaryPlate", _hard_panel_style(Color(0.018, 0.016, 0.020, 0.92), Color(0.48, 0.40, 0.29, 0.72), false), -5)
 	if opening_shop:
 		_hide_named_control(root, "GothicShopPlate")
 	else:
@@ -1031,7 +1062,7 @@ static func _apply_named_nodes(root: Control) -> void:
 	_remove_named_child(root, "GothicTimerPlate")
 	var stage_heading: Label = root.get_node_or_null("MarginContainer/VBoxContainer/StageLabel") as Label
 	if stage_heading != null:
-		VisualTypeSystem.set_impact(stage_heading)
+		VisualTypeSystem.set_gameplay_heading(stage_heading)
 	var planning_timer: Label = root.get_node_or_null("MarginContainer/VBoxContainer/PlanningTimerLabel") as Label
 	if planning_timer != null:
 		VisualTypeSystem.set_utility_bold(planning_timer)
@@ -1105,10 +1136,35 @@ static func _apply_button_node(button: Button) -> void:
 static func _apply_label_node(label: Label) -> void:
 	if not label.has_theme_color_override("font_color"):
 		label.add_theme_color_override("font_color", COLOR_TEXT)
+	# Presenter-owned trait rows are identified by the traits presenter's own
+	# contract, not only by where they sit: it names the two fitted labels
+	# `TraitName` and `TraitCheckpoint` and records the fitted copy through
+	# `trait_name_source` / `trait_name_complete`. The theme must never re-measure
+	# or re-weight those, whatever parent the rail is rebuilt under.
+	if label.name == "TraitName" or label.name == "TraitCheckpoint" \
+			or label.has_meta("trait_name_source") or label.has_meta("trait_name_complete"):
+		return
+	# Presenter-owned rails. The metric presenters and the traits presenter set
+	# their own sizes, weights and faces per row; the theme used to force 18px
+	# utility bold over every one of them, which is what left a whole rail
+	# shouting at one weight. Only a section heading is a theme role here.
+	var presenter_owned: bool = \
+		_has_ancestor_named(label, "StatsPanel") \
+		or _has_ancestor_named(label, "Scoreboard") \
+		or _has_ancestor_named(label, "TraitsPanel")
+	if presenter_owned and label.name != "Title" and label.name != "HeaderTitle" and label.name != "TraitsTitle":
+		return
 	if label.name == "Title":
 		label.add_theme_font_size_override("font_size", 24)
 		label.add_theme_color_override("font_color", COLOR_GOLD)
-		VisualTypeSystem.set_impact(label)
+		VisualTypeSystem.set_gameplay_heading(label)
+	elif label.name == "TraitsTitle":
+		# The rail's heading is a functional docket label, not a ceremonial one:
+		# the legibility face at a restrained size keeps it readable above the
+		# trait rows. The rows below it are presenter-owned and were skipped
+		# above, so a fitted trait name is never re-measured or re-weighted here.
+		_style_label_node(label, max(18, label.get_theme_font_size("font_size")), Color(0.94, 0.90, 0.82, 1.0), false)
+		VisualTypeSystem.set_utility_bold(label)
 	elif label.name == "Role" or label.name == "RoleBadge":
 		label.add_theme_font_size_override("font_size", 16)
 		label.add_theme_color_override("font_color", Color(0.78, 0.73, 0.66, 1.0))
@@ -1116,16 +1172,18 @@ static func _apply_label_node(label: Label) -> void:
 	elif label.name == "Name":
 		label.add_theme_font_size_override("font_size", 18)
 		label.add_theme_color_override("font_color", COLOR_TEXT)
-		VisualTypeSystem.set_utility_bold(label)
+		VisualTypeSystem.set_gameplay_name(label)
 	elif label.name == "Price":
 		label.add_theme_font_size_override("font_size", 19)
 		label.add_theme_color_override("font_color", COLOR_GOLD_HOT)
-		VisualTypeSystem.set_utility_bold(label)
+		VisualTypeSystem.set_gameplay_numeric(label)
 	elif label.name == "GoalLabel":
 		label.add_theme_font_size_override("font_size", 16)
 		label.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	elif label.name == "GoldLabel":
-		_style_label_node(label, 24, COLOR_GOLD, true)
+		# The reserve is a value, not a headline: a restrained numeric at 20 with
+		# no outline, sitting on its own plate.
+		_style_label_node(label, 20, COLOR_GOLD, false)
 		label.custom_minimum_size = Vector2(112.0, 44.0)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1138,8 +1196,10 @@ static func _apply_label_node(label: Label) -> void:
 		label.custom_minimum_size.x = 34.0
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	elif label.name == "BoardPhaseLabel" or label.name == "BoardTimerLabel" or label.name == "BoardCapacityLabel" or label.name == "WinOddsLabel":
-		_style_label_node(label, 20, Color(0.98, 0.87, 0.66, 1.0), true)
-		VisualTypeSystem.set_utility_bold(label)
+		# Operational readout: readable at 18 in the regular utility face. The
+		# previous 20px bold was as loud as the region headings.
+		_style_label_node(label, 18, Color(0.92, 0.84, 0.66, 1.0), true)
+		VisualTypeSystem.set_gameplay_name(label)
 		var status_width: float = 120.0 if label.name != "WinOddsLabel" else 148.0
 		label.custom_minimum_size = Vector2(status_width, 26.0)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1148,17 +1208,12 @@ static func _apply_label_node(label: Label) -> void:
 		_style_label_node(label, 21, COLOR_GOLD_HOT, true)
 		VisualTypeSystem.set_utility_bold(label)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	elif _has_ancestor_named(label, "StatsPanel") or _has_ancestor_named(label, "Scoreboard"):
-		if label.name == "Title":
-			_style_label_node(label, 22, COLOR_GOLD, true)
-		else:
-			_style_label_node(label, 18, Color(0.95, 0.91, 0.83, 1.0), false)
-			VisualTypeSystem.set_utility_bold(label)
-	elif _has_ancestor_named(label, "TraitsPanel"):
-		_style_label_node(label, max(17, label.get_theme_font_size("font_size")), Color(0.94, 0.90, 0.82, 1.0), false)
-		VisualTypeSystem.set_utility_bold(label)
 	elif _has_ancestor_named(label, "StageProgressTopBar"):
-		VisualTypeSystem.set_utility_bold(label)
+		# The chapter strip builds its own roles. Only its numeric token needs the
+		# legibility face assured, which the focused theme contract asserts; no
+		# size, colour or face is forced over the strip's own labels.
+		if label.name == "Number":
+			VisualTypeSystem.set_gameplay_numeric(label)
 
 static func _apply_rich_text(text: RichTextLabel) -> void:
 	text.add_theme_color_override("default_color", COLOR_TEXT_MUTED)
@@ -1168,7 +1223,8 @@ static func _apply_rich_text(text: RichTextLabel) -> void:
 
 static func _apply_panel_container(panel: PanelContainer) -> void:
 	if panel.name == "ItemCard":
-		panel.add_theme_stylebox_override("panel", _style(Color(0.045, 0.040, 0.050, 0.94), Color(0.39, 0.32, 0.30, 0.92), 1, 5))
+		# Worn dark metal inside the reliquary, not another pale outline.
+		panel.add_theme_stylebox_override("panel", _style(Color(0.030, 0.026, 0.032, 0.92), Color(0.40, 0.34, 0.24, 0.56), 1, 5))
 
 static func _apply_hbox_container(box: HBoxContainer) -> void:
 	if box.name == "BoardStatusRow":
@@ -1185,7 +1241,6 @@ static func _apply_vbox_container(box: VBoxContainer) -> void:
 		box.add_theme_constant_override("separation", 10)
 	elif box.name == "Scoreboard":
 		box.add_theme_constant_override("separation", 10)
-		box.custom_minimum_size = Vector2(max(box.custom_minimum_size.x, 294.0), max(box.custom_minimum_size.y, 430.0))
 	elif box.name == "PlayerColumn" or box.name == "EnemyColumn":
 		box.add_theme_constant_override("separation", 8)
 	elif box.name == "TraitsVBox":
@@ -1220,18 +1275,38 @@ static func _apply_color_rect(rect: ColorRect) -> void:
 		rect.color = Color(0.20, 0.45, 0.66, 0.94)
 
 static func _apply_tile(button: Button, is_player: bool) -> void:
-	var bg_color: Color = COLOR_TILE_PLAYER if is_player else COLOR_TILE_ENEMY
+	# One continuous deployment surface. A cell is a weighted ruling on the stone:
+	# no interior fill, a shared right edge on every cell, and an authored strong
+	# seam on a sparse irregular set. Neighbours therefore do not agree about how
+	# heavy their top line is, so the union reads as a ruled lattice over the
+	# authored floor instead of a uniform developer grid. The side hue (warm bone /
+	# oxblood) separates the two territories, and the territory guides still carry
+	# the structural boundary. Geometry (the square cell and its grid slot) is
+	# unchanged; only the paint is.
+	var bg_color: Color = Color(0.0, 0.0, 0.0, 0.0)
+	# Authored seam cadence: most cells carry only the shared right edge, and a
+	# sparse irregular set carries the full ruling. That is what keeps the
+	# deployment lattice reading as stone courses instead of a uniform developer
+	# grid, and it is why neighbours disagree about how heavy their top line is.
 	var cell_index: int = int(String(button.name).get_slice("_", 1))
 	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
-	bg_color.a = 0.52 if strong_seam else 0.42
-	var border_color: Color = Color(0.96, 0.88, 0.68, 0.76 if strong_seam else 0.54) if is_player else Color(0.96, 0.27, 0.19, 0.78 if strong_seam else 0.56)
-	var hover_color: Color = Color(0.060, 0.078, 0.070, 0.92) if is_player else Color(0.120, 0.044, 0.040, 0.92)
+	# The lattice is the board's brightest authored mark, so it carries the
+	# territory hue at a weight the field can actually read. The cadence above
+	# stays sparse and irregular; only the ruling's weight changed, because the
+	# measured field was short of highlight and the seams are the cheapest place
+	# to put it back. See docs/art/playfield_value_routing_2026-09-26.md.
+	var border_color: Color = Color(0.97, 0.90, 0.70, 0.92 if strong_seam else 0.74) if is_player else Color(0.98, 0.31, 0.22, 0.98 if strong_seam else 0.86)
+	var hover_color: Color = Color(0.055, 0.070, 0.064, 0.34) if is_player else Color(0.115, 0.042, 0.038, 0.34)
 	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
+	normal_style.shadow_size = 0
+	normal_style.border_width_left = 0
+	normal_style.border_width_bottom = 0
 	if not strong_seam:
 		normal_style.border_width_top = 0
-		normal_style.border_width_left = 0
-	var hover_style: StyleBoxFlat = _hover_style(hover_color, COLOR_GOLD_HOT, 2, 3)
-	hover_style.shadow_size = 12
+	# Hover is the only moment a cell gains a full ring: interaction feedback is
+	# worth one transient outline, and it is not part of the resting surface.
+	var hover_style: StyleBoxFlat = _hover_style(hover_color, COLOR_GOLD_HOT, 1, 3)
+	hover_style.shadow_size = 0
 	var tile_size: float = maxf(button.custom_minimum_size.x, button.custom_minimum_size.y)
 	if tile_size <= 0.0:
 		tile_size = 72.0
@@ -1249,6 +1324,7 @@ static func _apply_tile(button: Button, is_player: bool) -> void:
 	button.add_theme_stylebox_override("hover", hover_style)
 	button.add_theme_stylebox_override("pressed", hover_style)
 	button.add_theme_stylebox_override("focus", _focus_outline(3))
+	UnitArtPresentation.cover_board_tile(button)
 
 static func _apply_bench_slot(button: Button) -> void:
 	var normal_style: StyleBoxFlat = _style(Color(0.024, 0.021, 0.027, 0.86), Color(0.56, 0.50, 0.41, 0.78), 2, 5)
@@ -1275,30 +1351,35 @@ static func _apply_bench_slot(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", hover_style)
 	button.add_theme_stylebox_override("focus", _focus_outline(5))
 	button.add_theme_stylebox_override("disabled", disabled_style)
+	UnitArtPresentation.cover_board_tile(button)
 
 static func _style_shop_card(button: Button) -> void:
-	button.custom_minimum_size = Vector2(144.0, 124.0)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_apply_flat_button_states(button, Color(0.52, 0.31, 0.20, 1.0))
+	if button.has_method("_apply_static_style"):
+		button.call("_apply_static_style")
 	button.add_theme_font_size_override("font_size", 18)
 	button.clip_text = false
 
 static func _style_shop_action_button(button: Button) -> void:
 	button.custom_minimum_size = Vector2(96.0, 40.0)
-	button.add_theme_font_size_override("font_size", 20)
-	VisualTypeSystem.set_utility_bold(button)
+	# Resource chips stay readable but stop outweighing the headings.
+	button.add_theme_font_size_override("font_size", 18)
+	VisualTypeSystem.set_gameplay_name(button)
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.58, 0.52, 1.0))
 	_apply_flat_button_states(button, Color(0.46, 0.38, 0.32, 1.0))
 
 static func _style_metric_button(button: Button) -> void:
 	var is_small_expand: bool = button.name == "ExpandButton"
 	button.custom_minimum_size = Vector2(48.0, 36.0) if is_small_expand else Vector2(76.0, 36.0)
-	button.add_theme_font_size_override("font_size", 17)
-	VisualTypeSystem.set_utility_bold(button)
+	# Filters keep their authored footprint; the weight becomes regular so the
+	# rail's heading still outranks its controls.
+	button.add_theme_font_size_override("font_size", 16)
+	VisualTypeSystem.set_gameplay_name(button)
 	_apply_flat_button_states(button, Color(0.46, 0.38, 0.32, 1.0))
 
 static func _apply_metric_tabs(tabs: Control) -> void:
-	tabs.custom_minimum_size = Vector2(max(tabs.custom_minimum_size.x, 294.0), 52.0)
+	# Height only: the rail width belongs to the composed layout.
+	tabs.custom_minimum_size = Vector2(tabs.custom_minimum_size.x, 52.0)
 	tabs.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	for child: Node in tabs.get_children():
 		var row: HBoxContainer = child as HBoxContainer
@@ -1325,9 +1406,12 @@ static func _style_button_node(button: Button, primary: bool) -> void:
 		button.custom_minimum_size = Vector2(304.0, 54.0)
 		button.add_theme_font_size_override("font_size", 26)
 		button.set_meta("visual_role", "primary_commit")
-		VisualTypeSystem.set_utility_bold(button)
+		# The primary action is the screen's one ceremonial command: the gameplay
+		# heading face, not the heavy condensed action lettering.
+		VisualTypeSystem.set_gameplay_heading(button)
 		button.add_theme_color_override("font_disabled_color", Color(0.66, 0.60, 0.52, 1.0))
 		_apply_flat_button_states(button, COLOR_BLOOD)
+		GothicUIAssets.apply_button_material(button, true)
 	else:
 		button.custom_minimum_size.y = max(button.custom_minimum_size.y, 34.0)
 		button.add_theme_font_size_override("font_size", 18)
@@ -1565,13 +1649,18 @@ static func _ensure_planning_phase_geometry(root: Control) -> void:
 		geometry.add_child(directive)
 	directive.anchor_left = 0.5
 	directive.anchor_right = 0.5
-	directive.anchor_top = 0.0
-	directive.anchor_bottom = 0.0
-	directive.offset_left = -286.0
-	directive.offset_right = 286.0
-	directive.offset_top = 12.0
-	directive.offset_bottom = 54.0
-	directive.text = "01 // DEPLOY  >  02 // WAGER  >  03 // COMMIT"
+	# Sit on the commit boundary rather than at the top of the planning area. The
+	# planning area's top band is the enemy deployment grid, so the banner used to be
+	# painted straight across the enemy unit cards; the red commit rule it labels is
+	# already the seam between the two boards at 0.5.
+	directive.anchor_top = 0.5
+	directive.anchor_bottom = 0.5
+	directive.offset_left = -230.0
+	directive.offset_right = 230.0
+	directive.offset_top = -17.0
+	directive.offset_bottom = 17.0
+	# The order is the arrow; the ordinals were numbering it twice.
+	directive.text = "DEPLOY  >  WAGER  >  COMMIT"
 	directive.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	directive.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	# The ordered command needs to survive above the field painters and the compact
@@ -1774,12 +1863,15 @@ static func _ensure_arena_exposure_lift(arena: Control) -> void:
 		return
 	var gradient: Gradient = Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.20, 0.50, 0.78, 1.0])
+	# A shallow warm lift only. The previous pass added enough light over the
+	# whole field that stone grain competed with the figures; this keeps the
+	# landmark-aligned layer and its colour while letting the field recede.
 	gradient.colors = PackedColorArray([
-		Color(0.36, 0.16, 0.10, 0.090),
-		Color(0.22, 0.19, 0.16, 0.120),
-		Color(0.44, 0.38, 0.30, 0.180),
-		Color(0.30, 0.25, 0.20, 0.130),
-		Color(0.28, 0.08, 0.055, 0.100),
+		Color(0.36, 0.16, 0.10, 0.060),
+		Color(0.22, 0.19, 0.16, 0.078),
+		Color(0.44, 0.38, 0.30, 0.115),
+		Color(0.30, 0.25, 0.20, 0.084),
+		Color(0.28, 0.08, 0.055, 0.065),
 	])
 	var texture: GradientTexture2D = GradientTexture2D.new()
 	texture.width = 512
@@ -2019,7 +2111,9 @@ static func _ensure_tactical_shell_marks(root: Control) -> void:
 		corner.offset_right = 0.0
 		corner.offset_top = 0.0
 		corner.offset_bottom = 0.0
-		corner.color = Color(0.82, 0.12, 0.11, 0.56)
+		# A quiet registration mark in the gameplay material's warm edge tone.
+		# The saturated red bars read as UI rules laid over the field.
+		corner.color = Color(0.60, 0.49, 0.32, 0.30)
 
 static func _ensure_arena_threat_veil(arena: Control) -> void:
 	var veil: TextureRect = arena.get_node_or_null("ArenaAshThreatVeil") as TextureRect
@@ -2606,13 +2700,15 @@ static func _ensure_arena_cell_seams(arena: Control) -> void:
 		# The field remains muddy and subordinate, but the side-specific wash and
 		# weighted seams now survive a real 1080p combat glance without turning
 		# into a debug graph.
-		seam_style.bg_color = Color(0.14, 0.030, 0.018, 0.070 if alternating_cell else 0.032) if enemy_side else Color(0.14, 0.115, 0.070, 0.066 if alternating_cell else 0.030)
-		seam_style.border_color = Color(0.68, 0.25, 0.10, 0.50 if major_seam else 0.29) if enemy_side else Color(0.76, 0.66, 0.42, 0.52 if major_seam else 0.31)
+		# The cell is a marking on the stone. Its wash is faint enough that the
+		# authored floor keeps reading through the grid, and the cell no longer
+		# casts its own black offset shadow, which was what made each cell look
+		# like a raised tray sitting on a different plane than the ground.
+		seam_style.bg_color = Color(0.14, 0.030, 0.018, 0.042 if alternating_cell else 0.020) if enemy_side else Color(0.14, 0.115, 0.070, 0.040 if alternating_cell else 0.018)
+		seam_style.border_color = Color(0.68, 0.25, 0.10, 0.44 if major_seam else 0.29) if enemy_side else Color(0.76, 0.66, 0.42, 0.46 if major_seam else 0.31)
 		seam_style.border_width_right = 2 if column_index == 3 else 1
 		seam_style.border_width_bottom = 2 if row_index == 2 else 1
-		seam_style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
-		seam_style.shadow_size = 1
-		seam_style.shadow_offset = Vector2(1.0, 1.0)
+		seam_style.shadow_size = 0
 		cell.add_theme_stylebox_override("panel", seam_style)
 	seams.set_meta("major_seam_non_color_weight", 2)
 	seams.set_meta("minor_seam_non_color_weight", 1)
@@ -2643,8 +2739,9 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.98))
 	label.add_theme_constant_override("outline_size", 2)
 	var label_backing: StyleBoxFlat = StyleBoxFlat.new()
-	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.60)
-	label_backing.border_color = Color(0.48, 0.16, 0.10, 0.64) if enemy_side else Color(0.46, 0.39, 0.28, 0.58)
+	# A shallow recess rather than a black lid floating over the field.
+	label_backing.bg_color = Color(0.012, 0.010, 0.013, 0.40)
+	label_backing.border_color = Color(0.48, 0.16, 0.10, 0.44) if enemy_side else Color(0.46, 0.39, 0.28, 0.42)
 	label_backing.border_width_left = 2
 	label_backing.content_margin_left = 8.0
 	label_backing.content_margin_right = 8.0
@@ -2656,12 +2753,12 @@ static func _ensure_arena_field_label(arena: Control, node_name: String, copy: S
 static func _arena_zone_style(is_player: bool) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	if is_player:
-		style.bg_color = Color(0.055, 0.074, 0.072, 0.042)
-		style.border_color = Color(0.75, 0.70, 0.58, 0.78)
+		style.bg_color = Color(0.055, 0.074, 0.072, 0.028)
+		style.border_color = Color(0.75, 0.70, 0.58, 0.44)
 		style.border_width_top = 3
 	else:
-		style.bg_color = Color(0.12, 0.025, 0.030, 0.050)
-		style.border_color = Color(0.80, 0.075, 0.09, 0.84)
+		style.bg_color = Color(0.12, 0.025, 0.030, 0.032)
+		style.border_color = Color(0.80, 0.075, 0.09, 0.48)
 		style.border_width_bottom = 3
 	return style
 
@@ -2748,7 +2845,45 @@ static func _ensure_backplate_on_control(control: Control, plate_name: String, s
 		existing.offset_top = 0.0
 		existing.offset_right = 0.0
 		existing.offset_bottom = 0.0
-	existing.add_theme_stylebox_override("panel", style)
+	_apply_plate_material(existing, style, plate_name)
+	if plate_uses_trial_surface(plate_name):
+		_sync_plate_span(existing, control)
+		var span_callback: Callable = Callable(GothicUITheme, "_sync_plate_span").bind(existing, control)
+		if not control.is_connected("resized", span_callback):
+			control.resized.connect(span_callback)
+
+## The trial panel surface is only for the UI panels root intends it on. Every
+## other backplate keeps the paint it was authored with, including the arena, the
+## enemy/player board regions and the environment washes, which are transparent
+## or near-transparent on purpose. Size alone is never the authority.
+const TRIAL_PANEL_PLATES: PackedStringArray = [
+	"GothicStatsAreaPlate",
+	"GothicTraitsPlate",
+	"GothicItemsPlate",
+	"GothicShopPlate",
+	"PlanningCommandRecordPlate",
+	"PlanningUtilitiesPlate",
+]
+
+static func plate_uses_trial_surface(plate_name: String) -> bool:
+	return TRIAL_PANEL_PLATES.has(String(plate_name))
+
+## Records both materials for the plate and installs the one its role allows: the
+## trial surface for an allowlisted UI panel, otherwise the authored style exactly
+## as passed. The pair travels with the plate so a later size change can swap the
+## materials without rebuilding it.
+static func _apply_plate_material(panel: Panel, flat_style: StyleBox, plate_name: String) -> void:
+	if panel == null or flat_style == null:
+		return
+	panel.set_meta("plate_style_flat", flat_style)
+	var allow_trial: bool = plate_uses_trial_surface(plate_name)
+	panel.set_meta("plate_material_role", "trial_panel" if allow_trial else "authored")
+	if not allow_trial:
+		panel.set_meta("plate_style_large", flat_style)
+		if panel.get_theme_stylebox("panel") != flat_style:
+			panel.add_theme_stylebox_override("panel", flat_style)
+		return
+	panel.set_meta("plate_style_large", GothicUIAssets.gameplay_panel_style(flat_style))
 
 static func _ensure_external_backplate(root: Control, path: String, plate_name: String, style: StyleBox, z_value: int, pad: float) -> void:
 	var control: Control = root.get_node_or_null(path) as Control
@@ -2773,7 +2908,9 @@ static func _ensure_external_backplate_on_control(root: Control, control: Contro
 	existing.visible = true
 	existing.set_meta("target_path", root.get_path_to(control))
 	existing.set_meta("pad", pad)
-	existing.add_theme_stylebox_override("panel", style)
+	_apply_plate_material(existing, style, plate_name)
+	if plate_uses_trial_surface(plate_name):
+		_sync_plate_span(existing, control, Vector2(pad * 2.0, pad * 2.0))
 	var resize_callback: Callable = Callable(GothicUITheme, "_position_external_backplate").bind(root, existing)
 	if not control.is_connected("resized", resize_callback):
 		control.resized.connect(resize_callback)
@@ -2792,6 +2929,25 @@ static func _position_external_backplate(root: Control, plate: Panel) -> void:
 	var pad: float = float(plate.get_meta("pad", 0.0))
 	plate.global_position = target.global_position - Vector2(pad, pad)
 	plate.size = target.size + Vector2(pad * 2.0, pad * 2.0)
+	_sync_plate_span(plate, target, Vector2(pad * 2.0, pad * 2.0))
+
+## Among the allowlisted UI panels, the trial surface carries 40px nine-slice
+## bands, so it is only used while the plate is large enough to hold them. A
+## collapsed or small plate keeps the flat quiet iron, which stops the frame
+## becoming the whole surface.
+static func _sync_plate_span(panel: Panel, control: Control, growth: Vector2 = Vector2.ZERO) -> void:
+	if panel == null or control == null or not is_instance_valid(panel) or not is_instance_valid(control):
+		return
+	var large: StyleBox = panel.get_meta("plate_style_large", null) as StyleBox
+	var flat: StyleBox = panel.get_meta("plate_style_flat", null) as StyleBox
+	if large == null or flat == null:
+		return
+	var span: Vector2 = control.size + growth
+	if span.x <= 1.0 or span.y <= 1.0:
+		span = control.get_combined_minimum_size() + growth
+	var wanted: StyleBox = large if GothicUIAssets.gameplay_panel_fits(span) else flat
+	if panel.get_theme_stylebox("panel") != wanted:
+		panel.add_theme_stylebox_override("panel", wanted)
 
 static func _style_shop_command_bar(root: Control) -> void:
 	_hide_named_control(root, "GothicShopCommandPlate")
@@ -2811,7 +2967,7 @@ static func _style_shop_command_bar(root: Control) -> void:
 				if label.name == "Label" and label.text.begins_with("Lvl "):
 					label.custom_minimum_size = Vector2(98.0, 40.0)
 					label.add_theme_font_size_override("font_size", 18)
-					VisualTypeSystem.set_action(label)
+					VisualTypeSystem.set_gameplay_numeric(label)
 					label.add_theme_color_override("font_color", COLOR_TEXT)
 					label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
@@ -2821,6 +2977,23 @@ static func _has_ancestor_named(node: Node, ancestor_name: String) -> bool:
 		if current.name == ancestor_name:
 			return true
 		current = current.get_parent()
+	return false
+
+## True when the composed layout is driving screen geometry.
+##
+## The composition pass publishes `composed_rail_physical` on its host once it
+## owns the rails and the lower band. While that marker is present the theme
+## applies no size minimums of its own, so the two systems cannot fight over the
+## same nodes on every theme pass. The marker is checked on the theme root and
+## its immediate ancestors because the host is not always the themed control.
+static func _composed_geometry_owned(root: Control) -> bool:
+	var context: Node = root
+	for _level: int in range(3):
+		if context == null:
+			return false
+		if context.has_meta("composed_rail_physical"):
+			return true
+		context = context.get_parent()
 	return false
 
 static func _style(bg_color: Color, border_color: Color, border_width: int, radius: int) -> StyleBoxFlat:
@@ -2839,21 +3012,32 @@ static func _style(bg_color: Color, border_color: Color, border_width: int, radi
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.34)
 	return style
 
+## A flat territory tint with no shadow, for plates that cover a whole board half.
+## The generic _style() helper always carries a 5px black shadow, which is right
+## for a small panel and wrong for a full-rect plate: the shadow expands to the
+## whole plate and becomes a wash across the board instead of an edge. That wash
+## was what hid the firelit floor and cost the playfield its highlight. Measured
+## by tests/visual/PlayfieldValueIsolation.tscn and recorded in
+## docs/art/playfield_value_routing_2026-09-26.md.
+static func _territory_tint_style(bg_color: Color) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = bg_color
+	style.border_color = Color.TRANSPARENT
+	style.shadow_size = 0
+	return style
+
 static func _hover_style(bg_color: Color, border_color: Color, border_width: int, radius: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = _style(bg_color, border_color, border_width, radius)
 	style.shadow_size = 10
 	style.shadow_color = Color(0.74, 0.22, 0.055, 0.34)
 	return style
 
-static func _hard_panel_style(bg_color: Color, accent_color: Color, side_accent: bool) -> StyleBoxFlat:
-	var style: StyleBoxFlat = _style(bg_color, accent_color, 1, 0)
-	style.border_width_left = 5 if side_accent else 2
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 2
-	style.shadow_size = 12
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.58)
-	return style
+static func _hard_panel_style(bg_color: Color, accent_color: Color, side_accent: bool) -> StyleBox:
+	# Flat gameplay material: a recessed near-black interior behind a thin dull
+	# warm-gold edge. This is what every backplate uses except the panels in
+	# TRIAL_PANEL_PLATES, which opt into the trial surface instead. Title, menu and
+	# starter plates are untouched either way.
+	return GothicUIAssets.quiet_iron_panel_style(bg_color, accent_color, side_accent)
 
 static func _focus_outline(radius: int) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()
@@ -2874,6 +3058,7 @@ static func _apply_flat_button_states(button: Button, accent: Color) -> void:
 	button.add_theme_stylebox_override("hover_pressed", _hard_panel_style(Color(0.20, 0.028, 0.042, 1.0), COLOR_GOLD, true))
 	button.add_theme_stylebox_override("disabled", _hard_panel_style(Color(0.030, 0.027, 0.032, 0.88), Color(0.25, 0.23, 0.24, 0.72), false))
 	button.add_theme_stylebox_override("focus", _focus_outline(0))
+	GothicUIAssets.apply_button_material(button, false)
 
 static func _mark_interactive(button: Button) -> void:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

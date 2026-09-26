@@ -189,7 +189,15 @@ func remove_all(unit) -> Dictionary:
 	print("[Items] remove_all on=", uname3, " -> returned=", int(result.get("returned", 0)))
 	return result
 
-func force_set_equipped(unit, ids) -> Dictionary:
+## Restore an exact equipped loadout, bypassing the normal equip pipeline.
+##
+## `preserve_multiplicity` matters for snapshots: the mirror round copies the player's
+## board, and a unit holding two of the same component was coming back with one. The
+## snapshot still copies the unit's scalar stats, so the mirrored unit looked
+## identically rated while its item effects were short a trigger. Restoring a snapshot
+## has to be lossless; the dedupe is only right for a caller asking for "these items,
+## one each".
+func force_set_equipped(unit, ids, preserve_multiplicity: bool = false) -> Dictionary:
 	_cleanup_invalid_units()
 	var result := {"ok": false, "reason": ""}
 	if unit == null:
@@ -213,7 +221,7 @@ func force_set_equipped(unit, ids) -> Dictionary:
 		if not ItemCatalog.get_def(key):
 			push_warning("Items.force_set_equipped: unknown item %s" % key)
 			continue
-		if seen.has(key):
+		if not preserve_multiplicity and seen.has(key):
 			continue
 		seen[key] = true
 		deduped.append(key)

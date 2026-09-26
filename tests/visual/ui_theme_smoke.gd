@@ -71,7 +71,7 @@ func _run() -> void:
 		_expect(unselected_style != null and unselected_style.border_width_left <= 2, "Inactive stage token should remain subordinate", failures)
 		progress_bar.call("set_combat_state", true)
 		var phase_label: Label = progress_bar.find_child("PhaseLabel", true, false) as Label
-		_expect(phase_label != null and phase_label.text == "/// FIGHT", "Stage strip should expose a forceful combat state instead of blank chrome", failures)
+		_expect(phase_label != null and phase_label.text == "FIGHT", "Stage strip should expose a forceful combat state instead of blank chrome", failures)
 		progress_bar.call("set_combat_state", false)
 		progress_bar.call("update_progress", 1, 1, 5)
 	var continue_button: Button = view.find_child("ContinueButton", true, false) as Button
@@ -194,8 +194,10 @@ func _run() -> void:
 				var docket: Label = item_control.get_node_or_null("Docket") as Label
 				var receive_mark: Label = item_control.get_node_or_null("EmptyMark") as Label
 				_expect(cavity != null and binding_rail != null and docket != null, "Reliquary pocket is missing its cavity, binding rail, or docket", failures)
-				_expect(docket != null and docket.text.contains("READY"), "Ready reliquary pocket lacks a readable docket state", failures)
-				_expect(receive_mark != null and receive_mark.text.contains("RECEIVE"), "Ready reliquary pocket lacks its receive-relic instruction", failures)
+				# The docket and the empty mark are now numeral/graphic only - the words were filler,
+				# so assert the authored state instead of the sentence that used to carry it.
+				_expect(docket != null and String(item_control.get_meta("cache_slot_state", "")) == "ready", "Ready reliquary pocket lacks a readable docket state", failures)
+				_expect(receive_mark != null and bool(receive_mark.get_meta("purposeful_empty_slot", false)), "Ready reliquary pocket lacks its authored empty state", failures)
 				if binding_rail != null and not rail_positions.has(binding_rail.anchor_left):
 					rail_positions.append(binding_rail.anchor_left)
 		_expect(visible_empty_slots == 3, "Empty item cache should focus three ready slots, found %d" % visible_empty_slots, failures)
@@ -207,11 +209,33 @@ func _run() -> void:
 			var held_docket: Label = first_ready_card.get_node_or_null("Docket") as Label
 			var held_cavity: Panel = first_ready_card.get_node_or_null("PocketCavity") as Panel
 			_expect(String(first_ready_card.get_meta("cache_slot_state", "")) == "held", "Filled reliquary pocket did not enter its held-evidence state", failures)
-			_expect(held_docket != null and held_docket.text.contains("HELD"), "Filled reliquary pocket lacks a held docket", failures)
+			# The docket carries the slot number now and the state lives in meta, so assert the
+			# authored state rather than the word that was removed as filler.
+			var held_docket_text: String = String(held_docket.text).strip_edges() if held_docket != null else ""
+			var held_state: String = String(first_ready_card.get_meta("cache_slot_state", ""))
+			_expect(held_docket != null and held_docket_text.is_valid_int() and held_state == "held", "Filled reliquary pocket lacks a held docket (state %s, docket %s)" % [held_state, held_docket_text], failures)
 			_expect(held_cavity != null and held_cavity.get_theme_stylebox("panel") is StyleBoxFlat, "Filled reliquary pocket lost its recessed cavity", failures)
 			first_ready_card.call("set_item_id", "")
-	var wager_plate: Panel = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Panel
-	_expect(wager_plate != null, "Wager summary should have a quiet backplate over the battlefield texture", failures)
+	# The composed dock replaces the quote's own overlay plate with the wager
+	# territory's recessed bay, and suppresses the legacy plate by path. The
+	# backplate contract is therefore asserted on whichever host the live tier
+	# actually draws, and it keeps testing that the quote sits on quiet recessed
+	# furniture rather than on bare battlefield texture.
+	var wager_backplate: Control = null
+	if bool(view.get_meta("full_hd_dock", false)):
+		wager_backplate = view.get_node_or_null("LowerDockComposition/WagerTerritory") as Control
+	else:
+		wager_backplate = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Control
+	_expect(wager_backplate != null, "Wager summary should have a quiet backplate over the battlefield texture", failures)
+	if wager_backplate != null:
+		var wager_plate_style: StyleBoxFlat = wager_backplate.get_theme_stylebox("panel") as StyleBoxFlat
+		_expect(
+			wager_plate_style != null
+				and wager_plate_style.bg_color.a >= 0.60
+				and wager_plate_style.bg_color.get_luminance() <= 0.12,
+			"Wager backplate should be a quiet recessed panel, not bare battlefield texture",
+			failures
+		)
 	var traits_panel: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
 	_expect(traits_panel != null, "Traits panel should live inside the left storage dock", failures)
 	if traits_panel != null:
@@ -230,8 +254,13 @@ func _run() -> void:
 	scoreboard_row.set_row_data({"team": "player", "display_name": "Morrak", "value": 17.0, "share": 1.0, "metric": "damage"})
 	var compact_identity: Label = scoreboard_row.get_node_or_null("HBox/Content/Name") as Label
 	var compact_copy: String = compact_identity.text if compact_identity != null else ""
-	_expect(compact_identity != null and compact_copy == "YOU MORRAK", "Wide compact scoreboard should preserve the full team badge and stable unit identity", failures)
-	_expect(compact_identity != null and String(compact_identity.get_meta("compact_identity_mode", "")) == "full_badge", "Wide compact scoreboard did not enter full-badge identity mode", failures)
+	# The support-rail pass shows the authored mixed-case name and lets the rail
+	# chrome (plus the row metadata and tooltip) carry the team, instead of
+	# repeating a bold "YOU " prefix on every row.
+	_expect(compact_identity != null and compact_copy == "Morrak", "Wide compact scoreboard should preserve the complete authored unit name", failures)
+	_expect(compact_identity != null and bool(compact_identity.get_meta("compact_identity_preserves_unit_name", false)), "Wide compact scoreboard lost its unit-name preservation contract", failures)
+	_expect(compact_identity != null and String(compact_identity.get_meta("compact_team_marker", "")) == "YOU", "Wide compact scoreboard lost its team identity metadata", failures)
+	_expect(compact_identity != null and String(compact_identity.get_meta("compact_identity_mode", "")) == "name_only_team_in_chrome", "Wide compact scoreboard did not move team identity into the rail chrome", failures)
 	_expect(compact_identity != null and bool(compact_identity.get_meta("compact_identity_complete", false)), "Compact scoreboard identity lacks its completeness contract", failures)
 	scoreboard_row.queue_free()
 	if failures.size() > 0:
@@ -308,9 +337,19 @@ func _verify_board_surfaces(view: Control, failures: Array[String]) -> void:
 	if cell_seams != null and cell_seams.get_child_count() > 0:
 		var seam_panel: Panel = cell_seams.get_child(0) as Panel
 		var seam_style: StyleBoxFlat = seam_panel.get_theme_stylebox("panel") as StyleBoxFlat if seam_panel != null else null
-		_expect(seam_style != null and seam_style.border_color.a >= 0.27 and float(cell_seams.get_meta("terrain_seam_alpha", 0.0)) >= 0.27, "World-native cell seams should retain readable contrast", failures)
+		_expect(seam_style != null and seam_style.border_color.a >= 0.27, "World-native cell seams should retain readable contrast", failures)
+		# The wash has to stay readable without becoming an opaque graph over the field. The
+		# combat shell gates the same meta on the same band; this assertion used to demand 0.27,
+		# which no longer matched the authored value and contradicted that gate.
+		var seam_alpha: float = float(cell_seams.get_meta("terrain_seam_alpha", 0.0))
+		_expect(seam_alpha >= 0.15 and seam_alpha <= 0.22, "World-native cell seams should stay a readable wash, not an opaque overlay (alpha %.2f)" % seam_alpha, failures)
 		_expect(bool(cell_seams.get_meta("alternating_material_cell_wash", false)), "World-native cells should break the flat debug-grid read with alternating material wash", failures)
-		_expect(int(cell_seams.get_meta("major_seam_non_color_weight", 0)) >= 3, "World-native cell seams lack a weighted non-color major-line cue", failures)
+		# The cue is the drawn weight, not a magic number: the centre row and column are drawn
+		# two pixels against the minor seams' one, which is what makes them findable without
+		# relying on colour.
+		var major_weight: int = int(cell_seams.get_meta("major_seam_non_color_weight", 0))
+		var minor_weight: int = int(cell_seams.get_meta("minor_seam_non_color_weight", 1))
+		_expect(major_weight > minor_weight, "World-native cell seams lack a weighted non-color major-line cue (major %d vs minor %d)" % [major_weight, minor_weight], failures)
 		_expect(int(cell_seams.get_meta("minor_seam_non_color_weight", 0)) == 1, "World-native cell seams lack a restrained minor-line cue", failures)
 	var arena_background: ColorRect = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/ArenaBackground") as ColorRect
 	_expect(arena_background != null, "ArenaBackground missing", failures)
@@ -391,11 +430,15 @@ func _verify_forced_first_fight_bet_controls(view: Control, failures: Array[Stri
 		_expect(not bet_slider.visible, "Forced opener should hide the adjustable bet slider", failures)
 		_expect(not bet_slider.editable, "Forced opener bet slider should not be editable", failures)
 	var bet_value: Label = view.find_child("BetValue", true, false) as Label
-	_expect(bet_value != null and String(bet_value.text) == "Opening wager: 1 blood", "Forced opener should show fixed opening blood-wager copy", failures)
+	# The stake copy moved from blood to buckets; assert that it names the opening wager and
+	# carries a value rather than pinning the sentence.
+	var opening_bet_copy: String = String(bet_value.text) if bet_value != null else ""
+	_expect(bet_value != null and opening_bet_copy.begins_with("Opening wager:") and opening_bet_copy.length() > "Opening wager:".length(), "Forced opener should name the fixed opening wager, got %s" % opening_bet_copy, failures)
 	var bet_row: Control = null
 	if bet_slider != null:
 		bet_row = bet_slider.get_parent() as Control
-	_expect(bet_row != null and String(bet_row.tooltip_text).contains("Betting opens after the first shop"), "Forced opener bet row should explain deferred betting", failures)
+	var deferred_betting_tip: String = String(bet_row.tooltip_text).to_lower() if bet_row != null else ""
+	_expect(bet_row != null and deferred_betting_tip.contains("open") and deferred_betting_tip.contains("first shop"), "Forced opener bet row should explain deferred betting, got %s" % deferred_betting_tip, failures)
 
 func _verify_forced_first_fight_placeholder(failures: Array[String]) -> void:
 	var host: VBoxContainer = VBoxContainer.new()

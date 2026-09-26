@@ -10,12 +10,18 @@ extends Node
 const Generator := preload("res://scripts/game/progression/endless_chapter_generator.gd")
 const CombatPowerModel := preload("res://scripts/game/combat/combat_power_model.gd")
 const StageTypes := preload("res://scripts/game/progression/stage_types.gd")
+const ProgressionConfig := preload("res://scripts/game/progression/progression_config.gd")
 const SHUTDOWN_GRACE_SECONDS: float = 2.5
 const GENERATOR_SEED: int = 730711
 ## Bodies a shop can realistically supply by the time the chapter opens, at the level a
 ## breadth player would have: all level 1 in chapter 2, mostly level 2 by chapter 3.
 const PLAYER_BOARD: Array[String] = ["brute", "berebell", "bo", "velour", "kythera", "sari"]
 const PAIRS: Array = [[2, 2], [2, 3], [3, 2], [3, 3]]
+## Boss chapters to report. The boss body count is chosen from the chapter (see
+## BOSS_WIDTH_BY_CHAPTER), so this is the shape-ladder view the boss fight does not have
+## anywhere else: the generated width, the rating it was fitted to, and the fit's error.
+const BOSS_CHAPTERS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+const MAX_NON_CREEP_RELATIVE_ERROR: float = 0.17
 
 func _ready() -> void:
 	call_deferred("_run")
@@ -46,13 +52,43 @@ func _run() -> void:
 			player_level,
 			player_power,
 		])
+	_report_boss_shapes()
 	# Diagnostic only. This probe prints the generated shape, rating, power and
 	# modelled odds for two size ladders on one seed; it asserts nothing, so it cannot
 	# say which shape plays better and must not report PASS. Reading it as a pass is
 	# how the reverted breadth ladder was once described as proved to remove the cliff.
-	print("EncounterShapeComparisonProbe: DIAGNOSTIC pairs=%d (no behavioural assertions; reports generated shape and modelled power only)" % PAIRS.size())
+	print("EncounterShapeComparisonProbe: DIAGNOSTIC pairs=%d bosses=%d (no behavioural assertions; reports generated shape and modelled power only)" % [PAIRS.size(), BOSS_CHAPTERS.size()])
 	await get_tree().create_timer(SHUTDOWN_GRACE_SECONDS).timeout
 	get_tree().quit(0)
+
+## Boss shape, fitted rating and rating error per chapter. The rating error is the same
+## gate `EndlessChapterGenerationProbe` asserts (0.17), reported here because that probe
+## never quits its tree and its stdout is lost before the runner sees it.
+func _report_boss_shapes() -> void:
+	var worst_relative_error: float = 0.0
+	for chapter: int in BOSS_CHAPTERS:
+		Generator.clear_cache()
+		var state: Dictionary = {"recent_signatures": []}
+		var spec: Dictionary = Generator.get_spec(chapter, int(ProgressionConfig.BOSS_STAGE), GENERATOR_SEED, state)
+		var rules: Dictionary = spec.get(StageTypes.KEY_RULES, {}) if spec.get(StageTypes.KEY_RULES, {}) is Dictionary else {}
+		var ids: Array[String] = []
+		for raw_id: Variant in spec.get(StageTypes.KEY_IDS, []):
+			ids.append(String(raw_id))
+		var target: int = int(rules.get("target_rating", 0))
+		var rating: int = int(rules.get("difficulty_rating", 0))
+		var relative_error: float = float(abs(rating - target)) / float(max(1, target))
+		worst_relative_error = maxf(worst_relative_error, relative_error)
+		print("BossShape ch=%d size=%d target=%d rating=%d rel_err=%.3f gate=%.2f %s ids=%s" % [
+			chapter,
+			ids.size(),
+			target,
+			rating,
+			relative_error,
+			MAX_NON_CREEP_RELATIVE_ERROR,
+			"OK" if relative_error <= MAX_NON_CREEP_RELATIVE_ERROR else "OVER",
+			JSON.stringify(ids),
+		])
+	print("BossShape: worst_relative_error=%.3f gate=%.2f" % [worst_relative_error, MAX_NON_CREEP_RELATIVE_ERROR])
 
 func _shape(chapter: int, stage_index: int, mode: String) -> Dictionary:
 	Generator.size_ladder_mode = mode

@@ -63,11 +63,10 @@ static func compile(units: Array[Unit]) -> Dictionary:
 		thresholds_out[trait_id] = thresholds
 
 		var c := int(counts[trait_id])
-		var tier := -1
-		for i in range(thresholds.size()):
-			if c >= thresholds[i]:
-				tier = i
-		tiers[trait_id] = tier
+		# Dead zones are a property of the ladder, so the rule lives in TraitDef.
+		# A missing def still ramps on the coerced defaults.
+		var exact: bool = def != null and def.exact_thresholds
+		tiers[trait_id] = TraitDef.tier_for(c, thresholds, exact)
 
 	return {
 		"counts": counts,

@@ -350,6 +350,9 @@ def _png_visual_metrics(image_bytes: bytes) -> dict[str, Any]:
     }
 
 
+from visual_debug_harness.godot_art.freshness import screenshot_freshness as _screenshot_freshness, fresh_frame
+
+
 async def _capture_visible_frame(
     session: ClientSession,
     session_id: str,
@@ -362,6 +365,7 @@ async def _capture_visible_frame(
     deadline: float = asyncio.get_running_loop().time() + max(wait_seconds, 0.5)
     last_metrics: dict[str, Any] = {}
     attempts: int = 0
+    previous_frame: int | None = None
     while asyncio.get_running_loop().time() < deadline:
         attempts += 1
         screenshot_result: Any = await _call(
@@ -386,6 +390,12 @@ async def _capture_visible_frame(
             )
         image_bytes: bytes = base64.b64decode(image_items[0].data)
         last_metrics = _png_visual_metrics(image_bytes)
+        freshness: dict[str, Any] = _screenshot_freshness(screenshot_result)
+        last_metrics["freshness"] = freshness
+        frames: Any = freshness.get("frames_drawn")
+        fresh: bool = source != "game" or fresh_frame(freshness, previous_frame)
+        if type(frames) is int:
+            previous_frame = frames
         dimensions_match: bool = (
             expected_width <= 0
             or expected_height <= 0
@@ -394,13 +404,15 @@ async def _capture_visible_frame(
                 and int(last_metrics["height"]) == expected_height
             )
         )
-        if bool(last_metrics["nonblank"]) and dimensions_match:
+        if bool(last_metrics["nonblank"]) and dimensions_match and fresh:
             return image_items[0], image_bytes, last_metrics, attempts
         await asyncio.sleep(0.5)
     raise TimeoutError(
-        "Godot framebuffer remained blank or at the wrong dimensions after "
+        "Godot framebuffer remained stale, unverifiable, blank, or at the wrong dimensions after "
         f"{wait_seconds:.1f}s and {attempts} capture attempts: "
         f"{json.dumps(last_metrics)}"
+        + (". Game helper omitted freshness metadata; use a helper that reports stale_frame and frames_drawn."
+           if source == "game" and not last_metrics.get("freshness") else "")
     )
 
 

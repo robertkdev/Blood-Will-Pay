@@ -26,6 +26,10 @@ const CONTEXT_ENTRY_ALPHA: float = 0.42
 const CONTEXT_FADE_SECONDS: float = 0.36
 const CHROME_ENTRY_ALPHA: float = 0.0
 const CHROME_FADE_SECONDS: float = 0.24
+## One native floor exposure for every state. The authored battlefield texture
+## carries its own lighting; a planning/combat exposure split competed with the
+## characters and made the floor a different material between phases.
+const FLOOR_EXPOSURE: Color = Color.WHITE
 
 const CONTEXT_PATHS: Array[String] = [
 	"MarginContainer/VBoxContainer/StageLabel",
@@ -39,7 +43,13 @@ const CHROME_PATHS: Array[String] = [
 	"MarginContainer/VBoxContainer/ActionsRow",
 	"MarginContainer/VBoxContainer/BenchArea",
 	"MarginContainer/VBoxContainer/BottomStorageArea",
-	"MarginContainer/VBoxContainer/WagerSummary",
+	# The wager quote now rides inside the composed dock layer (WagerTerritory),
+	# so it is faded, input-locked and hidden by the LowerDockComposition entry
+	# below rather than by its own path.
+	# The composed planning dock hosts the shop header, the wager column and the
+	# primary action outside the BottomStorageArea subtree, so it is owned here
+	# explicitly: same fade, same input lock, same hide during combat.
+	"LowerDockComposition",
 	"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusRow",
 	"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/BoardStatusBackplate",
 	"GothicStatsAreaPlate",
@@ -103,7 +113,7 @@ func refresh_field_material() -> void:
 			decoration.visible = false
 	var floor_surface: Control = _arena_container.get_node_or_null("GothicArenaSurface") as Control
 	if floor_surface != null:
-		floor_surface.modulate = Color(1.24, 1.12, 1.04, 1.0)
+		floor_surface.modulate = FLOOR_EXPOSURE
 
 func sync_planning_field() -> void:
 	refresh_field_material()
@@ -133,7 +143,7 @@ func sync_planning_field() -> void:
 	_floor_scale = maxf(rect.size.x / texture_size.x, rect.size.y / texture_size.y)
 	_floor_origin = rect.get_center() - texture_size * _floor_scale * 0.5
 	_set_floor_transform(_floor_origin, _floor_scale)
-	surface.modulate = Color(1.24, 1.12, 1.04, 1.0)
+	surface.modulate = FLOOR_EXPOSURE
 
 func get_combat_viewport_rect() -> Rect2:
 	var viewport_rect: Rect2 = _host.get_viewport_rect()
