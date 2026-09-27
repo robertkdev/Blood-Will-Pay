@@ -238,13 +238,20 @@ func _verify_post_shop_bet_controls() -> void:
 	_expect(gold > 1, "post-opener gold should allow a meaningful bet, got %d" % gold)
 	_expect(slider.visible, "post-shop bet slider should be visible")
 	_expect(slider.editable, "post-shop bet slider should be editable")
-	_expect(slider.get_theme_stylebox("slider") is StyleBoxTexture, "post-shop wager rail should use the generated track asset")
-	_expect(slider.get_theme_stylebox("grabber_area") is StyleBoxTexture, "post-shop wager fill should use the generated fill asset")
-	_expect(slider.get_theme_icon("grabber") != null, "post-shop wager should use the generated grabber asset")
-	_expect(slider.get_theme_icon("grabber_highlight") != null, "post-shop wager should expose a distinct hover grabber")
-	_expect(slider.get_theme_icon("grabber_disabled") != null, "post-shop wager should expose a disabled grabber")
-	var authored_rail: TextureRect = slider.get_node_or_null("HardcoreWagerRail") as TextureRect
-	_expect(authored_rail != null and authored_rail.visible and authored_rail.texture != null, "post-shop wager should render its authored rail behind the grabber")
+	# The wager rail wears the gameplay family, not the cream hardcore one: the
+	# track and fill are flat iron and crimson styleboxes, and the cream rail
+	# overlay that used to sit behind the grabber is retired. See
+	# docs/art/dock_action_and_wager_2026-09-26.md.
+	var track_style: StyleBoxFlat = slider.get_theme_stylebox("slider") as StyleBoxFlat
+	var fill_style: StyleBoxFlat = slider.get_theme_stylebox("grabber_area") as StyleBoxFlat
+	_expect(track_style != null, "post-shop wager rail should wear the gameplay track material")
+	_expect(fill_style != null, "post-shop wager fill should wear the gameplay fill material")
+	if track_style != null:
+		_expect(track_style.bg_color.get_luminance() < 0.25, "post-shop wager rail should be a recessed dark track, got luminance %.2f" % track_style.bg_color.get_luminance())
+	if fill_style != null:
+		_expect(fill_style.bg_color.r > fill_style.bg_color.g * 3.0, "post-shop wager fill should be the wager's own crimson")
+	_expect(slider.get_theme_icon("grabber") != null, "post-shop wager should use the shared handle asset")
+	_expect(slider.get_node_or_null("HardcoreWagerRail") == null, "the cream rail overlay should be retired with the material it carried")
 	_expect(label == null or label.visible, "post-shop Bet label should be visible")
 	_expect(int(slider.min_value) == 1, "post-shop bet slider min should be 1")
 	_expect(int(slider.max_value) == gold, "post-shop bet slider max should equal current gold")
@@ -253,14 +260,28 @@ func _verify_post_shop_bet_controls() -> void:
 	if all_in_button != null:
 		all_in_button.emit_signal("pressed")
 	await _settle_frames(12)
+	# Amount changes after the victory overlay must settle, not keep reflowing
+	# the shop and wager targets every frame.
+	var stable_targets: Array[Control] = [slider, value_label, _main.find_child("ShopGrid", true, false) as Control]
+	var settled_rects: Array[Rect2] = []
+	for target: Control in stable_targets:
+		settled_rects.append(target.get_global_rect())
+	await _settle_frames(12)
+	for index: int in range(stable_targets.size()):
+		var settled: Rect2 = stable_targets[index].get_global_rect()
+		_expect(settled.position.distance_to(settled_rects[index].position) <= 1.0 and settled.size.distance_to(settled_rects[index].size) <= 1.0, "Post-victory wager change did not settle " + stable_targets[index].name)
 	_expect(int(slider.value) == max_bet, "All In should select the maximum wager")
 	_expect(int(Economy.current_bet) == max_bet, "max-bet slider should update Economy.current_bet")
 	_expect(int(Economy.preferred_bet) == max_bet, "max-bet slider should update Economy.preferred_bet")
 	_expect(String(value_label.text) == BloodBuckets.format_amount(max_bet), "max-bet slider should repaint BetValue to bucket copy %s, got %s" % [BloodBuckets.format_amount(max_bet), String(value_label.text)])
 	if all_in_button != null:
-		var armed_style: StyleBoxTexture = all_in_button.get_theme_stylebox("normal") as StyleBoxTexture
+		var armed_style: StyleBoxFlat = all_in_button.get_theme_stylebox("normal") as StyleBoxFlat
 		_expect(String(all_in_button.text) == "ALL IN!", "armed all-in control should switch to emphatic action copy")
-		_expect(armed_style != null and armed_style.texture != null and String(armed_style.texture.resource_path).ends_with("button_wager_selected.png"), "armed all-in control should use the authored selected wager state")
+		# The armed state is carried by the plate rather than by a separate
+		# generated button texture: the wager's crimson under the shared rule.
+		_expect(armed_style != null, "armed all-in control should wear the gameplay plate material")
+		if armed_style != null:
+			_expect(armed_style.bg_color.r > armed_style.bg_color.g * 3.0, "armed all-in plate should carry the wager's crimson")
 	if wager_summary != null:
 		var summary_copy: String = String(wager_summary.text)
 		# The strip is stake / odds-range / win-loss outcomes with no prose; the plate label and

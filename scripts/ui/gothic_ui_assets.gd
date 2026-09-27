@@ -52,6 +52,9 @@ const COLOR_GAMEPLAY_CRIMSON_HOT: Color = Color(0.62, 0.075, 0.075, 0.99)
 ## them widened into a band, so both uses share one colour and one thickness
 ## instead of each inventing its own edge.
 const COLOR_GAMEPLAY_RULE: Color = Color(0.72, 0.61, 0.38, 0.70)
+## The wager rail's handle, shared with the theme's blood-meter slider so the two
+## read as one control family.
+const WAGER_HANDLE: String = "res://assets/ui/blood_meter_handle.svg"
 
 ## Gameplay surfaces. Each helper returns its documented fallback while a file is
 ## absent or does not match the audited source size, so an unapproved or resized
@@ -79,11 +82,9 @@ const GAMEPLAY_COMMIT_SURFACE_SIZE: Vector2 = Vector2(256.0, 144.0)
 ## were authored with. The rejected v2 surface is never used, and the 40px bands
 ## below stay separate from the panels' own content insets.
 const GAMEPLAY_PANEL_SURFACE_ENABLED: bool = true
-## The crimson action plaque is declined for the commit action: that control's
-## acceptance contract is restrained flat field furniture, and the plaque's own
-## relief reads as a second frame inside its bay. The file is kept for provenance
-## and one-line rollback, exactly like the rejected v2 panel.
-const GAMEPLAY_COMMIT_SURFACE_ENABLED: bool = false
+## The action uses its isolated crimson texture as the native Button material.
+## Its quiet bay is unframed, so this remains one frame around one control.
+const GAMEPLAY_COMMIT_SURFACE_ENABLED: bool = true
 ## A surface at least this wide and tall can carry the 40px nine-slice bands
 ## without the rim becoming the whole surface. Small controls keep the flat iron.
 const GAMEPLAY_PANEL_MIN_SPAN: float = 80.0
@@ -209,8 +210,7 @@ static func apply_button_material(button: Button, primary: bool) -> void:
 		"disabled": Color(0.45, 0.45, 0.45, 0.86),
 	}
 	for state: String in states:
-		# The commit action keeps a material family of its own (the flat crimson
-		# field while the textured plaque is declined) so it keeps independent
+		# The commit action keeps a crimson material family of its own and independent
 		# weight through the same five authored states. Every other gameplay
 		# button is the same quiet recessed iron as the panels; the legacy silver
 		# button plate is no longer a gameplay surface.
@@ -474,16 +474,26 @@ static func quiet_iron_commit_style(modulate: Color = Color.WHITE) -> StyleBoxFl
 		COLOR_GAMEPLAY_CRIMSON.b * modulate.b,
 		COLOR_GAMEPLAY_CRIMSON.a * modulate.a,
 	)
+	# The commit action is the one saturated mass on the screen, so its edge is a
+	# frame rather than a rim: measured against the reference's own plate, ours read
+	# as a flat crimson slab because its border was the same dull gold used on every
+	# quiet panel (0.61, 0.51, 0.37 at 0.72 alpha) at one and two pixels. This is a
+	# brighter brass frame at a weight that survives the crimson behind it, which is
+	# what makes the plate read as the commitment rather than as a large button.
 	style.border_color = Color(
-		minf(1.0, COLOR_GAMEPLAY_EDGE.r + 0.14),
-		minf(1.0, COLOR_GAMEPLAY_EDGE.g + 0.12),
-		minf(1.0, COLOR_GAMEPLAY_EDGE.b + 0.10),
-		COLOR_GAMEPLAY_EDGE.a,
+		minf(1.0, COLOR_GAMEPLAY_RULE.r + 0.16) * modulate.r,
+		minf(1.0, COLOR_GAMEPLAY_RULE.g + 0.16) * modulate.g,
+		minf(1.0, COLOR_GAMEPLAY_RULE.b + 0.16) * modulate.b,
+		minf(1.0, COLOR_GAMEPLAY_RULE.a + 0.22),
 	)
-	style.border_width_left = 2
-	style.border_width_top = 1
-	style.border_width_right = 2
-	style.border_width_bottom = 3
+	style.border_width_left = 4
+	style.border_width_top = 3
+	style.border_width_right = 4
+	style.border_width_bottom = 5
+	style.corner_radius_top_left = 3
+	style.corner_radius_top_right = 3
+	style.corner_radius_bottom_left = 3
+	style.corner_radius_bottom_right = 3
 	style.shadow_size = 8
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.54)
 	style.content_margin_left = 12.0
@@ -521,14 +531,38 @@ static func gameplay_panel_style_for(surface_size: Vector2, fallback: StyleBox =
 		return fallback if fallback != null else quiet_iron_recess_style()
 	return gameplay_panel_style(fallback, content_insets)
 
-## The commit action's material: the flat crimson family while the plaque surface
-## is declined (`GAMEPLAY_COMMIT_SURFACE_ENABLED`), otherwise the root-approved
-## plaque when present at the audited size, then the existing primary button
-## material, then the crimson flat.
+## The wager rail and its fill: the same recessed iron and dull brass as every
+## other control in the dock, with the wager's own blood red for the filled share
+## and the shared handle. The betting area used to wear a different family
+## entirely - a cream rail, a cool grey button edge - which is what made it the
+## loudest and least finished-looking part of a dark dock. See
+## docs/art/dock_action_and_wager_2026-09-26.md.
+static func wager_track_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = COLOR_GAMEPLAY_RECESS_DEEP
+	style.border_color = COLOR_GAMEPLAY_EDGE_DIM
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(3)
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
+	return style
+
+static func wager_fill_style(highlighted: bool = false) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = COLOR_GAMEPLAY_CRIMSON_HOT if highlighted else COLOR_GAMEPLAY_CRIMSON
+	style.border_color = COLOR_GAMEPLAY_EDGE
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(3)
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
+	return style
+
+static func wager_handle_texture() -> Texture2D:
+	return TextureUtils.try_load_texture(WAGER_HANDLE)
+
 static func gameplay_commit_style(modulate: Color = Color.WHITE, content_insets: Vector4 = GAMEPLAY_COMMIT_CONTENT_INSETS) -> StyleBox:
 	if not GAMEPLAY_COMMIT_SURFACE_ENABLED:
-		# Surface declined: the commit action keeps the flat crimson family, which
-		# is the same material the plaque falls back to.
+		# Explicit rollback keeps the native button and its dimensions intact.
 		var declined: StyleBoxFlat = quiet_iron_commit_style(modulate)
 		declined.content_margin_left = content_insets.x
 		declined.content_margin_top = content_insets.y

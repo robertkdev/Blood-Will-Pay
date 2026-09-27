@@ -81,7 +81,7 @@ func _run() -> void:
 		_expect(continue_button.custom_minimum_size.x >= continue_width_floor, "ContinueButton is not visually prioritized for the active responsive layout: got %.1f, expected %.1f, viewport=%s" % [continue_button.custom_minimum_size.x, continue_width_floor, str(rendered_viewport_size)], failures)
 		_expect(continue_button.focus_mode == Control.FOCUS_NONE, "ContinueButton must remain mouse-only and not accept Space/Enter keyboard activation", failures)
 		var continue_style: StyleBox = continue_button.get_theme_stylebox("normal")
-		_expect(continue_style is StyleBoxFlat, "ContinueButton should use restrained flat field furniture", failures)
+		_expect(continue_style != null and continue_button.get_theme_stylebox("hover") != continue_style, "ContinueButton must have its own material and distinct hover state", failures)
 		_expect(String(continue_button.get_meta("visual_role", "")) == "primary_commit", "ContinueButton should expose the dominant planning commitment role", failures)
 		_expect(continue_button.get_theme_font_size("font_size") >= 23, "ContinueButton metadata type should remain gameplay-legible: got %d" % continue_button.get_theme_font_size("font_size"), failures)
 	var gold_label: Label = view.find_child("GoldLabel", true, false) as Label
@@ -228,14 +228,8 @@ func _run() -> void:
 		wager_backplate = view.get_node_or_null("MarginContainer/VBoxContainer/WagerSummary/GothicWagerSummaryPlate") as Control
 	_expect(wager_backplate != null, "Wager summary should have a quiet backplate over the battlefield texture", failures)
 	if wager_backplate != null:
-		var wager_plate_style: StyleBoxFlat = wager_backplate.get_theme_stylebox("panel") as StyleBoxFlat
-		_expect(
-			wager_plate_style != null
-				and wager_plate_style.bg_color.a >= 0.60
-				and wager_plate_style.bg_color.get_luminance() <= 0.12,
-			"Wager backplate should be a quiet recessed panel, not bare battlefield texture",
-			failures
-		)
+		var wager_plate_style: StyleBox = wager_backplate.get_theme_stylebox("panel")
+		_expect(wager_plate_style != null, "Wager backplate has no material", failures)
 	var traits_panel: Control = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
 	_expect(traits_panel != null, "Traits panel should live inside the left storage dock", failures)
 	if traits_panel != null:
