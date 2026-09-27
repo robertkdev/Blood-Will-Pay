@@ -16,3 +16,5 @@ All code and resource paths are relative to the selected repository root. Verify
 - The future-agent workflow for exact-size generated UI assets is `docs/art/ui_gothic_asset_workflow.md`.
 - Treat ImageGen as a texture/style pass only. Do not promote raw generated output directly into `assets/ui/gothic/`; recover candidates with deterministic bbox crop, exact resize, original alpha/shape mask, and dimension/nine-slice audits.
 - Wire UI frames through `scripts/ui/gothic_ui_assets.gd` as `StyleBoxTexture` helpers with flat fallbacks. Validate state variants with MCP visual scenes and compare against fresh full-game captures.
+
+The [wager/action production transfer](../art/wager-production-transfer.md) records the current native authoring tools, affected runtime checks, and the distinction between functional regressions and image-based visual acceptance. Use the installed [art-preview contract](../../addons/art_preview/README.md) for live material/property trials; integrate accepted values into their existing production owners.

@@ -456,6 +456,16 @@ func _apply_unit_detail_layout() -> void:
             _team_minimum_width = custom_minimum_size.x
     var base_minimum_width: float = _team_minimum_width if _team_minimum_width > 0.0 else custom_minimum_size.x
     var detail_minimum_width: float = 216.0 if use_compact_detail else base_minimum_width
+    # A composed fullscreen rail owns its width. The detail sheet must reflow
+    # inside it instead of relying on a later outer reflow to undo a 216px pin.
+    var composition_owner: Node = get_parent()
+    while composition_owner != null and not composition_owner.has_meta("full_hd_dock"):
+        composition_owner = composition_owner.get_parent()
+    if composition_owner != null and bool(composition_owner.get_meta("full_hd_dock", false)):
+        var composed_width: float = float(composition_owner.get_meta("composed_rail_logical", 0.0))
+        if composed_width > 0.0:
+            base_minimum_width = composed_width
+            detail_minimum_width = composed_width
     # The composition owns the team rail's width, so a team-mode pass only reads
     # it. The inspection sheet widens the rail while it is open, and gives that
     # width back exactly once when it closes.

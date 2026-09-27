@@ -2165,10 +2165,7 @@ func _dock_shop_bar() -> HBoxContainer:
 			return bar
 	return null
 
-## Wager controls keep their physical footprint as the UI scale grows: the
-## The wager column stacks the existing controls (label, slider, value badge,
-## All In) instead of running them across the band, which is what made the old
-## command strip enormously wide and pushed the dock split into a fallback.
+## Compose the existing economy controls; no wager calculations live here.
 func _ensure_dock_wager_column() -> void:
 	if _wager_controls != null and is_instance_valid(_wager_controls):
 		return
@@ -2178,64 +2175,142 @@ func _ensure_dock_wager_column() -> void:
 	_wager_controls.name = "WagerControls"
 	_wager_controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_wager_controls.alignment = BoxContainer.ALIGNMENT_CENTER
-	_wager_controls.add_theme_constant_override("separation", 8)
 	_wager_slot.add_child(_wager_controls)
-	# Heading and slider share one row, value and All In another: two control rows
-	# keep the column shorter than the 150 percent band without hiding anything.
 	_wager_control_row = HBoxContainer.new()
 	_wager_control_row.name = "WagerControlRow"
 	_wager_control_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_wager_control_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_wager_control_row.add_theme_constant_override("separation", 6)
+	_wager_control_row.add_theme_constant_override("separation", 12)
 	_wager_controls.add_child(_wager_control_row)
-	# Value badge and All In share one row: stacking all four controls is what
-	# made the column taller than its band at 150 percent.
+	var reserve: Label = Label.new()
+	reserve.name = "WagerReserve"
+	reserve.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	reserve.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reserve.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	reserve.add_theme_color_override("font_color", Color(0.69, 0.64, 0.55))
+	VisualTypeSystem.set_gameplay_body(reserve)
+	_wager_control_row.add_child(reserve)
 	_wager_value_row = HBoxContainer.new()
 	_wager_value_row.name = "WagerValueRow"
 	_wager_value_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_wager_value_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_wager_value_row.add_theme_constant_override("separation", 6)
 	_wager_controls.add_child(_wager_value_row)
+	for direction: int in [-1, 1]:
+		var button: Button = Button.new()
+		button.name = "WagerDecrease" if direction < 0 else "WagerIncrease"
+		button.text = "−" if direction < 0 else "+"
+		button.tooltip_text = "Decrease wager" if direction < 0 else "Increase wager"
+		VisualTypeSystem.set_gameplay_numeric(button)
+		for state_name: String in ["normal", "hover", "pressed", "disabled"]:
+			button.add_theme_stylebox_override(state_name, GothicUIAssets.quiet_iron_button_style(state_name))
+		button.add_theme_stylebox_override("focus", _wager_focus_style())
+		button.pressed.connect(_adjust_dock_wager.bind(direction))
+		_wager_value_row.add_child(button)
 	if _wager_label == null:
 		_wager_label = find_child("BetLabel", true, false) as Label
+	if _wager_label != null:
+		VisualTypeSystem.set_gameplay_heading(_wager_label)
 	if bet_slider != null:
 		_wager_row = bet_slider.get_parent() as HBoxContainer
+		# Slider has no native focus StyleBox slot. A mouse-transparent Panel
+		# makes keyboard focus visible without replacing slider input or drawing.
+		var focus_ring: Panel = Panel.new()
+		focus_ring.name = "WagerKeyboardFocus"
+		focus_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		focus_ring.add_theme_stylebox_override("panel", _wager_focus_style())
+		bet_slider.add_child(focus_ring)
+		focus_ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		focus_ring.offset_top = -3.0
+		focus_ring.offset_bottom = 3.0
+		focus_ring.visible = bet_slider.has_focus()
+		bet_slider.focus_entered.connect(focus_ring.show)
+		bet_slider.focus_exited.connect(focus_ring.hide)
+	if bet_value != null:
+		VisualTypeSystem.set_gameplay_heading(bet_value)
+		bet_value.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 
-## Physical-constant metrics for the stacked wager controls: the column stays a
-## comfortable narrow panel at 100/125/150 percent.
+func _wager_focus_style() -> StyleBoxFlat:
+	var focus: StyleBoxFlat = StyleBoxFlat.new()
+	focus.draw_center = false
+	focus.border_color = Color(1.0, 0.82, 0.49)
+	focus.set_border_width_all(2)
+	focus.set_corner_radius_all(2)
+	return focus
+
+func _adjust_dock_wager(direction: int) -> void:
+	if bet_slider != null and bet_slider.editable:
+		# Step in the slider's own units, including its large-reserve mapping.
+		bet_slider.value = clampf(bet_slider.value + float(direction) * bet_slider.step, bet_slider.min_value, bet_slider.max_value)
+
 func _apply_dock_wager_column_metrics(ui_scale: float) -> void:
-	var scale: float = maxf(1.0, ui_scale)
 	if _wager_controls == null or not is_instance_valid(_wager_controls):
-		# Sizing only: the column is created by the deferred composition pass,
-		# never from inside a layout notification.
 		return
-	_wager_controls.add_theme_constant_override("separation", int(clampf(10.0 / scale, 5.0, 10.0)))
-	var column_width: float = clampf(200.0 / scale, 132.0, 200.0)
-	var slider_height: float = clampf(38.0 / scale, 30.0, 38.0)
-	var badge_height: float = clampf(40.0 / scale, 30.0, 40.0)
+	var scale_factor: float = maxf(1.0, ui_scale)
+	_wager_controls.add_theme_constant_override("separation", int(roundf(8.0 / scale_factor)))
 	if bet_slider != null:
-		var slider_size: Vector2 = Vector2(column_width, slider_height)
-		if bet_slider.custom_minimum_size != slider_size:
-			bet_slider.custom_minimum_size = slider_size
-		if bet_slider.size_flags_horizontal != Control.SIZE_SHRINK_CENTER:
-			bet_slider.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	if _wager_value_row != null and is_instance_valid(_wager_value_row):
-		_wager_value_row.add_theme_constant_override("separation", int(clampf(8.0 / scale, 4.0, 8.0)))
-		for control: Control in [bet_value, all_in_button]:
-			if control == null:
-				continue
-			if control.get_parent() != _wager_value_row:
-				_reparent_dock_control(control, _wager_value_row)
-			# Idempotent: a repeated assignment emits another minimum-size change,
-			# which the grid's rect-changed signal can turn into a new re-assert.
-			if not is_equal_approx(control.custom_minimum_size.y, badge_height):
-				control.custom_minimum_size = Vector2(0.0, badge_height)
-			if control.size_flags_horizontal != Control.SIZE_SHRINK_CENTER:
-				control.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		bet_slider.custom_minimum_size = Vector2(0.0, 24.0 / scale_factor)
+		bet_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if bet_value != null:
+		if bet_value.get_theme_font("font") != VisualTypeSystem.FONT_HEADING:
+			VisualTypeSystem.set_gameplay_heading(bet_value)
+		var amount_font_size: int = int(roundf(24.0 / scale_factor))
+		# Reserve the widest selectable amount so changing one bucket to two
+		# buckets does not move the shop or neighboring hit targets.
+		var amount_font: Font = VisualTypeSystem.FONT_HEADING
+		var amount_width: float = maxf(
+			amount_font.get_string_size(BloodBuckets.format_amount(int(Economy.blood_buckets)), HORIZONTAL_ALIGNMENT_LEFT, -1.0, amount_font_size).x,
+			amount_font.get_string_size("1 bucket", HORIZONTAL_ALIGNMENT_LEFT, -1.0, amount_font_size).x
+		)
+		bet_value.custom_minimum_size = Vector2(ceilf(amount_width) + 8.0, 42.0 / scale_factor)
+		bet_value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bet_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_set_wager_font_size(bet_value, int(roundf(24.0 / scale_factor)))
+	if all_in_button != null:
+		all_in_button.custom_minimum_size = Vector2(70.0 / scale_factor, 38.0 / scale_factor)
+		all_in_button.size_flags_horizontal = Control.SIZE_FILL
+		all_in_button.icon = null
+		_set_wager_font_size(all_in_button, int(roundf(15.0 / scale_factor)))
 	if _wager_label != null:
-		_wager_label.custom_minimum_size = Vector2(0.0, 0.0)
-		_wager_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_wager_label.text = "WAGER"
+		if _wager_label.get_theme_font("font") != VisualTypeSystem.FONT_HEADING:
+			VisualTypeSystem.set_gameplay_heading(_wager_label)
+		_wager_label.visible = true
+		_wager_label.custom_minimum_size = Vector2.ZERO
+		_wager_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_set_wager_font_size(_wager_label, int(roundf(21.0 / scale_factor)))
+	var reserve: Label = _wager_control_row.get_node("WagerReserve") as Label
+	_set_wager_font_size(reserve, int(roundf(15.0 / scale_factor)))
+	for button_name: String in ["WagerDecrease", "WagerIncrease"]:
+		var stepper: Button = _wager_value_row.get_node(button_name) as Button
+		stepper.custom_minimum_size = Vector2(34.0, 38.0) / scale_factor
+		_set_wager_font_size(stepper, int(roundf(24.0 / scale_factor)))
 	_wager_controls.set_meta("dock_wager_metrics_scale", ui_scale)
+
+func _set_wager_font_size(control: Control, font_size: int) -> void:
+	if control.get_theme_font_size("font_size") != font_size:
+		control.add_theme_font_size_override("font_size", font_size)
+
+## Called by EconomyUI after its authoritative quote changes, including when
+## layout is stationary. A hidden summary remains available to compact layouts.
+func refresh_dock_wager_presentation() -> void:
+	if not _dock_composition_active or _wager_controls == null:
+		return
+	if gold_label != null:
+		gold_label.visible = false
+	var reserve: Label = _wager_control_row.get_node("WagerReserve") as Label
+	reserve.text = "Reserve: " + BloodBuckets.format_amount(int(Economy.blood_buckets), true)
+	reserve.tooltip_text = BloodBuckets.describe(int(Economy.blood_buckets))
+	var editable: bool = bet_slider != null and bet_slider.editable and bet_slider.visible
+	if all_in_button != null:
+		all_in_button.disabled = not editable
+	for button_name: String in ["WagerDecrease", "WagerIncrease"]:
+		var stepper: Button = _wager_value_row.get_node(button_name) as Button
+		stepper.visible = bet_slider != null and bet_slider.visible
+		stepper.disabled = not editable or (bet_slider.value <= bet_slider.min_value if button_name == "WagerDecrease" else bet_slider.value >= bet_slider.max_value)
+	if wager_summary != null:
+		var quotes: Dictionary = wager_summary.get_meta("outcome_quotes", {}) as Dictionary
+		wager_summary.visible = not bool(quotes.get("active", false))
+		_wager_controls.tooltip_text = wager_summary.tooltip_text
+	_apply_dock_wager_outcomes()
 
 ## The stacked column's own minimum width, used to size its territory. Measured
 ## from the live controls so a longer label or value badge cannot be pushed
@@ -2346,9 +2421,8 @@ func _apply_dock_ledge(band: Rect2) -> void:
 func _apply_dock_territory_material(territory: PanelContainer, primary: bool) -> void:
 	if territory == null:
 		return
-	# The action bay is unframed - the generated red button is the frame - and the
-	# wager column is the quiet recessed iron, never the ornate gameplay panel.
-	var wanted: String = "empty" if primary else "recess"
+	# The native action owns its frame; the wager uses the shared panel material.
+	var wanted: String = "empty" if primary else "panel"
 	var applied: String = "%s@%d" % [wanted, _dock_material_revision]
 	if String(territory.get_meta("dock_material", "")) == applied:
 		return
@@ -2581,24 +2655,14 @@ func _apply_dock_wager_outcomes() -> void:
 		_wager_outcomes.visible = false
 		return
 	_wager_outcomes.visible = true
-	# Authored composition scale only, which is the same distinction the stage bar
-	# uses to compact itself. An enlarged UI leaves the shipped frame 1280x720
-	# logical, where two more rows push the wager territory past the viewport -
-	# the review scene caught exactly that at 150 percent. The disclosure is not a
-	# hidden fact: the same two futures stay in the summary line and the tooltip at
-	# every scale.
-	if bool(get_meta("full_hd_dock", false)) and float(get_meta("persisted_ui_scale", 1.0)) > 1.0:
-		_wager_outcomes.visible = false
-		return
-	var compact: bool = bool(get_meta("compact_layout", false))
-	var tight: bool = bool(get_meta("tight_scale_layout", false))
-	var caption_size: int = 13 if tight else 14 if compact else 16
-	var value_size: int = 15 if tight else 17 if compact else 19
+	var scale_factor: float = maxf(1.0, float(get_meta("persisted_ui_scale", 1.0)))
+	var caption_size: int = int(roundf(16.0 / scale_factor))
+	var value_size: int = int(roundf(19.0 / scale_factor))
 	_write_wager_outcome_row(
 		"WagerWinRow",
 		"WIN  %d-%d%%" % [int(data.get("win_low", 0)), int(data.get("win_high", 0))],
 		BloodBuckets.format_amount(int(data.get("after_win", 0))),
-		GothicUIAssets.COLOR_GAMEPLAY_RULE,
+		Color(0.92, 0.78, 0.50),
 		Color(0.72, 0.61, 0.38, 0.10),
 		caption_size,
 		value_size
@@ -2607,7 +2671,7 @@ func _apply_dock_wager_outcomes() -> void:
 		"WagerLossRow",
 		"LOSS  %d-%d%%" % [int(data.get("loss_low", 0)), int(data.get("loss_high", 0))],
 		BloodBuckets.format_amount(int(data.get("after_loss", 0))),
-		GothicUIAssets.COLOR_GAMEPLAY_CRIMSON_HOT,
+		Color(0.98, 0.49, 0.47),
 		Color(0.62, 0.075, 0.075, 0.20),
 		caption_size,
 		value_size
@@ -2660,48 +2724,32 @@ func _write_wager_outcome_row(
 func _place_dock_controls(wager_rect: Rect2, plaque_rect: Rect2) -> void:
 	_ensure_dock_wager_column()
 	if _wager_controls != null:
-		# The existing wager quote becomes the column's own header instead of a
-		# second floating row across the screen.
 		if wager_summary != null and wager_summary.get_parent() != _wager_controls:
 			if not wager_summary.has_meta("dock_quote_home_index"):
 				wager_summary.set_meta("dock_quote_home_index", wager_summary.get_index())
 			_reparent_dock_control(wager_summary, _wager_controls)
-			_wager_controls.move_child(wager_summary, 0)
-		# Heading and slider share the first row; the value badge and All In the
-		# second, so the column is shorter than the band without hiding anything.
-		var control_home: Control = _wager_control_row if _wager_control_row != null and is_instance_valid(_wager_control_row) else _wager_controls
-		for control: Control in [_wager_label, bet_slider]:
-			if control == null:
-				continue
-			if control.get_parent() != control_home:
-				_reparent_dock_control(control, control_home)
-		# The authored row carries the deferred-wager explanation. It has to travel
-		# with the slider the dock just took out of it, so the row the pointer now
-		# lands on explains the deferred bet instead of leaving it blank.
-		if _wager_row != null and is_instance_valid(_wager_row) and bet_slider != null:
-			var live_wager_row: Control = bet_slider.get_parent() as Control
-			if live_wager_row != null and live_wager_row != _wager_row:
-				live_wager_row.tooltip_text = _wager_row.tooltip_text
-		var value_home: Control = _wager_value_row if _wager_value_row != null and is_instance_valid(_wager_value_row) else _wager_controls
+		if _wager_label != null and _wager_label.get_parent() != _wager_control_row:
+			_reparent_dock_control(_wager_label, _wager_control_row)
+			_wager_control_row.move_child(_wager_label, 0)
+		if bet_slider != null and bet_slider.get_parent() != _wager_controls:
+			_reparent_dock_control(bet_slider, _wager_controls)
 		for control: Control in [bet_value, all_in_button]:
-			if control == null:
-				continue
-			if control.get_parent() != value_home:
-				_reparent_dock_control(control, value_home)
-		if value_home == _wager_value_row:
-			_wager_controls.move_child(_wager_value_row, _wager_controls.get_child_count() - 1)
-		if control_home == _wager_control_row:
-			_wager_controls.move_child(_wager_control_row, maxi(0, _wager_controls.get_child_count() - 2))
-		# The emptied horizontal row keeps its name for existing lookups but no
-		# longer stretches any part of the band.
+			if control != null and control.get_parent() != _wager_value_row:
+				_reparent_dock_control(control, _wager_value_row)
+		if bet_value != null:
+			_wager_value_row.move_child(bet_value, 1)
+		if all_in_button != null:
+			_wager_value_row.move_child(all_in_button, _wager_value_row.get_child_count() - 1)
+		_ensure_dock_wager_outcomes()
+		var order: Array[Control] = [_wager_control_row, wager_summary, _wager_value_row, bet_slider, _wager_outcomes]
+		for index: int in range(order.size()):
+			if order[index] != null:
+				_wager_controls.move_child(order[index], index)
 		if _wager_row != null and is_instance_valid(_wager_row):
 			_wager_row.visible = false
 			_wager_row.custom_minimum_size = Vector2.ZERO
-		# The two futures close the column: heading, control, value, outcomes.
-		_ensure_dock_wager_outcomes()
-		if _wager_outcomes != null and is_instance_valid(_wager_outcomes):
-			_wager_controls.move_child(_wager_outcomes, _wager_controls.get_child_count() - 1)
-		_apply_dock_wager_outcomes()
+		_apply_dock_wager_column_metrics(float(get_meta("persisted_ui_scale", 1.0)))
+		refresh_dock_wager_presentation()
 		_wager_controls.set_meta("dock_territory", "wager")
 		_wager_controls.set_meta("dock_rect", wager_rect)
 	if continue_button != null and _plaque_slot != null:
@@ -2837,11 +2885,11 @@ func _apply_dock_plaque_button_material(button: Button) -> void:
 		return
 	if not button.has_meta("dock_plaque_material_previous"):
 		var previous: Dictionary[String, StyleBox] = {}
-		for state_name: String in ["normal", "hover", "pressed", "focus"]:
+		for state_name: String in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 			previous[state_name] = button.get_theme_stylebox(state_name)
 		button.set_meta("dock_plaque_material_previous", previous)
 	button.set_meta("dock_plaque_material", applied)
-	for state_name: String in ["normal", "hover", "pressed", "focus"]:
+	for state_name: String in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		button.add_theme_stylebox_override(state_name, _dock_plaque_style(state_name))
 
 ## Cached commit-plaque states. The approved 256x144 plaque tints for hover and
@@ -2851,12 +2899,14 @@ func _dock_plaque_style(state_name: String) -> StyleBox:
 		return _dock_plaque_styles[state_name]
 	var tint: Color = Color.WHITE
 	match state_name:
-		"hover", "focus":
-			tint = Color(1.10, 1.05, 1.02)
-		"pressed":
-			tint = Color(0.86, 0.76, 0.74)
+		"hover":
+			tint = Color(1.18, 1.12, 1.06)
+		"pressed", "hover_pressed":
+			tint = Color(0.70, 0.61, 0.59)
+		"disabled":
+			tint = Color(0.38, 0.34, 0.32)
 	var style: StyleBox
-	style = GothicUIAssets.gameplay_commit_style(tint)
+	style = _wager_focus_style() if state_name == "focus" else GothicUIAssets.gameplay_commit_style(tint)
 	_dock_plaque_styles[state_name] = style
 	return style
 
@@ -2871,6 +2921,8 @@ func _reparent_dock_control(control: Control, new_parent: Control) -> void:
 ## Restores the shop header's authored control order when the dock releases,
 ## so a resize back to a smaller tier rebuilds the previous stacked layout.
 func _restore_command_bar_order(bar: HBoxContainer) -> void:
+	if gold_label != null:
+		gold_label.visible = true
 	var progress_label: Label = null
 	for child: Node in bar.get_children():
 		var label: Label = child as Label
@@ -2931,7 +2983,7 @@ func _release_dock_composition() -> void:
 				var previous_material: Variant = continue_button.get_meta("dock_plaque_material_previous")
 				if previous_material is Dictionary:
 					var previous_states: Dictionary = previous_material as Dictionary
-					for state_name: String in ["normal", "hover", "pressed", "focus"]:
+					for state_name: String in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 						var previous_style: Variant = previous_states.get(state_name)
 						if previous_style is StyleBox:
 							continue_button.add_theme_stylebox_override(state_name, previous_style as StyleBox)
@@ -2975,6 +3027,7 @@ func _release_dock_composition() -> void:
 				_reparent_dock_control(wager_summary, vbox)
 				vbox.move_child(wager_summary, clampi(home_index, 0, vbox.get_child_count() - 1))
 			wager_summary.remove_meta("dock_quote_home_index")
+		wager_summary.visible = true
 		wager_summary.size_flags_horizontal = Control.SIZE_FILL
 		wager_summary.custom_minimum_size.x = 0.0
 		wager_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if bool(get_meta("compact_layout", false)) else HORIZONTAL_ALIGNMENT_LEFT
@@ -3032,7 +3085,9 @@ func _queue_dock_reassert() -> void:
 	if not _dock_composition_active or _dock_reassert_queued or _dock_reassert_running:
 		return
 	_dock_reassert_queued = true
-	call_deferred("_run_queued_dock_reassert")
+	# A reflow can emit more rect changes while Godot drains deferred calls.
+	# Bound the feedback to one layout transaction per rendered frame.
+	get_tree().process_frame.connect(_run_queued_dock_reassert, CONNECT_ONE_SHOT)
 
 func _run_queued_dock_reassert() -> void:
 	_dock_reassert_queued = false

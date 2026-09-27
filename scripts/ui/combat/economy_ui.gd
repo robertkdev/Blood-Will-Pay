@@ -34,22 +34,29 @@ func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all
 	# Cache the row container so we can hide/show parts of it
 	if bet_slider:
 		_bet_row = bet_slider.get_parent()
-		bet_slider.add_theme_stylebox_override("slider", HardcoreUIAssets.slider_style("track"))
-		bet_slider.add_theme_stylebox_override("grabber_area", HardcoreUIAssets.slider_style("fill"))
-		bet_slider.add_theme_stylebox_override("grabber_area_highlight", HardcoreUIAssets.slider_style("fill"))
-		bet_slider.add_theme_icon_override("grabber", HardcoreUIAssets.slider_icon("normal"))
-		bet_slider.add_theme_icon_override("grabber_highlight", HardcoreUIAssets.slider_icon("hover"))
-		bet_slider.add_theme_icon_override("grabber_disabled", HardcoreUIAssets.slider_icon("disabled"))
-		_ensure_visible_wager_rail()
+		# The wager rail wears the gameplay family, like every other control in the
+		# dock. It used to wear the hardcore family - a cream track and fill with
+		# pale grabbers - which made the betting area the brightest and least
+		# finished-looking strip on a dark dock, and the one control the theme's
+		# own slider vocabulary never reached. See
+		# docs/art/dock_action_and_wager_2026-09-26.md.
+		bet_slider.add_theme_stylebox_override("slider", GothicUIAssets.wager_track_style())
+		bet_slider.add_theme_stylebox_override("grabber_area", GothicUIAssets.wager_fill_style())
+		bet_slider.add_theme_stylebox_override("grabber_area_highlight", GothicUIAssets.wager_fill_style(true))
+		var handle: Texture2D = GothicUIAssets.wager_handle_texture()
+		if handle != null:
+			bet_slider.add_theme_icon_override("grabber", handle)
+			bet_slider.add_theme_icon_override("grabber_highlight", handle)
+			bet_slider.add_theme_icon_override("grabber_disabled", handle)
+		_release_wager_rail()
 	if all_in_button != null and not all_in_button.is_connected("pressed", Callable(self, "_on_all_in_pressed")):
 		all_in_button.pressed.connect(_on_all_in_pressed)
 	if all_in_button != null:
 		all_in_button.name = "AllInButton"
-		# The chip stack carries the action; the button says the words only when it is armed,
-		# because that is the moment the player needs to be told what they just risked.
+		# Compact layouts retain the icon; the composed dock uses an explicit label.
 		all_in_button.icon = GothicUIAssets.action_icon(GothicUIAssets.ACTION_ICON_ALL_IN)
 		all_in_button.add_theme_constant_override("icon_max_width", GothicUIAssets.ACTION_ICON_PIXELS)
-		HardcoreUIAssets.apply_button_family(all_in_button, "wager")
+		_apply_wager_button_family(false)
 	if _root is Control:
 		var root_control: Control = _root as Control
 		_root_resized_cb = Callable(self, "_on_root_resized")
@@ -68,28 +75,56 @@ func configure(_gold_label: Label, _bet_slider: HSlider, _bet_value: Label, _all
 	if gs and not gs.is_connected("phase_changed", Callable(self, "_on_phase_changed")):
 		gs.phase_changed.connect(_on_phase_changed)
 
-func _ensure_visible_wager_rail() -> void:
+## The rail overlay is retired with the cream track it carried: the wager rail is
+## a stylebox now, so the bar behind the grabber is drawn by the control itself.
+## A rail left over from an older session is removed rather than left hidden, so
+## the slider's children are exactly the slider's own.
+func _release_wager_rail() -> void:
 	if bet_slider == null:
 		return
-	var rail: TextureRect = bet_slider.get_node_or_null("HardcoreWagerRail") as TextureRect
-	if rail == null:
-		rail = TextureRect.new()
-		rail.name = "HardcoreWagerRail"
-		rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		rail.show_behind_parent = true
-		rail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		rail.stretch_mode = TextureRect.STRETCH_SCALE
-		rail.anchor_left = 0.0
-		rail.anchor_right = 1.0
-		rail.anchor_top = 0.5
-		rail.anchor_bottom = 0.5
-		rail.offset_left = 2.0
-		rail.offset_right = -2.0
-		rail.offset_top = -6.0
-		rail.offset_bottom = 6.0
-		bet_slider.add_child(rail)
-		bet_slider.move_child(rail, 0)
-	rail.texture = HardcoreUIAssets.texture(HardcoreUIAssets.HARDCORE_ROOT + "slider_track.png")
+	var rail: Node = bet_slider.get_node_or_null("HardcoreWagerRail")
+	if rail != null:
+		bet_slider.remove_child(rail)
+		rail.queue_free()
+
+## The all-in control wears the same quiet iron and dull brass as every other
+## button in the dock, and its armed state is the wager's own crimson under the
+## shared rule colour. It used to wear the generated wager button family, whose
+## edge is a cool grey that appears on no other surface on the screen, which is
+## what made the betting area read as borrowed furniture.
+func _apply_wager_button_family(armed: bool) -> void:
+	if all_in_button == null:
+		return
+	var iron: StyleBox = GothicUIAssets.quiet_iron_panel_style(
+		Color(0.052, 0.045, 0.054, 0.98), GothicUIAssets.COLOR_GAMEPLAY_EDGE, false
+	)
+	var iron_hover: StyleBox = GothicUIAssets.quiet_iron_panel_style(
+		Color(0.10, 0.052, 0.058, 0.99), GothicUIAssets.COLOR_GAMEPLAY_RULE, false
+	)
+	var armed_plate: StyleBox = GothicUIAssets.quiet_iron_panel_style(
+		GothicUIAssets.COLOR_GAMEPLAY_CRIMSON, GothicUIAssets.COLOR_GAMEPLAY_RULE, true
+	)
+	var armed_hover: StyleBox = GothicUIAssets.quiet_iron_panel_style(
+		GothicUIAssets.COLOR_GAMEPLAY_CRIMSON_HOT, GothicUIAssets.COLOR_GAMEPLAY_RULE, true
+	)
+	all_in_button.add_theme_stylebox_override("normal", armed_plate if armed else iron)
+	var pressed_plate: StyleBox = GothicUIAssets.quiet_iron_panel_style(
+		Color(0.19, 0.026, 0.031) if armed else Color(0.022, 0.018, 0.022), GothicUIAssets.COLOR_GAMEPLAY_RULE, false
+	)
+	all_in_button.add_theme_stylebox_override("pressed", pressed_plate)
+	var focus: StyleBoxFlat = StyleBoxFlat.new()
+	focus.draw_center = false
+	focus.border_color = Color(1.0, 0.82, 0.49)
+	focus.set_border_width_all(2)
+	all_in_button.add_theme_stylebox_override("focus", focus)
+	all_in_button.add_theme_stylebox_override("hover", armed_hover if armed else iron_hover)
+	all_in_button.add_theme_stylebox_override("hover_pressed", pressed_plate)
+	all_in_button.add_theme_stylebox_override(
+		"disabled",
+		GothicUIAssets.quiet_iron_panel_style(
+			Color(0.030, 0.027, 0.032, 0.88), Color(0.25, 0.23, 0.24, 0.72), false
+		)
+	)
 
 func teardown() -> void:
 	if Engine.has_singleton("Economy"):
@@ -295,7 +330,6 @@ func _on_all_in_pressed() -> void:
 func _refresh_all_in_visual(in_combat: bool, forced_first_fight: bool) -> void:
 	if all_in_button == null:
 		return
-	HardcoreUIAssets.apply_button_family(all_in_button, "wager")
 	var armed: bool = (
 		not in_combat
 		and not forced_first_fight
@@ -303,21 +337,15 @@ func _refresh_all_in_visual(in_combat: bool, forced_first_fight: bool) -> void:
 		and Economy.blood_buckets > 0
 		and int(round(bet_slider.value)) >= int(round(bet_slider.max_value))
 	)
-	all_in_button.text = "ALL IN!" if armed else ""
+	_apply_wager_button_family(armed)
+	all_in_button.text = "ALL IN!" if armed else "ALL IN"
 	all_in_button.tooltip_text = "Maximum wager armed. Starting battle risks the full bankroll." if armed else "Set the wager to your full available bankroll."
 	if not armed:
 		all_in_button.remove_theme_color_override("font_color")
 		all_in_button.remove_theme_color_override("font_hover_color")
 		return
-	var selected_style: StyleBoxTexture = HardcoreUIAssets.wager_button_style("selected")
-	var hover_selected_style: StyleBoxTexture = HardcoreUIAssets.wager_button_style("hover_selected")
-	if selected_style != null:
-		all_in_button.add_theme_stylebox_override("normal", selected_style)
-		all_in_button.add_theme_stylebox_override("pressed", selected_style)
-		all_in_button.add_theme_stylebox_override("focus", selected_style)
-	if hover_selected_style != null:
-		all_in_button.add_theme_stylebox_override("hover", hover_selected_style)
-		all_in_button.add_theme_stylebox_override("hover_pressed", hover_selected_style)
+	# The armed state is carried by the plate itself now (see
+	# `_apply_wager_button_family`), so only the copy needs its own colour.
 	all_in_button.add_theme_color_override("font_color", Color(1.0, 0.88, 0.60, 1.0))
 	all_in_button.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.82, 1.0))
 
@@ -335,8 +363,9 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		# under this strip - printing it twice was filler, and at 1920x1080 the longer line
 		# ran into the placeholder text below it.
 		wager_summary.text = "Opening wager: %s" % opening_risk
-		wager_summary.tooltip_text = BloodBuckets.describe(1) + ". Win the forced opener to unlock wager choice and outcome quotes."
+		wager_summary.tooltip_text = BloodBuckets.describe(1) + ". Wager controls open after the first shop; win the forced opener to unlock wager choice and outcome quotes."
 		wager_summary.set_meta("compact_summary_format", "opening_risk")
+		_refresh_dock_presentation()
 		return
 	var wager: int = max(0, int(Economy.current_bet))
 	if not in_combat and bet_slider != null:
@@ -391,10 +420,16 @@ func _refresh_wager_summary(in_combat: bool, forced_first_fight: bool) -> void:
 		"after_loss": after_loss,
 		"wager": wager,
 	})
+	_refresh_dock_presentation()
+
+func _refresh_dock_presentation() -> void:
+	if _root != null and _root.has_method("refresh_dock_wager_presentation"):
+		_root.call("refresh_dock_wager_presentation")
 
 func set_bet_editable(editable: bool) -> void:
 	if bet_slider:
 		bet_slider.editable = editable
+	_refresh_dock_presentation()
 
 func selected_wager() -> int:
 	if bet_slider != null:

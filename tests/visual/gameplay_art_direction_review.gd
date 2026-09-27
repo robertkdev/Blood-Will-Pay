@@ -1,6 +1,7 @@
 extends "res://tests/visual/post_shop_layout_capture.gd"
 
 const SETTINGS: GDScript = preload("res://scripts/game/settings/user_settings.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 const UNIT_FACTORY: GDScript = preload("res://scripts/unit_factory.gd")
 const UNIT_CATALOG: GDScript = preload("res://scripts/game/shop/unit_catalog.gd")
 const REVIEW_DIR: String = "res://outputs/visual_iter/composition_v10"
@@ -52,6 +53,7 @@ func _run() -> void:
 	controller.call("_set_continue_to_start_text")
 	await _settle_frames(18)
 	await _review_frame("03_populated_100", "populated", 1.0)
+	await _verify_wager_input()
 	await _set_scale(1.25)
 	await _review_frame("03b_populated_125", "populated", 1.25)
 	await _set_scale(1.5)
@@ -81,6 +83,8 @@ func _run() -> void:
 	await _click_review_button(continue_button)
 	await get_tree().create_timer(0.30).timeout
 	_expect(String(transition.call("get_state_name")) == "countdown", "Start Battle skipped the visible countdown")
+	_expect(not (_view.get("bet_slider") as HSlider).editable, "Countdown did not lock the wager slider")
+	_expect((_view.get("all_in_button") as Button).disabled, "Countdown left All In looking actionable")
 	_expect(floor_surface.get_global_rect().position.distance_to(planning_floor_rect.position) <= 1.0, "Countdown moved the planning floor")
 	_expect(floor_surface.get_global_rect().size.distance_to(planning_floor_rect.size) <= 1.0, "Countdown resized the planning floor")
 	await _review_frame("05b_countdown", "countdown", 1.0)
@@ -98,6 +102,60 @@ func _run() -> void:
 		_expect(first_positions != manager.get_player_positions(), "Combat actors did not advance between captures")
 		_expect(floor_surface.texture == floor_texture, "Combat swapped out the planning floor")
 	_finish_review()
+
+func _verify_wager_input() -> void:
+	var slider: HSlider = _view.get("bet_slider") as HSlider
+	var increment: Button = _view.find_child("WagerIncrease", true, false) as Button
+	var decrement: Button = _view.find_child("WagerDecrease", true, false) as Button
+	var all_in: Button = _view.get("all_in_button") as Button
+	var quote: Label = _view.get("wager_summary") as Label
+	var win_value: Label = _view.find_child("WagerWinRow", true, false).get_node("OutcomeLine/OutcomeValue") as Label
+	var loss_value: Label = _view.find_child("WagerLossRow", true, false).get_node("OutcomeLine/OutcomeValue") as Label
+	await _click_review_button(increment)
+	_expect(Economy.current_bet == 2, "Pointer increment did not set the authoritative wager")
+	await _click_review_button(decrement)
+	_expect(Economy.current_bet == 1 and decrement.disabled, "Pointer decrement failed or minimum remains actionable")
+	slider.grab_focus()
+	for down: bool in [true, false]:
+		var key: InputEventKey = InputEventKey.new()
+		key.keycode = KEY_RIGHT
+		key.physical_keycode = KEY_RIGHT
+		key.pressed = down
+		Input.parse_input_event(key)
+		Input.flush_buffered_events()
+		await get_tree().process_frame
+	_expect(Economy.current_bet == 2, "Keyboard slider adjustment did not update the wager")
+	_expect(slider.has_focus(), "Keyboard evidence does not have slider focus")
+	_expect((slider.get_node("WagerKeyboardFocus") as Panel).is_visible_in_tree(), "Keyboard focus ring is hidden")
+	await _settle_frames(12)
+	await _review_frame("03c_wager_keyboard_focus", "populated", 1.0)
+	await _click_review_button(all_in)
+	_expect(Economy.current_bet == Economy.blood_buckets and increment.disabled, "All In did not set/contain the maximum wager")
+	var data: Dictionary = quote.get_meta("outcome_quotes", {}) as Dictionary
+	_expect(win_value.text == BloodBuckets.format_amount(int(data.get("after_win", -1))), "Visible win reserve is stale after All In")
+	_expect(loss_value.text == BloodBuckets.format_amount(0), "Visible loss reserve is stale after All In")
+	_expect(all_in.text == "ALL IN!", "All In has no armed label")
+	await _review_frame("03d_wager_all_in", "populated", 1.0)
+	# A real held pointer exercises the native pressed material.
+	var click: InputEventMouseButton = InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.button_mask = MOUSE_BUTTON_MASK_LEFT
+	click.pressed = true
+	click.position = all_in.get_global_rect().get_center()
+	click.global_position = click.position
+	Input.parse_input_event(click)
+	Input.flush_buffered_events()
+	await _review_frame("03e_wager_pressed", "populated", 1.0)
+	click = click.duplicate() as InputEventMouseButton
+	click.pressed = false
+	click.button_mask = 0
+	Input.parse_input_event(click)
+	Input.flush_buffered_events()
+	slider.release_focus()
+	all_in.release_focus()
+	slider.value = slider.min_value
+	await _move_review_pointer(Vector2(960.0, 12.0))
+	await _settle_frames(4)
 
 func _set_fixed_review_offers() -> void:
 	var catalog: UnitCatalog = UNIT_CATALOG.new() as UnitCatalog
@@ -188,15 +246,11 @@ func _review_frame(capture_id: String, state: String, ui_scale: float) -> void:
 			_expect(card.get_global_rect().encloses(art.get_global_rect()), "Portrait extends outside its purchase target")
 			_expect(card.get_theme_stylebox("normal") is StyleBoxTexture, "Shop card lost its material frame")
 		var commit: Button = _view.get("continue_button") as Button
-		# The commit action's authored material is the flat crimson family, which
-		# ui_theme_smoke pins as restrained flat field furniture; the textured
-		# crimson plaque is declined and kept only for rollback. This step keeps
-		# testing what it was written for - that the action carries authored
-		# material states of its own - rather than requiring the declined texture.
+		# Check state resources and containment; visual acceptance is image-based.
 		var commit_normal: StyleBox = commit.get_theme_stylebox("normal")
 		var commit_hover: StyleBox = commit.get_theme_stylebox("hover")
 		var commit_pressed: StyleBox = commit.get_theme_stylebox("pressed")
-		_expect(commit_normal is StyleBoxFlat, "Commit action lost its flat field material")
+		_expect(commit_normal != null, "Commit action lost its material")
 		_expect(
 			commit_hover != null and commit_pressed != null,
 			"Commit action lost its material states"
@@ -305,10 +359,15 @@ func _assert_composed_bounds(ui_scale: float) -> void:
 			_expect(not wager_bounds.grow(-1.0).intersects(action_bay.get_global_rect()), "Wager territory overlaps the primary action bay")
 		if shop != null:
 			_expect(not wager_bounds.grow(-1.0).intersects(shop.get_global_rect()), "Wager territory overlaps shop purchase targets")
-		var quote: Control = _view.get("wager_summary") as Control
-		_expect(quote != null and quote.is_visible_in_tree(), "Composed wager quote is missing")
-		if quote != null:
-			_expect(wager_bounds.grow(1.0).encloses(quote.get_global_rect()), "Wager quote is detached from its territory")
+		var quote: Label = _view.get("wager_summary") as Label
+		var outcomes: Control = _view.find_child("WagerOutcomes", true, false) as Control
+		_expect(outcomes != null and outcomes.is_visible_in_tree(), "Wager outcomes are missing")
+		_expect(quote != null and not quote.is_visible_in_tree(), "Planning duplicates the outcome quote as prose")
+		if outcomes != null:
+			_expect(wager_bounds.grow(1.0).encloses(outcomes.get_global_rect()), "Outcome rows escaped the wager panel")
+		for button_name: String in ["WagerDecrease", "WagerIncrease"]:
+			var stepper: Button = _view.find_child(button_name, true, false) as Button
+			_expect(stepper != null and wager_bounds.grow(1.0).encloses(stepper.get_global_rect()), button_name + " escaped the wager panel")
 		for property_name: String in ["bet_slider", "bet_value", "all_in_button"]:
 			var control: Control = _view.get(property_name) as Control
 			_expect(control != null and control.is_visible_in_tree(), property_name + " is missing from the wager")
