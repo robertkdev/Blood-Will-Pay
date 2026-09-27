@@ -368,6 +368,13 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("contact_shade", 0.0)
 			material.set_shader_parameter("contact_start", 0.82)
 			material.set_shader_parameter("sample_bias", PORTRAIT_SAMPLE_BIAS)
+			# The catalogue is asked for less chroma than the board: measured on
+			# the settled frame the shop band carried 0.0677 of its pixels
+			# saturated against the reference's 0.0253, and 59 percent of that
+			# mass was a single card's costume in the red the palette reserves for
+			# hostility and commitment. Presentation only - the same art, one
+			# number to put back. See docs/art/shop_band_chroma_2026-09-26.md.
+			material.set_shader_parameter("saturation", 0.78)
 		SURFACE_COMBAT_UNIT:
 			# Same curve as the board, so a character carries one value family from
 			# deployment into the fight. The doc's combat measure was the field's
@@ -389,6 +396,7 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("contact_shade", 0.16)
 			material.set_shader_parameter("contact_start", 0.84)
 			material.set_shader_parameter("sample_bias", BOARD_COMBAT_SAMPLE_BIAS)
+			material.set_shader_parameter("saturation", 1.0)
 		_:
 			# Deployment tiles are the darkest, most detail-dense surface.
 			#
@@ -416,6 +424,7 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("contact_shade", 0.22)
 			material.set_shader_parameter("contact_start", 0.82)
 			material.set_shader_parameter("sample_bias", BOARD_COMBAT_SAMPLE_BIAS)
+			material.set_shader_parameter("saturation", 1.0)
 
 
 static func _present_unit_child(child: Node) -> void:
