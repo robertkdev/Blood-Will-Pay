@@ -34,6 +34,13 @@ uniform float edge_definition : hint_range(0.0, 1.0) = 0.26;
 uniform float contact_shade : hint_range(0.0, 0.60) = 0.0;
 uniform float contact_start : hint_range(0.0, 1.0) = 0.82;
 uniform float sample_bias : hint_range(-2.0, 2.0) = 0.0;
+// How much of each sprite's own chroma survives. Board and combat figures keep
+// all of it; the shop catalogue is asked for less, because measured it carried
+// twice the reference's saturated share and 59 percent of that mass was one
+// card's costume - a saturated red the palette reserves for hostility and
+// commitment. This is presentation only: same texture, same silhouette, same
+// identity, and it is one number to put back.
+uniform float saturation : hint_range(0.0, 1.5) = 1.0;
 
 varying vec4 v_tint;
 
@@ -53,6 +60,10 @@ void fragment() {
 		c = pow(c, vec3(1.0 / exposure_gamma));
 		// Gentle contrast around a low pivot keeps mid-tones apart without crushing.
 		c = clamp((c - contrast_pivot) * contrast + contrast_pivot, 0.0, 1.0);
+		// Chroma is scaled toward the sprite's own grey, so a quieter catalogue
+		// does not change what any figure is.
+		float grey = dot(c, vec3(0.299, 0.587, 0.114));
+		c = mix(vec3(grey), c, saturation);
 		// Highlight restraint: compress only the top of the range, so a lit face
 		// or blade keeps its shape instead of flattening into a bright patch.
 		float peak = dot(c, vec3(0.299, 0.587, 0.114));
