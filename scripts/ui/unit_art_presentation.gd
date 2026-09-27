@@ -365,6 +365,11 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			# portraits to 0.124 on the same axis. See
 			# docs/art/shop_portrait_exposure_2026-09-26.md.
 			material.set_shader_parameter("exposure_gamma", 1.0)
+			# The lift was not the only term: the card rows still measured 1.5 times
+			# the reference's luminance at their authored values, so a straight gain
+			# seats them the rest of the way - 0.0911 against the reference's 0.0848.
+			# One number per surface, and the same number puts it back.
+			material.set_shader_parameter("exposure", 0.65)
 			material.set_shader_parameter("contrast", 1.03)
 			material.set_shader_parameter("contrast_pivot", 0.26)
 			material.set_shader_parameter("key_light", 0.05)
@@ -373,12 +378,14 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("contact_shade", 0.0)
 			material.set_shader_parameter("contact_start", 0.82)
 			material.set_shader_parameter("sample_bias", PORTRAIT_SAMPLE_BIAS)
-			# Chroma needs its own term even after the lift comes off: at equal
-			# relative saturation a brighter pixel has a larger absolute
-			# max-minus-min, and the card rows were 0.0365 against the reference's
-			# 0.0231. 0.78 lands them at 0.0353 with the band's colour holding and
-			# every other reading on the screen unchanged. See
-			# docs/art/shop_band_chroma_2026-09-26.md.
+			# Chroma needs its own term as well: at equal relative saturation a
+			# brighter pixel has a larger absolute max-minus-min, and the card rows
+			# were 0.0365 against the reference's 0.0231. With the lift off and the
+			# gain above, 0.78 lands them at 0.0274 and the shop band at a saturated
+			# share of 0.039 against the reference's 0.034, from 0.0677 before this
+			# work, with every other reading on the screen unchanged. See
+			# docs/art/shop_band_chroma_2026-09-26.md and
+			# docs/art/shop_portrait_exposure_2026-09-26.md.
 			material.set_shader_parameter("saturation", 0.78)
 		SURFACE_COMBAT_UNIT:
 			# Same curve as the board, so a character carries one value family from
@@ -402,6 +409,7 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("contact_start", 0.84)
 			material.set_shader_parameter("sample_bias", BOARD_COMBAT_SAMPLE_BIAS)
 			material.set_shader_parameter("saturation", 1.0)
+			material.set_shader_parameter("exposure", 1.0)
 		_:
 			# Deployment tiles are the darkest, most detail-dense surface.
 			#
@@ -430,6 +438,7 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("contact_start", 0.82)
 			material.set_shader_parameter("sample_bias", BOARD_COMBAT_SAMPLE_BIAS)
 			material.set_shader_parameter("saturation", 1.0)
+			material.set_shader_parameter("exposure", 1.0)
 
 
 static func _present_unit_child(child: Node) -> void:
