@@ -48,14 +48,40 @@ review evidence): faces and silhouettes still read, the five units stay
 distinguishable at a glance, and the one saturated costume in the row - the last
 card's red coat - is the quietest it has been without losing its colour.
 
+## The lift was not the only term: a gain, and where the cards landed
+
+At their authored values the card rows were still 1.5 times the reference's
+luminance, and the shader could not take them further down - its exposure range
+floors at 1.0 because it is a lift by construction, not a dimmer. So the shader
+gained a straight gain term (`exposure`, 0.4 to 1.6, default 1.0), and the
+portrait surface sets it to 0.65. It is one number per surface with the default
+as the way back, and board and combat figures are set to 1.0 explicitly.
+
+| Configuration | card row luminance | card row chroma | band saturated share |
+| --- | --- | --- | --- |
+| reference | 0.0848 | 0.0231 | 0.034 |
+| lift 1.30, gain 1.0, chroma 0.78 (start of this work) | 0.1584 | 0.0365 | 0.0677 |
+| lift 1.0, gain 1.0, chroma 0.78 | 0.1241 | 0.0353 | 0.057 |
+| lift 1.0, gain 0.72, chroma 0.78 | 0.0980 | 0.0290 | 0.045 |
+| **lift 1.0, gain 0.65, chroma 0.78 (kept)** | **0.0911** | **0.0274** | **0.039** |
+
+The card rows are now within 7 percent of the reference's luminance, and the
+shop band's saturated share has come from 0.0677 to 0.039 against the reference's
+0.034 - a 42 percent reduction - while the board, both rails, the commit plate
+and the frame's own chroma are all unchanged (field mean 0.1046, density 0.0355,
+rail steps 0.1216 and 0.2099, frame chroma 0.0478).
+
+Checked by eye at the final setting against the reference's own cards
+(`outputs/visual_iter/composition_v10/shop_cards_now_vs_reference.png`): the five
+units stay individually identifiable, and the names and prices keep their cream
+and gold on the caption band.
+
 ## What is left
 
-The card rows are still **1.5 times** the reference's luminance (0.1241 against
-0.0848). Closing that needs the portraits darkened below their authored values,
-which the shader's exposure range does not offer - its floor is 1.0, by design,
-because it is a lift and not a dimmer - or new portrait art. That is the
-remaining decision, and it is the same one the earlier note recorded: what the
-catalogue is worth in exchange for a quieter screen.
+The card rows' median is still below the reference's (0.0532 against 0.0322),
+which says our card interiors are more evenly lit even at a matching mean - a
+matter of the portrait art's own contrast rather than of where it is seated.
+Closing that is an art question, not a presentation number.
 
 ## Verification
 
@@ -71,5 +97,6 @@ catalogue is worth in exchange for a quieter screen.
 
 ## What this does not claim
 
-No unit artwork is approved or altered. The trial panel material, the shop card
+No unit artwork is approved or altered - the gain and the chroma terms are
+presentation only, on the same textures. The trial panel material, the shop card
 frame and the commit-action crest are still awaiting the operator's verdicts.

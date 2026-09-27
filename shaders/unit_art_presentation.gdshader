@@ -34,6 +34,11 @@ uniform float edge_definition : hint_range(0.0, 1.0) = 0.26;
 uniform float contact_shade : hint_range(0.0, 0.60) = 0.0;
 uniform float contact_start : hint_range(0.0, 1.0) = 0.82;
 uniform float sample_bias : hint_range(-2.0, 2.0) = 0.0;
+// A straight gain, below 1.0 as well as above. The exposure curve is a lift by
+// construction and cannot darken anything, which is why the shop cards could only
+// be taken down as far as their authored values; this term is what lets a surface
+// be seated at the reference's own level without a different curve.
+uniform float exposure : hint_range(0.4, 1.6) = 1.0;
 // How much of each sprite's own chroma survives. Board and combat figures keep
 // all of it; the shop catalogue is asked for less, because measured it carried
 // twice the reference's saturated share and 59 percent of that mass was one
@@ -56,6 +61,7 @@ void fragment() {
 		COLOR = vec4(0.0);
 	} else {
 		vec3 c = clamp(tex.rgb, 0.0, 1.0);
+		c *= exposure;
 		// Shadow-weighted exposure: darks move most, highlights stay restrained.
 		c = pow(c, vec3(1.0 / exposure_gamma));
 		// Gentle contrast around a low pivot keeps mid-tones apart without crushing.
