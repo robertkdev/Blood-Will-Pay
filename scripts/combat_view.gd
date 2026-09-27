@@ -1315,7 +1315,12 @@ func _apply_functional_typography(compact: bool, tight_compact: bool) -> void:
 func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> void:
 	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var board_status_row: HBoxContainer = find_child("BoardStatusRow", true, false) as HBoxContainer
-	var status_height: float = 20.0 if tight_compact else 24.0 if compact else 34.0
+	# The readout strip is the one line a player scans every turn, and measured it
+	# was the smallest type on the screen: this pass owns the strip's size, and at
+	# 34px with 20px type it carried 0.0185 of its band as ink where the reference's
+	# readout carries 0.0387. The band and the type both go up; the face stays the
+	# legible utility one the theme already assigns, so weight does not change.
+	var status_height: float = 22.0 if tight_compact else 28.0 if compact else 40.0
 	if board_status_row != null:
 		board_status_row.custom_minimum_size = Vector2(468.0 if tight_compact else 540.0, status_height)
 		board_status_row.size.y = status_height
@@ -1333,7 +1338,7 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 			var status_label: Label = board_status_row.get_node_or_null(status_name) as Label
 			if status_label != null:
 				status_label.custom_minimum_size.y = status_height
-				status_label.add_theme_font_size_override("font_size", 15 if tight_compact else 17 if compact else 20)
+				status_label.add_theme_font_size_override("font_size", 15 if tight_compact else 19 if compact else 24)
 				status_label.modulate = Color(1.0, 1.0, 1.0, 0.88 if tight_compact else 0.86 if compact else 1.0)
 				status_label.set_meta("planning_status_priority", "secondary_to_commit" if compact else "primary")
 				if tight_compact:

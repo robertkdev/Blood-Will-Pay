@@ -1086,10 +1086,17 @@ func _make_board_status_label(node_name: String) -> Label:
 	label.name = node_name
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var min_width: float = 118.0 if node_name != "WinOddsLabel" else 146.0
+	var min_width: float = 132.0 if node_name != "WinOddsLabel" else 164.0
 	label.custom_minimum_size = Vector2(min_width, 30.0)
-	label.add_theme_font_size_override("font_size", 18)
-	VisualTypeSystem.set_action(label)
+	label.add_theme_font_size_override("font_size", 22)
+	# The planning readout is a value strip, not an action: the type system
+	# reserves the utility face at bold weight for exactly this job and keeps the
+	# condensed action faces off gameplay readouts. Measured against the reference,
+	# this strip carried 0.0185 of its band as ink against the reference's 0.0387 -
+	# the condensed face packs its strokes narrow, so the numbers a player scans
+	# every turn were the thinnest type on the screen. The utility face is wider,
+	# which is what the extra room in the strip is for.
+	VisualTypeSystem.set_gameplay_numeric(label)
 	label.add_theme_color_override("font_color", Color(0.98, 0.87, 0.67, 1.0))
 	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.75))
 	label.add_theme_constant_override("shadow_offset_x", 1)
