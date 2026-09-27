@@ -11,7 +11,12 @@ const UnitArtPresentation: GDScript = preload("res://scripts/ui/unit_art_present
 # own the team identity now.
 const COLOR_ROW_BG: Color = Color(0.020, 0.018, 0.022, 0.52)
 const COLOR_ROW_BG_HOVER: Color = Color(0.048, 0.034, 0.026, 0.72)
-const COLOR_ACCENT_PLAYER: Color = Color(0.62, 0.46, 0.24, 0.92)
+## The row's left accent carries the team, and measured it was the strongest border
+## step in the frame: the column beside the traits rail sat at 0.2983 against the
+## reference rail's own 0.2651, because this edge drew at 0.45 luminance next to a
+## near-black gutter. It is quieter now, at roughly the reference's own edge value,
+## and still the row's team colour. See docs/art/rail_row_edge_2026-09-26.md.
+const COLOR_ACCENT_PLAYER: Color = Color(0.48, 0.36, 0.21, 0.72)
 const COLOR_ACCENT_ENEMY: Color = Color(0.55, 0.090, 0.115, 0.92)
 const COLOR_NAME: Color = Color(0.92, 0.89, 0.83, 1.0)
 const COLOR_NAME_HOVER: Color = Color(1.0, 0.95, 0.87, 1.0)
