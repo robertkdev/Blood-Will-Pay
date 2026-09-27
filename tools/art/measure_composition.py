@@ -98,6 +98,27 @@ def _rail_border(rgb: np.ndarray, x_range: tuple[float, float]) -> float:
     return float(np.max(np.abs(np.diff(column_means))))
 
 
+def _rail_border_detail(rgb: np.ndarray, x_range: tuple[float, float]) -> dict:
+    """The strongest column step inside a rail, and where it sits.
+
+    The step is the border: its position says which edge owns it (the rail's
+    outer edge, or a border between two panels inside the rail).
+    """
+    width = rgb.shape[1]
+    x0 = int(round(x_range[0] * width))
+    x1 = max(x0 + 1, int(round(x_range[1] * width)))
+    region = _slice(rgb, x_range, RAIL_Y)
+    column_means = _luminance(region).mean(axis=0)
+    if column_means.size < 2:
+        return {"step": 0.0, "x_fraction": 0.0}
+    steps = np.abs(np.diff(column_means))
+    index = int(np.argmax(steps))
+    return {
+        "step": float(steps[index]),
+        "x_fraction": float((x0 + index) / max(1, width - 1)),
+    }
+
+
 def _region(rgb: np.ndarray, x_range: tuple[float, float], y_range: tuple[float, float]) -> dict:
     region = _slice(rgb, x_range, y_range)
     lum = _luminance(region)
@@ -191,6 +212,8 @@ def measure(path: Path) -> dict:
         "rails": {
             "left_border_step": _rail_border(rgb, LEFT_RAIL_X),
             "right_border_step": _rail_border(rgb, RIGHT_RAIL_X),
+            "left_border_x": _rail_border_detail(rgb, LEFT_RAIL_X)["x_fraction"],
+            "right_border_x": _rail_border_detail(rgb, RIGHT_RAIL_X)["x_fraction"],
             "right_median_luminance": float(
                 np.median(_luminance(_slice(rgb, RIGHT_RAIL_X, RAIL_Y)))
             ),

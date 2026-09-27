@@ -934,6 +934,27 @@ static func _get_theme() -> Theme:
 	_theme.set_stylebox("slider", "HSlider", _style(COLOR_IRON_DIM, Color(0.0, 0.0, 0.0, 0.0), 0, 3))
 	_theme.set_icon("grabber", "HSlider", BloodMeterHandle)
 	_theme.set_icon("grabber_highlight", "HSlider", BloodMeterHandle)
+	# The rails scroll, and an unstyled scroll bar was the one piece of default
+	# theme chrome left on the screen. Measured on the settled frame, the column
+	# beside the traits panel held a band 8 pixels wide at 0.28 luminance while the
+	# dark gap next to it sat at 0.017, which made the rail's inner edge the
+	# strongest border step in the frame (0.2742 against the reference's 0.1924).
+	# The reference's own rail line is about two pixels at 0.20. It now wears the
+	# same recessed iron and dull-brass grabber as every other control, and the
+	# grabber's own content margins thin the drawn bar instead of a wider one.
+	var scroll_track: StyleBoxFlat = _style(Color(0.010, 0.009, 0.012, 0.80), Color(0.0, 0.0, 0.0, 0.0), 0, 2)
+	scroll_track.content_margin_left = 1.0
+	scroll_track.content_margin_right = 1.0
+	scroll_track.content_margin_top = 0.0
+	scroll_track.content_margin_bottom = 0.0
+	_theme.set_stylebox("scroll", "VScrollBar", scroll_track)
+	_theme.set_stylebox("scroll_focus", "VScrollBar", scroll_track)
+	var scroll_grabber: StyleBoxFlat = _style(Color(0.34, 0.29, 0.22, 0.70), Color(0.0, 0.0, 0.0, 0.0), 0, 2)
+	scroll_grabber.content_margin_left = 1.0
+	scroll_grabber.content_margin_right = 1.0
+	_theme.set_stylebox("grabber", "VScrollBar", scroll_grabber)
+	_theme.set_stylebox("grabber_highlight", "VScrollBar", _style(Color(0.46, 0.38, 0.26, 0.84), Color(0.0, 0.0, 0.0, 0.0), 0, 2))
+	_theme.set_stylebox("grabber_pressed", "VScrollBar", _style(Color(0.56, 0.46, 0.30, 0.92), Color(0.0, 0.0, 0.0, 0.0), 0, 2))
 	return _theme
 
 static func _apply_root(root: Control) -> void:
@@ -2877,6 +2898,21 @@ const TRIAL_PANEL_PLATES: PackedStringArray = [
 static func plate_uses_trial_surface(plate_name: String) -> bool:
 	return TRIAL_PANEL_PLATES.has(String(plate_name))
 
+## The support rails are the frame, not the content, so their plate reads one
+## step quieter than the panels that carry decisions. Measured, the rail plates'
+## inner edge was the strongest border step in the frame - 0.2793 and 0.3098
+## against the reference's own 0.1924 and 0.2651 - while the rows inside them
+## were the flattest thing on the screen. Dimming the rim is what lets the row
+## marks do the talking instead of the frame around them. The shop, command and
+## utilities plates keep the surface at full strength, because those carry
+## decisions.
+const RAIL_PANEL_PLATES: PackedStringArray = [
+	"GothicStatsAreaPlate",
+	"GothicTraitsPlate",
+	"GothicItemsPlate",
+]
+const RAIL_PANEL_RIM_MODULATE: Color = Color(0.78, 0.77, 0.75, 1.0)
+
 ## Records both materials for the plate and installs the one its role allows: the
 ## trial surface for an allowlisted UI panel, otherwise the authored style exactly
 ## as passed. The pair travels with the plate so a later size change can swap the
@@ -2892,7 +2928,10 @@ static func _apply_plate_material(panel: Panel, flat_style: StyleBox, plate_name
 		if panel.get_theme_stylebox("panel") != flat_style:
 			panel.add_theme_stylebox_override("panel", flat_style)
 		return
-	panel.set_meta("plate_style_large", GothicUIAssets.gameplay_panel_style(flat_style))
+	var large_style: StyleBox = GothicUIAssets.gameplay_panel_style(flat_style)
+	if large_style is StyleBoxTexture and RAIL_PANEL_PLATES.has(String(plate_name)):
+		(large_style as StyleBoxTexture).modulate_color = RAIL_PANEL_RIM_MODULATE
+	panel.set_meta("plate_style_large", large_style)
 
 static func _ensure_external_backplate(root: Control, path: String, plate_name: String, style: StyleBox, z_value: int, pad: float) -> void:
 	var control: Control = root.get_node_or_null(path) as Control
