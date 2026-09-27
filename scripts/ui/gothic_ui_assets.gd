@@ -57,6 +57,14 @@ const COLOR_GAMEPLAY_RULE: Color = Color(0.72, 0.61, 0.38, 0.70)
 ## absent or does not match the audited source size, so an unapproved or resized
 ## asset can never reach the runtime. The v5 panel below is wired as a trial.
 const GAMEPLAY_PANEL_SURFACE: String = "res://assets/ui/gothic/generated/gameplay_panel_luna_v5.png"
+## v6 was generated, recovered and measured against v5, and rejected. It dims the
+## rim's corners and lifts the recessed centre, which is the wrong direction for
+## this screen: the rail interiors went from 0.0204 to 0.0389 median luminance -
+## twice v5 and two and a half times the reference's - while the rail's edge step
+## moved by 0.002. The candidate, its raw generation and its audit are kept under
+## outputs/art_pipeline/composition_v6_panel_rim/ for provenance, not wired.
+## See docs/art/panel_surface_trial_2026-09-26.md.
+const GAMEPLAY_PANEL_SURFACE_V6_REJECTED: String = "res://assets/ui/gothic/generated/gameplay_panel_luna_v6.png"
 ## The shipping name, so a caller can refer to the trial explicitly.
 const GAMEPLAY_PANEL_SURFACE_TRIAL_V5: String = GAMEPLAY_PANEL_SURFACE
 ## Rejected earlier candidate: kept for provenance and one-line rollback only.
