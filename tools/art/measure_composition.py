@@ -119,6 +119,66 @@ def _rail_border_detail(rgb: np.ndarray, x_range: tuple[float, float]) -> dict:
     }
 
 
+HEADING_BAND = ((0.30, 0.70), (0.005, 0.058))
+# Both layouts put their planning readout on the divider across the middle of the
+# field. Locating it by "brightest row" instead picked up the band's own rule on
+# the reference, so the band is fixed and proportional for both images.
+READOUT_BAND = ((0.26, 0.72), (0.325, 0.388))
+INK_LEVEL = 0.55
+
+
+def _ink(rgb: np.ndarray, x_range: tuple[float, float], y_range: tuple[float, float]) -> dict:
+    """How much of a band is text, and how hard the text is.
+
+    Text is the bright ink on a dark band, so the share of pixels above INK_LEVEL
+    is a proxy for how much type is in the band, and the mean luminance of the
+    ink separates a heavy condensed face from a lighter one at the same size.
+    """
+    region = _slice(rgb, x_range, y_range)
+    lum = _luminance(region)
+    ink = lum > INK_LEVEL
+    ink_share = float(ink.mean())
+    # Stroke width: the mean length of a horizontal run of ink. Share of ink
+    # cannot tell a heavy condensed face from a light wide one; the run length
+    # can, because it measures the stem itself rather than the glyph's width.
+    runs: list[int] = []
+    for row in ink:
+        length = 0
+        for value in row:
+            if value:
+                length += 1
+            elif length > 0:
+                runs.append(length)
+                length = 0
+        if length > 0:
+            runs.append(length)
+    stroke_px = float(np.mean(runs)) if runs else 0.0
+    return {
+        "ink_share": ink_share,
+        "ink_mean_luminance": float(lum[ink].mean()) if ink.any() else 0.0,
+        "band_mean_luminance": float(lum.mean()),
+        "stroke_px": stroke_px,
+        "stroke_share_of_height": stroke_px / max(1.0, float(region.shape[0])),
+    }
+
+
+def measure_typography(rgb: np.ndarray) -> dict:
+    readout = _ink(rgb, READOUT_BAND[0], READOUT_BAND[1])
+    heading = _ink(rgb, HEADING_BAND[0], HEADING_BAND[1])
+    return {
+        "heading_ink_share": heading["ink_share"],
+        "heading_ink_luminance": heading["ink_mean_luminance"],
+        "heading_stroke_px": heading["stroke_px"],
+        "readout_ink_share": readout["ink_share"],
+        "readout_ink_luminance": readout["ink_mean_luminance"],
+        "readout_stroke_px": readout["stroke_px"],
+        "readout_over_heading_stroke": readout["stroke_px"] / max(1e-6, heading["stroke_px"]),
+        # Above 1.0 the readout carries more ink than the heading it sits under,
+        # which is the document's "values outrank the headings".
+        "readout_over_heading_ink": readout["ink_share"] / max(1e-6, heading["ink_share"]),
+    }
+
+
 def _region(rgb: np.ndarray, x_range: tuple[float, float], y_range: tuple[float, float]) -> dict:
     region = _slice(rgb, x_range, y_range)
     lum = _luminance(region)
@@ -261,6 +321,7 @@ def measure(path: Path) -> dict:
             ),
         },
         "territory": measure_territories(rgb),
+        "typography": measure_typography(rgb),
     }
 
 
@@ -300,7 +361,7 @@ def report(reference: dict, capture: dict) -> str:
         "",
         f"{'metric':<44}{'reference':>12}{'capture':>12}   verdict",
     ]
-    for section in ("frame", "field", "halves", "figure_contrast", "lower_band", "rails", "rows"):
+    for section in ("frame", "field", "halves", "figure_contrast", "lower_band", "rails", "rows", "typography"):
         for key in reference[section]:
             name = f"{section}.{key}"
             ref_value = reference[section][key]

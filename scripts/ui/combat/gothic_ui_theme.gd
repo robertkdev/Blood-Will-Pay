@@ -1195,7 +1195,11 @@ static func _apply_label_node(label: Label) -> void:
 	elif label.name == "Role" or label.name == "RoleBadge":
 		label.add_theme_font_size_override("font_size", 16)
 		label.add_theme_color_override("font_color", Color(0.78, 0.73, 0.66, 1.0))
-		VisualTypeSystem.set_action_medium(label)
+		# A role is a word to read, not a value to scan: at 16px the condensed
+		# semibold was the least legible thing on the screen, which is the wrong end
+		# of the scale to be weak at. The legible utility face keeps it in the same
+		# family as the name beside it.
+		VisualTypeSystem.set_gameplay_body(label)
 	elif label.name == "Name":
 		label.add_theme_font_size_override("font_size", 18)
 		label.add_theme_color_override("font_color", COLOR_TEXT)
@@ -1223,12 +1227,20 @@ static func _apply_label_node(label: Label) -> void:
 		label.custom_minimum_size.x = 34.0
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	elif label.name == "BoardPhaseLabel" or label.name == "BoardTimerLabel" or label.name == "BoardCapacityLabel" or label.name == "WinOddsLabel":
-		# Operational readout: readable at 18 in the regular utility face. The
-		# previous 20px bold was as loud as the region headings.
-		_style_label_node(label, 18, Color(0.92, 0.84, 0.66, 1.0), true)
+		# Operational readout, still in the regular utility face: the previous 20px
+		# bold was as loud as the region headings, and that is already fixed. What
+		# the measurement found instead is that this strip was too quiet and too
+		# small: its type stood 18px in a 1080px frame where the reference's readout
+		# stands about twice that share, and its band carried 0.0185 of its pixels
+		# as ink against the reference's 0.0387. The facts a player scans every turn
+		# were the smallest type on the screen, which is the wrong end of the scale
+		# to be weak at. Size goes up, weight does not. The responsive pass owns the
+		# per-tier size from here and restates it for the compact tiers; this is the
+		# legible base it starts from.
+		_style_label_node(label, 22, Color(0.92, 0.84, 0.66, 1.0), true)
 		VisualTypeSystem.set_gameplay_name(label)
-		var status_width: float = 120.0 if label.name != "WinOddsLabel" else 148.0
-		label.custom_minimum_size = Vector2(status_width, 26.0)
+		var status_width: float = 132.0 if label.name != "WinOddsLabel" else 164.0
+		label.custom_minimum_size = Vector2(status_width, 30.0)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	elif label.name == "PlanningTimerLabel":
