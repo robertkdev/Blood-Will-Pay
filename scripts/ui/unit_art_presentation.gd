@@ -377,6 +377,12 @@ static func _configure_material(material: ShaderMaterial, surface: int) -> void:
 			material.set_shader_parameter("exposure_gamma", 1.55)
 			material.set_shader_parameter("contrast", 1.03)
 			material.set_shader_parameter("contrast_pivot", 0.26)
+			# Lifting the top-end terms here was tried on the theory that the
+			# figures own the fight's field p99 - measured, the combat crop's
+			# brightest 0.1 percent of pixels ARE theirs, at 0.94 luminance - and it
+			# moved the ratio by 0.007, because the p99 percentile is set by the
+			# floor's lit stone, not by the few brightest figure pixels. Not kept.
+			# See docs/art/combat_field_contrast_2026-09-26.md.
 			material.set_shader_parameter("key_light", 0.05)
 			material.set_shader_parameter("highlight_rolloff", 0.12)
 			material.set_shader_parameter("edge_definition", 0.26)
