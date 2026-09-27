@@ -153,12 +153,21 @@ def _ink(rgb: np.ndarray, x_range: tuple[float, float], y_range: tuple[float, fl
         if length > 0:
             runs.append(length)
     stroke_px = float(np.mean(runs)) if runs else 0.0
+    # A horizontal run longer than this is not a stroke: it is a rule, a plate
+    # edge or a filled ornament inside the band. The chapter strip carries two of
+    # them, and averaging them into the stroke measure reported 3.77px of "type"
+    # where the letters are 1.58px. Type and rules are reported apart.
+    type_runs = [length for length in runs if length <= 12]
+    rule_runs = [length for length in runs if length > 12]
     return {
         "ink_share": ink_share,
         "ink_mean_luminance": float(lum[ink].mean()) if ink.any() else 0.0,
         "band_mean_luminance": float(lum.mean()),
         "stroke_px": stroke_px,
         "stroke_share_of_height": stroke_px / max(1.0, float(region.shape[0])),
+        "type_stroke_px": float(np.mean(type_runs)) if type_runs else 0.0,
+        "type_run_count": len(type_runs),
+        "rule_run_count": len(rule_runs),
     }
 
 
@@ -169,10 +178,15 @@ def measure_typography(rgb: np.ndarray) -> dict:
         "heading_ink_share": heading["ink_share"],
         "heading_ink_luminance": heading["ink_mean_luminance"],
         "heading_stroke_px": heading["stroke_px"],
+        "heading_type_stroke_px": heading["type_stroke_px"],
+        "heading_rule_runs": float(heading["rule_run_count"]),
         "readout_ink_share": readout["ink_share"],
         "readout_ink_luminance": readout["ink_mean_luminance"],
         "readout_stroke_px": readout["stroke_px"],
+        "readout_type_stroke_px": readout["type_stroke_px"],
+        "readout_rule_runs": float(readout["rule_run_count"]),
         "readout_over_heading_stroke": readout["stroke_px"] / max(1e-6, heading["stroke_px"]),
+        "readout_over_heading_type_stroke": readout["type_stroke_px"] / max(1e-6, heading["type_stroke_px"]),
         # Above 1.0 the readout carries more ink than the heading it sits under,
         # which is the document's "values outrank the headings".
         "readout_over_heading_ink": readout["ink_share"] / max(1e-6, heading["ink_share"]),
