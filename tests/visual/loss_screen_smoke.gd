@@ -171,7 +171,6 @@ func _ready() -> void:
 	_expect(_save_capture("01_loss_overlay_default.png"), "default loss capture failed", failures)
 	var window: Window = get_window()
 	if window != null:
-		window.content_scale_factor = 1.5
 		window.content_scale_size = Vector2i(1280, 720)
 		window.size = Vector2i(1280, 720)
 	DisplayServer.window_set_size(Vector2i(1280, 720))
@@ -208,9 +207,8 @@ func _ready() -> void:
 		var compact_value_font_size: int = compact_value_label.get_theme_font_size("font_size")
 		var compact_value_text_width: float = compact_value_font.get_string_size(compact_value_label.text, HORIZONTAL_ALIGNMENT_RIGHT, -1.0, compact_value_font_size).x if compact_value_font != null else compact_value_label.get_combined_minimum_size().x
 		_expect(compact_value_label.size.x >= compact_value_text_width + 2.0, "Compact loss numeric content width clips the four-digit value", failures)
-	_expect(_save_capture("02_loss_overlay_compact_1280x720_150.png"), "compact 150 percent loss capture failed", failures)
+	_expect(_save_capture("02_loss_overlay_compact_1280x720.png"), "compact 1280x720 loss capture failed", failures)
 	if window != null:
-		window.content_scale_factor = 1.0
 		window.content_scale_size = Vector2i(1920, 1080)
 		window.size = Vector2i(1920, 1080)
 	DisplayServer.window_set_size(Vector2i(1920, 1080))

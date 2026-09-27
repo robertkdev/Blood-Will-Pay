@@ -469,28 +469,18 @@ func _apply_responsive_layout() -> void:
 	if not is_inside_tree():
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
-	var effective_size: Vector2 = _effective_ui_viewport_size(viewport_size)
-	var physical_window_size: Vector2 = get_window().size
-	var scaled_compact_physical_frame: bool = ui_scale >= 1.25 and (
-		physical_window_size.x <= 1280.0 or physical_window_size.y <= 720.0
-	)
+	# The viewport is the authored fullscreen size: content scale is locked, so
+	# there is no interface scale to divide out of the breakpoint source.
+	var effective_size: Vector2 = viewport_size
 	# 1080p is the normal shipping planning target. Its desktop stack is taller
 	# than the available field once the live shop and decision controls exist,
 	# so it uses the compact (still fully legible) tier.
 	var compact: bool = effective_size.y <= 1080.0 or effective_size.x <= 1400.0
-	var tight_compact: bool = (
-		effective_size.y <= 520.0
-		or effective_size.x <= 1100.0
-		or (ui_scale >= 1.25 and effective_size.y <= 720.0)
-		or scaled_compact_physical_frame
-	)
-	# Full HD at 100 percent UI is the authored composition target, not the
-	# dense tier. It gets its own composed dock instead of the compact
-	# abbreviations, so the field, bench and shop keep their readable
-	# presentation at the shipping resolution. Enlarged UI scales keep the
-	# legacy dense tiers.
-	var full_hd_dock: bool = Composition.is_full_hd_dock(effective_size, ui_scale)
+	var tight_compact: bool = effective_size.y <= 520.0 or effective_size.x <= 1100.0
+	# Full HD is the authored composition target, not the dense tier. It gets its
+	# own composed dock instead of the compact abbreviations, so the field, bench
+	# and shop keep their readable presentation at the shipping resolution.
+	var full_hd_dock: bool = Composition.is_full_hd_dock(effective_size)
 	if full_hd_dock:
 		compact = false
 		tight_compact = false
@@ -499,25 +489,15 @@ func _apply_responsive_layout() -> void:
 		# the legacy passes below run: they move the same controls this pass
 		# reparents, and a control can only have one parent.
 		_release_dock_composition()
-	# At the maximum supported scale, do not simply shrink every planning
-	# surface equally. The board and the commitment decision remain the reading
-	# spine; support rails become quieter, while Team Metrics receives enough
-	# width to keep its labels honest.
-	var maximum_scale_layout: bool = ui_scale >= 1.5 and effective_size.x <= 900.0 and effective_size.y <= 500.0
 	var ultrawide_planning_field: bool = effective_size.x >= 2200.0 and effective_size.y >= 800.0
 	set_meta("compact_layout", compact)
-	set_meta("tight_scale_layout", tight_compact)
+	set_meta("tight_layout", tight_compact)
 	set_meta("full_hd_dock", full_hd_dock)
-	set_meta("maximum_scale_layout", maximum_scale_layout)
 	set_meta("ultrawide_planning_field", ultrawide_planning_field)
-	set_meta("persisted_ui_scale", ui_scale)
 	set_meta("effective_ui_size", effective_size)
-	set_meta("physical_window_size", physical_window_size)
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
 	if stage_progress_top_bar != null and stage_progress_top_bar.has_method("set_compact_layout"):
-		# The composed dock keeps the stage bar on its dense bar at enlarged UI
-		# scale, so the extra band height belongs to the field, not the header.
-		stage_progress_top_bar.call("set_compact_layout", compact or (full_hd_dock and ui_scale > 1.0))
+		stage_progress_top_bar.call("set_compact_layout", compact)
 	if margin != null:
 		margin.add_theme_constant_override("margin_left", 6 if tight_compact else 10 if compact else 20)
 		margin.add_theme_constant_override("margin_top", 4 if tight_compact else 8 if compact else 14)
@@ -525,7 +505,7 @@ func _apply_responsive_layout() -> void:
 		# Keep a physical 8px escape gutter below the shop chrome at enlarged UI
 		# scale. Without it, a valid internal ShopBottomGutter can still be hidden
 		# by the framebuffer edge after container rounding.
-		margin.add_theme_constant_override("margin_bottom", 4 if maximum_scale_layout else 8 if tight_compact else 8 if compact else 18)
+		margin.add_theme_constant_override("margin_bottom", 8 if compact else 18)
 	stage_label.visible = not compact and not full_hd_dock
 	stage_label.custom_minimum_size = Vector2.ZERO if compact or full_hd_dock else Vector2(0.0, 64.0)
 	if planning_timer_label != null:
@@ -533,8 +513,8 @@ func _apply_responsive_layout() -> void:
 		# out of the vertical planning budget even if an older fixture reveals it.
 		planning_timer_label.visible = false
 	_set_minimum_size("MarginContainer/VBoxContainer/PlanningTimerLabel", Vector2(0.0, 0.0))
-	var battle_height: float = 212.0 if maximum_scale_layout else 232.0 if tight_compact else 330.0 if compact else 604.0
-	var board_half_height: float = 102.0 if maximum_scale_layout else 112.0 if tight_compact else 160.0 if compact else 264.0
+	var battle_height: float = 232.0 if tight_compact else 330.0 if compact else 604.0
+	var board_half_height: float = 112.0 if tight_compact else 160.0 if compact else 264.0
 	var large_planning_field: bool = not tight_compact and effective_size.x >= 1500.0 and effective_size.y >= 800.0
 	var battle_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	if battle_area != null:
@@ -554,11 +534,11 @@ func _apply_responsive_layout() -> void:
 		board_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if planning_area != null:
 		planning_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(160.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
-	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(108.0 if maximum_scale_layout else 136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea", Vector2(136.0 if tight_compact else 184.0 if compact else 310.0, 190.0 if tight_compact else 260.0 if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", Vector2(136.0 if tight_compact else 180.0 if compact else 286.0, 190.0 if tight_compact else battle_height if compact else 596.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 18.0 if tight_compact else 22.0 if compact else 24.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 60.0 if tight_compact else 82.0 if compact else 156.0))
+	_set_minimum_size("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel", Vector2(136.0 if tight_compact else 172.0 if compact else 286.0, 108.0 if tight_compact else 208.0 if compact else 394.0))
 	_apply_side_panel_layout(compact, tight_compact)
 	_apply_planning_focus_hierarchy(compact, tight_compact)
 	for half_path: String in [
@@ -603,18 +583,18 @@ func _apply_responsive_layout() -> void:
 	# Make the wager quote a decision line rather than a tertiary footnote. The
 	# battle field retains its scale because the flexible BattleArea absorbs this
 	# two-pixel increase before the fixed shop/gutter stack does.
-	wager_summary.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 17 if tight_compact else 18 if compact else 19)
+	wager_summary.add_theme_font_size_override("font_size", 17 if tight_compact else 18 if compact else 19)
 	wager_summary.custom_minimum_size = Vector2(0.0, 24.0 if tight_compact else 22.0)
 	wager_summary.autowrap_mode = TextServer.AUTOWRAP_OFF
 	wager_summary.clip_text = false
 	_set_box_separation("MarginContainer/VBoxContainer", 2 if tight_compact else 3 if compact else 3)
-	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 6 if maximum_scale_layout else 10 if tight_compact else 14 if compact else 20)
+	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow", 10 if tight_compact else 14 if compact else 20)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea", 2 if tight_compact else 8 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn", 6 if compact else 8)
 	_set_box_separation("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea", 2 if tight_compact else 6 if compact else 8)
 	_set_grid_separation(enemy_grid, 4 if tight_compact else 6 if compact else 8)
 	_set_grid_separation(player_grid, 4 if tight_compact else 6 if compact else 8)
-	_set_box_separation("MarginContainer/VBoxContainer/BottomStorageArea", 2 if maximum_scale_layout else 6 if compact else 10)
+	_set_box_separation("MarginContainer/VBoxContainer/BottomStorageArea", 6 if compact else 10)
 	_set_box_separation("MarginContainer/VBoxContainer/ActionsRow", 6 if tight_compact else 10 if compact else 18)
 	_apply_shop_compact_layout(compact, tight_compact)
 	_apply_shop_action_bar_layout(compact, tight_compact)
@@ -637,7 +617,7 @@ func _finalize_responsive_layout() -> void:
 	if not is_inside_tree():
 		return
 	var compact: bool = bool(get_meta("compact_layout", false))
-	var tight_compact: bool = bool(get_meta("tight_scale_layout", false))
+	var tight_compact: bool = bool(get_meta("tight_layout", false))
 	_apply_shop_action_bar_layout(compact, tight_compact)
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
 	var vbox: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
@@ -694,12 +674,6 @@ func _compact_field_floor() -> float:
 			grid_total += grid.get_combined_minimum_size().y
 	return maxf(160.0, grid_total + 12.0)
 
-func _effective_ui_viewport_size(viewport_size: Vector2) -> Vector2:
-	# Godot's viewport rect already reports logical UI coordinates after
-	# content_scale_factor is applied. Dividing Window.size again makes natural
-	# persisted 125/150 percent launches enter an unnecessarily tiny tier.
-	return viewport_size
-
 func _is_planning_phase() -> bool:
 	var game_state: Node = _get_gs()
 	if game_state == null:
@@ -726,12 +700,11 @@ func _apply_board_tile_size(compact: bool, tight_compact: bool, large_planning_f
 	var ultrawide_planning_field: bool = bool(get_meta("ultrawide_planning_field", false))
 	var wide_tight_field: bool = tight_compact and effective_size.x >= 1200.0
 	var wide_tight_tile_size: Vector2 = Vector2(78.0, 42.0) if effective_size.y >= 680.0 else Vector2(58.0, 26.0)
-	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	# Ultrawide planning has enough horizontal room to let the deployment grid
 	# read as the battlefield, rather than a small island floating between rails.
 	# The increase is limited to the authored grid cells; side-panel behavior and
 	# compact breakpoints stay unchanged.
-	var tile_size: Vector2 = Vector2(148.0, 74.0) if ultrawide_planning_field else wide_tight_tile_size if wide_tight_field else Vector2(44.0, 26.0) if maximum_scale_layout else Vector2(46.0, 28.0) if tight_compact else Vector2(124.0, 76.0 if effective_size.y >= 1000.0 else 62.0) if large_planning_field else Vector2(68.0, 50.0) if compact else Vector2(96.0, 76.0)
+	var tile_size: Vector2 = Vector2(148.0, 74.0) if ultrawide_planning_field else wide_tight_tile_size if wide_tight_field else Vector2(46.0, 28.0) if tight_compact else Vector2(124.0, 76.0 if effective_size.y >= 1000.0 else 62.0) if large_planning_field else Vector2(68.0, 50.0) if compact else Vector2(96.0, 76.0)
 	var grid_separation: int = 4 if tight_compact else 6 if compact else 8
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		if grid == null:
@@ -769,7 +742,6 @@ func _center_planning_grid(grid: GridContainer, tile_size: Vector2, separation: 
 	grid.offset_bottom = grid_size.y * 0.5
 
 func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
-	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var left_item_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
 	if left_item_area != null:
 		# Tight scale retains both tactical support rails. Their internals reflow
@@ -777,7 +749,6 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		left_item_area.visible = true
 		left_item_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		left_item_area.clip_contents = true if tight_compact else false
-		left_item_area.modulate.a = 0.76 if maximum_scale_layout else 1.0
 	var item_storage: GridContainer = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
 	var item_storage_header: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
 	var empty_item_cache: bool = item_storage_header != null and int(item_storage_header.get_meta("occupied_slots", 0)) <= 0
@@ -793,15 +764,10 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 			if item_control != null:
 				item_control.custom_minimum_size = Vector2(34.0, 34.0) if tight_compact else Vector2(42.0, 42.0) if compact else Vector2(58.0, 58.0)
 				item_control.clip_contents = tight_compact
-		# An empty cache is not planning information. At the maximum supported
-		# scale its label and placeholder slots are staged out, leaving trait
-		# checkpoints available without asking the board to share attention.
-		item_storage.visible = not (maximum_scale_layout and empty_item_cache)
-		item_storage.set_meta("maximum_scale_disclosure", "hidden_empty_cache" if maximum_scale_layout and empty_item_cache else "shown")
+		item_storage.visible = true
 	_sync_item_storage_header()
 	if item_storage_header != null:
-		item_storage_header.visible = not (maximum_scale_layout and empty_item_cache)
-		item_storage_header.set_meta("maximum_scale_disclosure", "hidden_empty_cache" if maximum_scale_layout and empty_item_cache else "shown")
+		item_storage_header.visible = true
 	var traits_title: Label = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel/TraitsTitle") as Label
 	if traits_title != null:
 		traits_title.add_theme_font_size_override("font_size", 14 if tight_compact else 18 if compact else 20)
@@ -826,16 +792,15 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		)
 	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	if stats_area != null:
-		stats_area.custom_minimum_size.x = 148.0 if maximum_scale_layout else 136.0 if tight_compact else 184.0 if compact else 310.0
+		stats_area.custom_minimum_size.x = 136.0 if tight_compact else 184.0 if compact else 310.0
 		stats_area.size_flags_horizontal = Control.SIZE_SHRINK_END
 		# The compact tiers keep the metrics rail at its authored compact panel
 		# height instead of stretching it over the whole battlefield: full-height
 		# furniture is a desktop-tier read. The composed dock owns its own rail
 		# height and selects the expanding branch because it is not compact.
 		stats_area.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
-		stats_area.modulate.a = 0.80 if maximum_scale_layout else 1.0
 	if stats_panel != null:
-		stats_panel.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
+		stats_panel.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 292.0, 188.0 if tight_compact else 252.0 if compact else 560.0)
 		stats_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact else Control.SIZE_EXPAND_FILL
 		stats_panel.clip_contents = false
 		if stats_panel.has_method("set_responsive_layout"):
@@ -852,12 +817,12 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 	var scoreboard: Control = find_child("Scoreboard", true, false) as Control
 	if scoreboard != null:
 		scoreboard.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		scoreboard.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 142.0 if tight_compact else 156.0 if compact else 430.0)
+		scoreboard.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 294.0, 142.0 if tight_compact else 156.0 if compact else 430.0)
 		var scoreboard_header: Control = scoreboard.get_node_or_null("Header") as Control
 		if scoreboard_header != null:
 			# "TEAM METRICS" already supplies the surface label. Removing the
 			# duplicate scoreboard header at tight scale preserves the rows.
-			scoreboard_header.visible = maximum_scale_layout or not tight_compact
+			scoreboard_header.visible = not tight_compact
 		for row_node: Node in scoreboard.find_children("*", "Control", true, false):
 			var row_control: Control = row_node as Control
 			if row_control != null and row_control.has_method("set_compact_layout"):
@@ -865,7 +830,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 				_apply_compact_metric_badge(row_control, compact)
 	var metric_tabs: Control = find_child("MetricTabs", true, false) as Control
 	if metric_tabs != null:
-		metric_tabs.custom_minimum_size = Vector2(148.0 if maximum_scale_layout else 136.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
+		metric_tabs.custom_minimum_size = Vector2(136.0 if tight_compact else 178.0 if compact else 294.0, 34.0 if compact else 52.0)
 		# The eight-column desktop metric selector cannot remain legible inside
 		# a 178px rail. Compact keeps the default Total scoreboard and removes
 		# the selector row instead of squeezing its controls into noise.
@@ -873,7 +838,7 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 	var stats_title: Label = stats_panel.find_child("Title", true, false) as Label if stats_panel != null else null
 	if stats_title != null:
 		stats_title.text = "TEAM METRICS" if compact else "Team Metrics"
-		stats_title.add_theme_font_size_override("font_size", 14 if maximum_scale_layout else 11 if tight_compact else 17 if compact else 22)
+		stats_title.add_theme_font_size_override("font_size", 11 if tight_compact else 17 if compact else 22)
 		stats_title.custom_minimum_size.y = 24.0 if tight_compact else 0.0
 		stats_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if tight_compact else HORIZONTAL_ALIGNMENT_LEFT
 		stats_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -922,7 +887,7 @@ func _sync_item_storage_header() -> void:
 	if bool(header.get_meta("reliquary_cache_hierarchy", false)):
 		# Presenter-owned: it owns clip, wrap, material and the complete counts.
 		return
-	var tight_compact: bool = bool(get_meta("tight_scale_layout", false))
+	var tight_compact: bool = bool(get_meta("tight_layout", false))
 	var compact: bool = bool(get_meta("compact_layout", false))
 	var occupied_slots: int = int(header.get_meta("occupied_slots", 0))
 	var total_slots: int = maxi(1, int(header.get_meta("total_slots", 18)))
@@ -995,8 +960,7 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	band.offset_top = 0.0
 	band.offset_right = 0.0
 	band.offset_bottom = 0.0
-	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
-	band.color = Color(0.52, 0.025, 0.034, 0.25 if maximum_scale_layout else 0.18) if enemy_side else Color(0.42, 0.35, 0.24, 0.22 if maximum_scale_layout else 0.16)
+	band.color = Color(0.52, 0.025, 0.034, 0.18) if enemy_side else Color(0.42, 0.35, 0.24, 0.16)
 	var label_name: String = "HostileFieldOrderLabel" if enemy_side else "SurvivalFieldOrderLabel"
 	var label: Label = area.get_node_or_null(label_name) as Label
 	if label == null:
@@ -1020,7 +984,7 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	label.text = "ENEMY" if enemy_side else "YOUR TEAM"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if enemy_side else HORIZONTAL_ALIGNMENT_RIGHT
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 12 if maximum_scale_layout else 11 if tight_compact else 13 if compact else 16)
+	label.add_theme_font_size_override("font_size", 11 if tight_compact else 13 if compact else 16)
 	label.add_theme_color_override("font_color", Color(1.0, 0.58, 0.47, 0.96) if enemy_side else Color(1.0, 0.90, 0.69, 0.96))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.94))
 	label.add_theme_constant_override("outline_size", 2)
@@ -1029,7 +993,7 @@ func _apply_planning_landmark_to_half(area: Control, enemy_side: bool, compact: 
 	label_plate.border_color = Color(0.82, 0.07, 0.09, 0.92) if enemy_side else Color(0.76, 0.62, 0.38, 0.90)
 	label_plate.border_width_left = 4 if enemy_side else 1
 	# Keep the label plate narrow so its team marker never competes with board units.
-	label_plate.border_width_right = 0 if maximum_scale_layout and not enemy_side else 1 if enemy_side else 4
+	label_plate.border_width_right = 1 if enemy_side else 4
 	label_plate.content_margin_left = 8.0
 	label_plate.content_margin_right = 8.0
 	label.add_theme_stylebox_override("normal", label_plate)
@@ -1129,7 +1093,6 @@ func _enforce_compact_metric_badges() -> void:
 			_apply_compact_metric_badge(row, true)
 
 func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
-	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var composed_dock: bool = bool(get_meta("full_hd_dock", false))
 	var card_size: Vector2 = Vector2(120.0 if tight_compact else 132.0, ShopCard.presentation_height(get_viewport_rect().size, tight_compact, composed_dock))
 	if shop_grid != null:
@@ -1154,7 +1117,7 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 					var name_label: Label = control.find_child("Name", true, false) as Label
 					var price_label: Label = control.find_child("Price", true, false) as Label
 					if name_label != null:
-						name_label.add_theme_font_size_override("font_size", 14 if maximum_scale_layout else 16 if tight_compact else 19)
+						name_label.add_theme_font_size_override("font_size", 16 if tight_compact else 19)
 						name_label.set_meta("compact_decision_card_label", true)
 						name_label.clip_text = tight_compact
 						if tight_compact:
@@ -1163,7 +1126,7 @@ func _apply_shop_compact_layout(compact: bool, tight_compact: bool) -> void:
 						# The compact card is 132 wide and the price owns 38 percent of
 						# the caption row. Twenty-pixel copy ran past that share, so the
 						# compact tiers keep the card's own authored price size.
-						price_label.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 17)
+						price_label.add_theme_font_size_override("font_size", 17)
 						price_label.clip_text = tight_compact
 						if tight_compact:
 							price_label.custom_minimum_size.x = 0.0
@@ -1251,7 +1214,6 @@ func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
 		# The composed dock owns the shop header and the primary action. The
 		# legacy strip metrics would widen them back into a full-width toolbar.
 		return
-	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 	if bottom_storage == null:
 		return
@@ -1273,8 +1235,8 @@ func _apply_shop_action_bar_layout(compact: bool, tight_compact: bool) -> void:
 				var text_width: float = button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size).x
 				var minimum_width: float = maxf(66.0, text_width + (16.0 if tight_compact else 22.0))
 				if primary_commit:
-					minimum_width = maxf(minimum_width, 176.0 if maximum_scale_layout else 190.0 if tight_compact else 236.0 if compact else 304.0)
-				button.custom_minimum_size = Vector2(minimum_width, (38.0 if maximum_scale_layout else 42.0 if tight_compact else 46.0 if compact else 54.0) if primary_commit else (30.0 if tight_compact else 34.0 if compact else 40.0))
+					minimum_width = maxf(minimum_width, 190.0 if tight_compact else 236.0 if compact else 304.0)
+				button.custom_minimum_size = Vector2(minimum_width, (42.0 if tight_compact else 46.0 if compact else 54.0) if primary_commit else (30.0 if tight_compact else 34.0 if compact else 40.0))
 				continue
 			var label: Label = action_child as Label
 			if label != null:
@@ -1313,7 +1275,6 @@ func _apply_functional_typography(compact: bool, tight_compact: bool) -> void:
 			stats_label.custom_minimum_size.x = 0.0
 
 func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> void:
-	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	var board_status_row: HBoxContainer = find_child("BoardStatusRow", true, false) as HBoxContainer
 	# The readout strip is the one line a player scans every turn, and measured it
 	# was the smallest type on the screen: this pass owns the strip's size, and at
@@ -1388,12 +1349,12 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 		planning_directive.z_index = 110
 		planning_directive.z_as_relative = false
 		planning_directive.set_meta("planning_action_order", "deploy>wager>commit")
-		planning_directive.set_meta("maximum_scale_disclosure", "hidden_redundant_instruction" if maximum_scale_layout else "persistent_ordered_command")
+		planning_directive.set_meta("ordered_command_disclosure", "persistent_ordered_command")
 	if continue_button != null:
 		continue_button.set_meta("visual_role", "primary_commit")
 		continue_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		continue_button.custom_minimum_size = Vector2(176.0 if maximum_scale_layout else 190.0 if tight_compact else 236.0 if compact else 304.0, 38.0 if maximum_scale_layout else 42.0 if tight_compact else 46.0 if compact else 54.0)
-		continue_button.add_theme_font_size_override("font_size", 20 if maximum_scale_layout else 22 if tight_compact else 23 if compact else 26)
+		continue_button.custom_minimum_size = Vector2(190.0 if tight_compact else 236.0 if compact else 304.0, 42.0 if tight_compact else 46.0 if compact else 54.0)
+		continue_button.add_theme_font_size_override("font_size", 22 if tight_compact else 23 if compact else 26)
 		GothicUIAssets.apply_button_material(continue_button, true)
 		continue_button.set_meta("compact_commit_rail_action", true)
 	# In the composed tier the dock's own metrics own this row's minimum; the
@@ -1419,7 +1380,6 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 func _apply_compact_commit_rail(compact: bool, tight_compact: bool) -> void:
 	var vbox: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
 	var actions_row: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/ActionsRow") as HBoxContainer
-	var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
 	if vbox == null or actions_row == null or wager_summary == null:
 		return
 	var summary_index: int = wager_summary.get_index()
@@ -1433,7 +1393,7 @@ func _apply_compact_commit_rail(compact: bool, tight_compact: bool) -> void:
 		wager_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		# Preserve the accessibility-sized outcome line established by the base
 		# layout; compacting the rail changes placement, not legibility.
-		wager_summary.add_theme_font_size_override("font_size", 16 if maximum_scale_layout else 17 if tight_compact else 18)
+		wager_summary.add_theme_font_size_override("font_size", 17 if tight_compact else 18)
 		wager_summary.modulate = Color(1.0, 1.0, 1.0, 0.72 if tight_compact else 0.84)
 		wager_summary.set_meta("compact_commit_rail", true)
 		actions_row.set_meta("compact_commit_rail", true)
@@ -1459,8 +1419,7 @@ func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool, tight_co
 		var button: Button = child as Button
 		if button != null:
 			if button.name == "ContinueButton":
-				var maximum_scale_layout: bool = bool(get_meta("maximum_scale_layout", false))
-				button.custom_minimum_size = Vector2(176.0 if maximum_scale_layout else 190.0 if tight_compact else 236.0 if compact else 304.0, 38.0 if maximum_scale_layout else 42.0 if tight_compact else 46.0 if compact else 54.0)
+				button.custom_minimum_size = Vector2(190.0 if tight_compact else 236.0 if compact else 304.0, 42.0 if tight_compact else 46.0 if compact else 54.0)
 				button.add_theme_font_size_override("font_size", 20 if tight_compact else 23 if compact else 26)
 			else:
 				var button_font_size: int = 16 if tight_compact else 18 if compact else 20
@@ -1478,7 +1437,7 @@ func _apply_action_bar_layout(action_bar: HBoxContainer, compact: bool, tight_co
 	action_bar.queue_sort()
 
 func _sync_compact_resource_strip() -> void:
-	var tight_compact: bool = bool(get_meta("tight_scale_layout", false))
+	var tight_compact: bool = bool(get_meta("tight_layout", false))
 	var strip: Label = _ensure_compact_resource_strip()
 	if strip == null:
 		return
@@ -1603,7 +1562,6 @@ func _apply_dock_composition(full_hd_dock: bool) -> void:
 	var viewport_size: Vector2 = get_meta("effective_ui_size", get_viewport_rect().size) as Vector2
 	if viewport_size.x <= 1.0 or viewport_size.y <= 1.0:
 		viewport_size = get_viewport_rect().size
-	var ui_scale: float = float(get_meta("persisted_ui_scale", 1.0))
 	var inset: float = Composition.DOCK_MARGIN
 	var margin: MarginContainer = get_node_or_null("MarginContainer") as MarginContainer
 	if margin != null:
@@ -1624,34 +1582,33 @@ func _apply_dock_composition(full_hd_dock: bool) -> void:
 			and controller != null and controller.phase_transition != null and controller.phase_transition.is_transition_active():
 		var settled_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 		if settled_storage != null and settled_storage.custom_minimum_size.y > 1.0:
-			_apply_dock_shop(settled_storage.custom_minimum_size.y, ui_scale)
+			_apply_dock_shop(settled_storage.custom_minimum_size.y)
 			_reassert_composed_field()
 			call_deferred("_refresh_dock_territories")
 		return
-	var rail_width: float = Composition.side_rail_width(ui_scale)
-	var resolved_rail: float = _apply_dock_support_rails(rail_width, ui_scale)
+	var rail_width: float = Composition.side_rail_width()
+	var resolved_rail: float = _apply_dock_support_rails(rail_width)
 	var field_width_value: float = Composition.field_width(viewport_size, resolved_rail, _dock_row_separation(), inset)
 	var board_column: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn") as Control
 	var board_width_value: float = Composition.board_width(field_width_value, board_column.size.x if board_column != null else 0.0)
-	_apply_dock_wager_column_metrics(ui_scale)
+	_apply_dock_wager_column_metrics()
 	# The bench is rounded from the grid's quantised span, so bench and board rows
 	# agree exactly instead of differing by the pre-quantised remainder.
-	var board_span_value: float = Composition.board_span(board_width_value, ui_scale)
+	var board_span_value: float = Composition.board_span(board_width_value)
 	# The bench hangs under the board. Its horizontal alignment is measured from
 	# the settled PlayerGrid in the deferred pass (nominal centre arithmetic here
 	# cancelled out and never used real bounds), so this pass only sizes the cells.
-	var bench_tile: Vector2 = _apply_dock_bench(board_span_value, ui_scale)
-	var dock_height: float = Composition.dock_height(viewport_size, ui_scale)
+	var bench_tile: Vector2 = _apply_dock_bench(board_span_value)
+	var dock_height: float = Composition.dock_height(viewport_size)
 	# The band is sized around the authored card cell, not the other way round,
 	# so the shop cells keep their designed height at every scale.
 	dock_height = maxf(dock_height, Composition.authored_dock_height(dock_height))
-	var board_space: float = _apply_dock_vertical_budget(ui_scale, dock_height, bench_tile, viewport_size)
-	_apply_dock_field(board_width_value, board_space, ui_scale)
-	_apply_dock_shop(dock_height, ui_scale)
+	var board_space: float = _apply_dock_vertical_budget(dock_height, bench_tile, viewport_size)
+	_apply_dock_field(board_width_value, board_space)
+	_apply_dock_shop(dock_height)
 	_dock_settled_field = {
 		"board_width": board_width_value,
 		"board_space": board_space,
-		"ui_scale": ui_scale,
 	}
 	_connect_dock_reassert_sources()
 	_dock_composition_active = true
@@ -1696,15 +1653,13 @@ func _dock_row_separation() -> float:
 ## The one place the dock's framebuffer gutter is expressed. It is folded into
 ## the parent margin, never into the band's own height.
 func _dock_bottom_margin() -> float:
-	return maxf(Composition.DOCK_MARGIN, Composition.dock_bottom_gutter(float(get_meta("persisted_ui_scale", 1.0))))
+	return maxf(Composition.DOCK_MARGIN, Composition.dock_bottom_gutter())
 
-## Keeps the dock tier inside the framebuffer at physical 1920x1080 for every
-## supported UI scale. The rails keep all of their content and only their
-## vertical minimums are trimmed (the traits rail already scrolls); the
-## remainder becomes the board's space, so the board can never push the dock
-## past the bottom edge.
-func _apply_dock_vertical_budget(ui_scale: float, dock_height: float, bench_tile: Vector2, viewport_size: Vector2) -> float:
-	var scale: float = maxf(1.0, ui_scale)
+## Keeps the dock tier inside the framebuffer at 1920x1080. The rails keep all of
+## their content and only their vertical minimums are trimmed (the traits rail
+## already scrolls); the remainder becomes the board's space, so the board can
+## never push the dock past the bottom edge.
+func _apply_dock_vertical_budget(dock_height: float, bench_tile: Vector2, viewport_size: Vector2) -> float:
 	var vbox: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
 	var separation: float = float(vbox.get_theme_constant("separation")) if vbox != null else 3.0
 	var visible_rows: int = 0
@@ -1716,30 +1671,30 @@ func _apply_dock_vertical_budget(ui_scale: float, dock_height: float, bench_tile
 	var rows: float = float(maxi(0, visible_rows - 1))
 	var top_bar: Control = get_node_or_null("MarginContainer/VBoxContainer/StageProgressTopBar") as Control
 	var top_bar_min: float = top_bar.get_combined_minimum_size().y if top_bar != null else 48.0
-	var quote_min: float = Composition.physical_px(26.0, scale, 20.0)
+	var quote_min: float = 26.0
 	if wager_summary != null:
 		quote_min = maxf(quote_min, wager_summary.get_combined_minimum_size().y)
 	var reserved: float = Composition.DOCK_MARGIN + _dock_bottom_margin() + top_bar_min + bench_tile.y + quote_min + dock_height + separation * rows
 	var board_space: float = maxf(200.0, viewport_size.y - reserved)
-	_write_composed_field_minima(board_space, scale)
+	_write_composed_field_minima(board_space)
 	return board_space
 
 ## The composed field's vertical minima, written in one place because two passes
 ## own them: the full composed pass and the re-assert a live phase transition
 ## runs instead of it. The re-assert has to restore these, not just the shop
 ## band, or the field falls back to the legacy desktop height inside the dock.
-func _write_composed_field_minima(board_space: float, ui_scale: float) -> void:
+func _write_composed_field_minima(board_space: float) -> void:
 	var battle_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea") as Control
 	if battle_area != null:
 		battle_area.custom_minimum_size.y = board_space
 	var item_grid: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as Control
 	if item_grid != null:
-		item_grid.custom_minimum_size.y = Composition.physical_px(132.0, ui_scale, 74.0)
+		item_grid.custom_minimum_size.y = 132.0
 	var traits_panel: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/TraitsPanel") as Control
 	if traits_panel != null:
-		traits_panel.custom_minimum_size.y = Composition.physical_px(352.0, ui_scale, 170.0)
+		traits_panel.custom_minimum_size.y = 352.0
 	if stats_panel != null:
-		stats_panel.custom_minimum_size.y = Composition.physical_px(540.0, ui_scale, 250.0)
+		stats_panel.custom_minimum_size.y = 540.0
 	var left_rail: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
 	if left_rail != null:
 		left_rail.custom_minimum_size.y = board_space
@@ -1755,17 +1710,16 @@ func _reassert_composed_field() -> void:
 	var board_space: float = float(_dock_settled_field.get("board_space", 0.0))
 	if board_space <= 1.0:
 		return
-	var ui_scale: float = float(_dock_settled_field.get("ui_scale", 1.0))
 	var board_width_value: float = float(_dock_settled_field.get("board_width", 0.0))
-	_write_composed_field_minima(board_space, ui_scale)
-	_apply_dock_field(board_width_value, board_space, ui_scale)
-	_apply_dock_bench(Composition.board_span(board_width_value, ui_scale), ui_scale)
+	_write_composed_field_minima(board_space)
+	_apply_dock_field(board_width_value, board_space)
+	_apply_dock_bench(Composition.board_span(board_width_value))
 
 ## Both support rails take the same substantial width. The field centre then
 ## agrees with the screen centre, which is what lets the bench sit under the
 ## player board without reparenting anything.
-func _apply_dock_support_rails(rail_width: float, ui_scale: float) -> float:
-	var inset_px: float = Composition.physical_px(16.0, ui_scale, 10.0)
+func _apply_dock_support_rails(rail_width: float) -> float:
+	var inset_px: float = 16.0
 	# The rail is a physical mass, and nothing else sizes it. Rail interiors are
 	# their owners' business; the theme owner removes the competing outer minima
 	# for this tier, using SIDE_RAIL_PHYSICAL through the composition metadata.
@@ -1778,13 +1732,13 @@ func _apply_dock_support_rails(rail_width: float, ui_scale: float) -> float:
 	_apply_dock_inner_min_yields(inner_width)
 	if stats_panel != null and stats_panel.has_method("set_responsive_layout"):
 		# The metrics panel's own dense presentation is what fits a 308px rail at
-		# enlarged UI scale; asking for it is the interior owner's supported API.
-		stats_panel.call("set_responsive_layout", ui_scale > 1.0 or inner_width < 260.0, false)
+		# composition width; asking for it is the interior owner's supported API.
+		stats_panel.call("set_responsive_layout", inner_width < 260.0, false)
 	if controller != null and controller.traits_presenter != null:
 		controller.traits_presenter.set_compact_layout(
 			inner_width,
-			Composition.physical_px(48.0, ui_scale, 30.0),
-			Composition.physical_px(40.0, ui_scale, 24.0),
+			48.0,
+			40.0,
 			false
 		)
 	var resolved: float = rail_width
@@ -1858,9 +1812,9 @@ func _apply_dock_inner_min_yields(inner_width: float) -> void:
 
 ## Board cells fill the field column instead of floating as a small island
 ## between the rails.
-func _apply_dock_field(board_width_value: float, available_height: float, ui_scale: float) -> void:
-	var foot_pad: float = Composition.board_foot_pad(ui_scale)
-	var tile: Vector2 = Composition.board_tile_size(board_width_value, available_height - foot_pad * 2.0, ui_scale)
+func _apply_dock_field(board_width_value: float, available_height: float) -> void:
+	var foot_pad: float = Composition.board_foot_pad()
+	var tile: Vector2 = Composition.board_tile_size(board_width_value, available_height - foot_pad * 2.0)
 	_set_grid_separation(enemy_grid, int(Composition.BOARD_GAP))
 	_set_grid_separation(player_grid, int(Composition.BOARD_GAP))
 	for grid: GridContainer in [enemy_grid, player_grid]:
@@ -1887,7 +1841,7 @@ func _apply_dock_field(board_width_value: float, available_height: float, ui_sca
 
 ## The bench row spans the same column as the board and hangs directly off
 ## it, so it reads as part of the field rather than as another toolbar.
-func _apply_dock_bench(board_width_value: float, ui_scale: float) -> Vector2:
+func _apply_dock_bench(board_width_value: float) -> Vector2:
 	var bench_area: HBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as HBoxContainer
 	if bench_area != null:
 		# A full-width strip that centres its single child is deterministic, where
@@ -1910,7 +1864,7 @@ func _apply_dock_bench(board_width_value: float, ui_scale: float) -> Vector2:
 	for child: Node in bench_grid.get_children():
 		if child is Button:
 			slot_count += 1
-	var tile: Vector2 = Composition.bench_tile_size(board_width_value, maxi(1, slot_count), ui_scale)
+	var tile: Vector2 = Composition.bench_tile_size(board_width_value, maxi(1, slot_count))
 	bench_grid.add_theme_constant_override("h_separation", int(Composition.BENCH_GAP))
 	bench_grid.add_theme_constant_override("v_separation", 4)
 	bench_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -1939,7 +1893,7 @@ func _apply_dock_bench(board_width_value: float, ui_scale: float) -> Vector2:
 
 ## The shop keeps its own territory: the existing reroll/lock/level header
 ## stays attached above five taller card cells.
-func _apply_dock_shop(dock_height: float, ui_scale: float) -> void:
+func _apply_dock_shop(dock_height: float) -> void:
 	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 	if bottom_storage == null:
 		return
@@ -1955,7 +1909,7 @@ func _apply_dock_shop(dock_height: float, ui_scale: float) -> void:
 	# One helper owns the whole split: wager by content, bay by close fit, gaps as
 	# separation, and the shop at its authored cell width. Any residual is
 	# reported as environment, never used to inflate a territory or its minimums.
-	var allocation: Dictionary = Composition.dock_allocation(content_available, authored_width, _dock_wager_content_min(), _dock_wager_insets(), ui_scale)
+	var allocation: Dictionary = Composition.dock_allocation(content_available, authored_width, _dock_wager_content_min(), _dock_wager_insets())
 	var shop_width_value: float = maxf(authored_width * 0.5, float(allocation.get("shop", authored_width)))
 	bottom_storage.set_meta("dock_allocation", allocation)
 	# The cells keep their authored portrait ratio; the band's leftover stays as
@@ -1986,7 +1940,7 @@ func _apply_dock_shop(dock_height: float, ui_scale: float) -> void:
 			footer_gutter.custom_minimum_size.x = shop_width_value
 		if footer_gutter.size_flags_horizontal != Control.SIZE_SHRINK_BEGIN:
 			footer_gutter.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	_apply_dock_shop_cells(card_width, card_height, ui_scale)
+	_apply_dock_shop_cells(card_width, card_height)
 
 ## The shop territory keeps the shop's authored five-cell span however many
 ## cells the panel is currently showing. The opening-fight state presents one
@@ -2021,7 +1975,7 @@ func _dock_cell_content_inset(card: Control) -> float:
 
 ## Five taller card cells across the shop territory. Re-applied while the dock
 ## is live because the shop rebuilds its own grid geometry on every refresh.
-func _apply_dock_shop_cells(card_width: float, card_height: float, ui_scale: float) -> void:
+func _apply_dock_shop_cells(card_width: float, card_height: float) -> void:
 	if shop_grid == null:
 		return
 	var gap: float = Composition.shop_card_gap()
@@ -2093,9 +2047,8 @@ func _apply_dock_shop_cells(card_width: float, card_height: float, ui_scale: flo
 ## Re-asserts the physical rail contract after a presenter has rebuilt rows: the
 ## rail stays 308 physical and its interiors are re-capped at the composed width.
 func _reassert_composed_rails() -> void:
-	var ui_scale: float = float(get_meta("persisted_ui_scale", 1.0))
-	var rail_width: float = Composition.side_rail_width(ui_scale)
-	var inset_px: float = Composition.physical_px(16.0, ui_scale, 10.0)
+	var rail_width: float = Composition.side_rail_width()
+	var inset_px: float = 16.0
 	var inner_width: float = maxf(120.0, rail_width - inset_px)
 	# Bounded: the presenter is only re-laid-out when the composed width actually
 	# changed, and its own resize is not a re-assert source, so a pass cannot
@@ -2105,8 +2058,8 @@ func _reassert_composed_rails() -> void:
 		if controller != null and controller.traits_presenter != null:
 			controller.traits_presenter.set_compact_layout(
 				inner_width,
-				Composition.physical_px(48.0, ui_scale, 30.0),
-				Composition.physical_px(40.0, ui_scale, 24.0),
+				48.0,
+				40.0,
 				false
 			)
 	for rail_path: String in [
@@ -2241,18 +2194,17 @@ func _adjust_dock_wager(direction: int) -> void:
 		# Step in the slider's own units, including its large-reserve mapping.
 		bet_slider.value = clampf(bet_slider.value + float(direction) * bet_slider.step, bet_slider.min_value, bet_slider.max_value)
 
-func _apply_dock_wager_column_metrics(ui_scale: float) -> void:
+func _apply_dock_wager_column_metrics() -> void:
 	if _wager_controls == null or not is_instance_valid(_wager_controls):
 		return
-	var scale_factor: float = maxf(1.0, ui_scale)
-	_wager_controls.add_theme_constant_override("separation", int(roundf(8.0 / scale_factor)))
+	_wager_controls.add_theme_constant_override("separation", 8)
 	if bet_slider != null:
-		bet_slider.custom_minimum_size = Vector2(0.0, 24.0 / scale_factor)
+		bet_slider.custom_minimum_size = Vector2(0.0, 24.0)
 		bet_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if bet_value != null:
 		if bet_value.get_theme_font("font") != VisualTypeSystem.FONT_HEADING:
 			VisualTypeSystem.set_gameplay_heading(bet_value)
-		var amount_font_size: int = int(roundf(24.0 / scale_factor))
+		var amount_font_size: int = 24
 		# Reserve the widest selectable amount so changing one bucket to two
 		# buckets does not move the shop or neighboring hit targets.
 		var amount_font: Font = VisualTypeSystem.FONT_HEADING
@@ -2260,15 +2212,15 @@ func _apply_dock_wager_column_metrics(ui_scale: float) -> void:
 			amount_font.get_string_size(BloodBuckets.format_amount(int(Economy.blood_buckets)), HORIZONTAL_ALIGNMENT_LEFT, -1.0, amount_font_size).x,
 			amount_font.get_string_size("1 bucket", HORIZONTAL_ALIGNMENT_LEFT, -1.0, amount_font_size).x
 		)
-		bet_value.custom_minimum_size = Vector2(ceilf(amount_width) + 8.0, 42.0 / scale_factor)
+		bet_value.custom_minimum_size = Vector2(ceilf(amount_width) + 8.0, 42.0)
 		bet_value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bet_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_set_wager_font_size(bet_value, int(roundf(24.0 / scale_factor)))
+		_set_wager_font_size(bet_value, 24)
 	if all_in_button != null:
-		all_in_button.custom_minimum_size = Vector2(70.0 / scale_factor, 38.0 / scale_factor)
+		all_in_button.custom_minimum_size = Vector2(70.0, 38.0)
 		all_in_button.size_flags_horizontal = Control.SIZE_FILL
 		all_in_button.icon = null
-		_set_wager_font_size(all_in_button, int(roundf(15.0 / scale_factor)))
+		_set_wager_font_size(all_in_button, 15)
 	if _wager_label != null:
 		_wager_label.text = "WAGER"
 		if _wager_label.get_theme_font("font") != VisualTypeSystem.FONT_HEADING:
@@ -2276,14 +2228,13 @@ func _apply_dock_wager_column_metrics(ui_scale: float) -> void:
 		_wager_label.visible = true
 		_wager_label.custom_minimum_size = Vector2.ZERO
 		_wager_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		_set_wager_font_size(_wager_label, int(roundf(21.0 / scale_factor)))
+		_set_wager_font_size(_wager_label, 21)
 	var reserve: Label = _wager_control_row.get_node("WagerReserve") as Label
-	_set_wager_font_size(reserve, int(roundf(15.0 / scale_factor)))
+	_set_wager_font_size(reserve, 15)
 	for button_name: String in ["WagerDecrease", "WagerIncrease"]:
 		var stepper: Button = _wager_value_row.get_node(button_name) as Button
-		stepper.custom_minimum_size = Vector2(34.0, 38.0) / scale_factor
-		_set_wager_font_size(stepper, int(roundf(24.0 / scale_factor)))
-	_wager_controls.set_meta("dock_wager_metrics_scale", ui_scale)
+		stepper.custom_minimum_size = Vector2(34.0, 38.0)
+		_set_wager_font_size(stepper, 24)
 
 func _set_wager_font_size(control: Control, font_size: int) -> void:
 	if control.get_theme_font_size("font_size") != font_size:
@@ -2444,7 +2395,6 @@ func _refresh_dock_territories() -> bool:
 		return false
 	var viewport_size: Vector2 = get_meta("effective_ui_size", get_viewport_rect().size) as Vector2
 	var inset: float = Composition.DOCK_MARGIN
-	var ui_scale: float = float(get_meta("persisted_ui_scale", 1.0))
 	var storage_rect: Rect2 = bottom_storage.get_global_rect()
 	if storage_rect.size.y <= 1.0:
 		return false
@@ -2469,14 +2419,13 @@ func _refresh_dock_territories() -> bool:
 			maxf(1.0, band.size.x),
 			float(bottom_storage.get_meta("dock_width", band.size.x)),
 			_dock_wager_content_min(),
-			_dock_wager_insets(),
-			ui_scale
+			_dock_wager_insets()
 		)
 	# The territories sit at the shop's authored right edge inside the group, so an
 	# inflated child minimum shifts them instead of being overlapped. Widths come
 	# from the allocation, so the bay is its authored fit, not a leftover remainder.
 	var shop_span: float = float(bottom_storage.get_meta("dock_width", storage_rect.size.x))
-	var plan: Dictionary = Composition.dock_plan(band, allocation, storage_rect.position.x + shop_span, ui_scale)
+	var plan: Dictionary = Composition.dock_plan(band, allocation, storage_rect.position.x + shop_span)
 	if not bool(plan.get("ok", false)):
 		_lower_dock_layer.set_meta("composition_ready", false)
 		_lower_dock_layer.visible = false
@@ -2492,16 +2441,16 @@ func _refresh_dock_territories() -> bool:
 	_apply_dock_territory_material(_wager_territory, false)
 	_apply_dock_territory_material(_start_plaque, true)
 	_apply_dock_ledge(band)
-	# Match the bay's padding box to the planned physical padding so the realised
-	# bay footprint equals the planned one at every UI scale.
+	# Match the bay's padding box to the planned padding so the realised bay
+	# footprint equals the planned one.
 	var bay_padding: MarginContainer = _start_plaque.get_node_or_null("Padding") as MarginContainer
 	if bay_padding != null:
-		var bay_inset: int = int(Composition.physical_px(Composition.PLAQUE_BAY_PADDING_PHYSICAL, ui_scale, Composition.PLAQUE_BAY_PADDING_MIN_LOGICAL))
+		var bay_inset: int = int(Composition.PLAQUE_BAY_PADDING_PHYSICAL)
 		for side_name: String in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
 			if bay_padding.get_theme_constant(side_name) != bay_inset:
 				bay_padding.add_theme_constant_override(side_name, bay_inset)
 	_place_dock_controls(wager_rect, plaque_rect)
-	_apply_dock_wager_quote(wager_rect, ui_scale)
+	_apply_dock_wager_quote(wager_rect)
 	_lower_dock_layer.set_meta("composition_ready", true)
 	# Settled-bounds alignment: measure the live PlayerGrid against the live bench
 	# row and shift the row by the residual, so an asymmetric realised rail (not a
@@ -2521,7 +2470,6 @@ func _refresh_dock_territories() -> bool:
 ## a capture fixture can assert the live layout instead of re-deriving it.
 func _publish_composition_meta(active: bool, reason: String, plan: Dictionary, band: Rect2) -> void:
 	var bottom_storage: Control = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as Control
-	var ui_scale: float = float(get_meta("persisted_ui_scale", 1.0))
 	var logical_size: Vector2 = get_meta("effective_ui_size", get_viewport_rect().size) as Vector2
 	var board_column: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn") as Control
 	var bench_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BenchArea") as Control
@@ -2530,9 +2478,8 @@ func _publish_composition_meta(active: bool, reason: String, plan: Dictionary, b
 		"active": active,
 		"reason": reason,
 		"tier": "composed_dock" if active else "legacy_stack",
-		"ui_scale": ui_scale,
 		"logical_size": logical_size,
-		"physical_size": logical_size * maxf(1.0, ui_scale),
+		"physical_size": logical_size,
 		"band": band,
 		"shop_rect": bottom_storage.get_global_rect() if bottom_storage != null else Rect2(),
 		"wager_rect": plan.get("wager", Rect2()),
@@ -2543,10 +2490,10 @@ func _publish_composition_meta(active: bool, reason: String, plan: Dictionary, b
 		"shop_grid_rect": shop_grid.get_global_rect() if shop_grid != null else Rect2(),
 		"bench_grid_rect": bench_grid.get_global_rect() if bench_grid != null else Rect2(),
 		"bench_slots": int(bench_grid.get_meta("composed_bench_slots", 0)) if bench_grid != null else 0,
-		"rail_physical": (left_rail.size.x if left_rail != null else 0.0) * maxf(1.0, ui_scale),
+		"rail_physical": left_rail.size.x if left_rail != null else 0.0,
 		"rail_physical_target": Composition.SIDE_RAIL_PHYSICAL,
-		"plaque_physical": (plan.get("plaque", Rect2()) as Rect2).size * maxf(1.0, ui_scale),
-		"dock_bottom_gutter": Composition.dock_bottom_gutter(ui_scale),
+		"plaque_physical": (plan.get("plaque", Rect2()) as Rect2).size,
+		"dock_bottom_gutter": Composition.dock_bottom_gutter(),
 		"rail_width": left_rail.size.x if left_rail != null else 0.0,
 		"wager_content_min": _dock_wager_content_min(),
 	}
@@ -2558,12 +2505,12 @@ func _publish_composition_meta(active: bool, reason: String, plan: Dictionary, b
 ## The wager quote becomes the wager territory's own header: it keeps its full
 ## words but stops spanning the screen, and its text edge lands on the wager
 ## column instead of on the framebuffer edge.
-func _apply_dock_wager_quote(wager_rect: Rect2, ui_scale: float) -> void:
+func _apply_dock_wager_quote(wager_rect: Rect2) -> void:
 	if wager_summary == null:
 		return
 	# The quote is the wager column's own header now: bay width, centred, with
 	# the inset copy removed so it is not a second floating row.
-	var total_width: float = maxf(120.0, wager_rect.size.x - Composition.physical_px(16.0, ui_scale, 8.0))
+	var total_width: float = maxf(120.0, wager_rect.size.x - 16.0)
 	if wager_summary.size_flags_horizontal != Control.SIZE_FILL:
 		wager_summary.size_flags_horizontal = Control.SIZE_FILL
 	# The whole quote stays visible by wrapping inside its own territory instead
@@ -2655,9 +2602,8 @@ func _apply_dock_wager_outcomes() -> void:
 		_wager_outcomes.visible = false
 		return
 	_wager_outcomes.visible = true
-	var scale_factor: float = maxf(1.0, float(get_meta("persisted_ui_scale", 1.0)))
-	var caption_size: int = int(roundf(16.0 / scale_factor))
-	var value_size: int = int(roundf(19.0 / scale_factor))
+	var caption_size: int = 16
+	var value_size: int = 19
 	_write_wager_outcome_row(
 		"WagerWinRow",
 		"WIN  %d-%d%%" % [int(data.get("win_low", 0)), int(data.get("win_high", 0))],
@@ -2748,7 +2694,7 @@ func _place_dock_controls(wager_rect: Rect2, plaque_rect: Rect2) -> void:
 		if _wager_row != null and is_instance_valid(_wager_row):
 			_wager_row.visible = false
 			_wager_row.custom_minimum_size = Vector2.ZERO
-		_apply_dock_wager_column_metrics(float(get_meta("persisted_ui_scale", 1.0)))
+		_apply_dock_wager_column_metrics()
 		refresh_dock_wager_presentation()
 		_wager_controls.set_meta("dock_territory", "wager")
 		_wager_controls.set_meta("dock_rect", wager_rect)
@@ -2790,9 +2736,8 @@ func _place_dock_controls(wager_rect: Rect2, plaque_rect: Rect2) -> void:
 		if int(continue_button.vertical_icon_alignment) != int(VERTICAL_ALIGNMENT_TOP):
 			continue_button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		# Real bounded icon size through the supported Button theme constant, so the
-		# emblem renders at 56 physical px rather than the helper's fixed logical
-		# size.
-		var emblem_box: int = int(roundf(Composition.physical_px(56.0, float(get_meta("persisted_ui_scale", 1.0)), 30.0)))
+		# emblem renders at its authored 56px rather than the helper's default size.
+		var emblem_box: int = 56
 		if continue_button.get_theme_constant("icon_max_width") != emblem_box:
 			continue_button.add_theme_constant_override("icon_max_width", emblem_box)
 		if not continue_button.expand_icon:
@@ -3096,15 +3041,14 @@ func _run_queued_dock_reassert() -> void:
 	# Re-entrancy guard: writes made by this pass must not queue the next pass.
 	_dock_reassert_running = true
 	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
-	var ui_scale: float = float(get_meta("persisted_ui_scale", 1.0))
-	_apply_dock_wager_column_metrics(ui_scale)
+	_apply_dock_wager_column_metrics()
 	if bottom_storage != null and bottom_storage.custom_minimum_size.y > 1.0:
-		_apply_dock_shop(bottom_storage.custom_minimum_size.y, ui_scale)
+		_apply_dock_shop(bottom_storage.custom_minimum_size.y)
 	_refresh_dock_territories()
 	_dock_reassert_running = false
 
 func _update_external_backplates() -> void:
-	var tight_scale_layout: bool = bool(get_meta("tight_scale_layout", false))
+	var tight_layout: bool = bool(get_meta("tight_layout", false))
 	var compact_layout: bool = bool(get_meta("compact_layout", false))
 	# The composed dock replaces two full-width strips. The bench now shares the
 	# field's band and the commit rail is the primary plaque, so their separate
@@ -3146,7 +3090,7 @@ func _update_external_backplates() -> void:
 		if not plate.visible:
 			continue
 		var authored_pad: float = float(plate.get_meta("pad", 0.0))
-		var pad: float = minf(authored_pad, 2.0) if tight_scale_layout else minf(authored_pad, 3.0) if compact_layout else authored_pad
+		var pad: float = minf(authored_pad, 2.0) if tight_layout else minf(authored_pad, 3.0) if compact_layout else authored_pad
 		if plate_name == "GothicCommitRailPlate":
 			var summary: Control = get_node_or_null("MarginContainer/VBoxContainer/WagerSummary") as Control
 			if summary != null and summary.is_visible_in_tree() and target.is_visible_in_tree():

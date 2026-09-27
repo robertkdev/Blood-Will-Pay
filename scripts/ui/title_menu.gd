@@ -84,7 +84,6 @@ var _logo_tween: Tween = null
 var _poster_border: TextureRect = null
 var _resize_refresh_queued: bool = false
 var _rail_fit_queued: bool = false
-var _scaled_focus_target_name: String = ""
 var _runtime_settings_mode: bool = false
 var _runtime_return_button: Button = null
 var _settings_pressed_surface_active: bool = false
@@ -97,7 +96,6 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_process(true)
 	UserSettingsScript.initialize(get_window())
-	set_meta("effective_ui_scale", _actual_ui_scale())
 	set_meta("effective_layout_size", _effective_layout_size())
 	set_meta("command_chrome_settled_alpha", COMMAND_CHROME_SETTLED_ALPHA)
 	set_meta("command_rail_minimum_contrast_ratio", COMMAND_RAIL_MIN_CONTRAST_RATIO)
@@ -785,8 +783,8 @@ func _ensure_content_panel() -> void:
 	_content_panel.z_index = 6
 	_content_panel.anchor_left = 0.35 if short_compact else 0.38
 	_content_panel.anchor_top = 0.025 if short_compact else 0.075
-	# Keep a physical right-side safety gutter at maximum UI scale so the full
-	# settings dossier shell remains inside the framebuffer in every input state.
+	# Keep a right-side safety gutter so the full settings dossier shell remains
+	# inside the framebuffer in every input state.
 	_content_panel.anchor_right = 0.94 if short_compact else 0.965
 	_content_panel.anchor_bottom = 0.975 if short_compact else 0.92
 	_content_panel.offset_left = 0.0
@@ -1078,8 +1076,7 @@ func _render_active_section() -> void:
 func _sync_settings_press_witness() -> void:
 	if _settings_press_witness == null or not is_instance_valid(_settings_press_witness):
 		return
-	var option: OptionButton = _content_body.find_child("UIScaleOption", true, false) as OptionButton if _content_body != null and is_instance_valid(_content_body) else null
-	var pressed_state: bool = _active_section == SECTION_SETTINGS and option != null and option.button_pressed
+	var pressed_state: bool = _active_section == SECTION_SETTINGS and _settings_control_held()
 	if pressed_state != _settings_pressed_surface_active:
 		_settings_pressed_surface_active = pressed_state
 		# Do not turn a local selector press into a whole-shell state. The rail,
@@ -1102,6 +1099,17 @@ func _sync_settings_press_witness() -> void:
 	if _content_panel != null and is_instance_valid(_content_panel):
 		_content_panel.set_meta("settings_press_shell_active", false)
 		_content_panel.set_meta("settings_interaction_scope", "selector_local_only")
+
+## True while any control in the settings record is held, so the shell marker can
+## escalate without turning a local press into a whole-shell state.
+func _settings_control_held() -> bool:
+	if _content_body == null or not is_instance_valid(_content_body) or not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return false
+	for node: Node in _content_body.find_children("*", "BaseButton", true, false):
+		var button: BaseButton = node as BaseButton
+		if button != null and button.is_hovered():
+			return true
+	return false
 
 func ensure_settings_surface_visible() -> void:
 	if _active_section != SECTION_SETTINGS:
@@ -1199,7 +1207,7 @@ func _add_home_route_manifest() -> void:
 	_add_manifest_route(manifest, "01", "FIELD MANUAL", "The opening fight, shop, bench, combines, wagers, and contracts.", SECTION_HOW_TO_PLAY)
 	_add_manifest_route(manifest, "02", "UNITS", "The current roster record and its combat identities.", SECTION_UNITS)
 	_add_manifest_route(manifest, "03", "COMBAT SIGNS", "The terms needed to read a board before it breaks.", SECTION_RGA)
-	_add_manifest_route(manifest, "04", "SETTINGS", "Readable scale, motion, sound, display, and controls.", SECTION_SETTINGS)
+	_add_manifest_route(manifest, "04", "SETTINGS", "Readability, motion, sound, display, and controls.", SECTION_SETTINGS)
 
 func _add_manifest_route(parent: VBoxContainer, number: String, title: String, body: String, section: String) -> void:
 	var route: Button = Button.new()
@@ -1209,18 +1217,10 @@ func _add_manifest_route(parent: VBoxContainer, number: String, title: String, b
 	route.tooltip_text = "Open %s" % title.to_lower()
 	route.focus_mode = Control.FOCUS_ALL
 	route.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	var scale_factor: float = _actual_ui_scale()
-	var route_height: float = 104.0
-	if _is_short_compact_layout():
-		route_height = 116.0
-	elif _is_compact_layout():
-		route_height = 104.0
-	if scale_factor >= 1.49:
-		route_height = maxf(route_height, 116.0)
+	var route_height: float = 116.0 if _is_short_compact_layout() else 104.0
 	route.custom_minimum_size = Vector2(0.0, route_height)
 	route.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	route.clip_contents = true
-	route.set_meta("layout_ui_scale", scale_factor)
 	route.set_meta("record_serial", number)
 	route.set_meta("record_section", section)
 	_style_manifest_route(route)
@@ -1367,16 +1367,16 @@ func _render_settings() -> void:
 	_binding_status = null
 	_set_content_header("Settings", "Local runtime controls, readable typography, high contrast, reduced motion, and keyboard bindings.")
 	if _search_field != null:
-		_search_field.placeholder_text = "Search settings: readability, contrast, scale, motion, keys..."
+		_search_field.placeholder_text = "Search settings: readability, contrast, motion, sound, display, keys..."
 	var added: int = 0
 	_add_settings_docket()
 	_add_accessibility_priority_banner()
-	added += _add_ui_scale_setting()
 	added += _add_motion_setting()
 	added += _add_readability_setting()
 	added += _add_volume_setting()
 	added += _add_fullscreen_setting()
 	added += _add_input_settings()
+	added += _add_settings_press_witness()
 	if added == 0:
 		_add_empty_state("No settings match this search. Clear the search to see every available setting.", true)
 	else:
@@ -1385,7 +1385,7 @@ func _render_settings() -> void:
 		_content_body.add_child(bottom_space)
 
 func _add_accessibility_priority_banner() -> void:
-	if not _matches_query("accessibility readable ui scale reduced motion comfort display"):
+	if not _matches_query("accessibility readable readability contrast reduced motion comfort display"):
 		return
 	var banner: PanelContainer = _make_card_container("AccessibilityPriority", Color(0.11, 0.018, 0.026, 0.96), Color(0.88, 0.10, 0.12, 0.98), 2)
 	banner.custom_minimum_size.y = 38.0 if _is_short_compact_layout() else 48.0
@@ -1400,11 +1400,11 @@ func _add_accessibility_priority_banner() -> void:
 	VisualTypeSystem.set_utility_bold(heading)
 	copy.add_child(heading)
 	if not _is_short_compact_layout():
-		copy.add_child(_make_label("Scale and motion controls stay first so the command record can be made usable before anything else.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
+		copy.add_child(_make_label("Readability and motion controls stay first, so the command record reads in the authored fullscreen size before anything else.", 20 if not _is_compact_layout() else 18, COLOR_MUTED, true))
 
 func _add_settings_docket() -> void:
-	# At enlarged UI scale the dossier plate consumes the first screenful while
-	# adding no control. Keep scale and Reduced Motion immediately reachable.
+	# On short fullscreen bands the dossier plate consumes the first screenful
+	# while adding no control. Keep Reduced Motion immediately reachable.
 	if _is_short_compact_layout():
 		return
 	var docket: PanelContainer = _make_field_order_container("SettingsDocket")
@@ -1657,42 +1657,11 @@ func _add_fullscreen_setting() -> int:
 	check.toggled.connect(_on_fullscreen_toggled)
 	return 1
 
-func _add_ui_scale_setting() -> int:
-	if not _matches_query("ui scale interface size text accessibility readable display"):
+## The settings record is authored for one fullscreen UI size, so it carries no
+## interface-scale control. The shell marker stays as the stable record witness.
+func _add_settings_press_witness() -> int:
+	if not _matches_query("shell record input state"):
 		return 0
-	var card: PanelContainer = _make_card_container("UIScaleSetting", COLOR_PANEL_SOFT, Color(0.42, 0.31, 0.24, 0.88), 1)
-	card.set_meta("accessibility_priority", 1)
-	_content_body.add_child(card)
-	var margin: MarginContainer = card.get_node("Margin") as MarginContainer
-	var stack: VBoxContainer = VBoxContainer.new()
-	stack.add_theme_constant_override("separation", 4 if _is_short_compact_layout() else 8)
-	margin.add_child(stack)
-	var scale_heading: Label = _make_label("Readable UI Scale", 20 if _is_short_compact_layout() else 22, COLOR_TEXT, false)
-	scale_heading.name = "UIScaleHeading"
-	stack.add_child(scale_heading)
-	var option: OptionButton = OptionButton.new()
-	option.name = "UIScaleOption"
-	option.focus_mode = Control.FOCUS_ALL
-	option.custom_minimum_size = Vector2(220.0, 38.0 if _is_short_compact_layout() else 42.0)
-	var scale_values: Array[float] = [1.0, 1.25, 1.5]
-	var current_scale: float = UserSettingsScript.get_ui_scale()
-	for index: int in range(scale_values.size()):
-		var scale_value: float = scale_values[index]
-		var descriptor: String = "STANDARD"
-		if is_equal_approx(scale_value, 1.25):
-			descriptor = "LARGE"
-		elif is_equal_approx(scale_value, 1.5):
-			descriptor = "MAXIMUM"
-		option.add_item("%d%% // %s" % [int(roundf(scale_value * 100.0)), descriptor], index)
-		option.set_item_metadata(index, scale_value)
-		if is_equal_approx(scale_value, current_scale):
-			option.select(index)
-	_style_selector(option)
-	var popup: PopupMenu = option.get_popup()
-	popup.add_theme_stylebox_override("panel", HardcoreUIAssets.popup_menu_style())
-	popup.add_theme_stylebox_override("hover", HardcoreUIAssets.popup_highlight_style())
-	option.item_selected.connect(_on_ui_scale_selected.bind(option))
-	stack.add_child(option)
 	var press_witness_copy: String = "SHELL LOCKED // RECORD PERSISTS" if _is_short_compact_layout() else "SHELL LOCKED // RECORD PERSISTS THROUGH INPUT"
 	var press_witness: Label = _make_label(press_witness_copy, 17, Color(0.78, 0.70, 0.58, 1.0), false)
 	press_witness.name = "SettingsPressWitness"
@@ -1711,16 +1680,12 @@ func _add_ui_scale_setting() -> int:
 	press_witness.add_theme_stylebox_override("normal", press_witness_style)
 	press_witness.visible = true
 	press_witness.set_meta("interaction_state", "pressed_shell_witness")
-	stack.add_child(press_witness)
+	_content_body.add_child(press_witness)
 	_settings_press_witness = press_witness
-	var guidance_text: String = "Enlarges interface text and controls." if _is_short_compact_layout() else "Enlarges interface text and controls. Smaller windows reflow this command record into a scrollable compact layout."
-	var scale_guidance: Label = _make_label(guidance_text, 16 if _is_short_compact_layout() else (18 if _is_compact_layout() else 20), COLOR_MUTED, true)
-	scale_guidance.name = "UIScaleGuidance"
-	stack.add_child(scale_guidance)
 	return 1
 
 func _add_readability_setting() -> int:
-	if not _matches_query("readability readable typography utility text contrast high contrast accessibility scale"):
+	if not _matches_query("readability readable typography utility text contrast high contrast accessibility display"):
 		return 0
 	var card: PanelContainer = _make_card_container("ReadabilitySetting", COLOR_PANEL_SOFT, Color(0.72, 0.58, 0.36, 0.94), 1)
 	_content_body.add_child(card)
@@ -1739,7 +1704,7 @@ func _add_readability_setting() -> int:
 	status.set_meta("utility_type_floor_px", 15)
 	status.set_meta("functional_type_floor_px", 16)
 	heading.add_child(status)
-	var guidance: Label = _make_label("This command console uses a readable dossier face with high-contrast paper and ink. Use Readable UI Scale above when you need larger controls.", 18 if _is_short_compact_layout() else 20, Color(0.86, 0.82, 0.74, 1.0), true)
+	var guidance: Label = _make_label("This command console uses a readable dossier face with high-contrast paper and ink at the authored fullscreen size.", 18 if _is_short_compact_layout() else 20, Color(0.86, 0.82, 0.74, 1.0), true)
 	guidance.name = "ReadabilityGuidance"
 	stack.add_child(guidance)
 	return 1
@@ -2007,30 +1972,17 @@ func _is_compact_layout() -> bool:
 	return effective_size.x < 1360.0 or effective_size.y < 900.0
 
 func _is_short_compact_layout() -> bool:
-	var ui_scale: float = _actual_ui_scale()
 	var effective_height: float = _effective_layout_size().y
-	var compact_short: bool = _is_compact_layout() and effective_height < 760.0
-	var maximum_scale_short: bool = ui_scale >= 1.49 and effective_height < 800.0
-	return compact_short or maximum_scale_short
+	return _is_compact_layout() and effective_height < 760.0
 
 func _is_extreme_compact_layout() -> bool:
 	var effective_size: Vector2 = _effective_layout_size()
 	return effective_size.x < 760.0 or effective_size.y < 440.0
 
-func _actual_ui_scale() -> float:
-	var persisted_scale: float = clampf(UserSettingsScript.get_ui_scale(), 1.0, 1.5)
-	var window: Window = get_window()
-	var window_scale: float = window.content_scale_factor if window != null else 1.0
-	return maxf(persisted_scale, clampf(window_scale, 1.0, 1.5))
-
 func _effective_layout_size() -> Vector2:
-	var physical_size: Vector2 = get_viewport_rect().size
-	var window: Window = get_window()
-	# Window size stays physical while a persisted content scale can make the
-	# viewport's logical dimensions an unreliable breakpoint source.
-	if window != null and window.size.x > 0 and window.size.y > 0:
-		physical_size = Vector2(window.size)
-	return physical_size / _actual_ui_scale()
+	# The viewport is the authored fullscreen size: there is no persisted UI
+	# scale left to divide out of the breakpoint source.
+	return get_viewport_rect().size
 
 func _update_nav_state() -> void:
 	for nav_button: Button in _nav_buttons:
@@ -2166,54 +2118,6 @@ func _on_slider_focus_changed(focused: bool, slider: HSlider) -> void:
 	slider.add_theme_stylebox_override("slider", track)
 	slider.add_theme_icon_override("grabber", HardcoreUIAssets.slider_icon("focus" if focused else "normal"))
 	slider.set_meta("focused_state_visible", focused)
-
-func _style_selector(option: OptionButton) -> void:
-	if option == null:
-		return
-	option.add_theme_font_size_override("font_size", 20)
-	option.add_theme_color_override("font_color", COLOR_TEXT)
-	option.add_theme_color_override("font_hover_color", Color(1.0, 0.90, 0.70, 1.0))
-	option.add_theme_color_override("font_pressed_color", Color(1.0, 0.78, 0.58, 1.0))
-	option.add_theme_color_override("font_focus_color", Color(0.84, 0.95, 1.0, 1.0))
-	option.add_theme_color_override("font_disabled_color", Color(0.62, 0.60, 0.56, 1.0))
-	VisualTypeSystem.set_action(option)
-	option.add_theme_stylebox_override("normal", _selector_box(Color(0.035, 0.029, 0.034, 0.98), Color(0.69, 0.61, 0.49, 0.92), 2))
-	option.add_theme_stylebox_override("hover", _selector_box(Color(0.075, 0.050, 0.050, 1.0), Color(0.94, 0.72, 0.39, 1.0), 3))
-	# Pressed remains a local control state; its brighter fill must never be
-	# mistaken for a menu fade or selector-only composite.
-	option.add_theme_stylebox_override("pressed", _selector_box(Color(0.27, 0.055, 0.065, 1.0), Color(1.0, 0.22, 0.20, 1.0), 8))
-	option.add_theme_stylebox_override("focus", _selector_box(Color(0.026, 0.072, 0.098, 1.0), COLOR_SIGNAL_BLUE, 10))
-	var disabled_style: StyleBoxFlat = _selector_box(Color(0.025, 0.023, 0.026, 0.96), Color(0.36, 0.34, 0.31, 0.94), 11)
-	disabled_style.border_width_right = 4
-	disabled_style.border_width_bottom = 5
-	option.add_theme_stylebox_override("disabled", disabled_style)
-	option.set_meta("authored_interaction_states", PackedStringArray(["normal", "hover", "pressed", "focus", "disabled"]))
-	option.set_meta("focus_visual_cue", "signal_blue_full_frame")
-	option.set_meta("pressed_visual_cue", "blood_red_fill_and_full_settings_shell")
-	option.set_meta("disabled_non_color_cue", "blocked_left_bar_and_bottom_cut")
-	option.set_meta("pressed_state_preserves_settings_shell", true)
-	if not option.is_connected("button_down", Callable(self, "_on_settings_selector_pressed")):
-		option.button_down.connect(_on_settings_selector_pressed)
-
-func _on_settings_selector_pressed() -> void:
-	# OptionButton's local pressed treatment must never become a selector-only
-	# composite. Reassert the surrounding command record before the framebuffer
-	# can settle, while keeping the red pressed style local to the selector.
-	ensure_settings_surface_visible()
-
-func _selector_box(background_color: Color, border_color: Color, left_width: int) -> StyleBoxFlat:
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = background_color
-	style.border_color = border_color
-	style.border_width_left = left_width
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.content_margin_left = 16.0
-	style.content_margin_right = 18.0
-	style.content_margin_top = 9.0
-	style.content_margin_bottom = 9.0
-	return style
 
 func _style_checkbox(check: CheckBox) -> void:
 	if check == null:
@@ -2376,22 +2280,8 @@ func _clear_search() -> void:
 	_render_active_section()
 	_search_field.grab_focus()
 
-func _on_ui_scale_selected(index: int, option: OptionButton) -> void:
-	if option == null or index < 0 or index >= option.item_count:
-		return
-	# The scale change rebuilds the active Settings controls. Remember the
-	# intentional keyboard target before the focused selector is queued for
-	# deletion so focus cannot fall through to the full-screen title chrome.
-	_scaled_focus_target_name = String(option.name)
-	var scale_value: float = float(option.get_item_metadata(index))
-	var save_error: Error = UserSettingsScript.set_ui_scale(scale_value, get_window())
-	if save_error != OK:
-		push_warning("TitleMenu: failed to save UI scale error=%d" % int(save_error))
-	call_deferred("_refresh_scaled_layout")
-
-func _refresh_scaled_layout() -> void:
+func _refresh_layout() -> void:
 	_resize_refresh_queued = false
-	set_meta("effective_ui_scale", _actual_ui_scale())
 	set_meta("effective_layout_size", _effective_layout_size())
 	_apply_gothic_layout()
 	_build_navigation()
@@ -2403,28 +2293,12 @@ func _refresh_scaled_layout() -> void:
 		_apply_runtime_settings_chrome()
 		ensure_settings_surface_visible()
 	_queue_title_panel_fit()
-	if _scaled_focus_target_name != "":
-		call_deferred("_restore_scaled_settings_focus")
-
-func _restore_scaled_settings_focus() -> void:
-	if _scaled_focus_target_name == "" or _active_section != SECTION_SETTINGS:
-		return
-	var target: Control = find_child(_scaled_focus_target_name, true, false) as Control
-	if target == null or not is_instance_valid(target) or not target.is_visible_in_tree():
-		return
-	if target.focus_mode == Control.FOCUS_NONE:
-		return
-	target.grab_focus()
-	target.set_meta("scale_rebuild_focus_target", true)
-	if _content_scroll != null and is_instance_valid(_content_scroll):
-		_content_scroll.ensure_control_visible(target)
-	_scaled_focus_target_name = ""
 
 func _on_layout_resized() -> void:
 	if _resize_refresh_queued or not is_inside_tree():
 		return
 	_resize_refresh_queued = true
-	call_deferred("_refresh_scaled_layout")
+	call_deferred("_refresh_layout")
 
 func _begin_binding_capture(action: StringName) -> void:
 	_listening_action = action

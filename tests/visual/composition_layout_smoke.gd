@@ -56,10 +56,6 @@ func _run() -> void:
 	_remove_test_settings()
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	var scale_error: Error = UserSettingsScript.set_ui_scale(1.0, window)
-	_expect(scale_error == OK, "failed to persist the 100 percent dock fixture")
-	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
-	UserSettingsScript.initialize(window)
 	if GameState.has_method("reset_run"):
 		GameState.reset_run()
 	if GameState.has_method("set_chapter_and_stage"):
@@ -92,43 +88,27 @@ func _run() -> void:
 	_assert_lower_dock()
 	_assert_dock_controls()
 	_assert_no_redundant_strips()
-	await _assert_layout_stability("100")
-	await _assert_scale_matrix()
+	await _assert_layout_stability("1080p")
+	_assert_composed_dock_geometry()
 	_finish()
 
-## Exercises the composed tier at the three shipping UI scales against the same
-## containment/adjacency invariants. The viewport is the logical size for each
-## scale, so the physical frame stays 1920x1080 in every case.
-func _assert_scale_matrix() -> void:
-	var window: Window = get_window()
-	var original_scale: float = UserSettingsScript.get_ui_scale()
-	for entry: Array in [[1920, 1080, 1.0], [1536, 864, 1.25], [1280, 720, 1.5]]:
-		var logical: Vector2i = Vector2i(int(entry[0]), int(entry[1]))
-		var ui_scale: float = float(entry[2])
-		var label: String = "scale %d" % roundi(ui_scale * 100.0)
-		UserSettingsScript.set_ui_scale(ui_scale, window)
-		_viewport.size = logical
-		await _settle_composed(2)
-		_assert_composed_invariants(label)
-		var rail_physical: float = _rail_width_now() * ui_scale
-		_expect(absf(rail_physical - 308.0) <= 8.0, "%s rail is %.1f physical, not the 308 contract" % [label, rail_physical])
-		_expect(bool(_view.get_meta("full_hd_dock", false)), "%s did not select the composed tier" % label)
-		# The lower group's adjacency and right-edge alignment are checked per
-		# scale, not only through the aggregate dock bounding box.
-		var scale_viewport: Rect2 = _viewport.get_visible_rect()
-		var wager_rect: Rect2 = _rect_of("LowerDockComposition/WagerTerritory")
-		var bay_rect: Rect2 = _rect_of("LowerDockComposition/StartBattlePlaque")
-		_expect(wager_rect.size.x > 1.0 and bay_rect.size.x > 1.0, "%s wager or action territory is not laid out" % label)
-		_expect(bay_rect.position.x >= wager_rect.end.x - 1.0, "%s action bay is not adjacent to the wager column" % label)
-		_expect(bay_rect.end.x <= scale_viewport.end.x + 1.0, "%s action bay escapes the framebuffer right" % label)
-		_expect(absf(bay_rect.end.x - (scale_viewport.end.x - Composition.DOCK_MARGIN)) <= 2.0, "%s lower group does not end at the right inset: %.1f" % [label, bay_rect.end.x])
-		# The plaque's own content and the countdown readout are measured at every
-		# scale: those are the tightest logical tiers for both.
-		_expect_plaque_content_fit(label)
-		_expect_countdown_readout_fit(label)
-	UserSettingsScript.set_ui_scale(original_scale, window)
-	_viewport.size = VIEWPORT_SIZE
-	await _settle_composed(1)
+## The composed dock's own containment and adjacency invariants at the authored
+## 1920x1080 fullscreen composition.
+func _assert_composed_dock_geometry() -> void:
+	var label: String = "1080p"
+	_assert_composed_invariants(label)
+	var rail_width: float = _rail_width_now()
+	_expect(absf(rail_width - 308.0) <= 8.0, "%s rail is %.1f, not the 308 contract" % [label, rail_width])
+	_expect(bool(_view.get_meta("full_hd_dock", false)), "%s did not select the composed tier" % label)
+	var scale_viewport: Rect2 = _viewport.get_visible_rect()
+	var wager_rect: Rect2 = _rect_of("LowerDockComposition/WagerTerritory")
+	var bay_rect: Rect2 = _rect_of("LowerDockComposition/StartBattlePlaque")
+	_expect(wager_rect.size.x > 1.0 and bay_rect.size.x > 1.0, "%s wager or action territory is not laid out" % label)
+	_expect(bay_rect.position.x >= wager_rect.end.x - 1.0, "%s action bay is not adjacent to the wager column" % label)
+	_expect(bay_rect.end.x <= scale_viewport.end.x + 1.0, "%s action bay escapes the framebuffer right" % label)
+	_expect(absf(bay_rect.end.x - (scale_viewport.end.x - Composition.DOCK_MARGIN)) <= 2.0, "%s lower group does not end at the right inset: %.1f" % [label, bay_rect.end.x])
+	_expect_plaque_content_fit(label)
+	_expect_countdown_readout_fit(label)
 
 ## Focused stability coverage: the same inputs must settle to the same geometry,
 ## including with the bench at its real capacity, because repeated passes and a
@@ -157,10 +137,9 @@ func _assert_composed_invariants(context: String) -> void:
 	var bench_rect: Rect2 = _rect_of(BENCH_GRID_PATH)
 	var dock_rect: Rect2 = _rect_of(DOCK_PATH)
 	var right_rail: Rect2 = _rect_of(RAIL_RIGHT_PATH)
-	var scale: float = maxf(1.0, float(_view.get_meta("persisted_ui_scale", 1.0)))
 	_expect(column_rect.size.x > 1.0 and grid_rect.size.x > 1.0 and bench_rect.size.x > 1.0, "%s composed surfaces not laid out" % context)
-	var centre_delta_physical: float = absf(bench_rect.get_center().x - column_rect.get_center().x) * scale
-	_expect(centre_delta_physical <= 2.0, "%s bench centre is %.1f physical px from the board column centre" % [context, centre_delta_physical])
+	var centre_delta: float = absf(bench_rect.get_center().x - column_rect.get_center().x)
+	_expect(centre_delta <= 2.0, "%s bench centre is %.1f px from the board column centre" % [context, centre_delta])
 	_expect(bench_rect.size.x <= grid_rect.size.x * 1.03, "%s bench row is wider than the player grid" % context)
 	_expect(grid_rect.position.x >= column_rect.position.x - 1.0 and grid_rect.end.x <= column_rect.end.x + 1.0, "%s deployment grid escaped its column" % context)
 	_expect(right_rail.end.x <= viewport_rect.end.x + 1.0, "%s right rail escapes the framebuffer: %.1f" % [context, right_rail.end.x])
@@ -232,7 +211,6 @@ func _assert_tier_classification() -> void:
 	_expect(is_equal_approx(viewport_rect.size.x, 1920.0) and is_equal_approx(viewport_rect.size.y, 1080.0), "fixture viewport is not 1920x1080: %s" % str(viewport_rect))
 	_expect(bool(_view.get_meta("full_hd_dock", false)), "1920x1080 did not select the composed dock tier")
 	_expect(not bool(_view.get_meta("compact_layout", false)), "1920x1080 is still classified as the dense compact tier")
-	_expect(is_equal_approx(float(_view.get_meta("persisted_ui_scale", 0.0)), 1.0), "fixture did not consume 100 percent UI scale")
 
 func _assert_balanced_rails() -> void:
 	var viewport_rect: Rect2 = _viewport.get_visible_rect()
@@ -247,7 +225,7 @@ func _assert_balanced_rails() -> void:
 	_expect(absf(left_rail.size.x - right_rail.size.x) <= 2.0, "support rails are not matched: left=%.1f right=%.1f" % [left_rail.size.x, right_rail.size.x])
 	var rail_share: float = left_rail.size.x / viewport_rect.size.x
 	_expect(rail_share >= RAIL_SHARE_MIN and rail_share <= RAIL_SHARE_MAX, "rail share %.3f left the substantial 13-17 percent band" % rail_share)
-	var contract_rail: float = Composition.side_rail_width(1.0)
+	var contract_rail: float = Composition.side_rail_width()
 	_expect(left_rail.size.x >= contract_rail - 1.0, "left rail %.1f fell below the composed rail width %.1f" % [left_rail.size.x, contract_rail])
 	_expect(board_column.size.x >= left_rail.size.x + right_rail.size.x, "the field column is not the widest mass between the rails: field=%.1f rails=%.1f" % [board_column.size.x, left_rail.size.x + right_rail.size.x])
 	var left_gap: float = board_column.get_global_rect().position.x - left_rail.get_global_rect().end.x
@@ -302,7 +280,7 @@ func _assert_lower_dock() -> void:
 		return
 	var dock_height: float = dock.custom_minimum_size.y
 	_expect(dock_height >= DOCK_MIN_HEIGHT and dock_height <= DOCK_MAX_HEIGHT, "dock band %.1f is outside the 250-280 pixel budget" % dock_height)
-	var contract_dock: float = Composition.dock_height(viewport_rect.size, 1.0)
+	var contract_dock: float = Composition.dock_height(viewport_rect.size)
 	_expect(absf(dock_height - contract_dock) <= 2.0, "dock band %.1f does not match the composed dock height %.1f" % [dock_height, contract_dock])
 	var dock_rect: Rect2 = dock.get_global_rect()
 	_expect_inside(dock, viewport_rect, "shop territory")
@@ -609,15 +587,14 @@ func _expect_plaque_content_fit(context: String) -> void:
 	if button == null or not button.is_visible_in_tree():
 		_fail("%s primary action missing" % context)
 		return
-	var ui_scale: float = maxf(1.0, float(_view.get_meta("persisted_ui_scale", 1.0)))
 	var emblem: Texture2D = button.icon
 	_expect(emblem != null, "%s primary action plaque has no emblem" % context)
 	var emblem_box: float = float(button.get_theme_constant("icon_max_width"))
 	if emblem != null:
 		_expect(emblem_box > 0.0, "%s primary action emblem has no display bound" % context)
 		_expect(
-			emblem_box * ui_scale <= 68.0,
-			"%s primary action emblem box is %.1f physical, beyond the authored 56px mark" % [context, emblem_box * ui_scale]
+			emblem_box <= 68.0,
+			"%s primary action emblem box is %.1f, beyond the authored 56px mark" % [context, emblem_box]
 		)
 		_expect(
 			emblem_box <= button.size.y * 0.6,

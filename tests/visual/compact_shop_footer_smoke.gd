@@ -19,12 +19,11 @@ const DOCK_PATH: String = "MarginContainer/VBoxContainer/BottomStorageArea"
 const DOCK_LAYER_PATH: String = "LowerDockComposition"
 const DOCK_WAGER_PATH: String = "LowerDockComposition/WagerTerritory"
 const DOCK_PLAQUE_PATH: String = "LowerDockComposition/StartBattlePlaque"
-## The rail masses are physical at every UI scale, so the composed tier keeps
-## the same 308-physical rail instead of inflating it with the logical UI scale.
+## The rail is one authored mass, so the composed tier keeps the same 308px rail.
 const COMPOSED_RAIL_TOLERANCE_PHYSICAL: float = 8.0
 ## The composed tier keeps the metrics rail's full panel budget
-## (`Composition.physical_px(540.0, scale, 250.0)` in CombatView) rather than
-## collapsing it into the compact rail's reduced footprint.
+## (540px in CombatView) rather than collapsing it into the compact rail's
+## reduced footprint.
 const COMPOSED_METRICS_PANEL_PHYSICAL: float = 540.0
 ## Legibility floors the composed dock keeps for its own controls.
 const DOCK_PLAQUE_MIN_FONT: int = 20
@@ -50,10 +49,6 @@ func _run() -> void:
 		window.size = VIEWPORT_SIZE
 		window.content_scale_size = VIEWPORT_SIZE
 	_remove_test_settings()
-	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
-	UserSettingsScript.initialize(window)
-	var default_scale_error: Error = UserSettingsScript.set_ui_scale(1.0, window)
-	_expect(default_scale_error == OK, "failed to persist the default UI scale fixture")
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
 	if GameState.has_method("reset_run"):
@@ -94,19 +89,12 @@ func _run() -> void:
 	await _settle_frames(2)
 	_assert_footer_layout(false)
 	_assert_system_menu_clear_of_metrics(false)
-	_apply_persisted_scale_fixture(STANDARD_VIEWPORT_SIZE, 1.0)
+	_apply_dock_fixture(STANDARD_VIEWPORT_SIZE)
 	await _settle_frames(12)
-	_assert_standard_1080p_planning("1080p footer", 1.0, false)
+	_assert_standard_1080p_planning("1080p footer")
 	_assert_dock_footer_layout("1080p footer")
-	_apply_persisted_scale_fixture(STANDARD_VIEWPORT_SIZE, 1.25)
-	await _settle_frames(12)
-	_assert_standard_1080p_planning("125-percent 1080p footer", 1.25, false)
-	_assert_dock_footer_layout("125-percent 1080p footer")
-	_apply_persisted_scale_fixture(STANDARD_VIEWPORT_SIZE, 1.5)
-	await _settle_frames(12)
-	_assert_dock_footer_layout("150-percent 1080p footer")
-	_assert_composed_metrics_rail_and_menu("150-percent 1080p footer")
-	_assert_composed_tier_hud_containment("150-percent 1080p footer")
+	_assert_composed_metrics_rail_and_menu("1080p footer")
+	_assert_composed_tier_hud_containment("1080p footer")
 	await _assert_compact_metric_identity_contract()
 	_finish()
 
@@ -160,21 +148,11 @@ func _build_compact_footer_fixture() -> void:
 			economy_ui.call("refresh")
 	_view.call("_apply_responsive_layout")
 
-func _apply_persisted_scale_fixture(physical_size: Vector2i, ui_scale: float) -> void:
+func _apply_dock_fixture(fullscreen_size: Vector2i) -> void:
 	if _viewport == null:
-		_fail("viewport missing before persisted-scale fixture")
+		_fail("viewport missing before dock fixture")
 		return
-	var window: Window = get_window()
-	var save_error: Error = UserSettingsScript.set_ui_scale(ui_scale, window)
-	_expect(save_error == OK, "failed to persist the %d-percent footer fixture" % roundi(ui_scale * 100.0))
-	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
-	UserSettingsScript.initialize(window)
-	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%d-percent footer scale did not survive settings reload" % roundi(ui_scale * 100.0))
-	var logical_size: Vector2i = Vector2i(
-		roundi(float(physical_size.x) / ui_scale),
-		roundi(float(physical_size.y) / ui_scale)
-	)
-	_viewport.size = logical_size
+	_viewport.size = fullscreen_size
 	if _view != null:
 		_view.call("_apply_responsive_layout")
 	if _main != null:
@@ -184,19 +162,17 @@ func _apply_persisted_scale_fixture(physical_size: Vector2i, ui_scale: float) ->
 		if _main.has_method("_sync_system_menu_button"):
 			_main.call("_sync_system_menu_button")
 
-func _assert_standard_1080p_planning(context: String, expected_scale: float, expected_tight: bool) -> void:
+func _assert_standard_1080p_planning(context: String) -> void:
 	if _view == null or _viewport == null:
 		_fail("%s fixture missing" % context)
 		return
 	var viewport_rect: Rect2 = _viewport.get_visible_rect()
-	var expected_logical_size: Vector2 = Vector2(STANDARD_VIEWPORT_SIZE) / expected_scale
-	_expect(viewport_rect.size.distance_to(expected_logical_size) <= 2.0, "%s logical viewport does not match standard 1080p at %.0f percent: %s" % [context, expected_scale * 100.0, str(viewport_rect)])
-	_expect(is_equal_approx(float(_view.get_meta("persisted_ui_scale", 0.0)), expected_scale), "%s did not consume persisted %.0f-percent scaling" % [context, expected_scale * 100.0])
-	# Physical 1920x1080 is the composed dock's tier at every supported UI scale:
-	# the dock replaces the dense compact stack rather than the other way round.
+	_expect(viewport_rect.size.distance_to(Vector2(STANDARD_VIEWPORT_SIZE)) <= 2.0, "%s viewport does not match the authored 1080p fullscreen size: %s" % [context, str(viewport_rect)])
+	# 1920x1080 is the composed dock's tier: the dock replaces the dense compact
+	# stack rather than the other way round.
 	_expect(bool(_view.get_meta("full_hd_dock", false)), "%s did not enter the composed 1080p dock tier" % context)
 	_expect(not bool(_view.get_meta("compact_layout", false)), "%s is still classified as the dense compact tier" % context)
-	_expect(bool(_view.get_meta("tight_scale_layout", false)) == expected_tight, "%s tight-layout state is wrong" % context)
+	_expect(not bool(_view.get_meta("tight_layout", false)), "%s tight-layout state is wrong" % context)
 	var required_paths: PackedStringArray = PackedStringArray([
 		"MarginContainer/VBoxContainer/StageProgressTopBar",
 		"MarginContainer/VBoxContainer/BattleArea",
@@ -243,7 +219,7 @@ func _assert_standard_1080p_planning(context: String, expected_scale: float, exp
 				_expect_inside(card, viewport_rect, "%s shop card %s" % [context, String(card.name)])
 				_assert_shop_card_contents_inside(card)
 
-func _assert_footer_layout(tight_scale: bool) -> void:
+func _assert_footer_layout(tight_layout: bool) -> void:
 	var viewport_rect: Rect2 = _view.get_viewport().get_visible_rect()
 	var shop_grid: GridContainer = _view.get("shop_grid") as GridContainer
 	_expect_inside(shop_grid, viewport_rect, "shop grid")
@@ -262,8 +238,8 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 			if card == null or not card.visible:
 				continue
 			_expect_inside(card, viewport_rect, "shop card %s" % String(card.name))
-			var maximum_card_height: float = 70.0 if tight_scale else 96.0
-			var minimum_card_height: float = 54.0 if tight_scale else 80.0
+			var maximum_card_height: float = 70.0 if tight_layout else 96.0
+			var minimum_card_height: float = 54.0 if tight_layout else 80.0
 			_expect(card.size.y <= maximum_card_height, "compact shop card exceeded height budget: %s" % str(card.get_global_rect()))
 			_expect(card.size.y >= minimum_card_height, "compact shop card is too compressed to show its complete visual hierarchy: %s" % str(card.get_global_rect()))
 			_assert_shop_card_contents_inside(card)
@@ -275,7 +251,7 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 		rendered_shop_end = maxf(rendered_shop_end, shop_plate.get_global_rect().end.y)
 	var visible_bottom_gutter: float = viewport_rect.end.y - rendered_shop_end
 	_expect(visible_bottom_gutter >= 8.0, "shop grid/backplate has only %.1fpx of visible bottom gutter: grid=%s plate=%s spacer=%s viewport=%s" % [visible_bottom_gutter, str(shop_grid.get_global_rect()) if shop_grid != null else "<missing>", str(shop_plate.get_global_rect()) if shop_plate != null else "<missing>", str(gutter.get_global_rect()) if gutter != null else "<missing>", str(viewport_rect)])
-	if tight_scale:
+	if tight_layout:
 		_expect(visible_bottom_gutter <= 12.0, "150-percent shop grid/backplate gutter grew beyond the authored 8-12px band: %.1fpx" % visible_bottom_gutter)
 	var bet_slider: HSlider = _view.get("bet_slider") as HSlider
 	var bet_value: Label = _view.get("bet_value") as Label
@@ -287,9 +263,9 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 	if command_bar != null and first_card_top < INF:
 		_expect(command_bar.get_global_rect().end.y <= first_card_top + 1.0, "shop command bar overlaps compact cards")
 	if bet_slider != null and bet_value != null:
-		var slider_width_budget: float = 104.0 if tight_scale else 152.0
+		var slider_width_budget: float = 104.0 if tight_layout else 152.0
 		_expect(bet_slider.custom_minimum_size.x <= slider_width_budget, "compact bet slider width budget was not applied")
-		var bet_value_width_budget: float = 34.0 if tight_scale else 42.0
+		var bet_value_width_budget: float = 34.0 if tight_layout else 42.0
 		_expect(bet_value.custom_minimum_size.x <= bet_value_width_budget, "compact bet value width budget was not applied")
 		_expect(bet_value.get_theme_stylebox("normal") is StyleBoxFlat, "compact bet value should use a framed badge")
 		_expect(bet_value.get_theme_font_size("font_size") >= 18, "compact bet value should remain at least 18px")
@@ -297,7 +273,7 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 		for child: Node in command_bar.find_children("*", "Button", true, false):
 			var button: Button = child as Button
 			if button != null and button.visible:
-				var minimum_button_font: int = 16 if tight_scale and button.name != "ContinueButton" else 18
+				var minimum_button_font: int = 16 if tight_layout and button.name != "ContinueButton" else 18
 				_expect(button.get_theme_font_size("font_size") >= minimum_button_font, "compact command button %s should remain at least %dpx" % [String(button.name), minimum_button_font])
 				_expect_inside(button, viewport_rect, "compact command button %s" % String(button.name))
 				_assert_button_text_inside(button, "compact command button %s" % String(button.name))
@@ -305,7 +281,7 @@ func _assert_footer_layout(tight_scale: bool) -> void:
 			var label: Label = child as Label
 			if label != null and label.visible:
 				_expect_inside(label, viewport_rect, "compact command label %s" % String(label.name))
-	if tight_scale:
+	if tight_layout:
 		_assert_compact_decision_record(viewport_rect)
 
 ## The composed dock's footer at physical 1920x1080. The dock replaces the
@@ -319,7 +295,6 @@ func _assert_dock_footer_layout(context: String) -> void:
 		_fail("%s dock footer fixture missing" % context)
 		return
 	var viewport_rect: Rect2 = _viewport.get_visible_rect()
-	var scale: float = maxf(1.0, float(_view.get_meta("persisted_ui_scale", 1.0)))
 	var band: Control = _view.get_node_or_null(DOCK_PATH) as Control
 	var shop_grid: GridContainer = _view.get("shop_grid") as GridContainer
 	_expect(band != null and band.is_visible_in_tree(), "%s composed dock lost its shop band" % context)
@@ -334,13 +309,13 @@ func _assert_dock_footer_layout(context: String) -> void:
 	var authored_card_height: float = float(band.get_meta("dock_card_height", 0.0))
 	var authored_card_width: float = float(band.get_meta("dock_card_width", 0.0))
 	_expect(authored_card_height >= Composition.SHOP_CARD_MIN_HEIGHT and authored_card_height <= Composition.SHOP_CARD_MAX_HEIGHT, "%s dock shop cell left the authored %.0f-%.0f logical budget: %.1f" % [context, Composition.SHOP_CARD_MIN_HEIGHT, Composition.SHOP_CARD_MAX_HEIGHT, authored_card_height])
-	_expect(authored_card_height * scale >= Composition.SHOP_MIN_CARD_PHYSICAL, "%s dock shop cell is %.1f physical, below the authored %.0fpx floor" % [context, authored_card_height * scale, Composition.SHOP_MIN_CARD_PHYSICAL])
+	_expect(authored_card_height >= Composition.SHOP_MIN_CARD_PHYSICAL, "%s dock shop cell is %.1f, below the authored %.0fpx floor" % [context, authored_card_height, Composition.SHOP_MIN_CARD_PHYSICAL])
 	_expect(authored_card_width > 1.0, "%s dock shop cell lost its authored width: %.1f" % [context, authored_card_width])
 	# The band has to hold every row it authors: the header, one card cell, the
 	# footer gutter and the separations between them.
 	var authored_band_height: float = Composition.authored_dock_height(band.custom_minimum_size.y)
 	_expect(band.custom_minimum_size.y + 1.0 >= authored_band_height, "%s dock band cannot hold its authored rows: band=%.1f authored=%.1f" % [context, band.custom_minimum_size.y, authored_band_height])
-	var authored_bottom_margin: float = maxf(Composition.DOCK_MARGIN, Composition.dock_bottom_gutter(scale))
+	var authored_bottom_margin: float = maxf(Composition.DOCK_MARGIN, Composition.dock_bottom_gutter())
 	var first_card_top: float = INF
 	for child: Node in shop_grid.get_children():
 		var card: Control = child as Control
@@ -436,7 +411,7 @@ func _assert_dock_footer_layout(context: String) -> void:
 		if first_card_top < INF:
 			_expect(shop_header.get_global_rect().end.y <= first_card_top + 1.0, "%s dock shop header overlaps the shop cells" % context)
 
-func _assert_system_menu_clear_of_metrics(tight_scale: bool) -> void:
+func _assert_system_menu_clear_of_metrics(tight_layout: bool) -> void:
 	_expect(_main != null, "compact Main fixture missing")
 	if _main == null:
 		return
@@ -453,9 +428,9 @@ func _assert_system_menu_clear_of_metrics(tight_scale: bool) -> void:
 	_expect(not menu_rect.intersects(metrics_rect), "compact Menu overlaps Team Metrics: menu=%s metrics=%s" % [str(menu_rect), str(metrics_rect)])
 	_expect(bool(menu_button.get_meta("compact_safe_placement", false)), "compact Menu did not enter its safe placement contract")
 	_expect(menu_button.get_theme_font("font") == VisualTypeSystemLib.FONT_UTILITY_BOLD, "compact Menu should use the legibility face")
-	var metrics_width_budget: float = 136.0 if tight_scale else 184.0
-	var metrics_panel_height_budget: float = 198.0 if tight_scale else 252.0
-	var metrics_area_height_budget: float = 214.0 if tight_scale else 270.0
+	var metrics_width_budget: float = 136.0 if tight_layout else 184.0
+	var metrics_panel_height_budget: float = 198.0 if tight_layout else 252.0
+	var metrics_area_height_budget: float = 214.0 if tight_layout else 270.0
 	_expect(stats_area.custom_minimum_size.x <= metrics_width_budget, "compact Team Metrics rail did not release board width: %.1f" % stats_area.custom_minimum_size.x)
 	_expect(stats_panel.custom_minimum_size.y <= metrics_panel_height_budget, "compact Team Metrics panel did not collapse its vertical footprint: %.1f" % stats_panel.custom_minimum_size.y)
 	_expect(stats_area.size.y <= metrics_area_height_budget, "compact Team Metrics rail still occupies desktop-height furniture: %.1f" % stats_area.size.y)
@@ -486,14 +461,18 @@ func _assert_composed_metrics_rail_and_menu(context: String) -> void:
 	var menu_rect: Rect2 = menu_button.get_global_rect()
 	var metrics_rect: Rect2 = stats_area.get_global_rect()
 	_expect(not menu_rect.intersects(metrics_rect), "%s Menu overlaps Team Metrics: menu=%s metrics=%s" % [context, str(menu_rect), str(metrics_rect)])
-	_expect(bool(menu_button.get_meta("compact_safe_placement", false)), "%s Menu did not enter its safe placement contract" % context)
+	# The global escape hatch declares the tier it was placed for: the compact
+	# utility cell at compact resolutions, the authored desktop anchor at
+	# 1920x1080. Either way it stays inside the viewport and clear of the rail,
+	# which the checks above already require.
+	var compact_tier: bool = bool(combat.get_meta("compact_layout", false))
+	_expect(bool(menu_button.get_meta("compact_safe_placement", false)) == compact_tier, "%s Menu placement contract does not match its tier" % context)
 	_expect(menu_button.get_theme_font("font") == VisualTypeSystemLib.FONT_UTILITY_BOLD, "%s Menu should use the legibility face" % context)
-	# The composed rail is a physical mass, so the field keeps the majority of
+	# The composed rail is one authored mass, so the field keeps the majority of
 	# the width instead of the rail collapsing into a compact footprint.
-	var scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
 	var rail_contract: float = float(combat.get_meta("composed_rail_physical", Composition.SIDE_RAIL_PHYSICAL))
-	_expect(absf(stats_area.size.x * scale - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s Team Metrics rail is %.1f physical, not the composed %.1f contract" % [context, stats_area.size.x * scale, rail_contract])
-	_expect(stats_panel.custom_minimum_size.y * scale >= COMPOSED_METRICS_PANEL_PHYSICAL - 2.0, "%s Team Metrics panel collapsed below its authored %.0f physical budget: %.1f" % [context, COMPOSED_METRICS_PANEL_PHYSICAL, stats_panel.custom_minimum_size.y * scale])
+	_expect(absf(stats_area.size.x - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s Team Metrics rail is %.1f, not the composed %.1f contract" % [context, stats_area.size.x, rail_contract])
+	_expect(stats_panel.custom_minimum_size.y >= COMPOSED_METRICS_PANEL_PHYSICAL - 2.0, "%s Team Metrics panel collapsed below its authored %.0f budget: %.1f" % [context, COMPOSED_METRICS_PANEL_PHYSICAL, stats_panel.custom_minimum_size.y])
 	var window_all: Button = stats_panel.find_child("WindowAll", true, false) as Button
 	var window_recent: Button = stats_panel.find_child("Window3s", true, false) as Button
 	var metric_tabs: Control = stats_panel.find_child("MetricTabs", true, false) as Control
@@ -535,58 +514,7 @@ func _assert_compact_metric_identity_contract() -> void:
 		_expect(name_label.text.contains("Bonko"), "tight metric fallback regressed to the ambiguous Boko label: %s" % name_label.text)
 	row.queue_free()
 
-func _assert_tight_scale_hud_containment() -> void:
-	if _view == null or _viewport == null:
-		_fail("150-percent combat fixture missing")
-		return
-	var viewport_rect: Rect2 = _viewport.get_visible_rect()
-	var expected_logical_size: Vector2 = Vector2(STANDARD_VIEWPORT_SIZE) / 1.5
-	_expect(viewport_rect.size.distance_to(expected_logical_size) <= 2.0, "150-percent fixture logical size is wrong: %s" % str(viewport_rect))
-	_expect(bool(_view.get_meta("tight_scale_layout", false)), "combat view did not enter tight-scale layout")
-	_expect(is_equal_approx(float(_view.get_meta("persisted_ui_scale", 0.0)), 1.5), "combat view did not consume persisted 150-percent scaling")
-	var left_panel: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
-	_expect(left_panel != null and left_panel.visible, "150-percent layout should retain the tactical item/trait dock")
-	if left_panel != null and left_panel.visible:
-		_expect_inside(left_panel, viewport_rect, "150-percent tactical item/trait dock")
-		_expect(left_panel.size.x <= 136.0, "150-percent tactical item/trait dock did not release board width: %.1f" % left_panel.size.x)
-	_assert_tight_item_cache(left_panel)
-	var required_paths: PackedStringArray = PackedStringArray([
-		"MarginContainer",
-		"MarginContainer/VBoxContainer/StageProgressTopBar",
-		"MarginContainer/VBoxContainer/BattleArea",
-		"MarginContainer/VBoxContainer/BattleArea/ContentRow",
-		"MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn",
-		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea",
-		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel",
-		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Header/Title",
-		"MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Body/Scoreboard",
-		"MarginContainer/VBoxContainer/BenchArea",
-		"MarginContainer/VBoxContainer/ActionsRow",
-		"MarginContainer/VBoxContainer/WagerSummary",
-		"MarginContainer/VBoxContainer/BottomStorageArea",
-		"MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip",
-		"MarginContainer/VBoxContainer/BottomStorageArea/ShopGrid",
-	])
-	for path: String in required_paths:
-		var surface: Control = _view.get_node_or_null(path) as Control
-		_expect(surface != null, "150-percent HUD surface missing: %s" % path)
-		if surface != null and surface.is_visible_in_tree():
-			_expect_inside(surface, viewport_rect, "150-percent HUD surface %s" % path)
-	for plate_name: String in ["GothicShopPlate", "GothicStatsAreaPlate", "GothicBenchPlate"]:
-		var plate: Control = _view.get_node_or_null(plate_name) as Control
-		if plate != null and plate.is_visible_in_tree():
-			_expect_inside(plate, viewport_rect, "150-percent HUD backplate %s" % plate_name)
-	var board_column: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn") as Control
-	var stats_area: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
-	_expect(board_column != null and stats_area != null, "150-percent battlefield dominance controls missing")
-	if board_column != null and stats_area != null:
-		var visible_left_width: float = left_panel.size.x if left_panel != null and left_panel.visible else 0.0
-		var support_width: float = visible_left_width + stats_area.size.x
-		_expect(board_column.size.x > support_width, "150-percent battlefield is narrower than visible support docks combined")
-		_expect(board_column.size.x >= viewport_rect.size.x * 0.60, "150-percent battlefield does not retain 60%% of logical viewport width")
-	_assert_tight_surface_separation()
-
-## The composed tier's HUD containment at physical 1920x1080 / 150 percent. It
+## The composed tier's HUD containment at 1920x1080. It
 ## carries the same intents as the tight-scale pass - every planning surface
 ## inside the framebuffer, the rails and the field in no overlapping order, the
 ## tactical cache keeping its complete frames - restated with the composed tier's
@@ -596,20 +524,17 @@ func _assert_composed_tier_hud_containment(context: String) -> void:
 		_fail("%s combat fixture missing" % context)
 		return
 	var viewport_rect: Rect2 = _viewport.get_visible_rect()
-	var expected_logical_size: Vector2 = Vector2(STANDARD_VIEWPORT_SIZE) / 1.5
-	_expect(viewport_rect.size.distance_to(expected_logical_size) <= 2.0, "%s fixture logical size is wrong: %s" % [context, str(viewport_rect)])
+	_expect(viewport_rect.size.distance_to(Vector2(STANDARD_VIEWPORT_SIZE)) <= 2.0, "%s fixture size is wrong: %s" % [context, str(viewport_rect)])
 	_expect(bool(_view.get_meta("full_hd_dock", false)), "%s combat view did not enter the composed dock tier" % context)
-	_expect(not bool(_view.get_meta("compact_layout", false)) and not bool(_view.get_meta("tight_scale_layout", false)), "%s composed tier is still classified as a dense tier" % context)
-	_expect(is_equal_approx(float(_view.get_meta("persisted_ui_scale", 0.0)), 1.5), "%s combat view did not consume persisted 150-percent scaling" % context)
-	var scale: float = 1.5
+	_expect(not bool(_view.get_meta("compact_layout", false)) and not bool(_view.get_meta("tight_layout", false)), "%s composed tier is still classified as a dense tier" % context)
 	var rail_contract: float = float(_view.get_meta("composed_rail_physical", Composition.SIDE_RAIL_PHYSICAL))
 	var left_panel: Control = _view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
 	_expect(left_panel != null and left_panel.visible, "%s composed layout should retain the tactical item/trait dock" % context)
 	if left_panel != null and left_panel.visible:
 		_expect_inside(left_panel, viewport_rect, "%s tactical item/trait dock" % context)
-		# The rail keeps the composed physical mass: it neither inflates with the
-		# UI scale nor collapses out of the composed contract.
-		_expect(absf(left_panel.size.x * scale - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s tactical item/trait dock is %.1f physical, not the composed %.1f contract" % [context, left_panel.size.x * scale, rail_contract])
+		# The rail keeps the composed mass instead of collapsing out of the
+		# composed contract.
+		_expect(absf(left_panel.size.x - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s tactical item/trait dock is %.1f, not the composed %.1f contract" % [context, left_panel.size.x, rail_contract])
 	_assert_tight_item_cache(left_panel)
 	var required_paths: PackedStringArray = PackedStringArray([
 		"MarginContainer",

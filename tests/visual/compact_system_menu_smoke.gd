@@ -62,21 +62,20 @@ func _run() -> void:
 		settings_button.emit_signal("pressed")
 		await _settle_frames(6)
 		var return_to_run: Button = title_menu.find_child("ReturnToRunButton", true, false) as Button if title_menu != null else null
-		var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
+		var reduced_motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 		_expect(not overlay.visible and title_menu != null and title_menu.visible, "System Settings route did not open the existing Settings experience")
 		_expect(title_menu != null and title_menu.process_mode == Node.PROCESS_MODE_ALWAYS, "runtime Settings must keep processing while the tree is paused")
 		_expect(get_tree().paused, "runtime Settings should keep the run paused")
 		_expect(combat_view != null and not combat_view.visible, "runtime Settings must fully hide CombatView while its modal is open")
 		_expect(title_menu != null and bool(title_menu.get_meta("runtime_settings_preserves_run", false)), "runtime Settings did not publish its run-preservation contract")
 		_expect(return_to_run != null and return_to_run.visible and bool(return_to_run.get_meta("preserves_active_run", false)), "runtime Settings should provide a clear Return to Run route")
-		_expect(ui_scale_option != null and ui_scale_option.visible and ui_scale_option.item_count == 3, "System Settings route did not render the existing Settings controls")
-		if ui_scale_option != null:
-			var option_pressed: StyleBoxFlat = ui_scale_option.get_theme_stylebox("pressed") as StyleBoxFlat
-			var option_focus: StyleBoxFlat = ui_scale_option.get_theme_stylebox("focus") as StyleBoxFlat
-			var option_disabled: StyleBoxFlat = ui_scale_option.get_theme_stylebox("disabled") as StyleBoxFlat
-			_expect(option_pressed != null and option_focus != null and option_pressed.border_color != option_focus.border_color, "runtime UI Scale focus must remain distinct from pressed")
-			_expect(option_disabled != null and option_disabled.border_width_left >= 10 and option_disabled.border_width_bottom >= 4, "runtime UI Scale disabled state needs a blocked non-color cue")
-			_expect(String(ui_scale_option.get_meta("disabled_non_color_cue", "")) != "", "runtime UI Scale must publish its disabled non-color cue")
+		_expect(reduced_motion_check != null and reduced_motion_check.visible, "System Settings route did not render the existing Settings controls")
+		if reduced_motion_check != null:
+			var motion_pressed: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("pressed") as StyleBoxFlat
+			var motion_focus: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("focus") as StyleBoxFlat
+			var motion_disabled: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("disabled") as StyleBoxFlat
+			_expect(motion_pressed != null and motion_focus != null and motion_pressed.border_color != motion_focus.border_color, "runtime Reduced Motion focus must remain distinct from pressed")
+			_expect(motion_disabled != null and motion_disabled.border_width_left >= 10 and motion_disabled.border_width_bottom >= 4, "runtime Reduced Motion disabled state needs a blocked non-color cue")
 		if return_to_run != null:
 			return_to_run.emit_signal("pressed")
 			await _settle_frames(4)

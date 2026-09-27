@@ -387,8 +387,7 @@ func _sync_row_pitch(scroll: ScrollContainer) -> void:
 			rows.append(row)
 	if rows.is_empty():
 		return
-	var ui_scale: float = maxf(1.0, UserSettingsScript.get_ui_scale())
-	var pitch: float = clampf(ROW_PITCH_PHYSICAL / ui_scale, ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
+	var pitch: float = clampf(ROW_PITCH_PHYSICAL, ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
 	if scroll != null and scroll.size.y > 1.0:
 		pitch = clampf(minf(pitch, scroll.size.y / float(rows.size())), ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
 	# One shared numeric column, so the value rules line up down the ledger

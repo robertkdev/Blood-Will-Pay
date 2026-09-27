@@ -516,12 +516,11 @@ func _row_height_for_width(width: float) -> float:
 		return 42.0
 	return 48.0
 
-## Row height is the smaller of what the width can carry and the physical row
-## rhythm the current UI scale budgets, capped by the strip's own viewport so a
-## long trait list scrolls instead of growing the rail.
+## Row height is the smaller of what the width can carry and the authored row
+## rhythm, capped by the strip's own viewport so a long trait list scrolls
+## instead of growing the rail.
 func _row_height_for(width: float) -> float:
-	var ui_scale: float = maxf(1.0, UserSettingsScript.get_ui_scale())
-	var physical_height: float = clampf(ROW_PITCH_PHYSICAL / ui_scale, ROW_MIN_HEIGHT, ROW_MAX_HEIGHT)
+	var physical_height: float = clampf(ROW_PITCH_PHYSICAL, ROW_MIN_HEIGHT, ROW_MAX_HEIGHT)
 	var wanted: float = minf(_row_height_for_width(width), physical_height)
 	if _scroll != null and _scroll.size.y > 1.0:
 		wanted = minf(wanted, _scroll.size.y / TARGET_VISIBLE_ROWS)

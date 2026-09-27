@@ -29,11 +29,6 @@ func _run() -> void:
 		window.content_scale_size = Vector2i(1920, 1080)
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	var scale_error: Error = UserSettingsScript.set_ui_scale(1.0, window)
-	if scale_error != OK:
-		push_error("UIThemeSmoke: could not isolate UI scale, error=%d" % int(scale_error))
-		get_tree().quit(1)
-		return
 	var view: Control = COMBAT_VIEW_SCENE.instantiate()
 	add_child(view)
 	await get_tree().process_frame
@@ -46,7 +41,7 @@ func _run() -> void:
 		await get_tree().process_frame
 	var rendered_viewport_size: Vector2 = view.get_viewport_rect().size
 	var compact_layout: bool = rendered_viewport_size.y <= 1080.0 or rendered_viewport_size.x <= 1400.0
-	var tight_layout: bool = bool(view.get_meta("tight_scale_layout", false))
+	var tight_layout: bool = bool(view.get_meta("tight_layout", false))
 	var failures: Array[String] = []
 	_expect(view.theme != null, "CombatView theme is missing", failures)
 	var stage_label: Label = view.get_node_or_null("MarginContainer/VBoxContainer/StageLabel") as Label

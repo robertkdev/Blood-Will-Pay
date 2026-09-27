@@ -182,7 +182,6 @@ func _assert_card_lifecycle() -> void:
 	_remove_fixture_sources()
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	UserSettingsScript.set_ui_scale(1.0, window)
 	var scene_root: SubViewport = SubViewport.new()
 	scene_root.name = "CropSmokeViewport"
 	scene_root.size = RAIL_VIEWPORT

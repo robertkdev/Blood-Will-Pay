@@ -211,13 +211,7 @@ func _sync_progress_metadata(compact: bool) -> void:
 		return
 	var next_seal_copy: String = "ALL SEALS WITNESSED" if _next_circle_requirement == 0 else "NEXT SEAL %03d" % _next_circle_requirement
 	var rank: int = LivingLedgerCatalogScript.rank_for_omens(_lifetime_omens)
-	var high_scale_compact: bool = compact and UserSettingsScript.get_ui_scale() >= 1.45
-	if high_scale_compact:
-		_progress_label.text = "LIFETIME OMENS %d\n%s" % [_lifetime_omens, next_seal_copy]
-		_progress_label.custom_minimum_size.y = 46.0
-		_progress_label.add_theme_font_size_override("font_size", 16)
-		_progress_label.set_meta("responsive_layout", "two_row")
-	elif compact:
+	if compact:
 		_progress_label.text = "RANK %02d  //  LIFETIME %d" % [rank, _lifetime_omens]
 		_progress_label.custom_minimum_size.y = 24.0
 		_progress_label.add_theme_font_size_override("font_size", 15)

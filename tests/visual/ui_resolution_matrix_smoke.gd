@@ -13,12 +13,10 @@ const VIEWPORTS: Array[Vector2i] = [
 	Vector2i(2560, 1080),
 	Vector2i(3840, 2160),
 ]
-const SCALES: Array[float] = [1.0, 1.25, 1.5]
 
 var _failures: Array[String] = []
 var _main: Control = null
 var _original_window_size: Vector2i = Vector2i.ZERO
-var _original_scale: float = 1.0
 var _capture_count: int = 0
 
 func _ready() -> void:
@@ -27,32 +25,27 @@ func _ready() -> void:
 func _run() -> void:
 	var window: Window = get_window()
 	_original_window_size = window.size if window != null else Vector2i.ZERO
-	_original_scale = window.content_scale_factor if window != null else 1.0
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	AccountProfileStoreScript.clear(TEST_ACCOUNT_PROFILE_PATH)
 	for viewport_size: Vector2i in VIEWPORTS:
-		for ui_scale: float in SCALES:
-			await _verify_configuration(viewport_size, ui_scale)
+		await _verify_configuration(viewport_size)
 	_finish()
 
-func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
+## Fullscreen display sizes only: the game has no interface-scale setting, and no
+## layout tier may be authored or tested against one.
+func _verify_configuration(viewport_size: Vector2i) -> void:
 	var window: Window = get_window()
 	DisplayServer.window_set_size(viewport_size)
 	if window != null:
 		window.size = viewport_size
 		window.content_scale_size = viewport_size
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
-	var scale_save_error: Error = UserSettingsScript.set_ui_scale(ui_scale, window)
 	var motion_save_error: Error = UserSettingsScript.set_reduced_motion(true)
-	_expect(scale_save_error == OK, "%dx%d @ %d%% scale fixture should persist" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
-	_expect(motion_save_error == OK, "%dx%d @ %d%% motion fixture should persist" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
+	_expect(motion_save_error == OK, "%dx%d motion fixture should persist" % [viewport_size.x, viewport_size.y])
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	_main = MAIN_SCENE.instantiate() as Control
 	get_tree().root.add_child(_main)
 	await _settle_frames(5)
-	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%dx%d @ %d%% Main should load the persisted UI scale" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
-	if window != null:
-		_expect(is_equal_approx(window.content_scale_factor, ui_scale), "%dx%d @ %d%% Main should apply the persisted UI scale to its window" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)])
 	if viewport_size == Vector2i(3840, 2160):
 		var title_page: Control = _main.get_node_or_null("TitlePage") as Control
 		var entry_affordance: PanelContainer = _main.get_node_or_null("TitlePage/Center/Stack/EntryAffordance") as PanelContainer
@@ -68,17 +61,16 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 		enter_button.pressed.emit()
 	await _settle_frames(3)
 	var title_menu: Control = _main.get_node_or_null("TitleMenu") as Control
-	var label: String = "%dx%d @ %d%%" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
-	if viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.5):
+	var label: String = "%dx%d" % [viewport_size.x, viewport_size.y]
+	if viewport_size == Vector2i(1920, 1080):
 		var natural_manifest: VBoxContainer = title_menu.find_child("HomeRouteManifest", true, false) as VBoxContainer if title_menu != null else null
-		_expect(title_menu != null and is_equal_approx(float(title_menu.get_meta("effective_ui_scale", 0.0)), 1.5), "%s Natural Main should publish the persisted 150 percent layout scale" % label)
 		_expect(natural_manifest != null, "%s Natural Main should open with its Available Records manifest" % label)
 		if natural_manifest != null:
 			_expect_manifest_rows_readable(natural_manifest, "%s Natural Main" % label)
-		_expect(_save_capture("1920x1080_150_percent_natural_home_manifest.png"), "%s Natural Main persisted-scale manifest capture was not produced" % label)
+		_expect(_save_capture("1920x1080_natural_home_manifest.png"), "%s Natural Main manifest capture was not produced" % label)
 	if title_menu != null:
 		title_menu.call("_select_section", "settings", false)
-		title_menu.call_deferred("_refresh_scaled_layout")
+		title_menu.call_deferred("_refresh_layout")
 	await _settle_frames(4)
 	var viewport_rect: Rect2 = title_menu.get_viewport().get_visible_rect() if title_menu != null else Rect2()
 	_expect(title_menu != null and title_menu.visible, "%s title menu missing" % label)
@@ -146,11 +138,10 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	)
 	var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer if title_menu != null else null
 	var accessibility_priority: PanelContainer = title_menu.find_child("AccessibilityPriority", true, false) as PanelContainer if title_menu != null else null
-	var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton if title_menu != null else null
 	var reduced_motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	var volume_slider: HSlider = title_menu.find_child("MasterVolumeSlider", true, false) as HSlider if title_menu != null else null
 	var settings_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer if title_menu != null else null
-	var effective_height: float = float(viewport_size.y) / ui_scale
+	var effective_height: float = float(viewport_size.y)
 	_expect(
 		(settings_docket != null and _rect_inside(settings_docket.get_global_rect(), viewport_rect.grow(2.0)))
 		or (accessibility_priority != null and bool(accessibility_priority.get_meta("pinned_settings_block", false))),
@@ -159,15 +150,7 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	if effective_height < 640.0:
 		var settings_visible_rect: Rect2 = settings_scroll.get_global_rect() if settings_scroll != null else Rect2()
 		_expect(accessibility_priority != null and _rect_inside(accessibility_priority.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact accessibility priority record should be visible without scrolling" % label)
-		_expect(ui_scale_option != null and _rect_inside(ui_scale_option.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact UI Scale should be visible without scrolling" % label)
 		_expect(reduced_motion_check != null and _rect_inside(reduced_motion_check.get_global_rect(), settings_visible_rect.grow(2.0)), "%s compact Reduced Motion should be visible without scrolling" % label)
-	if ui_scale_option != null:
-		var option_pressed: StyleBoxFlat = ui_scale_option.get_theme_stylebox("pressed") as StyleBoxFlat
-		var option_focus: StyleBoxFlat = ui_scale_option.get_theme_stylebox("focus") as StyleBoxFlat
-		var option_disabled: StyleBoxFlat = ui_scale_option.get_theme_stylebox("disabled") as StyleBoxFlat
-		_expect(option_pressed != null and option_focus != null and option_pressed.border_color != option_focus.border_color, "%s UI Scale focus should remain distinct from pressed" % label)
-		_expect(option_focus != null and option_focus.border_color.b > option_focus.border_color.r, "%s UI Scale focus should use signal blue" % label)
-		_expect(option_disabled != null and option_disabled.border_width_left >= 10 and option_disabled.border_width_bottom >= 4, "%s UI Scale disabled state should use a blocked non-color cue" % label)
 	if reduced_motion_check != null:
 		var motion_pressed: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("pressed") as StyleBoxFlat
 		var motion_focus: StyleBoxFlat = reduced_motion_check.get_theme_stylebox("focus") as StyleBoxFlat
@@ -193,8 +176,8 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 				compact_action != null and compact_action.get_theme_font_size("font_size") >= 16,
 				"%s compact action text should remain at least 16px" % label
 			)
-	if _should_capture(viewport_size, ui_scale):
-		var settings_filename: String = "%dx%d_%d_percent_title_menu.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
+	if _should_capture(viewport_size):
+		var settings_filename: String = "%dx%d_title_menu.png" % [viewport_size.x, viewport_size.y]
 		_expect(_save_capture(settings_filename), "%s settings capture was not produced" % label)
 	if title_menu != null:
 		title_menu.call("_select_section", "home", true)
@@ -221,14 +204,10 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 	var ledger_close_gutter: Control = ledger.find_child("HeaderActionFocusGutter", true, false) as Control if ledger != null else null
 	_expect(ledger_panel != null and _rect_inside(ledger_panel.get_global_rect(), viewport_rect.grow(2.0)), "%s Black Ledger escaped viewport panel=%s viewport=%s" % [label, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(viewport_rect)])
 	_expect(ledger_close != null and ledger_close_gutter != null and ledger_close.get_global_rect().end.x <= ledger_panel.get_global_rect().end.x - ledger_close_gutter.custom_minimum_size.x + 1.0, "%s Black Ledger Close action needs a visible focus-safe right margin" % label)
-	var effective_width: float = float(viewport_size.x) / ui_scale
+	var effective_width: float = float(viewport_size.x)
 	if effective_width < 1440.0:
-		if ui_scale >= 1.45:
-			_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "two_row", "%s high-scale compact Black Ledger progress metadata should reflow to two rows" % label)
-			_expect(ledger_progress != null and ledger_progress.text.split("\n").size() == 2 and ledger_progress.custom_minimum_size.y >= 46.0, "%s high-scale compact Black Ledger should preserve readable progress evidence across two rows" % label)
-		else:
-			_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "compressed_single_row", "%s compact Black Ledger progress metadata should use its compressed filing line" % label)
-			_expect(ledger_progress != null and ledger_progress.text.split("\n").size() == 1 and ledger_progress.custom_minimum_size.y <= 24.0, "%s compact Black Ledger should keep its progress evidence to one readable row" % label)
+		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "compressed_single_row", "%s compact Black Ledger progress metadata should use its compressed filing line" % label)
+		_expect(ledger_progress != null and ledger_progress.text.split("\n").size() == 1 and ledger_progress.custom_minimum_size.y <= 24.0, "%s compact Black Ledger should keep its progress evidence to one readable row" % label)
 	else:
 		_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "single_row", "%s wide Black Ledger progress metadata should retain its single-row filing line" % label)
 	if effective_width >= 1440.0:
@@ -236,7 +215,7 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 			ledger_panel != null and ledger_panel.size.y >= 630.0 and ledger_panel.size.y <= 670.0,
 			"%s sparse Black Ledger should remain content-height at wide scale, got %.1f" % [label, ledger_panel.size.y if ledger_panel != null else -1.0]
 		)
-	if viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.0):
+	if viewport_size == Vector2i(1920, 1080):
 		_expect(
 			ledger != null and bool(ledger.get("_sparse_content_record")),
 			"%s fresh Black Ledger should identify its actually rendered content as sparse" % label
@@ -245,22 +224,16 @@ func _verify_configuration(viewport_size: Vector2i, ui_scale: float) -> void:
 			ledger_panel != null and ledger_panel.size.y >= 630.0 and ledger_panel.size.y <= 670.0,
 			"%s fresh Black Ledger should preserve its dedicated record and footer gutters, got %.1f" % [label, ledger_panel.size.y if ledger_panel != null else -1.0]
 		)
-	if _should_capture(viewport_size, ui_scale):
-		var ledger_filename: String = "%dx%d_%d_percent_ledger.png" % [viewport_size.x, viewport_size.y, roundi(ui_scale * 100.0)]
+	if _should_capture(viewport_size):
+		var ledger_filename: String = "%dx%d_ledger.png" % [viewport_size.x, viewport_size.y]
 		_expect(_save_capture(ledger_filename), "%s Black Ledger capture was not produced" % label)
 	if _main != null:
 		_main.call("_close_black_ledger")
 	await _settle_frames(1)
 	_cleanup_main()
 
-func _should_capture(viewport_size: Vector2i, ui_scale: float) -> bool:
-	return (
-		(viewport_size == Vector2i(1280, 720) and (is_equal_approx(ui_scale, 1.0) or is_equal_approx(ui_scale, 1.5)))
-		or (viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.0))
-		or (viewport_size == Vector2i(1920, 1080) and is_equal_approx(ui_scale, 1.5))
-		or (viewport_size == Vector2i(2560, 1080) and is_equal_approx(ui_scale, 1.25))
-		or (viewport_size == Vector2i(3840, 2160) and is_equal_approx(ui_scale, 1.0))
-	)
+func _should_capture(viewport_size: Vector2i) -> bool:
+	return viewport_size == Vector2i(1280, 720) or viewport_size == Vector2i(1920, 1080)
 
 func _expect_manifest_rows_readable(route_manifest: VBoxContainer, label: String) -> void:
 	var previous_route_bottom: float = -1.0
@@ -351,7 +324,6 @@ func _finish() -> void:
 	_cleanup_main()
 	var window: Window = get_window()
 	if window != null:
-		window.content_scale_factor = _original_scale
 		if _original_window_size != Vector2i.ZERO:
 			window.size = _original_window_size
 			window.content_scale_size = _original_window_size
@@ -360,9 +332,9 @@ func _finish() -> void:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	if _framebuffer_capture_available():
-		_expect(_capture_count == 13, "expected 13 non-empty settings/Ledger/home-manifest proof images, produced %d" % _capture_count)
+		_expect(_capture_count == 5, "expected 5 non-empty settings/Ledger/home-manifest proof images, produced %d" % _capture_count)
 	if _failures.is_empty():
-		print(SMOKE_NAME + ": OK matrix=4x3")
+		print(SMOKE_NAME + ": OK fullscreen=4")
 		get_tree().quit(0)
 		return
 	for failure: String in _failures:

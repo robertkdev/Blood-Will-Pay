@@ -85,7 +85,6 @@ func _capture_clarity_title_states() -> void:
 	var window: Window = get_window()
 	UserSettingsScript.configure_storage_path(CLARITY_CAPTURE_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	UserSettingsScript.set_ui_scale(1.0, window)
 	UserSettingsScript.set_reduced_motion(true)
 
 	var preview_main: Control = MAIN_SCENE.instantiate() as Control
@@ -102,15 +101,13 @@ func _capture_clarity_title_states() -> void:
 	await _settle_frames(8)
 	_save_capture("00_tutorial.png")
 
-	UserSettingsScript.set_ui_scale(1.5, window)
-	UserSettingsScript.set_reduced_motion(true)
 	if title_menu != null:
-		title_menu.call_deferred("_refresh_scaled_layout")
+		title_menu.call_deferred("_refresh_layout")
 	await _settle_frames(12)
 	if title_menu != null:
 		title_menu.call("_select_section", "settings", true)
 	await _settle_frames(8)
-	_save_capture("00_settings_150_percent.png")
+	_save_capture("00_settings.png")
 
 	if preview_main.has_method("_reset_run_state"):
 		preview_main.call("_reset_run_state")
@@ -119,7 +116,6 @@ func _capture_clarity_title_states() -> void:
 		preview_parent.remove_child(preview_main)
 	preview_main.free()
 	await _settle_frames(6)
-	UserSettingsScript.set_ui_scale(1.0, window)
 	UserSettingsScript.set_reduced_motion(false)
 
 func _uses_manual_opening_continue() -> bool:

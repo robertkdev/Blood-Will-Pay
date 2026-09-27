@@ -12,35 +12,30 @@ const OUTPUT_DIR: String = "res://outputs/visual_iter/compact_viewport_audit"
 const TEST_SETTINGS_PATH: String = "user://compact_viewport_visual_audit_settings.cfg"
 const VIEWPORT_SIZE: Vector2i = Vector2i(1280, 720)
 const STANDARD_VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
-const COMPACT_LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1024, 576)
-const COMPACT_LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(853, 480)
-const STANDARD_LOGICAL_125_PERCENT_SIZE: Vector2i = Vector2i(1536, 864)
-const STANDARD_LOGICAL_150_PERCENT_SIZE: Vector2i = Vector2i(1280, 720)
-## Physical 1920x1080 is the composed dock's tier at every supported UI scale:
-## 100, 125 and 150 percent still compose the dock band instead of the dense
-## compact stack, so the steps at that size measure the dock's own authored
-## territories - the shop band, the full-height wager column and the action bay -
-## and use the composition's own numbers rather than the compact tier's. The
-## genuinely compact 1280x720 contexts keep their own expectations untouched.
+## 1920x1080 is the composed dock's tier, so the steps at that size measure the
+## dock's own authored territories - the shop band, the full-height wager column
+## and the action bay - and use the composition's own numbers rather than the
+## compact tier's. The genuinely compact 1280x720 context keeps its own
+## expectations untouched. There is no interface scale: the game is authored for
+## one fullscreen UI size.
 const Composition: GDScript = preload("res://scripts/ui/combat/planning_composition.gd")
 const DOCK_LAYER_PATH: String = "LowerDockComposition"
 const DOCK_WAGER_PATH: String = "LowerDockComposition/WagerTerritory"
 const DOCK_PLAQUE_PATH: String = "LowerDockComposition/StartBattlePlaque"
 const DOCK_WAGER_GROUP_PATH: String = "LowerDockComposition/WagerTerritory/Padding/Slot/WagerControls"
-## The composed rail masses are physical at every UI scale, so the rails keep the
-## same 308-physical contract instead of inflating with the logical UI scale.
+## The composed rail is one authored mass, so the rails keep the same 308px
+## contract.
 const COMPOSED_RAIL_TOLERANCE_PHYSICAL: float = 8.0
 ## Legibility floor the composed dock keeps for its own utility controls.
 const DOCK_UTILITY_MIN_FONT: int = 18
-## The composed dock is a physical band, not a tight tier: its row metrics hold
-## controls at their authored logical size at every supported scale.
+## The composed dock is a fixed band, not a tight tier: its row metrics hold
+## controls at their authored size.
 const DOCK_PHYSICAL_ROUNDING_TOLERANCE: float = 1.0
 
 var _main: Control = null
 var _unit_select: UnitSelect = null
 var _failures: Array[String] = []
 var _saved_captures: int = 0
-var _original_scale: float = 1.0
 var _original_window_size: Vector2i = Vector2i.ZERO
 
 func _ready() -> void:
@@ -158,77 +153,19 @@ func _run() -> void:
 	_expect_no_button_text_overflow(combat, "post-shop combat")
 	_save_capture("05_post_shop_planning_1280x720.png", _main)
 
-	_set_persisted_scaled_window(VIEWPORT_SIZE, 1.25, COMPACT_LOGICAL_125_PERCENT_SIZE)
+	_set_window_size(STANDARD_VIEWPORT_SIZE)
 	await _settle_frames(12)
 	if combat != null:
 		combat.call("_apply_responsive_layout")
 	if _main != null and _main.has_method("_sync_system_menu_button"):
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(12)
-	_expect_standard_planning_containment("compact 125-percent planning", COMPACT_LOGICAL_125_PERCENT_SIZE, 1.25, true)
-	_expect_scaled_tactical_surface_containment("compact 125-percent", COMPACT_LOGICAL_125_PERCENT_SIZE)
-	_expect_connected_planning_composition("compact 125-percent planning", false)
-	_expect_no_button_text_overflow(combat, "compact 125-percent post-shop combat")
-	_expect_compact_shop_detail_band("compact 125-percent planning")
-	_save_capture("05a_post_shop_planning_1280x720_125pct.png", _main)
-
-	_set_persisted_scaled_window(VIEWPORT_SIZE, 1.5, COMPACT_LOGICAL_150_PERCENT_SIZE)
-	await _settle_frames(12)
-	if combat != null:
-		combat.call("_apply_responsive_layout")
-	if _main != null and _main.has_method("_sync_system_menu_button"):
-		_main.call("_sync_system_menu_button")
-	await _settle_frames(12)
-	_expect_standard_planning_containment("compact 150-percent planning", COMPACT_LOGICAL_150_PERCENT_SIZE, 1.5, true)
-	_expect_maximum_scale_hierarchy("compact 150-percent planning")
-	_expect_scaled_tactical_surface_containment("compact 150-percent", COMPACT_LOGICAL_150_PERCENT_SIZE)
-	_expect_connected_planning_composition("compact 150-percent planning", false)
-	_expect_no_button_text_overflow(combat, "compact 150-percent post-shop combat")
-	_expect_compact_shop_detail_band("compact 150-percent planning")
-	_save_capture("05b_post_shop_planning_1280x720_150pct.png", _main)
-
-	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.0, STANDARD_VIEWPORT_SIZE)
-	await _settle_frames(12)
-	if combat != null:
-		combat.call("_apply_responsive_layout")
-	if _main != null and _main.has_method("_sync_system_menu_button"):
-		_main.call("_sync_system_menu_button")
-	await _settle_frames(12)
-	_expect_standard_planning_containment("1080p planning", STANDARD_VIEWPORT_SIZE, 1.0, false)
+	_expect_standard_planning_containment("1080p planning", STANDARD_VIEWPORT_SIZE, false)
 	_expect_compact_battlefield_dominance()
 	_expect_connected_planning_composition("1080p planning", true)
 	_expect_no_button_text_overflow(combat, "1080p post-shop combat")
 	_save_capture("05c_post_shop_planning_1920x1080.png", _main)
-
-	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.25, STANDARD_LOGICAL_125_PERCENT_SIZE)
-	await _settle_frames(12)
-	if combat != null:
-		combat.call("_apply_responsive_layout")
-	if _main != null and _main.has_method("_sync_system_menu_button"):
-		_main.call("_sync_system_menu_button")
-	await _settle_frames(12)
-	_expect_standard_planning_containment("125-percent planning", STANDARD_LOGICAL_125_PERCENT_SIZE, 1.25, false)
-	_expect_compact_battlefield_dominance()
-	_expect_connected_planning_composition("125-percent planning", true)
-	_expect_no_button_text_overflow(combat, "125-percent post-shop combat")
-	_save_capture("05d_post_shop_planning_1920x1080_125pct.png", _main)
-
-	_set_persisted_scaled_window(STANDARD_VIEWPORT_SIZE, 1.5, STANDARD_LOGICAL_150_PERCENT_SIZE)
-	await _settle_frames(12)
-	if combat != null:
-		combat.call("_apply_responsive_layout")
-	if _main != null and _main.has_method("_sync_system_menu_button"):
-		_main.call("_sync_system_menu_button")
-	await _settle_frames(12)
-	_expect_standard_planning_containment("150-percent planning", STANDARD_LOGICAL_150_PERCENT_SIZE, 1.5, true)
-	_expect_scaled_tactical_surface_containment("150-percent", STANDARD_LOGICAL_150_PERCENT_SIZE)
-	_expect_planning_action_hierarchy("150-percent planning", true)
-	_expect_compact_battlefield_dominance()
-	_expect_connected_planning_composition("150-percent planning", false)
-	_expect_no_button_text_overflow(combat, "150-percent post-shop combat")
-	_expect_compact_shop_detail_band("150-percent planning")
-	_save_capture("06_post_shop_planning_1920x1080_150pct.png", _main)
-	await _expect_scaled_unit_detail("150-percent unit detail")
+	await _expect_scaled_unit_detail("1080p unit detail")
 	await _finish()
 
 func _expect_compact_shop_detail_band(context: String) -> void:
@@ -540,33 +477,11 @@ func _set_window_size(size: Vector2i) -> void:
 	if window != null:
 		window.size = size
 		window.content_scale_size = size
-	var save_error: Error = UserSettingsScript.set_ui_scale(1.0, window)
-	_expect(save_error == OK, "failed to persist the 100-percent UI scale fixture")
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-
-func _set_persisted_scaled_window(physical_size: Vector2i, ui_scale: float, expected_logical_size: Vector2i) -> void:
-	var framebuffer_unavailable: bool = _is_framebuffer_unavailable()
-	var applied_window_size: Vector2i = expected_logical_size if framebuffer_unavailable else physical_size
-	DisplayServer.window_set_size(applied_window_size)
-	var window: Window = get_window()
-	if window != null:
-		window.size = applied_window_size
-		window.content_scale_size = applied_window_size
-	var save_error: Error = UserSettingsScript.set_ui_scale(ui_scale, window)
-	_expect(save_error == OK, "failed to persist the %d-percent UI scale fixture" % roundi(ui_scale * 100.0))
-	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
-	UserSettingsScript.initialize(window)
-	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%d-percent UI scale did not survive settings reload" % roundi(ui_scale * 100.0))
-	if framebuffer_unavailable and window != null:
-		# Headless display backends do not consistently expose content-scaled
-		# visible rects. Keep the persisted setting authoritative and provide
-		# its expected logical window directly.
-		window.content_scale_factor = 1.0
 
 func _configure_isolated_settings() -> void:
 	var window: Window = get_window()
-	_original_scale = window.content_scale_factor if window != null else 1.0
 	_original_window_size = window.size if window != null else Vector2i.ZERO
 	_remove_test_settings()
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
@@ -593,7 +508,6 @@ func _expect_dock_wager_information(combat: Control, context: String) -> void:
 	var summary: Label = _wager_summary_label(combat)
 	var data: Dictionary = summary.get_meta("outcome_quotes", {}) as Dictionary if summary != null else {}
 	_expect(bool(data.get("active", false)), "%s lacks active wager quotes" % context)
-	var scale_factor: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
 	for outcome: String in ["Win", "Loss"]:
 		var row: Control = combat.find_child("Wager%sRow" % outcome, true, false) as Control
 		_expect(row != null and row.is_visible_in_tree(), "%s hid its %s outcome" % [context, outcome])
@@ -609,7 +523,7 @@ func _expect_dock_wager_information(combat: Control, context: String) -> void:
 			_expect(label.is_visible_in_tree(), "%s %s label hidden" % [context, outcome])
 			_expect_control_inside(label, "%s %s text" % [context, outcome])
 			var font_size: int = label.get_theme_font_size("font_size")
-			_expect(float(font_size) * scale_factor >= (15.0 if label == caption else 18.0), "%s %s text below physical legibility floor" % [context, outcome])
+			_expect(float(font_size) >= (15.0 if label == caption else 18.0), "%s %s text below physical legibility floor" % [context, outcome])
 			var ink: Vector2 = label.get_theme_font("font").get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size)
 			_expect(ink.x <= label.size.x + 1.0, "%s %s text overflows its row" % [context, outcome])
 
@@ -659,8 +573,8 @@ func _expect_compact_battlefield_dominance() -> void:
 	var support_width: float = left_width + right_width
 	var viewport_width: float = _viewport_rect().size.x
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
-	var tight_scale_layout: bool = combat != null and bool(combat.get_meta("tight_scale_layout", false))
-	var minimum_board_share: float = 0.60 if tight_scale_layout else 0.55
+	var tight_layout: bool = combat != null and bool(combat.get_meta("tight_layout", false))
+	var minimum_board_share: float = 0.60 if tight_layout else 0.55
 	_expect(board_column.size.x > support_width, "compact battlefield should remain wider than all visible support docks combined")
 	_expect(board_column.size.x >= viewport_width * minimum_board_share, "compact battlefield should retain at least %.0f%% of logical viewport width: board=%.1f viewport=%.1f" % [minimum_board_share * 100.0, board_column.size.x, viewport_width])
 
@@ -727,13 +641,8 @@ func _expect_item_cache_contract(context: String) -> void:
 	var header: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
 	var item_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
-	var maximum_scale_layout: bool = combat != null and bool(combat.get_meta("maximum_scale_layout", false))
 	var full_hd_dock: bool = combat != null and bool(combat.get_meta("full_hd_dock", false))
 	_expect(left_panel != null, "%s item-cache rail missing" % context)
-	if maximum_scale_layout:
-		_expect(header != null and not header.is_visible_in_tree() and String(header.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s maximum-scale policy did not stage out the empty cache header" % context)
-		_expect(item_grid != null and not item_grid.is_visible_in_tree() and String(item_grid.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s maximum-scale policy did not stage out empty cache pockets" % context)
-		return
 	_expect(header != null and header.is_visible_in_tree(), "%s item-cache label missing" % context)
 	_expect(item_grid != null and item_grid.is_visible_in_tree(), "%s item-cache grid missing" % context)
 	if left_panel == null or header == null or item_grid == null:
@@ -751,7 +660,7 @@ func _expect_item_cache_contract(context: String) -> void:
 	_expect(bool(item_grid.get_meta("physical_compartment_shell", false)) and int(item_grid.get_meta("ready_slot_contract", 0)) == 3, "%s item cache lacks its three-pocket physical shell contract" % context)
 	var shell: Panel = _main.get_node_or_null("CombatView/GothicItemsPlate") as Panel if _main != null else null
 	_expect(shell != null and bool(shell.get_meta("physical_reliquary_shell", false)), "%s item-cache backplate is not a physical reliquary shell" % context)
-	var tight_layout: bool = bool(combat.get_meta("tight_scale_layout", false)) if combat != null else false
+	var tight_layout: bool = bool(combat.get_meta("tight_layout", false)) if combat != null else false
 	var compact_layout: bool = bool(combat.get_meta("compact_layout", false)) if combat != null else false
 	var viewport_size: Vector2 = combat.get_viewport_rect().size if combat != null else Vector2.ZERO
 	var wide_support_rail: bool = compact_layout and not tight_layout and viewport_size.x >= 1600.0
@@ -778,10 +687,6 @@ func _expect_item_cache_contract(context: String) -> void:
 		if inner_style != null:
 			_expect(inner_style.border_width_left > 0 and inner_style.border_width_top > 0 and inner_style.border_width_right > 0 and inner_style.border_width_bottom > 0, "%s item slot %s inner perimeter is incomplete" % [context, String(item_card.name)])
 		if not full_hd_dock:
-			# The desktop tier keeps its authored pocket floor. The composed dock is
-			# accepted on rendered geometry instead: its rail is the authored 308
-			# physical pixels at every supported scale, which three 84px pockets plus
-			# separations cannot fit into at 125 or 150 percent.
 			_expect(item_card.custom_minimum_size.x >= expected_slot_size.x and item_card.custom_minimum_size.y >= expected_slot_size.y, "%s item slot %s collapsed below its reliquary scale: %s expected=%s" % [context, String(item_card.name), str(item_card.custom_minimum_size), str(expected_slot_size)])
 		_expect(outer_style == null or (outer_style.border_width_left >= 3 and outer_style.border_width_bottom >= 4), "%s item slot %s lacks weighted reliquary joinery" % [context, String(item_card.name)])
 		var cavity: Panel = item_card.get_node_or_null("PocketCavity") as Panel
@@ -813,9 +718,8 @@ func _expect_item_cache_contract(context: String) -> void:
 ## Physical-composition acceptance for the full-HD composed dock.
 ##
 ## The desktop pocket floor above cannot hold in this tier: the composed rail is
-## the authored 308 physical pixels at every supported UI scale, and three 84px
-## pockets plus separations need 272 logical, which the rail's inner width does not
-## have at 125 or 150 percent. So this reads rendered geometry against the rail's
+## one authored 308px mass and three 84px pockets plus separations need 272, which
+## the rail's inner width does not have. So this reads rendered geometry against the rail's
 ## own published physical target instead of restating the presenter's pocket
 ## formula: the rail must render the authored mass, the header must show its whole
 ## state vocabulary without clipping, and the receive pockets must be exactly as
@@ -828,9 +732,8 @@ func _expect_composed_item_cache_contract(context: String, combat: Control, left
 	_expect(rail_target_physical > 0.0, "%s composed dock published no physical rail target" % context)
 	if rail_target_physical <= 0.0:
 		return
-	var ui_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
 	var rail_rect: Rect2 = left_panel.get_global_rect()
-	var rail_physical: float = rail_rect.size.x * ui_scale
+	var rail_physical: float = rail_rect.size.x
 	_expect(
 		absf(rail_physical - rail_target_physical) <= 2.0,
 		"%s composed rail renders %.1f physical px, not the published %.1f" % [context, rail_physical, rail_target_physical]
@@ -887,7 +790,7 @@ func _expect_composed_item_cache_contract(context: String, combat: Control, left
 			rail_rect.grow(1.0).encloses(pocket_rect),
 			"%s composed item pocket escaped its rail: %s vs %s" % [context, str(pocket_rect), str(rail_rect)]
 		)
-		var pocket_physical: Vector2 = pocket_rect.size * ui_scale
+		var pocket_physical: Vector2 = pocket_rect.size
 		_expect(
 			pocket_physical.x >= useful_floor_physical and pocket_physical.y >= useful_floor_physical,
 			"%s composed item pocket is not a useful target: %.1fx%.1f physical (floor %.1f)" % [context, pocket_physical.x, pocket_physical.y, useful_floor_physical]
@@ -1007,9 +910,9 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		# The tier the dock drew is the composed one, which is deliberately not the
 		# tight compact tier: its band is a physical constant and the rows that hold
 		# controls stay at their authored logical size.
-		_expect(bool(combat.get_meta("composed_dock_tier", false)) and not bool(combat.get_meta("tight_scale_layout", false)), "%s combat view did not enter the composed 1080p dock tier" % context)
+		_expect(bool(combat.get_meta("composed_dock_tier", false)) and not bool(combat.get_meta("tight_layout", false)), "%s combat view did not enter the composed 1080p dock tier" % context)
 	else:
-		_expect(bool(combat.get_meta("tight_scale_layout", false)), "%s combat view did not enter tight-scale layout" % context)
+		_expect(bool(combat.get_meta("tight_layout", false)), "%s combat view did not enter the tight layout" % context)
 	var left_panel: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
 	_expect(left_panel != null and left_panel.is_visible_in_tree(), "%s layout removed the item/trait tactical dock" % context)
 	var required_paths: PackedStringArray = PackedStringArray([
@@ -1050,9 +953,8 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 		# collapsing it into the compact footprint, so the board-width intent is
 		# restated as the rail's published physical contract plus the board keeping
 		# the field's majority. The rail must never grow past the board it frames.
-		var rail_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
 		var rail_contract: float = _composed_rail_physical(combat)
-		_expect(stats_area != null and absf(stats_area.size.x * rail_scale - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s Team Metrics rail did not render the composed %.0f physical contract" % [context, rail_contract])
+		_expect(stats_area != null and absf(stats_area.size.x - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s Team Metrics rail did not render the composed %.0f physical contract" % [context, rail_contract])
 		var dock_board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
 		_expect(stats_area != null and dock_board_column != null and stats_area.size.x < dock_board_column.size.x, "%s Team Metrics rail grew past the planning board" % context)
 	else:
@@ -1142,45 +1044,18 @@ func _expect_scaled_tactical_surface_containment(context: String, expected_logic
 	var tactical_record: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/TacticalFieldRecordShell/TacticalRecordMark") as Label
 	_expect(tactical_record != null and not tactical_record.visible, "%s decorative tactical-record caption can still overlay gameplay" % context)
 
-func _expect_maximum_scale_hierarchy(context: String) -> void:
-	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
-	_expect(combat != null and bool(combat.get_meta("maximum_scale_layout", false)), "%s did not enter the maximum-scale priority reflow" % context)
-	if combat == null:
-		return
-	var board_column: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn")
-	var left_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea")
-	var metrics_rail: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea")
-	var metrics_title: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Header/Title") as Label
-	var scoreboard_header: Control = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea/StatsPanel/VBox/Body/Scoreboard/Header")
-	var empty_cache_header: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageHeader") as Label
-	var empty_cache_grid: GridContainer = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea/ItemStorageGrid") as GridContainer
-	var planning_directive: Label = _combat_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/PlanningDeploymentGeometry/PlanningDirective") as Label
-	_expect(board_column != null and left_rail != null and metrics_rail != null, "%s priority surfaces are missing" % context)
-	if board_column != null and left_rail != null and metrics_rail != null:
-		_expect(board_column.size.x >= left_rail.size.x * 3.5, "%s board lost planning priority over support information" % context)
-		# 148 logical pixels remains readable at 150% (222 physical pixels), and
-		# the row-level text-fit assertions below guard the actual identities.
-		_expect(metrics_rail.size.x >= 148.0, "%s Team Metrics rail is too narrow for readable identities" % context)
-	_expect(metrics_title != null and metrics_title.text == "TEAM METRICS" and metrics_title.get_theme_font_size("font_size") >= 14, "%s Team Metrics label is not a readable maximum-scale heading" % context)
-	_expect(scoreboard_header != null and scoreboard_header.is_visible_in_tree(), "%s maximum-scale Team Metrics lost its compact navigation header" % context)
-	_expect(empty_cache_header != null and not empty_cache_header.is_visible_in_tree() and String(empty_cache_header.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s empty cache header was not staged out" % context)
-	_expect(empty_cache_grid != null and not empty_cache_grid.is_visible_in_tree() and String(empty_cache_grid.get_meta("maximum_scale_disclosure", "")) == "hidden_empty_cache", "%s empty cache placeholders were not staged out" % context)
-	_expect(planning_directive != null and not planning_directive.is_visible_in_tree() and String(planning_directive.get_meta("maximum_scale_disclosure", "")) == "hidden_redundant_instruction", "%s duplicate deployment instruction was not staged out" % context)
-
-func _expect_standard_planning_containment(context: String, expected_logical_size: Vector2i, expected_scale: float, expected_tight: bool) -> void:
+func _expect_standard_planning_containment(context: String, expected_logical_size: Vector2i, expected_tight: bool) -> void:
 	var viewport_rect: Rect2 = _viewport_rect()
-	_expect(absf(viewport_rect.size.x - float(expected_logical_size.x)) <= 2.0, "%s logical width is wrong: %s" % [context, str(viewport_rect)])
-	_expect(absf(viewport_rect.size.y - float(expected_logical_size.y)) <= 2.0, "%s logical height is wrong: %s" % [context, str(viewport_rect)])
+	_expect(absf(viewport_rect.size.x - float(expected_logical_size.x)) <= 2.0, "%s viewport width is wrong: %s" % [context, str(viewport_rect)])
+	_expect(absf(viewport_rect.size.y - float(expected_logical_size.y)) <= 2.0, "%s viewport height is wrong: %s" % [context, str(viewport_rect)])
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
 	_expect(combat != null, "%s combat view missing" % context)
 	if combat == null:
 		return
-	_expect(is_equal_approx(float(combat.get_meta("persisted_ui_scale", 0.0)), expected_scale), "%s did not consume the persisted %.0f-percent UI scale" % [context, expected_scale * 100.0])
 	var dock_tier: bool = _dock_tier(combat)
 	if dock_tier:
-		# Physical 1920x1080 composes the dock at every supported UI scale, so the
-		# tier markers are the composed ones and the recorded tier has to be the
-		# tier that was drawn.
+		# 1920x1080 composes the dock, so the tier markers are the composed ones and
+		# the recorded tier has to be the tier that was drawn.
 		_expect(bool(combat.get_meta("composed_dock_tier", false)), "%s did not enter the composed 1080p dock tier" % context)
 		_expect(not bool(combat.get_meta("compact_layout", false)), "%s is still classified as the dense compact tier" % context)
 	else:
@@ -1188,7 +1063,7 @@ func _expect_standard_planning_containment(context: String, expected_logical_siz
 	# The composed dock is never a tight tier - its band is a physical constant -
 	# while the compact contexts keep the tight expectation they were written for.
 	var expected_tight_state: bool = expected_tight and not dock_tier
-	_expect(bool(combat.get_meta("tight_scale_layout", false)) == expected_tight_state, "%s tight-layout state is wrong" % context)
+	_expect(bool(combat.get_meta("tight_layout", false)) == expected_tight_state, "%s tight-layout state is wrong" % context)
 	var required_paths: PackedStringArray = PackedStringArray([
 		"MarginContainer/VBoxContainer/StageProgressTopBar",
 		"MarginContainer/VBoxContainer/BattleArea",
@@ -1301,7 +1176,7 @@ func _expect_dock_decision_record(context: String, combat: Control) -> void:
 		var badge_font_size: int = bet_value.get_theme_font_size("font_size")
 		var badge_text_width: float = badge_font.get_string_size(bet_value.text, HORIZONTAL_ALIGNMENT_LEFT, -1, badge_font_size).x if badge_font != null else 0.0
 		_expect(badge_text_width <= bet_value.size.x + 1.0, "%s wager value badge compresses its copy: text=%.1f width=%.1f" % [context, badge_text_width, bet_value.size.x])
-		_expect(float(badge_font_size) * maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0))) >= DOCK_UTILITY_MIN_FONT, "%s wager value badge fell below the %dpx legibility floor" % [context, DOCK_UTILITY_MIN_FONT])
+		_expect(float(badge_font_size) >= DOCK_UTILITY_MIN_FONT, "%s wager value badge fell below the %dpx legibility floor" % [context, DOCK_UTILITY_MIN_FONT])
 		_expect_control_inside(bet_value, "%s wager value badge" % context)
 		var wager_territory: Control = combat.get_node_or_null(DOCK_WAGER_PATH) as Control
 		if wager_territory != null:
@@ -1416,9 +1291,8 @@ func _expect_scaled_unit_detail(context: String) -> void:
 		# survives is that the detail surface has room to be complete inside the rail
 		# it was given: the rail keeps its published contract and the detail frame it
 		# hosts is a real, non-collapsed surface.
-		var detail_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
 		var rail_contract: float = _composed_rail_physical(combat)
-		_expect(absf(stats_area.size.x * detail_scale - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s unit detail left the composed rail contract: team=%.1f detail=%.1f physical=%.1f contract=%.1f" % [context, team_width, stats_area.size.x, stats_area.size.x * detail_scale, rail_contract])
+		_expect(absf(stats_area.size.x - rail_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s unit detail left the composed rail contract: team=%.1f detail=%.1f contract=%.1f" % [context, team_width, stats_area.size.x, rail_contract])
 		_expect(unit_frame.get_global_rect().size.x > 1.0 and unit_frame.get_global_rect().size.y > 1.0, "%s unit detail frame collapsed inside the composed rail" % context)
 	else:
 		_expect(stats_area.size.x >= 210.0 and stats_area.size.x > team_width + 20.0, "%s did not widen its temporary inspection rail: team=%.1f detail=%.1f" % [context, team_width, stats_area.size.x])
@@ -1434,12 +1308,11 @@ func _expect_scaled_unit_detail(context: String) -> void:
 		stats_panel.call("set_responsive_layout", true, true)
 	await _settle_frames(2)
 	if dock_tier:
-		var refresh_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
 		var refresh_contract: float = _composed_rail_physical(combat)
-		_expect(absf(stats_area.size.x * refresh_scale - refresh_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s lost the composed rail width after a responsive refresh: %.1f physical vs %.1f" % [context, stats_area.size.x * refresh_scale, refresh_contract])
+		_expect(absf(stats_area.size.x - refresh_contract) <= COMPOSED_RAIL_TOLERANCE_PHYSICAL, "%s lost the composed rail width after a responsive refresh: %.1f vs %.1f" % [context, stats_area.size.x, refresh_contract])
 	else:
 		_expect(stats_area.size.x >= 210.0, "%s lost its detail width after a responsive refresh: %.1f" % [context, stats_area.size.x])
-	_save_capture("06a_unit_detail_1920x1080_150pct.png", _main)
+	_save_capture("06a_unit_detail_1920x1080.png", _main)
 	if stats_panel.has_method("show_team_metrics"):
 		stats_panel.call("show_team_metrics")
 	await _settle_frames(6)
@@ -1485,7 +1358,6 @@ func _expect_text_children_horizontally_inside(surface: Control, context: String
 func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	var combat: Control = _main.get_node_or_null("CombatView") as Control if _main != null else null
 	var dock_tier: bool = _dock_tier(combat)
-	var maximum_scale_layout: bool = combat != null and bool(combat.get_meta("maximum_scale_layout", false))
 	var continue_button: Button = combat.find_child("ContinueButton", true, false) as Button if combat != null else null
 	var bet_row: Control = _wager_utility_group(combat)
 	var all_in_button: Button = bet_row.find_child("AllInButton", true, false) as Button if bet_row != null else null
@@ -1502,9 +1374,8 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 			# The dock's commit action is its authored physical plaque, shrunk only
 			# when the bay genuinely cannot hold it, so dominance is the plaque's own
 			# authored size rather than the compact rail's minimum.
-			var plaque_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
-			_expect(continue_button.custom_minimum_size.x * plaque_scale >= Composition.PLAQUE_PHYSICAL.x - 2.0, "%s Start Battle fell below the composed plaque's authored %.0f physical width: %.1f" % [context, Composition.PLAQUE_PHYSICAL.x, continue_button.custom_minimum_size.x * plaque_scale])
-			_expect(continue_button.custom_minimum_size.y * plaque_scale >= Composition.PLAQUE_PHYSICAL.y - 2.0, "%s Start Battle fell below the composed plaque's authored %.0f physical height: %.1f" % [context, Composition.PLAQUE_PHYSICAL.y, continue_button.custom_minimum_size.y * plaque_scale])
+			_expect(continue_button.custom_minimum_size.x >= Composition.PLAQUE_PHYSICAL.x - 2.0, "%s Start Battle fell below the composed plaque's authored %.0f width: %.1f" % [context, Composition.PLAQUE_PHYSICAL.x, continue_button.custom_minimum_size.x])
+			_expect(continue_button.custom_minimum_size.y >= Composition.PLAQUE_PHYSICAL.y - 2.0, "%s Start Battle fell below the composed plaque's authored %.0f height: %.1f" % [context, Composition.PLAQUE_PHYSICAL.y, continue_button.custom_minimum_size.y])
 		else:
 			_expect(continue_button.custom_minimum_size.x >= (176.0 if tight else 236.0), "%s Start Battle is not wide enough to dominate" % context)
 			_expect(continue_button.custom_minimum_size.y >= (38.0 if tight else 46.0), "%s Start Battle lacks dominant action height" % context)
@@ -1516,8 +1387,7 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 			# The dock's group is its own wager territory, and the column is sized by
 			# its content: the authored wager content width is the floor that keeps the
 			# controls from being compressed, and the group has to sit inside it.
-			var wager_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
-			var wager_floor: float = maxf(Composition.minimum_wager_width(wager_scale), Composition.wager_content_width(wager_scale))
+			var wager_floor: float = maxf(Composition.minimum_wager_width(), Composition.wager_content_width())
 			var wager_territory: Control = combat.get_node_or_null(DOCK_WAGER_PATH) as Control
 			_expect(String(bet_row.get_meta("dock_territory", "")) == "wager", "%s wager controls are not grouped as the dock's wager territory" % context)
 			_expect(wager_territory != null and wager_territory.is_visible_in_tree() and wager_territory.size.x >= wager_floor, "%s wager controls are too compressed" % context)
@@ -1531,8 +1401,7 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	if all_in_button != null and continue_button != null:
 		_expect(continue_button.custom_minimum_size.x > all_in_button.custom_minimum_size.x * 2.0, "%s Start Battle does not dominate its wager utility" % context)
 	if wager_label != null:
-		var label_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0))) if dock_tier else 1.0
-		_expect(wager_label.text == "WAGER" and float(wager_label.get_theme_font_size("font_size")) * label_scale >= 18.0, "%s wager label is not gameplay-legible" % context)
+		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
 	if dock_tier:
 		_expect_dock_wager_information(combat, context)
 	elif wager_summary != null:
@@ -1540,11 +1409,8 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 		_expect_wager_outcome_information(wager_summary, "%s wager outcome metadata" % context)
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
 	_expect(planning_geometry != null and planning_geometry.visible, "%s deployment geometry missing" % context)
-	if maximum_scale_layout:
-		_expect(directive != null and not directive.is_visible_in_tree() and String(directive.get_meta("maximum_scale_disclosure", "")) == "hidden_redundant_instruction", "%s duplicate planning directive was not staged out" % context)
-	else:
-		var minimum_directive_size: int = 16 if tight else 18
-		_expect(directive != null and directive.text.contains("COMMIT") and directive.get_theme_font_size("font_size") >= minimum_directive_size, "%s planning directive missing or unreadable" % context)
+	var minimum_directive_size: int = 16 if tight else 18
+	_expect(directive != null and directive.text.contains("COMMIT") and directive.get_theme_font_size("font_size") >= minimum_directive_size, "%s planning directive missing or unreadable" % context)
 
 func _expect_shop_card_contents_inside(card: Control) -> void:
 	if not (card is ShopCard):
@@ -1635,7 +1501,6 @@ func _finish() -> void:
 	_unit_select = null
 	var window: Window = get_window()
 	if window != null:
-		window.content_scale_factor = _original_scale
 		if _original_window_size != Vector2i.ZERO:
 			window.size = _original_window_size
 			window.content_scale_size = _original_window_size
