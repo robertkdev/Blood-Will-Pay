@@ -6,6 +6,7 @@ const VisionSnapshot := preload("res://scripts/util/vision_snapshot.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const UI_FIT_AUDITOR: GDScript = preload("res://tests/visual/ui_fit_auditor.gd")
 const UNIT_FACTORY_SCRIPT: GDScript = preload("res://scripts/unit_factory.gd")
+const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
 const SMOKE_NAME: String = "CompactViewportVisualAuditSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/compact_viewport_audit"
 const TEST_SETTINGS_PATH: String = "user://compact_viewport_visual_audit_settings.cfg"
@@ -585,6 +586,32 @@ func _expect_wager_outcome_information(summary: Label, context: String) -> void:
 	_expect(text.contains("%"), "%s omitted its odds range" % context)
 	_expect(text.contains("-"), "%s omitted its odds spread" % context)
 	_expect(text.split("/").size() >= 2, "%s omitted its win/loss comparison" % context)
+
+## Check the decision data the player can see, including exact projected reserves.
+## The legacy summary is intentionally hidden in the composed dock.
+func _expect_dock_wager_information(combat: Control, context: String) -> void:
+	var summary: Label = _wager_summary_label(combat)
+	var data: Dictionary = summary.get_meta("outcome_quotes", {}) as Dictionary if summary != null else {}
+	_expect(bool(data.get("active", false)), "%s lacks active wager quotes" % context)
+	var scale_factor: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0)))
+	for outcome: String in ["Win", "Loss"]:
+		var row: Control = combat.find_child("Wager%sRow" % outcome, true, false) as Control
+		_expect(row != null and row.is_visible_in_tree(), "%s hid its %s outcome" % [context, outcome])
+		if row == null:
+			continue
+		_expect_control_inside(row, "%s %s outcome" % [context, outcome])
+		var caption: Label = row.get_node("OutcomeLine/OutcomeCaption") as Label
+		var value: Label = row.get_node("OutcomeLine/OutcomeValue") as Label
+		var prefix: String = outcome.to_lower()
+		_expect(caption.text == "%s  %d-%d%%" % [outcome.to_upper(), int(data.get(prefix + "_low", -1)), int(data.get(prefix + "_high", -1))], "%s %s odds are stale or incomplete" % [context, outcome])
+		_expect(value.text == BloodBuckets.format_amount(int(data.get("after_" + prefix, -1))), "%s %s projected reserve is stale" % [context, outcome])
+		for label: Label in [caption, value]:
+			_expect(label.is_visible_in_tree(), "%s %s label hidden" % [context, outcome])
+			_expect_control_inside(label, "%s %s text" % [context, outcome])
+			var font_size: int = label.get_theme_font_size("font_size")
+			_expect(float(font_size) * scale_factor >= (15.0 if label == caption else 18.0), "%s %s text below physical legibility floor" % [context, outcome])
+			var ink: Vector2 = label.get_theme_font("font").get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size)
+			_expect(ink.x <= label.size.x + 1.0, "%s %s text overflows its row" % [context, outcome])
 
 func _expect_control_inside(control: Control, label: String) -> void:
 	_expect(control != null, "%s missing" % label)
@@ -1208,10 +1235,7 @@ func _expect_scaled_decision_data(context: String) -> void:
 		# the same blood/level/XP record in its band header, so the record and the
 		# wager outcomes are read from the labels the band actually draws.
 		_expect_dock_decision_record(context, combat)
-		_expect(wager_summary != null and wager_summary.is_visible_in_tree(), "%s composed dock hid its wager outcomes" % context)
-		if wager_summary != null:
-			_expect_wager_outcome_information(wager_summary, "%s wager outcome record" % context)
-			_expect_control_inside(wager_summary, "%s wager outcome record" % context)
+		_expect_dock_wager_information(combat, context)
 		return
 	var resource_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
 	var bet_value: Label = combat.find_child("BetValue", true, false) as Label if combat != null else null
@@ -1248,7 +1272,7 @@ func _expect_scaled_decision_data(context: String) -> void:
 func _expect_dock_decision_record(context: String, combat: Control) -> void:
 	var band: Control = _dock_band(combat)
 	var compact_strip: Label = _combat_node("MarginContainer/VBoxContainer/BottomStorageArea/CompactResourceStrip") as Label
-	var gold_source: Label = combat.find_child("GoldLabel", true, false) as Label if combat != null else null
+	var gold_source: Label = combat.find_child("WagerReserve", true, false) as Label if combat != null else null
 	var progress_source: Label = _find_progress_source()
 	var bet_value: Label = combat.find_child("BetValue", true, false) as Label if combat != null else null
 	_expect(band != null and band.is_visible_in_tree(), "%s composed dock lost its lower band" % context)
@@ -1277,7 +1301,7 @@ func _expect_dock_decision_record(context: String, combat: Control) -> void:
 		var badge_font_size: int = bet_value.get_theme_font_size("font_size")
 		var badge_text_width: float = badge_font.get_string_size(bet_value.text, HORIZONTAL_ALIGNMENT_LEFT, -1, badge_font_size).x if badge_font != null else 0.0
 		_expect(badge_text_width <= bet_value.size.x + 1.0, "%s wager value badge compresses its copy: text=%.1f width=%.1f" % [context, badge_text_width, bet_value.size.x])
-		_expect(badge_font_size >= DOCK_UTILITY_MIN_FONT, "%s wager value badge fell below the %dpx legibility floor" % [context, DOCK_UTILITY_MIN_FONT])
+		_expect(float(badge_font_size) * maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0))) >= DOCK_UTILITY_MIN_FONT, "%s wager value badge fell below the %dpx legibility floor" % [context, DOCK_UTILITY_MIN_FONT])
 		_expect_control_inside(bet_value, "%s wager value badge" % context)
 		var wager_territory: Control = combat.get_node_or_null(DOCK_WAGER_PATH) as Control
 		if wager_territory != null:
@@ -1507,8 +1531,11 @@ func _expect_planning_action_hierarchy(context: String, tight: bool) -> void:
 	if all_in_button != null and continue_button != null:
 		_expect(continue_button.custom_minimum_size.x > all_in_button.custom_minimum_size.x * 2.0, "%s Start Battle does not dominate its wager utility" % context)
 	if wager_label != null:
-		_expect(wager_label.text == "WAGER" and wager_label.get_theme_font_size("font_size") >= 18, "%s wager label is not gameplay-legible" % context)
-	if wager_summary != null:
+		var label_scale: float = maxf(1.0, float(combat.get_meta("persisted_ui_scale", 1.0))) if dock_tier else 1.0
+		_expect(wager_label.text == "WAGER" and float(wager_label.get_theme_font_size("font_size")) * label_scale >= 18.0, "%s wager label is not gameplay-legible" % context)
+	if dock_tier:
+		_expect_dock_wager_information(combat, context)
+	elif wager_summary != null:
 		_expect(wager_summary.get_theme_font_size("font_size") >= (14 if tight else 18), "%s wager outcome metadata is too small" % context)
 		_expect_wager_outcome_information(wager_summary, "%s wager outcome metadata" % context)
 		_expect_control_inside(wager_summary, "%s wager outcome summary" % context)
