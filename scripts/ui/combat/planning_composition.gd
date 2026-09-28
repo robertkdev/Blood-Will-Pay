@@ -235,7 +235,7 @@ static func board_span(board_column_width: float) -> float:
 static func board_tile_size(board_column_width: float, available_height: float) -> Vector2:
 	var width: float = board_tile_width(board_column_width)
 	var height_cap: float = BOARD_MAX_TILE_HEIGHT_PHYSICAL
-	var from_width: float = width * 0.58
+	var from_width: float = width * 0.72
 	# Six rows plus four in-half gaps and the planning seam have to fit.
 	var rows_fit: float = floorf((available_height - BOARD_PLANNING_SEPARATION - BOARD_GAP * 4.0) / 6.0)
 	var height: float = from_width

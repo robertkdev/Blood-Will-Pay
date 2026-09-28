@@ -363,6 +363,11 @@ static func board_tile_style(is_player: bool, modulate: Color = Color.WHITE) -> 
 	var path: String = BOARD_TILE_PLAYER if is_player else BOARD_TILE_ENEMY
 	return texture_style(path, Vector4(22.0, 22.0, 22.0, 22.0), Vector4(0.0, 0.0, 0.0, 0.0), modulate)
 
+## Complete Inkscape-authored edges with a transparent recess beneath figures.
+static func deployment_cell_style(is_player: bool) -> StyleBoxTexture:
+	var path: String = "res://assets/ui/gothic/deployment_cell_player.png" if is_player else "res://assets/ui/gothic/deployment_cell_enemy.png"
+	return texture_style(path, Vector4(12.0, 12.0, 12.0, 12.0), Vector4.ZERO, Color.WHITE)
+
 ## Quiet recessed iron: the gameplay panel fallback, and the shape the approved
 ## generated panel replaces. Deliberately flat, with one thin edge rather than a
 ## bevel, so panels read as construction instead of a stack of bright outlines.

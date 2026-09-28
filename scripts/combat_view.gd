@@ -1026,7 +1026,8 @@ func _position_planning_labels() -> void:
 	for node_name: String in ["BoardStatusRow", "BoardStatusBackplate"]:
 		var status: Control = find_child(node_name, true, false) as Control
 		if status != null:
-			status.size.y = minf(float(status.get_meta("authored_status_height", status.size.y)), seam)
+			var height: float = minf(float(status.get_meta("authored_status_height", status.size.y)), seam)
+			status.offset_bottom = status.offset_top + height
 			status.global_position.y = gap_center - status.size.y * 0.5
 	for grid: GridContainer in [enemy_grid, player_grid]:
 		var area: Control = grid.get_parent() as Control
@@ -1040,6 +1041,7 @@ func _position_planning_labels() -> void:
 				label.global_position = Vector2(grid.global_position.x, maxf(area.global_position.y, grid.global_position.y - 22.0))
 			else:
 				label.autowrap_mode = TextServer.AUTOWRAP_WORD
+				label.add_theme_font_size_override("font_size", 18)
 				label.size = Vector2(minf(164.0, side_width), 32.0)
 				label.global_position = Vector2(area.global_position.x + 4.0, grid.global_position.y)
 
@@ -2108,6 +2110,38 @@ func _apply_dock_bench_alignment() -> void:
 		bench_area.set_meta("composed_bench_center_delta", row_rect.get_center().x - column_rect.get_center().x)
 		bench_area.set_meta("composed_bench_host_minimum", bench_area.get_combined_minimum_size().x)
 
+func _position_dock_headings() -> void:
+	# Labels occupy the existing left gutters and do not affect container minima.
+	var target: Control = bench_grid
+	var label: Label = get_node_or_null("BenchSectionHeading") as Label
+	if label == null:
+		label = Label.new()
+		label.name = "BenchSectionHeading"
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.text = "BENCH"
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 20)
+		label.add_theme_color_override("font_color", Color(0.81, 0.70, 0.49))
+		VisualTypeSystem.set_gameplay_heading(label)
+		add_child(label)
+	label.visible = target != null and target.is_visible_in_tree() and bool(get_meta("full_hd_dock", false))
+	if label.visible:
+		var bounds: Rect2 = target.get_global_rect()
+		label.size = Vector2(122.0, bounds.size.y)
+		label.global_position = Vector2(bounds.position.x - 138.0, bounds.position.y)
+	var shop_bar: HBoxContainer = _dock_shop_bar()
+	if shop_bar != null and shop_bar.get_node_or_null("ShopSectionHeading") == null:
+		var shop_heading: Label = Label.new()
+		shop_heading.name = "ShopSectionHeading"
+		shop_heading.text = "SHOP"
+		shop_heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		shop_heading.custom_minimum_size.x = 76.0
+		shop_heading.add_theme_font_size_override("font_size", 20)
+		shop_heading.add_theme_color_override("font_color", Color(0.81, 0.70, 0.49))
+		VisualTypeSystem.set_gameplay_heading(shop_heading)
+		shop_bar.add_child(shop_heading)
+		shop_bar.move_child(shop_heading, 0)
+
 func _dock_shop_bar() -> HBoxContainer:
 	var bottom_storage: VBoxContainer = get_node_or_null("MarginContainer/VBoxContainer/BottomStorageArea") as VBoxContainer
 	if bottom_storage == null:
@@ -2456,6 +2490,7 @@ func _refresh_dock_territories() -> bool:
 	# row and shift the row by the residual, so an asymmetric realised rail (not a
 	# nominal symmetric assumption) is what the bench follows.
 	_apply_dock_bench_alignment()
+	_position_dock_headings()
 	# Re-assert the composed rail contract last, so a presenter that rebuilt its
 	# rows after the layout pass cannot re-inflate the rail it lives in.
 	_reassert_composed_rails()

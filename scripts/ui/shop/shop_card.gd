@@ -1190,7 +1190,7 @@ func _format_list(values: Array, limit: int) -> String:
 		return ""
 	var formatted := PackedStringArray()
 	for i in range(min(limit, values.size())):
-		var token := _prettify_token(String(values[i]))
+		var token: String = _format_goal(String(values[i]))
 		if token != "":
 			formatted.append(token)
 	if values.size() > limit:

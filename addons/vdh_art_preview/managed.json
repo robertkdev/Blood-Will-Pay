@@ -1,6 +1,6 @@
 {
   "package": "visual-debug-harness",
-  "version": "0.16.15",
+  "version": "0.16.19",
   "files": {
     ".gitattributes": "18c369be397cc1afcc9d21b28773bc15f9be2038181bc4e7da6c81488804b72d",
     "arrange_tools.gd": "97e4d966afefb3710f6adab0319c6309247ffaece31f4adc7f4bf3f45cce8edc",
@@ -16,13 +16,13 @@
     "generic_adapter.gd": "f65a997288d053087cb57716f90f4c02adee0b4086145ff2b449791046c4aa01",
     "input_tools.gd": "f8ec70a9a7de72a54ba96fe9f5322ed22f90cc44641da7e10ed812f1352310a1",
     "json_publications.gd": "b5180b6fb11f8cbca0cdc7a13f28f943bc83ee7e13a24933940d294faf548977",
-    "layer_tools.gd": "36dbd34b507dabe5e9d9c36e68e19690b3dc1eed904f31a06520da28b639ffc5",
+    "layer_tools.gd": "6fcedd2cde63612ebc52d4b206be2e7069c63ebef14aea93d7716634d48e92c1",
     "picking.gd": "00ad77c9f830bdb4e6426740f97e9ff0496319c582658a7aa52b31d36242ea25",
     "render_bounds.gd": "121a1e00b09e8e8d374b6dca665bb4dd29b5fbdac6b2b661029c817c64ba7459",
     "render_scene.gd": "80232db53075c4db04007c94feecd6ce5ab9ea094087bd66b8fe816f6442e734",
     "resource_snapshots.gd": "f5b1e08fb4a3baff990c816bc66daac249058666740ec9362b6bb8deed0e63f3",
     "runtime_tools.gd": "23b3499f8da6e01d27cf15a35a81690b23bfbca15d60618c6f825903dbd8af7e",
-    "scene_tools.gd": "dc573bcb80470f9e18e0e26af9bc158864f9454e15a0ec336baed8cc43148e23",
+    "scene_tools.gd": "4b183bd298031d652a7814e9967ecc15844f470c8789dbbb762295d93fb9b1d7",
     "surface_spec.gd": "52cc036d695141eff1af6a823b69ce62ed5040528e001cedb2007efd5c645f56",
     "surface_tools.gd": "b315aa8e46f593714f1ca75bcfa4a538833d36eec1837ad686e78b9da83cc953",
     "texture_readiness.gd": "bc6553c736d0d82e3371015a6817c0562ba27c1222b2a8b5914d62ef85d0b3ba",

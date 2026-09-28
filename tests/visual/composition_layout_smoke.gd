@@ -3,7 +3,7 @@ extends Node
 ## Checks the composed 1920x1080 planning screen: matched support rails, a
 ## bench that hangs off the field, and one lower dock that groups the shop,
 ## the wager controls and a substantial primary action instead of stacking
-## full-width strips. It renders the real CombatView at 100 percent UI scale;
+## full-width strips. It renders the real CombatView at the authored fullscreen size;
 ## nothing here restates the layout maths, it measures the laid-out controls.
 
 const SMOKE_NAME: String = "CompositionLayoutSmoke"
@@ -413,19 +413,17 @@ func _assert_dock_controls() -> void:
 			var text_width: float = font.get_string_size(continue_button.text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size).x
 			_expect(text_width <= continue_button.size.x - 6.0, "primary action copy clips the plaque: text=%.1f width=%.1f" % [text_width, continue_button.size.x])
 		_expect(font_size >= 20, "primary action type is too small for a plaque: %d" % font_size)
-	# The wager quote belongs to the wager column instead of the whole screen.
-	# The quote is now the wager territory's own header, not a row of the outer
-	# stack, so it is looked up by name and asserted inside its territory.
-	var summary: Control = _find_control("WagerSummary")
-	_expect(summary != null and summary.is_visible_in_tree(), "wager quote missing from the composed dock")
-	if summary != null and summary.is_visible_in_tree():
-		var summary_rect: Rect2 = summary.get_global_rect()
-		_expect(summary.size.x <= viewport_rect.size.x * 0.4, "wager quote still spans the screen: %.1f" % summary.size.x)
-		_expect(wager_rect.grow(3.0).encloses(summary_rect), "wager quote is not inside its wager territory: quote=%s wager=%s" % [str(summary_rect), str(wager_rect)])
-		_expect(_has_ancestor_named(summary, "WagerTerritory"), "wager quote is not parented into the wager territory")
-		_expect_inside(summary, viewport_rect, "wager quote")
-	_expect_plaque_content_fit("100 percent")
-	_expect_countdown_readout_fit("100 percent")
+	# The legacy summary is hidden by the composed reserve/outcome controls.
+	# Measure what the player actually sees, including both authoritative outcomes.
+	for field_name: String in ["WagerReserve", "WagerWinRow", "WagerLossRow"]:
+		var field: Control = _find_control(field_name)
+		_expect(field != null and field.is_visible_in_tree(), "Visible wager data missing: " + field_name)
+		if field != null:
+			_expect_inside(field, wager_rect.grow(3.0), field_name)
+			_expect(_has_ancestor_named(field, "WagerTerritory"), field_name + " escaped its territory")
+
+	_expect_plaque_content_fit("fullscreen")
+	_expect_countdown_readout_fit("fullscreen")
 
 func _assert_no_redundant_strips() -> void:
 	for plate_path: String in [

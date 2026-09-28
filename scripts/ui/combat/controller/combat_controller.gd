@@ -1180,7 +1180,7 @@ func set_board_timer_text(text: String, active: bool = true) -> void:
 	board_timer_label.text = cleaned
 	board_timer_label.tooltip_text = "Planning countdown before auto-start." if cleaned.begins_with("Plan") else "Current combat phase."
 	if board_phase_label != null:
-		board_phase_label.text = "/// %s" % ("PLAN" if active else "FIGHT")
+		board_phase_label.text = "PLAN" if active else "FIGHT"
 
 func _current_board_cap() -> int:
 	var cap: int = 0

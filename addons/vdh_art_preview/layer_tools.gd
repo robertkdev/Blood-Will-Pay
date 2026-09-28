@@ -4,7 +4,7 @@ extends RefCounted
 
 const CLASSES := ["Node2D", "CanvasGroup", "Sprite2D", "Polygon2D", "Line2D", "Marker2D", "Path2D",
 	"AnimatedSprite2D", "AnimationPlayer", "CPUParticles2D", "GPUParticles2D",
-	"Control", "Button", "ColorRect", "TextureRect", "NinePatchRect", "Panel", "Label", "RichTextLabel", "ProgressBar",
+	"Control", "Button", "ColorRect", "TextureRect", "NinePatchRect", "Panel", "Label", "RichTextLabel", "ProgressBar", "HScrollBar", "VScrollBar",
 	"HBoxContainer", "VBoxContainer", "GridContainer", "MarginContainer", "PanelContainer", "ScrollContainer"]
 var root: Node
 var active: Array = []
@@ -50,7 +50,7 @@ func _build(definition: Dictionary, path: String, edits: Array, budget: Array, c
 	budget[0] += 1
 	var node: Node = ClassDB.instantiate(kind) as Node
 	node.name = title
-	if node is Control and not node is BaseButton and not node is ScrollContainer:
+	if node is Control and not node is BaseButton and not node is ScrollContainer and not node is ScrollBar:
 		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var properties: Variant = definition.get("properties", {})
 	var initial: Variant = definition.get("initial_properties", {})
@@ -195,6 +195,20 @@ func prepare(operations: Array, codec: RefCounted, replace: bool = false) -> Dic
 				if not operation.get("properties", {}) is Dictionary:
 					error = "Duplicate property overrides must be an object"
 					break
+				# Control stores its rectangle as offsets. A requested position/size
+				# alias would otherwise compete with those captured offsets during
+				# verification. Keep the rectangle in the same coordinate system as
+				# the requested edit, without pinning the old offset aliases too.
+				var overrides: Dictionary = operation.get("properties", {})
+				var rectangle_override := false
+				for key: String in overrides:
+					if key.split(":")[0] in ["position", "size"]: rectangle_override = true
+				if nodes[path] is Control and rectangle_override:
+					var control: Control = nodes[path]
+					for key: String in ["offset_left", "offset_top", "offset_right", "offset_bottom"]:
+						definition.properties.erase(key)
+					definition.properties["position"] = codec._value_recipe(control.position)
+					definition.properties["size"] = codec._value_recipe(control.size)
 				definition.properties.merge(operation.get("properties", {}), true)
 			if not definition is Dictionary:
 				error = "create requires node {class,name,properties?,children?}"

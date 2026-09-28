@@ -102,10 +102,13 @@ func _verify_wager_input() -> void:
 	var quote: Label = _view.get("wager_summary") as Label
 	var win_value: Label = _view.find_child("WagerWinRow", true, false).get_node("OutcomeLine/OutcomeValue") as Label
 	var loss_value: Label = _view.find_child("WagerLossRow", true, false).get_node("OutcomeLine/OutcomeValue") as Label
-	await _click_review_button(increment)
-	_expect(Economy.current_bet == 2, "Pointer increment did not set the authoritative wager")
-	await _click_review_button(decrement)
-	_expect(Economy.current_bet == 1 and decrement.disabled, "Pointer decrement failed or minimum remains actionable")
+	# Repeated fast reversals expose stale disabled states and layout races.
+	for attempt: int in range(4):
+		await _click_review_button(increment)
+		_expect(Economy.current_bet == 2, "Pointer increment did not set the authoritative wager")
+		await _click_review_button(decrement)
+		_expect(Economy.current_bet == 1 and decrement.disabled, "Pointer decrement failed or minimum remains actionable")
+
 	slider.grab_focus()
 	for down: bool in [true, false]:
 		var key: InputEventKey = InputEventKey.new()
@@ -174,6 +177,8 @@ func _move_review_pointer(position: Vector2) -> void:
 	await get_tree().process_frame
 
 func _click_review_button(button: Button) -> void:
+	var before_click: Rect2 = button.get_global_rect()
+	var was_disabled: bool = button.disabled
 	var received: Array[bool] = [false]
 	var witness: Callable = func() -> void: received[0] = true
 	button.pressed.connect(witness)
@@ -192,7 +197,7 @@ func _click_review_button(button: Button) -> void:
 	await _settle_frames(2)
 	if is_instance_valid(button) and button.pressed.is_connected(witness):
 		button.pressed.disconnect(witness)
-	_expect(received[0], "Composed primary action did not receive its pointer click")
+	_expect(received[0], "%s did not receive its pointer click (disabled=%s, before=%s, after=%s, wager=%d)" % [button.name, was_disabled, before_click, button.get_global_rect(), Economy.current_bet])
 
 func _units(ids: Array[String]) -> Array[Unit]:
 	var units: Array[Unit] = []

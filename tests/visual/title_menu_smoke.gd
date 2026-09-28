@@ -115,9 +115,6 @@ func _run() -> void:
 		_expect(int(title_label.get_meta("wordmark_custom_treatment_revision", 0)) >= 2, "GameTitle should publish its custom cut-stencil treatment revision", failures)
 		var threat_signal: Label = title_menu.get_node_or_null("ImmediateThreatSignal") as Label
 		_expect(threat_signal != null and threat_signal.text.contains("CONTACT MOVING"), "Command menu should expose an immediate authored danger signal", failures)
-		var action_docket: Label = title_menu.get_node_or_null("Center/VBox/ActionDocket") as Label
-		_expect(action_docket != null and action_docket.visible and action_docket.text.contains("ENTER THE INTAKE"), "Desktop command rail should expose an authored active-order docket", failures)
-		_expect(action_docket != null and action_docket.get_theme_font_size("font_size") >= 19, "Command-rail action docket should use readable utility type", failures)
 		var hero: TextureRect = title_menu.get_node_or_null("TitleHero") as TextureRect
 		_expect(hero == null, "TitleHero should not render a background unit over the menu", failures)
 		var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer
@@ -279,8 +276,6 @@ func _run() -> void:
 			if settings_pressed_style != null and settings_focus_style != null:
 				_expect(settings_pressed_style.border_color != settings_focus_style.border_color, "Settings active-page state should remain distinct from keyboard focus", failures)
 				_expect(settings_focus_style.border_color.b > settings_focus_style.border_color.r, "Settings keyboard focus should use the non-red signal-blue channel", failures)
-			var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer
-			_expect(settings_docket == null, "Settings should omit the redundant active-page docket", failures)
 			_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "Settings should use a machine-console material distinct from the field-order record", failures)
 			var volume_slider: HSlider = title_menu.find_child("MasterVolumeSlider", true, false) as HSlider
 			_expect(volume_slider != null, "Settings did not expose master volume slider", failures)

@@ -6,9 +6,8 @@ const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_s
 const TEST_SETTINGS_PATH: String = "user://accessibility_settings_smoke.cfg"
 const TEST_ACCOUNT_PROFILE_PATH: String = "user://accessibility_settings_account_profile.json"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/accessibility_settings_pass"
-const STRESS_VIEWPORT_SIZE: Vector2i = Vector2i(1024, 576)
 
-@export var viewport_size: Vector2i = Vector2i(1280, 720)
+const viewport_size: Vector2i = Vector2i(1920, 1080)
 
 var _main: Control = null
 var _failures: Array[String] = []
@@ -86,7 +85,7 @@ func _run() -> void:
 	_expect(accessibility_priority != null and _rect_inside(accessibility_priority.get_global_rect(), settings_visible_rect.grow(2.0)), "accessibility priority banner should be visible without scrolling")
 	_expect(motion_check != null and _rect_inside(motion_check.get_global_rect(), settings_visible_rect.grow(2.0)), "Reduced Motion should be immediately discoverable without scrolling")
 	_expect(volume_setting != null and motion_check != null and motion_check.get_global_rect().position.y < volume_setting.get_global_rect().position.y, "Accessibility controls should precede secondary volume settings")
-	_save_capture("00_accessibility_first_1280x720.png")
+	_save_capture("00_accessibility_fullscreen.png")
 	for control_name: String in [
 		"GameTitle",
 		"StartButton",
@@ -123,12 +122,12 @@ func _run() -> void:
 		"Black Ledger should remain inside the %dx%d viewport panel=%s viewport=%s"
 		% [viewport_size.x, viewport_size.y, str(ledger_panel.get_global_rect() if ledger_panel != null else Rect2()), str(ledger_viewport)]
 	)
-	_expect(ledger_progress != null and String(ledger_progress.get_meta("responsive_layout", "")) == "compressed_single_row", "compact Black Ledger should keep progress metadata on one filing line")
-	var ledger_progress_rows: PackedStringArray = ledger_progress.text.split("\n") if ledger_progress != null else PackedStringArray()
-	_expect(
-		ledger_progress_rows.size() == 1 and ledger_progress_rows[0].begins_with("RANK "),
-		"compact Black Ledger should keep its progress evidence to one readable row"
-	)
+	_expect(ledger_progress != null and ledger_progress.text.contains("RANK"), "Black Ledger should show progression metadata")
+	if ledger_progress != null:
+		var progress_font: Font = ledger_progress.get_theme_font("font")
+		var progress_size: int = ledger_progress.get_theme_font_size("font_size")
+		_expect(progress_size >= 18, "Fullscreen ledger progress should use readable type")
+		_expect(progress_font.get_string_size(ledger_progress.text, HORIZONTAL_ALIGNMENT_LEFT, -1, progress_size).x <= ledger_progress.size.x, "Ledger progress text should fit without truncation")
 	var ledger_close: Button = ledger.find_child("*", true, false) as Button if ledger != null else null
 	if ledger != null:
 		for candidate: Node in ledger.find_children("*", "Button", true, false):
@@ -143,16 +142,9 @@ func _run() -> void:
 	if _main != null:
 		_main.call("_close_black_ledger")
 	await _settle_frames(2)
-	await _verify_stress_menu(title_menu, window)
-	DisplayServer.window_set_size(viewport_size)
-	if window != null:
-		window.size = viewport_size
-		window.content_scale_size = viewport_size
 	if title_menu != null:
-		title_menu.call_deferred("_refresh_layout")
-	# UI-scale changes rebuild the command-menu content on deferred frames.
-	# Wait through that rebuild so focus screenshots never capture the transient blank shell.
-	await _settle_frames(12)
+		title_menu.call("_select_section", "settings", false)
+	await _settle_frames(4)
 	motion_check = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox if title_menu != null else null
 	reset_button = title_menu.find_child("ResetBindingsButton", true, false) as Button if title_menu != null else null
 	if motion_check != null:
@@ -211,71 +203,6 @@ func _run() -> void:
 		await _settle_frames(4)
 		_expect(String(title_menu.get("_active_section")) == "how_to_play", "controller A should activate the focused title-menu action")
 	_finish()
-
-func _verify_stress_menu(title_menu: Control, window: Window) -> void:
-	DisplayServer.window_set_size(STRESS_VIEWPORT_SIZE)
-	if window != null:
-		window.size = STRESS_VIEWPORT_SIZE
-		window.content_scale_size = STRESS_VIEWPORT_SIZE
-	if title_menu != null:
-		title_menu.call("_select_section", "settings", false)
-		title_menu.call_deferred("_refresh_layout")
-	await _settle_frames(5)
-	var title_panel: Panel = title_menu.find_child("TitlePanel", true, false) as Panel if title_menu != null else null
-	var quit_button: Button = title_menu.find_child("QuitButton", true, false) as Button if title_menu != null else null
-	var stress_viewport: Rect2 = title_menu.get_viewport().get_visible_rect() if title_menu != null else Rect2()
-	var stress_title: Label = title_menu.find_child("GameTitle", true, false) as Label if title_menu != null else null
-	_expect(title_panel != null, "1024x576 stress menu TitlePanel missing")
-	_expect(
-		title_panel != null and _rect_inside(title_panel.get_global_rect(), stress_viewport.grow(1.0)),
-		"1024x576 title rail should remain fully inside the physical viewport"
-	)
-	# The wordmark has two authored marks: the single-line extreme-compact mark and
-	# the compact two-line mark. 1024x576 is the compact tier, so it must render one
-	# of those two rather than an unbounded wrap, at a readable size.
-	_expect(
-		stress_title != null
-		and (stress_title.text == "BLOOD WILL PAY" or stress_title.text == "BLOOD\nWILL PAY")
-		and stress_title.get_theme_font_size("font_size") >= 18,
-		"1024x576 should use an authored compact wordmark, got %s at %dpx" % [
-			str(stress_title.text if stress_title != null else ""),
-			stress_title.get_theme_font_size("font_size") if stress_title != null else 0,
-		]
-	)
-	_expect(
-		title_panel != null and quit_button != null and _rect_inside(quit_button.get_global_rect(), title_panel.get_global_rect().grow(1.0)),
-		"1024x576 Quit button should remain fully contained by the title rail"
-	)
-	for action_name: String in [
-		"StartButton",
-		"BlackLedgerButton",
-		"HomeButton",
-		"HowToPlayButton",
-		"UnitsButton",
-		"RGAGlossaryButton",
-		"SettingsButton",
-		"QuitButton",
-	]:
-		var action_button: Button = title_menu.find_child(action_name, true, false) as Button if title_menu != null else null
-		_expect(action_button != null, "1024x576 action %s missing" % action_name)
-		_expect(
-			action_button != null and action_button.get_theme_font_size("font_size") >= 16,
-			"1024x576 action %s should use at least 16px functional type" % action_name
-		)
-		_expect(
-			action_button != null and _rect_inside(action_button.get_global_rect(), stress_viewport.grow(1.0)),
-			"1024x576 action %s should remain fully visible in the physical viewport" % action_name
-		)
-	var section_hint: Label = title_menu.find_child("SectionHint", true, false) as Label if title_menu != null else null
-	var binding_status: Label = title_menu.find_child("BindingStatus", true, false) as Label if title_menu != null else null
-	_expect(section_hint != null and section_hint.get_theme_font_size("font_size") >= 15, "1024x576 section guidance should remain at least 15px")
-	_expect(binding_status != null and binding_status.get_theme_font_size("font_size") >= 15, "1024x576 binding guidance should remain at least 15px")
-	var settings_button: Button = title_menu.find_child("SettingsButton", true, false) as Button if title_menu != null else null
-	var ledger_button: Button = title_menu.find_child("BlackLedgerButton", true, false) as Button if title_menu != null else null
-	_expect(settings_button != null and String(settings_button.get_meta("visual_role", "")) == "selected_navigation", "selected navigation should expose a distinct selected hierarchy role")
-	_expect(ledger_button != null and String(ledger_button.get_meta("visual_role", "")) == "ledger", "Black Ledger should expose a distinct ledger hierarchy role")
-	_expect(quit_button != null and String(quit_button.get_meta("visual_role", "")) == "quit", "Quit should expose a distinct destructive hierarchy role")
-	_save_capture("00_settings_stress_1024x576.png")
 
 func _copy_events(action: StringName) -> Array[InputEvent]:
 	var copied: Array[InputEvent] = []

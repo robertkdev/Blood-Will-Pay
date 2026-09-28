@@ -505,7 +505,7 @@ func _row_separation() -> int:
 ## Traits want the largest readable name the rail can hold; the rail width, not
 ## the UI tier, decides how far down the candidate list we walk.
 func _preferred_name_font_size() -> int:
-	return 14
+	return 18
 
 func _row_height_for_width(width: float) -> float:
 	if width < 150.0:

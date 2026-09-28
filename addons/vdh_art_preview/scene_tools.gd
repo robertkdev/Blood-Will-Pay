@@ -439,8 +439,11 @@ func export_layers() -> Array:
 	return _layers.export_layers()
 
 func _edit_values(edits: Array, label: String, replace_state: bool, context: Dictionary, structural: bool) -> Dictionary:
-	if (not replace_state and edits.is_empty() and context.is_empty() and not structural) or edits.size() > (4096 if replace_state or structural else 128):
-		return _fail("A transaction needs 1..128 edits; a saved state supports 0..4096")
+	# A saved composition accumulates many properties per node across transactions.
+	# Its property budget must not accidentally equal the independent node ceiling.
+	var property_limit: int = 65536 if replace_state else 4096 if structural else 128
+	if (not replace_state and edits.is_empty() and context.is_empty() and not structural) or edits.size() > property_limit:
+		return _fail("Property count %d exceeds the allowed 1..%d transaction range (empty saved/context states are permitted)" % [edits.size(), property_limit])
 	var slots: Dictionary = {}
 	var checks: Dictionary = {} if replace_state else _checks.duplicate(true)
 	var recipe: Dictionary = {} if replace_state else _recipe.duplicate(true)
@@ -545,18 +548,43 @@ func _edit_values(edits: Array, label: String, replace_state: bool, context: Dic
 	_redo.clear()
 	return {"ok": true, "changed": true, "edit_count": edits.size(), "history": history_status()}
 
-func _set_slots(slots: Array, side: String) -> void:
+func _ordered_slots(slots: Array) -> Array:
+	# Fonts, text, themes, textures and expansion modes can change Control's
+	# native minimum size. Apply them before rectangle aliases, independent of
+	# JSON property order. Size precedes position because grow modes can move it.
+	var ordinary: Array = []
+	var sizes: Array = []
+	var positions: Array = []
 	for slot: Dictionary in slots:
+		if is_instance_valid(slot.node) and slot.node is Control and slot.property == "size":
+			sizes.append(slot)
+		elif is_instance_valid(slot.node) and slot.node is Control and slot.property == "position":
+			positions.append(slot)
+		else:
+			ordinary.append(slot)
+	return ordinary + sizes + positions
+
+func _set_slots(slots: Array, side: String) -> void:
+	for slot: Dictionary in _ordered_slots(slots):
 		if is_instance_valid(slot.node):
-			slot.node.set(slot.property, slot[side])
+			_assign_slot(slot, side)
+
+func _assign_slot(slot: Dictionary, side: String) -> void:
+	slot.node.set(slot.property, slot[side])
+	if slot.node is Control and slot.property == "size" and not _same(slot.node.size, slot[side]):
+		# A wrapping Label can cache a tall minimum using its previous width.
+		# Refresh after the requested width lands, then retry once. Impossible
+		# final sizes still fail normal readback and roll back the transaction.
+		slot.node.update_minimum_size()
+		slot.node.set(slot.property, slot[side])
 
 func reapply() -> void:
 	# Native setters may have effects even when assigned the current value.
 	# CPUParticles2D.amount, for example, clears its live particle population.
 	# Repair actual drift without restarting a correct scene on every capture.
-	for slot: Dictionary in _held.values():
+	for slot: Dictionary in _ordered_slots(_held.values()):
 		if is_instance_valid(slot.node) and not _same(slot.node.get(slot.property), slot.after):
-			slot.node.set(slot.property, slot.after)
+			_assign_slot(slot, "after")
 
 func _verify(checks: Dictionary) -> Dictionary:
 	var targets: Array[Dictionary] = []
