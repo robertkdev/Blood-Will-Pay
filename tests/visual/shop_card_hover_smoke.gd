@@ -3,6 +3,9 @@ extends Node
 const SMOKE_NAME: String = "ShopCardHoverSmoke"
 const ShopPresenterLib: Script = preload("res://scripts/ui/shop/shop_presenter.gd")
 const OUTPUT_DIR: String = "res://outputs/visual_iter/shop_card_hover_pass"
+const UnitCatalogScript: GDScript = preload("res://scripts/game/shop/unit_catalog.gd")
+const UnitFactoryScript: GDScript = preload("res://scripts/unit_factory.gd")
+const PurchaseSummary: GDScript = preload("res://scripts/ui/shop/shop_ability_summary.gd")
 
 var _failures: Array[String] = []
 var _presenter: ShopPresenter = null
@@ -12,18 +15,24 @@ func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	DisplayServer.window_set_size(Vector2i(1280, 720))
+	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	var window: Window = get_window()
 	if window != null:
-		window.size = Vector2i(1280, 720)
-		window.content_scale_size = Vector2i(1280, 720)
+		window.size = Vector2i(1920, 1080)
+		window.content_scale_size = Vector2i(1920, 1080)
 	if not _autoloads_ready():
 		_finish()
 		return
+	var catalog: RefCounted = UnitCatalogScript.new()
+	catalog.call("ensure_ready")
+	for cost: int in catalog.call("get_all_costs"):
+		for unit_id: String in catalog.call("get_ids_by_cost", cost):
+			var unit: Unit = UnitFactoryScript.spawn(unit_id)
+			_expect(unit != null and PurchaseSummary.COPY.has(String(unit.ability_id)), "Shop unit lacks a concise purchase cue: " + unit_id)
 	_prepare_populated_shop()
 	_host = VBoxContainer.new()
 	_host.custom_minimum_size = Vector2(860.0, 180.0)
-	_host.position = Vector2(80.0, 520.0)
+	_host.position = Vector2(530.0, 840.0)
 	add_child(_host)
 	var grid: GridContainer = GridContainer.new()
 	_host.add_child(grid)
@@ -38,14 +47,8 @@ func _run() -> void:
 		return
 	_expect(String(card.get_meta("tooltip_detail_state", "")) == "deferred", "shop card binding must defer tooltip-only unit previews")
 	_expect(not bool(card.get("_tooltip_details_built")), "shop card binding must not build tooltip-only unit previews")
-	_hover_card(card)
-	card.emit_signal("mouse_entered")
-	await _settle_frames(3)
-	_expect(bool(card.get_meta("tooltip_suppressed_for_compact", false)), "compact shop card hover should suppress the detail panel")
-	_expect(String(card.get_meta("tooltip_detail_state", "")) == "deferred", "compact hover must leave tooltip-only unit previews deferred")
-	_expect(_tooltip_count() == 0, "compact shop card hover should not create a custom tooltip")
 	card.set_compact_presentation(false)
-	card.emit_signal("mouse_exited")
+	_hover_card(card)
 	card.emit_signal("mouse_entered")
 	await _settle_frames(3)
 	_expect(String(card.get_meta("tooltip_detail_state", "")) == "resolved", "shop card hover must resolve deferred tooltip detail")
@@ -58,12 +61,14 @@ func _run() -> void:
 	if tooltip != null:
 		var tooltip_layer: CanvasLayer = tooltip.get_parent() as CanvasLayer
 		_expect(tooltip_layer != null and tooltip_layer.layer >= 400, "shop tooltip should live above shop/footer CanvasLayers")
-		_expect(tooltip.get_theme_stylebox("panel") is StyleBoxTexture, "shop tooltip should use the generated panel asset")
+		var panel_style: StyleBoxFlat = tooltip.get_theme_stylebox("panel") as StyleBoxFlat
+		_expect(panel_style != null and panel_style.bg_color.a >= 0.95, "shop tooltip needs an opaque reading surface")
 		_expect(not tooltip.get_global_rect().intersects(card.get_global_rect()), "shop tooltip should not cover its source card")
 		var card_grid: Control = card.get_parent() as Control
 		_expect(card_grid == null or not tooltip.get_global_rect().intersects(card_grid.get_global_rect()), "shop tooltip should not cover the shop-card strip")
-		_expect(_tooltip_contains(tooltip, "Attack Targeting:"), "shop tooltip should show attack targeting")
-		_expect(_tooltip_contains(tooltip, "Ability Targeting:"), "shop tooltip should show ability targeting")
+		_expect(_tooltip_contains(tooltip, "Traits:") and _tooltip_contains(tooltip, "Role:"), "purchase hover should retain traits and role")
+		_expect(not _tooltip_contains(tooltip, "Targeting:") and not _tooltip_contains(tooltip, "Goal:"), "purchase hover must leave detailed mechanics in the explicit unit record")
+		_expect(_tooltip_contains(tooltip, "Right-click"), "purchase hover must expose the full-record action")
 		_expect(not _tooltip_contains(tooltip, "Positioning:"), "shop tooltip should not prescribe positioning")
 	_save_capture("01_shop_card_hover_tooltip.png")
 	var hover_rect: Rect2 = card.get_global_rect()

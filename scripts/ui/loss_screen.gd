@@ -193,6 +193,8 @@ func _populate() -> void:
 func _style_loss_scoreboard(scoreboard: Node) -> void:
 	if scoreboard == null:
 		return
+	# Fill the authored record slot so the scroll body has room for its rows.
+	(scoreboard as Control).size_flags_vertical = Control.SIZE_EXPAND_FILL
 	# The loss record is a frozen final tally. Stop the reusable live-combat
 	# scoreboard from reapplying its utility header size every process frame.
 	scoreboard.set_process(false)

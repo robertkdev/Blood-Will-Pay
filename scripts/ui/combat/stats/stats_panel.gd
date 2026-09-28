@@ -340,6 +340,7 @@ func configure(_parent: Control, _manager: CombatManager) -> void:
 func set_tracker(t: StatsTracker) -> void:
     _tracker = t
     if scoreboard and _tracker:
+        scoreboard.show_planning_empty_state = true
         scoreboard.configure(_tracker)
     if unit_panel and _tracker:
         unit_panel.configure(_tracker)

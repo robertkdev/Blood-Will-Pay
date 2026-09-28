@@ -850,12 +850,10 @@ func _apply_side_panel_layout(compact: bool, tight_compact: bool) -> void:
 		title_inset.content_margin_bottom = 3.0
 		stats_title.add_theme_stylebox_override("normal", title_inset)
 
-func _apply_planning_focus_hierarchy(compact: bool, tight_compact: bool) -> void:
-	# At readable 125/150% scales the deployment board is the decision spine.
-	# Keep item/metric context present, but lower its visual urgency so the eye
-	# lands on placement and the primary commit action before secondary telemetry.
-	var rail_alpha: float = 0.92 if tight_compact else 0.87 if compact else 1.0
-	var lower_support_alpha: float = 0.88 if tight_compact else 0.92 if compact else 1.0
+func _apply_planning_focus_hierarchy(_compact: bool, _tight_compact: bool) -> void:
+	# Hierarchy comes from typography and material, without dimming readable text.
+	var rail_alpha: float = 1.0
+	var lower_support_alpha: float = 1.0
 	var left_item_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/LeftItemArea") as Control
 	var stats_area: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/StatsArea") as Control
 	var planning_surface: Control = get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea") as Control
@@ -1302,7 +1300,7 @@ func _apply_planning_action_hierarchy(compact: bool, tight_compact: bool) -> voi
 			if status_label != null:
 				status_label.custom_minimum_size.y = status_height
 				status_label.add_theme_font_size_override("font_size", 15 if tight_compact else 19 if compact else 24)
-				status_label.modulate = Color(1.0, 1.0, 1.0, 0.88 if tight_compact else 0.86 if compact else 1.0)
+				status_label.modulate = Color.WHITE
 				status_label.set_meta("planning_status_priority", "secondary_to_commit" if compact else "primary")
 				if tight_compact:
 					status_label.custom_minimum_size.x = status_widths[status_name]
@@ -2173,7 +2171,7 @@ func _ensure_dock_wager_column() -> void:
 	reserve.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	reserve.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reserve.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	reserve.add_theme_color_override("font_color", Color(0.69, 0.64, 0.55))
+	reserve.add_theme_color_override("font_color", Color(0.86, 0.82, 0.74))
 	VisualTypeSystem.set_gameplay_body(reserve)
 	_wager_control_row.add_child(reserve)
 	_wager_value_row = HBoxContainer.new()
@@ -2641,7 +2639,7 @@ func _apply_dock_wager_outcomes() -> void:
 	var value_size: int = 19
 	_write_wager_outcome_row(
 		"WagerWinRow",
-		"WIN  %d-%d%%" % [int(data.get("win_low", 0)), int(data.get("win_high", 0))],
+		"AFTER WIN",
 		BloodBuckets.format_amount(int(data.get("after_win", 0))),
 		Color(0.92, 0.78, 0.50),
 		Color(0.72, 0.61, 0.38, 0.10),
@@ -2650,7 +2648,7 @@ func _apply_dock_wager_outcomes() -> void:
 	)
 	_write_wager_outcome_row(
 		"WagerLossRow",
-		"LOSS  %d-%d%%" % [int(data.get("loss_low", 0)), int(data.get("loss_high", 0))],
+		"AFTER LOSS",
 		BloodBuckets.format_amount(int(data.get("after_loss", 0))),
 		Color(0.98, 0.49, 0.47),
 		Color(0.62, 0.075, 0.075, 0.20),
@@ -2695,7 +2693,7 @@ func _write_wager_outcome_row(
 	if caption != null:
 		caption.text = caption_text
 		caption.add_theme_font_size_override("font_size", caption_size)
-		caption.add_theme_color_override("font_color", Color(0.72, 0.68, 0.62, 0.92))
+		caption.add_theme_color_override("font_color", Color(0.88, 0.84, 0.77, 1.0))
 	var value: Label = row.get_node_or_null("OutcomeLine/OutcomeValue") as Label
 	if value != null:
 		value.text = value_text

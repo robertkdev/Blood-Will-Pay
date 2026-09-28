@@ -3922,8 +3922,8 @@ func _ensure_combat_broadcast_strip() -> void:
 	combat_broadcast_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	combat_broadcast_strip.anchor_left = 0.5
 	combat_broadcast_strip.anchor_right = 0.5
-	combat_broadcast_strip.offset_left = -360.0
-	combat_broadcast_strip.offset_right = 360.0
+	combat_broadcast_strip.offset_left = -410.0
+	combat_broadcast_strip.offset_right = 410.0
 	combat_broadcast_strip.offset_top = 58.0
 	combat_broadcast_strip.offset_bottom = 90.0
 	var strip_style: StyleBoxFlat = StyleBoxFlat.new()
@@ -3958,13 +3958,13 @@ func _make_broadcast_label(label_name: String) -> Label:
 		"BroadcastWager":
 			minimum_width = 120.0
 		"BroadcastHealth":
-			minimum_width = 320.0
+			minimum_width = 360.0
 	label.custom_minimum_size = Vector2(minimum_width, 28.0)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.clip_text = false
-	label.add_theme_font_size_override("font_size", 15)
-	label.add_theme_color_override("font_color", Color(0.96, 0.88, 0.72, 1.0))
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", Color(0.94, 0.91, 0.83, 1.0))
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.95))
 	label.add_theme_constant_override("outline_size", 2)
 	VisualTypeSystem.set_utility_bold(label)
