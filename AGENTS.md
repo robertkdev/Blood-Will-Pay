@@ -48,6 +48,15 @@ Match existing naming and indentation. Every variable, parameter, return, export
 - For combat/shop/items behavior changes, use an existing appropriate regression scene or add focused coverage when it would catch a meaningful failure. Keep behavior deterministic where possible; do not create a test that merely repeats the implementation.
 - Keep changes focused; do not reformat unrelated files.
 
+## Fullscreen UI Size Only
+
+The game is authored for one fullscreen UI size and must look right full screen. There is no interface-scale feature, and this is permanent:
+
+- Never add a UI-size / interface-scale / readable-scale setting, and never reintroduce `content_scale_factor` as a user-controlled value. `UserSettings` pins it to `1.0`.
+- Never implement resize-driven layout: no UI-scale tiers, no scale-compensated frames, no per-scale compact branches, no persisted `ui_scale`.
+- Never author or run resize/UI-scale acceptance: no 100/125/150 percent matrices, no scale-parameterised capture passes, and no assertions that read a persisted UI scale. Compact/large tiers key off the viewport alone.
+- If a layout fits poorly, fix the authored fullscreen composition. Do not solve it by making the UI resizable.
+
 ## Git ownership and integration
 
 Inspect the relevant checkout and preserve pre-existing edits. Stage only reviewed owned paths; commit and publish meaningful work through the existing authorized branch/PR workflow. Check whitespace and affected behavior before integration, verifying current head/check/ownership evidence. Runtime-affecting changes need appropriate engine/debug inspection; instruction-only edits need content and link checks, not a game launch. Report any owned work left unpublished and why.

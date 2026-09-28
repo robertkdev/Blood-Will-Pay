@@ -28,9 +28,9 @@ const COMPACT_NAME_SHARE: float = 0.62
 ## share is 0.38 of the cell. The tier's price copy ("0 bkt") measures 43.0
 ## logical at the dock's 17px font plus its own 4px right inset, so holding the
 ## name and the price on one row needs (43.0 + 4.0) / 0.38 = 124 logical of
-## card. The composed dock's 150-percent cell is 97 logical wide and the dock
-## band has no width left to widen it, so below this width the caption stacks:
-## the name keeps a full-width row and the price takes the row beneath it.
+## card. A trimmed composed cell can be 97 logical wide and the dock band has no
+## width left to widen it, so below this width the caption stacks: the name
+## keeps a full-width row and the price takes the row beneath it.
 const CAPTION_STACK_MAX_WIDTH: float = 124.0
 ## The compact tiers are budgeted cells, not a share of the raw frame:
 ## `CompactShopFooterSmoke` holds the compact card to 80-96 logical pixels and the
@@ -679,10 +679,9 @@ func _apply_static_style() -> void:
 	pivot_offset = size * 0.5
 	tooltip_text = ""
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
 	var effective_size: Vector2 = _effective_ui_viewport_size(viewport_size)
 	var compact: bool = effective_size.y <= 1080.0 or effective_size.x <= 1400.0
-	var tight_compact: bool = effective_size.y <= 520.0 or effective_size.x <= 1100.0 or (ui_scale >= 1.25 and effective_size.y <= 720.0)
+	var tight_compact: bool = effective_size.y <= 520.0 or effective_size.x <= 1100.0
 	custom_minimum_size = Vector2(120.0, 54.0) if tight_compact else Vector2(132.0, 80.0) if compact else Vector2(150.0, 122.0)
 	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	set_meta("shop_safe_bottom_gutter", 2.0 if tight_compact else 6.0 if compact else 16.0)
@@ -757,6 +756,8 @@ func _apply_static_style() -> void:
 	set_compact_presentation(compact, tight_compact)
 
 func _effective_ui_viewport_size(viewport_size: Vector2) -> Vector2:
+	# The viewport is the authored fullscreen size: content scale is locked, so
+	# there is no interface scale to divide out of the breakpoint source.
 	return viewport_size
 
 func _make_card_style(pressed_state: bool, highlighted: bool, disabled_state: bool = false) -> StyleBox:
@@ -1189,7 +1190,7 @@ func _format_list(values: Array, limit: int) -> String:
 		return ""
 	var formatted := PackedStringArray()
 	for i in range(min(limit, values.size())):
-		var token := _prettify_token(String(values[i]))
+		var token: String = _format_goal(String(values[i]))
 		if token != "":
 			formatted.append(token)
 	if values.size() > limit:

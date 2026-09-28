@@ -1,6 +1,12 @@
 # Blood Will Pay Menu, Result, and Pressure Asset Freeze
 
 Date: 2026-07-29
+
+Superseded interface-size policy: the 100/125/150 percent UI scale referenced
+below has been removed. The game is authored for one fullscreen UI size and
+interface-scale/resize acceptance is not to be reintroduced; the 1280x720
+compact stress gate remains a viewport gate only.
+
 Status: frozen implementation inventory; implementation must not add an unlisted
 player-facing surface without updating this file first
 Runtime source audited: `codex/019fabad-cbc-blood-will-pay-rename` at

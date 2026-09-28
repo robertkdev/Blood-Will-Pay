@@ -213,7 +213,7 @@ func _is_forced_first_fight() -> bool:
 
 
 func _is_tight_compact_layout() -> bool:
-	return _root != null and bool(_root.get_meta("tight_scale_layout", false))
+	return _root != null and bool(_root.get_meta("tight_layout", false))
 
 func _uses_narrow_compact_copy() -> bool:
 	if _root == null:

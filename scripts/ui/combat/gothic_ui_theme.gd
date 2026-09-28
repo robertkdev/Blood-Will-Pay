@@ -1314,58 +1314,18 @@ static func _apply_color_rect(rect: ColorRect) -> void:
 		rect.color = Color(0.20, 0.45, 0.66, 0.94)
 
 static func _apply_tile(button: Button, is_player: bool) -> void:
-	# One continuous deployment surface. A cell is a weighted ruling on the stone:
-	# no interior fill, a shared right edge on every cell, and an authored strong
-	# seam on a sparse irregular set. Neighbours therefore do not agree about how
-	# heavy their top line is, so the union reads as a ruled lattice over the
-	# authored floor instead of a uniform developer grid. The side hue (warm bone /
-	# oxblood) separates the two territories, and the territory guides still carry
-	# the structural boundary. Geometry (the square cell and its grid slot) is
-	# unchanged; only the paint is.
-	var bg_color: Color = Color(0.0, 0.0, 0.0, 0.0)
-	# Authored seam cadence: most cells carry only the shared right edge, and a
-	# sparse irregular set carries the full ruling. That is what keeps the
-	# deployment lattice reading as stone courses instead of a uniform developer
-	# grid, and it is why neighbours disagree about how heavy their top line is.
-	var cell_index: int = int(String(button.name).get_slice("_", 1))
-	var strong_seam: bool = cell_index % 5 == 0 or cell_index % 7 == 0
-	# The lattice is the board's brightest authored mark, so it carries the
-	# territory hue at a weight the field can actually read. The cadence above
-	# stays sparse and irregular; only the ruling's weight changed, because the
-	# measured field was short of highlight and the seams are the cheapest place
-	# to put it back. See docs/art/playfield_value_routing_2026-09-26.md.
-	# The hostile ruling holds its weight now that the ground beneath it is dark:
-	# on the old light stone the same line read heavy enough, and on oxblood the
-	# field's hot density fell with it.
-	var border_color: Color = Color(0.97, 0.90, 0.70, 0.94 if strong_seam else 0.78) if is_player else Color(0.99, 0.33, 0.23, 1.0 if strong_seam else 0.92)
-	var hover_color: Color = Color(0.055, 0.070, 0.064, 0.34) if is_player else Color(0.115, 0.042, 0.038, 0.34)
-	var normal_style: StyleBoxFlat = _style(bg_color, border_color, 1, 3)
-	normal_style.shadow_size = 0
-	normal_style.border_width_left = 0
-	normal_style.border_width_bottom = 0
-	if not strong_seam:
-		normal_style.border_width_top = 0
-	# Hover is the only moment a cell gains a full ring: interaction feedback is
-	# worth one transient outline, and it is not part of the resting surface.
-	var hover_style: StyleBoxFlat = _hover_style(hover_color, COLOR_GOLD_HOT, 1, 3)
+	# Deployment targets need complete boundaries at rest. Editable vector art
+	# supplies the recessed edges; hover and focus remain native button states.
+	var normal_style: StyleBox = GothicUIAssets.deployment_cell_style(is_player)
+	if normal_style == null:
+		normal_style = _style(Color(0.02, 0.015, 0.012, 0.26), COLOR_GOLD if is_player else COLOR_BLOOD, 1, 0)
+	var hover_style: StyleBoxFlat = _hover_style(Color(0.12, 0.09, 0.04, 0.30), COLOR_GOLD_HOT, 2, 0)
 	hover_style.shadow_size = 0
-	var tile_size: float = maxf(button.custom_minimum_size.x, button.custom_minimum_size.y)
-	if tile_size <= 0.0:
-		tile_size = 72.0
-	button.custom_minimum_size = Vector2(tile_size, tile_size)
-	normal_style.corner_radius_top_left = 0
-	normal_style.corner_radius_top_right = 0
-	normal_style.corner_radius_bottom_left = 0
-	normal_style.corner_radius_bottom_right = 0
-	hover_style.corner_radius_top_left = 0
-	hover_style.corner_radius_top_right = 0
-	hover_style.corner_radius_bottom_left = 0
-	hover_style.corner_radius_bottom_right = 0
 	button.add_theme_stylebox_override("normal", normal_style)
 	button.add_theme_stylebox_override("disabled", normal_style)
 	button.add_theme_stylebox_override("hover", hover_style)
 	button.add_theme_stylebox_override("pressed", hover_style)
-	button.add_theme_stylebox_override("focus", _focus_outline(3))
+	button.add_theme_stylebox_override("focus", _focus_outline(0))
 	UnitArtPresentation.cover_board_tile(button)
 
 static func _apply_bench_slot(button: Button) -> void:

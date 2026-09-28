@@ -14,7 +14,6 @@ const VISION_SNAPSHOT: GDScript = preload("res://scripts/util/vision_snapshot.gd
 const SMOKE_NAME: String = "TextContainerFitSmoke"
 const OUTPUT_DIR: String = "res://outputs/visual_iter/text_container_fit_pass"
 const TEST_SETTINGS_PATH: String = "user://text_container_fit_smoke_settings.cfg"
-const TEST_UI_SCALE: float = 1.5
 const VIEWPORT_SIZE: Vector2i = Vector2i(1280, 720)
 const DESKTOP_VIEWPORT_SIZE: Vector2i = Vector2i(1920, 1080)
 const TITLE_SECTIONS: Array[String] = ["how_to_play", "units", "rga", "traits", "items", "settings"]
@@ -27,7 +26,6 @@ var _failures: Array[String] = []
 var _capture_count: int = 0
 var _original_reduced_motion: bool = false
 var _original_scale: float = 1.0
-var _original_user_scale: float = 1.0
 var _original_window_size: Vector2i = Vector2i.ZERO
 
 func _ready() -> void:
@@ -56,25 +54,15 @@ func _configure_isolated_settings() -> void:
 	var window: Window = get_window()
 	_original_scale = window.content_scale_factor if window != null else 1.0
 	_original_window_size = window.size if window != null else Vector2i.ZERO
-	_original_user_scale = UserSettingsScript.get_ui_scale()
 	_original_reduced_motion = UserSettingsScript.get_reduced_motion()
 	_remove_test_settings()
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	_set_test_ui_scale(TEST_UI_SCALE, "deterministic 150-percent text-fit fixture")
 	var motion_save_error: Error = UserSettingsScript.set_reduced_motion(true)
 	_expect(motion_save_error == OK, "failed to persist the reduced-motion text-fit fixture")
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
 	_expect(UserSettingsScript.get_reduced_motion(), "reduced-motion text-fit fixture did not survive reload")
-
-func _set_test_ui_scale(ui_scale: float, context: String) -> void:
-	var window: Window = get_window()
-	var scale_save_error: Error = UserSettingsScript.set_ui_scale(ui_scale, window)
-	_expect(scale_save_error == OK, "failed to persist the %s" % context)
-	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
-	UserSettingsScript.initialize(window)
-	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), ui_scale), "%s did not survive reload" % context)
 
 func _audit_title_surfaces() -> void:
 	_main = MAIN_SCENE.instantiate() as Control
@@ -153,7 +141,6 @@ func _audit_shop_card_catalog() -> void:
 			card.call("_clear_tooltip")
 		host.remove_child(card)
 		card.free()
-	_set_test_ui_scale(1.0, "desktop shop-tooltip fixture")
 	_configure_viewport(DESKTOP_VIEWPORT_SIZE)
 	# Exercise both bottom- and right-edge placement. With the source this low,
 	# the full desktop dossier must choose the authored above-card path and then
@@ -182,7 +169,6 @@ func _audit_shop_card_catalog() -> void:
 		card.free()
 	host.queue_free()
 	await _settle_frames(2)
-	_set_test_ui_scale(TEST_UI_SCALE, "deterministic 150-percent text-fit fixture")
 	_configure_viewport()
 	await _settle_frames(4)
 
@@ -456,7 +442,6 @@ func _restore_test_settings() -> void:
 			window.content_scale_size = _original_window_size
 	UserSettingsScript.configure_storage_path(UserSettingsScript.DEFAULT_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	_expect(is_equal_approx(UserSettingsScript.get_ui_scale(), _original_user_scale), "default UI scale changed while the isolated text-fit fixture ran")
 	_expect(UserSettingsScript.get_reduced_motion() == _original_reduced_motion, "default reduced-motion setting changed while the isolated text-fit fixture ran")
 	if window != null:
 		window.content_scale_factor = _original_scale

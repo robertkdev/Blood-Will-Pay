@@ -41,6 +41,11 @@ var _authored_title: String = "Scoreboard"
 
 func _ready() -> void:
 	set_process(true)
+	var header_inset: Control = Control.new()
+	header_inset.name = "RightInset"
+	header_inset.custom_minimum_size.x = 12.0
+	header_inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$Header.add_child(header_inset)
 	if expand_button and not expand_button.is_connected("pressed", Callable(self, "_on_toggle_expand")):
 		expand_button.pressed.connect(_on_toggle_expand)
 	_build_overlay()
@@ -387,8 +392,7 @@ func _sync_row_pitch(scroll: ScrollContainer) -> void:
 			rows.append(row)
 	if rows.is_empty():
 		return
-	var ui_scale: float = maxf(1.0, UserSettingsScript.get_ui_scale())
-	var pitch: float = clampf(ROW_PITCH_PHYSICAL / ui_scale, ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
+	var pitch: float = clampf(ROW_PITCH_PHYSICAL, ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
 	if scroll != null and scroll.size.y > 1.0:
 		pitch = clampf(minf(pitch, scroll.size.y / float(rows.size())), ROW_PITCH_MIN_LOGICAL, ROW_PITCH_MAX_LOGICAL)
 	# One shared numeric column, so the value rules line up down the ledger

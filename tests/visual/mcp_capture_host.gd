@@ -6,7 +6,6 @@ const CAPTURE_SETTINGS_PATH: String = "user://mcp_capture_host_settings.cfg"
 
 @export var viewport_size: Vector2i = Vector2i(1920, 1080)
 @export_enum("title", "tutorial", "settings") var capture_state: String = "title"
-@export var ui_scale: float = 1.0
 @export var reduced_motion: bool = false
 
 var _main: Control = null
@@ -25,7 +24,6 @@ func _build_player_runtime() -> void:
 		window.content_scale_size = viewport_size
 	UserSettingsScript.configure_storage_path(CAPTURE_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	UserSettingsScript.set_ui_scale(ui_scale, window)
 	UserSettingsScript.set_reduced_motion(reduced_motion)
 
 	_main = MAIN_SCENE.instantiate() as Control

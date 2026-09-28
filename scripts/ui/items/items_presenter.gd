@@ -183,9 +183,9 @@ func _defer_material_storage_layout() -> void:
 ## width it publishes (`composed_rail_logical`) instead of pinning a desktop one,
 ## and the header wraps its counts inside that width rather than forcing the rail
 ## wider than the authored physical mass. Lowering a pin is what the legacy
-## `maxf` never allowed, which is why the rail used to grow at enlarged UI scales.
+## `maxf` never allowed, which is why the rail used to grow past its budget.
 func _material_storage_metrics() -> Dictionary:
-	var tight_compact: bool = bool(view.get_meta("tight_scale_layout", false))
+	var tight_compact: bool = bool(view.get_meta("tight_layout", false))
 	var compact: bool = bool(view.get_meta("compact_layout", false))
 	var viewport_size: Vector2 = view.get_viewport_rect().size
 	var composed_inner: float = float(view.get_meta("composed_rail_logical", 0.0))
@@ -206,8 +206,7 @@ func _material_storage_metrics() -> Dictionary:
 	var header_height: float = 34.0 if tight_compact else 48.0 if wide_support_rail else 42.0 if compact else 52.0
 	var header_font_size: int = 11 if tight_compact else 13 if wide_support_rail else 12 if compact else 15
 	var header_wrap: int = TextServer.AUTOWRAP_OFF
-	var ui_scale: float = maxf(1.0, float(view.get_meta("persisted_ui_scale", 1.0)))
-	var composed_rail: float = float(view.get_meta("composed_rail_physical", 0.0)) / ui_scale
+	var composed_rail: float = float(view.get_meta("composed_rail_physical", 0.0))
 	if composed:
 		var slot_cap: float = maxf(
 			MIN_COMPOSED_SLOT,

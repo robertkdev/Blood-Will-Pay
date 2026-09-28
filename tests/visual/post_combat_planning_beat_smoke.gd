@@ -19,7 +19,6 @@ func _run() -> void:
 		window.content_scale_size = Vector2i(1920, 1080)
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	UserSettingsScript.set_ui_scale(1.0, window)
 	_previous_time_scale = Engine.time_scale
 	_previous_suppress_validation_warnings = UnitFactory.suppress_validation_warnings
 	UnitFactory.suppress_validation_warnings = true
@@ -216,7 +215,6 @@ func _assert_compact_defeat_result(controller: Variant, defeat_detail: String) -
 	DisplayServer.window_set_size(Vector2i(1280, 720))
 	window.size = Vector2i(1280, 720)
 	window.content_scale_size = Vector2i(1280, 720)
-	UserSettingsScript.set_ui_scale(1.5, window)
 	await _settle_frames(3)
 	controller.call("_show_result_banner", "DEFEAT", defeat_detail, Color(0.72, 0.18, 0.16, 1.0), Color(1.0, 0.66, 0.60, 1.0))
 	_pin_result_variant_visible()
@@ -225,15 +223,13 @@ func _assert_compact_defeat_result(controller: Variant, defeat_detail: String) -
 	var card: PanelContainer = banner.get_node_or_null("Center/BattleResultCard") as PanelContainer if banner != null else null
 	var title_label: Label = card.get_node_or_null("CardMargin/Content/OutcomeLabel") as Label if card != null else null
 	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label if banner != null else null
-	_expect(card != null and bool(card.get_meta("compact_centered_stack", false)), "150% defeat result did not enter its centered compact stack")
-	_expect(card != null and is_equal_approx(float(card.get_meta("ui_scale_compensation", 0.0)), 1.5), "150% defeat result did not compensate its logical frame for UI scale")
-	_expect(card != null and card.custom_minimum_size.x <= 470.0, "150% defeat logical width stayed too large for the 1280px safe area")
-	_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER, "150% defeat headline drifted back to the right edge")
-	_expect(aftermath_stamp != null and not aftermath_stamp.visible and bool(aftermath_stamp.get_meta("compact_stamp_suppressed", false)), "150% defeat retained its colliding environmental stamp")
+	_expect(card != null and bool(card.get_meta("compact_centered_stack", false)), "compact defeat result did not enter its centered compact stack")
+	_expect(card != null and card.custom_minimum_size.x <= 700.0, "compact defeat frame stayed too wide for the 1280px safe area")
+	_expect(title_label != null and title_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER, "compact defeat headline drifted back to the right edge")
+	_expect(aftermath_stamp != null and not aftermath_stamp.visible and bool(aftermath_stamp.get_meta("compact_stamp_suppressed", false)), "compact defeat retained its colliding environmental stamp")
 	if banner != null and card != null:
-		_assert_result_frame_inside_viewport(card, card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button, "DEFEAT 1280x720 150%")
-	_save_capture("result_defeat_1280x720_150pct.png")
-	UserSettingsScript.set_ui_scale(1.0, window)
+		_assert_result_frame_inside_viewport(card, card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button, "DEFEAT 1280x720")
+	_save_capture("result_defeat_1280x720.png")
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
 	window.size = Vector2i(1920, 1080)
 	window.content_scale_size = Vector2i(1920, 1080)

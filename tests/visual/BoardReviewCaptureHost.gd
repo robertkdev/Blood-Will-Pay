@@ -29,8 +29,7 @@ const EXPECTED_FILES: Array[String] = [
 	"09_planning_1280x720.png",
 	"10_system_menu_1280x720.png",
 	"11_planning_1920x1080.png",
-	"12_planning_1280x720_125pct.png",
-	"13_planning_1280x720_150pct.png",
+	"13_planning_1280x720.png",
 	"14_active_combat_onset_1920x1080.png",
 	"15_active_combat_midfight_1920x1080.png",
 	"16_active_combat_reduced_motion_1920x1080.png",
@@ -41,11 +40,10 @@ const EXPECTED_FILES: Array[String] = [
 	"19_stalemate_hold_1920x1080.png",
 	"20_defeat_hold_1920x1080.png",
 	"21_loss_1920x1080.png",
-	"22_title_1280x720_150pct.png",
-	"23_settings_1280x720_150pct.png",
-	"24_ledger_1280x720_150pct.png",
-	"25_defeat_hold_1280x720_150pct.png",
-	"26_loss_1280x720_150pct.png",
+	"22_title_1280x720.png",
+	"24_ledger_1280x720.png",
+	"25_defeat_hold_1280x720.png",
+	"26_loss_1280x720.png",
 	"27_title_ultrawide_2560x1080.png",
 	"28_title_4k_3840x2160.png",
 	"29_settings_focus_hover_1920x1080.png",
@@ -53,9 +51,9 @@ const EXPECTED_FILES: Array[String] = [
 	"31_settings_disabled_1920x1080.png",
 	"32_planning_ultrawide_2560x1080.png",
 	"33_result_skip_hover_1920x1080.png",
-	"46_settings_focus_hover_1280x720_150pct.png",
-	"47_settings_pressed_1280x720_150pct.png",
-	"48_settings_disabled_1280x720_150pct.png",
+	"46_settings_focus_hover_1280x720.png",
+	"47_settings_pressed_1280x720.png",
+	"48_settings_disabled_1280x720.png",
 	"52_planning_to_combat_bridge_1920x1080.png",
 	"53_combat_contact_bridge_1920x1080.png",
 	"54_combat_to_planning_bridge_1920x1080.png",
@@ -96,11 +94,10 @@ func _run() -> void:
 		await _finish()
 		return
 
-	_configure_window(DESKTOP_SIZE, false)
+	_configure_window(DESKTOP_SIZE)
 	var window: Window = get_window()
 	USER_SETTINGS_SCRIPT.configure_storage_path(_settings_path)
 	USER_SETTINGS_SCRIPT.initialize(window)
-	USER_SETTINGS_SCRIPT.set_ui_scale(1.0, window)
 	USER_SETTINGS_SCRIPT.set_reduced_motion(false)
 	ACCOUNT_PROFILE_STORE_SCRIPT.clear(_profile_path)
 
@@ -122,10 +119,10 @@ func _run() -> void:
 	await _settle_frames(14)
 	_assert_title_gateway_contract("4K title", false)
 	await _capture("28_title_4k_3840x2160.png", "title_4k", FOUR_K_SIZE)
-	_configure_scaled_window(COMPACT_SIZE, 1.5)
+	_configure_window(COMPACT_SIZE)
 	await _settle_frames(12)
-	_assert_title_gateway_contract("150% compact title", true)
-	await _capture("22_title_1280x720_150pct.png", "title_150_percent", COMPACT_SIZE)
+	_assert_title_gateway_contract("compact title", true)
+	await _capture("22_title_1280x720.png", "title_compact", COMPACT_SIZE)
 	_configure_window(DESKTOP_SIZE)
 	await _settle_frames(8)
 
@@ -137,12 +134,12 @@ func _run() -> void:
 	_expect(title_menu != null, "TitleMenu missing")
 	if title_menu != null:
 		title_menu.call("_select_section", "settings", false)
-		title_menu.call_deferred("_refresh_scaled_layout")
+		title_menu.call_deferred("_refresh_layout")
 	await _settle_frames(8)
 	_assert_settings_rail_contract()
 	await _capture("03_settings_1920x1080.png", "settings", DESKTOP_SIZE)
-	var settings_state_button: Button = title_menu.find_child("UIScaleOption", true, false) as Button if title_menu != null else null
-	_expect(settings_state_button != null, "settings did not expose the real UI Scale selector for interaction-state review")
+	var settings_state_button: Button = title_menu.find_child("ReducedMotionCheck", true, false) as Button if title_menu != null else null
+	_expect(settings_state_button != null, "settings did not expose a real control for interaction-state review")
 	if settings_state_button != null:
 		settings_state_button.grab_focus()
 		DisplayServer.warp_mouse(settings_state_button.get_global_rect().get_center())
@@ -150,16 +147,16 @@ func _run() -> void:
 		_expect(settings_state_button.has_focus(), "settings focus state did not become authoritative")
 		var settings_focus_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("focus") as StyleBoxFlat
 		var settings_pressed_style: StyleBoxFlat = settings_state_button.get_theme_stylebox("pressed") as StyleBoxFlat
-		_expect(settings_focus_style != null and settings_pressed_style != null and settings_focus_style.border_color != settings_pressed_style.border_color, "settings selector focus must be visibly distinct from pressed")
+		_expect(settings_focus_style != null and settings_pressed_style != null and settings_focus_style.border_color != settings_pressed_style.border_color, "settings control focus must be visibly distinct from pressed")
 		_assert_settings_focus_surface_contract(title_menu, settings_state_button)
 		await _capture("29_settings_focus_hover_1920x1080.png", "settings_focus_hover", DESKTOP_SIZE)
 		settings_state_button.release_focus()
 		DisplayServer.warp_mouse(Vector2(1.0, 1.0))
 		await _settle_frames(3)
 		_expect(not settings_state_button.has_focus(), "settings pressed capture retained keyboard focus")
-		var previous_toggle_mode: bool = settings_state_button.toggle_mode
-		settings_state_button.toggle_mode = true
-		settings_state_button.button_pressed = true
+		# Drive the pressed visual without firing the control's own toggle handler,
+		# so the capture proves the authored pressed surface, not a settings write.
+		settings_state_button.set_pressed_no_signal(true)
 		await _settle_frames(3)
 		if title_menu.has_method("ensure_settings_surface_visible"):
 			title_menu.call("ensure_settings_surface_visible")
@@ -167,8 +164,7 @@ func _run() -> void:
 		_assert_settings_pressed_surface_contract(title_menu, settings_state_button)
 		var settings_pressed_frame: Image = await _capture("30_settings_pressed_1920x1080.png", "settings_pressed", DESKTOP_SIZE)
 		_assert_settings_pressed_pixels(settings_pressed_frame, title_menu)
-		settings_state_button.button_pressed = false
-		settings_state_button.toggle_mode = previous_toggle_mode
+		settings_state_button.set_pressed_no_signal(false)
 		settings_state_button.disabled = true
 		if title_menu.has_method("ensure_settings_surface_visible"):
 			title_menu.call("ensure_settings_surface_visible")
@@ -182,49 +178,41 @@ func _run() -> void:
 
 	_configure_window(COMPACT_SIZE)
 	if title_menu != null:
-		title_menu.call_deferred("_refresh_scaled_layout")
-	await _settle_frames(12)
-	await _capture("04_settings_1280x720.png", "settings", COMPACT_SIZE)
-	_configure_scaled_window(COMPACT_SIZE, 1.5)
-	if title_menu != null:
-		title_menu.call_deferred("_refresh_scaled_layout")
+		title_menu.call_deferred("_refresh_layout")
 	await _settle_frames(12)
 	_assert_compact_settings_finish()
-	await _capture("23_settings_1280x720_150pct.png", "settings_150_percent", COMPACT_SIZE)
-	var compact_settings_state_button: Button = title_menu.find_child("UIScaleOption", true, false) as Button if title_menu != null else null
-	_expect(compact_settings_state_button != null, "150% settings did not retain a live UI Scale selector for interaction-state review")
+	await _capture("04_settings_1280x720.png", "settings_compact", COMPACT_SIZE)
+	var compact_settings_state_button: Button = title_menu.find_child("ReducedMotionCheck", true, false) as Button if title_menu != null else null
+	_expect(compact_settings_state_button != null, "compact settings did not retain a live control for interaction-state review")
 	if compact_settings_state_button != null:
 		compact_settings_state_button.disabled = false
 		compact_settings_state_button.grab_focus()
 		DisplayServer.warp_mouse(compact_settings_state_button.get_global_rect().get_center())
 		await _settle_frames(4)
 		_assert_settings_focus_surface_contract(title_menu, compact_settings_state_button)
-		await _capture("46_settings_focus_hover_1280x720_150pct.png", "settings_focus_hover_150_percent", COMPACT_SIZE)
+		await _capture("46_settings_focus_hover_1280x720.png", "settings_focus_hover_compact", COMPACT_SIZE)
 		compact_settings_state_button.release_focus()
 		DisplayServer.warp_mouse(Vector2(1.0, 1.0))
 		await _settle_frames(2)
-		var compact_toggle_mode: bool = compact_settings_state_button.toggle_mode
-		compact_settings_state_button.toggle_mode = true
-		compact_settings_state_button.button_pressed = true
+		compact_settings_state_button.set_pressed_no_signal(true)
 		if title_menu.has_method("ensure_settings_surface_visible"):
 			title_menu.call("ensure_settings_surface_visible")
 		await _settle_frames(3)
 		_assert_settings_pressed_surface_contract(title_menu, compact_settings_state_button)
-		var compact_pressed_frame: Image = await _capture("47_settings_pressed_1280x720_150pct.png", "settings_pressed_150_percent", COMPACT_SIZE)
+		var compact_pressed_frame: Image = await _capture("47_settings_pressed_1280x720.png", "settings_pressed_compact", COMPACT_SIZE)
 		_assert_settings_pressed_pixels(compact_pressed_frame, title_menu)
-		compact_settings_state_button.button_pressed = false
-		compact_settings_state_button.toggle_mode = compact_toggle_mode
+		compact_settings_state_button.set_pressed_no_signal(false)
 		compact_settings_state_button.disabled = true
 		if title_menu.has_method("ensure_settings_surface_visible"):
 			title_menu.call("ensure_settings_surface_visible")
 		await _settle_frames(3)
 		_assert_settings_disabled_surface_contract(title_menu, compact_settings_state_button)
-		await _capture("48_settings_disabled_1280x720_150pct.png", "settings_disabled_150_percent", COMPACT_SIZE)
+		await _capture("48_settings_disabled_1280x720.png", "settings_disabled_compact", COMPACT_SIZE)
 		compact_settings_state_button.disabled = false
 
 	_configure_window(DESKTOP_SIZE)
 	if title_menu != null:
-		title_menu.call_deferred("_refresh_scaled_layout")
+		title_menu.call_deferred("_refresh_layout")
 	await _settle_frames(12)
 	_main.call("open_black_ledger", _profile_path)
 	await _settle_frames(10)
@@ -258,12 +246,12 @@ func _run() -> void:
 		ledger.call("refresh")
 	await _settle_frames(10)
 	await _capture("06_veteran_ledger_1920x1080.png", "black_ledger_veteran", DESKTOP_SIZE)
-	_configure_scaled_window(COMPACT_SIZE, 1.5)
-	if ledger != null and ledger.has_method("_refresh_scaled_layout"):
-		ledger.call_deferred("_refresh_scaled_layout")
+	_configure_window(COMPACT_SIZE)
+	if ledger != null and ledger.has_method("_refresh_layout"):
+		ledger.call_deferred("_refresh_layout")
 	await _settle_frames(12)
 	_assert_compact_ledger_finish(ledger)
-	await _capture("24_ledger_1280x720_150pct.png", "black_ledger_veteran_150_percent", COMPACT_SIZE)
+	await _capture("24_ledger_1280x720.png", "black_ledger_veteran_compact", COMPACT_SIZE)
 	_configure_window(DESKTOP_SIZE)
 	await _settle_frames(8)
 	_main.call("_close_black_ledger")
@@ -309,24 +297,15 @@ func _run() -> void:
 		combat.call("_apply_responsive_layout")
 	await _settle_frames(10)
 
-	_configure_scaled_window(COMPACT_SIZE, 1.25)
+	_configure_window(COMPACT_SIZE)
 	if combat != null and combat.has_method("_apply_responsive_layout"):
 		combat.call("_apply_responsive_layout")
 	if _main.has_method("_sync_system_menu_button"):
 		_main.call("_sync_system_menu_button")
 	await _settle_frames(14)
-	_assert_compact_shop_hover_safety("125% planning")
-	await _capture("12_planning_1280x720_125pct.png", "planning_125_percent", COMPACT_SIZE)
-
-	_configure_scaled_window(COMPACT_SIZE, 1.5)
-	if combat != null and combat.has_method("_apply_responsive_layout"):
-		combat.call("_apply_responsive_layout")
-	if _main.has_method("_sync_system_menu_button"):
-		_main.call("_sync_system_menu_button")
-	await _settle_frames(14)
-	_assert_planning_footer_and_metric_contract("150% planning")
-	_assert_compact_shop_hover_safety("150% planning")
-	await _capture("13_planning_1280x720_150pct.png", "planning_150_percent", COMPACT_SIZE)
+	_assert_planning_footer_and_metric_contract("compact planning")
+	_assert_compact_shop_hover_safety("compact planning")
+	await _capture("13_planning_1280x720.png", "planning_compact", COMPACT_SIZE)
 
 	_configure_window(DESKTOP_SIZE)
 	if combat != null and combat.has_method("_apply_responsive_layout"):
@@ -488,7 +467,7 @@ func _run() -> void:
 			manager.process_mode = manager_process_mode_for_focus
 		if combat != null:
 			combat.set_process(combat_was_processing_for_focus)
-		_configure_scaled_window(COMPACT_SIZE, 1.5)
+		_configure_window(COMPACT_SIZE)
 		if combat != null and combat.has_method("_apply_responsive_layout"):
 			combat.call("_apply_responsive_layout")
 		if controller.has_method("refresh_result_banner_layout"):
@@ -496,7 +475,7 @@ func _run() -> void:
 		await _settle_frames(12)
 		_assert_result_outcome_contract("DEFEAT")
 		_assert_compact_result_contract()
-		await _capture("25_defeat_hold_1280x720_150pct.png", "defeat_150_percent", COMPACT_SIZE)
+		await _capture("25_defeat_hold_1280x720.png", "defeat_compact", COMPACT_SIZE)
 		_configure_window(DESKTOP_SIZE)
 		if combat != null and combat.has_method("_apply_responsive_layout"):
 			combat.call("_apply_responsive_layout")
@@ -539,12 +518,12 @@ func _run() -> void:
 	await _build_loss_surface()
 	await _settle_frames(10)
 	await _capture("21_loss_1920x1080.png", "loss", DESKTOP_SIZE)
-	_configure_scaled_window(COMPACT_SIZE, 1.5)
+	_configure_window(COMPACT_SIZE)
 	var loss_screen: Control = _loss_layer.get_child(0) as Control if _loss_layer != null and _loss_layer.get_child_count() > 0 else null
 	if loss_screen != null and loss_screen.has_method("_sync_layout"):
 		loss_screen.call_deferred("_sync_layout")
 	await _settle_frames(12)
-	await _capture("26_loss_1280x720_150pct.png", "loss_150_percent", COMPACT_SIZE)
+	await _capture("26_loss_1280x720.png", "loss_compact", COMPACT_SIZE)
 	await _finish()
 
 
@@ -990,15 +969,15 @@ func _assert_settings_pressed_surface_contract(title_menu: Control, selector: Bu
 	# surface. Guard against a transient menu fade or a selector-only frame being
 	# mistaken for an interaction-state proof.
 	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
-	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
-	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("ReducedMotionCheckCard", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("ReducedMotionCheck", true, false) as Control if title_menu != null else null
 	var rail: Control = title_menu.get_node_or_null("TitlePanel") as Control if title_menu != null else null
 	var backing: Control = title_menu.get_node_or_null("ContentRecordBacking") as Control if title_menu != null else null
 	var integrity_shell: Control = title_menu.get_node_or_null("SettingsIntegrityShell") as Control if title_menu != null else null
 	_expect(title_menu != null and title_menu.is_visible_in_tree(), "settings pressed proof lost the command surface")
 	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "settings pressed proof lost the settings content panel")
-	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings pressed proof lost the UI scale card")
-	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings pressed proof lost its readable scale heading")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings pressed proof lost the Reduced Motion card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings pressed proof lost its readable control label")
 	_expect(selector != null and selector.is_visible_in_tree() and selector.button_pressed, "settings pressed proof did not retain the pressed selector")
 	_expect(rail != null and bool(rail.get_meta("settings_pressed_surface_readability", false)), "settings pressed proof lost the persistent navigation-rail substrate")
 	_expect(content_panel != null and bool(content_panel.get_meta("settings_pressed_surface_readability", false)), "settings pressed proof lost the persistent dossier substrate")
@@ -1050,28 +1029,28 @@ func _assert_settings_focus_surface_contract(title_menu: Control, selector: Butt
 	# Focus/hover evidence must retain the full settings shell; a selector-only
 	# composite is not a valid interaction-state review even if the focus flag is set.
 	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
-	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
-	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("ReducedMotionCheckCard", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("ReducedMotionCheck", true, false) as Control if title_menu != null else null
 	var integrity_shell: Control = title_menu.get_node_or_null("SettingsIntegrityShell") as Control if title_menu != null else null
 	_expect(title_menu != null and title_menu.is_visible_in_tree(), "settings focus proof lost the command surface")
 	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "settings focus proof lost the settings content panel")
-	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings focus proof lost the UI scale card")
-	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings focus proof lost its readable scale heading")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "settings focus proof lost the Reduced Motion card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "settings focus proof lost its readable control label")
 	_expect(selector != null and selector.is_visible_in_tree() and selector.has_focus(), "settings focus proof did not retain the focused selector")
 	_expect(integrity_shell != null and integrity_shell.is_visible_in_tree(), "settings focus proof lost the full dossier shell")
 
 
 func _assert_settings_disabled_surface_contract(title_menu: Control, selector: Button) -> void:
 	var content_panel: Control = title_menu.get_node_or_null("ContentPanel") as Control if title_menu != null else null
-	var settings_card: Control = title_menu.find_child("UIScaleSetting", true, false) as Control if title_menu != null else null
-	var settings_heading: Control = title_menu.find_child("UIScaleHeading", true, false) as Control if title_menu != null else null
+	var settings_card: Control = title_menu.find_child("ReducedMotionCheckCard", true, false) as Control if title_menu != null else null
+	var settings_heading: Control = title_menu.find_child("ReducedMotionCheck", true, false) as Control if title_menu != null else null
 	var integrity_shell: Control = title_menu.get_node_or_null("SettingsIntegrityShell") as Control if title_menu != null else null
-	_expect(title_menu != null and title_menu.is_visible_in_tree(), "150% settings disabled proof lost the command surface")
-	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "150% settings disabled proof lost the settings content shell")
-	_expect(settings_card != null and settings_card.is_visible_in_tree(), "150% settings disabled proof lost the UI scale card")
-	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "150% settings disabled proof lost its readable scale heading")
-	_expect(selector != null and selector.is_visible_in_tree() and selector.disabled, "150% settings disabled proof did not retain the disabled selector")
-	_expect(integrity_shell != null and integrity_shell.is_visible_in_tree(), "150% settings disabled proof lost the full dossier shell")
+	_expect(title_menu != null and title_menu.is_visible_in_tree(), "compact Settings disabled proof lost the command surface")
+	_expect(content_panel != null and content_panel.is_visible_in_tree() and content_panel.size.x >= 480.0 and content_panel.size.y >= 360.0, "compact Settings disabled proof lost the settings content shell")
+	_expect(settings_card != null and settings_card.is_visible_in_tree(), "compact Settings disabled proof lost the Reduced Motion card")
+	_expect(settings_heading != null and settings_heading.is_visible_in_tree() and not String(settings_heading.get("text")).strip_edges().is_empty(), "compact Settings disabled proof lost its readable control label")
+	_expect(selector != null and selector.is_visible_in_tree() and selector.disabled, "compact Settings disabled proof did not retain the disabled selector")
+	_expect(integrity_shell != null and integrity_shell.is_visible_in_tree(), "compact Settings disabled proof lost the full dossier shell")
 
 
 func _assert_compact_settings_finish() -> void:
@@ -1079,23 +1058,23 @@ func _assert_compact_settings_finish() -> void:
 	var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer if title_menu != null else null
 	var content_scroll: ScrollContainer = title_menu.find_child("ContentScroll", true, false) as ScrollContainer if title_menu != null else null
 	var scroll_cue: Label = title_menu.find_child("SettingsScrollCue", true, false) as Label if title_menu != null else null
-	_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "150% Settings did not select its distinct machine-console material")
-	_expect(content_scroll != null and content_scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED, "150% Settings content is not scrollable")
-	_expect(content_scroll != null and content_scroll.get_v_scroll_bar().custom_minimum_size.x >= 10.0, "150% Settings scrollbar remains too cramped")
-	_expect(scroll_cue != null and scroll_cue.is_visible_in_tree() and scroll_cue.text.to_lower().contains("settings below"), "150% Settings does not explain the intentionally continued record")
+	_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "compact Settings did not select its distinct machine-console material")
+	_expect(content_scroll != null and content_scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED, "compact Settings content is not scrollable")
+	_expect(content_scroll != null and content_scroll.get_v_scroll_bar().custom_minimum_size.x >= 10.0, "compact Settings scrollbar remains too cramped")
+	_expect(scroll_cue != null and scroll_cue.is_visible_in_tree() and scroll_cue.text.to_lower().contains("settings below"), "compact Settings does not explain the intentionally continued record")
 
 
 func _assert_compact_ledger_finish(ledger: Control) -> void:
-	_expect(ledger != null, "150% Ledger finish check has no ledger")
+	_expect(ledger != null, "compact Ledger finish check has no ledger")
 	if ledger == null:
 		return
 	var page_scroll: ScrollContainer = ledger.get("_page_scroll") as ScrollContainer
 	var close_button: Button = ledger.get("_close_button") as Button
 	var witness_stamp: Label = ledger.get("_witness_stamp_label") as Label
-	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "150% Ledger exposes a horizontal scrollbar")
-	_expect(page_scroll != null and page_scroll.get_v_scroll_bar().custom_minimum_size.x >= 12.0, "150% Ledger vertical scrollbar remains too cramped")
-	_expect(close_button != null and close_button.text == "CLOSE" and close_button.custom_minimum_size.x <= 128.0, "150% Ledger close action did not collapse to its compact header treatment")
-	_expect(witness_stamp != null and not witness_stamp.visible, "150% Ledger keeps the witness stamp jammed beside the close action")
+	_expect(page_scroll != null and page_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "compact Ledger exposes a horizontal scrollbar")
+	_expect(page_scroll != null and page_scroll.get_v_scroll_bar().custom_minimum_size.x >= 12.0, "compact Ledger vertical scrollbar remains too cramped")
+	_expect(close_button != null and close_button.text == "CLOSE" and close_button.custom_minimum_size.x <= 128.0, "compact Ledger close action did not collapse to its compact header treatment")
+	_expect(witness_stamp != null and not witness_stamp.visible, "compact Ledger keeps the witness stamp jammed beside the close action")
 
 
 func _assert_compact_shop_hover_safety(context: String) -> void:
@@ -1264,18 +1243,18 @@ func _assert_compact_result_contract() -> void:
 	var skip_button: Button = card.get_node_or_null("CardMargin/Content/ResultHoldRow/ResultSkipButton") as Button if card != null else null
 	var aftermath_stamp: Label = banner.get_node_or_null("BattleResultAftermath/AftermathStamp") as Label if banner != null else null
 	var rupture_field: Control = banner.get_node_or_null("BattleResultAftermath/AftermathRuptureField") as Control if banner != null else null
-	_expect(card != null and String(card.get_meta("responsive_result_layout", "")) == "compact_safe", "150% defeat did not select the compact result layout")
+	_expect(card != null and String(card.get_meta("responsive_result_layout", "")) == "compact_safe", "compact defeat did not select the compact result layout")
 	if card == null or skip_button == null:
-		_expect(false, "150% defeat is missing its card or skip control")
+		_expect(false, "compact defeat is missing its card or skip control")
 		return
 	var viewport_rect: Rect2 = get_viewport().get_visible_rect()
 	var card_rect: Rect2 = card.get_global_rect()
 	var skip_rect: Rect2 = skip_button.get_global_rect()
-	_expect(viewport_rect.encloses(card_rect), "150%% defeat frame exceeds the logical viewport: viewport=%s card=%s" % [str(viewport_rect), str(card_rect)])
-	_expect(card_rect.encloses(skip_rect), "150%% defeat skip control exceeds the lower frame: card=%s skip=%s" % [str(card_rect), str(skip_rect)])
-	_expect(skip_rect.end.y <= viewport_rect.end.y - 2.0, "150% defeat skip control is clipped by the lower viewport edge")
-	_expect(aftermath_stamp != null and not aftermath_stamp.visible and bool(aftermath_stamp.get_meta("compact_stamp_suppressed", false)), "150% defeat retained the colliding environmental stamp")
-	_expect(rupture_field != null and not rupture_field.visible and bool(rupture_field.get_meta("debug_splinters_suppressed", false)), "150% defeat retained straight procedural aftermath bars")
+	_expect(viewport_rect.encloses(card_rect), "compact%% defeat frame exceeds the logical viewport: viewport=%s card=%s" % [str(viewport_rect), str(card_rect)])
+	_expect(card_rect.encloses(skip_rect), "compact%% defeat skip control exceeds the lower frame: card=%s skip=%s" % [str(card_rect), str(skip_rect)])
+	_expect(skip_rect.end.y <= viewport_rect.end.y - 2.0, "compact defeat skip control is clipped by the lower viewport edge")
+	_expect(aftermath_stamp != null and not aftermath_stamp.visible and bool(aftermath_stamp.get_meta("compact_stamp_suppressed", false)), "compact defeat retained the colliding environmental stamp")
+	_expect(rupture_field != null and not rupture_field.visible and bool(rupture_field.get_meta("debug_splinters_suppressed", false)), "compact defeat retained straight procedural aftermath bars")
 
 func _build_visual_contract(state: String) -> Dictionary[String, Variant]:
 	var contract: Dictionary[String, Variant] = {"state": state}
@@ -1571,7 +1550,7 @@ func _write_manifest() -> void:
 	print("%s: MANIFEST %s" % [CAPTURE_NAME, _absolute_output_path(_manifest_path)])
 
 
-func _configure_window(size: Vector2i, reset_ui_scale: bool = true) -> void:
+func _configure_window(size: Vector2i) -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(size)
 	var window: Window = get_window()
@@ -1580,14 +1559,6 @@ func _configure_window(size: Vector2i, reset_ui_scale: bool = true) -> void:
 		window.size = size
 		window.content_scale_size = size
 		window.content_scale_factor = 1.0
-		if reset_ui_scale:
-			USER_SETTINGS_SCRIPT.set_ui_scale(1.0, window)
-
-
-func _configure_scaled_window(physical_size: Vector2i, ui_scale: float) -> void:
-	_configure_window(physical_size)
-	var window: Window = get_window()
-	USER_SETTINGS_SCRIPT.set_ui_scale(ui_scale, window)
 
 
 func _framebuffer_capture_available() -> bool:
@@ -1647,7 +1618,6 @@ func _cleanup() -> void:
 	Economy.reset_run()
 	ACCOUNT_PROFILE_STORE_SCRIPT.clear(_profile_path)
 	USER_SETTINGS_SCRIPT.set_reduced_motion(false)
-	USER_SETTINGS_SCRIPT.set_ui_scale(1.0, get_window())
 	USER_SETTINGS_SCRIPT.configure_storage_path(USER_SETTINGS_SCRIPT.DEFAULT_SETTINGS_PATH)
 	for path: String in [_settings_path, "%s.tmp" % _settings_path, "%s.bak" % _settings_path]:
 		if FileAccess.file_exists(path):

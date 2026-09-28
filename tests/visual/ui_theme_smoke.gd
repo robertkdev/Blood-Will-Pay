@@ -29,11 +29,6 @@ func _run() -> void:
 		window.content_scale_size = Vector2i(1920, 1080)
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	var scale_error: Error = UserSettingsScript.set_ui_scale(1.0, window)
-	if scale_error != OK:
-		push_error("UIThemeSmoke: could not isolate UI scale, error=%d" % int(scale_error))
-		get_tree().quit(1)
-		return
 	var view: Control = COMBAT_VIEW_SCENE.instantiate()
 	add_child(view)
 	await get_tree().process_frame
@@ -46,7 +41,7 @@ func _run() -> void:
 		await get_tree().process_frame
 	var rendered_viewport_size: Vector2 = view.get_viewport_rect().size
 	var compact_layout: bool = rendered_viewport_size.y <= 1080.0 or rendered_viewport_size.x <= 1400.0
-	var tight_layout: bool = bool(view.get_meta("tight_scale_layout", false))
+	var tight_layout: bool = bool(view.get_meta("tight_layout", false))
 	var failures: Array[String] = []
 	_expect(view.theme != null, "CombatView theme is missing", failures)
 	var stage_label: Label = view.get_node_or_null("MarginContainer/VBoxContainer/StageLabel") as Label
@@ -130,26 +125,22 @@ func _run() -> void:
 	_verify_forced_first_fight_bet_controls(view, failures)
 	await _verify_forced_first_fight_placeholder(failures)
 	await _verify_forced_first_fight_presenter_feedback(failures)
-	var player_tile: Button = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid/TileP_00") as Button
-	_expect(player_tile != null, "Player tile missing", failures)
-	if player_tile != null:
-		_expect(player_tile.has_theme_stylebox_override("disabled"), "Player tile disabled style missing", failures)
-		var player_style: StyleBoxFlat = player_tile.get_theme_stylebox("disabled") as StyleBoxFlat
-		_expect(player_style != null, "Player tiles should use the flat tactical board style", failures)
-		if player_style != null:
-			_expect(player_style.border_width_right >= 1 and player_style.border_color.a >= 0.55, "Player grid should retain weighted survival-line seams", failures)
-			var adjacent_player_tile: Button = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid/TileP_01") as Button
-			var adjacent_player_style: StyleBoxFlat = adjacent_player_tile.get_theme_stylebox("disabled") as StyleBoxFlat if adjacent_player_tile != null else null
-			_expect(adjacent_player_style != null and adjacent_player_style.border_width_top != player_style.border_width_top, "Planning cells should use irregular seam emphasis rather than a uniform developer grid", failures)
-	var enemy_tile: Button = view.get_node_or_null("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/EnemyGrid/TileE_00") as Button
-	_expect(enemy_tile != null, "Enemy tile missing", failures)
-	if enemy_tile != null:
-		var enemy_style: StyleBoxFlat = enemy_tile.get_theme_stylebox("disabled") as StyleBoxFlat
-		_expect(enemy_style != null, "Enemy tiles should use the flat tactical board style", failures)
-		if enemy_style != null:
-			_expect(enemy_style.border_width_right >= 1 and enemy_style.border_color.a >= 0.60, "Enemy grid should retain weighted hostile-line seams", failures)
-			var player_style_for_color: StyleBoxFlat = player_tile.get_theme_stylebox("disabled") as StyleBoxFlat if player_tile != null else null
-			_expect(player_style_for_color == null or enemy_style.border_color != player_style_for_color.border_color, "Player and enemy tile borders should carry distinct zone colors", failures)
+	var player_grid: GridContainer = view.get_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/BottomArea/PlayerGrid") as GridContainer
+	var enemy_grid: GridContainer = view.get_node("MarginContainer/VBoxContainer/BattleArea/ContentRow/BoardColumn/PlanningArea/TopArea/EnemyGrid") as GridContainer
+	for grid: GridContainer in [player_grid, enemy_grid]:
+		for child: Node in grid.get_children():
+			var tile: Button = child as Button
+			if tile == null:
+				continue
+			var style: StyleBoxTexture = tile.get_theme_stylebox("disabled") as StyleBoxTexture
+			_expect(style != null and style.texture != null, "Deployment cell is missing its visible boundary: " + tile.name, failures)
+			if style == null or style.texture == null:
+				continue
+			var edge_image: Image = style.texture.get_image()
+			var width: int = edge_image.get_width()
+			var height: int = edge_image.get_height()
+			for edge: Vector2i in [Vector2i(width / 2, 0), Vector2i(width / 2, height - 1), Vector2i(0, height / 2), Vector2i(width - 1, height / 2)]:
+				_expect(edge_image.get_pixelv(edge).a > 0.35, "Deployment cell has an invisible edge: " + tile.name, failures)
 	_verify_board_surfaces(view, failures)
 	await _verify_tactical_phase_switch(view, failures)
 	var stats_plate: Panel = view.get_node_or_null("GothicStatsAreaPlate") as Panel

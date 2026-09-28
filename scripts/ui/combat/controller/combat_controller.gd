@@ -1180,7 +1180,7 @@ func set_board_timer_text(text: String, active: bool = true) -> void:
 	board_timer_label.text = cleaned
 	board_timer_label.tooltip_text = "Planning countdown before auto-start." if cleaned.begins_with("Plan") else "Current combat phase."
 	if board_phase_label != null:
-		board_phase_label.text = "/// %s" % ("PLAN" if active else "FIGHT")
+		board_phase_label.text = "PLAN" if active else "FIGHT"
 
 func _current_board_cap() -> int:
 	var cap: int = 0
@@ -4137,7 +4137,7 @@ func _objective_uses_compact_form() -> bool:
 	if parent == null:
 		return false
 	var viewport_size: Vector2 = parent.get_viewport_rect().size
-	var tight_layout: bool = bool(parent.get_meta("tight_scale_layout", false))
+	var tight_layout: bool = bool(parent.get_meta("tight_layout", false))
 	return tight_layout or viewport_size.x <= 1100.0 or viewport_size.y <= 560.0
 
 func _update_environmental_pressure(delta: float) -> void:
@@ -4870,12 +4870,9 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	var top_reservation: float = 70.0 if compact_layout else 82.0
 	var horizontal_gutter: float = 32.0 if compact_layout else 72.0
 	var bottom_gutter: float = 18.0 if compact_layout else 28.0
-	var ui_scale: float = maxf(1.0, float(UserSettingsScript.get_ui_scale()))
-	var layout_scale_compensation: float = ui_scale if compact_layout else 1.0
-	ideal_size /= layout_scale_compensation
 	var maximum_size: Vector2 = Vector2(
-		maxf(320.0, (viewport_size.x - horizontal_gutter) / layout_scale_compensation),
-		maxf(230.0, (viewport_size.y - top_reservation - bottom_gutter) / layout_scale_compensation)
+		maxf(320.0, viewport_size.x - horizontal_gutter),
+		maxf(230.0, viewport_size.y - top_reservation - bottom_gutter)
 	)
 	card.custom_minimum_size = Vector2(min(ideal_size.x, maximum_size.x), min(ideal_size.y, maximum_size.y))
 	card.rotation = card_rotation
@@ -4883,7 +4880,6 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 	card.set_meta("responsive_result_layout", "compact_safe" if compact_layout else "authored_desktop")
 	card.set_meta("logical_viewport_size", viewport_size)
 	card.set_meta("logical_safe_maximum", maximum_size)
-	card.set_meta("ui_scale_compensation", layout_scale_compensation)
 	card.set_meta("compact_centered_stack", compact_layout)
 	_apply_result_content_layout(card, title, compact_layout)
 	if _result_banner != null and is_instance_valid(_result_banner):
@@ -4901,9 +4897,8 @@ func _apply_result_card_geometry(card: PanelContainer, title: String) -> void:
 			center.set_meta("outcome_composition", "fixed_center_over_finished_fight")
 
 func _result_uses_compact_layout(viewport_size: Vector2) -> bool:
-	var ui_scale: float = float(UserSettingsScript.get_ui_scale())
-	var tight_layout: bool = parent != null and bool(parent.get_meta("tight_scale_layout", false))
-	return tight_layout or viewport_size.x <= 1100.0 or viewport_size.y <= 560.0 or (ui_scale >= 1.45 and viewport_size.x <= 1366.0 and viewport_size.y <= 768.0)
+	var tight_layout: bool = parent != null and bool(parent.get_meta("tight_layout", false))
+	return tight_layout or viewport_size.x <= 1100.0 or viewport_size.y <= 560.0
 
 func _apply_result_content_layout(card: PanelContainer, title: String, compact_layout: bool) -> void:
 	var margin: MarginContainer = card.get_node_or_null("CardMargin") as MarginContainer

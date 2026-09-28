@@ -54,7 +54,6 @@ func _run() -> void:
 	window.size = Vector2i(1920, 1080)
 	window.content_scale_size = Vector2i(1920, 1080)
 	SETTINGS.initialize(window)
-	SETTINGS.set_ui_scale(1.0, window)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(ISOLATION_DIR))
 	_main = MAIN_SCENE.instantiate() as Control
 	_main.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -176,7 +175,6 @@ func _write_manifest() -> void:
 	report.store_string(JSON.stringify({
 		"ok": _failures.is_empty(),
 		"viewport": [1920, 1080],
-		"ui_scale": 1.0,
 		"layers": _records,
 		"failures": _failures,
 	}, "\t"))

@@ -161,9 +161,8 @@ func _apply_safe_gutter_layout() -> void:
     if _grid == null or not is_instance_valid(_grid) or not _grid.is_inside_tree():
         return
     var viewport_size: Vector2 = _grid.get_viewport_rect().size
-    var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
     var compact: bool = viewport_size.y <= 1080.0 or viewport_size.x <= 1400.0
-    var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0 or (ui_scale >= 1.25 and viewport_size.y <= 720.0)
+    var tight_compact: bool = viewport_size.y <= 520.0 or viewport_size.x <= 1100.0
     var card_height: float = ShopCard.presentation_height(viewport_size, tight_compact)
     var safe_gutter: float = 8.0 if compact else 16.0
     # When the composed planning dock owns the shop cells it also owns the cell

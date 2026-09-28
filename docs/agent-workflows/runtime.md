@@ -76,3 +76,12 @@ Output locations
 ### Troubleshooting
 - Not a valid Godot project: . � Use an absolute `projectPath` (e.g., `C:\Users\Flipm\Documents\blood-will-pay`) or discover via `list_projects`.
 - Scene parse errors � Ensure required scripts/resources parse under Godot 4.5; update dependencies or run the appropriate RGA probe scene to confirm.
+
+## One Fullscreen UI Size (no resizing)
+
+The game is authored for one fullscreen UI size. There is no interface-scale setting and no resize acceptance: do not add, restore, or test 100/125/150 percent UI scale, `content_scale_factor` as a user setting, a persisted `ui_scale`, scale-compensated frames, or per-scale layout tiers. `UserSettings` pins the content scale to `1.0`, and layout tiers key off the viewport alone.
+
+When validating a runtime change:
+- Run and judge the authored fullscreen composition (the shipping target is 1920x1080).
+- Do not build or re-run a scale matrix, and do not record a UI scale in a capture manifest as if it were a supported axis.
+- If a fullscreen layout reads poorly, fix the authored composition instead of making the UI resizable.

@@ -2,6 +2,13 @@
 
 Date: 2026-07-29
 
+Superseded interface-size policy: the 100/125/150 percent UI scale described
+below has been removed. The game is authored for one fullscreen UI size
+(`content_scale_factor` is pinned to `1.0`), and interface-scale settings,
+resize tiers, and scale acceptance are not to be reintroduced. The layout,
+material, and typography findings in this record are still the reference for the
+authored fullscreen composition.
+
 ## Direction
 
 The implemented visual split is deliberate:

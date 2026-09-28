@@ -16,7 +16,6 @@ func _run() -> void:
 		window.content_scale_size = VIEWPORT_SIZE
 	UserSettingsScript.configure_storage_path(TEST_SETTINGS_PATH)
 	UserSettingsScript.initialize(window)
-	UserSettingsScript.set_ui_scale(1.0, window)
 	UserSettingsScript.set_reduced_motion(false)
 	var main: Control = MAIN_SCENE.instantiate()
 	add_child(main)
@@ -116,9 +115,6 @@ func _run() -> void:
 		_expect(int(title_label.get_meta("wordmark_custom_treatment_revision", 0)) >= 2, "GameTitle should publish its custom cut-stencil treatment revision", failures)
 		var threat_signal: Label = title_menu.get_node_or_null("ImmediateThreatSignal") as Label
 		_expect(threat_signal != null and threat_signal.text.contains("CONTACT MOVING"), "Command menu should expose an immediate authored danger signal", failures)
-		var action_docket: Label = title_menu.get_node_or_null("Center/VBox/ActionDocket") as Label
-		_expect(action_docket != null and action_docket.visible and action_docket.text.contains("ENTER THE INTAKE"), "Desktop command rail should expose an authored active-order docket", failures)
-		_expect(action_docket != null and action_docket.get_theme_font_size("font_size") >= 19, "Command-rail action docket should use readable utility type", failures)
 		var hero: TextureRect = title_menu.get_node_or_null("TitleHero") as TextureRect
 		_expect(hero == null, "TitleHero should not render a background unit over the menu", failures)
 		var content_panel: PanelContainer = title_menu.get_node_or_null("ContentPanel") as PanelContainer
@@ -280,8 +276,6 @@ func _run() -> void:
 			if settings_pressed_style != null and settings_focus_style != null:
 				_expect(settings_pressed_style.border_color != settings_focus_style.border_color, "Settings active-page state should remain distinct from keyboard focus", failures)
 				_expect(settings_focus_style.border_color.b > settings_focus_style.border_color.r, "Settings keyboard focus should use the non-red signal-blue channel", failures)
-			var settings_docket: PanelContainer = title_menu.find_child("SettingsDocket", true, false) as PanelContainer
-			_expect(settings_docket == null, "Settings should omit the redundant active-page docket", failures)
 			_expect(content_panel != null and String(content_panel.get_meta("material_role", "")) == "machine_console_olive_steel", "Settings should use a machine-console material distinct from the field-order record", failures)
 			var volume_slider: HSlider = title_menu.find_child("MasterVolumeSlider", true, false) as HSlider
 			_expect(volume_slider != null, "Settings did not expose master volume slider", failures)
@@ -292,30 +286,19 @@ func _run() -> void:
 				_expect(String(volume_slider.get_meta("disabled_non_color_cue", "")) == "crossed_grabber_and_broken_track", "MasterVolumeSlider disabled state needs a non-color cue", failures)
 			var fullscreen_check: CheckBox = title_menu.find_child("FullscreenCheck", true, false) as CheckBox
 			var motion_check: CheckBox = title_menu.find_child("ReducedMotionCheck", true, false) as CheckBox
-			var ui_scale_option: OptionButton = title_menu.find_child("UIScaleOption", true, false) as OptionButton
 			var readability_setting: PanelContainer = title_menu.find_child("ReadabilitySetting", true, false) as PanelContainer
 			var readability_status: Label = title_menu.find_child("ReadabilityStatus", true, false) as Label
-			var scale_guidance: Label = title_menu.find_child("UIScaleGuidance", true, false) as Label
+			# The settings record must not carry an interface-scale control again.
+			var retired_scale_controls: Array[Node] = title_menu.find_children("UIScale*", "", true, false)
 			var accept_binding: Button = title_menu.find_child("Binding_ui_accept", true, false) as Button
 			var cancel_binding: Button = title_menu.find_child("Binding_ui_cancel", true, false) as Button
 			var reset_bindings: Button = title_menu.find_child("ResetBindingsButton", true, false) as Button
 			_expect(fullscreen_check != null, "FullscreenCheck missing", failures)
 			_expect(motion_check != null, "Settings should expose Reduced Motion", failures)
-			_expect(ui_scale_option != null and ui_scale_option.item_count == 3, "Settings should expose three supported UI scales", failures)
-			if ui_scale_option != null:
-				for option_state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
-					_expect_stylebox_flat(ui_scale_option, option_state, "UIScaleOption %s should use an authored selector state" % option_state, failures)
-				var option_pressed: StyleBoxFlat = ui_scale_option.get_theme_stylebox("pressed") as StyleBoxFlat
-				var option_focus: StyleBoxFlat = ui_scale_option.get_theme_stylebox("focus") as StyleBoxFlat
-				var option_disabled: StyleBoxFlat = ui_scale_option.get_theme_stylebox("disabled") as StyleBoxFlat
-				_expect(option_pressed != null and option_focus != null and option_pressed.border_color != option_focus.border_color, "UIScaleOption focus must remain distinct from pressed", failures)
-				_expect(option_focus != null and option_focus.border_color.b > option_focus.border_color.r, "UIScaleOption focus should use signal blue", failures)
-				_expect(option_disabled != null and option_disabled.border_width_left >= 10 and option_disabled.border_width_bottom >= 4, "UIScaleOption disabled state should use a blocked shape, not only dimming", failures)
-				_expect(String(ui_scale_option.get_meta("disabled_non_color_cue", "")) != "", "UIScaleOption should publish its disabled non-color cue", failures)
 			_expect(readability_setting != null, "Settings should expose a visible readability and contrast record", failures)
 			_expect(readability_status != null and readability_status.text.to_lower().contains("high contrast"), "Settings should state the enforced high-contrast default", failures)
 			_expect(readability_status != null and readability_status.get_theme_font_size("font_size") >= 19, "Readability status should remain functional-size copy", failures)
-			_expect(scale_guidance != null and not scale_guidance.text.contains("every supported scale"), "UI scale guidance should avoid an unbounded responsiveness claim", failures)
+			_expect(retired_scale_controls.is_empty(), "Settings should not expose any interface-scale control", failures)
 			_expect(accept_binding != null, "Settings should expose Confirm remapping", failures)
 			_expect(cancel_binding != null, "Settings should expose Menu / Back remapping", failures)
 			_expect(reset_bindings != null, "Settings should expose binding reset", failures)

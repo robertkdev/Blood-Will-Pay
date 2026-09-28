@@ -169,28 +169,11 @@ func _ready() -> void:
 			_expect(float(backdrop_stats.get("bright_fraction", 0.0)) >= 0.01, "Loss runtime top field did not expose enough visible paper/woodland aftermath", failures)
 			_expect(float(backdrop_stats.get("detail_energy", 0.0)) >= 0.004, "Loss runtime top field lacked visible woodland/paper texture detail", failures)
 	_expect(_save_capture("01_loss_overlay_default.png"), "default loss capture failed", failures)
-	var window: Window = get_window()
-	if window != null:
-		window.content_scale_factor = 1.5
-		window.content_scale_size = Vector2i(1280, 720)
-		window.size = Vector2i(1280, 720)
-	DisplayServer.window_set_size(Vector2i(1280, 720))
-	screen.call("_sync_layout")
-	await _settle_frames(5)
-	var compact_viewport: Rect2 = screen.get_viewport().get_visible_rect()
-	_expect(record_footer != null and not record_footer.visible and bool(record_footer.get_meta("compact_decorative_suppressed", false)), "Compact loss should intentionally suppress the decorative footer instead of colliding with recovery", failures)
-	_expect(forfeit_stamp != null and not forfeit_stamp.visible and bool(forfeit_stamp.get_meta("compact_decorative_suppressed", false)), "Compact loss should intentionally suppress the forest-claim stamp instead of placing it behind recovery", failures)
-	_expect(aftermath_caption != null and not aftermath_caption.visible and bool(aftermath_caption.get_meta("compact_decorative_suppressed", false)), "Compact loss retained its oversized off-card environmental caption", failures)
-	_expect(woodland_rupture != null and not woodland_rupture.visible and bool(woodland_rupture.get_meta("compact_decorative_suppressed", false)), "Compact loss retained off-card rupture fragments", failures)
-	_expect(pressure_layer != null and bool(pressure_layer.get_meta("compact_fragment_suppression", false)) and float(pressure_layer.get_meta("loss_pressure_density", 1.0)) <= 0.16, "Compact loss retained excessive red-pressure density", failures)
-	_expect(new_game_button != null and new_game_button.visible and _rect_inside(new_game_button.get_global_rect(), compact_viewport.grow(2.0)), "Compact START NEW RUN should retain independent visible bounds", failures)
-	_expect(frame_panel != null and new_game_button != null and _rect_inside(new_game_button.get_global_rect(), frame_panel.get_global_rect().grow(2.0)), "Compact START NEW RUN should remain contained by the casualty record", failures)
-	_expect(return_title_button != null and return_title_button.visible and _rect_inside(return_title_button.get_global_rect(), compact_viewport.grow(2.0)), "Compact RETURN TO TITLE should retain independent visible bounds", failures)
-	_expect(frame_panel != null and return_title_button != null and _rect_inside(return_title_button.get_global_rect(), frame_panel.get_global_rect().grow(2.0)), "Compact RETURN TO TITLE should remain contained by the casualty record", failures)
-	_expect(new_game_button != null and return_title_button != null and not new_game_button.get_global_rect().intersects(return_title_button.get_global_rect()), "Compact loss recovery actions should not collide", failures)
-	var compact_scoreboard_row: Control = scoreboard.find_child("ScoreboardRow", true, false) as Control if scoreboard != null else null
-	if compact_scoreboard_row != null:
-		compact_scoreboard_row.call("set_row_data", {
+	var fullscreen_scoreboard_row: Control = scoreboard.find_child("ScoreboardRow", true, false) as Control if scoreboard != null else null
+	if fullscreen_scoreboard_row != null:
+		# Keep the fixture value stable while measuring its rendered text.
+		scoreboard.set_process(false)
+		fullscreen_scoreboard_row.call("set_row_data", {
 			"team": "player",
 			"index": 0,
 			"display_name": "Axiom",
@@ -199,23 +182,15 @@ func _ready() -> void:
 			"metric": "damage",
 		})
 	await _settle_frames(2)
-	var compact_value_label: Label = scoreboard.find_child("Value", true, false) as Label if scoreboard != null else null
-	var compact_value_well: Panel = scoreboard.find_child("ValueWell", true, false) as Panel if scoreboard != null else null
-	_expect(compact_value_label != null and compact_value_label.text == "9143", "Compact loss must render an exact four-digit damage value", failures)
-	_expect(compact_value_well != null and compact_value_well.size.x >= 76.0, "Compact loss numeric well is too narrow for four digits", failures)
-	if compact_value_label != null:
-		var compact_value_font: Font = compact_value_label.get_theme_font("font")
-		var compact_value_font_size: int = compact_value_label.get_theme_font_size("font_size")
-		var compact_value_text_width: float = compact_value_font.get_string_size(compact_value_label.text, HORIZONTAL_ALIGNMENT_RIGHT, -1.0, compact_value_font_size).x if compact_value_font != null else compact_value_label.get_combined_minimum_size().x
-		_expect(compact_value_label.size.x >= compact_value_text_width + 2.0, "Compact loss numeric content width clips the four-digit value", failures)
-	_expect(_save_capture("02_loss_overlay_compact_1280x720_150.png"), "compact 150 percent loss capture failed", failures)
-	if window != null:
-		window.content_scale_factor = 1.0
-		window.content_scale_size = Vector2i(1920, 1080)
-		window.size = Vector2i(1920, 1080)
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
-	screen.call("_sync_layout")
-	await _settle_frames(5)
+	var fullscreen_value_label: Label = scoreboard.find_child("Value", true, false) as Label if scoreboard != null else null
+	var fullscreen_value_well: Panel = scoreboard.find_child("ValueWell", true, false) as Panel if scoreboard != null else null
+	_expect(fullscreen_value_label != null and fullscreen_value_label.text == "9.1k", "Fullscreen loss should render its abbreviated damage value", failures)
+	_expect(fullscreen_value_well != null and fullscreen_value_well.size.x >= 76.0, "Fullscreen loss numeric well is too narrow for its damage readout", failures)
+	if fullscreen_value_label != null:
+		var fullscreen_value_font: Font = fullscreen_value_label.get_theme_font("font")
+		var fullscreen_value_font_size: int = fullscreen_value_label.get_theme_font_size("font_size")
+		var fullscreen_value_text_width: float = fullscreen_value_font.get_string_size(fullscreen_value_label.text, HORIZONTAL_ALIGNMENT_RIGHT, -1.0, fullscreen_value_font_size).x if fullscreen_value_font != null else fullscreen_value_label.get_combined_minimum_size().x
+		_expect(fullscreen_value_label.size.x >= fullscreen_value_text_width + 2.0, "Fullscreen loss numeric content width clips the damage value", failures)
 	_expect(record_footer != null and record_footer.visible, "Default loss should restore the authored footer warning", failures)
 	_expect(forfeit_stamp != null and forfeit_stamp.visible, "Default loss should restore the forest-claim forfeiture stamp", failures)
 	_expect(record_footer != null and new_game_button != null and not record_footer.get_global_rect().intersects(new_game_button.get_global_rect()), "Default loss footer and START NEW RUN should retain independent bounds", failures)
@@ -243,7 +218,7 @@ func _ready() -> void:
 	_expect(int(Roster.first_empty_slot()) == 0, "New Game did not clear Roster bench", failures)
 	_expect(not is_instance_valid(layer), "New Game did not clear the overlay CanvasLayer", failures)
 	if _framebuffer_capture_available():
-		_expect(_capture_count == 4, "Expected four non-empty loss proof images, produced %d" % _capture_count, failures)
+		_expect(_capture_count == 3, "Expected three non-empty loss proof images, produced %d" % _capture_count, failures)
 
 	var exit_code: int = 0
 	if failures.is_empty():

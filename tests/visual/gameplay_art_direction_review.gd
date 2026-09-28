@@ -20,7 +20,6 @@ func _run() -> void:
 	get_window().size = Vector2i(1920, 1080)
 	get_window().content_scale_size = Vector2i(1920, 1080)
 	SETTINGS.initialize(get_window())
-	SETTINGS.set_ui_scale(1.0, get_window())
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(REVIEW_DIR))
 	_main = MAIN_SCENE.instantiate() as Control
 	get_tree().root.add_child(_main)
@@ -36,10 +35,7 @@ func _run() -> void:
 	_set_fixed_review_offers()
 	await _settle_frames(18)
 	print("GameplayArtDirectionReview: planning settled")
-	await _review_frame("01_sparse_100", "sparse", 1.0)
-	await _set_scale(1.5)
-	await _review_frame("02_sparse_150", "sparse", 1.5)
-	await _set_scale(1.0)
+	await _review_frame("01_sparse", "sparse")
 	var manager: CombatManager = _view.get("manager") as CombatManager
 	Shop.set_level(8)
 	Shop.call("_emit_all")
@@ -52,19 +48,14 @@ func _run() -> void:
 	controller.call("refresh_all_views")
 	controller.call("_set_continue_to_start_text")
 	await _settle_frames(18)
-	await _review_frame("03_populated_100", "populated", 1.0)
+	await _review_frame("03_populated", "populated")
 	await _verify_wager_input()
-	await _set_scale(1.25)
-	await _review_frame("03b_populated_125", "populated", 1.25)
-	await _set_scale(1.5)
-	await _review_frame("04_populated_150", "populated", 1.5)
-	await _set_scale(1.0)
 	var shop_grid: GridContainer = _view.get("shop_grid") as GridContainer
 	var first_card: ShopCard = shop_grid.get_child(0) as ShopCard
 	_capture_context = "05_shop_hover"
 	_expect(first_card != null, "Review shop has no first purchase target")
 	if first_card != null:
-		await _assert_layout_stability(1.0)
+		await _assert_layout_stability()
 		await _move_review_pointer(first_card.get_global_rect().get_center())
 		await _settle_frames(4)
 		var tooltip: Control = get_tree().root.find_child("ShopCardTooltip", true, false) as Control
@@ -72,7 +63,7 @@ func _run() -> void:
 		if tooltip != null:
 			_expect(_view.get_viewport_rect().grow(1.0).encloses(tooltip.get_global_rect()), "Shop tooltip extends beyond the viewport")
 			_expect(not tooltip.get_global_rect().intersects(shop_grid.get_global_rect()), "Shop tooltip overlaps purchase targets")
-		await _review_frame("05_shop_hover", "hover", 1.0)
+		await _review_frame("05_shop_hover", "hover")
 		await _move_review_pointer(Vector2(960.0, 12.0))
 		await _settle_frames(4)
 	var floor_surface: TextureRect = _view.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
@@ -87,7 +78,7 @@ func _run() -> void:
 	_expect((_view.get("all_in_button") as Button).disabled, "Countdown left All In looking actionable")
 	_expect(floor_surface.get_global_rect().position.distance_to(planning_floor_rect.position) <= 1.0, "Countdown moved the planning floor")
 	_expect(floor_surface.get_global_rect().size.distance_to(planning_floor_rect.size) <= 1.0, "Countdown resized the planning floor")
-	await _review_frame("05b_countdown", "countdown", 1.0)
+	await _review_frame("05b_countdown", "countdown")
 	var deadline: int = Time.get_ticks_msec() + 8000
 	while String(transition.call("get_state_name")) != "combat" and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
@@ -95,10 +86,10 @@ func _run() -> void:
 	_expect(live_combat and GameState.phase == GameState.GamePhase.COMBAT, "Start Battle did not enter live combat after countdown")
 	if live_combat:
 		await get_tree().create_timer(0.8).timeout
-		await _review_frame("06_combat_early", "combat", 1.0)
+		await _review_frame("06_combat_early", "combat")
 		var first_positions: Array = manager.get_player_positions().duplicate()
 		await get_tree().create_timer(0.8).timeout
-		await _review_frame("07_combat_active", "combat", 1.0)
+		await _review_frame("07_combat_active", "combat")
 		_expect(first_positions != manager.get_player_positions(), "Combat actors did not advance between captures")
 		_expect(floor_surface.texture == floor_texture, "Combat swapped out the planning floor")
 	_finish_review()
@@ -111,10 +102,13 @@ func _verify_wager_input() -> void:
 	var quote: Label = _view.get("wager_summary") as Label
 	var win_value: Label = _view.find_child("WagerWinRow", true, false).get_node("OutcomeLine/OutcomeValue") as Label
 	var loss_value: Label = _view.find_child("WagerLossRow", true, false).get_node("OutcomeLine/OutcomeValue") as Label
-	await _click_review_button(increment)
-	_expect(Economy.current_bet == 2, "Pointer increment did not set the authoritative wager")
-	await _click_review_button(decrement)
-	_expect(Economy.current_bet == 1 and decrement.disabled, "Pointer decrement failed or minimum remains actionable")
+	# Repeated fast reversals expose stale disabled states and layout races.
+	for attempt: int in range(4):
+		await _click_review_button(increment)
+		_expect(Economy.current_bet == 2, "Pointer increment did not set the authoritative wager")
+		await _click_review_button(decrement)
+		_expect(Economy.current_bet == 1 and decrement.disabled, "Pointer decrement failed or minimum remains actionable")
+
 	slider.grab_focus()
 	for down: bool in [true, false]:
 		var key: InputEventKey = InputEventKey.new()
@@ -128,14 +122,14 @@ func _verify_wager_input() -> void:
 	_expect(slider.has_focus(), "Keyboard evidence does not have slider focus")
 	_expect((slider.get_node("WagerKeyboardFocus") as Panel).is_visible_in_tree(), "Keyboard focus ring is hidden")
 	await _settle_frames(12)
-	await _review_frame("03c_wager_keyboard_focus", "populated", 1.0)
+	await _review_frame("03c_wager_keyboard_focus", "populated")
 	await _click_review_button(all_in)
 	_expect(Economy.current_bet == Economy.blood_buckets and increment.disabled, "All In did not set/contain the maximum wager")
 	var data: Dictionary = quote.get_meta("outcome_quotes", {}) as Dictionary
 	_expect(win_value.text == BloodBuckets.format_amount(int(data.get("after_win", -1))), "Visible win reserve is stale after All In")
 	_expect(loss_value.text == BloodBuckets.format_amount(0), "Visible loss reserve is stale after All In")
 	_expect(all_in.text == "ALL IN!", "All In has no armed label")
-	await _review_frame("03d_wager_all_in", "populated", 1.0)
+	await _review_frame("03d_wager_all_in", "populated")
 	# A real held pointer exercises the native pressed material.
 	var click: InputEventMouseButton = InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
@@ -145,7 +139,7 @@ func _verify_wager_input() -> void:
 	click.global_position = click.position
 	Input.parse_input_event(click)
 	Input.flush_buffered_events()
-	await _review_frame("03e_wager_pressed", "populated", 1.0)
+	await _review_frame("03e_wager_pressed", "populated")
 	click = click.duplicate() as InputEventMouseButton
 	click.pressed = false
 	click.button_mask = 0
@@ -183,6 +177,8 @@ func _move_review_pointer(position: Vector2) -> void:
 	await get_tree().process_frame
 
 func _click_review_button(button: Button) -> void:
+	var before_click: Rect2 = button.get_global_rect()
+	var was_disabled: bool = button.disabled
 	var received: Array[bool] = [false]
 	var witness: Callable = func() -> void: received[0] = true
 	button.pressed.connect(witness)
@@ -201,7 +197,7 @@ func _click_review_button(button: Button) -> void:
 	await _settle_frames(2)
 	if is_instance_valid(button) and button.pressed.is_connected(witness):
 		button.pressed.disconnect(witness)
-	_expect(received[0], "Composed primary action did not receive its pointer click")
+	_expect(received[0], "%s did not receive its pointer click (disabled=%s, before=%s, after=%s, wager=%d)" % [button.name, was_disabled, before_click, button.get_global_rect(), Economy.current_bet])
 
 func _units(ids: Array[String]) -> Array[Unit]:
 	var units: Array[Unit] = []
@@ -212,16 +208,10 @@ func _units(ids: Array[String]) -> Array[Unit]:
 			units.append(unit)
 	return units
 
-func _set_scale(value: float) -> void:
-	_expect(SETTINGS.set_ui_scale(value, get_window()) == OK, "Could not set review UI scale")
-	await _settle_frames(12)
-	_view.call("_apply_responsive_layout")
-	await _settle_frames(12)
-
-func _review_frame(capture_id: String, state: String, ui_scale: float) -> void:
+func _review_frame(capture_id: String, state: String) -> void:
 	_capture_context = capture_id
 	if state != "combat" and state != "countdown" and state != "hover":
-		await _assert_layout_stability(ui_scale)
+		await _assert_layout_stability()
 	await RenderingServer.frame_post_draw
 	var hover_tooltip: Control = get_tree().root.find_child("ShopCardTooltip", true, false) as Control
 	if state == "hover":
@@ -242,7 +232,7 @@ func _review_frame(capture_id: String, state: String, ui_scale: float) -> void:
 			if card == null:
 				continue
 			var art: TextureRect = card.get_node("Icon") as TextureRect
-			_expect(card.size.y >= (180.0 if ui_scale == 1.0 else 100.0), "Portrait card lost its allocated height")
+			_expect(card.size.y >= 180.0, "Portrait card lost its allocated height")
 			_expect(card.get_global_rect().encloses(art.get_global_rect()), "Portrait extends outside its purchase target")
 			_expect(card.get_theme_stylebox("normal") is StyleBoxTexture, "Shop card lost its material frame")
 		var commit: Button = _view.get("continue_button") as Button
@@ -260,7 +250,7 @@ func _review_frame(capture_id: String, state: String, ui_scale: float) -> void:
 			"Commit action material states are not distinct"
 		)
 		_expect(visible_bounds.encloses(commit.get_global_rect()), "Commit action extends beyond the viewport")
-		_expect(commit.size.y * ui_scale >= 96.0, "Commit action is still a thin toolbar control")
+		_expect(commit.size.y >= 96.0, "Commit action is still a thin toolbar control")
 		_expect(not commit.get_global_rect().intersects(grid.get_global_rect()), "Commit action overlaps shop cards")
 		var stats: Control = _view.get("stats_panel") as Control
 		_expect(visible_bounds.encloses(stats.get_global_rect()), "Team rail extends beyond the viewport")
@@ -271,11 +261,11 @@ func _review_frame(capture_id: String, state: String, ui_scale: float) -> void:
 		_expect(dock != null, "Composed lower dock was not created")
 		if dock != null:
 			_expect(String(dock.get_meta("dock_plan", "missing")) == "composed", "Composed dock rejected its live territory dimensions")
-		_assert_composed_bounds(ui_scale)
+		_assert_composed_bounds()
 	_captures.append({
 		"id": capture_id, "path": ProjectSettings.globalize_path(path),
 		"camera": "player", "layer": "final", "state": state,
-		"viewport": "1920x1080", "ui_scale": ui_scale, "event": capture_id,
+		"viewport": "1920x1080", "event": capture_id,
 		"layout": _layout_diagnostics(),
 		"unit_sampling": _sampling_diagnostics(),
 		"hover_tooltip": _control_diagnostics("shop_tooltip", hover_tooltip) if state == "hover" and hover_tooltip != null else {},
@@ -287,7 +277,7 @@ func _review_frame(capture_id: String, state: String, ui_scale: float) -> void:
 	_write_review_report(false)
 	print("GameplayArtDirectionReview: saved " + ProjectSettings.globalize_path(path))
 
-func _assert_layout_stability(ui_scale: float) -> void:
+func _assert_layout_stability() -> void:
 	var controls: Array[Control] = []
 	for property_name: String in ["stats_panel", "player_grid", "bench_grid", "shop_grid", "continue_button"]:
 		var control: Control = _view.get(property_name) as Control
@@ -300,31 +290,31 @@ func _assert_layout_stability(ui_scale: float) -> void:
 	await _settle_frames(24)
 	for index: int in range(controls.size()):
 		var after: Rect2 = controls[index].get_global_rect()
-		var position_drift: float = before[index].position.distance_to(after.position) * ui_scale
-		var size_drift: float = before[index].size.distance_to(after.size) * ui_scale
+		var position_drift: float = before[index].position.distance_to(after.position)
+		var size_drift: float = before[index].size.distance_to(after.size)
 		_expect(
 			position_drift <= 1.0 and size_drift <= 1.0,
 			"Repeated layout drifted %s: before %s after %s (position %.2f px, size %.2f px)"
 			% [str(controls[index].get_path()), str(before[index]), str(after), position_drift, size_drift]
 		)
 
-func _assert_composed_bounds(ui_scale: float) -> void:
+func _assert_composed_bounds() -> void:
 	var visible_bounds: Rect2 = _view.get_viewport_rect().grow(1.0)
 	var traits: Control = _view.find_child("TraitsPanel", true, false) as Control
 	var stats: Control = _view.get("stats_panel") as Control
 	_expect(traits != null and stats != null, "Support rails are missing")
 	if traits != null and stats != null:
-		var traits_width: float = traits.get_global_rect().size.x * ui_scale
-		var stats_width: float = stats.get_global_rect().size.x * ui_scale
+		var traits_width: float = traits.get_global_rect().size.x
+		var stats_width: float = stats.get_global_rect().size.x
 		_expect(absf(traits_width - stats_width) <= 3.0, "Support rails have unequal physical widths")
 		_expect(maxf(traits_width, stats_width) <= 330.0, "Support rail grew beyond its authored physical width")
 	var action_bay: Control = _view.find_child("StartBattlePlaque", true, false) as Control
 	_expect(action_bay != null, "Primary action bay is missing")
 	if action_bay != null:
-		_expect(action_bay.get_global_rect().size.x * ui_scale <= 350.0, "Primary action bay lost its close-fitting surround")
+		_expect(action_bay.get_global_rect().size.x <= 350.0, "Primary action bay lost its close-fitting surround")
 		_expect(visible_bounds.encloses(action_bay.get_global_rect()), "Primary action bay extends beyond the viewport")
 		if stats != null:
-			_expect(absf(action_bay.get_global_rect().end.x - stats.get_global_rect().end.x) * ui_scale <= 2.0, "Lower group right edge is not aligned with the team rail")
+			_expect(absf(action_bay.get_global_rect().end.x - stats.get_global_rect().end.x) <= 2.0, "Lower group right edge is not aligned with the team rail")
 	var board_column: Control = _view.find_child("BoardColumn", true, false) as Control
 	var floor_surface: Control = _view.find_child("GothicArenaSurface", true, false) as Control
 	_expect(board_column != null and floor_surface != null, "Board or floor is missing from composed planning")
@@ -345,7 +335,7 @@ func _assert_composed_bounds(ui_scale: float) -> void:
 		var bench_bounds: Rect2 = bench.get_global_rect()
 		var grid_bounds: Rect2 = player_grid.get_global_rect().grow(1.0)
 		_expect(bench_bounds.position.x >= grid_bounds.position.x and bench_bounds.end.x <= grid_bounds.end.x, "Bench slots extend beyond the board's horizontal span")
-		_expect(absf(bench_bounds.get_center().x - grid_bounds.get_center().x) * ui_scale <= 2.0, "Bench is not centered under the actual player grid")
+		_expect(absf(bench_bounds.get_center().x - grid_bounds.get_center().x) <= 2.0, "Bench is not centered under the actual player grid")
 	var storage: Control = _view.find_child("BottomStorageArea", true, false) as Control
 	var wager: Control = _view.find_child("WagerTerritory", true, false) as Control
 	var shop: Control = _view.get("shop_grid") as Control
@@ -405,7 +395,6 @@ func _sampling_diagnostics() -> Dictionary:
 			"texture_size": [texture_size.x, texture_size.y],
 			"draw_size_logical": [draw_size.x, draw_size.y],
 			"draw_size_canvas": [draw_size.x * texture_scale.x, draw_size.y * texture_scale.y],
-			"persisted_ui_scale": float(_view.get_meta("persisted_ui_scale", 1.0)),
 			"stretch_mode": art.stretch_mode, "filter": art.texture_filter,
 			"source_size": [source.get_width(), source.get_height()] if source != null else [],
 			"atlas_region": [atlas.region.position.x, atlas.region.position.y, atlas.region.size.x, atlas.region.size.y] if atlas != null else [],
@@ -494,7 +483,6 @@ func _expect(condition: bool, message: String) -> void:
 	super._expect(condition, _capture_context + ": " + message)
 
 func _finish_review() -> void:
-	SETTINGS.set_ui_scale(1.0, get_window())
 	_write_review_report(true)
 	for failure: String in _failures:
 		push_error("GameplayArtDirectionReview: " + failure)

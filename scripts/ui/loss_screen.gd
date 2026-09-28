@@ -797,13 +797,11 @@ func _sync_layout() -> void:
 	if frame_panel == null:
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
-	# A 150% UI scale leaves a desktop-sized logical viewport but substantially
-	# less physical reading room. The terminal record has several required
-	# recovery controls, so enter the compact reflow before its fixed desktop
-	# frame can push the headline or restart CTA beyond the framebuffer.
-	var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
-	var scaled_desktop_frame: bool = ui_scale >= 1.25 and (viewport_size.x <= 1440.0 or viewport_size.y <= 900.0)
-	var tight_compact: bool = viewport_size.x <= 1000.0 or viewport_size.y <= 520.0 or scaled_desktop_frame
+	# The terminal record has several required recovery controls, so a frame that
+	# is smaller than the authored desktop record enters the compact reflow before
+	# its fixed desktop layout can push the headline or restart CTA beyond the
+	# framebuffer. 1920x1080 keeps the desktop record.
+	var tight_compact: bool = viewport_size.x <= 1440.0 or viewport_size.y <= 900.0
 	var frame_width: float = maxf(640.0, viewport_size.x - 32.0) if tight_compact else clampf(viewport_size.x - 96.0, 900.0, 1120.0)
 	var frame_height: float = maxf(420.0, viewport_size.y - 24.0) if tight_compact else clampf(viewport_size.y - 96.0, 680.0, 780.0)
 	frame_panel.custom_minimum_size = Vector2(frame_width, frame_height)
@@ -914,9 +912,7 @@ func _reassert_loss_scoreboard_typography() -> void:
 	if scoreboard_holder == null or not is_instance_valid(scoreboard_holder):
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var ui_scale: float = clampf(UserSettingsScript.get_ui_scale(), UserSettingsScript.MIN_UI_SCALE, UserSettingsScript.MAX_UI_SCALE)
-	var scaled_desktop_frame: bool = ui_scale >= 1.25 and (viewport_size.x <= 1440.0 or viewport_size.y <= 900.0)
-	var tight_compact: bool = viewport_size.x <= 1000.0 or viewport_size.y <= 520.0 or scaled_desktop_frame
+	var tight_compact: bool = viewport_size.x <= 1440.0 or viewport_size.y <= 900.0
 	var scoreboard_title: Label = scoreboard_holder.get_node_or_null("Scoreboard/Header/Title") as Label
 	if scoreboard_title != null:
 		scoreboard_title.add_theme_font_size_override("font_size", 14 if tight_compact else 21)
