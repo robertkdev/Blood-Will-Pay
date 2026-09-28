@@ -8,6 +8,10 @@ var _capture_count: int = 0
 
 func _ready() -> void:
 	var failures: Array[String] = []
+	# Verify a fresh run independently of the player's earned Ledger bonuses.
+	var previous_profile_path: String = Economy.account_profile_path
+	Economy.account_profile_path = "user://loss_screen_smoke_%d.json" % Time.get_ticks_usec()
+	Economy.reset_run()
 	var initial_window: Window = get_window()
 	if initial_window != null:
 		initial_window.content_scale_factor = 1.0
@@ -150,6 +154,9 @@ func _ready() -> void:
 		_expect(row_frame != null and _is_hard_flat_panel(row_frame), "Loss scoreboard row should use severe flat chrome", failures)
 		_expect(value_well != null and _is_hard_flat_panel(value_well), "Loss scoreboard value well should use severe flat chrome", failures)
 		_expect(scoreboard_row != null and scoreboard_row.custom_minimum_size.y >= 90.0, "Loss damage visualization should be enlarged beyond a utility scoreboard row", failures)
+		if scoreboard_row != null:
+			var record_rect: Rect2 = (scoreboard as Control).get_global_rect()
+			_expect(scoreboard_row.is_visible_in_tree() and record_rect.grow(1.0).encloses(scoreboard_row.get_global_rect()), "Loss damage row is clipped by its record: record=%s row=%s" % [record_rect, scoreboard_row.get_global_rect()], failures)
 		_expect(scoreboard_row != null and scoreboard_row.tooltip_text.is_empty() and scoreboard_row.mouse_filter == Control.MOUSE_FILTER_IGNORE and bool(scoreboard_row.get_meta("terminal_record_tooltip_suppressed", false)), "Terminal loss scoreboard should suppress hover records that can cover recovery actions", failures)
 		_expect(portrait != null and portrait.custom_minimum_size.y >= 76.0, "Loss damage record should allocate a substantial identity marker", failures)
 		_expect(labels.has("Axiom"), "Loss scoreboard should show player row", failures)
@@ -221,6 +228,7 @@ func _ready() -> void:
 		_expect(_capture_count == 3, "Expected three non-empty loss proof images, produced %d" % _capture_count, failures)
 
 	var exit_code: int = 0
+	Economy.account_profile_path = previous_profile_path
 	if failures.is_empty():
 		print("LossScreenSmoke: OK")
 	else:

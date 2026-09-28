@@ -34,6 +34,7 @@ var norm_mode: int = ScoreboardModel.NormMode.TEAM_SHARE
 var expanded: bool = false
 var expand_enabled: bool = true
 var enemy_rows_enabled: bool = true
+var show_planning_empty_state: bool = false
 
 var refresh_interval: float = 0.3
 var _accum: float = 0.0
@@ -51,6 +52,7 @@ func _ready() -> void:
 		expand_button.pressed.connect(_on_toggle_expand)
 	_waiting_label = Label.new()
 	_waiting_label.name = "PlanningMetricsHint"
+	_waiting_label.visible = false
 	_waiting_label.text = "Metrics appear during battle"
 	_waiting_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_waiting_label.add_theme_font_size_override("font_size", 17)
@@ -150,7 +152,7 @@ func _rebuild_now() -> void:
 	if tracker == null:
 		return
 	_enforce_rail_containment()
-	var waiting: bool = tracker.manager != null and not bool(tracker.get("_active")) and tracker.get_team_total("player", StatsTracker.METRIC_TIME) <= 0.0
+	var waiting: bool = show_planning_empty_state and tracker.manager != null and not bool(tracker.get("_active")) and tracker.get_team_total("player", StatsTracker.METRIC_TIME) <= 0.0
 	if _waiting_label != null:
 		_waiting_label.visible = waiting
 	var body_scroll: Control = get_node_or_null("BodyScroll") as Control
