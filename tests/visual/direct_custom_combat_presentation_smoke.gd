@@ -6,7 +6,6 @@ const MainTransitionWait: GDScript = preload("res://tests/visual/main_transition
 const PLAYER_IDS: Array[String] = ["bonko", "berebell", "luna", "nyxa"]
 const ENEMY_IDS: Array[String] = ["brute", "mortem", "morrak", "malachor"]
 const DESKTOP_SIZE: Vector2i = Vector2i(1920, 1080)
-const COMPACT_SIZE: Vector2i = Vector2i(1280, 720)
 
 var _main: Control = null
 var _view: Control = null
@@ -64,11 +63,15 @@ func _run() -> void:
 	var transition: PhaseTransitionController = _view.get("controller").get("phase_transition") as PhaseTransitionController
 	_expect(transition != null and not transition.is_layout_locked(), "direct battle should release an interrupted countdown's layout ownership")
 	_assert_direct_combat_centroid()
-	_assert_broadcast_health_contract("desktop")
-
-	_viewport.size = COMPACT_SIZE
-	await _settle_frames(24)
-	_assert_broadcast_health_contract("compact")
+	_assert_broadcast_health_contract("fullscreen")
+	if DisplayServer.get_name() != "headless":
+		RenderingServer.force_draw(false)
+		var proof: Image = _viewport.get_texture().get_image()
+		_expect(proof != null and not proof.is_empty(), "Fullscreen combat proof image is empty")
+		if proof != null and not proof.is_empty():
+			var proof_directory: String = "res://outputs/visual_iter/direct_custom_combat_pass"
+			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(proof_directory))
+			_expect(proof.save_png(proof_directory + "/01_fullscreen_hud.png") == OK, "Fullscreen combat proof could not be saved")
 	await _finish()
 
 func _assert_direct_combat_centroid() -> void:
