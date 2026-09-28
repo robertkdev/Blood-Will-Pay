@@ -48,6 +48,21 @@ func _run() -> void:
 	controller.call("refresh_all_views")
 	controller.call("_set_continue_to_start_text")
 	await _settle_frames(18)
+	var placement: GridPlacement = controller.get("grid_placement") as GridPlacement
+	var previous_tile: int = placement.player_views[0].tile_idx
+	placement.call("_on_player_unit_dropped", 0, 23)
+	_expect(placement.player_views[0].tile_idx == 23, "Rear placement cell must remain usable regardless of the unit cap")
+	_expect(placement.player_grid_helper.occupant_at(23) == placement.player_views[0].view, "Rear placement did not move the actual unit view")
+	placement.call("_on_player_unit_dropped", 0, previous_tile)
+	var waiting: Label = _view.find_child("PlanningMetricsHint", true, false) as Label
+	_expect(waiting != null and waiting.is_visible_in_tree(), "Planning should explain why battle metrics are not yet available")
+	var scoreboard: Control = _view.find_child("Scoreboard", true, false) as Control
+	_expect(not (scoreboard.get_node("BodyScroll") as Control).is_visible_in_tree(), "Planning should not show a column of zero battle metrics")
+	_expect(String((_view.find_child("RerollButton", true, false) as Button).text).contains("Reroll"), "Shop reroll cost needs an action label")
+	_expect(String((_view.find_child("BuyXpButton", true, false) as Button).text).contains("XP"), "Shop XP cost needs an action label")
+	for row_name: String in ["WagerWinRow", "WagerLossRow"]:
+		var caption: Label = _view.find_child(row_name, true, false).get_node("OutcomeLine/OutcomeCaption") as Label
+		_expect(caption.text.begins_with("AFTER ") and not caption.text.contains("%"), "Outcome row must describe resulting reserve, without repeating probability")
 	await _review_frame("03_populated", "populated")
 	await _verify_wager_input()
 	var shop_grid: GridContainer = _view.get("shop_grid") as GridContainer
@@ -63,7 +78,38 @@ func _run() -> void:
 		if tooltip != null:
 			_expect(_view.get_viewport_rect().grow(1.0).encloses(tooltip.get_global_rect()), "Shop tooltip extends beyond the viewport")
 			_expect(not tooltip.get_global_rect().intersects(shop_grid.get_global_rect()), "Shop tooltip overlaps purchase targets")
+			var hover_copy: String = ""
+			for label_node: Node in tooltip.find_children("*", "Label", true, false):
+				hover_copy += (label_node as Label).text + " "
+			_expect(hover_copy.split(" ", false).size() <= 40, "Mortem purchase hover should be a short summary, not a full unit record")
+			for detail_heading: String in ["Goal:", "Approaches:", "Alt Goals:", "Attack:", "Targeting:"]:
+				_expect(not hover_copy.contains(detail_heading), "Detailed mechanics leaked back into purchase hover: " + detail_heading)
+			_expect(hover_copy.contains("third cast") and hover_copy.contains("heals"), "Mortem summary lost its defining third-cast payoff")
+			_expect(tooltip.size.y <= 220.0, "Purchase hover is still too tall for its information")
 		await _review_frame("05_shop_hover", "hover")
+		var reserve_before_inspect: int = Economy.blood_buckets
+		var inspect_event: InputEventMouseButton = InputEventMouseButton.new()
+		inspect_event.button_index = MOUSE_BUTTON_RIGHT
+		inspect_event.pressed = true
+		inspect_event.position = first_card.get_global_rect().get_center()
+		inspect_event.global_position = inspect_event.position
+		Input.parse_input_event(inspect_event)
+		Input.flush_buffered_events()
+		await _settle_frames(3)
+		var details: AcceptDialog = first_card.get_node_or_null("ShopUnitDetails") as AcceptDialog
+		_expect(details != null and details.visible, "Right-click did not open the full unit record")
+		_expect(Economy.blood_buckets == reserve_before_inspect, "Inspecting a shop offer must not buy it")
+		if details != null:
+			var record: RichTextLabel = details.get_node("UnitRecord") as RichTextLabel
+			for detail_heading: String in ["Goal:", "Approaches:", "Alt Goals:", "Attack:", "Attack Targeting:", "Ability:", "Ability Targeting:"]:
+				_expect(record.text.contains(detail_heading), "Full record lost " + detail_heading)
+			await _review_frame("05a_shop_details", "details")
+			details.get_ok_button().pressed.emit()
+			await _settle_frames(2)
+			_expect(not details.visible, "Closing the unit record did not return to the shop")
+		inspect_event.pressed = false
+		Input.parse_input_event(inspect_event)
+		Input.flush_buffered_events()
 		await _move_review_pointer(Vector2(960.0, 12.0))
 		await _settle_frames(4)
 	var floor_surface: TextureRect = _view.get_node("MarginContainer/VBoxContainer/BattleArea/ArenaContainer/GothicArenaSurface") as TextureRect
@@ -86,6 +132,14 @@ func _run() -> void:
 	_expect(live_combat and GameState.phase == GameState.GamePhase.COMBAT, "Start Battle did not enter live combat after countdown")
 	if live_combat:
 		await get_tree().create_timer(0.8).timeout
+		_expect(waiting == null or not waiting.visible, "Live combat failed to replace the metrics waiting state")
+		var metrics_button: Button = scoreboard.get_node("Header/ExpandButton") as Button
+		_expect(metrics_button.text == "Enemy", "Metrics navigation still uses an unexplained abbreviation")
+		scoreboard.call("set_expanded", true)
+		await _settle_frames(3)
+		var caption_width: float = metrics_button.get_theme_font("font").get_string_size(metrics_button.text, HORIZONTAL_ALIGNMENT_LEFT, -1, metrics_button.get_theme_font_size("font_size")).x
+		_expect(metrics_button.text == "Close enemy" and metrics_button.size.x >= caption_width, "Expanded enemy navigation clips its action label")
+		scoreboard.call("set_expanded", false)
 		await _review_frame("06_combat_early", "combat")
 		var first_positions: Array = manager.get_player_positions().duplicate()
 		await get_tree().create_timer(0.8).timeout

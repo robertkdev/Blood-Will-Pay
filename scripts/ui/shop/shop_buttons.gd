@@ -132,9 +132,7 @@ func set_progress(level: int, xp: int, xp_to_next: int) -> void:
 		_progress_label.text = "Lvl %d (%d/%d)" % [int(level), cur, need]
 
 func set_action_prices(reroll_price: int, progression_price: int, progression_mode: String, command_rank: int = 0) -> void:
-	# The icon carries the action, so the button only needs the number. The words live in the
-	# tooltip, which is where a player looks when the glyph is not enough.
-	_reroll_action_text = BloodBuckets.format_amount(max(0, int(reroll_price)), true)
+	_reroll_action_text = "Reroll · %s" % BloodBuckets.format_amount(max(0, int(reroll_price)), true)
 	_reroll_action_tooltip = "Reroll the shelf — %s" % BloodBuckets.describe(max(0, int(reroll_price)))
 	if _reroll != null:
 		if not _reroll_pending:
@@ -147,7 +145,7 @@ func set_action_prices(reroll_price: int, progression_price: int, progression_mo
 			if _progress_label != null:
 				_progress_label.text = "Command Rank %d" % max(0, int(command_rank))
 		else:
-			_buy_xp.text = progression_cost
+			_buy_xp.text = "XP · %s" % progression_cost
 		_buy_xp.tooltip_text = "Buy XP — %s" % BloodBuckets.describe(max(0, int(progression_price)))
 
 func set_progression_available(available: bool, progression_mode: String) -> void:

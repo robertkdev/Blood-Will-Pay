@@ -12,6 +12,7 @@ const VisualTypeSystem: GDScript = preload("res://scripts/ui/visual_type_system.
 const UnitArtPresentation: GDScript = preload("res://scripts/ui/unit_art_presentation.gd")
 const UserSettingsScript: GDScript = preload("res://scripts/game/settings/user_settings.gd")
 const BloodBuckets: GDScript = preload("res://scripts/game/economy/blood_buckets.gd")
+const ShopAbilitySummary: GDScript = preload("res://scripts/ui/shop/shop_ability_summary.gd")
 
 const COLOR_TEXT: Color = Color(0.91, 0.87, 0.78, 1.0)
 const COLOR_MUTED: Color = Color(0.66, 0.60, 0.52, 1.0)
@@ -73,6 +74,8 @@ var _tooltip_subtitle: String = ""
 var _tooltip_lines: Array[String] = []
 var _tooltip_detail_context: Dictionary = {}
 var _tooltip_details_built: bool = false
+var _package_detail_lines: Array[String] = []
+var _details_dialog: AcceptDialog = null
 var _status_tip: String = ""
 var _package_level: int = 1
 var _package_kind: String = "standard"
@@ -108,6 +111,7 @@ func _ready() -> void:
 	_wire_portrait_refresh()
 	_apply_static_style()
 	_wire_hover()
+	visibility_changed.connect(_on_card_visibility_changed)
 	if not is_connected("pressed", Callable(self, "_on_pressed")):
 		pressed.connect(_on_pressed)
 
@@ -192,6 +196,7 @@ func set_data(props: Dictionary) -> void:
 	# Unit preview construction is tooltip-only work. Do not do it while a reroll
 	# is binding every visible card; wait until the player asks for detail.
 	_tooltip_lines.clear()
+	_package_detail_lines.clear()
 	_tooltip_details_built = false
 	_tooltip_detail_context = {
 		"display_role": display_role,
@@ -611,16 +616,19 @@ func _ensure_tooltip_details() -> void:
 	if _tooltip_details_built:
 		return
 	_tooltip_details_built = true
-	var capital_lines: Array[String] = _tooltip_lines.duplicate()
-	_tooltip_lines = _build_tooltip_lines(
-		String(_tooltip_detail_context.get("display_role", "")),
-		String(_tooltip_detail_context.get("display_goal", "")),
-		_coerce_array(_tooltip_detail_context.get("approaches", [])),
-		_coerce_array(_tooltip_detail_context.get("alt_goals", [])),
-		_coerce_array(_tooltip_detail_context.get("traits", []))
-	)
-	for index: int in range(capital_lines.size() - 1, -1, -1):
-		_tooltip_lines.push_front(capital_lines[index])
+	_package_detail_lines = _tooltip_lines.duplicate()
+	_tooltip_lines.clear()
+	var traits: String = _format_list(_coerce_array(_tooltip_detail_context.get("traits", [])), 4)
+	var role: String = String(_tooltip_detail_context.get("display_role", ""))
+	if traits != "":
+		_tooltip_lines.append("Traits: " + traits)
+	if role != "":
+		_tooltip_lines.append("Role: " + role)
+	var unit: Unit = UnitFactory.spawn_at_level(offer_id, _package_level) if offer_id != "" else null
+	if unit != null:
+		var ability: AbilityDef = AbilityCatalog.get_def(String(unit.ability_id))
+		if ability != null:
+			_tooltip_lines.append(ShopAbilitySummary.copy_for(String(unit.ability_id), String(ability.name)))
 	set_meta("tooltip_detail_state", "resolved")
 
 func _format_attack_info(unit: Unit) -> String:
@@ -826,6 +834,12 @@ func _on_hover_exited() -> void:
 	_clear_tooltip()
 
 func _on_hover_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var click: InputEventMouseButton = event as InputEventMouseButton
+		if click.button_index == MOUSE_BUTTON_RIGHT and click.pressed:
+			accept_event()
+			_show_unit_details()
+			return
 	if event is InputEventMouseMotion and _tooltip != null and is_instance_valid(_tooltip):
 		var viewport: Viewport = get_viewport()
 		if viewport != null:
@@ -885,6 +899,8 @@ func _composed_dock_host() -> Control:
 
 func _show_tooltip() -> void:
 	_clear_tooltip()
+	if _details_dialog != null and is_instance_valid(_details_dialog) and _details_dialog.visible:
+		return
 	set_meta("tooltip_suppressed_for_compact", false)
 	if not is_inside_tree():
 		return
@@ -950,6 +966,7 @@ func _show_tooltip() -> void:
 	for line: String in lines:
 		var color: Color = Color(0.92, 0.76, 0.58, 1.0) if line == _status_tip and _status_tip != "" else COLOR_TEXT
 		_add_tooltip_label(box, line, 18, color)
+	_add_tooltip_label(box, "Right-click for unit details", 16, Color(0.84, 0.81, 0.75, 1.0))
 	var tooltip_layer: CanvasLayer = CanvasLayer.new()
 	tooltip_layer.name = "ShopCardTooltipLayer"
 	tooltip_layer.layer = 400
@@ -961,6 +978,61 @@ func _show_tooltip() -> void:
 	var viewport: Viewport = get_viewport()
 	if viewport != null:
 		_move_tooltip(viewport.get_mouse_position())
+
+func _show_unit_details() -> void:
+	_ensure_tooltip_details()
+	_clear_tooltip()
+	if _details_dialog != null and is_instance_valid(_details_dialog):
+		_details_dialog.popup_centered(Vector2i(580, 640))
+		return
+	var lines: Array[String] = [_tooltip_subtitle]
+	lines.append_array(_package_detail_lines)
+	lines.append_array(_build_tooltip_lines(
+		String(_tooltip_detail_context.get("display_role", "")),
+		String(_tooltip_detail_context.get("display_goal", "")),
+		_coerce_array(_tooltip_detail_context.get("approaches", [])),
+		_coerce_array(_tooltip_detail_context.get("alt_goals", [])),
+		_coerce_array(_tooltip_detail_context.get("traits", []))
+	))
+	_details_dialog = AcceptDialog.new()
+	_details_dialog.name = "ShopUnitDetails"
+	_details_dialog.title = _tooltip_title + " — Unit details"
+	_details_dialog.ok_button_text = "Close"
+	_details_dialog.min_size = Vector2i(580, 640)
+	_details_dialog.add_theme_stylebox_override("panel", _make_tooltip_style())
+	var border: StyleBoxFlat = _details_dialog.get_theme_stylebox("embedded_border").duplicate() as StyleBoxFlat
+	if border != null:
+		border.bg_color = COLOR_PANEL
+		border.border_color = COLOR_IRON
+		_details_dialog.add_theme_stylebox_override("embedded_border", border)
+	_details_dialog.add_theme_color_override("title_color", COLOR_GOLD)
+	var close_button: Button = _details_dialog.get_ok_button()
+	close_button.custom_minimum_size = Vector2(100.0, 38.0)
+	close_button.add_theme_font_size_override("font_size", 18)
+	VisualTypeSystem.set_utility(close_button)
+	for state: String in ["normal", "hover", "pressed", "disabled"]:
+		close_button.add_theme_stylebox_override(state, GothicUIAssets.quiet_iron_button_style(state))
+	var record: RichTextLabel = RichTextLabel.new()
+	record.name = "UnitRecord"
+	record.text = "\n\n".join(lines)
+	record.add_theme_font_size_override("normal_font_size", 18)
+	record.add_theme_color_override("default_color", COLOR_TEXT)
+	VisualTypeSystem.set_utility(record)
+	record.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	record.offset_left = 20.0
+	record.offset_top = 20.0
+	record.offset_right = -20.0
+	record.offset_bottom = -60.0
+	_details_dialog.add_child(record)
+	add_child(_details_dialog)
+	_details_dialog.popup_centered(Vector2i(580, 640))
+
+func _on_card_visibility_changed() -> void:
+	if is_visible_in_tree():
+		return
+	_clear_tooltip()
+	if _details_dialog != null and is_instance_valid(_details_dialog):
+		_details_dialog.hide()
 
 func _clear_global_tooltip_layers() -> void:
 	if not is_inside_tree():

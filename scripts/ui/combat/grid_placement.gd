@@ -185,6 +185,7 @@ func rebuild_enemy_views(enemy_team: Array) -> void:
 		summary.append(placement)
 	if not summary.is_empty():
 		Debug.log("Plan", "Enemy positions %s" % [Strings.join(summary, ", ")])
+	_refresh_deployment_cell_emphasis(enemy_tiles, enemy_grid_helper, false)
 
 func rebuild_player_views(player_team: Array, allow_drag: bool) -> void:
 	# Capture previous placements by Unit from existing views to preserve layout robustly
@@ -199,6 +200,7 @@ func rebuild_player_views(player_team: Array, allow_drag: bool) -> void:
 		if player_grid_helper:
 			player_grid_helper.clear()
 		_player_index_by_unit.clear()
+		_refresh_deployment_cell_emphasis(player_tiles, player_grid_helper, true)
 		return
 	if player_grid_helper:
 		player_grid_helper.clear()
@@ -251,6 +253,15 @@ func rebuild_player_views(player_team: Array, allow_drag: bool) -> void:
 		summary.append(placement)
 	if not summary.is_empty():
 		Debug.log("Plan", "Player positions %s" % [Strings.join(summary, ", ")])
+	_refresh_deployment_cell_emphasis(player_tiles, player_grid_helper, true)
+
+func _refresh_deployment_cell_emphasis(tiles: Array[Button], grid: BoardGrid, is_player: bool) -> void:
+	if grid == null:
+		return
+	for index: int in range(tiles.size()):
+		var tile: Button = tiles[index]
+		tile.set_meta("deployment_occupied", grid.is_occupied(index))
+		GothicUITheme._apply_tile(tile, is_player)
 
 func _on_player_unit_view_dropped(idx: int, view: UnitView) -> void:
 	if view == null:
@@ -297,4 +308,5 @@ func _on_player_unit_dropped(i: int, idx: int) -> void:
 		if player_grid_helper and ctrl:
 			player_grid_helper.attach(ctrl, idx)
 		player_views[i].tile_idx = idx
+	_refresh_deployment_cell_emphasis(player_tiles, player_grid_helper, true)
 	player_placements_changed.emit()

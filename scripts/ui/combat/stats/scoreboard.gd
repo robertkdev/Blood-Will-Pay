@@ -38,6 +38,7 @@ var enemy_rows_enabled: bool = true
 var refresh_interval: float = 0.3
 var _accum: float = 0.0
 var _authored_title: String = "Scoreboard"
+var _waiting_label: Label = null
 
 func _ready() -> void:
 	set_process(true)
@@ -48,6 +49,17 @@ func _ready() -> void:
 	$Header.add_child(header_inset)
 	if expand_button and not expand_button.is_connected("pressed", Callable(self, "_on_toggle_expand")):
 		expand_button.pressed.connect(_on_toggle_expand)
+	_waiting_label = Label.new()
+	_waiting_label.name = "PlanningMetricsHint"
+	_waiting_label.text = "Metrics appear during battle"
+	_waiting_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_waiting_label.add_theme_font_size_override("font_size", 17)
+	_waiting_label.add_theme_color_override("font_color", Color(0.88, 0.84, 0.77, 1.0))
+	add_child(_waiting_label)
+	_waiting_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_waiting_label.offset_top = 16.0
+	_waiting_label.offset_left = 12.0
+	_waiting_label.offset_right = -12.0
 	_build_overlay()
 	set_expanded(false)
 	# Ensure in-panel enemy column never forces layout
@@ -138,6 +150,15 @@ func _rebuild_now() -> void:
 	if tracker == null:
 		return
 	_enforce_rail_containment()
+	var waiting: bool = tracker.manager != null and not bool(tracker.get("_active")) and tracker.get_team_total("player", StatsTracker.METRIC_TIME) <= 0.0
+	if _waiting_label != null:
+		_waiting_label.visible = waiting
+	var body_scroll: Control = get_node_or_null("BodyScroll") as Control
+	if body_scroll != null:
+		body_scroll.visible = not waiting
+	if waiting:
+		set_expanded(false)
+		return
 	var data: Dictionary = model.build(metric, window, norm_mode)
 	_apply_rows(player_col, data.get("player_rows", []), float(data.get("player_total", 0.0)))
 	if not enemy_rows_enabled:
@@ -273,8 +294,7 @@ func _sync_expand_button() -> void:
 		return
 	expand_button.visible = expand_enabled and enemy_rows_enabled
 	expand_button.disabled = not expand_enabled or not enemy_rows_enabled
-	var compact_header: bool = _uses_compact_header()
-	expand_button.text = ("< YOU" if expanded else "FOE >") if compact_header else (">>" if expanded else "<<")
+	expand_button.text = "Close enemy" if expanded else "Enemy"
 	expand_button.tooltip_text = "Hide enemy ledger" if expanded else "Show enemy ledger"
 
 func _sync_responsive_header() -> void:
@@ -282,7 +302,7 @@ func _sync_responsive_header() -> void:
 	if header == null or title_label == null:
 		return
 	var compact_header: bool = _uses_compact_header()
-	header.visible = true
+	header.visible = _waiting_label == null or not _waiting_label.visible
 	title_label.clip_text = false
 	if not compact_header:
 		title_label.text = _authored_title
@@ -303,14 +323,14 @@ func _sync_responsive_header() -> void:
 		spacer.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	if expand_button != null:
 		expand_button.custom_minimum_size = Vector2(46.0 if tight_header else 54.0, 24.0)
-		expand_button.add_theme_font_size_override("font_size", 10 if tight_header else 12)
+		expand_button.add_theme_font_size_override("font_size", 16)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 10 if tight_header else 12)
+	title_label.add_theme_font_size_override("font_size", 16)
 	# A quiet separator reads as a metric identity; the old "//" scanned as
 	# technical identifier truncation.
-	title_label.text = "%s \u00b7 %s" % [_metric_header_label(), _window_header_label()]
+	title_label.text = _metric_header_label() if window == "ALL" else "%s · %s" % [_metric_header_label(), _window_header_label()]
 	title_label.tooltip_text = "Current metric: %s, window: %s" % [metric.capitalize(), window]
 	title_label.set_meta("compact_metric_identity", true)
 	header.set_meta("compact_navigation_visible", true)
@@ -344,14 +364,14 @@ func _enforce_rail_containment() -> void:
 		header.add_theme_constant_override("separation", 4 if dense else 8)
 	if expand_button != null:
 		expand_button.custom_minimum_size = Vector2(40.0 if dense else 46.0, 22.0 if dense else 24.0)
-		expand_button.clip_text = true
-		expand_button.add_theme_font_size_override("font_size", 10 if dense else 12)
+		expand_button.clip_text = false
+		expand_button.add_theme_font_size_override("font_size", 16)
 	if title_label != null:
 		title_label.clip_text = true
 		title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		title_label.custom_minimum_size = Vector2(0.0, 0.0)
 		if _uses_compact_header():
-			title_label.add_theme_font_size_override("font_size", 10 if dense else 12)
+			title_label.add_theme_font_size_override("font_size", 16)
 	var scroll: ScrollContainer = get_node_or_null("BodyScroll") as ScrollContainer
 	if scroll != null:
 		scroll.clip_contents = true
@@ -412,13 +432,13 @@ func _sync_row_pitch(scroll: ScrollContainer) -> void:
 func _metric_header_label() -> String:
 	match metric.to_lower():
 		"damage":
-			return "DMG"
+			return "Damage"
 		"dps":
 			return "DPS"
 		"casts":
-			return "CAST"
+			return "Casts"
 		"healing":
-			return "HEAL"
+			return "Healing"
 		_:
 			return metric.left(4).to_upper()
 

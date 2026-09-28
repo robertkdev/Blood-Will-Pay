@@ -1237,7 +1237,7 @@ static func _apply_label_node(label: Label) -> void:
 		# to be weak at. Size goes up, weight does not. The responsive pass owns the
 		# per-tier size from here and restates it for the compact tiers; this is the
 		# legible base it starts from.
-		_style_label_node(label, 22, Color(0.92, 0.84, 0.66, 1.0), true)
+		_style_label_node(label, 22, Color(0.94, 0.91, 0.83, 1.0), true)
 		VisualTypeSystem.set_gameplay_name(label)
 		var status_width: float = 132.0 if label.name != "WinOddsLabel" else 164.0
 		label.custom_minimum_size = Vector2(status_width, 30.0)
@@ -1317,6 +1317,8 @@ static func _apply_tile(button: Button, is_player: bool) -> void:
 	# Deployment targets need complete boundaries at rest. Editable vector art
 	# supplies the recessed edges; hover and focus remain native button states.
 	var normal_style: StyleBox = GothicUIAssets.deployment_cell_style(is_player)
+	if normal_style is StyleBoxTexture and not bool(button.get_meta("deployment_occupied", false)):
+		(normal_style as StyleBoxTexture).modulate_color.a = 0.20
 	if normal_style == null:
 		normal_style = _style(Color(0.02, 0.015, 0.012, 0.26), COLOR_GOLD if is_player else COLOR_BLOOD, 1, 0)
 	var hover_style: StyleBoxFlat = _hover_style(Color(0.12, 0.09, 0.04, 0.30), COLOR_GOLD_HOT, 2, 0)
